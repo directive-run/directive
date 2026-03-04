@@ -248,7 +248,7 @@ export function detectPromptInjection(
   if (text.length > MAX_INJECTION_INPUT_LENGTH) {
     throw new Error(
       `[Directive] Input exceeds maximum length of ${MAX_INJECTION_INPUT_LENGTH} characters for injection detection. ` +
-        `Truncate input or process in chunks.`,
+        "Truncate input or process in chunks.",
     );
   }
 

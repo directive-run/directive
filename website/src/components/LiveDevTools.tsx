@@ -239,13 +239,13 @@ export function DevToolsContent({ mode = "standalone" }: DevToolsContentProps) {
   // Tab badge counts — only show for tabs with data
   const tabBadges: Partial<Record<string, number>> = useMemo(() => {
     const badges: Partial<Record<string, number>> = {};
-    if (factCount > 0) badges["Facts"] = factCount;
-    if (derivationCount > 0) badges["Derivations"] = derivationCount;
+    if (factCount > 0) badges.Facts = factCount;
+    if (derivationCount > 0) badges.Derivations = derivationCount;
     const totalTimelineEvents = eventCount + traceEventCount;
-    if (totalTimelineEvents > 0) badges["Timeline"] = totalTimelineEvents;
+    if (totalTimelineEvents > 0) badges.Timeline = totalTimelineEvents;
     const totalBreakpointHits =
       factBreakpointHitCount + eventBreakpointHitCount;
-    if (totalBreakpointHits > 0) badges["Breakpoints"] = totalBreakpointHits;
+    if (totalBreakpointHits > 0) badges.Breakpoints = totalBreakpointHits;
 
     return badges;
   }, [

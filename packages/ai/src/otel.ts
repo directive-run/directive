@@ -946,7 +946,7 @@ export function createOtelPlugin(config: OtelPluginConfig): OtelPlugin {
         warnedExternalGetSpans = true;
         if (
           typeof process !== "undefined" &&
-          process.env?.["NODE_ENV"] !== "production"
+          process.env?.NODE_ENV !== "production"
         ) {
           console.warn(
             "[Directive OTEL] getSpans() returns [] when using an external tracer. " +

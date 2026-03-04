@@ -164,7 +164,7 @@ function calculateBackoffDelay(
   baseDelayMs: number,
   maxDelayMs: number,
 ): number {
-  const exponential = baseDelayMs * Math.pow(2, attempt - 1);
+  const exponential = baseDelayMs * 2 ** (attempt - 1);
   const jitter = Math.random() * baseDelayMs * 0.5;
   const delay = exponential + jitter;
 

@@ -714,7 +714,7 @@ export function createBatchedEmbedder(config: {
       if (embeddings.length !== batch.length) {
         throw new Error(
           `[Directive SemanticCache] embedBatch returned ${embeddings.length} embeddings for ${batch.length} texts. ` +
-            `The embedBatch function must return exactly one embedding per input text.`,
+            "The embedBatch function must return exactly one embedding per input text.",
         );
       }
 

@@ -196,7 +196,7 @@ export function createCheckersAI(): CheckersAI {
     serviceName: "checkers-ai",
     onError: (err) => {
       console.debug(
-        `[OTLP] export failed (collector not running?):`,
+        "[OTLP] export failed (collector not running?):",
         err.message,
       );
     },

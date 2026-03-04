@@ -46,8 +46,8 @@ export function GET() {
   lines.push("## Links");
   lines.push("");
   lines.push(`- [Homepage](${baseUrl})`);
-  lines.push(`- [GitHub](https://github.com/directive-run/directive)`);
-  lines.push(`- [npm](https://www.npmjs.com/package/directive)`);
+  lines.push("- [GitHub](https://github.com/directive-run/directive)");
+  lines.push("- [npm](https://www.npmjs.com/package/directive)");
   lines.push("");
 
   return new Response(lines.join("\n"), {

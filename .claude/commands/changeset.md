@@ -92,7 +92,13 @@ Write **one** `.changeset/<name>.md` file:
 "@directive-run/ai": patch
 ---
 
-Add snapshotEvents API for event-driven state snapshots. Simplify single-module system creation across all framework adapters.
+Add tasks system and harden resolver lifecycle.
+
+- Add `createTask` and `TaskModule` for structured async work
+- Fix resolver cancel/finally race condition causing orphaned statuses
+- Add circuit breaker pattern to multi-agent orchestrator
+- Improve debug timeline with resolver flamechart visualization
+- **BREAKING:** `ResolverContext.cancel()` now returns `Promise<void>`
 ```
 
 **How fixed groups work:**
@@ -104,10 +110,13 @@ Add snapshotEvents API for event-driven state snapshots. Simplify single-module 
 **Per-package changelogs:** Fixed groups share version numbers, but changelog entries only appear for packages explicitly listed in the changeset file. If an adapter (react, vue, etc.) has its own meaningful changes, list it explicitly alongside `core` so it gets its own changelog entry. Example: if `core` adds a new API and `react` adds a new hook, list both `@directive-run/core` and `@directive-run/react`. Packages with no changes of their own don't need listing &ndash; they'll still get the version bump from the group.
 
 **Summary rules:**
+- Write a **headline sentence** (imperative mood, what the release does)
+- Follow with a **bullet list** of individual changes
+- Group bullets by category when 5+: **Features**, **Fixes**, **Improvements**
+- Prefix breaking changes with `**BREAKING:**`
 - User-facing changelog text only (no internal jargon, no review references)
 - Focus on what npm consumers get: new APIs, fixed bugs, improved behavior
 - Use imperative mood: "Add X", "Fix Y", "Improve Z"
-- 1-3 sentences max
 
 ## Step 6: Confirm
 

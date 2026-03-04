@@ -1,5 +1,4 @@
 import { generateCursorRules } from "./cursor.js";
-import { getKnowledge } from "../lib/knowledge.js";
 
 /**
  * Generate GitHub Copilot instructions (~12KB).

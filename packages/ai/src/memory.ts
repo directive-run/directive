@@ -522,7 +522,7 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
         if (totalTokens > maxContextTokens) {
           console.warn(
             `[Directive Memory] Context messages (${totalTokens} tokens) exceed maxContextTokens (${maxContextTokens}). ` +
-              `Consider calling manage() or reducing message count.`,
+              "Consider calling manage() or reducing message count.",
           );
         }
       }

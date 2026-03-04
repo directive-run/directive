@@ -371,7 +371,7 @@ function minimax(
       }
     }
     return best;
-  } else {
+  }
     let best = Number.POSITIVE_INFINITY;
     for (const move of moves) {
       if (move.captured !== null) {
@@ -411,7 +411,6 @@ function minimax(
       }
     }
     return best;
-  }
 }
 
 /** Pick the best move for the AI player. Returns null if no moves available. */
