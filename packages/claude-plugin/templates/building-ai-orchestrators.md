@@ -5,7 +5,11 @@ description: "Create AI orchestration systems using createAgentOrchestrator (sin
 
 # Building AI Orchestrators
 
-# When Claude Should Use This Skill
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/ai`. If not found in `package.json`, suggest installing it: `npm install @directive-run/ai`.
+
+## When Claude Should Use This Skill
 
 ## Auto-Invoke Triggers
 - User asks to "build an AI agent", "create an orchestrator", "set up an LLM workflow"
@@ -21,7 +25,7 @@ description: "Create AI orchestration systems using createAgentOrchestrator (sin
 
 ---
 
-# Quick Reference
+## Quick Reference
 
 ## Decision Tree: Which Orchestrator?
 
@@ -322,7 +326,7 @@ constraints: {
 
 ---
 
-# Critical Anti-Patterns
+## Critical Anti-Patterns
 
 ## Using TypeScript types instead of t.*() in factsSchema
 
@@ -358,15 +362,8 @@ init: (facts) => {
 },
 ```
 
-## Using ctx instead of context
-
-```typescript
-// WRONG — violates project naming convention
-resolve: async (req, ctx) => { ... }
-
-// CORRECT
-resolve: async (req, context) => { ... }
-```
+### Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ## Single-line returns without braces
 
@@ -394,11 +391,11 @@ resolve: async (req, context) => {
 
 ---
 
-# Reference Files
+## Reference Files
 
-- `knowledge/ai-orchestrator.md` — Full createAgentOrchestrator API, options, lifecycle
-- `knowledge/ai-multi-agent.md` — createMultiAgentOrchestrator, coordinator pattern, agent communication
-- `knowledge/ai-tasks.md` — createTask API, task composition, input/output validation
+- `ai-orchestrator.md` — Full createAgentOrchestrator API, options, lifecycle
+- `ai-multi-agent.md` — createMultiAgentOrchestrator, coordinator pattern, agent communication
+- `ai-tasks.md` — createTask API, task composition, input/output validation
 - `examples/ai-orchestrator.ts` — Complete single-agent example
 - `examples/ai-checkpoint.ts` — Checkpoint/resume pattern
 - `examples/fraud-analysis.ts` — Multi-agent fraud detection example

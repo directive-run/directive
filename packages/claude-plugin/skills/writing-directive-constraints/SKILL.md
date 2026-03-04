@@ -5,6 +5,10 @@ description: "Write Directive constraints, resolvers, and error boundaries: when
 
 # Writing Directive Constraints
 
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
 ## When Claude Should Use This Skill
 
 **Auto-invoke when the user:**
@@ -441,15 +445,8 @@ resolve: async (req, context) => { return await fetchUser(req.userId); }
 resolve: async (req, context) => { context.facts.user = await fetchUser(req.userId); }
 ```
 
-### 6. Abbreviating context to ctx
-
-```typescript
-// WRONG
-resolve: async (req, ctx) => { ctx.facts.status = "done"; }
-
-// CORRECT
-resolve: async (req, context) => { context.facts.status = "done"; }
-```
+### 6. Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ### 7. No error handling on network resolvers
 

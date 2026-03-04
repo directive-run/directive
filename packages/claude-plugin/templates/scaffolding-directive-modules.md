@@ -5,22 +5,26 @@ description: "Generate Directive module scaffolds with schema, init, derivations
 
 # Scaffolding Directive Modules
 
-# When Claude Should Use This Skill
+## Prerequisites
 
-## Auto-Invoke Triggers
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
+## When Claude Should Use This Skill
+
+### Auto-Invoke Triggers
 - User asks to "scaffold a module" or "generate a module"
 - User describes a feature and wants boilerplate created
 - User asks for a "starter" or "template" for a Directive module
 - User wants to create a module with tests in one step
 
-## Exclusions — Use a Different Skill
+### Exclusions — Use a Different Skill
 - User wants to understand Directive concepts → `getting-started-with-directive`
 - User has existing code and wants patterns guidance → `writing-directive-modules`
 - User wants to review existing code → `reviewing-directive-code`
 
 ---
 
-# Module Scaffold Template
+## Module Scaffold Template
 
 ## Step 1: Identify the Domain
 

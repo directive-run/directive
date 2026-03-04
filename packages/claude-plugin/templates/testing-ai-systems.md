@@ -5,7 +5,11 @@ description: "Test AI orchestrators without real LLM API calls using createMockR
 
 # Testing AI Systems
 
-# When Claude Should Use This Skill
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/ai`. If not found in `package.json`, suggest installing it: `npm install @directive-run/ai`.
+
+## When Claude Should Use This Skill
 
 ## Auto-Invoke Triggers
 - User asks how to test agents or orchestrators without calling real APIs
@@ -22,7 +26,7 @@ description: "Test AI orchestrators without real LLM API calls using createMockR
 
 ---
 
-# Quick Reference
+## Quick Reference
 
 ## Decision Tree: Testing Approach
 
@@ -354,7 +358,7 @@ resolvers: {
 
 ---
 
-# Critical Anti-Patterns
+## Critical Anti-Patterns
 
 ## Using real API keys in CI tests
 
@@ -382,20 +386,13 @@ expect(result.facts.status).toBe("done");
 expect(result.facts.output).toBeTruthy();
 ```
 
-## Using ctx instead of context
-
-```typescript
-// WRONG
-resolve: async (req, ctx) => { ctx.facts.output = "..."; }
-
-// CORRECT
-resolve: async (req, context) => { context.facts.output = "..."; }
-```
+### Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ---
 
-# Reference Files
+## Reference Files
 
-- `knowledge/ai-testing-evals.md` — Full testing API, createMockRunner options, evaluation suite patterns
-- `knowledge/ai-debug-observability.md` — Tracing plugins, logging config, metrics collection, inspector API
-- `knowledge/ai-mcp-rag.md` — MCP transport options, tool provider interface, RAG retrieval config
+- `ai-testing-evals.md` — Full testing API, createMockRunner options, evaluation suite patterns
+- `ai-debug-observability.md` — Tracing plugins, logging config, metrics collection, inspector API
+- `ai-mcp-rag.md` — MCP transport options, tool provider interface, RAG retrieval config
