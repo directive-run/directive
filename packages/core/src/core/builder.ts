@@ -51,9 +51,15 @@ import type {
 // ============================================================================
 
 /**
- * Module builder interface - provides fluent API for building modules.
+ * Fluent builder interface for constructing {@link ModuleDef} instances step by step.
  *
- * @typeParam M - The module schema type (set after calling `.schema()`)
+ * Chain methods like `.schema()`, `.init()`, `.derive()`, `.events()`, and others
+ * to configure the module, then call `.build()` to produce the final definition.
+ * The builder validates that all schema-declared derivations and events have
+ * corresponding implementations before returning.
+ *
+ * @typeParam M - The module schema type, narrowed after calling `.schema()`.
+ * @public
  */
 export interface ModuleBuilder<M extends ModuleSchema = ModuleSchema> {
   /**
@@ -178,10 +184,47 @@ interface ResolverDef<M extends ModuleSchema> {
 // ============================================================================
 
 /**
- * Create a new module builder.
+ * Create a new module using the fluent builder pattern.
  *
- * @param id - The unique identifier for this module
- * @returns A module builder
+ * Returns a {@link ModuleBuilder} that lets you declaratively define a module's
+ * schema, initialization, derivations, events, effects, constraints, resolvers,
+ * and lifecycle hooks via method chaining. Call `.build()` at the end to produce
+ * the final {@link ModuleDef}.
+ *
+ * @remarks
+ * The builder validates at build time that every derivation and event declared
+ * in the schema has a corresponding implementation. Missing implementations
+ * cause a descriptive error.
+ *
+ * @param id - Unique identifier for this module, used for namespacing in multi-module systems.
+ * @returns A {@link ModuleBuilder} ready for configuration via method chaining.
+ *
+ * @example
+ * ```typescript
+ * import { module, t } from '@directive-run/core';
+ *
+ * const counter = module("counter")
+ *   .schema({
+ *     facts: { count: t.number() },
+ *     derivations: { doubled: t.number() },
+ *     events: { increment: {} },
+ *     requirements: {},
+ *   })
+ *   .init((facts) => {
+ *     facts.count = 0;
+ *   })
+ *   .derive({
+ *     doubled: (facts) => facts.count * 2,
+ *   })
+ *   .events({
+ *     increment: (facts) => {
+ *       facts.count += 1;
+ *     },
+ *   })
+ *   .build();
+ * ```
+ *
+ * @public
  */
 export function module(id: string): ModuleBuilder<ModuleSchema> {
   // Internal state for building the module

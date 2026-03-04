@@ -49,7 +49,7 @@
     "generate": "tsx scripts/generate-api-skeleton.ts",
     "extract-examples": "tsx scripts/extract-examples.ts",
     "validate": "tsx scripts/validate-knowledge.ts",
-    "test": "vitest run",
+    "test": "tsx scripts/validate-knowledge.ts && vitest run",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

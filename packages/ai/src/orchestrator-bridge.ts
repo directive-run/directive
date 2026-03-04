@@ -47,51 +47,61 @@ import {
 // Bridge Accessors
 // ============================================================================
 
+/** @internal Read the agent state from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getAgentState(facts: any): AgentState {
   return getBridgeFact<AgentState>(facts, AGENT_KEY);
 }
 
+/** @internal Write the agent state to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setAgentState(facts: any, state: AgentState): void {
   setBridgeFact(facts, AGENT_KEY, state);
 }
 
+/** @internal Read the approval state from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getApprovalState(facts: any): ApprovalState {
   return getBridgeFact<ApprovalState>(facts, APPROVAL_KEY);
 }
 
+/** @internal Write the approval state to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setApprovalState(facts: any, state: ApprovalState): void {
   setBridgeFact(facts, APPROVAL_KEY, state);
 }
 
+/** @internal Read the conversation messages from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getConversation(facts: any): Message[] {
   return getBridgeFact<Message[]>(facts, CONVERSATION_KEY);
 }
 
+/** @internal Write conversation messages to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setConversation(facts: any, messages: Message[]): void {
   setBridgeFact(facts, CONVERSATION_KEY, messages);
 }
 
+/** @internal Read the tool calls from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getToolCalls(facts: any): ToolCall[] {
   return getBridgeFact<ToolCall[]>(facts, TOOL_CALLS_KEY);
 }
 
+/** @internal Write tool calls to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setToolCalls(facts: any, toolCalls: ToolCall[]): void {
   setBridgeFact(facts, TOOL_CALLS_KEY, toolCalls);
 }
 
+/** @internal Read the health state map from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getHealthState(facts: any): Record<string, AgentHealthState> {
   return getBridgeFact<Record<string, AgentHealthState>>(facts, HEALTH_KEY);
 }
 
+/** @internal Write the health state map to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setHealthState(
   facts: any,
@@ -100,11 +110,13 @@ export function setHealthState(
   setBridgeFact(facts, HEALTH_KEY, state);
 }
 
+/** @internal Read the breakpoint state from bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getBreakpointState(facts: any): BreakpointState {
   return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
 }
 
+/** @internal Write the breakpoint state to bridge facts. */
 // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setBreakpointState(facts: any, state: BreakpointState): void {
   setBridgeFact(facts, BREAKPOINT_KEY, state);

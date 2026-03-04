@@ -224,7 +224,16 @@ function shallowEqual(a: unknown, b: unknown): boolean {
 // Checkpoint Utility Functions
 // ============================================================================
 
-/** Get the current step/round/iteration count from a pattern checkpoint state */
+/**
+ * Get the current step/round/iteration count from a pattern checkpoint state.
+ *
+ * Maps each pattern type to its natural progress counter: `step` for sequential
+ * and goal, `round` for supervisor and debate, `iteration` for reflect, and
+ * `completedCount` for DAG.
+ *
+ * @param state - The pattern checkpoint state to inspect.
+ * @returns The current progress count for the pattern.
+ */
 export function getPatternStep(state: PatternCheckpointState): number {
   switch (state.type) {
     case "sequential":
@@ -242,7 +251,16 @@ export function getPatternStep(state: PatternCheckpointState): number {
   }
 }
 
-/** Compute progress from a pattern checkpoint state */
+/**
+ * Compute progress metrics from a pattern checkpoint state.
+ *
+ * Returns percentage complete, steps completed/remaining, tokens consumed,
+ * and estimated tokens remaining (when computable). Each pattern type
+ * calculates these metrics from its own state structure.
+ *
+ * @param state - The pattern checkpoint state to analyze.
+ * @returns A {@link CheckpointProgress} object with completion metrics.
+ */
 export function getCheckpointProgress(
   state: PatternCheckpointState,
 ): CheckpointProgress {
@@ -397,7 +415,17 @@ function estimateGoalSteps(state: GoalCheckpointState): number | null {
   return Math.ceil(remaining / avgDelta);
 }
 
-/** Compute the diff between two checkpoint states */
+/**
+ * Compute the diff between two checkpoint states of the same pattern type.
+ *
+ * Returns the delta in steps, tokens, and time between checkpoints.
+ * Useful for understanding how much progress occurred between saves.
+ *
+ * @param a - The earlier checkpoint state.
+ * @param b - The later checkpoint state.
+ * @returns A {@link CheckpointDiff} with step, token, and time deltas.
+ * @throws If the two checkpoints have different pattern types.
+ */
 export function diffCheckpoints(
   a: PatternCheckpointState,
   b: PatternCheckpointState,
@@ -1388,7 +1416,10 @@ const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
  *
  * Each registered agent becomes a namespaced Directive module with reactive state,
  * constraint evaluation, guardrails, streaming, approval, memory, retry, budget,
- * hooks, and time-travel debugging — all features at parity with `createAgentOrchestrator`.
+ * hooks, and time-travel debugging -- all features at parity with {@link createAgentOrchestrator}.
+ *
+ * @param options - Orchestrator configuration including runner, agent registry, patterns, guardrails, and plugins.
+ * @returns A {@link MultiAgentOrchestrator} instance with `runAgent`, `runPattern`, `handoff`, and checkpoint APIs.
  *
  * @example
  * ```typescript
@@ -1420,8 +1451,9 @@ const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
  * }
  * ```
  *
- * @throws {Error} If a pattern references an agent that is not in the registry
- * @throws {Error} If autoApproveToolCalls is false but no onApprovalRequest callback is provided
+ * @throws If a pattern references an agent that is not in the registry
+ * @throws If autoApproveToolCalls is false but no onApprovalRequest callback is provided
+ * @public
  */
 export function createMultiAgentOrchestrator(
   options: MultiAgentOrchestratorOptions,
@@ -8619,17 +8651,18 @@ export function createMultiAgentOrchestrator(
 // ============================================================================
 
 /**
- * Create a parallel pattern configuration.
+ * Create a parallel execution pattern that runs handlers concurrently and merges results.
  *
- * @param handlers - Handler IDs (agents or tasks) to run concurrently
- * @param merge - Combine all handler results into a single output. Receives all successful RunResults (array may be shorter than handlers.length when minSuccess is set).
- * @param options - Optional `minSuccess` and `timeout` overrides
+ * @param handlers - Handler IDs (agents or tasks) to run concurrently.
+ * @param merge - Combine all handler results into a single output (array may be shorter than handlers when `minSuccess` is set).
+ * @param options - Optional `minSuccess` and `timeout` overrides.
+ * @returns A {@link ParallelPattern} configuration object.
  *
  * @example
  * ```typescript
  * const researchPattern = parallel(
  *   ['researcher', 'researcher', 'researcher'],
- *   (results) => results.map(r => r.output).join('\n')
+ *   (results) => results.map(r => r.output).join('\n'),
  * );
  * ```
  */
@@ -8647,16 +8680,17 @@ export function parallel<T>(
 }
 
 /**
- * Create a sequential pattern configuration.
+ * Create a sequential execution pattern that pipes output from one handler to the next.
  *
- * @param handlers - Handler IDs (agents or tasks) to run in order (output of each feeds into the next)
- * @param options - Optional `transform`, `extract`, `continueOnError`
+ * @param handlers - Handler IDs (agents or tasks) to run in order, where each handler's output feeds as input to the next.
+ * @param options - Optional `transform`, `extract`, and `continueOnError` overrides.
+ * @returns A {@link SequentialPattern} configuration object.
  *
  * @example
  * ```typescript
  * const writeReviewPattern = sequential(
  *   ['writer', 'reviewer'],
- *   { transform: (output) => `Review this: ${output}` }
+ *   { transform: (output) => `Review this: ${output}` },
  * );
  * ```
  */
@@ -8676,18 +8710,22 @@ export function sequential<T>(
 }
 
 /**
- * Create a supervisor pattern configuration.
+ * Create a supervisor pattern where a coordinating agent delegates work to a pool of workers.
  *
- * @param supervisorAgent - Agent ID that coordinates the workers
- * @param workers - Agent IDs for the worker pool
- * @param options - Optional `maxRounds` and `extract`
+ * The supervisor runs first, then dispatches tasks to workers based on its output.
+ * This repeats for up to `maxRounds` until the supervisor signals completion.
+ *
+ * @param supervisorAgent - Agent ID that coordinates the workers.
+ * @param workers - Agent IDs for the worker pool.
+ * @param options - Optional `maxRounds` and `extract` overrides.
+ * @returns A {@link SupervisorPattern} configuration object.
  *
  * @example
  * ```typescript
  * const managedPattern = supervisor(
  *   'manager',
  *   ['worker1', 'worker2'],
- *   { maxRounds: 3 }
+ *   { maxRounds: 3 },
  * );
  * ```
  */
@@ -8711,11 +8749,15 @@ export function supervisor<T>(
 }
 
 /**
- * Create a DAG execution pattern.
+ * Create a directed acyclic graph (DAG) execution pattern.
  *
- * @param nodes - Node definitions keyed by ID, each with `handler` and optional `deps`
- * @param merge - Combine DAG outputs into a single result (defaults to `context.outputs`)
- * @param options - Optional `timeout`, `maxConcurrent`, `onNodeError`
+ * Nodes run concurrently when their dependencies are satisfied. The runtime
+ * validates the graph is acyclic and that all dependency references are valid.
+ *
+ * @param nodes - Node definitions keyed by ID, each with a `handler` and optional `deps` array.
+ * @param merge - Combine DAG outputs into a single result (defaults to `context.outputs`).
+ * @param options - Optional `timeout`, `maxConcurrent`, and `onNodeError` strategy.
+ * @returns A {@link DagPattern} configuration object.
  *
  * @example
  * ```typescript
@@ -8755,11 +8797,16 @@ export function dag<T = Record<string, unknown>>(
 }
 
 /**
- * Create a reflect pattern configuration.
+ * Create a reflect pattern that iterates between a producer and evaluator until quality is met.
  *
- * @param handler - Producer handler ID (agent or task) that generates output
- * @param evaluator - Evaluator handler ID that judges quality
- * @param options - Optional iteration, parsing, signal, and threshold config
+ * The producer generates output, then the evaluator scores it. If the score
+ * is below the threshold, the producer retries with evaluator feedback,
+ * up to `maxIterations` times.
+ *
+ * @param handler - Producer handler ID (agent or task) that generates output.
+ * @param evaluator - Evaluator handler ID that judges quality and provides feedback.
+ * @param options - Optional iteration, parsing, signal, and threshold configuration.
+ * @returns A {@link ReflectPattern} configuration object.
  *
  * @example
  * ```typescript
@@ -8794,10 +8841,14 @@ export function reflect<T>(
 }
 
 /**
- * Create a race pattern configuration.
+ * Create a race pattern that runs handlers concurrently and returns the first successful result.
  *
- * @param handlers - Handler IDs (agents or tasks) to race concurrently
- * @param options - Optional `extract`, `timeout`, `minSuccess`, `signal`
+ * All handlers start simultaneously. The first to complete successfully wins;
+ * remaining handlers are aborted. Use `minSuccess` to wait for N results before picking.
+ *
+ * @param handlers - Handler IDs (agents or tasks) to race concurrently.
+ * @param options - Optional `extract`, `timeout`, `minSuccess`, and `signal` overrides.
+ * @returns A {@link RacePattern} configuration object.
  *
  * @example
  * ```typescript
@@ -8825,11 +8876,17 @@ export function race<T>(
 // ============================================================================
 
 /**
- * Create a goal execution pattern.
+ * Create a goal-driven execution pattern where agents are selected and run
+ * until a goal condition is satisfied.
  *
  * Declare what each agent produces and requires. The runtime automatically
  * infers the execution graph from dependency analysis and drives agents
- * to goal achievement.
+ * toward goal achievement, with optional satisfaction scoring and relaxation tiers.
+ *
+ * @param nodes - Goal node definitions keyed by ID, each declaring `produces`, `requires`, and a `handler`.
+ * @param when - Predicate that returns `true` when the goal is achieved.
+ * @param options - Optional `satisfaction`, `maxSteps`, `extract`, `timeout`, `selectionStrategy`, and `relaxation` config.
+ * @returns A {@link GoalPattern} configuration object.
  *
  * @example
  * ```typescript
@@ -8882,7 +8939,11 @@ export function goal<T = Record<string, unknown>>(
 }
 
 /**
- * Selection strategy: run all ready agents (default).
+ * Create a selection strategy that runs all ready agents concurrently.
+ *
+ * This is the default strategy for {@link goal} patterns.
+ *
+ * @returns An {@link AgentSelectionStrategy} that selects every ready agent.
  */
 export function allReadyStrategy(): AgentSelectionStrategy {
   return {
@@ -8891,9 +8952,12 @@ export function allReadyStrategy(): AgentSelectionStrategy {
 }
 
 /**
- * Selection strategy: pick agents with the highest historical impact.
+ * Create a selection strategy that picks agents with the highest historical impact.
  *
- * Sorts by average satisfaction delta (descending) and picks the top N.
+ * Sorts ready agents by average satisfaction delta (descending) and selects the top N.
+ *
+ * @param opts - Optional `topN` to limit how many agents are selected (default: 3).
+ * @returns An {@link AgentSelectionStrategy} that prioritizes high-impact agents.
  */
 export function highestImpactStrategy(opts?: {
   topN?: number;
@@ -8915,7 +8979,11 @@ export function highestImpactStrategy(opts?: {
 }
 
 /**
- * Selection strategy: prefer agents that consume fewer tokens per satisfaction delta.
+ * Create a selection strategy that prefers agents with lower token cost per satisfaction delta.
+ *
+ * Agents without historical metrics are prioritized first (to gather data).
+ *
+ * @returns An {@link AgentSelectionStrategy} that optimizes for cost efficiency.
  */
 export function costEfficientStrategy(): AgentSelectionStrategy {
   return {
@@ -9027,7 +9095,13 @@ function validateDagAcyclic(
 // ============================================================================
 
 /**
- * Create an agent selection constraint.
+ * Create a constraint that routes to a specific agent when a condition is met.
+ *
+ * @param when - Predicate that triggers the constraint (may be async).
+ * @param agent - Agent ID or function returning an agent ID to route to.
+ * @param input - Input string or function returning the input for the selected agent.
+ * @param priority - Optional constraint priority (higher = evaluated first).
+ * @returns An {@link OrchestratorConstraint} that emits a `RUN_AGENT` requirement.
  *
  * @example
  * ```typescript
@@ -9035,7 +9109,7 @@ function validateDagAcyclic(
  *   routeToExpert: selectAgent(
  *     (facts) => facts.complexity > 0.8,
  *     'expert',
- *     (facts) => facts.query
+ *     (facts) => facts.query,
  *   ),
  * };
  * ```
@@ -9065,7 +9139,12 @@ export function selectAgent(
 }
 
 /**
- * Create a RUN_AGENT requirement.
+ * Create a `RUN_AGENT` requirement object for use in constraint `require()` functions.
+ *
+ * @param agent - The agent ID to run.
+ * @param input - The input string for the agent.
+ * @param context - Optional additional context passed to the agent runner.
+ * @returns A `RUN_AGENT` {@link RunAgentRequirement} object.
  *
  * @example
  * ```typescript
@@ -9095,7 +9174,11 @@ export function runAgentRequirement(
 // ============================================================================
 
 /**
- * Merge results by concatenating outputs.
+ * Merge run results by concatenating their outputs into a single string.
+ *
+ * @param results - Array of run results to concatenate.
+ * @param separator - String inserted between outputs (default: `"\n\n"`).
+ * @returns The concatenated output string.
  */
 export function concatResults(
   results: RunResult<unknown>[],
@@ -9109,7 +9192,12 @@ export function concatResults(
 }
 
 /**
- * Merge results by picking the best one based on a scoring function.
+ * Pick the highest-scoring result from an array using a scoring function.
+ *
+ * @param results - Array of run results to compare.
+ * @param score - Function that assigns a numeric score to each result (higher wins).
+ * @returns The {@link RunResult} with the highest score.
+ * @throws If the results array is empty.
  */
 export function pickBestResult<T>(
   results: RunResult<T>[],
@@ -9125,14 +9213,20 @@ export function pickBestResult<T>(
 }
 
 /**
- * Merge results into an array of outputs.
+ * Extract the `output` value from each run result into an array.
+ *
+ * @param results - Array of run results to collect from.
+ * @returns An array of output values in the same order as the input results.
  */
 export function collectOutputs<T>(results: RunResult<T>[]): T[] {
   return results.map((r) => r.output);
 }
 
 /**
- * Aggregate token counts from results.
+ * Sum the total token counts from an array of run results.
+ *
+ * @param results - Array of run results to aggregate.
+ * @returns The total number of tokens consumed across all results.
  */
 export function aggregateTokens(results: RunResult<unknown>[]): number {
   return results.reduce((sum, r) => sum + r.totalTokens, 0);
@@ -9143,14 +9237,17 @@ export function aggregateTokens(results: RunResult<unknown>[]): number {
 // ============================================================================
 
 /**
- * Compose multiple patterns into a pipeline where each pattern's
- * output feeds as input to the next. Returns an async function
- * that runs the pipeline on a given orchestrator.
+ * Compose multiple execution patterns into a pipeline where each pattern's
+ * output feeds as input to the next.
  *
+ * @remarks
  * Between patterns, output is converted to a string input:
  * - `string` output passes through directly
  * - Objects are JSON-stringified
  * - Optionally provide a `transform` to customize between steps
+ *
+ * @param patterns - One or more execution patterns to chain together.
+ * @returns An async function that runs the pipeline on a given orchestrator.
  *
  * @example
  * ```typescript
@@ -9482,10 +9579,11 @@ export function composePatterns(
 }
 
 /**
- * Create a capability-based agent selector.
+ * Find agents in a registry that match all required capabilities.
  *
- * Given a registry and required capabilities, returns the agent IDs
- * that match all required capabilities.
+ * @param registry - The agent registry to search.
+ * @param requiredCapabilities - Capabilities that each matching agent must have.
+ * @returns An array of agent IDs whose `capabilities` include every required capability.
  *
  * @example
  * ```typescript
@@ -9497,9 +9595,6 @@ export function composePatterns(
  *
  * const matches = findAgentsByCapability(agents, ['search']);
  * // Returns ['researcher']
- *
- * const matches2 = findAgentsByCapability(agents, ['write', 'edit']);
- * // Returns ['writer']
  * ```
  */
 export function findAgentsByCapability(
@@ -9516,7 +9611,16 @@ export function findAgentsByCapability(
 }
 
 /**
- * Create a constraint that auto-routes to an agent based on capabilities.
+ * Create a constraint that auto-routes to an agent based on required capabilities.
+ *
+ * When the condition fires, it finds agents matching the capabilities returned by
+ * `getCapabilities`, then emits a `RUN_AGENT` requirement for the best match.
+ *
+ * @param registry - The agent registry to search for matching capabilities.
+ * @param getCapabilities - Function that extracts required capabilities from facts.
+ * @param getInput - Function that extracts the input string from facts.
+ * @param options - Optional `priority` and custom `select` function.
+ * @returns An {@link OrchestratorConstraint} that routes to a capability-matched agent.
  *
  * @example
  * ```typescript
@@ -9594,10 +9698,13 @@ export interface SpawnOnConditionOptions {
 }
 
 /**
- * Create a constraint that auto-runs an agent when a condition is met.
+ * Create a constraint that auto-runs a single agent when a condition is met.
  *
- * The orchestrator's built-in RUN_AGENT resolver handles execution —
+ * The orchestrator's built-in `RUN_AGENT` resolver handles execution --
  * you only need to add this to your `constraints` config.
+ *
+ * @param config - Condition, agent ID, input builder, and optional priority/context.
+ * @returns An {@link OrchestratorConstraint} that emits a `RUN_AGENT` requirement.
  *
  * @example
  * ```typescript
@@ -9656,13 +9763,15 @@ export type DebateConfig<T = unknown> = Omit<DebatePattern<T>, "type">;
 /**
  * Create a debate pattern where agents compete and an evaluator picks the best.
  *
+ * @remarks
  * Flow:
  * 1. All agents produce proposals in parallel
  * 2. Evaluator receives all proposals and picks a winner
  * 3. Optionally repeat with evaluator feedback for refinement
  *
- * @param config - Debate configuration with `handlers`, `evaluator`, and optional settings
- * @see runDebate for the imperative API
+ * @param config - Debate configuration with `handlers`, `evaluator`, and optional settings.
+ * @returns A {@link DebatePattern} configuration object.
+ * @see {@link runDebate} for the imperative API
  *
  * @example
  * ```typescript
@@ -9717,15 +9826,16 @@ export function debate<T = unknown>(config: DebateConfig<T>): DebatePattern<T> {
 }
 
 /**
- * Run a debate imperatively on an orchestrator (no pattern registration needed).
+ * Run a debate imperatively on an orchestrator without pattern registration.
+ *
  * Delegates to `orchestrator.runDebate()` so that lifecycle hooks, debug timeline,
  * and signal propagation all work correctly.
  *
- * @param orchestrator - The multi-agent orchestrator instance
- * @param config - Debate configuration with agents, evaluator, and optional settings
- * @param input - The initial input/prompt for the debate
- * @see debate for the declarative pattern API
- * @returns The winning agent's output, the winner ID, and all proposals from each round
+ * @param orchestrator - The multi-agent orchestrator instance to run the debate on.
+ * @param config - Debate configuration with agents, evaluator, and optional settings.
+ * @param input - The initial input/prompt for the debate.
+ * @returns The winning agent's output, the winner ID, and all proposals from each round.
+ * @see {@link debate} for the declarative pattern API
  */
 export async function runDebate<T>(
   orchestrator: MultiAgentOrchestrator,
@@ -9748,8 +9858,14 @@ export async function runDebate<T>(
 /**
  * Create a constraint that fires when a cross-agent derivation meets a condition.
  *
+ * @remarks
  * Wire this into the orchestrator's `derive` config and `constraints` config together.
  * The constraint's `when()` reads the derivation value from the orchestrator's derived snapshot.
+ *
+ * @param derivationId - The ID of the cross-agent derivation to watch.
+ * @param condition - Predicate that receives the derivation value and returns `true` when the constraint should fire.
+ * @param action - Agent ID, input builder, and optional priority/context for the emitted requirement.
+ * @returns An {@link OrchestratorConstraint} that emits a `RUN_AGENT` requirement when the derivation condition is met.
  *
  * @example
  * ```typescript
@@ -9833,11 +9949,15 @@ export interface SpawnPoolConfig {
 /**
  * Create a constraint that spawns a pool of agent instances when a condition is met.
  *
- * Unlike `spawnOnCondition` (which spawns one agent), `spawnPool` can target N agents.
- * However, only **one requirement is emitted per constraint evaluation cycle** — the constraint
+ * @remarks
+ * Unlike {@link spawnOnCondition} (which spawns one agent), `spawnPool` can target N agents.
+ * However, only one requirement is emitted per constraint evaluation cycle -- the constraint
  * re-fires on subsequent cycles as long as `when()` returns true, spawning one agent per cycle.
  *
- * @see spawnOnCondition — for spawning a single agent
+ * @param when - Predicate that triggers the pool spawn.
+ * @param config - Pool configuration with agent ID, input builder, count, and optional priority/context.
+ * @returns An {@link OrchestratorConstraint} that emits `RUN_AGENT` requirements.
+ * @see {@link spawnOnCondition} for spawning a single agent
  *
  * @example
  * ```typescript
@@ -9950,19 +10070,23 @@ export interface SerializedGoalNode {
 /**
  * Serialize an execution pattern to a JSON-safe object.
  *
+ * @remarks
  * Strips all function callbacks and runtime objects (AbortSignal) while
- * preserving the topology — which agents, in what structure, with what
+ * preserving the topology -- which agents, in what structure, with what
  * numeric/string/boolean options.
  *
  * Use this for visual editors, LLM-generated plans, persistence, or
  * debugging. Restore with {@link patternFromJSON}.
  *
- * Note: Function-form `threshold` on reflect patterns is not serializable and will be dropped.
+ * Function-form `threshold` on reflect patterns is not serializable and will be dropped.
  * Re-supply it via `overrides` when calling {@link patternFromJSON}.
+ *
+ * @param pattern - The execution pattern to serialize.
+ * @returns A {@link SerializedPattern} safe for `JSON.stringify`.
  *
  * @example
  * ```typescript
- * const p = parallel({ handlers: ["a", "b"], merge: (r) => r });
+ * const p = parallel(['a', 'b'], (r) => r);
  * const json = patternToJSON(p);
  * // { type: "parallel", handlers: ["a", "b"] }
  * localStorage.setItem("plan", JSON.stringify(json));
@@ -10071,11 +10195,18 @@ const ALLOWED_PATTERN_TYPES = new Set([
 ]);
 
 /**
- * Restore an execution pattern from its serialized form.
+ * Restore an execution pattern from its serialized JSON form.
  *
+ * @remarks
  * Returns the data structure with all function fields set to `undefined`.
  * Supply callbacks via the optional `overrides` parameter to re-attach
- * runtime behavior.
+ * runtime behavior. Handles legacy field migrations (`agent` to `handler`,
+ * `agents` to `handlers`, `converge` to `goal`).
+ *
+ * @param json - The serialized pattern from {@link patternToJSON} or persisted storage.
+ * @param overrides - Optional partial pattern to re-attach function callbacks (e.g. `merge`, `extract`).
+ * @returns A fully typed {@link ExecutionPattern} ready for use with the imperative API.
+ * @throws If the pattern type is invalid or unknown.
  *
  * @example
  * ```typescript
@@ -10083,7 +10214,6 @@ const ALLOWED_PATTERN_TYPES = new Set([
  * const pattern = patternFromJSON<string[]>(json, {
  *   merge: (results) => results.map(r => r.output as string),
  * });
- * // Use the imperative API — runPattern takes a registered pattern ID, not an object
  * if (pattern.type === "parallel") {
  *   const result = await orchestrator.runParallel(pattern.handlers, input, pattern.merge);
  * }

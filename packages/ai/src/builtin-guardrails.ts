@@ -43,7 +43,12 @@ function safeStringify(value: unknown): string {
 // ============================================================================
 
 /**
- * Create a PII detection guardrail.
+ * Create a PII detection guardrail that scans input text for personally identifiable
+ * information. Blocks input when PII is detected, or optionally redacts matches and
+ * passes the sanitized text through.
+ *
+ * @param options - Configuration for PII detection: `patterns` sets the RegExp list (defaults to SSN, credit card, email), `redact` replaces matches instead of blocking, `redactReplacement` sets the replacement string (defaults to `"[REDACTED]"`).
+ * @returns An input guardrail that blocks or redacts PII in user input.
  *
  * @example
  * ```typescript
@@ -55,6 +60,8 @@ function safeStringify(value: unknown): string {
  *   redact: true,
  * });
  * ```
+ *
+ * @public
  */
 export function createPIIGuardrail(options: {
   patterns?: RegExp[];
@@ -99,7 +106,12 @@ export function createPIIGuardrail(options: {
 // ============================================================================
 
 /**
- * Create a content moderation guardrail.
+ * Create a content moderation guardrail that delegates to a user-supplied check function.
+ * Works on both input and output data — the guardrail extracts the text content
+ * automatically and passes it to {@link options.checkFn}.
+ *
+ * @param options - Configuration for content moderation: `checkFn` returns `true` when content should be flagged (supports async), `message` sets the rejection reason (defaults to `"Content flagged by moderation"`).
+ * @returns A guardrail that blocks content flagged by the check function.
  *
  * @example
  * ```typescript
@@ -110,6 +122,8 @@ export function createPIIGuardrail(options: {
  *   },
  * });
  * ```
+ *
+ * @public
  */
 export function createModerationGuardrail(options: {
   checkFn: (text: string) => boolean | Promise<boolean>;
@@ -141,8 +155,22 @@ export interface RateLimitGuardrail extends GuardrailFn<InputGuardrailData> {
 }
 
 /**
- * Create a rate limit guardrail based on token usage.
- * Returns a guardrail function with an additional `reset()` method for testing.
+ * Create a rate limit guardrail that tracks token and request counts over a sliding
+ * one-minute window. Returns a {@link RateLimitGuardrail} — a guardrail function with
+ * an additional `reset()` method for testing.
+ *
+ * @param options - Configuration for rate limiting: `maxTokensPerMinute` caps tokens in the sliding window (defaults to `100000`), `maxRequestsPerMinute` caps requests (defaults to `60`).
+ * @returns A rate limit guardrail with an attached `reset()` method.
+ *
+ * @example
+ * ```typescript
+ * const rateLimiter = createRateLimitGuardrail({
+ *   maxTokensPerMinute: 50000,
+ *   maxRequestsPerMinute: 30,
+ * });
+ * ```
+ *
+ * @public
  */
 export function createRateLimitGuardrail(options: {
   maxTokensPerMinute?: number;
@@ -220,7 +248,22 @@ export function createRateLimitGuardrail(options: {
 // ============================================================================
 
 /**
- * Create a tool allowlist/denylist guardrail.
+ * Create a tool-call guardrail that restricts which tools an agent may invoke.
+ * Supports allowlist mode, denylist mode, or both — when both are provided, a tool
+ * must appear in the allowlist and not appear in the denylist.
+ *
+ * @param options - Configuration for tool filtering: `allowlist` sets permitted tool names, `denylist` sets blocked tool names, `caseSensitive` controls case matching (defaults to `false`).
+ * @returns A tool-call guardrail that enforces the allowlist/denylist rules.
+ *
+ * @example
+ * ```typescript
+ * const toolGuardrail = createToolGuardrail({
+ *   allowlist: ["search", "calculate"],
+ *   denylist: ["delete_account"],
+ * });
+ * ```
+ *
+ * @public
  */
 export function createToolGuardrail(options: {
   allowlist?: string[];
@@ -265,7 +308,26 @@ export function createToolGuardrail(options: {
 // ============================================================================
 
 /**
- * Create an output schema validation guardrail.
+ * Create an output guardrail that validates agent output against a schema using
+ * a user-supplied {@link SchemaValidator}. Compatible with any validation library
+ * (Zod, Valibot, ArkType, etc.) via the adapter pattern.
+ *
+ * @param options - Configuration for schema validation: `validate` checks the output against the expected schema, `errorPrefix` is prepended to error messages (defaults to `"Output schema validation failed"`).
+ * @returns An output guardrail that rejects output failing schema validation.
+ *
+ * @example
+ * ```typescript
+ * import { z } from "zod";
+ *
+ * const schemaGuardrail = createOutputSchemaGuardrail({
+ *   validate: (value) => {
+ *     const result = z.object({ answer: z.string() }).safeParse(value);
+ *     return { valid: result.success, errors: result.error?.issues.map(i => i.message) };
+ *   },
+ * });
+ * ```
+ *
+ * @public
  */
 export function createOutputSchemaGuardrail<T = unknown>(options: {
   validate: SchemaValidator<T>;
@@ -300,7 +362,22 @@ export function createOutputSchemaGuardrail<T = unknown>(options: {
 // ============================================================================
 
 /**
- * Create a simple type check guardrail for common output types.
+ * Create an output guardrail that performs lightweight runtime type checks without
+ * requiring a schema library. Supports `"string"`, `"number"`, `"boolean"`, `"object"`,
+ * and `"array"` with optional size and field constraints.
+ *
+ * @param options - Configuration for type checking: `type` sets the expected JS type, `requiredFields` lists object keys that must exist, `minLength`/`maxLength` constrain array size, `minStringLength`/`maxStringLength` constrain string length.
+ * @returns An output guardrail that rejects output not matching the expected type or constraints.
+ *
+ * @example
+ * ```typescript
+ * const typeGuardrail = createOutputTypeGuardrail({
+ *   type: "object",
+ *   requiredFields: ["id", "name"],
+ * });
+ * ```
+ *
+ * @public
  */
 export function createOutputTypeGuardrail(options: {
   type: "string" | "number" | "boolean" | "object" | "array";
@@ -415,14 +492,21 @@ export function createOutputTypeGuardrail(options: {
 // ============================================================================
 
 /**
- * Create a length guardrail that limits output size.
+ * Create an output guardrail that enforces maximum length constraints on agent output,
+ * measured in characters or estimated tokens.
+ *
+ * @param options - Configuration for length limits: `maxCharacters` caps character count, `maxTokens` caps estimated token count, `estimateTokens` provides a custom token estimator (defaults to `Math.ceil(text.length / 4)`).
+ * @returns An output guardrail that rejects output exceeding the configured length limits.
  *
  * @example
  * ```typescript
  * const lengthGuardrail = createLengthGuardrail({
  *   maxCharacters: 5000,
+ *   maxTokens: 1200,
  * });
  * ```
+ *
+ * @public
  */
 export function createLengthGuardrail(options: {
   /** Maximum characters in output */
@@ -467,7 +551,15 @@ export function createLengthGuardrail(options: {
 // ============================================================================
 
 /**
- * Create a content filter guardrail that blocks output matching specific patterns.
+ * Create an output guardrail that blocks content matching any of the provided patterns.
+ * String patterns are escaped and compiled to RegExp; RegExp patterns are used as-is.
+ *
+ * @remarks
+ * A warning is logged when `blockedPatterns` is empty, since an empty list means no
+ * content will ever be filtered.
+ *
+ * @param options - Configuration for content filtering: `blockedPatterns` lists strings or RegExps to match against output, `caseSensitive` controls case matching for string patterns (defaults to `false`).
+ * @returns An output guardrail that rejects output containing any blocked pattern.
  *
  * @example
  * ```typescript
@@ -479,6 +571,8 @@ export function createLengthGuardrail(options: {
  *   ],
  * });
  * ```
+ *
+ * @public
  */
 export function createContentFilterGuardrail(options: {
   /** Patterns to block — strings or RegExp */

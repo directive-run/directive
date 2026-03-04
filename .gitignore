@@ -44,6 +44,11 @@ website/docs/generated/
 playwright-report/
 test-results/
 
+# Generated knowledge assets (rebuild with `pnpm build:docs-pipeline`)
+packages/knowledge/api-skeleton.md
+packages/knowledge/examples/
+packages/claude-plugin/skills/*/api-skeleton.md
+
 # Temporary
 tmp/
 temp/

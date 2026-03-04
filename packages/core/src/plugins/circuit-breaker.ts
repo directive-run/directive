@@ -128,6 +128,9 @@ export class CircuitBreakerOpenError extends Error {
 /**
  * Create a circuit breaker for protecting against cascading failures.
  *
+ * @param config - Circuit breaker configuration (thresholds, recovery time, observability)
+ * @returns A circuit breaker instance with `execute`, `getState`, and `reset` methods
+ *
  * @example
  * ```typescript
  * const breaker = createCircuitBreaker({
@@ -148,10 +151,10 @@ export class CircuitBreakerOpenError extends Error {
  * }
  * ```
  *
- * @throws {Error} If failureThreshold is less than 1 or not a finite number
- * @throws {Error} If recoveryTimeMs is not positive or not a finite number
- * @throws {Error} If halfOpenMaxRequests is less than 1 or not a finite number
- * @throws {Error} If failureWindowMs is not positive or not a finite number
+ * @throws If failureThreshold is less than 1 or not a finite number
+ * @throws If recoveryTimeMs is not positive or not a finite number
+ * @throws If halfOpenMaxRequests is less than 1 or not a finite number
+ * @throws If failureWindowMs is not positive or not a finite number
  */
 export function createCircuitBreaker(
   config: CircuitBreakerConfig = {},

@@ -12,6 +12,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const JSON_PATH = join(
@@ -42,22 +43,26 @@ interface ApiDocEntry {
 }
 
 function main() {
+  const PHASE = "Generate API Skeleton";
+  log.header(PHASE);
+
   if (!existsSync(JSON_PATH)) {
-    console.warn(
-      `Warning: ${JSON_PATH} not found. Run website/scripts/extract-api-docs.ts first.`,
-    );
-    console.warn("Generating placeholder api-skeleton.md instead.");
+    log.warn("api-reference.json not found — generating placeholder");
     writeFileSync(
       OUTPUT,
       "# API Skeleton\n\n> Auto-generated. Do not edit.\n\n> Source JSON not found. Build website docs first.\n",
       "utf-8",
     );
+    log.done(PHASE);
 
     return;
   }
 
   const raw = readFileSync(JSON_PATH, "utf-8");
   const entries: ApiDocEntry[] = JSON.parse(raw);
+
+  log.reads(["docs/generated/api-reference.json"]);
+  log.item(`${entries.length} entries`);
 
   const coreEntries: ApiDocEntry[] = [];
   const aiEntries: ApiDocEntry[] = [];
@@ -70,6 +75,8 @@ function main() {
       coreEntries.push(entry);
     }
   }
+
+  log.step(`Condensing ${coreEntries.length} core + ${aiEntries.length} ai symbols...`);
 
   const lines: string[] = [
     "# API Skeleton",
@@ -88,10 +95,10 @@ function main() {
   const output = lines.join("\n") + "\n";
   writeFileSync(OUTPUT, output, "utf-8");
 
-  const symbolCount = coreEntries.length + aiEntries.length;
-  console.log(
-    `Generated api-skeleton.md (${symbolCount} symbols: ${coreEntries.length} core, ${aiEntries.length} ai)`,
-  );
+  const size = `${(Buffer.byteLength(output) / 1024).toFixed(0)} KB`;
+  log.writes("packages/knowledge/api-skeleton.md", size);
+
+  log.done(PHASE);
 }
 
 function formatEntries(entries: ApiDocEntry[]): string[] {

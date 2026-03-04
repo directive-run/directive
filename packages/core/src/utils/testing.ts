@@ -24,8 +24,12 @@ import type {
 // ============================================================================
 
 /**
- * Flush all pending microtasks.
- * Call this after advancing fake timers to ensure all Promise callbacks run.
+ * Flush all pending microtasks by awaiting multiple rounds of `Promise.resolve()`.
+ *
+ * Call this after advancing fake timers to ensure all Promise callbacks
+ * (including nested microtasks) have run before making assertions.
+ *
+ * @returns A promise that resolves after all pending microtasks have been drained.
  *
  * @example
  * ```typescript
@@ -36,6 +40,8 @@ import type {
  * vi.advanceTimersByTime(100); // Advance resolver delay
  * await flushMicrotasks(); // Let resolver complete
  * ```
+ *
+ * @public
  */
 export async function flushMicrotasks(): Promise<void> {
   // Multiple rounds to catch nested microtasks
@@ -46,11 +52,16 @@ export async function flushMicrotasks(): Promise<void> {
 
 /**
  * Wait for the system to settle with fake timers enabled.
- * Combines timer advancement with microtask flushing.
  *
- * @param system - The Directive system
- * @param advanceTime - Function to advance fake timers (e.g., vi.advanceTimersByTime)
- * @param options - Configuration options
+ * Repeatedly advances fake timers in discrete steps while flushing microtasks,
+ * until no resolvers remain inflight or the time budget is exhausted.
+ *
+ * @param system - The Directive system to wait on (must expose {@link SystemInspection} via `inspect()`).
+ * @param advanceTime - Function that advances fake timers by a given number of milliseconds (e.g., `vi.advanceTimersByTime`).
+ * @param options - Configuration for total time budget, step size, and iteration limit.
+ * @returns A promise that resolves once the system is idle.
+ *
+ * @throws Error if the system does not settle within the configured time budget.
  *
  * @example
  * ```typescript
@@ -66,6 +77,8 @@ export async function flushMicrotasks(): Promise<void> {
  *
  * expect(system.facts.result).toBe("done");
  * ```
+ *
+ * @public
  */
 export async function settleWithFakeTimers(
   system: { inspect(): SystemInspection },
@@ -118,23 +131,48 @@ export async function settleWithFakeTimers(
 // Fake Timers (for standalone use without vi.useFakeTimers)
 // ============================================================================
 
+/**
+ * Standalone fake timer controller for tests that do not use Vitest/Jest fake timers.
+ *
+ * @remarks
+ * For most tests, prefer Vitest's `vi.useFakeTimers()` paired with
+ * {@link settleWithFakeTimers} for better integration. Use this interface
+ * only when you need a lightweight, framework-independent timer mock.
+ *
+ * @public
+ */
 export interface FakeTimers {
-  /** Advance time by a number of milliseconds */
+  /** Advance time by a number of milliseconds, firing any timers that fall within the window. */
   advance(ms: number): Promise<void>;
-  /** Advance to the next scheduled timer */
+  /** Advance to the next scheduled timer and fire its callback. */
   next(): Promise<void>;
-  /** Run all pending timers */
+  /** Run all pending timers in chronological order. */
   runAll(): Promise<void>;
-  /** Get current fake time */
+  /** Get the current fake time in milliseconds. */
   now(): number;
-  /** Reset to time 0 */
+  /** Reset the clock to time 0 and discard all scheduled timers. */
   reset(): void;
 }
 
 /**
- * Create standalone fake timers for testing.
- * Note: For most tests, prefer using Vitest's vi.useFakeTimers() with
- * settleWithFakeTimers() for better integration.
+ * Create standalone fake timers for testing without a framework timer mock.
+ *
+ * @remarks
+ * For most tests, prefer Vitest's `vi.useFakeTimers()` paired with
+ * {@link settleWithFakeTimers}. This factory is useful when you need an
+ * isolated timer that does not interfere with global timer state.
+ *
+ * @returns A {@link FakeTimers} controller with `advance`, `next`, `runAll`, `now`, and `reset` methods.
+ *
+ * @example
+ * ```typescript
+ * const timers = createFakeTimers();
+ * // schedule work, then:
+ * await timers.advance(500);
+ * expect(timers.now()).toBe(500);
+ * ```
+ *
+ * @public
  */
 export function createFakeTimers(): FakeTimers {
   let currentTime = 0;
@@ -185,7 +223,11 @@ export function createFakeTimers(): FakeTimers {
 // Mock Resolvers
 // ============================================================================
 
-/** Context passed to mock resolver resolve functions */
+/**
+ * Context passed to mock resolver resolve functions.
+ *
+ * @public
+ */
 export interface MockResolverContext {
   /** Facts object (use type assertion for specific facts) */
   // biome-ignore lint/suspicious/noExplicitAny: Facts type varies by system
@@ -194,16 +236,23 @@ export interface MockResolverContext {
   signal: AbortSignal;
 }
 
+/**
+ * Configuration for a simple mock resolver created via {@link createMockResolver}.
+ *
+ * @typeParam R - The requirement type this resolver handles.
+ *
+ * @public
+ */
 export interface MockResolverOptions<R extends Requirement = Requirement> {
-  /** Predicate to check if this resolver handles a requirement */
+  /** Predicate to check if this resolver handles a given requirement. */
   requirement?: (req: Requirement) => req is R;
-  /** Mock implementation */
+  /** Mock implementation invoked when the resolver runs. */
   resolve?: (req: R, ctx: MockResolverContext) => void | Promise<void>;
-  /** Delay before resolving (ms) */
+  /** Artificial delay in milliseconds before the resolver completes. */
   delay?: number;
-  /** Simulate an error */
+  /** Error (or message string) to throw, simulating a resolver failure. */
   error?: Error | string;
-  /** Track calls */
+  /** Array that receives every requirement passed to this resolver. */
   calls?: R[];
 }
 
@@ -214,7 +263,19 @@ interface MockResolverDef {
 }
 
 /**
- * Create a mock resolver for testing.
+ * Create a simple mock resolver that matches requirements by type and optionally
+ * records calls, injects delays, or throws errors.
+ *
+ * @param typeOrOptions - A requirement type string, or a full {@link MockResolverOptions} object.
+ * @returns A resolver definition that can be spread into a module's `resolvers` map.
+ *
+ * @example
+ * ```typescript
+ * const calls: Requirement[] = [];
+ * const mock = createMockResolver({ requirement: (r): r is MyReq => r.type === "LOAD", calls });
+ * ```
+ *
+ * @public
  */
 export function createMockResolver<R extends Requirement = Requirement>(
   typeOrOptions: string | MockResolverOptions<R>,
@@ -259,7 +320,15 @@ export function createMockResolver<R extends Requirement = Requirement>(
 
 /**
  * A mock resolver that captures requirements for manual resolution.
- * Use this when you need fine-grained control over when and how requirements resolve.
+ *
+ * @remarks
+ * Use this when you need fine-grained control over when and how requirements
+ * resolve. Requirements are queued in `pending` and stay unresolved until you
+ * explicitly call `resolve()` or `reject()`.
+ *
+ * @typeParam R - The requirement type this resolver handles.
+ *
+ * @public
  */
 export interface MockResolver<R extends Requirement = Requirement> {
   /** All requirements received by this resolver */
@@ -283,8 +352,11 @@ export interface MockResolver<R extends Requirement = Requirement> {
 }
 
 /**
- * Create a mock resolver that captures requirements instead of resolving them.
- * This gives you manual control over requirement resolution in tests.
+ * Create a mock resolver that captures requirements instead of resolving them,
+ * giving you manual control over when and how each requirement completes.
+ *
+ * @param _requirementType - The requirement `type` string this mock handles (used for documentation; matching is done by the test harness).
+ * @returns A {@link MockResolver} with a `handler` function suitable for passing to {@link createTestSystem} mocks.
  *
  * @example
  * ```typescript
@@ -312,6 +384,8 @@ export interface MockResolver<R extends Requirement = Requirement> {
  *
  * expect(system.facts.user).toEqual({ name: "John" });
  * ```
+ *
+ * @public
  */
 export function mockResolver<R extends Requirement = Requirement>(
   _requirementType: string,
@@ -385,7 +459,11 @@ export function mockResolver<R extends Requirement = Requirement>(
 // Fact Change Tracking
 // ============================================================================
 
-/** Record of a single fact change */
+/**
+ * Record of a single fact change captured by the test tracking plugin.
+ *
+ * @public
+ */
 export interface FactChangeRecord {
   /** The fact key that changed (without namespace prefix for namespaced systems) */
   key: string;
@@ -405,6 +483,17 @@ export interface FactChangeRecord {
 // Test System
 // ============================================================================
 
+/**
+ * A Directive system augmented with testing utilities.
+ *
+ * @remarks
+ * Extends {@link NamespacedSystem} with event/resolver/fact tracking, idle
+ * waiting, and assertion helpers. Created via {@link createTestSystem}.
+ *
+ * @typeParam Modules - The modules map that defines the system's schema.
+ *
+ * @public
+ */
 export interface TestSystem<Modules extends ModulesMap>
   extends NamespacedSystem<Modules> {
   /**
@@ -444,6 +533,14 @@ export interface TestSystem<Modules extends ModulesMap>
   assertFactChanges(key: string, times: number): void;
 }
 
+/**
+ * Options for {@link createTestSystem}, extending the standard system options
+ * with mock resolver injection and automatic tracking.
+ *
+ * @typeParam Modules - The modules map that defines the system's schema.
+ *
+ * @public
+ */
 export interface CreateTestSystemOptions<Modules extends ModulesMap>
   extends Omit<CreateSystemOptionsNamed<Modules>, "plugins"> {
   /** Mock resolvers by type */
@@ -456,7 +553,26 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
 }
 
 /**
- * Create a test system with additional testing utilities.
+ * Create a Directive system instrumented for testing.
+ *
+ * Wraps {@link createSystem} with an automatic tracking plugin that records
+ * dispatched events, resolver calls, fact changes, and generated requirements.
+ * Mock resolvers can be injected via `options.mocks.resolvers` to replace
+ * real resolvers by requirement type.
+ *
+ * @param options - System configuration with optional mock resolvers and additional plugins.
+ * @returns A {@link TestSystem} with assertion helpers, idle waiting, and history tracking.
+ *
+ * @example
+ * ```typescript
+ * const system = createTestSystem({
+ *   modules: { counter: counterModule },
+ *   mocks: { resolvers: { INCREMENT: { resolve: (req, context) => { context.facts.count++; } } } },
+ * });
+ * system.start();
+ * ```
+ *
+ * @public
  */
 export function createTestSystem<Modules extends ModulesMap>(
   options: CreateTestSystemOptions<Modules>,

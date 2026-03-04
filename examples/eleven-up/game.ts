@@ -160,10 +160,10 @@ function countValidMoves(table: Card[]): {
 
 export const elevenUpSchema = {
   facts: {
-    deck: t.object<Card[]>(),
-    table: t.object<Card[]>(),
-    removed: t.object<Card[]>(),
-    selected: t.object<string[]>(),
+    deck: t.array<Card>(),
+    table: t.array<Card>(),
+    removed: t.array<Card>(),
+    selected: t.array<string>(),
     lastMessage: t.string(),
     gameOver: t.boolean(),
     won: t.boolean(),
@@ -172,12 +172,12 @@ export const elevenUpSchema = {
     maxStreak: t.number(),
     lastMoveTimestamp: t.number(),
     comboCount: t.number(),
-    newCardIds: t.object<string[]>(),
+    newCardIds: t.array<string>(),
   },
   derivations: {
     deckCount: t.number(),
     removedCount: t.number(),
-    selectedCards: t.object<Card[]>(),
+    selectedCards: t.array<Card>(),
     selectionFeedback: t.string(),
     hasValidMoves: t.boolean(),
     totalValidMoves: t.number(),
@@ -194,7 +194,7 @@ export const elevenUpSchema = {
     clearSelection: {},
   },
   requirements: {
-    REMOVE_CARDS: { cardIds: t.object<string[]>(), reason: t.string() },
+    REMOVE_CARDS: { cardIds: t.array<string>(), reason: t.string() },
     REFILL_TABLE: { count: t.number() },
     END_GAME: { won: t.boolean(), reason: t.string() },
   },
@@ -395,6 +395,8 @@ export const elevenUpGame = createModule("eleven-up", {
         if (facts.moveCount > 0) {
           facts.lastMoveTimestamp = Date.now();
         }
+
+        return undefined;
       },
     },
 
@@ -402,12 +404,15 @@ export const elevenUpGame = createModule("eleven-up", {
       // Auto-tracked: reads currentStreak
       run: (facts) => {
         const streak = facts.currentStreak;
-        if (streak === 3)
+        if (streak === 3) {
           console.log("[EFFECT] streak: Hat trick! 3 in a row!");
-        else if (streak === 5)
+        } else if (streak === 5) {
           console.log("[EFFECT] streak: On fire! 5 in a row!");
-        else if (streak === 10)
+        } else if (streak === 10) {
           console.log("[EFFECT] streak: Unstoppable! 10 in a row!");
+        }
+
+        return undefined;
       },
     },
 
@@ -422,6 +427,8 @@ export const elevenUpGame = createModule("eleven-up", {
               `Combos: ${facts.comboCount}`,
           );
         }
+
+        return undefined;
       },
     },
   },

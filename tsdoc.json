@@ -1,0 +1,23 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/tsdoc/v0/tsdoc.schema.json",
+  "tagDefinitions": [
+    {
+      "tagName": "@packageDocumentation",
+      "syntaxKind": "modifier"
+    }
+  ],
+  "supportForTags": {
+    "@param": true,
+    "@returns": true,
+    "@remarks": true,
+    "@example": true,
+    "@public": true,
+    "@internal": true,
+    "@deprecated": true,
+    "@throws": true,
+    "@see": true,
+    "@defaultValue": true,
+    "@typeParam": true,
+    "@packageDocumentation": true
+  }
+}
