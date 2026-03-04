@@ -5,7 +5,11 @@ description: "Configure AI provider runners (Anthropic, OpenAI, Ollama), stream 
 
 # Building AI Agents
 
-# When Claude Should Use This Skill
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/ai`. If not found in `package.json`, suggest installing it: `npm install @directive-run/ai`.
+
+## When Claude Should Use This Skill
 
 ## Auto-Invoke Triggers
 - User asks which LLM provider to use or how to set one up
@@ -21,7 +25,7 @@ description: "Configure AI provider runners (Anthropic, OpenAI, Ollama), stream 
 
 ---
 
-# Quick Reference
+## Quick Reference
 
 ## Decision Tree: Which Runner?
 
@@ -334,7 +338,7 @@ resolve: async (req, context) => {
 
 ---
 
-# Critical Anti-Patterns
+## Critical Anti-Patterns
 
 ## Not handling stream errors
 
@@ -375,15 +379,8 @@ resolve: async (req, context) => {
 },
 ```
 
-## Using ctx instead of context
-
-```typescript
-// WRONG
-resolve: async (req, ctx) => { ctx.facts.output = "..."; }
-
-// CORRECT
-resolve: async (req, context) => { context.facts.output = "..."; }
-```
+### Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ## Hardcoding API keys
 
@@ -410,8 +407,8 @@ context.facts.tokensUsed = (context.facts.tokensUsed ?? 0) + result.usage.totalT
 
 ---
 
-# Reference Files
+## Reference Files
 
-- `knowledge/ai-agents-streaming.md` — Streaming events, AsyncIterable patterns, token buffering
-- `knowledge/ai-adapters.md` — Provider adapter interface, all runner options, custom runner guide
-- `knowledge/ai-communication.md` — Cross-agent communication, coordinator facts, requirement payloads
+- `ai-agents-streaming.md` — Streaming events, AsyncIterable patterns, token buffering
+- `ai-adapters.md` — Provider adapter interface, all runner options, custom runner guide
+- `ai-communication.md` — Cross-agent communication, coordinator facts, requirement payloads
