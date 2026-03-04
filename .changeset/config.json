@@ -12,10 +12,11 @@
       "@directive-run/vue",
       "@directive-run/svelte",
       "@directive-run/solid",
-      "@directive-run/lit"
-    ],
-    ["@directive-run/ai"],
-    ["@directive-run/cli", "@directive-run/knowledge"]
+      "@directive-run/lit",
+      "@directive-run/ai",
+      "@directive-run/cli",
+      "@directive-run/knowledge"
+    ]
   ],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true
