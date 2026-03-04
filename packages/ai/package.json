@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/ai",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "AI agent orchestration, guardrails, and multi-agent coordination for Directive.",
   "license": "MIT",
   "author": "Jason Comes",
