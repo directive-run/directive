@@ -231,7 +231,8 @@ export interface CrossModuleEffectDef<
   run: (
     facts: CrossModuleFactsWithSelf<M, Deps>,
     prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
-  ) => undefined | EffectCleanup | Promise<undefined | EffectCleanup>;
+  // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+  ) => void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional dependency keys to filter when effect runs */
   deps?: string[];
 }
