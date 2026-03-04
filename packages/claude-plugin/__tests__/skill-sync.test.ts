@@ -17,7 +17,8 @@ function getAllKnowledgeFiles(): string[] {
   for (const dir of [KNOWLEDGE_ROOT, CORE_DIR, AI_DIR]) {
     try {
       for (const f of readdirSync(dir).filter(
-        (f) => f.endsWith(".md") && f !== "README.md",
+        (f) =>
+          f.endsWith(".md") && f !== "README.md" && f !== "CHANGELOG.md",
       )) {
         files.push(f.replace(".md", ""));
       }
