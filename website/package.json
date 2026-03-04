@@ -1,6 +1,6 @@
 {
   "name": "directive-website",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Documentation site for Directive - constraint-driven state management for TypeScript",
   "scripts": {
