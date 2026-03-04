@@ -18,7 +18,7 @@ This skill applies when migrating TO Directive. The user should have or plan to 
 - User asks about Directive equivalents of concepts from other libraries
 - User has existing code in another library and wants Directive version
 
-### Exclusions — Use a Different Skill
+### Exclusions – Use a Different Skill
 - User is writing Directive from scratch (no migration) → `writing-directive-modules`
 - User wants to understand Directive basics → `getting-started-with-directive`
 
@@ -244,6 +244,6 @@ Directive: Fact change → Constraint when() → Requirement → Resolver
 ## Reference Files
 
 Supporting knowledge files loaded with this skill:
-- `core-patterns.md` — Directive patterns reference
-- `schema-types.md` — Type builder reference for migration
-- `anti-patterns.md` — Common mistakes when migrating
+- `core-patterns.md` – Directive patterns reference
+- `schema-types.md` – Type builder reference for migration
+- `anti-patterns.md` – Common mistakes when migrating

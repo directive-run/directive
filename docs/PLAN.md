@@ -34,7 +34,7 @@ directive/
 │   ├── CLAUDE.md              # Project context
 │   └── session-log.md         # Session tracking
 ├── packages/
-│   ├── core/                  # @directive-run/core — runtime, modules, systems
+│   ├── core/                  # @directive-run/core – runtime, modules, systems
 │   │   ├── src/
 │   │   │   ├── core/          # Core primitives
 │   │   │   │   ├── types.ts
@@ -57,13 +57,13 @@ directive/
 │   │   ├── package.json
 │   │   ├── tsconfig.json
 │   │   └── tsup.config.ts
-│   ├── react/                 # @directive-run/react — React hooks
-│   ├── vue/                   # @directive-run/vue — Vue composables
-│   ├── svelte/                # @directive-run/svelte — Svelte stores
-│   ├── solid/                 # @directive-run/solid — Solid signals
-│   ├── lit/                   # @directive-run/lit — Lit controllers
-│   ├── ai/                    # @directive-run/ai — AI agent orchestration
-│   └── directive/             # Deprecated — redirects to @directive-run/core
+│   ├── react/                 # @directive-run/react – React hooks
+│   ├── vue/                   # @directive-run/vue – Vue composables
+│   ├── svelte/                # @directive-run/svelte – Svelte stores
+│   ├── solid/                 # @directive-run/solid – Solid signals
+│   ├── lit/                   # @directive-run/lit – Lit controllers
+│   ├── ai/                    # @directive-run/ai – AI agent orchestration
+│   └── directive/             # Deprecated – redirects to @directive-run/core
 ├── examples/
 │   ├── traffic-light/
 │   └── data-fetching/

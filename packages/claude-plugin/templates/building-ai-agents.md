@@ -19,9 +19,9 @@ This skill applies when the project uses `@directive-run/ai`. If not found in `p
 - User needs to switch providers or implement a provider abstraction
 
 ## Exclusions
-- Do NOT invoke for orchestrator structure (constraints/resolvers) — use `building-ai-orchestrators`
-- Do NOT invoke for rate limits, budgets, or guardrails — use `hardening-ai-systems`
-- Do NOT invoke for testing runners — use `testing-ai-systems`
+- Do NOT invoke for orchestrator structure (constraints/resolvers) – use `building-ai-orchestrators`
+- Do NOT invoke for rate limits, budgets, or guardrails – use `hardening-ai-systems`
+- Do NOT invoke for testing runners – use `testing-ai-systems`
 
 ---
 
@@ -100,7 +100,7 @@ resolvers: {
   generate: {
     requirement: "GENERATE",
     resolve: async (req, context) => {
-      // Basic call — returns full response when complete
+      // Basic call – returns full response when complete
       const result = await context.runner.run({
         prompt: "Explain quantum entanglement simply.",
         system: "You are a science communicator.",
@@ -142,7 +142,7 @@ const stream = orchestrator.runStream({ input: "Write a story about..." });
 
 for await (const event of stream) {
   if (event.type === "token") {
-    // Arrives as the LLM generates — display immediately
+    // Arrives as the LLM generates – display immediately
     process.stdout.write(event.text);
   }
 
@@ -263,7 +263,7 @@ resolvers: {
 
 ---
 
-## Custom Provider — Implement AgentRunner Interface
+## Custom Provider – Implement AgentRunner Interface
 
 ```typescript
 import type { AgentRunner, RunOptions, RunnerResult } from "@directive-run/ai";
@@ -343,14 +343,14 @@ resolve: async (req, context) => {
 ## Not handling stream errors
 
 ```typescript
-// WRONG — if stream throws, it crashes uncaught
+// WRONG – if stream throws, it crashes uncaught
 for await (const event of orchestrator.runStream(input)) {
   if (event.type === "token") {
     process.stdout.write(event.text);
   }
 }
 
-// CORRECT — always handle error events
+// CORRECT – always handle error events
 for await (const event of orchestrator.runStream(input)) {
   if (event.type === "token") {
     process.stdout.write(event.text);
@@ -366,13 +366,13 @@ for await (const event of orchestrator.runStream(input)) {
 ## Blocking on stream consumption inside a resolver
 
 ```typescript
-// WRONG — consuming a stream inside a resolver blocks the engine
+// WRONG – consuming a stream inside a resolver blocks the engine
 resolve: async (req, context) => {
   const stream = orchestrator.runStream(req.input);
   for await (const event of stream) { /* deadlock risk */ }
 },
 
-// CORRECT — use context.runner.run() inside resolvers
+// CORRECT – use context.runner.run() inside resolvers
 resolve: async (req, context) => {
   const result = await context.runner.run({ prompt: req.input });
   context.facts.output = result.text;
@@ -380,7 +380,7 @@ resolve: async (req, context) => {
 ```
 
 ### Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ## Hardcoding API keys
 
@@ -395,11 +395,11 @@ const runner = createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY });
 ## Ignoring token usage
 
 ```typescript
-// WRONG — fire and forget, no budget awareness
+// WRONG – fire and forget, no budget awareness
 const result = await context.runner.run({ prompt });
 context.facts.output = result.text;
 
-// CORRECT — track usage for budget management
+// CORRECT – track usage for budget management
 const result = await context.runner.run({ prompt });
 context.facts.output = result.text;
 context.facts.tokensUsed = (context.facts.tokensUsed ?? 0) + result.usage.totalTokens;
@@ -409,6 +409,6 @@ context.facts.tokensUsed = (context.facts.tokensUsed ?? 0) + result.usage.totalT
 
 ## Reference Files
 
-- `ai-agents-streaming.md` — Streaming events, AsyncIterable patterns, token buffering
-- `ai-adapters.md` — Provider adapter interface, all runner options, custom runner guide
-- `ai-communication.md` — Cross-agent communication, coordinator facts, requirement payloads
+- `ai-agents-streaming.md` – Streaming events, AsyncIterable patterns, token buffering
+- `ai-adapters.md` – Provider adapter interface, all runner options, custom runner guide
+- `ai-communication.md` – Cross-agent communication, coordinator facts, requirement payloads

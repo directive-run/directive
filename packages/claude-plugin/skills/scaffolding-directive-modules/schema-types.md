@@ -32,7 +32,7 @@ const myModule = createModule("example", {
       // Basic string
       name: t.string(),
 
-      // String literal union — full type safety
+      // String literal union – full type safety
       phase: t.string<"idle" | "loading" | "done">(),
 
       // Number with validation
@@ -85,11 +85,11 @@ schema: {
 ```typescript
 schema: {
   facts: {
-    // Enum — string literal union from values
+    // Enum – string literal union from values
     status: t.enum("pending", "active", "archived"),
     // TypeScript type: "pending" | "active" | "archived"
 
-    // Literal — exact match
+    // Literal – exact match
     version: t.literal(2),
     mode: t.literal("strict"),
     enabled: t.literal(true),
@@ -102,13 +102,13 @@ schema: {
 ```typescript
 schema: {
   facts: {
-    // Nullable — T | null
+    // Nullable – T | null
     selectedItem: t.nullable(t.string()),
 
-    // Optional — T | undefined
+    // Optional – T | undefined
     nickname: t.optional(t.string()),
 
-    // Union — combine types
+    // Union – combine types
     result: t.union(t.string(), t.number()),
 
     // Nullable via object generic (also valid)
@@ -122,28 +122,28 @@ schema: {
 ```typescript
 schema: {
   facts: {
-    // Default value — used if init doesn't set it
+    // Default value – used if init doesn't set it
     theme: t.string<"light" | "dark">().default("light"),
 
-    // Custom validation — runs in dev mode
+    // Custom validation – runs in dev mode
     email: t.string().validate((val) => val.includes("@")),
 
-    // Transform on set — runs when fact is mutated
+    // Transform on set – runs when fact is mutated
     slug: t.string().transform((val) => val.toLowerCase().replace(/\s+/g, "-")),
 
-    // Branded type — nominal typing
+    // Branded type – nominal typing
     userId: t.string().brand<"UserId">(),
 
-    // Description — for docs and devtools
+    // Description – for docs and devtools
     retryCount: t.number().describe("Number of failed attempts"),
 
-    // Refinement — predicate with error message
+    // Refinement – predicate with error message
     port: t.number().refine(
       (n) => n >= 1 && n <= 65535,
       "Port must be between 1 and 65535",
     ),
 
-    // Chaining — combine multiple modifiers
+    // Chaining – combine multiple modifiers
     score: t.number()
       .min(0)
       .max(100)
@@ -193,43 +193,43 @@ schema: {
 These are common AI hallucinations. Do not use them.
 
 ```typescript
-// WRONG — t.map() does not exist
+// WRONG – t.map() does not exist
 items: t.map<string, number>(),
 // CORRECT
 items: t.object<Map<string, number>>(),
 
-// WRONG — t.set() does not exist
+// WRONG – t.set() does not exist
 tags: t.set<string>(),
 // CORRECT
 tags: t.object<Set<string>>(),
 
-// WRONG — t.date() does not exist
+// WRONG – t.date() does not exist
 createdAt: t.date(),
 // CORRECT
 createdAt: t.object<Date>(),
 // OR use timestamps
 createdAt: t.number(), // Unix ms
 
-// WRONG — t.tuple() does not exist
+// WRONG – t.tuple() does not exist
 coords: t.tuple<[number, number]>(),
 // CORRECT
 coords: t.array<[number, number]>(),
 
-// WRONG — t.record() does not exist
+// WRONG – t.record() does not exist
 scores: t.record<string, number>(),
 // CORRECT
 scores: t.object<Record<string, number>>(),
 
-// WRONG — t.promise() does not exist (facts are synchronous)
+// WRONG – t.promise() does not exist (facts are synchronous)
 result: t.promise<string>(),
 
-// WRONG — t.any() does not exist
+// WRONG – t.any() does not exist
 data: t.any(),
 // CORRECT
 data: t.object<unknown>(),
 
-// WRONG — t.void() does not exist (not a fact type)
-// WRONG — t.function() does not exist (functions are not serializable)
+// WRONG – t.void() does not exist (not a fact type)
+// WRONG – t.function() does not exist (functions are not serializable)
 ```
 
 ## Type Assertion Alternative

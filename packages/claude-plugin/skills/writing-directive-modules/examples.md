@@ -6,14 +6,14 @@
 
 ```typescript
 // Example: counter
-// Source: examples/counter/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/counter/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Number Match — DOM Rendering & System Wiring
+ * Number Match – Directive Module
  *
- * Creates the Directive system, subscribes to state changes,
- * renders the game grid and event timeline.
+ * Types, schema, helpers, module definition, timeline, and system creation
+ * for a tile-matching game where pairs must add to 10.
  */
 
 import {
@@ -28,17 +28,21 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-interface Tile {
+export interface Tile {
   id: string;
   value: number;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
   type: string;
 }
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 // Create a pool of numbered tiles (1-9, four of each = 36 tiles)
 function createPool(): Tile[] {
@@ -62,9 +66,9 @@ function createPool(): Tile[] {
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function log(msg: string) {
+export function addLog(msg: string) {
   console.log(`[NumberMatch] ${msg}`);
 
   // Classify and add significant events to the timeline
@@ -108,15 +112,15 @@ function log(msg: string) {
 }
 
 // ============================================================================
-// Schema - same structure as eleven-up
+// Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
-    pool: t.object<Tile[]>(),
-    table: t.object<Tile[]>(),
-    removed: t.object<Tile[]>(),
-    selected: t.object<string[]>(),
+    pool: t.array<Tile>(),
+    table: t.array<Tile>(),
+    removed: t.array<Tile>(),
+    selected: t.array<string>(),
     message: t.string(),
     moveCount: t.number(),
     gameOver: t.boolean(),
@@ -124,7 +128,7 @@ const schema = {
   derivations: {
     poolCount: t.number(),
     removedCount: t.number(),
-    selectedTiles: t.object<Tile[]>(),
+    selectedTiles: t.array<Tile>(),
     hasValidMoves: t.boolean(),
   },
   events: {
@@ -134,7 +138,7 @@ const schema = {
     clearSelection: {},
   },
   requirements: {
-    REMOVE_TILES: { tileIds: t.object<string[]>() },
+    REMOVE_TILES: { tileIds: t.array<string>() },
     REFILL_TABLE: { count: t.number() },
     END_GAME: { reason: t.string() },
   },
@@ -167,9 +171,12 @@ const numberMatch = createModule("number-match", {
       const nums = facts.table.map((t: Tile) => t.value);
       for (let i = 0; i < nums.length; i++) {
         for (let j = i + 1; j < nums.length; j++) {
-          if (nums[i] + nums[j] === 10) return true;
+          if (nums[i] + nums[j] === 10) {
+            return true;
+          }
         }
       }
+
       return false;
     },
   },
@@ -188,7 +195,7 @@ const numberMatch = createModule("number-match", {
     selectTile: (facts, { tileId }) => {
       if (!facts.selected.includes(tileId) && !facts.gameOver) {
         facts.selected = [...facts.selected, tileId];
-        log(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
+        addLog(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
       }
     },
     deselectTile: (facts, { tileId }) => {
@@ -200,27 +207,34 @@ const numberMatch = createModule("number-match", {
   },
 
   // ============================================================================
-  // Constraints - same pattern as eleven-up
+  // Constraints
   // ============================================================================
   constraints: {
     // When two selected tiles add to 10 -> remove them
     pairAddsTen: {
       priority: 100,
       when: (facts) => {
-        if (facts.gameOver) return false;
+        if (facts.gameOver) {
+          return false;
+        }
         const selected = facts.table.filter((tile: Tile) =>
           facts.selected.includes(tile.id),
         );
-        if (selected.length !== 2) return false;
+        if (selected.length !== 2) {
+          return false;
+        }
         const result = selected[0].value + selected[1].value === 10;
-        if (result)
-          log(
+        if (result) {
+          addLog(
             `CONSTRAINT pairAddsTen: TRUE (${selected[0].value} + ${selected[1].value})`,
           );
+        }
+
         return result;
       },
       require: (facts) => {
-        log("CONSTRAINT pairAddsTen: producing REMOVE_TILES");
+        addLog("CONSTRAINT pairAddsTen: producing REMOVE_TILES");
+
         return {
           type: "REMOVE_TILES",
           tileIds: [...facts.selected],
@@ -234,15 +248,18 @@ const numberMatch = createModule("number-match", {
       when: (facts) => {
         const result =
           !facts.gameOver && facts.table.length < 9 && facts.pool.length > 0;
-        if (result)
-          log(
+        if (result) {
+          addLog(
             `CONSTRAINT refillTable: TRUE (table: ${facts.table.length}, pool: ${facts.pool.length})`,
           );
+        }
+
         return result;
       },
       require: (facts) => {
         const count = Math.min(9 - facts.table.length, facts.pool.length);
-        log(`CONSTRAINT refillTable: producing REFILL_TABLE count=${count}`);
+        addLog(`CONSTRAINT refillTable: producing REFILL_TABLE count=${count}`);
+
         return { type: "REFILL_TABLE", count };
       },
     },
@@ -251,16 +268,25 @@ const numberMatch = createModule("number-match", {
     noMovesLeft: {
       priority: 190,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        if (facts.table.length === 0) return false;
-        if (facts.pool.length > 0) return false;
+        if (facts.gameOver) {
+          return false;
+        }
+        if (facts.table.length === 0) {
+          return false;
+        }
+        if (facts.pool.length > 0) {
+          return false;
+        }
         const nums = facts.table.map((t: Tile) => t.value);
         for (let i = 0; i < nums.length; i++) {
           for (let j = i + 1; j < nums.length; j++) {
-            if (nums[i] + nums[j] === 10) return false;
+            if (nums[i] + nums[j] === 10) {
+              return false;
+            }
           }
         }
-        log("CONSTRAINT noMovesLeft: TRUE");
+        addLog("CONSTRAINT noMovesLeft: TRUE");
+
         return true;
       },
       require: (facts) => ({
@@ -277,7 +303,10 @@ const numberMatch = createModule("number-match", {
           !facts.gameOver &&
           facts.table.length === 0 &&
           facts.pool.length === 0;
-        if (result) log("CONSTRAINT allCleared: TRUE");
+        if (result) {
+          addLog("CONSTRAINT allCleared: TRUE");
+        }
+
         return result;
       },
       require: (facts) => ({
@@ -288,42 +317,42 @@ const numberMatch = createModule("number-match", {
   },
 
   // ============================================================================
-  // Resolvers - same multi-fact mutation pattern as eleven-up
+  // Resolvers
   // ============================================================================
   resolvers: {
     removeTiles: {
       requirement: "REMOVE_TILES",
       resolve: async (req, context) => {
-        log("RESOLVER removeTiles: START");
+        addLog("RESOLVER removeTiles: START");
         const tilesToRemove = context.facts.table.filter((tile: Tile) =>
           req.tileIds.includes(tile.id),
         );
 
         // Multiple fact mutations
-        log("RESOLVER removeTiles: setting table");
+        addLog("RESOLVER removeTiles: setting table");
         context.facts.table = context.facts.table.filter(
           (tile: Tile) => !req.tileIds.includes(tile.id),
         );
-        log("RESOLVER removeTiles: setting removed");
+        addLog("RESOLVER removeTiles: setting removed");
         context.facts.removed = [...context.facts.removed, ...tilesToRemove];
-        log("RESOLVER removeTiles: clearing selected");
+        addLog("RESOLVER removeTiles: clearing selected");
         context.facts.selected = [];
-        log("RESOLVER removeTiles: incrementing moveCount");
+        addLog("RESOLVER removeTiles: incrementing moveCount");
         context.facts.moveCount++;
-        log("RESOLVER removeTiles: setting message");
+        addLog("RESOLVER removeTiles: setting message");
         context.facts.message = `Removed ${tilesToRemove[0].value} + ${tilesToRemove[1].value} = 10!`;
-        log("RESOLVER removeTiles: DONE");
+        addLog("RESOLVER removeTiles: DONE");
       },
     },
 
     refillTable: {
       requirement: "REFILL_TABLE",
       resolve: async (req, context) => {
-        log(`RESOLVER refillTable: START (count: ${req.count})`);
+        addLog(`RESOLVER refillTable: START (count: ${req.count})`);
         const newTiles = context.facts.pool.slice(0, req.count);
         context.facts.pool = context.facts.pool.slice(req.count);
         context.facts.table = [...context.facts.table, ...newTiles];
-        log(
+        addLog(
           `RESOLVER refillTable: DONE (table now: ${context.facts.table.length})`,
         );
       },
@@ -332,7 +361,7 @@ const numberMatch = createModule("number-match", {
     endGame: {
       requirement: "END_GAME",
       resolve: async (req, context) => {
-        log(`RESOLVER endGame: ${req.reason}`);
+        addLog(`RESOLVER endGame: ${req.reason}`);
         context.facts.gameOver = true;
         context.facts.message = req.reason;
       },
@@ -344,74 +373,32 @@ const numberMatch = createModule("number-match", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: numberMatch,
   plugins: [devtoolsPlugin({ name: "number-match" })],
   debug: { timeTravel: true, runHistory: true },
 });
-system.start();
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-// Stats
-
-// Timeline
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-system.subscribe(
-  [
-    "table",
-    "selected",
-    "pool",
-    "removed",
-    "moveCount",
-    "message",
-    "gameOver",
-    "poolCount",
-    "removedCount",
-    "selectedTiles",
-    "hasValidMoves",
-  ],
-  render,
-);
-
-// Button handlers
-
-
-// Initial render
-render();
-log("Game started. Select two numbers that add to 10.");
-
-// Signal to tests that initialization is complete
 ```
 
 ## contact-form
 
 ```typescript
 // Example: contact-form
-// Source: examples/contact-form/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/contact-form/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Contact Form — DOM Rendering & System Wiring
+ * Contact Form – Directive Module
  *
- * Creates the Directive system, subscribes to state changes,
- * renders the form and event timeline.
+ * Multi-field contact form showcasing validation, constraints, and resolvers:
+ * - Facts: name, email, subject, message, touched, status, errorMessage, etc.
+ * - Derivations: field errors, isValid, canSubmit, messageCharCount
+ * - Events: updateField, touchField, submit, reset
+ * - Constraints: submitForm, resetAfterSuccess
+ * - Resolvers: simulated async send, auto-reset after delay
+ * - Effects: logging status transitions
+ *
+ * Uses a simulated setTimeout instead of a real API so no account is needed.
  */
 
 import {
@@ -430,23 +417,35 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RATE_LIMIT_MS = 10_000; // 10 seconds (shorter for demo)
 
 // ============================================================================
-// Timeline
+// Types
 // ============================================================================
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
   type: string;
 }
 
-const timeline: TimelineEntry[] = [];
+// ============================================================================
+// Timeline (external mutable array, same pattern as fraud-analysis)
+// ============================================================================
 
-function addTimelineEntry(event: string, detail: string, type: string) {
+export const timeline: TimelineEntry[] = [];
+
+export function addTimelineEntry(
+  event: string,
+  detail: string,
+  type: string,
+): void {
   timeline.unshift({ time: Date.now(), event, detail, type });
 }
 
-function log(msg: string) {
+// ============================================================================
+// Logs helper
+// ============================================================================
+
+export function log(msg: string): void {
   console.log(`[contact-form] ${msg}`);
 
   // Classify and add to timeline
@@ -471,7 +470,7 @@ function log(msg: string) {
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
     name: t.string(),
     email: t.string(),
@@ -508,87 +507,220 @@ const schema = {
 // Module
 // ============================================================================
 
+const contactForm = createModule("contact-form", {
+  schema,
+
+  init: (facts) => {
+    facts.name = "";
+    facts.email = "";
+    facts.subject = "";
+    facts.message = "";
+    facts.touched = {};
+    facts.status = "idle";
+    facts.errorMessage = "";
+    facts.lastSubmittedAt = 0;
+    facts.submissionCount = 0;
+  },
+
+  derive: {
+    nameError: (facts) => {
+      if (!facts.touched.name) {
+        return "";
+      }
+      if (!facts.name.trim()) {
+        return "Name is required";
+      }
+      if (facts.name.trim().length < 2) {
+        return "Name must be at least 2 characters";
+      }
+
+      return "";
+    },
+
+    emailError: (facts) => {
+      if (!facts.touched.email) {
+        return "";
+      }
+      if (!facts.email.trim()) {
+        return "Email is required";
+      }
+      if (!EMAIL_REGEX.test(facts.email)) {
+        return "Enter a valid email address";
+      }
+
+      return "";
+    },
+
+    subjectError: (facts) => {
+      if (!facts.touched.subject) {
+        return "";
+      }
+      if (!facts.subject) {
+        return "Please select a subject";
+      }
+
+      return "";
+    },
+
+    messageError: (facts) => {
+      if (!facts.touched.message) {
+        return "";
+      }
+      if (!facts.message.trim()) {
+        return "Message is required";
+      }
+      if (facts.message.trim().length < 10) {
+        return "Message must be at least 10 characters";
+      }
+
+      return "";
+    },
+
+    isValid: (facts) =>
+      facts.name.trim().length >= 2 &&
+      EMAIL_REGEX.test(facts.email) &&
+      facts.subject !== "" &&
+      facts.message.trim().length >= 10,
+
+    canSubmit: (facts, derive) => {
+      if (!derive.isValid) {
+        return false;
+      }
+      if (facts.status !== "idle") {
+        return false;
+      }
+      if (
+        facts.lastSubmittedAt > 0 &&
+        Date.now() - facts.lastSubmittedAt < RATE_LIMIT_MS
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+
+    messageCharCount: (facts) => facts.message.length,
+  },
+
+  events: {
+    updateField: (facts, { field, value }) => {
+      const key = field as "name" | "email" | "subject" | "message";
+      if (key in facts && typeof facts[key] === "string") {
+        (facts as Record<string, string>)[key] = value;
+      }
+    },
+
+    touchField: (facts, { field }) => {
+      facts.touched = { ...facts.touched, [field]: true };
+    },
+
+    submit: (facts) => {
+      facts.touched = { name: true, email: true, subject: true, message: true };
+      facts.status = "submitting";
+    },
+
+    reset: (facts) => {
+      facts.name = "";
+      facts.email = "";
+      facts.subject = "";
+      facts.message = "";
+      facts.touched = {};
+      facts.status = "idle";
+      facts.errorMessage = "";
+    },
+  },
+
+  constraints: {
+    submitForm: {
+      when: (facts) => facts.status === "submitting",
+      require: { type: "SEND_MESSAGE" },
+    },
+
+    resetAfterSuccess: {
+      when: (facts) => facts.status === "success",
+      require: { type: "RESET_AFTER_DELAY" },
+    },
+  },
+
+  resolvers: {
+    sendMessage: {
+      requirement: "SEND_MESSAGE",
+      resolve: async (req, context) => {
+        log(
+          `Sending: ${context.facts.name} <${context.facts.email}> [${context.facts.subject}]`,
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        if (Math.random() < 0.2) {
+          context.facts.status = "error";
+          context.facts.errorMessage =
+            "Simulated error – try again (20% failure rate for demo).";
+          log("Submission failed (simulated)");
+
+          return;
+        }
+
+        context.facts.status = "success";
+        context.facts.lastSubmittedAt = Date.now();
+        context.facts.submissionCount++;
+        log(`Submission #${context.facts.submissionCount} succeeded`);
+      },
+    },
+
+    resetAfterDelay: {
+      requirement: "RESET_AFTER_DELAY",
+      resolve: async (req, context) => {
+        log("Auto-resetting in 3 seconds...");
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        context.facts.name = "";
+        context.facts.email = "";
+        context.facts.subject = "";
+        context.facts.message = "";
+        context.facts.touched = {};
+        context.facts.status = "idle";
+        context.facts.errorMessage = "";
+        log("Form reset");
+      },
+    },
+  },
+
+  effects: {
+    logSubmission: {
+      deps: ["status", "submissionCount"],
+      run: (facts, prev) => {
+        if (!prev) {
+          return;
+        }
+
+        if (facts.status !== prev.status) {
+          log(`Status: ${prev.status} → ${facts.status}`);
+        }
+      },
+    },
+  },
+});
 
 // ============================================================================
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: contactForm,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "contact-form" })],
 });
-system.start();
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-// Form inputs
-
-// Timeline
-
-// ============================================================================
-// Input Handlers
-// ============================================================================
-
-for (const [el, field] of [
-  [nameInput, "name"],
-  [emailInput, "email"],
-  [subjectInput, "subject"],
-  [messageInput, "message"],
-] as const) {
-}
-
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// Subscribe to all relevant facts and derivations
-system.subscribe(
-  [
-    "name",
-    "email",
-    "subject",
-    "message",
-    "touched",
-    "status",
-    "errorMessage",
-    "lastSubmittedAt",
-    "submissionCount",
-    "nameError",
-    "emailError",
-    "subjectError",
-    "messageError",
-    "isValid",
-    "canSubmit",
-    "messageCharCount",
-  ],
-  render,
-);
-
-// Initial render
-render();
-log("Contact form ready. Fill in all fields and submit.");
-
-// Signal to tests that initialization is complete
 ```
 
 ## newsletter
 
 ```typescript
 // Example: newsletter
-// Source: examples/newsletter/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/newsletter/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Newsletter Signup - Vanilla Directive Example
+ * Newsletter Signup – Directive Module
  *
  * Demonstrates all six primitives with the simplest possible module:
  * - Facts: email, touched, status, errorMessage, lastSubmittedAt
@@ -617,10 +749,21 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RATE_LIMIT_MS = 10_000; // 10 seconds (shorter for demo)
 
 // ============================================================================
+// Logs (external mutable array, same pattern as fraud-analysis)
+// ============================================================================
+
+export const logs: string[] = [];
+
+export function addLog(msg: string): void {
+  console.log(`[newsletter] ${msg}`);
+  logs.push(`${new Date().toLocaleTimeString()}: ${msg}`);
+}
+
+// ============================================================================
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
     email: t.string(),
     touched: t.boolean(),
@@ -722,11 +865,11 @@ const newsletter = createModule("newsletter", {
   },
 
   resolvers: {
-    // Simulated submission — no API account needed
+    // Simulated submission – no API account needed
     subscribe: {
       requirement: "SUBSCRIBE",
       resolve: async (req, context) => {
-        log(`Subscribing: ${context.facts.email}`);
+        addLog(`Subscribing: ${context.facts.email}`);
 
         // Simulate network delay
         await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -735,28 +878,28 @@ const newsletter = createModule("newsletter", {
         if (Math.random() < 0.2) {
           context.facts.status = "error";
           context.facts.errorMessage =
-            "Simulated error — try again (20% failure rate for demo).";
-          log("Subscription failed (simulated)");
+            "Simulated error – try again (20% failure rate for demo).";
+          addLog("Subscription failed (simulated)");
 
           return;
         }
 
         context.facts.status = "success";
         context.facts.lastSubmittedAt = Date.now();
-        log("Subscription succeeded");
+        addLog("Subscription succeeded");
       },
     },
 
     resetAfterDelay: {
       requirement: "RESET_AFTER_DELAY",
       resolve: async (req, context) => {
-        log("Auto-resetting in 5 seconds...");
+        addLog("Auto-resetting in 5 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 5000));
         context.facts.email = "";
         context.facts.touched = false;
         context.facts.status = "idle";
         context.facts.errorMessage = "";
-        log("Form reset");
+        addLog("Form reset");
       },
     },
   },
@@ -770,7 +913,7 @@ const newsletter = createModule("newsletter", {
         }
 
         if (facts.status !== prev.status) {
-          log(`Status: ${prev.status} → ${facts.status}`);
+          addLog(`Status: ${prev.status} → ${facts.status}`);
         }
       },
     },
@@ -781,48 +924,11 @@ const newsletter = createModule("newsletter", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: newsletter,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "newsletter" })],
 });
-system.start();
-
-// ============================================================================
-// Logging helper
-// ============================================================================
-
-function log(msg: string) {
-  console.log(`[newsletter] ${msg}`);
-}
-
-// ============================================================================
-// DOM Bindings
-// ============================================================================
-
-
-// ============================================================================
-// Render
-// ============================================================================
-
-
-// Subscribe to all relevant facts and derivations
-system.subscribe(
-  [
-    "email",
-    "touched",
-    "status",
-    "errorMessage",
-    "lastSubmittedAt",
-    "emailError",
-    "isValid",
-    "canSubmit",
-  ],
-  render,
-);
-
-// Initial render
-render();
-log("Newsletter signup ready. Enter an email and subscribe.");
 ```
 
 ## feature-flags
@@ -830,7 +936,7 @@ log("Newsletter signup ready. Enter an email and subscribe.");
 ```typescript
 // Example: feature-flags
 // Source: examples/feature-flags/src/module.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
  * Feature Flags Directive Module (Example)
@@ -1055,10 +1161,10 @@ export const featureFlagsModule = createModule("feature-flags", {
 ```typescript
 // Example: shopping-cart
 // Source: examples/shopping-cart/src/shopping-cart.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Shopping Cart — Directive Modules
+ * Shopping Cart – Directive Modules
  *
  * Two modules:
  * - cart: Items, coupons, checkout with cross-module auth dependency
@@ -1243,22 +1349,22 @@ export const cartModule = createModule("cart", {
     },
 
     discount: (facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub * (facts.self.couponDiscount / 100);
     },
 
     tax: (facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
 
       return (sub - disc) * 0.08;
     },
 
     total: (_facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
-      const tx = derive.tax as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
+      const tx = derive.tax;
 
       return sub - disc + tx;
     },
@@ -1270,7 +1376,7 @@ export const cartModule = createModule("cart", {
     },
 
     freeShipping: (_facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub >= 75;
     },
@@ -1372,7 +1478,7 @@ export const cartModule = createModule("cart", {
       priority: 60,
       after: ["quantityLimit", "couponValidation"],
       when: (facts) => {
-        const items = facts.self.items as CartItem[];
+        const items = facts.self.items;
         const notEmpty = items.length > 0;
         const noOverstock = !items.some(
           (item: CartItem) => item.quantity > item.maxStock,
@@ -1472,6 +1578,7 @@ export const system = createSystem({
   debug: {
     timeTravel: true,
     maxSnapshots: 50,
+    runHistory: true,
   },
 });
 ```
@@ -1481,10 +1588,10 @@ export const system = createSystem({
 ```typescript
 // Example: form-wizard
 // Source: examples/form-wizard/src/form-wizard.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Form Wizard — Directive Modules
+ * Form Wizard – Directive Modules
  *
  * Two-module system demonstrating multi-step form validation,
  * constraint-driven step advancement, cross-module async email
@@ -1810,6 +1917,7 @@ export const system = createSystem({
     wizard: wizardModule,
     validation: validationModule,
   },
+  debug: { runHistory: true },
   plugins: [
     devtoolsPlugin({ name: "form-wizard" }),
     persistencePlugin({

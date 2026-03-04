@@ -16,7 +16,7 @@ Is the work async (API calls, timers)?
 │   ├── Yes → Add batch config to group them
 │   └── No  → Single resolve is fine
 │
-└── No → Reconsider — maybe this is an event handler or derivation
+└── No → Reconsider – maybe this is an event handler or derivation
 ```
 
 ## Basic Resolver
@@ -27,12 +27,12 @@ resolvers: {
     // Which requirement type this resolver handles
     requirement: "FETCH_USER",
 
-    // Async function — req is the requirement, context has facts + signal
+    // Async function – req is the requirement, context has facts + signal
     resolve: async (req, context) => {
       const res = await fetch(`/api/users/${req.userId}`);
       const user = await res.json();
 
-      // Mutate facts to store results — resolvers return void
+      // Mutate facts to store results – resolvers return void
       context.facts.user = user;
       context.facts.phase = "loaded";
     },
@@ -46,13 +46,13 @@ The `context` object provides:
 
 ```typescript
 resolve: async (req, context) => {
-  // context.facts — mutable proxy to the module's facts
+  // context.facts – mutable proxy to the module's facts
   context.facts.status = "loading";
 
-  // context.signal — AbortSignal, cancelled when system stops or requirement removed
+  // context.signal – AbortSignal, cancelled when system stops or requirement removed
   const res = await fetch("/api/data", { signal: context.signal });
 
-  // context.snapshot() — read-only snapshot for before/after comparisons
+  // context.snapshot() – read-only snapshot for before/after comparisons
   const before = context.snapshot();
   context.facts.count += 1;
   const after = context.snapshot();
@@ -69,7 +69,7 @@ resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
 
-    // Custom key — only one inflight resolver per userId
+    // Custom key – only one inflight resolver per userId
     key: (req) => `fetch-user-${req.userId}`,
 
     resolve: async (req, context) => {
@@ -270,14 +270,14 @@ const explanation = system.explain("req-123");
 ### Returning data from resolve
 
 ```typescript
-// WRONG — return value is ignored
+// WRONG – return value is ignored
 resolve: async (req, context) => {
   const user = await fetchUser(req.userId);
 
   return user; // Ignored!
 },
 
-// CORRECT — mutate context.facts
+// CORRECT – mutate context.facts
 resolve: async (req, context) => {
   const user = await fetchUser(req.userId);
   context.facts.user = user;
@@ -297,7 +297,7 @@ resolve: async (req, context) => { /* ... */ },
 ### Checking conditions in resolve (constraint's job)
 
 ```typescript
-// WRONG — condition checking belongs in constraint's when()
+// WRONG – condition checking belongs in constraint's when()
 resolve: async (req, context) => {
   if (!context.facts.isAuthenticated) {
     return;
@@ -305,7 +305,7 @@ resolve: async (req, context) => {
   // ...
 },
 
-// CORRECT — let constraints handle conditions
+// CORRECT – let constraints handle conditions
 // The resolver only runs when a requirement is emitted
 resolve: async (req, context) => {
   const data = await fetch("/api/data");
@@ -316,7 +316,7 @@ resolve: async (req, context) => {
 ### Forgetting error handling
 
 ```typescript
-// WRONG — unhandled errors with no recovery
+// WRONG – unhandled errors with no recovery
 resolvers: {
   fetch: {
     requirement: "FETCH",
@@ -327,7 +327,7 @@ resolvers: {
   },
 },
 
-// CORRECT — retry policy + error handling
+// CORRECT – retry policy + error handling
 resolvers: {
   fetch: {
     requirement: "FETCH",
@@ -346,7 +346,7 @@ resolvers: {
 ### Missing settle() after start()
 
 ```typescript
-// WRONG — reading facts before resolvers finish
+// WRONG – reading facts before resolvers finish
 system.start();
 console.log(system.facts.data); // Likely null
 

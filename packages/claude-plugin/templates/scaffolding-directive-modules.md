@@ -17,7 +17,7 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 - User asks for a "starter" or "template" for a Directive module
 - User wants to create a module with tests in one step
 
-### Exclusions — Use a Different Skill
+### Exclusions – Use a Different Skill
 - User wants to understand Directive concepts → `getting-started-with-directive`
 - User has existing code and wants patterns guidance → `writing-directive-modules`
 - User wants to review existing code → `reviewing-directive-code`
@@ -43,7 +43,7 @@ import { createModule, t } from "@directive-run/core";
 
 export const {camelCaseName} = createModule("{kebab-case-name}", {
   schema: {
-    // State — all facts must have type builders
+    // State – all facts must have type builders
     // {factName}: t.{type}(),
   },
 
@@ -53,7 +53,7 @@ export const {camelCaseName} = createModule("{kebab-case-name}", {
   },
 
   derive: {
-    // Computed values — pure functions, auto-tracked
+    // Computed values – pure functions, auto-tracked
     // {derivedName}: (facts) => {computation},
     // Composition: {name}: (facts, derive) => derive.other && facts.x,
   },
@@ -213,6 +213,6 @@ Test describe:      kebab-case      describe("user-auth", ...)
 ## Reference Files
 
 Supporting knowledge files loaded with this skill:
-- `core-patterns.md` — Patterns and API reference
-- `schema-types.md` — Type builders and schema patterns
-- `naming.md` — Naming conventions
+- `core-patterns.md` – Patterns and API reference
+- `schema-types.md` – Type builders and schema patterns
+- `naming.md` – Naming conventions

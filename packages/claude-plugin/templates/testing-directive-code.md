@@ -62,7 +62,7 @@ import {
 ### Single module
 
 ```typescript
-// Minimal — testing defaults: time-travel off, no plugins, sync settling
+// Minimal – testing defaults: time-travel off, no plugins, sync settling
 const system = createTestSystem(myModule);
 
 // With initial state
@@ -197,7 +197,7 @@ describe("fetchUser resolver", () => {
 
 ## Testing Derivations
 
-Set facts, then read the derived value. No need to settle — derivations are synchronous.
+Set facts, then read the derived value. No need to settle – derivations are synchronous.
 
 ```typescript
 describe("isOverBudget derivation", () => {
@@ -364,12 +364,12 @@ describe("time-travel", () => {
 ### 1. Testing real resolvers (hitting real APIs)
 
 ```typescript
-// WRONG — slow, flaky, external dependency
+// WRONG – slow, flaky, external dependency
 const system = createTestSystem(myModule);
 system.facts.needsFetch = true;
 await system.settle();   // Makes real HTTP call
 
-// CORRECT — always mock resolvers in unit tests
+// CORRECT – always mock resolvers in unit tests
 const system = createTestSystem(myModule, {
   mockResolvers: [mockResolver("FETCH", async (req, context) => {
     context.facts.data = { mocked: true };
@@ -380,7 +380,7 @@ const system = createTestSystem(myModule, {
 ### 2. Forgetting to settle before asserting async results
 
 ```typescript
-// WRONG — resolver hasn't completed
+// WRONG – resolver hasn't completed
 system.facts.trigger = true;
 assertFact(system, "result", "done");   // Fails
 
@@ -391,15 +391,15 @@ assertFact(system, "result", "done");
 ```
 
 ### 3. Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`. Applies to `mockResolver` callbacks too.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`. Applies to `mockResolver` callbacks too.
 
 ### 4. Testing implementation details instead of behavior
 
 ```typescript
-// WRONG — testing internal resolver call count without behavior check
+// WRONG – testing internal resolver call count without behavior check
 expect(mockFn).toHaveBeenCalledTimes(1);
 
-// CORRECT — test the observable outcome (facts, derivations)
+// CORRECT – test the observable outcome (facts, derivations)
 assertFact(system, "user", { id: "1", name: "Alice" });
 assertDerivation(system, "isLoggedIn", true);
 ```
@@ -407,22 +407,22 @@ assertDerivation(system, "isLoggedIn", true);
 ### 5. Using createSystem instead of createTestSystem
 
 ```typescript
-// WRONG — production system, no test defaults, runs plugins
+// WRONG – production system, no test defaults, runs plugins
 const system = createSystem({ module: myModule });
 
-// CORRECT — isolated, no plugins, testing utilities available
+// CORRECT – isolated, no plugins, testing utilities available
 const system = createTestSystem(myModule);
 ```
 
 ### 6. Not resetting fake timers
 
 ```typescript
-// WRONG — leaks fake timers to other tests
+// WRONG – leaks fake timers to other tests
 vi.useFakeTimers();
 await settleWithFakeTimers(system, vi);
 // Missing vi.useRealTimers()
 
-// CORRECT — always restore in afterEach or at the end of the test
+// CORRECT – always restore in afterEach or at the end of the test
 vi.useFakeTimers();
 await settleWithFakeTimers(system, vi);
 vi.useRealTimers();
@@ -438,7 +438,7 @@ vi.useRealTimers();
 ### 8. Forgetting to destroy the system between tests
 
 ```typescript
-// CORRECT — use afterEach to clean up
+// CORRECT – use afterEach to clean up
 let system: ReturnType<typeof createTestSystem>;
 
 beforeEach(() => {
@@ -475,5 +475,5 @@ const { facts, requirements, resolvers, inflight } = system.inspect();
 
 ## Reference Files
 
-- `testing.md` — full testing API, createTestSystem options, multi-module test setup
-- `time-travel.md` — time-travel API, changesets, export/import, performance considerations
+- `testing.md` – full testing API, createTestSystem options, multi-module test setup
+- `time-travel.md` – time-travel API, changesets, export/import, performance considerations

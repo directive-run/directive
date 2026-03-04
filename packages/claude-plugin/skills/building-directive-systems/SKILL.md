@@ -102,7 +102,7 @@ system.registerModule("chat", chatModule.default);
 
 ## Accessing System State
 
-### Single module — direct access
+### Single module – direct access
 
 ```typescript
 system.facts.count = 5;
@@ -112,7 +112,7 @@ system.events.increment();
 system.events.setUser({ user: { id: "1", name: "Alice" } });
 ```
 
-### Multi-module — namespaced access (dot notation always)
+### Multi-module – namespaced access (dot notation always)
 
 ```typescript
 system.facts.auth.token;
@@ -124,11 +124,11 @@ system.events.cart.addItem({ productId: "p1", qty: 1 });
 ```
 
 ```typescript
-// WRONG — internal separator never used in public API
+// WRONG – internal separator never used in public API
 system.facts["auth::token"];
 system.facts["auth_token"];
 
-// CORRECT — dot notation through namespace proxy
+// CORRECT – dot notation through namespace proxy
 system.facts.auth.token;
 ```
 
@@ -161,7 +161,7 @@ await system.when((facts) => facts.auth.isAuthenticated, { timeout: 5000 });
 ```typescript
 system.start();     // Begins constraint evaluation and reconciliation
 system.stop();      // Pauses evaluation, cancels inflight resolvers
-system.destroy();   // Full cleanup — subscriptions, plugins, resources
+system.destroy();   // Full cleanup – subscriptions, plugins, resources
 ```
 
 Always call `destroy()` when a system is no longer needed (teardown, React unmount, test cleanup).
@@ -251,7 +251,7 @@ plugins.push(persistencePlugin({
 }));
 ```
 
-Plugin order matters — logging first captures all events including those from other plugins.
+Plugin order matters – logging first captures all events including those from other plugins.
 
 ### Custom plugin
 
@@ -282,11 +282,11 @@ Import from `@directive-run/react`.
 ### Setup: create system outside React
 
 ```typescript
-// system.ts — created once, imported anywhere
+// system.ts – created once, imported anywhere
 export const system = createSystem({ module: counterModule });
 ```
 
-### useSelector — subscribe to state
+### useSelector – subscribe to state
 
 Re-renders only when the selected value changes (shallow comparison).
 
@@ -312,7 +312,7 @@ function Counter() {
 }
 ```
 
-### useEvent — dispatch events (stable reference)
+### useEvent – dispatch events (stable reference)
 
 ```typescript
 const events = useEvent(system);
@@ -320,7 +320,7 @@ events.increment();
 events.auth.login({ token: "abc" });   // Multi-module
 ```
 
-### useSystem — lifecycle scoped to component
+### useSystem – lifecycle scoped to component
 
 ```typescript
 import { useSystem } from "@directive-run/react";
@@ -338,7 +338,7 @@ function GameBoard() {
 
 Use `useSystem` when the system's lifecycle matches a component's lifecycle (wizard, game board, modal form). For app-wide state, create outside React.
 
-### DirectiveProvider — share system via context
+### DirectiveProvider – share system via context
 
 ```typescript
 import { DirectiveProvider, useDirectiveContext } from "@directive-run/react";
@@ -366,7 +366,7 @@ function Dashboard() {
 ### 1. Reading facts before settling
 
 ```typescript
-// WRONG — resolver hasn't completed
+// WRONG – resolver hasn't completed
 system.start();
 console.log(system.facts.user);   // null
 
@@ -379,9 +379,9 @@ console.log(system.facts.user);   // resolved
 ### 2. Forgetting to start the system
 
 ```typescript
-// WRONG — constraints never evaluate
+// WRONG – constraints never evaluate
 const system = createSystem({ module: myModule });
-console.log(system.facts.phase);  // "idle" — resolvers never ran
+console.log(system.facts.phase);  // "idle" – resolvers never ran
 
 // CORRECT
 system.start();
@@ -391,7 +391,7 @@ await system.settle();
 ### 3. Missing crossModuleDeps
 
 ```typescript
-// WRONG — facts.auth untyped, no reactive tracking
+// WRONG – facts.auth untyped, no reactive tracking
 when: (facts) => facts.auth.isAuthenticated,   // TypeScript error
 
 // CORRECT
@@ -402,7 +402,7 @@ when: (facts) => facts.auth.isAuthenticated,   // Fully typed + tracked
 ### 4. Bare facts.* in cross-module context
 
 ```typescript
-// WRONG — in cross-module constraints, bare facts has no self properties
+// WRONG – in cross-module constraints, bare facts has no self properties
 when: (facts) => facts.loaded,
 
 // CORRECT
@@ -422,19 +422,19 @@ system.facts.auth.token;
 ### 6. Creating system inside a React component without useSystem
 
 ```typescript
-// WRONG — new system on every render
+// WRONG – new system on every render
 function Counter() {
   const system = createSystem({ module: counterModule });   // Bug!
 }
 
-// CORRECT — module-level or useSystem()
+// CORRECT – module-level or useSystem()
 const system = createSystem({ module: counterModule });
 ```
 
 ### 7. The nonexistent useDirective hook
 
 ```typescript
-// WRONG — this does not exist
+// WRONG – this does not exist
 const { facts, derive, events } = useDirective(system);
 
 // CORRECT
@@ -445,17 +445,17 @@ const events = useEvent(system);
 ### 8. Selecting too much state in useSelector
 
 ```typescript
-// WRONG — re-renders on any fact change
+// WRONG – re-renders on any fact change
 const allFacts = useSelector(system, (s) => s.facts);
 
-// CORRECT — select only what you need
+// CORRECT – select only what you need
 const name = useSelector(system, (s) => s.facts.userName);
 ```
 
 ### 9. devtoolsPlugin in production
 
 ```typescript
-// CORRECT — gate on environment
+// CORRECT – gate on environment
 const plugins = process.env.NODE_ENV === "development"
   ? [loggingPlugin(), devtoolsPlugin()]
   : [];
@@ -464,7 +464,7 @@ const plugins = process.env.NODE_ENV === "development"
 ### 10. persistencePlugin without version
 
 ```typescript
-// WRONG — schema changes break existing users
+// WRONG – schema changes break existing users
 persistencePlugin({ key: "app", storage: localStorage })
 
 // CORRECT
@@ -493,7 +493,7 @@ system.isSettled;           // boolean
 
 ## Reference Files
 
-- `multi-module.md` — crossModuleDeps, module schema export pattern, subscribe/watch in multi-module
-- `system-api.md` — full system API reference, read(), watch(), when(), lifecycle order
-- `plugins.md` — all built-in plugins with full config, custom plugin lifecycle hooks
-- `react-adapter.md` — all React hooks with examples, common mistakes, multi-module patterns
+- `multi-module.md` – crossModuleDeps, module schema export pattern, subscribe/watch in multi-module
+- `system-api.md` – full system API reference, read(), watch(), when(), lifecycle order
+- `plugins.md` – all built-in plugins with full config, custom plugin lifecycle hooks
+- `react-adapter.md` – all React hooks with examples, common mistakes, multi-module patterns

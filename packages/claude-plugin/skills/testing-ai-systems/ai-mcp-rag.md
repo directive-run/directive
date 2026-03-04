@@ -30,13 +30,13 @@ import { createMCPAdapter } from "@directive-run/ai";
 
 const mcp = createMCPAdapter({
   servers: [
-    // stdio transport — runs a local process
+    // stdio transport – runs a local process
     {
       name: "tools",
       transport: "stdio",
       command: "npx mcp-server-tools",
     },
-    // SSE transport — connects to an HTTP server
+    // SSE transport – connects to an HTTP server
     {
       name: "data",
       transport: "sse",
@@ -78,10 +78,10 @@ const agent = {
 ### Anti-Pattern #36: Importing MCP from subpath
 
 ```typescript
-// WRONG — there is no /mcp subpath export
+// WRONG – there is no /mcp subpath export
 import { createMCPToolProvider } from "@directive-run/ai/mcp";
 
-// CORRECT — MCP adapter is exported from the main package
+// CORRECT – MCP adapter is exported from the main package
 import { createMCPAdapter } from "@directive-run/ai";
 ```
 
@@ -193,7 +193,7 @@ await enricher.ingestFile("./docs/architecture.md", {
 ## Enriching Prompts
 
 ```typescript
-// Basic enrichment — prepends relevant context
+// Basic enrichment – prepends relevant context
 const enrichedInput = await enricher.enrich("How do facts work?", {
   prefix: "Use this context to answer:\n",
 });

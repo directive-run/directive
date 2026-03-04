@@ -53,7 +53,7 @@ const system = createSystem({
     onEffectError: "skip",
     onDerivationError: "throw",
 
-    // Global error callback — fires for all errors
+    // Global error callback – fires for all errors
     onError: (error) => {
       // error is a DirectiveError with source tracking
       console.error(`[${error.source}] ${error.sourceId}: ${error.message}`);
@@ -79,17 +79,17 @@ Use functions instead of strings for conditional recovery:
 ```typescript
 errorBoundary: {
   onResolverError: (error, resolverId) => {
-    // Network errors — retry later
+    // Network errors – retry later
     if (error.message.includes("NetworkError")) {
       return "retry-later";
     }
 
-    // Auth errors — skip, don't retry
+    // Auth errors – skip, don't retry
     if (error.message.includes("401")) {
       return "skip";
     }
 
-    // Everything else — throw
+    // Everything else – throw
     return "throw";
   },
 
@@ -125,8 +125,8 @@ try {
 } catch (err) {
   if (err instanceof DirectiveError) {
     err.source;      // "constraint" | "resolver" | "effect" | "derivation" | "system"
-    err.sourceId;    // e.g., "fetchUser" — the specific item that failed
-    err.recoverable; // boolean — whether recovery strategies apply
+    err.sourceId;    // e.g., "fetchUser" – the specific item that failed
+    err.recoverable; // boolean – whether recovery strategies apply
     err.context;     // arbitrary debug data (e.g., the requirement object)
     err.message;     // human-readable description
   }
@@ -286,7 +286,7 @@ HALF_OPEN → Limited trial requests allowed
 
 ```typescript
 apiBreaker.getState();     // "CLOSED" | "OPEN" | "HALF_OPEN"
-apiBreaker.isAllowed();    // boolean — would a request be allowed?
+apiBreaker.isAllowed();    // boolean – would a request be allowed?
 apiBreaker.getStats();     // { totalRequests, totalFailures, recentFailures, ... }
 apiBreaker.forceState("CLOSED"); // Force state (useful in tests)
 apiBreaker.reset();        // Reset to CLOSED with cleared stats

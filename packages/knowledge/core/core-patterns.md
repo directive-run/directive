@@ -17,7 +17,7 @@ User wants to...
 ## Module Shape (Canonical Object Syntax)
 
 ```typescript
-// CORRECT — full module definition
+// CORRECT – full module definition
 import { createModule, t } from "@directive-run/core";
 
 const myModule = createModule("name", {
@@ -104,14 +104,14 @@ const myModule = createModule("name", {
 import { createSystem } from "@directive-run/core";
 import { loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 
-// Single module — direct access: system.facts.count
+// Single module – direct access: system.facts.count
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
   debug: { timeTravel: true, maxSnapshots: 100 },
 });
 
-// Multi-module — namespaced access: system.facts.auth.token
+// Multi-module – namespaced access: system.facts.auth.token
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule },
   plugins: [devtoolsPlugin()],
@@ -130,7 +130,7 @@ system.destroy();
 WRONG thinking: "I'll put the fetch call in a resolver that checks auth."
 
 ```typescript
-// WRONG — resolver doing condition checking + data fetching
+// WRONG – resolver doing condition checking + data fetching
 resolvers: {
   fetchData: {
     requirement: "FETCH_DATA",
@@ -148,7 +148,7 @@ resolvers: {
 CORRECT thinking: "Constraint declares WHEN, resolver declares HOW."
 
 ```typescript
-// CORRECT — constraint declares the need, resolver fulfills it
+// CORRECT – constraint declares the need, resolver fulfills it
 constraints: {
   fetchWhenAuthenticated: {
     when: (facts) => facts.isAuthenticated && !facts.data,
@@ -170,14 +170,14 @@ resolvers: {
 ## Reading System State
 
 ```typescript
-// Facts — mutable state
+// Facts – mutable state
 system.facts.count = 5;
 const val = system.facts.count;
 
-// Derivations — read-only computed values
+// Derivations – read-only computed values
 const loading = system.derive.isLoading;
 
-// Events — dispatch user actions
+// Events – dispatch user actions
 system.events.increment();
 system.events.setUser({ user: { id: "1", name: "Alice" } });
 
@@ -201,7 +201,7 @@ await system.when((facts) => facts.phase === "done", { timeout: 5000 });
 Only `facts` is required in the schema. Other sections are optional:
 
 ```typescript
-// Minimal module — facts only
+// Minimal module – facts only
 const minimal = createModule("minimal", {
   schema: {
     facts: { count: t.number() },

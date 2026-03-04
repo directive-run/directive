@@ -7,7 +7,7 @@
 ```typescript
 // Example: multi-module
 // Source: examples/multi-module/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Extracted for AI rules – DOM wiring stripped
 
 /**
  * Multi-Module Example - Main Entry Point
@@ -69,10 +69,10 @@ console.log("3. UI module effects react to facts.data.* changes");
 ```typescript
 // Example: dynamic-modules
 // Source: examples/dynamic-modules/src/modules.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Dynamic Modules — Directive Module Definitions
+ * Dynamic Modules – Directive Module Definitions
  *
  * Dashboard module (always loaded) + 3 dynamic modules (Counter, Weather, Dice).
  * Demonstrates runtime module registration, namespaced fact access,
@@ -97,7 +97,7 @@ export interface EventLogEntry {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 50) {
     log.splice(0, log.length - 50);
@@ -111,8 +111,8 @@ function addLogEntry(facts: any, event: string, detail: string): void {
 
 export const dashboardSchema = {
   facts: {
-    loadedModules: t.object<string[]>(),
-    eventLog: t.object<EventLogEntry[]>(),
+    loadedModules: t.array<string>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     loadedCount: t.number(),
@@ -132,12 +132,12 @@ export const dashboardModule = createModule("dashboard", {
   },
 
   derive: {
-    loadedCount: (facts) => (facts.loadedModules as string[]).length,
+    loadedCount: (facts) => facts.loadedModules.length,
   },
 
   events: {
     moduleLoaded: (facts, { name }) => {
-      facts.loadedModules = [...(facts.loadedModules as string[]), name];
+      facts.loadedModules = [...facts.loadedModules, name];
       addLogEntry(facts, "loaded", `Loaded "${name}" module`);
     },
   },
@@ -174,18 +174,15 @@ export const counterModule = createModule("counter", {
   },
 
   derive: {
-    isNearMax: (facts) => (facts.count as number) >= 90,
+    isNearMax: (facts) => facts.count >= 90,
   },
 
   events: {
     increment: (facts) => {
-      facts.count = (facts.count as number) + (facts.step as number);
+      facts.count = facts.count + facts.step;
     },
     decrement: (facts) => {
-      facts.count = Math.max(
-        0,
-        (facts.count as number) - (facts.step as number),
-      );
+      facts.count = Math.max(0, facts.count - facts.step);
     },
     setStep: (facts, { value }) => {
       facts.step = value;
@@ -195,7 +192,7 @@ export const counterModule = createModule("counter", {
   constraints: {
     overflow: {
       priority: 100,
-      when: (facts) => (facts.count as number) >= 100,
+      when: (facts) => facts.count >= 100,
       require: () => ({ type: "COUNTER_RESET" }),
     },
   },
@@ -252,13 +249,13 @@ export const weatherModule = createModule("weather", {
 
   derive: {
     summary: (facts) => {
-      if ((facts.city as string) === "") {
+      if (facts.city === "") {
         return "";
       }
 
       return `${facts.temperature}\u00B0F, ${facts.condition}`;
     },
-    hasFetched: (facts) => (facts.lastFetchedCity as string) !== "",
+    hasFetched: (facts) => facts.lastFetchedCity !== "",
   },
 
   events: {
@@ -274,12 +271,12 @@ export const weatherModule = createModule("weather", {
     needsFetch: {
       priority: 100,
       when: (facts) =>
-        (facts.city as string).length >= 2 &&
+        facts.city.length >= 2 &&
         facts.city !== facts.lastFetchedCity &&
-        !(facts.isLoading as boolean),
+        !facts.isLoading,
       require: (facts) => ({
         type: "FETCH_WEATHER",
-        city: facts.city as string,
+        city: facts.city,
       }),
     },
   },
@@ -295,7 +292,7 @@ export const weatherModule = createModule("weather", {
         const data = await mockFetchWeather(req.city, 800);
 
         // Stale check: only apply if city still matches
-        if ((context.facts.city as string) === req.city) {
+        if (context.facts.city === req.city) {
           context.facts.temperature = data.temperature;
           context.facts.condition = data.condition;
           context.facts.humidity = data.humidity;
@@ -338,7 +335,7 @@ export const diceModule = createModule("dice", {
   },
 
   derive: {
-    total: (facts) => (facts.die1 as number) + (facts.die2 as number),
+    total: (facts) => facts.die1 + facts.die2,
     isDoubles: (facts) => facts.die1 === facts.die2,
   },
 
@@ -346,7 +343,7 @@ export const diceModule = createModule("dice", {
     roll: (facts) => {
       facts.die1 = Math.floor(Math.random() * 6) + 1;
       facts.die2 = Math.floor(Math.random() * 6) + 1;
-      facts.rollCount = (facts.rollCount as number) + 1;
+      facts.rollCount = facts.rollCount + 1;
     },
   },
 });
@@ -367,14 +364,14 @@ export const moduleRegistry: Record<string, { module: any; label: string }> = {
 ```typescript
 // Example: theme-locale
 // Source: examples/theme-locale/src/theme-locale.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Theme & Locale — Directive Modules
+ * Theme & Locale – Directive Modules
  *
  * Two modules:
- * - `preferences` — theme, locale, sidebar, translations, system dark preference
- * - `layout` — responsive breakpoint tracking
+ * - `preferences` – theme, locale, sidebar, translations, system dark preference
+ * - `layout` – responsive breakpoint tracking
  *
  * Demonstrates multi-module composition, auto-tracked derivations,
  * effects for DOM side-effects, and persistence plugin for user prefs.
@@ -502,7 +499,7 @@ export const preferencesModule = createModule("preferences", {
     isRTL: (facts) => {
       const rtlLocales = ["ar", "he", "fa", "ur"];
 
-      return rtlLocales.includes(facts.locale as string);
+      return rtlLocales.includes(facts.locale);
     },
   },
 
@@ -543,10 +540,7 @@ export const preferencesModule = createModule("preferences", {
               ? "dark"
               : "light"
             : facts.theme;
-        document.documentElement.setAttribute(
-          "data-theme",
-          effective as string,
-        );
+        document.documentElement.setAttribute("data-theme", effective);
       },
     },
   },
@@ -576,10 +570,10 @@ export const layoutModule = createModule("layout", {
 ```typescript
 // Example: permissions
 // Source: examples/permissions/src/permissions.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Role-Based Permissions — Directive Modules
+ * Role-Based Permissions – Directive Modules
  *
  * Three modules demonstrate cross-module constraint resolution:
  * - auth: manages login state (role, userName, token)
@@ -677,7 +671,7 @@ export const authModule = createModule("auth", {
 
 export const permissionsSchema = {
   facts: {
-    permissions: t.object<string[]>(),
+    permissions: t.array<string>(),
     loaded: t.boolean(),
   },
   derivations: {
@@ -709,17 +703,17 @@ export const permissionsModule = createModule("permissions", {
 
   derive: {
     canEdit: (facts) =>
-      (facts.self.permissions as string[]).includes("content.edit"),
+      facts.self.permissions.includes("content.edit"),
     canPublish: (facts) =>
-      (facts.self.permissions as string[]).includes("content.publish"),
+      facts.self.permissions.includes("content.publish"),
     canDelete: (facts) =>
-      (facts.self.permissions as string[]).includes("content.delete"),
+      facts.self.permissions.includes("content.delete"),
     canManageUsers: (facts) =>
-      (facts.self.permissions as string[]).includes("users.manage"),
+      facts.self.permissions.includes("users.manage"),
     canViewAnalytics: (facts) =>
-      (facts.self.permissions as string[]).includes("analytics.view"),
-    isAdmin: (_facts, derive) => derive.canManageUsers as boolean,
-    permissionCount: (facts) => (facts.self.permissions as string[]).length,
+      facts.self.permissions.includes("analytics.view"),
+    isAdmin: (_facts, derive) => derive.canManageUsers,
+    permissionCount: (facts) => facts.self.permissions.length,
   },
 
   events: {
@@ -732,13 +726,11 @@ export const permissionsModule = createModule("permissions", {
   constraints: {
     loadPermissions: {
       when: (facts) => {
-        return (
-          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
-        );
+        return facts.auth.token !== "" && !facts.self.loaded;
       },
       require: (facts) => ({
         type: "FETCH_PERMISSIONS",
-        role: facts.auth.role as string,
+        role: facts.auth.role,
       }),
     },
   },
@@ -762,7 +754,7 @@ export const permissionsModule = createModule("permissions", {
 
 export const contentSchema = {
   facts: {
-    articles: t.object<Article[]>(),
+    articles: t.array<Article>(),
     loaded: t.boolean(),
     publishRequested: t.string(),
     deleteRequested: t.string(),
@@ -797,9 +789,7 @@ export const contentModule = createModule("content", {
   constraints: {
     loadContent: {
       when: (facts) => {
-        return (
-          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
-        );
+        return facts.auth.token !== "" && !facts.self.loaded;
       },
       require: { type: "LOAD_CONTENT" },
     },
@@ -807,28 +797,26 @@ export const contentModule = createModule("content", {
     publishArticle: {
       when: (facts) => {
         return (
-          (facts.self.publishRequested as string) !== "" &&
-          (facts.permissions.permissions as string[]).includes(
-            "content.publish",
-          )
+          facts.self.publishRequested !== "" &&
+          facts.permissions.permissions.includes("content.publish")
         );
       },
       require: (facts) => ({
         type: "PUBLISH_ARTICLE",
-        articleId: facts.self.publishRequested as string,
+        articleId: facts.self.publishRequested,
       }),
     },
 
     deleteArticle: {
       when: (facts) => {
         return (
-          (facts.self.deleteRequested as string) !== "" &&
-          (facts.permissions.permissions as string[]).includes("content.delete")
+          facts.self.deleteRequested !== "" &&
+          facts.permissions.permissions.includes("content.delete")
         );
       },
       require: (facts) => ({
         type: "DELETE_ARTICLE",
-        articleId: facts.self.deleteRequested as string,
+        articleId: facts.self.deleteRequested,
       }),
     },
   },
@@ -851,8 +839,7 @@ export const contentModule = createModule("content", {
         context.facts.actionStatus = "publishing";
         await apiPublishArticle(req.articleId);
 
-        const articles = context.facts.articles as Article[];
-        context.facts.articles = articles.map((a) => {
+        context.facts.articles = context.facts.articles.map((a) => {
           if (a.id === req.articleId) {
             return { ...a, status: "published" as const };
           }
@@ -871,8 +858,9 @@ export const contentModule = createModule("content", {
         context.facts.actionStatus = "deleting";
         await apiDeleteArticle(req.articleId);
 
-        const articles = context.facts.articles as Article[];
-        context.facts.articles = articles.filter((a) => a.id !== req.articleId);
+        context.facts.articles = context.facts.articles.filter(
+          (a) => a.id !== req.articleId,
+        );
         context.facts.deleteRequested = "";
         context.facts.actionStatus = "done";
       },
@@ -908,6 +896,7 @@ export const system = createSystem({
     permissions: permissionsModule,
     content: contentModule,
   },
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "permissions" })],
 });
 ```
@@ -917,10 +906,10 @@ export const system = createSystem({
 ```typescript
 // Example: notifications
 // Source: examples/notifications/src/notifications.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Notifications & Toasts — Directive Modules
+ * Notifications & Toasts – Directive Modules
  *
  * Two modules:
  * - notifications: queue management, auto-dismiss via constraints, overflow protection
@@ -947,13 +936,13 @@ export interface Notification {
 
 export const notificationsSchema = {
   facts: {
-    queue: t.object<Notification[]>(),
+    queue: t.array<Notification>(),
     maxVisible: t.number(),
     now: t.number(),
     idCounter: t.number(),
   },
   derivations: {
-    visibleNotifications: t.object<Notification[]>(),
+    visibleNotifications: t.array<Notification>(),
     hasNotifications: t.boolean(),
     oldestExpired: t.object<Notification | null>(),
   },
@@ -988,24 +977,20 @@ export const notificationsModule = createModule("notifications", {
 
   derive: {
     visibleNotifications: (facts) => {
-      return (facts.queue as Notification[]).slice(
-        0,
-        facts.maxVisible as number,
-      );
+      return facts.queue.slice(0, facts.maxVisible);
     },
 
     hasNotifications: (facts) => {
-      return (facts.queue as Notification[]).length > 0;
+      return facts.queue.length > 0;
     },
 
     oldestExpired: (facts) => {
-      const queue = facts.queue as Notification[];
-      const oldest = queue[0];
+      const oldest = facts.queue[0];
       if (!oldest) {
         return null;
       }
 
-      if ((facts.now as number) > oldest.createdAt + oldest.ttl) {
+      if (facts.now > oldest.createdAt + oldest.ttl) {
         return oldest;
       }
 
@@ -1023,20 +1008,18 @@ export const notificationsModule = createModule("notifications", {
       when: (_facts, derive) => derive.oldestExpired !== null,
       require: (_facts, derive) => ({
         type: "DISMISS_NOTIFICATION" as const,
-        id: (derive.oldestExpired as Notification).id,
+        id: derive.oldestExpired!.id,
       }),
     },
 
     overflow: {
       priority: 60,
       when: (facts) => {
-        const queue = facts.queue as Notification[];
-
-        return queue.length > (facts.maxVisible as number) + 5;
+        return facts.queue.length > facts.maxVisible + 5;
       },
       require: (facts) => ({
         type: "DISMISS_NOTIFICATION" as const,
-        id: (facts.queue as Notification[])[0].id,
+        id: facts.queue[0].id,
       }),
     },
   },
@@ -1049,7 +1032,7 @@ export const notificationsModule = createModule("notifications", {
     dismiss: {
       requirement: "DISMISS_NOTIFICATION",
       resolve: async (req, context) => {
-        context.facts.queue = (context.facts.queue as Notification[]).filter(
+        context.facts.queue = context.facts.queue.filter(
           (n) => n.id !== req.id,
         );
       },
@@ -1071,7 +1054,7 @@ export const notificationsModule = createModule("notifications", {
         warning: 6000,
         error: 10000,
       };
-      const counter = (facts.idCounter as number) + 1;
+      const counter = facts.idCounter + 1;
       facts.idCounter = counter;
 
       const notification: Notification = {
@@ -1082,11 +1065,11 @@ export const notificationsModule = createModule("notifications", {
         ttl: payload.ttl ?? ttlMap[payload.level] ?? 4000,
       };
 
-      facts.queue = [...(facts.queue as Notification[]), notification];
+      facts.queue = [...facts.queue, notification];
     },
 
     dismissNotification: (facts, { id }: { id: string }) => {
-      facts.queue = (facts.queue as Notification[]).filter((n) => n.id !== id);
+      facts.queue = facts.queue.filter((n) => n.id !== id);
     },
 
     tick: (facts) => {
@@ -1105,7 +1088,7 @@ export const notificationsModule = createModule("notifications", {
 
 export const appSchema = {
   facts: {
-    actionLog: t.object<string[]>(),
+    actionLog: t.array<string>(),
   },
   events: {
     simulateAction: { message: t.string(), level: t.string() },
@@ -1121,7 +1104,7 @@ export const appModule = createModule("app", {
 
   events: {
     simulateAction: (facts, { message }: { message: string }) => {
-      facts.actionLog = [...(facts.actionLog as string[]), message];
+      facts.actionLog = [...facts.actionLog, message];
     },
   },
 });
@@ -1132,10 +1115,10 @@ export const appModule = createModule("app", {
 ```typescript
 // Example: dashboard-loader
 // Source: examples/dashboard-loader/src/dashboard-loader.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Dashboard Loader — Directive Module
+ * Dashboard Loader – Directive Module
  *
  * Demonstrates loading & error states with concurrent resource fetching,
  * configurable delays/failure rates, retry with exponential backoff,
@@ -1202,7 +1185,7 @@ export const dashboardLoaderSchema = {
     preferencesFailRate: t.number(),
     permissionsFailRate: t.number(),
     loadRequested: t.boolean(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     loadedCount: t.number(),
@@ -1238,7 +1221,7 @@ function addLogEntry(
   resource: string,
   detail: string,
 ): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, resource, detail });
   facts.eventLog = log;
 }
@@ -1313,9 +1296,9 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     combinedStatus: (facts, derive) => {
-      const loaded = derive.loadedCount as number;
-      const anyErr = derive.anyError as boolean;
-      const anyLoad = derive.anyLoading as boolean;
+      const loaded = derive.loadedCount;
+      const anyErr = derive.anyError;
+      const anyLoad = derive.anyLoading;
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -1348,7 +1331,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     canStart: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -1369,7 +1352,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     start: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       if (id.length === 0) {
         return;
       }
@@ -1425,54 +1408,42 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     needsProfile: {
       priority: 100,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const profile = facts.profile as ResourceState<Profile>;
+        const id = facts.userId.trim();
+        const profile = facts.profile;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          profile.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && profile.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PROFILE",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPreferences: {
       priority: 90,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const prefs = facts.preferences as ResourceState<Preferences>;
+        const id = facts.userId.trim();
+        const prefs = facts.preferences;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          prefs.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && prefs.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PREFERENCES",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPermissions: {
       priority: 80,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const perms = facts.permissions as ResourceState<Permissions>;
+        const id = facts.userId.trim();
+        const perms = facts.permissions;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          perms.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && perms.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PERMISSIONS",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
   },
@@ -1487,7 +1458,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 10000,
       resolve: async (req, context) => {
-        const prev = context.facts.profile as ResourceState<Profile>;
+        const prev = context.facts.profile;
         context.facts.profile = {
           ...prev,
           status: "loading",
@@ -1504,24 +1475,22 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockProfile(
             req.userId,
-            context.facts.profileDelay as number,
-            context.facts.profileFailRate as number,
+            context.facts.profileDelay,
+            context.facts.profileFailRate,
           );
           context.facts.profile = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.profile as ResourceState<Profile>)
-              .attempts,
-            startedAt: (context.facts.profile as ResourceState<Profile>)
-              .startedAt,
+            attempts: context.facts.profile.attempts,
+            startedAt: context.facts.profile.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(context.facts, "success", "profile", data.name);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.profile = {
-            ...(context.facts.profile as ResourceState<Profile>),
+            ...context.facts.profile,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -1536,7 +1505,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       requirement: "FETCH_PREFERENCES",
       retry: { attempts: 2, backoff: "exponential" },
       resolve: async (req, context) => {
-        const prev = context.facts.preferences as ResourceState<Preferences>;
+        const prev = context.facts.preferences;
         context.facts.preferences = {
           ...prev,
           status: "loading",
@@ -1553,17 +1522,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPreferences(
             req.userId,
-            context.facts.preferencesDelay as number,
-            context.facts.preferencesFailRate as number,
+            context.facts.preferencesDelay,
+            context.facts.preferencesFailRate,
           );
           context.facts.preferences = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.preferences as ResourceState<Preferences>)
-              .attempts,
-            startedAt: (context.facts.preferences as ResourceState<Preferences>)
-              .startedAt,
+            attempts: context.facts.preferences.attempts,
+            startedAt: context.facts.preferences.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -1575,7 +1542,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.preferences = {
-            ...(context.facts.preferences as ResourceState<Preferences>),
+            ...context.facts.preferences,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -1591,7 +1558,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 15000,
       resolve: async (req, context) => {
-        const prev = context.facts.permissions as ResourceState<Permissions>;
+        const prev = context.facts.permissions;
         context.facts.permissions = {
           ...prev,
           status: "loading",
@@ -1608,17 +1575,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPermissions(
             req.userId,
-            context.facts.permissionsDelay as number,
-            context.facts.permissionsFailRate as number,
+            context.facts.permissionsDelay,
+            context.facts.permissionsFailRate,
           );
           context.facts.permissions = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.permissions as ResourceState<Permissions>)
-              .attempts,
-            startedAt: (context.facts.permissions as ResourceState<Permissions>)
-              .startedAt,
+            attempts: context.facts.permissions.attempts,
+            startedAt: context.facts.permissions.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -1630,7 +1595,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.permissions = {
-            ...(context.facts.permissions as ResourceState<Permissions>),
+            ...context.facts.permissions,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -1649,10 +1614,10 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
 ```typescript
 // Example: pagination
 // Source: examples/pagination/src/pagination.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Pagination & Infinite Scroll — Directive Modules
+ * Pagination & Infinite Scroll – Directive Modules
  *
  * Two modules: `filters` owns search/sort/category,
  * `list` owns items and pagination state with crossModuleDeps.
@@ -1719,7 +1684,7 @@ export const filtersModule = createModule("filters", {
 
 export const listSchema = {
   facts: {
-    items: t.object<ListItem[]>(),
+    items: t.array<ListItem>(),
     cursor: t.string(),
     hasMore: t.boolean(),
     isLoadingMore: t.boolean(),
@@ -1904,6 +1869,7 @@ export const listModule = createModule("list", {
 
 export const system = createSystem({
   modules: { filters: filtersModule, list: listModule },
+  debug: { runHistory: true },
   plugins: [loggingPlugin(), devtoolsPlugin({ name: "pagination" })],
 });
 ```
@@ -1913,10 +1879,10 @@ export const system = createSystem({
 ```typescript
 // Example: url-sync
 // Source: examples/url-sync/src/url-sync.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * URL Sync — Directive Modules
+ * URL Sync – Directive Modules
  *
  * Two modules that synchronize URL query parameters with product filtering:
  * - **url module**: Reads/writes URL params, dispatches filter changes
@@ -1936,7 +1902,7 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { type Product, allProducts, filterProducts } from "./mock-products.js";
 
 // ============================================================================
-// URL Module — Schema
+// URL Module – Schema
 // ============================================================================
 
 export const urlSchema = {
@@ -1965,7 +1931,7 @@ export const urlSchema = {
 } satisfies ModuleSchema;
 
 // ============================================================================
-// URL Module — Helpers
+// URL Module – Helpers
 // ============================================================================
 
 function readUrlParams(): {
@@ -2073,15 +2039,15 @@ export const urlModule = createModule("url", {
         const params = new URLSearchParams();
 
         if (facts.search !== "") {
-          params.set("q", facts.search as string);
+          params.set("q", facts.search);
         }
         if (facts.category !== "" && facts.category !== "all") {
-          params.set("cat", facts.category as string);
+          params.set("cat", facts.category);
         }
         if (facts.sortBy !== "newest") {
-          params.set("sort", facts.sortBy as string);
+          params.set("sort", facts.sortBy);
         }
-        if ((facts.page as number) > 1) {
+        if (facts.page > 1) {
           params.set("page", String(facts.page));
         }
 
@@ -2099,12 +2065,12 @@ export const urlModule = createModule("url", {
 });
 
 // ============================================================================
-// Products Module — Schema
+// Products Module – Schema
 // ============================================================================
 
 export const productsSchema = {
   facts: {
-    items: t.object<Product[]>(),
+    items: t.array<Product>(),
     totalItems: t.number(),
     isLoading: t.boolean(),
     itemsPerPage: t.number(),
@@ -2241,6 +2207,7 @@ export const system = createSystem({
     url: urlModule,
     products: productsModule,
   },
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "url-sync" })],
 });
 ```
@@ -2250,10 +2217,10 @@ export const system = createSystem({
 ```typescript
 // Example: websocket
 // Source: examples/websocket/src/websocket.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * WebSocket Connections — Directive Module
+ * WebSocket Connections – Directive Module
  *
  * Demonstrates resolver-driven connection lifecycle, automatic reconnection
  * via constraints with exponential backoff, live message streaming,
@@ -2299,7 +2266,7 @@ export const websocketSchema = {
     url: t.string(),
     status: t.string<WsStatus>(),
     connectRequested: t.boolean(),
-    messages: t.object<WsMessage[]>(),
+    messages: t.array<WsMessage>(),
     retryCount: t.number(),
     maxRetries: t.number(),
     messageToSend: t.string(),
@@ -2308,7 +2275,7 @@ export const websocketSchema = {
     messageRate: t.number(),
     connectFailRate: t.number(),
     reconnectFailRate: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isConnected: t.boolean(),
@@ -2350,7 +2317,7 @@ export const websocketSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   // Cap at 100
   if (log.length > 100) {
@@ -2562,7 +2529,7 @@ export const websocketModule = createModule("websocket", {
               return;
             }
 
-            const messages = [...(context.facts.messages as WsMessage[])];
+            const messages = [...context.facts.messages];
             messages.push(msg);
             // Cap at 50
             if (messages.length > 50) {
@@ -2619,7 +2586,7 @@ export const websocketModule = createModule("websocket", {
       requirement: "RECONNECT",
       timeout: 60000,
       resolve: async (req, context) => {
-        const retryCount = context.facts.retryCount as number;
+        const retryCount = context.facts.retryCount;
         context.facts.status = "reconnecting";
         context.facts.reconnectTargetTime = Date.now() + req.delay;
         addLogEntry(
@@ -2659,7 +2626,7 @@ export const websocketModule = createModule("websocket", {
 ```typescript
 // Example: server
 // Source: examples/server/src/server.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
  * Directive Server Example
@@ -2980,10 +2947,10 @@ app.listen(PORT, () => {
 ```typescript
 // Example: optimistic-updates
 // Source: examples/optimistic-updates/src/optimistic-updates.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Optimistic Updates — Directive Module
+ * Optimistic Updates – Directive Module
  *
  * Demonstrates optimistic mutations via events (instant UI), server sync via
  * constraint-resolver pattern, per-operation rollback from a sync queue,
@@ -3031,15 +2998,15 @@ let nextOpId = 1;
 
 export const optimisticUpdatesSchema = {
   facts: {
-    items: t.object<TodoItem[]>(),
-    syncQueue: t.object<SyncQueueEntry[]>(),
+    items: t.array<TodoItem>(),
+    syncQueue: t.array<SyncQueueEntry>(),
     syncingOpId: t.string(),
     newItemText: t.string(),
     serverDelay: t.number(),
     failRate: t.number(),
     toastMessage: t.string(),
     toastType: t.string(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     totalCount: t.number(),
@@ -3107,16 +3074,15 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
   // ============================================================================
 
   derive: {
-    totalCount: (facts) => (facts.items as TodoItem[]).length,
+    totalCount: (facts) => facts.items.length,
 
-    doneCount: (facts) =>
-      (facts.items as TodoItem[]).filter((i) => i.done).length,
+    doneCount: (facts) => facts.items.filter((i) => i.done).length,
 
-    pendingCount: (facts) => (facts.syncQueue as SyncQueueEntry[]).length,
+    pendingCount: (facts) => facts.syncQueue.length,
 
-    canAdd: (facts) => (facts.newItemText as string).trim() !== "",
+    canAdd: (facts) => facts.newItemText.trim() !== "",
 
-    isSyncing: (facts) => (facts.syncingOpId as string) !== "",
+    isSyncing: (facts) => facts.syncingOpId !== "",
   },
 
   // ============================================================================
@@ -3125,15 +3091,14 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
 
   events: {
     toggleItem: (facts, { id }) => {
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
-      facts.items = items.map((i) =>
+      facts.items = facts.items.map((i) =>
         i.id === id ? { ...i, done: !i.done } : i,
       );
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId: id, op: "toggle", undoItems });
       facts.syncQueue = queue;
 
@@ -3141,13 +3106,12 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     },
 
     deleteItem: (facts, { id }) => {
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
-      facts.items = items.filter((i) => i.id !== id);
+      facts.items = facts.items.filter((i) => i.id !== id);
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId: id, op: "delete", undoItems });
       facts.syncQueue = queue;
 
@@ -3155,20 +3119,19 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     },
 
     addItem: (facts) => {
-      const text = (facts.newItemText as string).trim();
+      const text = facts.newItemText.trim();
       if (!text) {
         return;
       }
 
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
       const itemId = String(nextId++);
-      facts.items = [...items, { id: itemId, text, done: false }];
+      facts.items = [...facts.items, { id: itemId, text, done: false }];
       facts.newItemText = "";
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId, op: "add", undoItems });
       facts.syncQueue = queue;
 
@@ -3201,17 +3164,12 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     needsSync: {
       priority: 100,
       when: (facts) => {
-        const queue = facts.syncQueue as SyncQueueEntry[];
-        const syncingOpId = facts.syncingOpId as string;
-
-        return queue.length > 0 && syncingOpId === "";
+        return facts.syncQueue.length > 0 && facts.syncingOpId === "";
       },
       require: (facts) => {
-        const queue = facts.syncQueue as SyncQueueEntry[];
-
         return {
           type: "SYNC_TODO",
-          opId: queue[0].opId,
+          opId: facts.syncQueue[0].opId,
         };
       },
     },
@@ -3227,8 +3185,7 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
       key: (req) => `sync-${req.opId}`,
       timeout: 10000,
       resolve: async (req, context) => {
-        const queue = context.facts.syncQueue as SyncQueueEntry[];
-        const entry = queue.find((e) => e.opId === req.opId);
+        const entry = context.facts.syncQueue.find((e) => e.opId === req.opId);
         if (!entry) {
           return;
         }
@@ -3240,8 +3197,8 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
           `Syncing ${entry.op} for item ${entry.itemId}...`,
         );
 
-        const serverDelay = context.facts.serverDelay as number;
-        const failRate = context.facts.failRate as number;
+        const serverDelay = context.facts.serverDelay;
+        const failRate = context.facts.failRate;
 
         try {
           await mockServerSync(entry.op, entry.itemId, serverDelay, failRate);
@@ -3258,15 +3215,14 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
           addLogEntry(
             context.facts,
             "rollback",
-            `Failed to ${entry.op} item ${entry.itemId} — rolled back`,
+            `Failed to ${entry.op} item ${entry.itemId} – rolled back`,
           );
-          context.facts.toastMessage = `Failed to ${entry.op} — rolled back`;
+          context.facts.toastMessage = `Failed to ${entry.op} – rolled back`;
           context.facts.toastType = "error";
         }
 
         // Remove entry from queue
-        const currentQueue = context.facts.syncQueue as SyncQueueEntry[];
-        context.facts.syncQueue = currentQueue.filter(
+        context.facts.syncQueue = context.facts.syncQueue.filter(
           (e) => e.opId !== req.opId,
         );
         context.facts.syncingOpId = "";
@@ -3283,12 +3239,10 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
       deps: ["syncingOpId"],
       run: (facts, prev) => {
         if (prev) {
-          const prevId = prev.syncingOpId as string;
-          const currId = facts.syncingOpId as string;
-          if (prevId === "" && currId !== "") {
-            addLogEntry(facts, "status", `Sync started: op ${currId}`);
-          } else if (prevId !== "" && currId === "") {
-            addLogEntry(facts, "status", `Sync completed: op ${prevId}`);
+          if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
+            addLogEntry(facts, "status", `Sync started: op ${facts.syncingOpId}`);
+          } else if (prev.syncingOpId !== "" && facts.syncingOpId === "") {
+            addLogEntry(facts, "status", `Sync completed: op ${prev.syncingOpId}`);
           }
         }
       },
@@ -3301,14 +3255,14 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
 
 ```typescript
 // Example: ab-testing
-// Source: examples/ab-testing/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/ab-testing/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * A/B Testing Engine — DOM Rendering & System Wiring
+ * A/B Testing Engine – Directive Module
  *
- * Creates the Directive system, subscribes to state changes,
- * renders experiment cards and event timeline.
+ * Types, schema, helpers, module definition, timeline, and system creation
+ * for a constraint-driven A/B testing engine with deterministic hashing.
  */
 
 import {
@@ -3323,20 +3277,20 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-interface Variant {
+export interface Variant {
   id: string;
   weight: number;
   label: string;
 }
 
-interface Experiment {
+export interface Experiment {
   id: string;
   name: string;
   variants: Variant[];
   active: boolean;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
@@ -3380,9 +3334,9 @@ function pickVariant(
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function log(type: "event" | "constraint" | "resolver", msg: string) {
+export function addLog(type: "event" | "constraint" | "resolver", msg: string) {
   console.log(`[AB] [${type}] ${msg}`);
 
   // Classify for timeline
@@ -3427,16 +3381,16 @@ function log(type: "event" | "constraint" | "resolver", msg: string) {
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
-    experiments: t.object<Experiment[]>(),
+    experiments: t.array<Experiment>(),
     assignments: t.object<Record<string, string>>(),
     exposures: t.object<Record<string, number>>(),
     userId: t.string(),
     paused: t.boolean(),
   },
   derivations: {
-    activeExperiments: t.object<Experiment[]>(),
+    activeExperiments: t.array<Experiment>(),
     assignedCount: t.number(),
     exposedCount: t.number(),
   },
@@ -3444,7 +3398,7 @@ const schema = {
     registerExperiment: {
       id: t.string(),
       name: t.string(),
-      variants: t.object<Variant[]>(),
+      variants: t.array<Variant>(),
     },
     assignVariant: { experimentId: t.string(), variantId: t.string() },
     recordExposure: { experimentId: t.string() },
@@ -3475,9 +3429,7 @@ const abTesting = createModule("ab-testing", {
 
   derive: {
     activeExperiments: (facts) =>
-      (facts.experiments as Experiment[]).filter(
-        (e) => e.active && !facts.paused,
-      ),
+      facts.experiments.filter((e: Experiment) => e.active && !facts.paused),
     assignedCount: (facts) => Object.keys(facts.assignments).length,
     exposedCount: (facts) => Object.keys(facts.exposures).length,
   },
@@ -3585,7 +3537,7 @@ const abTesting = createModule("ab-testing", {
           ...context.facts.assignments,
           [req.experimentId]: variantId,
         };
-        log("resolver", `Assigned ${req.experimentId} → ${variantId}`);
+        addLog("resolver", `Assigned ${req.experimentId} → ${variantId}`);
       },
     },
 
@@ -3597,7 +3549,7 @@ const abTesting = createModule("ab-testing", {
           ...context.facts.exposures,
           [req.experimentId]: now,
         };
-        log(
+        addLog(
           "resolver",
           `Exposure tracked: ${req.experimentId} (variant: ${req.variantId}) at ${new Date(now).toLocaleTimeString()}`,
         );
@@ -3610,80 +3562,11 @@ const abTesting = createModule("ab-testing", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: abTesting,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ab-testing" })],
 });
-system.start();
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-// Stats
-
-// Timeline
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-system.subscribe(
-  [
-    "experiments",
-    "assignments",
-    "exposures",
-    "userId",
-    "paused",
-    "activeExperiments",
-    "assignedCount",
-    "exposedCount",
-  ],
-  render,
-);
-
-// Button handlers
-
-
-// ============================================================================
-// Register sample experiments
-// ============================================================================
-
-system.events.registerExperiment({
-  id: "theme-icons",
-  name: "Theme Icons",
-  variants: [
-    { id: "custom-svg", weight: 50, label: "Custom SVG" },
-    { id: "phosphor", weight: 50, label: "Phosphor" },
-  ],
-});
-log("event", "Registered experiment: theme-icons");
-
-system.events.registerExperiment({
-  id: "cta-color",
-  name: "CTA Button Color",
-  variants: [
-    { id: "brand", weight: 50, label: "Brand" },
-    { id: "green", weight: 30, label: "Green" },
-    { id: "orange", weight: 20, label: "Orange" },
-  ],
-});
-log("event", "Registered experiment: cta-color");
-
-// Initial render
-render();
-
-// Signal to tests that initialization is complete
 ```
 
 ## sudoku
@@ -3691,7 +3574,7 @@ render();
 ```typescript
 // Example: sudoku
 // Source: examples/sudoku/src/sudoku.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
  * Sudoku – Directive Module
@@ -3743,23 +3626,23 @@ export const sudokuSchema = {
     won: t.boolean(),
     message: t.string(),
     notesMode: t.boolean(),
-    notes: t.object<Set<number>[]>(),
+    notes: t.array<Set<number>>(),
     hintsUsed: t.number(),
     errorsCount: t.number(),
     hintRequested: t.boolean(),
   },
   derivations: {
-    conflicts: t.object<Conflict[]>(),
+    conflicts: t.array<Conflict>(),
     conflictIndices: t.object<Set<number>>(),
     hasConflicts: t.boolean(),
     filledCount: t.number(),
     progress: t.number(),
     isComplete: t.boolean(),
     isSolved: t.boolean(),
-    selectedPeers: t.object<number[]>(),
+    selectedPeers: t.array<number>(),
     highlightValue: t.number(),
     sameValueIndices: t.object<Set<number>>(),
-    candidates: t.object<number[]>(),
+    candidates: t.array<number>(),
     timerDisplay: t.string(),
     timerUrgency: t.object<"normal" | "warning" | "critical">(),
   },
@@ -3835,13 +3718,13 @@ export const sudokuGame = createModule("sudoku", {
 
   derive: {
     conflicts: (facts) => {
-      return findConflicts(facts.grid as Grid);
+      return findConflicts(facts.grid);
     },
 
     conflictIndices: (facts, derive) => {
       const indices = new Set<number>();
-      const givens = facts.givens as Set<number>;
-      for (const c of derive.conflicts as Conflict[]) {
+      const givens = facts.givens;
+      for (const c of derive.conflicts) {
         // Only highlight player-placed cells, not givens
         if (!givens.has(c.index)) {
           indices.add(c.index);
@@ -3852,12 +3735,12 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     hasConflicts: (_facts, derive) => {
-      return (derive.conflicts as Conflict[]).length > 0;
+      return derive.conflicts.length > 0;
     },
 
     filledCount: (facts) => {
       let count = 0;
-      const grid = facts.grid as Grid;
+      const grid = facts.grid;
       for (let i = 0; i < 81; i++) {
         if (grid[i] !== 0) {
           count++;
@@ -3868,21 +3751,19 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     progress: (_facts, derive) => {
-      return Math.round(((derive.filledCount as number) / 81) * 100);
+      return Math.round((derive.filledCount / 81) * 100);
     },
 
     isComplete: (facts) => {
-      return isBoardComplete(facts.grid as Grid);
+      return isBoardComplete(facts.grid);
     },
 
     isSolved: (_facts, derive) => {
-      return (
-        (derive.isComplete as boolean) && !(derive.hasConflicts as boolean)
-      );
+      return derive.isComplete && !derive.hasConflicts;
     },
 
     selectedPeers: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return [];
       }
@@ -3891,22 +3772,22 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     highlightValue: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return 0;
       }
 
-      return (facts.grid as Grid)[sel];
+      return facts.grid[sel];
     },
 
     sameValueIndices: (facts, derive) => {
-      const val = derive.highlightValue as number;
+      const val = derive.highlightValue;
       if (val === 0) {
         return new Set<number>();
       }
 
       const indices = new Set<number>();
-      const grid = facts.grid as Grid;
+      const grid = facts.grid;
       for (let i = 0; i < 81; i++) {
         if (grid[i] === val) {
           indices.add(i);
@@ -3917,16 +3798,16 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     candidates: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return [];
       }
 
-      return getCandidates(facts.grid as Grid, sel);
+      return getCandidates(facts.grid, sel);
     },
 
     timerDisplay: (facts) => {
-      const remaining = facts.timerRemaining as number;
+      const remaining = facts.timerRemaining;
       const mins = Math.max(0, Math.floor(remaining / 60));
       const secs = Math.max(0, remaining % 60);
 
@@ -3934,7 +3815,7 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     timerUrgency: (facts) => {
-      const remaining = facts.timerRemaining as number;
+      const remaining = facts.timerRemaining;
       if (remaining <= TIMER_CRITICAL_THRESHOLD) {
         return "critical";
       }
@@ -3990,12 +3871,12 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         facts.message = "That cell is locked.";
 
@@ -4004,7 +3885,7 @@ export const sudokuGame = createModule("sudoku", {
 
       if (facts.notesMode && value !== 0) {
         // In notes mode, toggle the pencil mark instead
-        const notes = [...(facts.notes as Set<number>[])];
+        const notes = [...facts.notes];
         notes[sel] = new Set(notes[sel]);
         if (notes[sel].has(value)) {
           notes[sel].delete(value);
@@ -4018,13 +3899,13 @@ export const sudokuGame = createModule("sudoku", {
       }
 
       // Place or clear a number
-      const grid = [...(facts.grid as Grid)];
+      const grid = [...facts.grid];
       grid[sel] = value;
       facts.grid = grid;
 
       // Clear notes for this cell when placing a number
       if (value !== 0) {
-        const notes = [...(facts.notes as Set<number>[])];
+        const notes = [...facts.notes];
         notes[sel] = new Set();
         // Also clear this value from peer notes
         for (const peer of getPeers(sel)) {
@@ -4044,22 +3925,22 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         return;
       }
 
       // Only allow notes on empty cells
-      if ((facts.grid as Grid)[sel] !== 0) {
+      if (facts.grid[sel] !== 0) {
         return;
       }
 
-      const notes = [...(facts.notes as Set<number>[])];
+      const notes = [...facts.notes];
       notes[sel] = new Set(notes[sel]);
       if (notes[sel].has(value)) {
         notes[sel].delete(value);
@@ -4070,7 +3951,7 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     toggleNotesMode: (facts) => {
-      facts.notesMode = !(facts.notesMode as boolean);
+      facts.notesMode = !facts.notesMode;
     },
 
     requestHint: (facts) => {
@@ -4083,21 +3964,21 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         facts.message = "Select a cell first.";
 
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         facts.message = "That cell is already filled.";
 
         return;
       }
 
-      if ((facts.grid as Grid)[sel] !== 0) {
+      if (facts.grid[sel] !== 0) {
         facts.message = "Clear the cell first, or select an empty cell.";
 
         return;
@@ -4111,7 +3992,7 @@ export const sudokuGame = createModule("sudoku", {
       if (!facts.timerRunning || facts.gameOver) {
         return;
       }
-      facts.timerRemaining = Math.max(0, (facts.timerRemaining as number) - 1);
+      facts.timerRemaining = Math.max(0, facts.timerRemaining - 1);
     },
   },
 
@@ -4128,7 +4009,7 @@ export const sudokuGame = createModule("sudoku", {
           return false;
         }
 
-        return (facts.timerRemaining as number) <= 0;
+        return facts.timerRemaining <= 0;
       },
       require: () => ({
         type: "GAME_OVER",
@@ -4143,14 +4024,14 @@ export const sudokuGame = createModule("sudoku", {
         if (facts.gameOver) {
           return false;
         }
-        const conflicts = findConflicts(facts.grid as Grid);
-        const givens = facts.givens as Set<number>;
+        const conflicts = findConflicts(facts.grid);
+        const givens = facts.givens;
 
         return conflicts.some((c) => !givens.has(c.index));
       },
       require: (facts) => {
-        const conflicts = findConflicts(facts.grid as Grid);
-        const givens = facts.givens as Set<number>;
+        const conflicts = findConflicts(facts.grid);
+        const givens = facts.givens;
         const playerConflict = conflicts.find((c) => !givens.has(c.index));
         const idx = playerConflict?.index ?? 0;
         const { row, col } = toRowCol(idx);
@@ -4174,15 +4055,15 @@ export const sudokuGame = createModule("sudoku", {
         }
 
         return (
-          isBoardComplete(facts.grid as Grid) &&
-          findConflicts(facts.grid as Grid).length === 0
+          isBoardComplete(facts.grid) &&
+          findConflicts(facts.grid).length === 0
         );
       },
       require: (facts) => ({
         type: "GAME_WON",
-        timeLeft: facts.timerRemaining as number,
-        hintsUsed: facts.hintsUsed as number,
-        errors: facts.errorsCount as number,
+        timeLeft: facts.timerRemaining,
+        hintsUsed: facts.hintsUsed,
+        errors: facts.errorsCount,
       }),
     },
 
@@ -4197,16 +4078,16 @@ export const sudokuGame = createModule("sudoku", {
           return false;
         }
 
-        const sel = facts.selectedIndex as number | null;
+        const sel = facts.selectedIndex;
         if (sel === null) {
           return false;
         }
 
-        return (facts.grid as Grid)[sel] === 0;
+        return facts.grid[sel] === 0;
       },
       require: (facts) => {
         const sel = facts.selectedIndex as number;
-        const solution = facts.solution as Grid;
+        const solution = facts.solution;
 
         return {
           type: "REVEAL_HINT",
@@ -4225,7 +4106,7 @@ export const sudokuGame = createModule("sudoku", {
     showConflict: {
       requirement: "SHOW_CONFLICT",
       resolve: async (req, context) => {
-        context.facts.errorsCount = (context.facts.errorsCount as number) + 1;
+        context.facts.errorsCount = context.facts.errorsCount + 1;
         context.facts.message = `Conflict at row ${req.row}, column ${req.col} – duplicate ${req.value}.`;
       },
     },
@@ -4238,14 +4119,10 @@ export const sudokuGame = createModule("sudoku", {
         context.facts.won = true;
 
         const mins = Math.floor(
-          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
-            req.timeLeft) /
-            60,
+          (TIMER_DURATIONS[context.facts.difficulty] - req.timeLeft) / 60,
         );
         const secs =
-          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
-            req.timeLeft) %
-          60;
+          (TIMER_DURATIONS[context.facts.difficulty] - req.timeLeft) % 60;
         context.facts.message = `Solved in ${mins}m ${secs}s! Hints: ${req.hintsUsed}, Errors: ${req.errors}`;
       },
     },
@@ -4263,12 +4140,12 @@ export const sudokuGame = createModule("sudoku", {
     revealHint: {
       requirement: "REVEAL_HINT",
       resolve: async (req, context) => {
-        const grid = [...(context.facts.grid as Grid)];
+        const grid = [...context.facts.grid];
         grid[req.index] = req.value;
         context.facts.grid = grid;
 
         // Clear notes for the hinted cell and remove value from peer notes
-        const notes = [...(context.facts.notes as Set<number>[])];
+        const notes = [...context.facts.notes];
         notes[req.index] = new Set();
         for (const peer of getPeers(req.index)) {
           if (notes[peer].has(req.value)) {
@@ -4279,8 +4156,8 @@ export const sudokuGame = createModule("sudoku", {
         context.facts.notes = notes;
 
         context.facts.hintRequested = false;
-        context.facts.hintsUsed = (context.facts.hintsUsed as number) + 1;
-        context.facts.message = `Hint revealed! ${MAX_HINTS - (context.facts.hintsUsed as number)} remaining.`;
+        context.facts.hintsUsed = context.facts.hintsUsed + 1;
+        context.facts.message = `Hint revealed! ${MAX_HINTS - context.facts.hintsUsed} remaining.`;
       },
     },
   },
@@ -4293,7 +4170,7 @@ export const sudokuGame = createModule("sudoku", {
     timerWarning: {
       deps: ["timerRemaining"],
       run: (facts) => {
-        const remaining = facts.timerRemaining as number;
+        const remaining = facts.timerRemaining;
         if (remaining === TIMER_EFFECT_WARNING) {
           console.log("[Sudoku] 1 minute remaining!");
         }

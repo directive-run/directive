@@ -46,13 +46,13 @@ Logs state changes, requirements, and resolutions to the console.
 ```typescript
 import { loggingPlugin } from "@directive-run/core/plugins";
 
-// Default — logs facts changes and resolver start/complete
+// Default – logs facts changes and resolver start/complete
 loggingPlugin()
 
-// Verbose — logs everything including derivation recomputation and constraint evaluation
+// Verbose – logs everything including derivation recomputation and constraint evaluation
 loggingPlugin({ verbose: true })
 
-// Custom filter — only log specific events
+// Custom filter – only log specific events
 loggingPlugin({
   filter: (event) => {
     // Only log resolver events
@@ -97,7 +97,7 @@ persistencePlugin({
   storage: localStorage,
 })
 
-// sessionStorage — cleared when tab closes
+// sessionStorage – cleared when tab closes
 persistencePlugin({
   key: "session-state",
   storage: sessionStorage,
@@ -113,7 +113,7 @@ persistencePlugin({
   },
 })
 
-// Selective persistence — only persist certain facts
+// Selective persistence – only persist certain facts
 persistencePlugin({
   key: "my-app",
   storage: localStorage,
@@ -122,7 +122,7 @@ persistencePlugin({
   exclude: ["tempData", "sessionId"], // Everything except these
 })
 
-// Versioning — handle schema changes
+// Versioning – handle schema changes
 persistencePlugin({
   key: "my-app",
   storage: localStorage,
@@ -267,13 +267,13 @@ const system = createSystem({
 ### Enabling devtools in production
 
 ```typescript
-// WRONG — devtools overhead in production
+// WRONG – devtools overhead in production
 const system = createSystem({
   module: myModule,
   plugins: [devtoolsPlugin()],
 });
 
-// CORRECT — conditional on environment
+// CORRECT – conditional on environment
 const plugins = [];
 if (process.env.NODE_ENV === "development") {
   plugins.push(devtoolsPlugin());
@@ -289,13 +289,13 @@ const system = createSystem({
 ### Persistence without versioning
 
 ```typescript
-// WRONG — schema changes break existing users
+// WRONG – schema changes break existing users
 persistencePlugin({
   key: "app-state",
   storage: localStorage,
 })
 
-// CORRECT — version and migrate
+// CORRECT – version and migrate
 persistencePlugin({
   key: "app-state",
   storage: localStorage,
@@ -307,7 +307,7 @@ persistencePlugin({
 ### Plugin order matters
 
 ```typescript
-// WRONG — logging misses events from persistence restore
+// WRONG – logging misses events from persistence restore
 const system = createSystem({
   module: myModule,
   plugins: [
@@ -316,7 +316,7 @@ const system = createSystem({
   ],
 });
 
-// CORRECT — logging first to capture everything
+// CORRECT – logging first to capture everything
 const system = createSystem({
   module: myModule,
   plugins: [
@@ -329,13 +329,13 @@ const system = createSystem({
 ### Persisting sensitive or transient data
 
 ```typescript
-// WRONG — persists auth tokens and loading state
+// WRONG – persists auth tokens and loading state
 persistencePlugin({
   key: "app",
   storage: localStorage,
 })
 
-// CORRECT — exclude sensitive and transient facts
+// CORRECT – exclude sensitive and transient facts
 persistencePlugin({
   key: "app",
   storage: localStorage,
