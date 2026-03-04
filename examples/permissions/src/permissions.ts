@@ -328,5 +328,6 @@ export const system = createSystem({
     permissions: permissionsModule,
     content: contentModule,
   },
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "permissions" })],
 });

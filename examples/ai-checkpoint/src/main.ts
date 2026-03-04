@@ -227,6 +227,7 @@ const pipelineModule = createModule("pipeline", {
 
 const system = createSystem({
   module: pipelineModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ai-checkpoint" })],
 });
 system.start();

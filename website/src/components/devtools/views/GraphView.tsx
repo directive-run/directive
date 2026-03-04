@@ -111,11 +111,12 @@ interface AgentNodeData {
   status: string;
   tokens: number;
   runs: number;
+  instructions: string | null;
   [key: string]: unknown;
 }
 
 function AgentNode({ data, selected }: NodeProps) {
-  const { label, status, tokens, runs } = data as AgentNodeData;
+  const { label, status, tokens, runs, instructions } = data as AgentNodeData;
   const color = STATUS_COLORS[status] ?? STATUS_COLORS.pending;
 
   return (
@@ -148,6 +149,11 @@ function AgentNode({ data, selected }: NodeProps) {
               )}
             </div>
           )}
+          {instructions && (
+            <div className="mt-1 max-w-[200px] truncate text-[10px] italic text-zinc-500">
+              {instructions}
+            </div>
+          )}
         </div>
       </div>
 
@@ -165,7 +171,11 @@ function AgentNode({ data, selected }: NodeProps) {
 // ---------------------------------------------------------------------------
 
 function VirtualNode({ data, selected }: NodeProps) {
-  const { label } = data as { label: string; [key: string]: unknown };
+  const { label, snippet } = data as {
+    label: string;
+    snippet: string | null;
+    [key: string]: unknown;
+  };
 
   return (
     <div
@@ -179,6 +189,11 @@ function VirtualNode({ data, selected }: NodeProps) {
         className="!h-2 !w-2 !bg-zinc-600"
       />
       <div className="text-xs font-medium text-zinc-400">{label}</div>
+      {snippet && (
+        <div className="mt-0.5 max-w-[180px] truncate text-[10px] text-zinc-500">
+          {snippet}
+        </div>
+      )}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -539,6 +554,22 @@ function buildParallelGraph(events: DebugEvent[]): {
   enrichFromAgentEvents(nodes, events);
   markVirtualStatus(nodes, events);
 
+  // Propagate first agent input → Input node, last agent output → Merge node
+  const inputNode = nodes.get("__input");
+  const mergeNode = nodes.get("__merge");
+  for (const id of agentIds) {
+    const agent = nodes.get(id);
+    if (!agent) {
+      continue;
+    }
+    if (inputNode && agent.lastInput && !inputNode.lastInput) {
+      inputNode.lastInput = agent.lastInput;
+    }
+    if (mergeNode && agent.lastOutput) {
+      mergeNode.lastOutput = agent.lastOutput;
+    }
+  }
+
   const edges: GraphEdgeState[] = [];
   for (const id of agentIds) {
     edges.push({ source: "__input", target: id });
@@ -804,6 +835,22 @@ function buildRaceGraph(events: DebugEvent[]): {
 
   enrichFromAgentEvents(nodes, events);
   markVirtualStatus(nodes, events);
+
+  // Propagate first agent input → Input node, last agent output → Output node
+  const inputNode = nodes.get("__input");
+  const outputNode = nodes.get("__output");
+  for (const id of agentIds) {
+    const agent = nodes.get(id);
+    if (!agent) {
+      continue;
+    }
+    if (inputNode && agent.lastInput && !inputNode.lastInput) {
+      inputNode.lastInput = agent.lastInput;
+    }
+    if (outputNode && agent.lastOutput) {
+      outputNode.lastOutput = agent.lastOutput;
+    }
+  }
 
   const edges: GraphEdgeState[] = [];
   for (const id of agentIds) {
@@ -1320,8 +1367,7 @@ function buildGraphFromEvents(events: DebugEvent[]): {
 
     // Only agent events, no DAG structure — show flat agent nodes
     const agentIds = extractAgentIds(events);
-    if (agentIds.length <= 1) {
-      // Single agent — graph isn't useful, show empty state
+    if (agentIds.length === 0) {
       return null;
     }
 
@@ -1907,6 +1953,9 @@ function layoutGraph(
         runs: n.runs,
         progress: n.progress,
         description: n.description,
+        instructions: n.instructions,
+        // Virtual nodes show a snippet: input for Input, output for Merge
+        snippet: n.isVirtual ? (n.lastInput ?? n.lastOutput ?? null) : null,
       },
     };
   });

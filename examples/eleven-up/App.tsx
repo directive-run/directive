@@ -247,6 +247,7 @@ function CardComponent({ card, selected, onSelect }: CardProps) {
 // Create the system
 const system = createSystem({
   module: elevenUpGame,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "eleven-up" })],
 });
 system.start();

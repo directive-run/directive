@@ -22,6 +22,7 @@ import type { User } from "./mock-auth.js";
 
 const system = createSystem({
   module: authFlowModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "auth-flow" })],
 });
 system.start();

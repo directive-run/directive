@@ -20,6 +20,7 @@ import {
 
 const system = createSystem({
   module: dashboardLoaderModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "dashboard-loader" })],
 });
 system.start();

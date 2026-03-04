@@ -33,6 +33,7 @@ export const system = createSystem({
   debug: {
     timeTravel: true,
     maxSnapshots: 50,
+    runHistory: true,
   },
 });
 

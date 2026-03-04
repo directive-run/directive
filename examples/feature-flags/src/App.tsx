@@ -10,6 +10,7 @@ import { featureFlagsModule } from "./module";
 // Create the system with persistence
 const system = createSystem({
   module: featureFlagsModule,
+  debug: { runHistory: true },
   plugins: [
     devtoolsPlugin({ name: "feature-flags" }),
     persistencePlugin({
