@@ -249,7 +249,7 @@ export function createDerivationsManager<
           throw new Error(
             `[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. ` +
               `Remaining: ${remaining.join(", ")}. ` +
-              `This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
+              "This usually means a derivation listener is mutating facts that re-trigger the same derivation.",
           );
         }
 

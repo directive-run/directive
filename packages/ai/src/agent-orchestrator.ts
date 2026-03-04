@@ -468,7 +468,7 @@ export function createAgentOrchestrator<
       throw new Error(
         `[Directive] Facts schema key "${key}" conflicts with orchestrator state. ` +
           `Reserved keys: ${RESERVED_ORCHESTRATOR_KEYS.join(", ")}. ` +
-          `Rename your fact to avoid the collision.`,
+          "Rename your fact to avoid the collision.",
       );
     }
   }
@@ -486,6 +486,7 @@ export function createAgentOrchestrator<
   } satisfies ModuleSchema;
 
   // Forward declaration for runAgentWithGuardrails (used in resolver converter)
+  // biome-ignore lint/style/useConst: forward declaration, assigned later
   let runAgentWithGuardrailsFn: <T>(
     agent: AgentLike,
     input: string,
@@ -495,6 +496,7 @@ export function createAgentOrchestrator<
   ) => Promise<RunResult<T>>;
 
   // Forward declaration for system (used in resolver converter)
+  // biome-ignore lint/style/useConst: forward declaration, assigned later
   // biome-ignore lint/suspicious/noExplicitAny: System type varies
   let system: SingleModuleSystem<any>;
 
@@ -505,7 +507,7 @@ export function createAgentOrchestrator<
 
   // Add built-in budget limit constraint
   if (maxTokenBudget) {
-    directiveConstraints["__budgetLimit"] = {
+    directiveConstraints.__budgetLimit = {
       priority: 100, // High priority
       // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => getAgentState(facts).tokenUsage > maxTokenBudget,
@@ -524,7 +526,7 @@ export function createAgentOrchestrator<
     );
 
   // Add built-in pause resolver
-  directiveResolvers["__pause"] = {
+  directiveResolvers.__pause = {
     requirement: requirementGuard<PauseBudgetExceededReq>(
       "__PAUSE_BUDGET_EXCEEDED",
     ),
@@ -1480,11 +1482,11 @@ export function createAgentOrchestrator<
         reject(
           new Error(
             `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-              `Solutions:\n` +
-              `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
-              `  2. Set autoApproveToolCalls: true to auto-approve\n` +
+              "Solutions:\n" +
+              "  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n" +
+              "  2. Set autoApproveToolCalls: true to auto-approve\n" +
               `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-              `See: https://directive.run/docs/ai/running-agents`,
+              "See: https://directive.run/docs/ai/running-agents",
           ),
         );
       }, approvalTimeoutMs);

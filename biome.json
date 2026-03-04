@@ -10,7 +10,7 @@
       "complexity": {
         "noExcessiveCognitiveComplexity": "warn",
         "noForEach": "warn",
-        "useLiteralKeys": "warn",
+        "useLiteralKeys": "error",
         "noBannedTypes": "warn"
       },
       "style": {
@@ -20,12 +20,12 @@
         "useImportType": "error",
         "useConsistentArrayType": "warn",
         "useTemplate": "warn",
-        "noUnusedTemplateLiteral": "warn",
+        "noUnusedTemplateLiteral": "error",
         "noParameterAssign": "warn",
-        "useExponentiationOperator": "warn",
-        "useConst": "warn",
-        "noUselessElse": "warn",
-        "noCommaOperator": "warn"
+        "useExponentiationOperator": "error",
+        "useConst": "error",
+        "noUselessElse": "error",
+        "noCommaOperator": "error"
       },
       "correctness": {
         "noUnusedImports": "error",
@@ -36,13 +36,13 @@
         "noExplicitAny": "warn",
         "noArrayIndexKey": "warn",
         "noAssignInExpressions": "warn",
-        "noConfusingVoidType": "warn"
+        "noConfusingVoidType": "error"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
       },
       "performance": {
-        "noDelete": "warn"
+        "noDelete": "error"
       },
       "a11y": {
         "recommended": false

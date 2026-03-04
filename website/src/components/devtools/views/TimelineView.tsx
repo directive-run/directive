@@ -281,7 +281,7 @@ export function TimelineView() {
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      const factor = Math.pow(1.003, -e.deltaY);
+      const factor = 1.003 ** -e.deltaY;
       setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z * factor)));
     }
   }, []);

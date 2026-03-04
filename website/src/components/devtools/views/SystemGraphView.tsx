@@ -888,7 +888,7 @@ function DetailRow({
   const [expanded, setExpanded] = useState(false);
 
   if (expandable && value !== null && typeof value === "object") {
-    const preview = Array.isArray(value) ? `Array(${value.length})` : `Object`;
+    const preview = Array.isArray(value) ? `Array(${value.length})` : "Object";
 
     return (
       <div>

@@ -81,16 +81,16 @@ export interface RetryLaterConfig {
 export interface ErrorBoundaryConfig {
   onConstraintError?:
     | RecoveryStrategy
-    | ((error: Error, constraint: string) => RecoveryStrategy | void);
+    | ((error: Error, constraint: string) => RecoveryStrategy | undefined);
   onResolverError?:
     | RecoveryStrategy
-    | ((error: Error, resolver: string) => RecoveryStrategy | void);
+    | ((error: Error, resolver: string) => RecoveryStrategy | undefined);
   onEffectError?:
     | RecoveryStrategy
-    | ((error: Error, effect: string) => RecoveryStrategy | void);
+    | ((error: Error, effect: string) => RecoveryStrategy | undefined);
   onDerivationError?:
     | RecoveryStrategy
-    | ((error: Error, derivation: string) => RecoveryStrategy | void);
+    | ((error: Error, derivation: string) => RecoveryStrategy | undefined);
   onError?: (error: DirectiveError) => void;
 
   /** Configuration for retry-later strategy */

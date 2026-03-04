@@ -513,7 +513,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
           rState.attempts++;
           // Exponential backoff with jitter, capped at 60s
           const delay = Math.min(
-            rState.baseDelay * Math.pow(2, rState.attempts - 1) +
+            rState.baseDelay * 2 ** (rState.attempts - 1) +
               Math.random() * 1000,
             60000,
           );

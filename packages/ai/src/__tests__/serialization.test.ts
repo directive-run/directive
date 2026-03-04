@@ -164,18 +164,16 @@ describe("patternToJSON / patternFromJSON", () => {
       "analyze",
       "summarize",
     ]);
-    expect(restored.nodes["fetch"]!.handler).toBe("fetcher");
-    expect(restored.nodes["analyze"]!.deps).toEqual(["fetch"]);
-    expect(restored.nodes["analyze"]!.timeout).toBe(3000);
-    expect(restored.nodes["summarize"]!.priority).toBe(5);
+    expect(restored.nodes.fetch!.handler).toBe("fetcher");
+    expect(restored.nodes.analyze!.deps).toEqual(["fetch"]);
+    expect(restored.nodes.analyze!.timeout).toBe(3000);
+    expect(restored.nodes.summarize!.priority).toBe(5);
     // when/transform stripped
     expect(
-      (restored.nodes["analyze"] as unknown as Record<string, unknown>)["when"],
+      (restored.nodes.analyze as unknown as Record<string, unknown>).when,
     ).toBeUndefined();
     expect(
-      (restored.nodes["analyze"] as unknown as Record<string, unknown>)[
-        "transform"
-      ],
+      (restored.nodes.analyze as unknown as Record<string, unknown>).transform,
     ).toBeUndefined();
     // merge function stripped
     expect(restored.merge).toBeUndefined();
@@ -311,10 +309,10 @@ describe("patternToJSON / patternFromJSON", () => {
 
     // The restored object must not have a polluted prototype
     expect(
-      (restored as unknown as Record<string, unknown>)["polluted"],
+      (restored as unknown as Record<string, unknown>).polluted,
     ).toBeUndefined();
     // The plain Object.prototype must not be polluted
-    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
 
     expect(restored.type).toBe("parallel");
     expect((restored as ParallelPattern<unknown>).handlers).toEqual(["a", "b"]);
@@ -331,13 +329,13 @@ describe("patternToJSON / patternFromJSON", () => {
     patternFromJSON(poisoned);
 
     // Object.prototype must not be contaminated
-    expect(({} as Record<string, unknown>)["evil"]).toBeUndefined();
+    expect(({} as Record<string, unknown>).evil).toBeUndefined();
 
     // The pattern itself must not carry the poisoned key
     const restored = patternFromJSON(poisoned);
     expect(restored.type).toBe("sequential");
     expect(
-      (restored as unknown as Record<string, unknown>)["evil"],
+      (restored as unknown as Record<string, unknown>).evil,
     ).toBeUndefined();
   });
 
@@ -422,9 +420,9 @@ describe("patternToJSON / patternFromJSON", () => {
     const restored = patternFromJSON(deserialized) as DagPattern<unknown>;
 
     expect(restored.type).toBe("dag");
-    expect(restored.nodes["A"]!.handler).toBe("fetcher");
-    expect(restored.nodes["B"]!.handler).toBe("analyzer");
-    expect(restored.nodes["B"]!.deps).toEqual(["A"]);
+    expect(restored.nodes.A!.handler).toBe("fetcher");
+    expect(restored.nodes.B!.handler).toBe("analyzer");
+    expect(restored.nodes.B!.deps).toEqual(["A"]);
   });
 
   it("JSON.stringify / JSON.parse full cycle — reflect with numeric threshold", () => {

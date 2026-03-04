@@ -132,7 +132,7 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
       delay = initialDelay * attempt;
       break;
     case "exponential":
-      delay = initialDelay * Math.pow(2, attempt - 1);
+      delay = initialDelay * 2 ** (attempt - 1);
       break;
     default:
       delay = initialDelay;
@@ -176,7 +176,7 @@ export function createResolversManager<S extends Schema>(
       if (!def.resolve && !def.resolveBatch && !def.resolveBatchWithResults) {
         throw new Error(
           `[Directive] Resolver "${id}" must define either resolve() or resolveBatch(). ` +
-            `Add one of these methods to handle requirements.`,
+            "Add one of these methods to handle requirements.",
         );
       }
       if (
@@ -187,7 +187,7 @@ export function createResolversManager<S extends Schema>(
         if (def.resolve) {
           console.warn(
             `[Directive] Resolver "${id}" has batch.enabled but no resolveBatch(). ` +
-              `Falling back to individual resolve() calls. Add resolveBatch() for true bulk operations.`,
+              "Falling back to individual resolve() calls. Add resolveBatch() for true bulk operations.",
           );
         } else {
           throw new Error(

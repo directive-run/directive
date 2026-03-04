@@ -183,7 +183,7 @@ export const checkersGame = createModule("checkers", {
         }
         facts.selectedIndex = index;
         facts.targetIndex = null;
-        facts.message = `Selected. Choose a destination.`;
+        facts.message = "Selected. Choose a destination.";
         return;
       }
 

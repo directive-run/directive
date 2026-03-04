@@ -731,7 +731,7 @@ export function createRetryUntilSuccess<S extends Schema, TResult = unknown>(
         }
 
         if (!isSuccess(result, facts)) {
-          throw new Error(`Operation not yet successful`);
+          throw new Error("Operation not yet successful");
         }
       },
     },

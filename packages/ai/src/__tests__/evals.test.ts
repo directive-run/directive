@@ -556,13 +556,13 @@ describe("createEvalSuite", () => {
     });
 
     const results = await suite.run();
-    const summary = results.summary["a"]!;
+    const summary = results.summary.a!;
 
     expect(summary.agentName).toBe("a");
     expect(summary.totalCases).toBe(2);
     expect(summary.totalTokens).toBe(200);
-    expect(summary.criterionAverages["cost"]).toBeDefined();
-    expect(summary.criterionPassRates["cost"]).toBeDefined();
+    expect(summary.criterionAverages.cost).toBeDefined();
+    expect(summary.criterionPassRates.cost).toBeDefined();
   });
 
   it("fires onCaseComplete callback", async () => {
@@ -621,10 +621,10 @@ describe("createEvalSuite", () => {
 
     const results = await suite.run();
 
-    expect(results.summary["failing"]!.passRate).toBe(0);
+    expect(results.summary.failing!.passRate).toBe(0);
     for (const detail of results.details) {
       expect(detail.allPassed).toBe(false);
-      expect(detail.scores["cost"]!.reason).toContain("Agent error");
+      expect(detail.scores.cost!.reason).toContain("Agent error");
     }
   });
 
@@ -688,9 +688,9 @@ describe("createEvalSuite", () => {
     const detail = results.details[0]!;
 
     expect(Object.keys(detail.scores)).toHaveLength(3);
-    expect(detail.scores["cost"]!.passed).toBe(true);
-    expect(detail.scores["safety"]!.passed).toBe(true);
-    expect(detail.scores["length"]!.passed).toBe(true);
+    expect(detail.scores.cost!.passed).toBe(true);
+    expect(detail.scores.safety!.passed).toBe(true);
+    expect(detail.scores.length!.passed).toBe(true);
     expect(detail.allPassed).toBe(true);
   });
 
@@ -710,7 +710,7 @@ describe("createEvalSuite", () => {
 
     const results = await suite.run();
 
-    expect(results.details[0]!.scores["custom"]!.score).toBe(1.0);
+    expect(results.details[0]!.scores.custom!.score).toBe(1.0);
   });
 
   it("respects abort signal", async () => {
@@ -957,7 +957,7 @@ describe("NaN score propagation guard (A10)", () => {
     });
 
     const results = await suite.run();
-    const summary = results.summary["a"]!;
+    const summary = results.summary.a!;
 
     // The weighted average should be finite (NaN replaced with 0)
     expect(Number.isFinite(summary.overallScore)).toBe(true);
@@ -979,7 +979,7 @@ describe("NaN score propagation guard (A10)", () => {
     });
 
     const results = await suite.run();
-    const summary = results.summary["a"]!;
+    const summary = results.summary.a!;
 
     expect(Number.isFinite(summary.overallScore)).toBe(true);
   });

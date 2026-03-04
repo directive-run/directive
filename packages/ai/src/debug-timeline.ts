@@ -162,7 +162,7 @@ export function createDebugTimeline(
           // A6: Log listener errors in dev mode instead of swallowing silently
           if (
             typeof process !== "undefined" &&
-            process.env?.["NODE_ENV"] !== "production"
+            process.env?.NODE_ENV !== "production"
           ) {
             console.error(
               "[Directive DebugTimeline] Listener threw:",

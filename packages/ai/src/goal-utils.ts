@@ -176,7 +176,7 @@ function buildGraph(
 
     throw new Error(
       `[Directive Goal] Circular dependency detected among agents: ${inCycle.join(", ")}. ` +
-        `Review their produces/requires declarations.`,
+        "Review their produces/requires declarations.",
     );
   }
 

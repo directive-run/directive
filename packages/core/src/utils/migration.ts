@@ -290,60 +290,60 @@ export function generateModuleCode(
 ): string {
   const lines: string[] = [
     `import { createModule, t } from '@directive-run/core';`,
-    ``,
+    "",
     `const ${structure.name}Module = createModule('${structure.name}', {`,
-    `  schema: {`,
-    `    facts: {`,
+    "  schema: {",
+    "    facts: {",
   ];
 
   // Facts
   for (const [key, type] of Object.entries(structure.facts)) {
     lines.push(`      ${key}: ${type},`);
   }
-  lines.push(`    },`);
+  lines.push("    },");
 
   // Derivations
-  lines.push(`    derivations: {`);
+  lines.push("    derivations: {");
   for (const [key, type] of Object.entries(structure.derivations)) {
     lines.push(`      ${key}: ${type},`);
   }
-  lines.push(`    },`);
+  lines.push("    },");
 
   // Events
-  lines.push(`    events: {`);
+  lines.push("    events: {");
   for (const [key, schema] of Object.entries(structure.events)) {
     const schemaStr = Object.entries(schema)
       .map(([k, v]) => `${k}: ${v}`)
       .join(", ");
     lines.push(`      ${key}: { ${schemaStr} },`);
   }
-  lines.push(`    },`);
+  lines.push("    },");
 
   // Requirements
-  lines.push(`    requirements: {},`);
-  lines.push(`  },`);
+  lines.push("    requirements: {},");
+  lines.push("  },");
 
   // Init
   lines.push(`  init: ${structure.initCode},`);
 
   // Derive
   if (Object.keys(structure.deriveCode).length > 0) {
-    lines.push(`  derive: {`);
+    lines.push("  derive: {");
     for (const [key, code] of Object.entries(structure.deriveCode)) {
       lines.push(`    ${key}: ${code},`);
     }
-    lines.push(`  },`);
+    lines.push("  },");
   }
 
   // Events handlers
-  lines.push(`  events: {`);
+  lines.push("  events: {");
   for (const [key, code] of Object.entries(structure.eventsCode)) {
     lines.push(`    ${key}: ${code},`);
   }
-  lines.push(`  },`);
+  lines.push("  },");
 
-  lines.push(`});`);
-  lines.push(``);
+  lines.push("});");
+  lines.push("");
   lines.push(`export { ${structure.name}Module };`);
 
   return lines.join("\n");

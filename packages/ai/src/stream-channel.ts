@@ -403,7 +403,7 @@ export function mergeStreams<T>(
                   hasWarnedDrop = true;
                   console.warn(
                     `[Directive mergeStreams] Buffer exceeded ${MAX_BUFFER} items. ` +
-                      `Values are being dropped. Ensure the consumer keeps up or use bounded StreamChannel sources.`,
+                      "Values are being dropped. Ensure the consumer keeps up or use bounded StreamChannel sources.",
                   );
                 }
               }
