@@ -298,8 +298,8 @@ export function createModule<const M extends ModuleSchema>(
     if (config.snapshotEvents) {
       if (config.snapshotEvents.length === 0) {
         console.warn(
-          `[Directive] snapshotEvents is an empty array — no events will create time-travel snapshots. ` +
-            `Omit snapshotEvents entirely to snapshot all events, or list specific events.`,
+          "[Directive] snapshotEvents is an empty array — no events will create time-travel snapshots. " +
+            "Omit snapshotEvents entirely to snapshot all events, or list specific events.",
         );
       }
       const schemaEventKeysForValidation = new Set(

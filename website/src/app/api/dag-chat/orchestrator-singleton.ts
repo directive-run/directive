@@ -151,7 +151,7 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
           if (p.test(input)) {
             return {
               passed: false,
-              reason: `Content filter: blocked sensitive keyword`,
+              reason: "Content filter: blocked sensitive keyword",
             };
           }
         }
@@ -294,29 +294,29 @@ export function getDagOrchestrator(): DagOrchestratorInstance | null {
             handler: "sentiment",
             deps: ["news"],
             transform: (context: DagExecutionContext) =>
-              `News finding: ${context.outputs["news"] ?? ""}`,
+              `News finding: ${context.outputs.news ?? ""}`,
           },
           "fact-checker": {
             handler: "fact-checker",
             deps: ["academic"],
             transform: (context: DagExecutionContext) =>
-              `Academic claim: ${context.outputs["academic"] ?? ""}`,
+              `Academic claim: ${context.outputs.academic ?? ""}`,
           },
           synthesizer: {
             handler: "synthesizer",
             deps: ["sentiment", "fact-checker"],
             transform: (context: DagExecutionContext) =>
-              `Sentiment: ${context.outputs["sentiment"] ?? ""}\nFact-check: ${context.outputs["fact-checker"] ?? ""}`,
+              `Sentiment: ${context.outputs.sentiment ?? ""}\nFact-check: ${context.outputs["fact-checker"] ?? ""}`,
           },
           reviewer: {
             handler: "reviewer",
             deps: ["synthesizer"],
             transform: (context: DagExecutionContext) =>
-              `Synthesized report: ${context.outputs["synthesizer"] ?? ""}`,
+              `Synthesized report: ${context.outputs.synthesizer ?? ""}`,
           },
         },
         (context: DagExecutionContext) =>
-          String(context.outputs["reviewer"] ?? ""),
+          String(context.outputs.reviewer ?? ""),
       ),
     },
 

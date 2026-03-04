@@ -147,7 +147,7 @@ export function getPitchDeckOrchestrator(): PitchDeckOrchestratorInstance | null
           if (p.test(input)) {
             return {
               passed: false,
-              reason: `Content filter: blocked sensitive keyword`,
+              reason: "Content filter: blocked sensitive keyword",
             };
           }
         }

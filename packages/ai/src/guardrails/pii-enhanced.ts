@@ -324,7 +324,7 @@ export const regexDetector: PIIDetector = {
     if (text.length > MAX_PII_INPUT_LENGTH) {
       throw new Error(
         `[Directive] Input exceeds maximum length of ${MAX_PII_INPUT_LENGTH} characters for PII detection. ` +
-          `Truncate input or process in chunks.`,
+          "Truncate input or process in chunks.",
       );
     }
 

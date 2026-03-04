@@ -1709,7 +1709,7 @@ export function createMultiAgentOrchestrator(
 
   // Add __derived bridge fact so constraints can read derivation values via facts.__derived
   if (userDerivations && Object.keys(userDerivations).length > 0) {
-    coordFacts["__derived"] = t.object() as unknown;
+    coordFacts.__derived = t.object() as unknown;
   }
 
   const coordSchema = {
@@ -1726,7 +1726,7 @@ export function createMultiAgentOrchestrator(
 
   // Add built-in budget constraint — reads coordinator fact reactively
   if (maxTokenBudget) {
-    coordConstraints["__budgetLimit"] = {
+    coordConstraints.__budgetLimit = {
       priority: 100,
       // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => {
@@ -1774,7 +1774,7 @@ export function createMultiAgentOrchestrator(
   }
 
   // Built-in pause resolver
-  coordResolvers["__pause"] = {
+  coordResolvers.__pause = {
     requirement: requirementGuard<PauseBudgetExceededReq>(
       "__PAUSE_BUDGET_EXCEEDED",
     ),
@@ -1790,7 +1790,7 @@ export function createMultiAgentOrchestrator(
   };
 
   // Built-in RUN_AGENT resolver
-  coordResolvers["__runAgent"] = {
+  coordResolvers.__runAgent = {
     requirement: isRunAgentReq,
     // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async (req: RunAgentRequirement) => {
@@ -1818,7 +1818,7 @@ export function createMultiAgentOrchestrator(
   // ---- Per-Agent Modules (as a map for createSystem) ----
   // biome-ignore lint/suspicious/noExplicitAny: Module types vary
   const modulesMap: Record<string, any> = Object.create(null);
-  modulesMap["__coord"] = coordinatorModule;
+  modulesMap.__coord = coordinatorModule;
 
   for (const [agentId, registration] of Object.entries(agents)) {
     // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
@@ -2599,11 +2599,11 @@ export function createMultiAgentOrchestrator(
         reject(
           new Error(
             `[Directive MultiAgent] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-              `Solutions:\n` +
-              `  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n` +
-              `  2. Set autoApproveToolCalls: true to auto-approve\n` +
+              "Solutions:\n" +
+              "  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n" +
+              "  2. Set autoApproveToolCalls: true to auto-approve\n" +
               `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-              `See: https://directive.run/docs/ai/multi-agent`,
+              "See: https://directive.run/docs/ai/multi-agent",
           ),
         );
       }, approvalTimeoutMs);
@@ -2959,7 +2959,7 @@ export function createMultiAgentOrchestrator(
 
     if (globalStatus === "paused") {
       throw new Error(
-        `[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)`,
+        "[Directive MultiAgent] Orchestrator is paused (budget exceeded or manual pause)",
       );
     }
 
@@ -7550,7 +7550,7 @@ export function createMultiAgentOrchestrator(
         taskId.length === 0
       ) {
         throw new Error(
-          `[Directive MultiAgent] Task ID must be a non-empty trimmed string`,
+          "[Directive MultiAgent] Task ID must be a non-empty trimmed string",
         );
       }
       if (agents[taskId]) {

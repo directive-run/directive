@@ -127,7 +127,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
       );
 
       return () => clearTimeout(timer);
-    } else if (previousFocusRef.current) {
+    }if (previousFocusRef.current) {
       previousFocusRef.current.focus();
       previousFocusRef.current = null;
     }

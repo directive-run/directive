@@ -71,7 +71,7 @@ export function createRetryLaterManager(config: RetryLaterConfig = {}): {
   const pendingRetries: Map<string, PendingRetry> = new Map();
 
   function calculateDelay(attempt: number): number {
-    const delay = delayMs * Math.pow(backoffMultiplier, attempt - 1);
+    const delay = delayMs * backoffMultiplier ** (attempt - 1);
     return Math.min(delay, maxDelayMs);
   }
 

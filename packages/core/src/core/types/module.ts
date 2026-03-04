@@ -231,7 +231,7 @@ export interface CrossModuleEffectDef<
   run: (
     facts: CrossModuleFactsWithSelf<M, Deps>,
     prev: CrossModuleFactsWithSelf<M, Deps> | undefined,
-  ) => void | EffectCleanup | Promise<void | EffectCleanup>;
+  ) => undefined | EffectCleanup | Promise<undefined | EffectCleanup>;
   /** Optional dependency keys to filter when effect runs */
   deps?: string[];
 }

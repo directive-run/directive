@@ -67,8 +67,8 @@ function topologicalSort<Modules extends ModulesMap>(
       const cycle = [...path.slice(cycleStart), namespace].join(" → ");
       throw new Error(
         `[Directive] Circular dependency detected: ${cycle}. ` +
-          `Modules cannot have circular crossModuleDeps. ` +
-          `Break the cycle by removing one of the cross-module references.`,
+          "Modules cannot have circular crossModuleDeps. " +
+          "Break the cycle by removing one of the cross-module references.",
       );
     }
 
@@ -193,13 +193,13 @@ export function createSystem<
   // Validate not an array
   if (Array.isArray(namedOptions.modules)) {
     throw new Error(
-      `[Directive] createSystem expects modules as an object, not an array.\n\n` +
-        `Instead of:\n` +
-        `  createSystem({ modules: [authModule, dataModule] })\n\n` +
-        `Use:\n` +
-        `  createSystem({ modules: { auth: authModule, data: dataModule } })\n\n` +
-        `Or for a single module:\n` +
-        `  createSystem({ module: counterModule })`,
+      "[Directive] createSystem expects modules as an object, not an array.\n\n" +
+        "Instead of:\n" +
+        "  createSystem({ modules: [authModule, dataModule] })\n\n" +
+        "Use:\n" +
+        "  createSystem({ modules: { auth: authModule, data: dataModule } })\n\n" +
+        "Or for a single module:\n" +
+        "  createSystem({ module: counterModule })",
     );
   }
 
@@ -273,7 +273,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     if (missingModules.length > 0) {
       throw new Error(
         `[Directive] initOrder is missing modules: ${missingModules.join(", ")}. ` +
-          `All modules must be included in the explicit order.`,
+          "All modules must be included in the explicit order.",
       );
     }
     orderedNamespaces = explicitOrder;
@@ -653,8 +653,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       if (facts && typeof facts === "object" && !isPrototypeSafe(facts)) {
         throw new Error(
           `[Directive] initialFacts/hydrate for namespace "${namespace}" contains potentially ` +
-            `dangerous keys (__proto__, constructor, or prototype). This may indicate a ` +
-            `prototype pollution attack.`,
+            "dangerous keys (__proto__, constructor, or prototype). This may indicate a " +
+            "prototype pollution attack.",
         );
       }
 
@@ -998,10 +998,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           namespacedData[namespace][localKey] = value;
         } else {
           // No namespace found, keep as-is
-          if (!namespacedData["_root"]) {
-            namespacedData["_root"] = {};
+          if (!namespacedData._root) {
+            namespacedData._root = {};
           }
-          namespacedData["_root"][key] = value;
+          namespacedData._root[key] = value;
         }
       }
 
@@ -1063,10 +1063,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
               }
               namespacedData[namespace][localKey] = value;
             } else {
-              if (!namespacedData["_root"]) {
-                namespacedData["_root"] = {};
+              if (!namespacedData._root) {
+                namespacedData._root = {};
               }
-              namespacedData["_root"][key] = value;
+              namespacedData._root[key] = value;
             }
           }
 
@@ -1085,7 +1085,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       if (moduleNamespaces.has(namespace)) {
         throw new Error(
           `[Directive] Module namespace "${namespace}" already exists. ` +
-            `Cannot register a duplicate namespace.`,
+            "Cannot register a duplicate namespace.",
         );
       }
       if (namespace.includes(SEPARATOR)) {

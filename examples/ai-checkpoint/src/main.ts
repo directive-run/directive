@@ -265,7 +265,7 @@ async function runStageWithRetry(stage: PipelineStage): Promise<StageResult> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
-        const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000);
+        const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
         const jitter = Math.random() * delay * 0.1;
         system.facts.retryCount = (system.facts.retryCount as number) + 1;
         addTimeline(

@@ -149,7 +149,7 @@ function render(): void {
       const isEcho = msg.from === "You";
       el.className = `ws-message-item ${isEcho ? "" : msg.type}`;
       if (isEcho) {
-        el.style.borderLeft = `3px solid var(--brand-text-dim)`;
+        el.style.borderLeft = "3px solid var(--brand-text-dim)";
       }
 
       const time = new Date(msg.timestamp);
