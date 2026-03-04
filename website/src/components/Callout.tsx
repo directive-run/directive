@@ -7,13 +7,13 @@ const styles = {
     container:
       "bg-brand-primary-50 dark:bg-brand-surface-raised/60 dark:ring-1 dark:ring-slate-300/10",
     title: "text-brand-primary-900 dark:text-brand-primary-400",
-    body: "text-brand-primary-800 [--tw-prose-background:var(--brand-primary-50)] prose-a:text-brand-primary-900 prose-code:text-brand-primary-900 dark:text-slate-300 dark:prose-code:text-slate-300",
+    body: "text-brand-primary-800 prose-strong:text-brand-primary-900 [--tw-prose-background:var(--brand-primary-50)] prose-a:text-brand-primary-900 prose-code:text-brand-primary-900 dark:text-slate-300 dark:prose-strong:text-white dark:prose-code:text-slate-300",
   },
   warning: {
     container:
       "bg-amber-50 dark:bg-brand-surface-raised/60 dark:ring-1 dark:ring-slate-300/10",
     title: "text-amber-900 dark:text-amber-500",
-    body: "text-amber-800 [--tw-prose-underline:var(--color-amber-400)] [--tw-prose-background:var(--color-amber-50)] prose-a:text-amber-900 prose-code:text-amber-900 dark:text-slate-300 dark:[--tw-prose-underline:var(--brand-primary-700)] dark:prose-code:text-slate-300",
+    body: "text-amber-800 prose-strong:text-amber-900 [--tw-prose-underline:var(--color-amber-400)] [--tw-prose-background:var(--color-amber-50)] prose-a:text-amber-900 prose-code:text-amber-900 dark:text-slate-300 dark:prose-strong:text-white dark:[--tw-prose-underline:var(--brand-primary-700)] dark:prose-code:text-slate-300",
   },
 };
 
