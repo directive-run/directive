@@ -185,8 +185,8 @@ export const AI_VIEWS = [
 ] as const;
 export const SHARED_VIEWS = ["Timeline"] as const;
 export const ALL_VIEWS = [
-  ...SYSTEM_VIEWS,
   ...SHARED_VIEWS,
+  ...SYSTEM_VIEWS,
   ...AI_VIEWS,
 ] as const;
 

@@ -138,7 +138,7 @@ const canvasModule = createModule("canvas", {
 
 const system = createSystem({
   module: canvasModule,
-  debug: { timeTravel: true, maxSnapshots: 200 },
+  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
   plugins: [devtoolsPlugin({ name: "time-machine" })],
 });
 system.start();

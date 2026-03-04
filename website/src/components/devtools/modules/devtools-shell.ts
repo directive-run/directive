@@ -102,7 +102,7 @@ export const devtoolsShell = createModule("shell", {
 
   init: (facts) => {
     const prefs = loadDrawerPrefs();
-    facts.activeView = "Facts";
+    facts.activeView = "Timeline";
     facts.isFullscreen = false;
     facts.confirmClear = false;
     facts.drawerOpen = false;
