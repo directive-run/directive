@@ -227,7 +227,7 @@ When `when()` is async, facts can change while the promise is pending. Any fact 
 constraints: {
   asyncSafe: {
     async: true,
-    deps: ["userId", "hasData"],  // Explicit deps — re-evaluated when these change
+    deps: ["userId", "hasData"],  // Explicit deps – re-evaluated when these change
     when: async (facts) => {
       const allowed = await checkPermissions(facts.userId);
 
@@ -246,7 +246,7 @@ Multi-module systems use different separators for different contexts:
 - **Fact access in code:** `system.facts.moduleName.factKey` (dot access)
 - **Constraint `deps`:** `["factKey"]` (auto-prefixed with module namespace)
 
-The `::` separator is used internally and in `after` references. You never need it for fact access or `deps` — those are handled automatically.
+The `::` separator is used internally and in `after` references. You never need it for fact access or `deps` – those are handled automatically.
 {% /callout %}
 
 ---

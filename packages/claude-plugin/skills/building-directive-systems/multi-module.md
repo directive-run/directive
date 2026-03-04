@@ -68,7 +68,7 @@ const cartModule = createModule("cart", {
   },
 });
 
-// Multi-module system — namespaced access
+// Multi-module system – namespaced access
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule },
 });
@@ -79,24 +79,24 @@ system.start();
 ## Accessing Namespaced State
 
 ```typescript
-// Facts — namespaced under module name
+// Facts – namespaced under module name
 system.facts.auth.token;
 system.facts.auth.isAuthenticated;
 system.facts.cart.items;
 
-// Derivations — namespaced under module name
+// Derivations – namespaced under module name
 system.derive.cart.itemCount;
 
-// Events — namespaced under module name
+// Events – namespaced under module name
 system.events.auth.login({ token: "abc123" });
 system.events.auth.logout();
 
-// Subscribe — use "namespace.key" format
+// Subscribe – use "namespace.key" format
 system.subscribe(["auth.token", "cart.items"], () => {
   console.log("auth or cart changed");
 });
 
-// Watch — use "namespace.key" format
+// Watch – use "namespace.key" format
 system.watch("auth.isAuthenticated", (newVal, oldVal) => {
   console.log(`Auth: ${oldVal} -> ${newVal}`);
 });
@@ -106,7 +106,7 @@ system.subscribeModule("cart", () => {
   console.log("anything in cart changed");
 });
 
-// Wait for condition — facts are namespaced
+// Wait for condition – facts are namespaced
 await system.when((facts) => facts.auth.isAuthenticated);
 ```
 
@@ -166,7 +166,7 @@ const dataModule = createModule("data", {
     facts.loaded = false;
   },
 
-  // CORRECT — facts.self for own module, facts.auth for cross-module
+  // CORRECT – facts.self for own module, facts.auth for cross-module
   constraints: {
     fetchWhenAuth: {
       when: (facts) => facts.auth.isAuthenticated && !facts.self.loaded,
@@ -203,7 +203,7 @@ const dataModule = createModule("data", {
 ### Using bare `facts.*` instead of `facts.self.*`
 
 ```typescript
-// WRONG — in cross-module context, bare facts has no self-module properties
+// WRONG – in cross-module context, bare facts has no self-module properties
 constraints: {
   check: {
     when: (facts) => facts.loaded, // TypeScript error
@@ -211,7 +211,7 @@ constraints: {
   },
 },
 
-// CORRECT — use facts.self for own module
+// CORRECT – use facts.self for own module
 constraints: {
   check: {
     when: (facts) => facts.self.loaded,
@@ -223,11 +223,11 @@ constraints: {
 ### Bracket notation for internal keys
 
 ```typescript
-// WRONG — the :: separator is internal, never use it directly
+// WRONG – the :: separator is internal, never use it directly
 system.facts["auth::token"];
 system.read("auth::status");
 
-// CORRECT — dot notation through namespace proxy
+// CORRECT – dot notation through namespace proxy
 system.facts.auth.token;
 system.read("auth.status");
 ```
@@ -235,7 +235,7 @@ system.read("auth.status");
 ### Forgetting crossModuleDeps
 
 ```typescript
-// WRONG — facts.auth is untyped without crossModuleDeps
+// WRONG – facts.auth is untyped without crossModuleDeps
 const dataModule = createModule("data", {
   schema: { facts: { items: t.array(t.string()) } },
   constraints: {
@@ -246,7 +246,7 @@ const dataModule = createModule("data", {
   },
 });
 
-// CORRECT — declare the dependency
+// CORRECT – declare the dependency
 const dataModule = createModule("data", {
   schema: { facts: { items: t.array(t.string()) } },
   crossModuleDeps: { auth: authSchema },
@@ -265,13 +265,13 @@ const dataModule = createModule("data", {
 const system = createSystem({
   modules: { auth: authModule, cart: cartModule, data: dataModule },
 
-  // Initial facts — applied after init(), before first reconciliation
+  // Initial facts – applied after init(), before first reconciliation
   initialFacts: {
     auth: { token: "restored-token" },
     cart: { items: cachedItems },
   },
 
-  // Init order — control module initialization sequence
+  // Init order – control module initialization sequence
   initOrder: "auto",            // Sort by crossModuleDeps topology (default)
   // initOrder: "declaration",   // Use object key order
   // initOrder: ["auth", "data", "cart"], // Explicit order

@@ -1,6 +1,6 @@
 ---
 title: Execution Patterns
-description: 8 built-in execution patterns for goal-directed agent orchestration — parallel, sequential, supervisor, DAG, race, reflect, debate, and goal. Declarative dependency resolution with satisfaction scoring.
+description: 8 built-in execution patterns for goal-directed agent orchestration – parallel, sequential, supervisor, DAG, race, reflect, debate, and goal. Declarative dependency resolution with satisfaction scoring.
 ---
 
 Declarative and imperative execution patterns for coordinating multiple agents. {% .lead %}
@@ -623,10 +623,10 @@ Timeline events: `debate_round` with round number, `winnerId`, `score`, and `age
 
 ## Goal
 
-Declare the desired end-state and let the runtime figure out which agents to run. Nodes declare what they `produce` and `require` — the runtime resolves the dependency graph and drives agents to goal achievement.
+Declare the desired end-state and let the runtime figure out which agents to run. Nodes declare what they `produce` and `require` – the runtime resolves the dependency graph and drives agents to goal achievement.
 
 {% callout title="Goal vs DAG" %}
-**DAG** requires you to wire the execution graph manually with explicit `deps` edges — it's a static topology. **Goal** infers the graph from `produces`/`requires` declarations and drives toward a `when()` condition — it's dynamic, adaptive pursuit. Use DAG when you know the exact execution order upfront. Use Goal when you want the runtime to figure out ordering, handle stalls with relaxation, and track satisfaction progress toward a desired end-state.
+**DAG** requires you to wire the execution graph manually with explicit `deps` edges – it's a static topology. **Goal** infers the graph from `produces`/`requires` declarations and drives toward a `when()` condition – it's dynamic, adaptive pursuit. Use DAG when you know the exact execution order upfront. Use Goal when you want the runtime to figure out ordering, handle stalls with relaxation, and track satisfaction progress toward a desired end-state.
 {% /callout %}
 
 {% callout title="Standalone utilities" %}
@@ -763,7 +763,7 @@ goal(nodes, when, {
 
 ### Explaining Results
 
-`explainGoal()` converts a `GoalResult` into a human-readable step-by-step summary — useful for logging, LLM context, or debugging:
+`explainGoal()` converts a `GoalResult` into a human-readable step-by-step summary – useful for logging, LLM context, or debugging:
 
 ```typescript
 import { explainGoal } from '@directive-run/ai';
@@ -805,7 +805,7 @@ const state = JSON.parse(checkpoint.systemExport) as GoalCheckpointState;
 const result = await orchestrator.resumeGoal(state, pattern);
 ```
 
-The checkpoint captures facts, completed nodes, failure counts, step metrics, and relaxation state — everything needed to continue exactly where you left off.
+The checkpoint captures facts, completed nodes, failure counts, step metrics, and relaxation state – everything needed to continue exactly where you left off.
 
 {% callout title="All patterns support checkpoints" %}
 Checkpointing works with all multi-step patterns (sequential, supervisor, reflect, debate, DAG, goal). See the [Pattern Checkpoints](/ai/checkpoints) page for per-pattern examples, progress tracking, diffing, forking, and the full API reference.
@@ -1017,7 +1017,7 @@ const diagram = patternToMermaid(json);
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `direction` | `"LR" \| "TD" \| "TB" \| "RL" \| "BT"` | `"LR"` | Graph flow direction |
-| `theme` | `"default" \| "dark" \| "forest" \| "neutral"` | — | Mermaid theme hint |
+| `theme` | `"default" \| "dark" \| "forest" \| "neutral"` | – | Mermaid theme hint |
 | `shapes.agent` | `"square" \| "round" \| "stadium" \| "hexagon"` | `"square"` | Agent node shape |
 | `shapes.virtual` | `"circle" \| "square" \| "round" \| "stadium"` | `"circle"` | Virtual node shape |
 
@@ -1025,7 +1025,7 @@ const diagram = patternToMermaid(json);
 
 ## Tasks in Patterns
 
-Patterns work with both **agents** (LLM calls) and **tasks** (imperative code). Register tasks alongside agents — they share the same ID namespace and can appear in any position within any pattern.
+Patterns work with both **agents** (LLM calls) and **tasks** (imperative code). Register tasks alongside agents – they share the same ID namespace and can appear in any position within any pattern.
 
 ### TaskRegistration
 

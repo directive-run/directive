@@ -91,7 +91,7 @@ system.hydrate()   →  hydrate callback     →  Override everything (highest p
 system.start()     →  Constraints evaluate →  Reconciliation begins
 ```
 
-`init()` runs during `system.start()` (or `system.initialize()`), not during `createSystem()`. `hydrate()` must be called before `start()` and its values take highest precedence — use it for SSR restoration or persisted state.
+`init()` runs during `system.start()` (or `system.initialize()`), not during `createSystem()`. `hydrate()` must be called before `start()` and its values take highest precedence – use it for SSR restoration or persisted state.
 
 ---
 
@@ -133,7 +133,7 @@ system.batch(() => {
 });
 ```
 
-Batches can nest — only the outermost batch triggers reconciliation. Resolver `resolve()` functions are automatically batched, so multiple fact mutations inside a resolver always coalesce.
+Batches can nest – only the outermost batch triggers reconciliation. Resolver `resolve()` functions are automatically batched, so multiple fact mutations inside a resolver always coalesce.
 
 ### Derivations
 
@@ -226,7 +226,7 @@ events: {
 
 ### Hydrate
 
-Apply persisted or server-rendered state before starting. Values from `hydrate()` take highest precedence — they override both `init()` and `initialFacts`:
+Apply persisted or server-rendered state before starting. Values from `hydrate()` take highest precedence – they override both `init()` and `initialFacts`:
 
 ```typescript
 // Must be called before system.start()

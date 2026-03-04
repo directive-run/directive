@@ -423,12 +423,12 @@ const externalCheck: NamedGuardrail<InputGuardrailData> = {
 
       return { passed: result.safe, reason: result.safe ? undefined : result.reason };
     } catch (error) {
-      // Option 1: Fail open — allow the input through when the service is down
+      // Option 1: Fail open – allow the input through when the service is down
       console.warn('Safety service unavailable, allowing input:', error);
 
       return { passed: true };
 
-      // Option 2: Fail closed — block the input when the service is down
+      // Option 2: Fail closed – block the input when the service is down
       // return { passed: false, reason: 'Safety check unavailable' };
     }
   },
@@ -439,7 +439,7 @@ const externalCheck: NamedGuardrail<InputGuardrailData> = {
 ```
 
 {% callout type="warning" title="Fail-open vs fail-closed" %}
-**Fail-open** (allow on error) prioritizes availability — use for non-critical checks. **Fail-closed** (block on error) prioritizes safety — use for PII, injection detection, and compliance-critical guardrails.
+**Fail-open** (allow on error) prioritizes availability – use for non-critical checks. **Fail-closed** (block on error) prioritizes safety – use for PII, injection detection, and compliance-critical guardrails.
 {% /callout %}
 
 ---

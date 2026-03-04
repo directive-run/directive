@@ -23,14 +23,14 @@ What do you want to do?
 import { createSystem } from "@directive-run/core";
 import { loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 
-// Single module — direct access to facts/derive/events
+// Single module – direct access to facts/derive/events
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
   debug: { timeTravel: true, maxSnapshots: 100 },
 });
 
-// Multi-module — namespaced access
+// Multi-module – namespaced access
 const system = createSystem({
   modules: {
     auth: authModule,
@@ -48,7 +48,7 @@ const system = createSystem({
 system.facts.count = 5;
 const val = system.facts.count;
 
-// Multi-module — access through module namespace
+// Multi-module – access through module namespace
 system.facts.auth.token = "abc123";
 system.facts.cart.items = [];
 const token = system.facts.auth.token;
@@ -107,7 +107,7 @@ unsub();
 // Wait until a condition is true
 await system.when((facts) => facts.phase === "done");
 
-// With timeout — throws if condition not met in time
+// With timeout – throws if condition not met in time
 await system.when((facts) => facts.phase === "done", { timeout: 5000 });
 ```
 
@@ -140,7 +140,7 @@ const unsub = system.onSettledChange(() => {
 const count = system.read("count");
 const isLoading = system.read("isLoading");
 
-// Multi-module — use dot notation
+// Multi-module – use dot notation
 const token = system.read("auth.token");
 const total = system.read("cart.totalPrice");
 ```
@@ -184,13 +184,13 @@ const explanation = system.explain("req-123");
 ## Lifecycle
 
 ```typescript
-// Start — begins constraint evaluation and reconciliation
+// Start – begins constraint evaluation and reconciliation
 system.start();
 
-// Stop — pauses evaluation, cancels inflight resolvers
+// Stop – pauses evaluation, cancels inflight resolvers
 system.stop();
 
-// Destroy — cleans up all resources, subscriptions, plugins
+// Destroy – cleans up all resources, subscriptions, plugins
 system.destroy();
 
 // Lifecycle order:
@@ -202,13 +202,13 @@ system.destroy();
 ## Constraint Control at Runtime
 
 ```typescript
-// Disable a constraint — it won't be evaluated
+// Disable a constraint – it won't be evaluated
 system.constraints.disable("fetchWhenReady");
 
 // Check if disabled
 system.constraints.isDisabled("fetchWhenReady"); // true
 
-// Re-enable — triggers re-evaluation on next cycle
+// Re-enable – triggers re-evaluation on next cycle
 system.constraints.enable("fetchWhenReady");
 ```
 
@@ -217,11 +217,11 @@ system.constraints.enable("fetchWhenReady");
 ### Reading facts before settling
 
 ```typescript
-// WRONG — resolver hasn't completed, facts are stale
+// WRONG – resolver hasn't completed, facts are stale
 system.start();
 console.log(system.facts.user); // null
 
-// CORRECT — wait for async resolution
+// CORRECT – wait for async resolution
 system.start();
 await system.settle();
 console.log(system.facts.user); // { id: "1", name: "Alice" }
@@ -230,10 +230,10 @@ console.log(system.facts.user); // { id: "1", name: "Alice" }
 ### Casting facts/derivations unnecessarily
 
 ```typescript
-// WRONG — the schema already provides types
+// WRONG – the schema already provides types
 const profile = system.facts.profile as ResourceState<Profile>;
 
-// CORRECT — types are inferred from the schema
+// CORRECT – types are inferred from the schema
 const profile = system.facts.profile;
 ```
 
@@ -254,7 +254,7 @@ system.watch("phase", (val) => {
 ### Forgetting to destroy
 
 ```typescript
-// WRONG — resources leak
+// WRONG – resources leak
 function setupSystem() {
   const system = createSystem({ module: myModule });
   system.start();
@@ -262,7 +262,7 @@ function setupSystem() {
   return system;
 }
 
-// CORRECT — clean up when done
+// CORRECT – clean up when done
 const system = createSystem({ module: myModule });
 system.start();
 // ... when finished:

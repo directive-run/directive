@@ -1,6 +1,6 @@
 ---
 title: DevTools Plugin
-description: Debug Directive systems with a console API, event tracing, and an optional floating panel — all from a single plugin.
+description: Debug Directive systems with a console API, event tracing, and an optional floating panel – all from a single plugin.
 ---
 
 The devtools plugin exposes your system to the browser console via `window.__DIRECTIVE__` and optionally renders a floating debug panel that shows facts, derivations, requirements, and events in real time. {% .lead %}
@@ -47,22 +47,22 @@ devtoolsPlugin({
 
 The panel shows:
 
-- **Status** — "Settled" (green) or "Working..." (yellow)
-- **Facts** — Live key/value table, updates on every fact change
-- **Derivations** — Key/value table, re-reads after each reconciliation
-- **Inflight** — Currently executing resolvers
-- **Unmet** — Requirements waiting for a resolver
-- **Performance** — Reconcile count/avg, per-resolver stats, effect run/error counts (sorted by total time)
-- **Dependency Graph** — Live SVG showing facts &rarr; derivations &rarr; constraints &rarr; requirements &rarr; resolvers
-- **Timeline** — Flamechart-style waterfall showing resolver execution timing with swim lanes per resolver
-- **Time-Travel** — Undo/redo buttons (when `debug: { timeTravel: true }`)
-- **Events** — Scrollable event log with timestamps (when `trace: true`)
-- **Record & Replay** — Capture sessions and export as JSON
+- **Status** – "Settled" (green) or "Working..." (yellow)
+- **Facts** – Live key/value table, updates on every fact change
+- **Derivations** – Key/value table, re-reads after each reconciliation
+- **Inflight** – Currently executing resolvers
+- **Unmet** – Requirements waiting for a resolver
+- **Performance** – Reconcile count/avg, per-resolver stats, effect run/error counts (sorted by total time)
+- **Dependency Graph** – Live SVG showing facts &rarr; derivations &rarr; constraints &rarr; requirements &rarr; resolvers
+- **Timeline** – Flamechart-style waterfall showing resolver execution timing with swim lanes per resolver
+- **Time-Travel** – Undo/redo buttons (when `debug: { timeTravel: true }`)
+- **Events** – Scrollable event log with timestamps (when `trace: true`)
+- **Record & Replay** – Capture sessions and export as JSON
 
 The panel is automatically removed in production builds and when `typeof window === "undefined"` (SSR). Press **Escape** to close.
 
 {% callout type="note" title="Framework-agnostic" %}
-The floating panel uses vanilla DOM — no React, Vue, or other framework dependency. It works in any app that uses `@directive-run/core`.
+The floating panel uses vanilla DOM – no React, Vue, or other framework dependency. It works in any app that uses `@directive-run/core`.
 {% /callout %}
 
 ---
@@ -301,8 +301,8 @@ The plugin is safe to use in server-side rendering. When `typeof window === "und
 When `panel: true`, the panel includes a collapsible **Performance** section that tracks:
 
 - **Reconcile count** and average duration
-- **Per-resolver stats** — call count, average duration, error count (sorted by total time)
-- **Effect stats** — run count and error count
+- **Per-resolver stats** – call count, average duration, error count (sorted by total time)
+- **Effect stats** – run count and error count
 
 Stats are collected from lifecycle hooks and update in real time after each reconciliation.
 
@@ -313,10 +313,10 @@ Stats are collected from lifecycle hooks and update in real time after each reco
 When the system has `debug: { timeTravel: true }`, the panel renders **Time-Travel** controls:
 
 - **Back / Forward** buttons with snapshot count display
-- **Position indicator** — shows current index / total snapshots
+- **Position indicator** – shows current index / total snapshots
 - Buttons are disabled when there's nowhere to navigate
 
-No extra configuration — the panel detects `system.debug` and shows the controls automatically.
+No extra configuration – the panel detects `system.debug` and shows the controls automatically.
 
 ---
 
@@ -324,11 +324,11 @@ No extra configuration — the panel detects `system.debug` and shows the contro
 
 The panel includes a collapsible **Dependency Graph** section that renders an SVG directed graph showing the full system topology across five columns:
 
-- **Facts** (column 1) — all fact keys, pulsing when recently changed
-- **Derivations** (column 2) — all derivation keys with tracked fact dependencies, pulsing on recompute
-- **Constraints** (column 3) — all constraints, active ones highlighted, inactive ones dimmed
-- **Requirements** (column 4) — color-coded: red for unmet, yellow for inflight
-- **Resolvers** (column 5) — all resolvers, active ones highlighted, idle ones dimmed
+- **Facts** (column 1) – all fact keys, pulsing when recently changed
+- **Derivations** (column 2) – all derivation keys with tracked fact dependencies, pulsing on recompute
+- **Constraints** (column 3) – all constraints, active ones highlighted, inactive ones dimmed
+- **Requirements** (column 4) – color-coded: red for unmet, yellow for inflight
+- **Resolvers** (column 5) – all resolvers, active ones highlighted, idle ones dimmed
 
 Dashed arrows connect related nodes across columns. The diagram updates after each reconciliation and uses brief animations to highlight recent activity. The SVG is responsive via `viewBox` and scales to fit the panel width.
 
@@ -338,12 +338,12 @@ Dashed arrows connect related nodes across columns. The diagram updates after ea
 
 The panel includes a collapsible **Timeline** section that renders a flamechart-style waterfall of resolver execution:
 
-- **Swim lanes** — one row per resolver, labeled on the left
-- **Horizontal bars** — each bar represents a single resolver execution, width proportional to duration
-- **Color coding** — each resolver gets a distinct color; error bars are red
-- **Inflight indicators** — dashed outline bars for resolvers currently executing
-- **Time axis** — millisecond markers along the top with gridlines
-- **Tooltips** — hover any bar to see resolver name and duration
+- **Swim lanes** – one row per resolver, labeled on the left
+- **Horizontal bars** – each bar represents a single resolver execution, width proportional to duration
+- **Color coding** – each resolver gets a distinct color; error bars are red
+- **Inflight indicators** – dashed outline bars for resolvers currently executing
+- **Time axis** – millisecond markers along the top with gridlines
+- **Tooltips** – hover any bar to see resolver name and duration
 
 The timeline captures the last 200 resolver executions and updates in real time. It is useful for identifying slow resolvers, spotting overlapping executions, and understanding the resolution waterfall.
 
@@ -353,8 +353,8 @@ The timeline captures the last 200 resolver executions and updates in real time.
 
 The panel includes **Record** and **Export** buttons at the bottom:
 
-- **Record** — Click to start capturing events and fact snapshots. Click again to stop. While recording, the button turns red.
-- **Export** — Downloads the recorded session (or the current trace buffer if no recording was made) as a JSON file.
+- **Record** – Click to start capturing events and fact snapshots. Click again to stop. While recording, the button turns red.
+- **Export** – Downloads the recorded session (or the current trace buffer if no recording was made) as a JSON file.
 
 You can also use the console API:
 
@@ -435,8 +435,8 @@ The documentation website includes a full-featured React DevTools UI with 13 tab
 
 Two components power the website's DevTools:
 
-- **`LiveDevTools`** — Standalone panel embedded directly in layout
-- **`FloatingDevTools`** — Drawer overlay triggered by a floating action button (the Directive logo)
+- **`LiveDevTools`** – Standalone panel embedded directly in layout
+- **`FloatingDevTools`** – Drawer overlay triggered by a floating action button (the Directive logo)
 
 Both auto-detect systems registered via `devtoolsPlugin()` and connect to the `window.__DIRECTIVE__` registry.
 
@@ -475,11 +475,11 @@ Seven tabs for debugging multi-agent AI orchestration:
 
 The Breakpoints tab lets you pause execution when specific conditions are met.
 
-**Fact breakpoints** — Click the eye icon next to any fact in the Facts tab to add a breakpoint. You can optionally set a condition expression (e.g., `value > 10`). When the fact mutates and the condition passes, execution pauses and the mutation is logged.
+**Fact breakpoints** – Click the eye icon next to any fact in the Facts tab to add a breakpoint. You can optionally set a condition expression (e.g., `value > 10`). When the fact mutates and the condition passes, execution pauses and the mutation is logged.
 
-**Event breakpoints** — Break on any trace event type from the [event tracing table](#recorded-event-types) (e.g., `resolver.error`, `constraint.evaluate`). Supports condition expressions and logs every hit. Use the wildcard `*` to break on all events.
+**Event breakpoints** – Break on any trace event type from the [event tracing table](#recorded-event-types) (e.g., `resolver.error`, `constraint.evaluate`). Supports condition expressions and logs every hit. Use the wildcard `*` to break on all events.
 
-**AI event breakpoints** — Break on SSE stream events during AI orchestration. Useful for pausing mid-stream to inspect agent state.
+**AI event breakpoints** – Break on SSE stream events during AI orchestration. Useful for pausing mid-stream to inspect agent state.
 
 When a breakpoint triggers, the system pauses and the Breakpoints tab shows the hit log. Click **Resume** to continue execution.
 
@@ -495,8 +495,8 @@ When multiple Directive systems are registered on the page, the DevTools header 
 
 For richer debugging beyond the console and floating panel:
 
-- **[AI DevTools](/ai/devtools)** — Visual debugger for multi-agent orchestration with Timeline, Cost, and State views. Connects via WebSocket or SSE transport.
-- **[AI Chat Demo](/ai/examples/chat)** — Try the visual debugger in your browser right now — no installation required.
+- **[AI DevTools](/ai/devtools)** – Visual debugger for multi-agent orchestration with Timeline, Cost, and State views. Connects via WebSocket or SSE transport.
+- **[AI Chat Demo](/ai/examples/chat)** – Try the visual debugger in your browser right now – no installation required.
 
 ---
 

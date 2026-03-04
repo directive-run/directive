@@ -129,7 +129,7 @@ const resilientRunner = withFallback(
   [primaryWithRetry, backupWithRetry],
   {
     shouldFallback: (error) => {
-      // Don't fall back on auth errors — those won't fix themselves
+      // Don't fall back on auth errors – those won't fix themselves
       return !error.message.includes('401');
     },
     onFallback: (from, to, error) => {
@@ -151,5 +151,5 @@ console.log(`Stats:`, breaker.getStats());
 
 ## Related
 
-- [Resilience & Routing](/ai/resilience-routing) — full middleware reference
-- [Control AI Costs guide](/ai/guides/control-ai-costs) — budget middleware to prevent runaway spending
+- [Resilience & Routing](/ai/resilience-routing) – full middleware reference
+- [Control AI Costs guide](/ai/guides/control-ai-costs) – budget middleware to prevent runaway spending

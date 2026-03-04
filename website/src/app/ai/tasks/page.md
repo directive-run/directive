@@ -3,13 +3,13 @@ title: Tasks
 description: Register imperative code alongside agents in any execution pattern.
 ---
 
-Register imperative code tasks alongside LLM agents. Tasks and agents share the same ID namespace, so they work in any execution pattern — DAG, Sequential, Parallel, Race, or any other. {% .lead %}
+Register imperative code tasks alongside LLM agents. Tasks and agents share the same ID namespace, so they work in any execution pattern – DAG, Sequential, Parallel, Race, or any other. {% .lead %}
 
 ---
 
 ## The Problem
 
-Real pipelines need imperative code between agent runs: data transforms, API calls, validation logic, state machine transitions. Without tasks, you're forced to use `transform` functions or lifecycle hooks — which are invisible in the DevTools Agent Graph.
+Real pipelines need imperative code between agent runs: data transforms, API calls, validation logic, state machine transitions. Without tasks, you're forced to use `transform` functions or lifecycle hooks – which are invisible in the DevTools Agent Graph.
 
 ## The Solution
 
@@ -56,10 +56,10 @@ const orchestrator = createMultiAgentOrchestrator({
 |--------|------|---------|-------------|
 | `run` | `(input, signal, context) => unknown \| Promise<unknown>` | required | The function to execute |
 | `label` | `string` | task ID | Display label for DevTools graph |
-| `description` | `string` | — | DevTools tooltip/detail panel text |
-| `timeout` | `number` | — | Abort after this many milliseconds |
+| `description` | `string` | – | DevTools tooltip/detail panel text |
+| `timeout` | `number` | – | Abort after this many milliseconds |
 | `maxConcurrent` | `number` | `1` | Max parallel executions (semaphore) |
-| `retry` | `object` | — | `{ attempts, backoff?, delayMs? }` |
+| `retry` | `object` | – | `{ attempts, backoff?, delayMs? }` |
 
 ### Retry Configuration
 
@@ -115,7 +115,7 @@ run: async (input: string, signal: AbortSignal, context: TaskContext) => {
 
 ## Tasks in Every Pattern
 
-Tasks work in any pattern position. The `handler` field references IDs from both the `agents` and `tasks` registries — patterns don't know or care which is which.
+Tasks work in any pattern position. The `handler` field references IDs from both the `agents` and `tasks` registries – patterns don't know or care which is which.
 
 ### DAG
 
@@ -145,7 +145,7 @@ parallel(
 
 ### Supervisor
 
-Tasks can be workers — the supervisor delegates to them like any agent:
+Tasks can be workers – the supervisor delegates to them like any agent:
 
 ```typescript
 supervisor('manager', ['researcher', 'transform', 'writer'], {
@@ -156,7 +156,7 @@ supervisor('manager', ['researcher', 'transform', 'writer'], {
 
 ### Race
 
-Tasks compete alongside agents — the first to complete wins:
+Tasks compete alongside agents – the first to complete wins:
 
 ```typescript
 race(['fast-transform', 'slow-transform', 'fallback-agent'], {
@@ -169,7 +169,7 @@ race(['fast-transform', 'slow-transform', 'fallback-agent'], {
 A task can be the handler or the evaluator:
 
 ```typescript
-// Task as evaluator — score output with imperative logic instead of an LLM
+// Task as evaluator – score output with imperative logic instead of an LLM
 reflect('writer', 'validate-score', {
   maxIterations: 3,
   threshold: 0.8,
@@ -231,19 +231,19 @@ orchestrator.getTaskIds();    // All registered task IDs
 orchestrator.getTaskState('transform'); // { status, lastOutput, lastError, ... }
 ```
 
-Task and agent IDs share a namespace — registering a task with an existing agent ID (or vice versa) throws an error.
+Task and agent IDs share a namespace – registering a task with an existing agent ID (or vice versa) throws an error.
 
 ## What Tasks Don't Do
 
-- **No token budgeting** — Tasks don't call LLMs. `totalTokens` is always 0.
-- **No self-healing reroute** — Tasks aren't reroutable. Use `retry` instead.
-- **No `runSingleAgent` access** — If a task needs to call an agent, make it a separate node.
-- **No guardrail enforcement** — Tasks bypass input/output guardrails (they're imperative code, not LLM calls).
+- **No token budgeting** – Tasks don't call LLMs. `totalTokens` is always 0.
+- **No self-healing reroute** – Tasks aren't reroutable. Use `retry` instead.
+- **No `runSingleAgent` access** – If a task needs to call an agent, make it a separate node.
+- **No guardrail enforcement** – Tasks bypass input/output guardrails (they're imperative code, not LLM calls).
 
 ## Related
 
-- [Execution Patterns](/ai/patterns) — All 8 patterns support tasks
-- [Multi-Agent Orchestrator](/ai/multi-agent) — Task registration API
-- [DAG Pipeline Guide](/ai/guides/dag-pipeline) — Adding tasks to DAGs
-- [Data Pipeline Example](/ai/examples/data-pipeline) — Live demo with mixed agents + tasks
-- [DevTools](/ai/devtools) — Task node visualization
+- [Execution Patterns](/ai/patterns) – All 8 patterns support tasks
+- [Multi-Agent Orchestrator](/ai/multi-agent) – Task registration API
+- [DAG Pipeline Guide](/ai/guides/dag-pipeline) – Adding tasks to DAGs
+- [Data Pipeline Example](/ai/examples/data-pipeline) – Live demo with mixed agents + tasks
+- [DevTools](/ai/devtools) – Task node visualization

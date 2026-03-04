@@ -6,11 +6,11 @@ Everything free, adoption-first, MIT licensed. Build traction before monetizatio
 
 ## What Stays Free Forever
 
-- **Core library** (`@directive-run/core`) — constraint engine, facts, derivations, effects, resolvers
-- **Local DevTools** (`@directive-run/devtools`) — standalone debug UI, WebSocket server, all 13 views
-- **AI orchestrator** (`@directive-run/ai`) — single/multi-agent, guardrails, breakpoints, streaming
+- **Core library** (`@directive-run/core`) – constraint engine, facts, derivations, effects, resolvers
+- **Local DevTools** (`@directive-run/devtools`) – standalone debug UI, WebSocket server, all 13 views
+- **AI orchestrator** (`@directive-run/ai`) – single/multi-agent, guardrails, breakpoints, streaming
 - **Framework adapters** (`@directive-run/react`, `vue`, `svelte`, `solid`, `lit`)
-- **Documentation & examples** — full docs site, interactive examples, blog
+- **Documentation & examples** – full docs site, interactive examples, blog
 
 ## Future Premium Features
 
@@ -33,10 +33,10 @@ Everything free, adoption-first, MIT licensed. Build traction before monetizatio
 
 ## Timeline
 
-1. **Now** — Everything free. Focus on adoption, docs, and developer experience.
-2. **After traction** — Publish `@directive-run/devtools` as standalone npm package.
-3. **First paid feature** — Cloud-hosted DevTools (remote debug without running local server).
-4. **After paying customers** — Team features (shared sessions, annotations, RBAC).
+1. **Now** – Everything free. Focus on adoption, docs, and developer experience.
+2. **After traction** – Publish `@directive-run/devtools` as standalone npm package.
+3. **First paid feature** – Cloud-hosted DevTools (remote debug without running local server).
+4. **After paying customers** – Team features (shared sessions, annotations, RBAC).
 
 ## Key Principle
 

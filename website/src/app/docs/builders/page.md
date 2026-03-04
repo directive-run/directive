@@ -9,7 +9,7 @@ Fluent builder APIs for modules and systems, plus factory helpers for typed cons
 
 ## Constraints as Object Literals
 
-Constraints, resolvers, and effects are defined as plain object literals inside `createModule()`. TypeScript provides full type inference on the object literal — no builder functions needed:
+Constraints, resolvers, and effects are defined as plain object literals inside `createModule()`. TypeScript provides full type inference on the object literal – no builder functions needed:
 
 ```typescript
 const myModule = createModule("example", {

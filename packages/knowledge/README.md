@@ -3,9 +3,9 @@
 Knowledge files, examples, and validation scripts for the [Directive](https://directive.run) runtime.
 
 This package is the **source of truth** for all Directive coding knowledge used by:
-- `@directive-run/cli` — generates AI rules files (`.cursorrules`, `CLAUDE.md`, etc.)
-- `@directive-run/claude-plugin` — builds Claude Code plugin skills
-- `directive.run/llms.txt` — website LLM reference
+- `@directive-run/cli` – generates AI rules files (`.cursorrules`, `CLAUDE.md`, etc.)
+- `@directive-run/claude-plugin` – builds Claude Code plugin skills
+- `directive.run/llms.txt` – website LLM reference
 
 ## Contents
 

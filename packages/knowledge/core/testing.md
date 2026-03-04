@@ -29,7 +29,7 @@ import {
   assertRequirement,
 } from "@directive-run/core/testing";
 
-// Single module — same API as createSystem, with testing defaults
+// Single module – same API as createSystem, with testing defaults
 // (time-travel off, no plugins, synchronous settling)
 const system = createTestSystem(myModule);
 
@@ -220,12 +220,12 @@ it("processes intermediate state", async () => {
 ### Testing real resolvers instead of mocking
 
 ```typescript
-// WRONG — tests hit real APIs, slow and flaky
+// WRONG – tests hit real APIs, slow and flaky
 const system = createTestSystem(myModule);
 system.facts.needsFetch = true;
 await system.settle(); // Makes real HTTP call
 
-// CORRECT — mock the resolver
+// CORRECT – mock the resolver
 const system = createTestSystem(myModule, {
   mockResolvers: [mockResolver("FETCH", async (req, context) => {
     context.facts.data = { mocked: true };
@@ -236,11 +236,11 @@ const system = createTestSystem(myModule, {
 ### Forgetting to settle before asserting async results
 
 ```typescript
-// WRONG — resolver hasn't completed yet
+// WRONG – resolver hasn't completed yet
 system.facts.trigger = true;
 assertFact(system, "result", "done"); // Fails!
 
-// CORRECT — wait for resolution
+// CORRECT – wait for resolution
 system.facts.trigger = true;
 await system.settle();
 assertFact(system, "result", "done");

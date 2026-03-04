@@ -1,6 +1,6 @@
 ---
 title: DevTools
-description: Visual debugger for AI agent orchestration — see what your agents did, why, and how long it took.
+description: Visual debugger for AI agent orchestration – see what your agents did, why, and how long it took.
 ---
 
 A visual debugger that shows you what your AI agents did, why decisions were made, how long things took, and what went wrong. {% .lead %}
@@ -35,7 +35,7 @@ These are two separate outputs from the same orchestrator. They serve different 
 
 **DevTools** is for you, the developer. It streams debug events (timeline, health, state) to the DevTools UI so you can inspect what happened inside the orchestrator.
 
-**SSE Transport** (`createSSETransport`) is for your users. It streams agent text responses to your frontend — the typing effect you see in ChatGPT-style interfaces.
+**SSE Transport** (`createSSETransport`) is for your users. It streams agent text responses to your frontend – the typing effect you see in ChatGPT-style interfaces.
 
 | | DevTools | SSE Transport |
 |---|---------|---------------|
@@ -105,13 +105,13 @@ const server = createDevToolsServer({
 | `maxClients` | `number` | `50` | Maximum concurrent DevTools clients |
 | `batchSize` | `number` | `1` | Events per batch message |
 | `batchIntervalMs` | `number` | `50` | Batch flush interval (ms) |
-| `authenticate` | `(token: string) => boolean \| Promise<boolean>` | — | Token validation callback (see [Authentication](#authentication)) |
+| `authenticate` | `(token: string) => boolean \| Promise<boolean>` | – | Token validation callback (see [Authentication](#authentication)) |
 
 ---
 
 ## Remote Connections
 
-By default, the DevTools server binds to `localhost` — only accessible from the same machine. To debug a remote orchestrator (staging, production, another machine on your network):
+By default, the DevTools server binds to `localhost` – only accessible from the same machine. To debug a remote orchestrator (staging, production, another machine on your network):
 
 ```typescript
 const server = await connectDevTools(orchestrator, {
@@ -127,7 +127,7 @@ Binding to `0.0.0.0` exposes the server to your entire network. Always use authe
 
 **When you need this:**
 - Debugging a staging/production orchestrator from your local DevTools UI
-- Team debugging — multiple developers inspecting the same orchestrator
+- Team debugging – multiple developers inspecting the same orchestrator
 - Cloud-hosted DevTools connecting to your running server
 
 In the DevTools UI, enter the remote URL (e.g., `ws://staging.internal:4040`) and the auth token to connect.
@@ -157,7 +157,7 @@ When `authenticate` is configured:
 3. If valid → sends `welcome`, proceeds normally
 4. If invalid → sends `error` with code `AUTH_FAILED`, closes connection
 
-When `authenticate` is **not** configured, connections work exactly as before — no auth required. This is fully backward compatible.
+When `authenticate` is **not** configured, connections work exactly as before – no auth required. This is fully backward compatible.
 
 ### Client Side
 
@@ -451,8 +451,8 @@ interface DevToolsServer {
 
 ## Related
 
-- **[DevTools Plugin](/docs/plugins/devtools)** — Console API and floating panel for debugging any Directive system's facts, derivations, and events.
-- **[AI Chat Demo](/ai/examples/chat)** — Try the visual debugger in your browser.
+- **[DevTools Plugin](/docs/plugins/devtools)** – Console API and floating panel for debugging any Directive system's facts, derivations, and events.
+- **[AI Chat Demo](/ai/examples/chat)** – Try the visual debugger in your browser.
 
 ---
 

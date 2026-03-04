@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
 - **`orchestrator.runStream()`** returns `{ stream, result, abort }`. The `stream` is an `AsyncIterable<StreamChunk>` with 8 chunk types: `text`, `tool_call`, `tool_result`, `thinking`, `error`, `done`, `heartbeat`, and `metadata`.
 - **`createSSETransport`** converts the async iterable to a `text/event-stream` response with automatic heartbeats (every 15s), JSON serialization, and error mapping.
-- **`signal: request.signal`** cancels the LLM call when the client disconnects — no wasted tokens on abandoned requests.
+- **`signal: request.signal`** cancels the LLM call when the client disconnects – no wasted tokens on abandoned requests.
 - **Streaming guardrails** evaluate partial output every N tokens. Use `createLengthStreamingGuardrail` to cap output length and `createPatternStreamingGuardrail` to block dangerous patterns mid-stream.
 
 ## Full Example
@@ -176,8 +176,8 @@ cancelButton.onclick = () => controller.abort();
 
 ## Related
 
-- [Streaming reference](/ai/streaming) — `createStreamingRunner` and chunk types
-- [SSE Transport reference](/ai/sse-transport) — `createSSETransport` options
-- [Guardrails](/ai/guardrails) — streaming guardrail configuration
-- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) — retry and fallback for failed streams
-- [Control AI Costs guide](/ai/guides/control-ai-costs) — budget limits during streaming
+- [Streaming reference](/ai/streaming) – `createStreamingRunner` and chunk types
+- [SSE Transport reference](/ai/sse-transport) – `createSSETransport` options
+- [Guardrails](/ai/guardrails) – streaming guardrail configuration
+- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) – retry and fallback for failed streams
+- [Control AI Costs guide](/ai/guides/control-ai-costs) – budget limits during streaming

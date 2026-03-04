@@ -215,13 +215,13 @@ function WizardForm({ system }) {
 
 1. **Per-step derivations** (`step0Valid`, `step1Valid`, `step2Valid`) evaluate validation rules independently. `currentStepValid` selects the right one based on `currentStep`.
 
-2. **Constraint-gated advancement** — the `advance` constraint only fires when `advanceRequested && currentStepValid`. If the user clicks "Next" on an invalid step, nothing happens.
+2. **Constraint-gated advancement** – the `advance` constraint only fires when `advanceRequested && currentStepValid`. If the user clicks "Next" on an invalid step, nothing happens.
 
-3. **Async validation** — the `validation` module checks email availability using `after: ['wizard::advance']` to sequence after step advancement. This prevents the check from blocking the form.
+3. **Async validation** – the `validation` module checks email availability using `after: ['wizard::advance']` to sequence after step advancement. This prevents the check from blocking the form.
 
 4. **`persistencePlugin`** saves field values and current step to sessionStorage. Closing the tab and reopening restores the wizard exactly where the user left off.
 
-5. **Back navigation** — `goBack` decrements `currentStep` without clearing any field data. All previous values are preserved because facts persist until explicitly cleared.
+5. **Back navigation** – `goBack` decrements `currentStep` without clearing any field data. All previous values are preserved because facts persist until explicitly cleared.
 
 ## Common Variations
 
@@ -275,8 +275,8 @@ events: {
 
 ## Related
 
-- [Interactive Example](/docs/examples/form-wizard) — try it in your browser
-- [Persistence Plugin](/docs/plugins/persistence) — save and restore state
-- [Constraints](/docs/constraints) — priority and `after` ordering
-- [Schema & Types](/docs/schema-overview) — runtime validation in dev mode
-- [Choosing Primitives](/docs/choosing-primitives) — constraints vs events for gating
+- [Interactive Example](/docs/examples/form-wizard) – try it in your browser
+- [Persistence Plugin](/docs/plugins/persistence) – save and restore state
+- [Constraints](/docs/constraints) – priority and `after` ordering
+- [Schema & Types](/docs/schema-overview) – runtime validation in dev mode
+- [Choosing Primitives](/docs/choosing-primitives) – constraints vs events for gating

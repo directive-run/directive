@@ -20,9 +20,9 @@ This skill applies when the project uses `@directive-run/ai`. If not found in `p
 - User wants to add RAG (retrieval-augmented generation) to an agent
 
 ## Exclusions
-- Do NOT invoke for production guardrails or security — use `hardening-ai-systems`
-- Do NOT invoke for orchestrator setup — use `building-ai-orchestrators`
-- Do NOT invoke for provider runner config — use `building-ai-agents`
+- Do NOT invoke for production guardrails or security – use `hardening-ai-systems`
+- Do NOT invoke for orchestrator setup – use `building-ai-orchestrators`
+- Do NOT invoke for provider runner config – use `building-ai-agents`
 
 ---
 
@@ -42,12 +42,12 @@ What are you testing?
 
 ---
 
-## createMockRunner — Test Without API Calls
+## createMockRunner – Test Without API Calls
 
 ```typescript
 import { createMockRunner } from "@directive-run/ai/testing";
 
-// Static responses — returned in sequence
+// Static responses – returned in sequence
 const mockRunner = createMockRunner({
   responses: [
     { text: "First response.", usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } },
@@ -55,7 +55,7 @@ const mockRunner = createMockRunner({
   ],
 });
 
-// Dynamic — choose response based on prompt
+// Dynamic – choose response based on prompt
 const dynamicRunner = createMockRunner({
   handler: async (options) => {
     if (options.prompt.includes("capital")) {
@@ -82,7 +82,7 @@ import { createMockRunner } from "@directive-run/ai/testing";
 import { t } from "@directive-run/core";
 import { describe, it, expect } from "vitest";
 
-// Build orchestrator with injected runner — enables swapping real/mock
+// Build orchestrator with injected runner – enables swapping real/mock
 function buildOrchestrator(runner: AgentRunner) {
   return createAgentOrchestrator({
     runner,
@@ -231,10 +231,10 @@ it("produces quality output", async () => {
 import { createTracingPlugin, createLoggingPlugin, createMetricsPlugin } from "@directive-run/ai/plugins";
 import { createInspector } from "@directive-run/ai/testing";
 
-// Tracing — spans around every LLM call and resolver
+// Tracing – spans around every LLM call and resolver
 const tracer = createTracingPlugin({
   exportTo: "console",  // "console" | "opentelemetry" | "custom"
-  onSpanEnd: (span) => console.log(`[${span.name}] ${span.duration}ms — ${span.status}`),
+  onSpanEnd: (span) => console.log(`[${span.name}] ${span.duration}ms – ${span.status}`),
 });
 
 // Structured logging for LLM calls, guardrail violations, budget warnings
@@ -244,12 +244,12 @@ const logger = createLoggingPlugin({
   include: ["runner_calls", "guardrail_violations", "budget_warnings"],
 });
 
-// Metrics — auto-collects: ai.tokens.*, ai.latency.runner, ai.guardrail.violations
+// Metrics – auto-collects: ai.tokens.*, ai.latency.runner, ai.guardrail.violations
 const metrics = createMetricsPlugin({
   onMetric: (metric) => myMetricsClient.gauge(metric.name, metric.value, metric.tags),
 });
 
-// Inspector — assert on calls and events in tests
+// Inspector – assert on calls and events in tests
 const inspector = createInspector();
 
 const orchestrator = createAgentOrchestrator({
@@ -363,12 +363,12 @@ resolvers: {
 ## Using real API keys in CI tests
 
 ```typescript
-// WRONG — slow, expensive, flaky, exposes keys in logs
+// WRONG – slow, expensive, flaky, exposes keys in logs
 const orchestrator = createAgentOrchestrator({
   runner: createAnthropicRunner({ apiKey: process.env.ANTHROPIC_API_KEY, model: "claude-opus-4-6" }),
 });
 
-// CORRECT — always inject mock runners in tests
+// CORRECT – always inject mock runners in tests
 const orchestrator = buildOrchestrator(
   createMockRunner({ responses: [{ text: "ok", usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 } }] })
 );
@@ -377,22 +377,22 @@ const orchestrator = buildOrchestrator(
 ## Testing implementation instead of behavior
 
 ```typescript
-// WRONG — brittle, breaks if impl changes
+// WRONG – brittle, breaks if impl changes
 const spy = vi.spyOn(runner, "run");
 expect(spy).toHaveBeenCalledOnce();
 
-// CORRECT — test observable facts
+// CORRECT – test observable facts
 expect(result.facts.status).toBe("done");
 expect(result.facts.output).toBeTruthy();
 ```
 
 ### Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ---
 
 ## Reference Files
 
-- `ai-testing-evals.md` — Full testing API, createMockRunner options, evaluation suite patterns
-- `ai-debug-observability.md` — Tracing plugins, logging config, metrics collection, inspector API
-- `ai-mcp-rag.md` — MCP transport options, tool provider interface, RAG retrieval config
+- `ai-testing-evals.md` – Full testing API, createMockRunner options, evaluation suite patterns
+- `ai-debug-observability.md` – Tracing plugins, logging config, metrics collection, inspector API
+- `ai-mcp-rag.md` – MCP transport options, tool provider interface, RAG retrieval config

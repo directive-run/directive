@@ -325,7 +325,7 @@ export function <Name>Demo({
         )}
       </section>
 
-      {/* How it works — list Directive features demonstrated */}
+      {/* How it works – list Directive features demonstrated */}
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           How it works
@@ -336,12 +336,12 @@ export function <Name>Demo({
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">
             {/* List each Directive concept used:
-              - Facts — what state is tracked
-              - Derivations — what is computed
-              - Constraints — what conditions trigger requirements
-              - Resolvers — how requirements are fulfilled
-              - Effects — what side effects occur
-              - Events — what user actions are dispatched
+              - Facts – what state is tracked
+              - Derivations – what is computed
+              - Constraints – what conditions trigger requirements
+              - Resolvers – how requirements are fulfilled
+              - Effects – what side effects occur
+              - Events – what user actions are dispatched
             */}
           </ol>
         </div>
@@ -355,11 +355,11 @@ export function <Name>Demo({
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
             <strong className="text-slate-900 dark:text-slate-200">What:</strong>{' '}
-            {/* What was built — one sentence describing the example */}
+            {/* What was built – one sentence describing the example */}
           </p>
           <p>
             <strong className="text-slate-900 dark:text-slate-200">How:</strong>{' '}
-            {/* How Directive powers it — which features, how they connect */}
+            {/* How Directive powers it – which features, how they connect */}
           </p>
           <p>
             <strong className="text-slate-900 dark:text-slate-200">Why it works:</strong>{' '}

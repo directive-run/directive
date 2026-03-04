@@ -5,7 +5,7 @@ description: Save, resume, replay, fork, and track progress of long-running exec
 
 Save execution state mid-pattern for fault tolerance, resume from failures, fork workflows, and track progress. {% .lead %}
 
-Pattern checkpoints capture the full internal state of any execution pattern at configurable intervals. If a process crashes, you resume exactly where you left off — no wasted tokens, no re-running completed agents.
+Pattern checkpoints capture the full internal state of any execution pattern at configurable intervals. If a process crashes, you resume exactly where you left off – no wasted tokens, no re-running completed agents.
 
 ---
 
@@ -301,7 +301,7 @@ const forked = await forkFromCheckpoint(
   'ckpt_abc123',
 );
 
-// The forked orchestrator is fully independent — changes don't affect the original
+// The forked orchestrator is fully independent – changes don't affect the original
 const result = await forked.runGoal(nodes, newInput, when);
 ```
 
@@ -380,7 +380,7 @@ if (diff.nodesCompleted) {
 }
 ```
 
-Both checkpoints must be from the same pattern type — `diffCheckpoints` throws if types differ.
+Both checkpoints must be from the same pattern type – `diffCheckpoints` throws if types differ.
 
 ---
 

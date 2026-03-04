@@ -54,13 +54,13 @@ Is this "when X is true, the system needs Y"?
 
 ```typescript
 constraints: {
-  // Static — same object every time
+  // Static – same object every time
   loadConfig: {
     when: (facts) => facts.config === null,
     require: { type: "LOAD_CONFIG" },
   },
 
-  // Dynamic — function reads facts
+  // Dynamic – function reads facts
   fetchUser: {
     when: (facts) => facts.isAuthenticated && !facts.profile,
     require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
@@ -75,7 +75,7 @@ constraints: {
     ],
   },
 
-  // Suppress conditionally — return null from require
+  // Suppress conditionally – return null from require
   conditionalFetch: {
     when: (facts) => facts.needsUpdate,
     require: (facts) => {
@@ -89,7 +89,7 @@ constraints: {
 },
 ```
 
-### Priority — conflict resolution
+### Priority – conflict resolution
 
 ```typescript
 constraints: {
@@ -107,7 +107,7 @@ constraints: {
 },
 ```
 
-### Ordering with `after` — sequencing constraints
+### Ordering with `after` – sequencing constraints
 
 ```typescript
 constraints: {
@@ -127,7 +127,7 @@ constraints: {
 
 `after` blocks evaluation entirely until the named constraint's resolver finishes. If the dependency's `when()` returns false, the blocked constraint proceeds normally.
 
-### Async constraints — MUST declare `deps`
+### Async constraints – MUST declare `deps`
 
 Synchronous constraints auto-track deps via proxy. Async constraints cannot (suspended across await), so you must declare `deps` explicitly.
 
@@ -166,10 +166,10 @@ resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
     resolve: async (req, context) => {
-      // req — the requirement object emitted by the constraint
-      // context.facts — mutable proxy to module facts
-      // context.signal — AbortSignal (cancelled on stop or timeout)
-      // context.snapshot() — read-only snapshot for before/after
+      // req – the requirement object emitted by the constraint
+      // context.facts – mutable proxy to module facts
+      // context.signal – AbortSignal (cancelled on stop or timeout)
+      // context.snapshot() – read-only snapshot for before/after
       const user = await fetch(`/api/users/${req.userId}`, {
         signal: context.signal,
       }).then((r) => r.json());
@@ -226,7 +226,7 @@ resolvers: {
 },
 ```
 
-### Batch resolution — prevent N+1
+### Batch resolution – prevent N+1
 
 ```typescript
 resolvers: {
@@ -275,7 +275,7 @@ const system = createSystem({
     onConstraintError: "skip",
     onResolverError: "retry-later",
     onEffectError: "skip",
-    onDerivationError: "throw",   // Derivation errors are bugs — throw always
+    onDerivationError: "throw",   // Derivation errors are bugs – throw always
     onError: (error) => {
       console.error(`[${error.source}] ${error.sourceId}: ${error.message}`);
     },
@@ -392,19 +392,19 @@ constraints: {
 ### 1. Async logic in constraint when()
 
 ```typescript
-// WRONG — when() must be synchronous (unless async: true + deps)
+// WRONG – when() must be synchronous (unless async: true + deps)
 when: async (facts) => {
   return await validate(facts.token);
 }
 
-// CORRECT — either use async: true with deps, or put validation in resolver
+// CORRECT – either use async: true with deps, or put validation in resolver
 when: (facts) => Boolean(facts.token),
 ```
 
 ### 2. Condition checking inside a resolver
 
 ```typescript
-// WRONG — resolver should not check conditions (that's the constraint's job)
+// WRONG – resolver should not check conditions (that's the constraint's job)
 resolve: async (req, context) => {
   if (!context.facts.isAuthenticated) {
     return;
@@ -412,13 +412,13 @@ resolve: async (req, context) => {
   // ...
 }
 
-// CORRECT — let the constraint's when() gate this
+// CORRECT – let the constraint's when() gate this
 ```
 
 ### 3. Async constraint without deps
 
 ```typescript
-// WRONG — engine cannot track dependencies
+// WRONG – engine cannot track dependencies
 { async: true, when: async (facts) => await validate(facts.token) }
 
 // CORRECT
@@ -438,7 +438,7 @@ require: { type: "FETCH_DATA" }
 ### 5. Returning data from a resolver
 
 ```typescript
-// WRONG — return value ignored
+// WRONG – return value ignored
 resolve: async (req, context) => { return await fetchUser(req.userId); }
 
 // CORRECT
@@ -446,7 +446,7 @@ resolve: async (req, context) => { context.facts.user = await fetchUser(req.user
 ```
 
 ### 6. Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ### 7. No error handling on network resolvers
 
@@ -456,7 +456,7 @@ resolve: async (req, context) => {
   context.facts.data = await fetch("/api").then((r) => r.json());
 }
 
-// CORRECT — add retry and check response status
+// CORRECT – add retry and check response status
 resolve: async (req, context) => {
   const res = await fetch("/api");
   if (!res.ok) {
@@ -481,6 +481,6 @@ resolve: async (req, context) => {
 
 ## Reference Files
 
-- `constraints.md` — full constraint API, async constraints, disabling, common mistakes
-- `resolvers.md` — full resolver API, context object, batch resolution, inspecting resolver status
-- `error-boundaries.md` — all recovery strategies, DirectiveError API, circuit breaker patterns
+- `constraints.md` – full constraint API, async constraints, disabling, common mistakes
+- `resolvers.md` – full resolver API, context object, batch resolution, inspecting resolver status
+- `error-boundaries.md` – all recovery strategies, DirectiveError API, circuit breaker patterns

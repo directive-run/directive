@@ -224,10 +224,10 @@ const orchestrator = createAgentOrchestrator({
 ### Input Validation
 
 ```typescript
-// WRONG — passing raw user input to the agent
+// WRONG – passing raw user input to the agent
 const result = await orchestrator.run(agent, userInput);
 
-// CORRECT — validate and sanitize input first
+// CORRECT – validate and sanitize input first
 const sanitized = sanitizeInput(userInput);
 const result = await orchestrator.run(agent, sanitized);
 ```

@@ -20,9 +20,9 @@ This skill applies when the project uses `@directive-run/ai`. If not found in `p
 - User wants retry logic, circuit breakers, or failure resilience
 
 ## Exclusions
-- Do NOT invoke for basic orchestrator/agent setup — use `building-ai-orchestrators`
-- Do NOT invoke for streaming or provider setup — use `building-ai-agents`
-- Do NOT invoke for test mocking — use `testing-ai-systems`
+- Do NOT invoke for basic orchestrator/agent setup – use `building-ai-orchestrators`
+- Do NOT invoke for streaming or provider setup – use `building-ai-agents`
+- Do NOT invoke for test mocking – use `testing-ai-systems`
 
 ---
 
@@ -52,7 +52,7 @@ Guardrails are pure validators. They check content and throw `GuardrailError` on
 ```typescript
 import { createGuardrail, GuardrailError } from "@directive-run/ai";
 
-// Input guardrail — runs before each LLM call
+// Input guardrail – runs before each LLM call
 const lengthGuardrail = createGuardrail({
   name: "input-length",
   type: "input",
@@ -64,11 +64,11 @@ const lengthGuardrail = createGuardrail({
         guardrail: "input-length",
       });
     }
-    // No return value needed — guardrails only validate
+    // No return value needed – guardrails only validate
   },
 });
 
-// Output guardrail — runs after each LLM response
+// Output guardrail – runs after each LLM response
 const toxicityGuardrail = createGuardrail({
   name: "toxicity-check",
   type: "output",
@@ -233,7 +233,7 @@ resolvers: {
 const orchestrator = createAgentOrchestrator({
   runner: createAnthropicRunner({ model: "claude-opus-4-6", apiKey: process.env.ANTHROPIC_API_KEY }),
   budget: {
-    maxTokenBudget: 100_000,          // Hard limit — halts execution
+    maxTokenBudget: 100_000,          // Hard limit – halts execution
     budgetWarningThreshold: 0.8,      // Fire warning at 80%
     onBudgetWarning: (used, max) => {
       console.warn(`Budget at ${Math.round((used / max) * 100)}%`);
@@ -311,7 +311,7 @@ resolvers: {
 ## Guardrails that modify content
 
 ```typescript
-// WRONG — guardrails must not transform input
+// WRONG – guardrails must not transform input
 const bad = createGuardrail({
   name: "sanitizer",
   type: "input",
@@ -321,7 +321,7 @@ const bad = createGuardrail({
   },
 });
 
-// CORRECT — only validate, throw on violation
+// CORRECT – only validate, throw on violation
 const good = createGuardrail({
   name: "content-check",
   type: "input",
@@ -336,7 +336,7 @@ const good = createGuardrail({
 ## Not setting token budgets in production
 
 ```typescript
-// WRONG — runaway loops = runaway costs
+// WRONG – runaway loops = runaway costs
 const orchestrator = createAgentOrchestrator({ runner, /* no budget */ });
 
 // CORRECT
@@ -349,7 +349,7 @@ const orchestrator = createAgentOrchestrator({
 ## Catching GuardrailError silently
 
 ```typescript
-// WRONG — violations disappear
+// WRONG – violations disappear
 } catch (e) { /* swallowed */ }
 
 // CORRECT
@@ -364,14 +364,14 @@ const orchestrator = createAgentOrchestrator({
 ```
 
 ### Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ---
 
 ## Reference Files
 
-- `ai-guardrails-memory.md` — Full guardrail API, all memory strategies, configuration options
-- `ai-budget-resilience.md` — Budget configuration, circuit breaker, retry policies, estimateTokens
-- `ai-security.md` — PII patterns, injection detection, security best practices
-- `examples/auth-flow.ts` — Auth-gated orchestrator with security guardrails
-- `examples/fraud-analysis.ts` — Budget-aware multi-agent fraud detection
+- `ai-guardrails-memory.md` – Full guardrail API, all memory strategies, configuration options
+- `ai-budget-resilience.md` – Budget configuration, circuit breaker, retry policies, estimateTokens
+- `ai-security.md` – PII patterns, injection detection, security best practices
+- `examples/auth-flow.ts` – Auth-gated orchestrator with security guardrails
+- `examples/fraud-analysis.ts` – Budget-aware multi-agent fraud detection

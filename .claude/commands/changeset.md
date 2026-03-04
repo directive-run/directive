@@ -6,7 +6,7 @@ description: Create a changeset for unreleased changes
 
 Create an accurate changeset by analyzing actual package changes since the last version bump.
 
-**IMPORTANT:** Only `packages/` changes matter. Ignore `website/`, `docs/`, `.claude/`, config files, etc. — those are not published to npm.
+**IMPORTANT:** Only `packages/` changes matter. Ignore `website/`, `docs/`, `.claude/`, config files, etc. – those are not published to npm.
 
 ## Step 1: Detect Last Version Bump
 
@@ -43,7 +43,7 @@ For significant changes, read the actual diff to understand new/changed exports:
 git diff <last-bump-hash>..HEAD -- packages/core/src/ packages/react/src/ packages/ai/src/
 ```
 
-**Ignore these entirely** — they don't affect the published package:
+**Ignore these entirely** – they don't affect the published package:
 - `website/` (docs site, not published)
 - `packages/*/README.md` (docs only, not a code change)
 - `packages/*/__tests__/` or `packages/*/test/` (tests, not shipped)
@@ -66,11 +66,11 @@ The highest classification wins per group:
 
 Show the user a summary of detected **source code** changes per package:
 
-**All packages** (single fixed group — all bump together):
+**All packages** (single fixed group – all bump together):
 - `@directive-run/core`: [list actual src/ changes found]
 - `@directive-run/ai`: [list actual src/ changes found]
 - `@directive-run/cli`: [list actual src/ changes found]
-- (etc. — only list packages that actually changed)
+- (etc. – only list packages that actually changed)
 
 **Recommended bump:** [patch/minor/major] because [reason]
 

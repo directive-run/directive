@@ -18,7 +18,7 @@ What are you building?
 Create the system outside of React. Components subscribe to it.
 
 ```typescript
-// system.ts — created once, imported anywhere
+// system.ts – created once, imported anywhere
 import { createSystem } from "@directive-run/core";
 import { counterModule } from "./counter-module";
 
@@ -31,7 +31,7 @@ import { useSelector, useEvent } from "@directive-run/react";
 import { system } from "./system";
 
 function Counter() {
-  // Subscribe to derived state — re-renders only when value changes
+  // Subscribe to derived state – re-renders only when value changes
   const count = useSelector(system, (s) => s.facts.count);
   const doubled = useSelector(system, (s) => s.derive.doubled);
 
@@ -174,10 +174,10 @@ function Dashboard() {
 ## CRITICAL: Hooks That DO NOT Exist
 
 ```typescript
-// WRONG — useDirective() does not exist. This is a common hallucination.
+// WRONG – useDirective() does not exist. This is a common hallucination.
 const { facts, derive, events } = useDirective(system);
 
-// CORRECT — use useSelector for state, useEvent for actions
+// CORRECT – use useSelector for state, useEvent for actions
 const count = useSelector(system, (s) => s.facts.count);
 const events = useEvent(system);
 ```
@@ -187,7 +187,7 @@ const events = useEvent(system);
 ### Creating the system inside a component without useSystem
 
 ```typescript
-// WRONG — creates a new system on every render
+// WRONG – creates a new system on every render
 function Counter() {
   const system = createSystem({ module: counterModule }); // New system each render!
   const count = useSelector(system, (s) => s.facts.count);
@@ -195,7 +195,7 @@ function Counter() {
   return <div>{count}</div>;
 }
 
-// CORRECT — create outside the component
+// CORRECT – create outside the component
 const system = createSystem({ module: counterModule });
 
 function Counter() {
@@ -204,7 +204,7 @@ function Counter() {
   return <div>{count}</div>;
 }
 
-// ALSO CORRECT — useSystem manages lifecycle
+// ALSO CORRECT – useSystem manages lifecycle
 function Counter() {
   const system = useSystem({ module: counterModule });
   const count = useSelector(system, (s) => s.facts.count);
@@ -216,10 +216,10 @@ function Counter() {
 ### Selecting too much state (causes unnecessary re-renders)
 
 ```typescript
-// WRONG — re-renders on ANY fact change
+// WRONG – re-renders on ANY fact change
 const allFacts = useSelector(system, (s) => s.facts);
 
-// CORRECT — select only what you need
+// CORRECT – select only what you need
 const name = useSelector(system, (s) => s.facts.userName);
 const count = useSelector(system, (s) => s.facts.count);
 ```
@@ -227,7 +227,7 @@ const count = useSelector(system, (s) => s.facts.count);
 ### Mutating facts directly in event handlers
 
 ```typescript
-// WRONG — bypass the event system
+// WRONG – bypass the event system
 function Counter() {
   const count = useSelector(system, (s) => s.facts.count);
 
@@ -238,7 +238,7 @@ function Counter() {
   );
 }
 
-// CORRECT — use events for intent-driven mutations
+// CORRECT – use events for intent-driven mutations
 function Counter() {
   const count = useSelector(system, (s) => s.facts.count);
   const events = useEvent(system);
@@ -254,9 +254,9 @@ function Counter() {
 ### Casting values from useSelector
 
 ```typescript
-// WRONG — unnecessary type casting
+// WRONG – unnecessary type casting
 const profile = useSelector(system, (s) => s.facts.profile as UserProfile);
 
-// CORRECT — types are inferred from the module schema
+// CORRECT – types are inferred from the module schema
 const profile = useSelector(system, (s) => s.facts.profile);
 ```

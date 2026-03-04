@@ -18,7 +18,7 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 - User asks "should I use a constraint or an effect" or similar conceptual questions
 - User wants to understand the Directive mental model before writing code
 
-### Exclusions — Use a Different Skill
+### Exclusions – Use a Different Skill
 - User already knows Directive and wants to write a specific module → `writing-directive-modules`
 - User asks about specific constraint/resolver patterns → `writing-directive-constraints`
 - User asks about multi-module systems or React → `building-directive-systems`
@@ -31,11 +31,11 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 
 Directive is a **constraint-driven runtime** for TypeScript. Instead of imperative state management, you:
 
-1. **Declare facts** — observable state values
-2. **Derive** computed values — auto-tracked, no manual deps
-3. **Set constraints** — conditions that must be true (when X, require Y)
-4. **Write resolvers** — how to fulfill requirements (async handlers)
-5. **Compose into systems** — wire modules together with plugins
+1. **Declare facts** – observable state values
+2. **Derive** computed values – auto-tracked, no manual deps
+3. **Set constraints** – conditions that must be true (when X, require Y)
+4. **Write resolvers** – how to fulfill requirements (async handlers)
+5. **Compose into systems** – wire modules together with plugins
 
 The runtime watches your facts, evaluates constraints, and dispatches requirements to resolvers automatically.
 
@@ -108,7 +108,7 @@ const system = createSystem({ module: counter });
 console.log(system.facts.count);     // 0
 console.log(system.derive.isAtLimit); // false
 
-// Mutate — constraints auto-evaluate
+// Mutate – constraints auto-evaluate
 system.facts.count = 15;
 // → constraint fires → resolver resets count to limit
 ```
@@ -173,26 +173,26 @@ Requirement:    UPPER_SNAKE_CASE → require: { type: "FETCH_PROFILE" }
 All available Directive skills, grouped by use case:
 
 **Learning:**
-- `getting-started-with-directive` — This skill. Fundamentals and mental model
-- `migrating-to-directive` — Convert from Redux, Zustand, XState, MobX
+- `getting-started-with-directive` – This skill. Fundamentals and mental model
+- `migrating-to-directive` – Convert from Redux, Zustand, XState, MobX
 
 **Building (Core):**
-- `writing-directive-modules` — Schema, type builders, derivations, naming
-- `writing-directive-constraints` — Constraints, resolvers, error boundaries, retry
-- `building-directive-systems` — Multi-module, plugins, React integration
-- `scaffolding-directive-modules` — Generate module + test boilerplate
+- `writing-directive-modules` – Schema, type builders, derivations, naming
+- `writing-directive-constraints` – Constraints, resolvers, error boundaries, retry
+- `building-directive-systems` – Multi-module, plugins, React integration
+- `scaffolding-directive-modules` – Generate module + test boilerplate
 
 **Building (AI):**
-- `building-ai-orchestrators` — Single and multi-agent orchestrators
-- `building-ai-agents` — Streaming, provider adapters, cross-agent communication
-- `hardening-ai-systems` — Guardrails, budgets, PII detection, security
+- `building-ai-orchestrators` – Single and multi-agent orchestrators
+- `building-ai-agents` – Streaming, provider adapters, cross-agent communication
+- `hardening-ai-systems` – Guardrails, budgets, PII detection, security
 
 **Quality:**
-- `testing-directive-code` — createTestSystem, mockResolver, time-travel
-- `testing-ai-systems` — Mock runners, evaluations, observability
-- `reviewing-directive-code` — Anti-pattern scanner, naming audit
+- `testing-directive-code` – createTestSystem, mockResolver, time-travel
+- `testing-ai-systems` – Mock runners, evaluations, observability
+- `reviewing-directive-code` – Anti-pattern scanner, naming audit
 
 ## Reference Files
 
 Supporting knowledge files loaded with this skill:
-- `core-patterns.md` — Core patterns and API reference
+- `core-patterns.md` – Core patterns and API reference

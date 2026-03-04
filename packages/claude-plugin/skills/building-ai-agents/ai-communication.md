@@ -184,7 +184,7 @@ const isReady = orchestrator.system.derive.researcher.isComplete;
 The scratchpad is an ephemeral key-value store scoped to a single pattern execution. Tasks and agents in the same pattern share it:
 
 ```typescript
-// In a task — write to scratchpad
+// In a task – write to scratchpad
 tasks: {
   gather: {
     run: async (input, context) => {

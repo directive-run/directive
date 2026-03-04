@@ -33,9 +33,9 @@ Directive has a two-layer error handling system. Resolver retry handles transien
 
 | Layer | Purpose | Speed | Scope |
 |-------|---------|-------|-------|
-| `resolver.retry` | Transient failures (network blips, rate limits) | Fast — immediate retries with backoff | Per-resolver |
-| `errorBoundary: "retry"` | One more attempt after all retries fail | Immediate — same reconciliation cycle | System-wide |
-| `errorBoundary: "retry-later"` | Service degradation, longer outages | Slow — deferred with exponential backoff | System-wide |
+| `resolver.retry` | Transient failures (network blips, rate limits) | Fast – immediate retries with backoff | Per-resolver |
+| `errorBoundary: "retry"` | One more attempt after all retries fail | Immediate – same reconciliation cycle | System-wide |
+| `errorBoundary: "retry-later"` | Service degradation, longer outages | Slow – deferred with exponential backoff | System-wide |
 | [Circuit Breaker](/docs/plugins/circuit-breaker) | Cascading failure prevention | Instant rejection when open | Per-service |
 
 ### Full Example
@@ -51,7 +51,7 @@ const system = createSystem({
         return "retry-later"; // Back off and try again later
       }
       if (error.message.includes("not found")) {
-        return "disable"; // Stop trying — the resource doesn't exist
+        return "disable"; // Stop trying – the resource doesn't exist
       }
 
       return "skip"; // Swallow and continue
@@ -212,7 +212,7 @@ const system = createSystem({
 
 ## Retry-Later Configuration
 
-When using `"retry-later"`, configure the backoff behavior. This is **separate** from resolver retry — it fires after all resolver-level retries are exhausted:
+When using `"retry-later"`, configure the backoff behavior. This is **separate** from resolver retry – it fires after all resolver-level retries are exhausted:
 
 ```typescript
 errorBoundary: {
@@ -269,7 +269,7 @@ If the callback returns `void` (no return value), the strategy defaults to `"ski
 
 ### See Also
 
-- [Error Boundaries Example](/docs/examples/error-boundaries) — Interactive demo of all 5 strategies
+- [Error Boundaries Example](/docs/examples/error-boundaries) – Interactive demo of all 5 strategies
 
 ---
 
@@ -277,7 +277,7 @@ If the callback returns `void` (no return value), the strategy defaults to `"ski
 
 For operations that call external services, use a [circuit breaker](/docs/plugins/circuit-breaker) to automatically stop sending requests to a failing service and recover gracefully.
 
-The circuit breaker is a **standalone utility** — wrap calls inside your resolver's `resolve()` function. It complements retry policies: retries handle transient failures within a single operation, while the circuit breaker prevents repeated attempts against a service that is consistently failing.
+The circuit breaker is a **standalone utility** – wrap calls inside your resolver's `resolve()` function. It complements retry policies: retries handle transient failures within a single operation, while the circuit breaker prevents repeated attempts against a service that is consistently failing.
 
 ```typescript
 import { createCircuitBreaker } from '@directive-run/core/plugins';
@@ -366,7 +366,7 @@ resolvers: {
     requirement: "FETCH_USER",
     batch: { enabled: true, windowMs: 50 },
 
-    // Individual resolve — called once per batched requirement
+    // Individual resolve – called once per batched requirement
     resolve: async (req, context) => {
       context.facts.user = await api.getUser(req.userId);
     },

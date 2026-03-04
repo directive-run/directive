@@ -55,13 +55,13 @@ const budgetRunner = withBudget(baseRunner, {
 ### Anti-Pattern #29: budgetWarningThreshold out of range
 
 ```typescript
-// WRONG — threshold must be a 0-1 percentage
+// WRONG – threshold must be a 0-1 percentage
 const budgetRunner = withBudget(baseRunner, {
   budgetWarningThreshold: 80, // Not a percentage!
   budgets: [{ window: "hour", maxCost: 1.0, pricing: { inputPerMillion: 3, outputPerMillion: 15 } }],
 });
 
-// CORRECT — use a decimal between 0 and 1
+// CORRECT – use a decimal between 0 and 1
 const budgetRunner = withBudget(baseRunner, {
   budgetWarningThreshold: 0.8, // 80%
   budgets: [{ window: "hour", maxCost: 1.0, pricing: { inputPerMillion: 3, outputPerMillion: 15 } }],
@@ -127,12 +127,12 @@ breaker.reset();            // Force back to closed
 ### Anti-Pattern #28: Sharing a CircuitBreaker across unrelated agents
 
 ```typescript
-// WRONG — one failing agent opens the breaker for all agents
+// WRONG – one failing agent opens the breaker for all agents
 const sharedBreaker = createCircuitBreaker({ failureThreshold: 3, resetTimeout: 30000 });
 const researchRunner = sharedBreaker.wrap(baseRunner);
 const writerRunner = sharedBreaker.wrap(baseRunner); // Same breaker!
 
-// CORRECT — each agent gets its own breaker instance
+// CORRECT – each agent gets its own breaker instance
 const researchBreaker = createCircuitBreaker({ failureThreshold: 3, resetTimeout: 30000 });
 const writerBreaker = createCircuitBreaker({ failureThreshold: 3, resetTimeout: 30000 });
 
@@ -207,7 +207,7 @@ const router = createConstraintRouter({
 
 ## Combining Wrappers
 
-Wrappers compose — apply them inside-out (innermost runs first):
+Wrappers compose – apply them inside-out (innermost runs first):
 
 ```typescript
 import { withBudget, withRetry, withFallback } from "@directive-run/ai";

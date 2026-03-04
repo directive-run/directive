@@ -1,6 +1,6 @@
 ---
 title: "Declarative Forms with Directive: Zero useState, Zero useEffect"
-description: Build a production contact form using Directive's six primitives. Per-field validation, async submission, rate limiting, and auto-reset — without a single useState or useEffect.
+description: Build a production contact form using Directive's six primitives. Per-field validation, async submission, rate limiting, and auto-reset – without a single useState or useEffect.
 layout: blog
 date: 2026-02-16
 dateModified: 2026-02-16

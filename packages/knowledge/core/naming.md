@@ -33,7 +33,7 @@ Fulfillment logic?
 The `req` parameter in resolvers and constraint `key()` functions is short for **requirement** -- the object emitted by a constraint's `require` property.
 
 ```typescript
-// CORRECT — req is a requirement
+// CORRECT – req is a requirement
 resolvers: {
   fetchUser: {
     requirement: "FETCH_USER",
@@ -47,7 +47,7 @@ resolvers: {
   },
 },
 
-// WRONG — never use "request" or "r"
+// WRONG – never use "request" or "r"
 resolve: async (request, context) => { /* ... */ },
 resolve: async (r, context) => { /* ... */ },
 ```
@@ -62,7 +62,7 @@ resolve: async (req, context) => {
   context.snapshot(); // facts snapshot
 },
 
-// WRONG — never abbreviate to ctx
+// WRONG – never abbreviate to ctx
 resolve: async (req, ctx) => { /* ... */ },
 ```
 
@@ -88,10 +88,10 @@ constraints: {
 // Wait -- the above IS correct for one-line arrow expressions.
 // The brace rule applies to if/return blocks:
 
-// WRONG — single-line if return
+// WRONG – single-line if return
 if (facts.user) return "ready";
 
-// CORRECT — always use braces
+// CORRECT – always use braces
 if (facts.user) {
   return "ready";
 }
@@ -102,7 +102,7 @@ if (facts.user) {
 Add a blank line before `return` when there is code above it. Skip the blank line when `return` is the first statement in a block.
 
 ```typescript
-// CORRECT — blank line before return when code precedes it
+// CORRECT – blank line before return when code precedes it
 function getStatus(facts) {
   const phase = facts.phase;
   const hasUser = facts.user !== null;
@@ -110,12 +110,12 @@ function getStatus(facts) {
   return phase === "ready" && hasUser;
 }
 
-// CORRECT — no blank line when return is first statement
+// CORRECT – no blank line when return is first statement
 function isReady(facts) {
   return facts.phase === "ready";
 }
 
-// CORRECT — blank line after brace-style return block
+// CORRECT – blank line after brace-style return block
 function process(facts) {
   if (!facts.ready) {
     return null;
@@ -126,7 +126,7 @@ function process(facts) {
   return result;
 }
 
-// WRONG — no blank line before return after code
+// WRONG – no blank line before return after code
 function getStatus(facts) {
   const phase = facts.phase;
   return phase === "ready"; // Missing blank line
@@ -138,13 +138,13 @@ function getStatus(facts) {
 Never put properties or statements on a single line inside braces. Always expand to one item per line with proper indentation. This applies everywhere: schema definitions, init functions, events, effects, requirement types, and any other object or block.
 
 ```typescript
-// WRONG — properties crammed on one line
+// WRONG – properties crammed on one line
 schema: {
   facts: { phase: t.string(), count: t.number() },
   requirements: { FETCH_USER: { id: t.string() }, RESET: {} },
 },
 
-// CORRECT — one property per line, always expanded
+// CORRECT – one property per line, always expanded
 schema: {
   facts: {
     phase: t.string(),
@@ -158,10 +158,10 @@ schema: {
   },
 },
 
-// WRONG — statements crammed on one line
+// WRONG – statements crammed on one line
 init: (facts) => { facts.phase = "idle"; facts.count = 0; },
 
-// CORRECT — one statement per line
+// CORRECT – one statement per line
 init: (facts) => {
   facts.phase = "idle";
   facts.count = 0;
@@ -181,12 +181,12 @@ events: {
 
 Single-expression arrows (no braces) are fine on one line. Empty objects `{}` are fine inline.
 ```typescript
-// OK — single expression, no braces
+// OK – single expression, no braces
 derive: {
   isReady: (facts) => facts.phase === "ready",
 },
 
-// OK — empty object
+// OK – empty object
 RESET: {},
 ```
 
@@ -205,7 +205,7 @@ constraints: {
   },
 },
 
-// WRONG — bare facts.* in multi-module context
+// WRONG – bare facts.* in multi-module context
 constraints: {
   loadWhenAuth: {
     when: (facts) => facts.isAuthenticated && !facts.loaded,
@@ -217,13 +217,13 @@ constraints: {
 ### System-Level Access Uses Dot Notation
 
 ```typescript
-// CORRECT — dot notation through namespace proxy
+// CORRECT – dot notation through namespace proxy
 system.facts.auth.token;
 system.facts.cart.items;
 system.derive.auth.isLoggedIn;
 system.events.auth.login({ token: "..." });
 
-// WRONG — bracket notation with internal separator
+// WRONG – bracket notation with internal separator
 system.facts["auth::token"];
 system.facts["auth_token"];
 ```
@@ -235,11 +235,11 @@ system.facts["auth_token"];
 The schema provides all types. Do not add `as` casts when reading facts or derivations from the system.
 
 ```typescript
-// CORRECT — schema provides the type
+// CORRECT – schema provides the type
 const profile = system.facts.profile;
 const isReady = system.derive.isReady;
 
-// WRONG — unnecessary cast
+// WRONG – unnecessary cast
 const profile = system.facts.profile as UserProfile;
 const isReady = system.derive.isReady as boolean;
 ```
@@ -249,7 +249,7 @@ const isReady = system.derive.isReady as boolean;
 Type assertions are only valid in schema definition using the `{} as {}` pattern:
 
 ```typescript
-// CORRECT — cast in schema definition
+// CORRECT – cast in schema definition
 schema: {
   facts: {} as { profile: UserProfile; settings: AppSettings },
   derivations: {} as { displayName: string },

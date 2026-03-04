@@ -37,7 +37,7 @@ const result = await structuredRunner(agent, 'Analyze: "I love this product!"');
 
 ## How It Works
 
-- **`schema`** accepts any object with a `safeParse(value)` method — Zod schemas work out of the box.
+- **`schema`** accepts any object with a `safeParse(value)` method – Zod schemas work out of the box.
 - **The middleware extracts JSON** from the agent's output, handling markdown code fences and leading text automatically.
 - **If parsing fails**, the middleware retries the agent call with an error message asking it to fix the output. Up to `maxRetries` attempts (default: 2).
 - **After all retries fail**, a `StructuredOutputError` is thrown with the last raw output and validation errors.
@@ -94,5 +94,5 @@ try {
 
 ## Related
 
-- [Resilience & Routing](/ai/resilience-routing) — `withStructuredOutput` and other middleware
-- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) — catching `StructuredOutputError` and other error types
+- [Resilience & Routing](/ai/resilience-routing) – `withStructuredOutput` and other middleware
+- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) – catching `StructuredOutputError` and other error types

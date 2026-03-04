@@ -79,7 +79,7 @@ const classifierGuardrail = createModerationGuardrail({
       body: JSON.stringify({ text, allowedTopics: ['product', 'billing', 'support'] }),
     });
     if (!response.ok) {
-      return false; // Fail open — allow input if classifier is down
+      return false; // Fail open – allow input if classifier is down
     }
     const result = await response.json();
 
@@ -111,5 +111,5 @@ const result2 = await orchestrator.run(agent, 'Tell me about the weather');
 
 ## Related
 
-- [Guardrails reference](/ai/guardrails) — all built-in guardrails and custom guardrail API
-- [Customer Support Bot guide](/ai/guides/customer-support-bot) — full support agent with PII detection and escalation
+- [Guardrails reference](/ai/guardrails) – all built-in guardrails and custom guardrail API
+- [Customer Support Bot guide](/ai/guides/customer-support-bot) – full support agent with PII detection and escalation
