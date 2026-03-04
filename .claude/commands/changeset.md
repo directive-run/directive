@@ -64,15 +64,13 @@ The highest classification wins per group:
 
 ## Step 4: Present Findings
 
-Show the user a summary of detected **source code** changes per package group:
+Show the user a summary of detected **source code** changes per package:
 
-**Core + Frameworks** (fixed group — all bump together):
+**All packages** (single fixed group — all bump together):
 - `@directive-run/core`: [list actual src/ changes found]
-- `@directive-run/react`: [list actual src/ changes found]
-- (etc. — only list packages that actually changed)
-
-**AI:**
 - `@directive-run/ai`: [list actual src/ changes found]
+- `@directive-run/cli`: [list actual src/ changes found]
+- (etc. — only list packages that actually changed)
 
 **Recommended bump:** [patch/minor/major] because [reason]
 
@@ -89,7 +87,6 @@ Write **one** `.changeset/<name>.md` file:
 ```markdown
 ---
 "@directive-run/core": minor
-"@directive-run/ai": patch
 ---
 
 Add tasks system and harden resolver lifecycle.
@@ -101,13 +98,12 @@ Add tasks system and harden resolver lifecycle.
 - **BREAKING:** `ResolverContext.cancel()` now returns `Promise<void>`
 ```
 
-**How fixed groups work:**
-- List only ONE package from the fixed group (e.g., `@directive-run/core`)
-- Changesets automatically bumps ALL packages in the group (core, react, vue, svelte, solid, lit) to the same version
-- Do NOT list every package in the group just for the version bump &ndash; that's redundant
-- AI is its own group, so add a separate entry if it also changed
+**How the fixed group works:**
+- All `@directive-run/*` packages share one version (core, react, vue, svelte, solid, lit, ai, cli, knowledge)
+- List only ONE package (e.g., `@directive-run/core`) &ndash; changesets bumps all packages in the group automatically
+- Do NOT list every package just for the version bump &ndash; that's redundant
 
-**Per-package changelogs:** Fixed groups share version numbers, but changelog entries only appear for packages explicitly listed in the changeset file. If an adapter (react, vue, etc.) has its own meaningful changes, list it explicitly alongside `core` so it gets its own changelog entry. Example: if `core` adds a new API and `react` adds a new hook, list both `@directive-run/core` and `@directive-run/react`. Packages with no changes of their own don't need listing &ndash; they'll still get the version bump from the group.
+**Per-package changelogs:** All packages share a version number, but changelog entries only appear for packages explicitly listed in the changeset file. If a package has its own meaningful changes, list it explicitly so it gets its own changelog entry. Example: if `core` adds a new API and `react` adds a new hook, list both. Packages with no changes of their own don't need listing &ndash; they still get the version bump.
 
 **Summary rules:**
 - Write a **headline sentence** (imperative mood, what the release does)
@@ -124,9 +120,8 @@ Show the created changeset and remind the user:
 
 > Changeset created. Run `/release` when ready to version bump + publish to npm.
 
-## Fixed Groups Reference
+## Fixed Group Reference
 
 From `.changeset/config.json`:
-- **Core group** (all share one version): core, react, vue, svelte, solid, lit
-- **AI group** (independent version): ai
-- **Not managed by changesets:** directive, vite-plugin-api-proxy
+- **All packages** (single fixed group, one version): core, react, vue, svelte, solid, lit, ai, cli, knowledge
+- **Not managed by changesets:** claude-plugin (private), vite-plugin-api-proxy
