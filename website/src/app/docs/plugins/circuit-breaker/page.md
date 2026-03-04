@@ -61,7 +61,7 @@ The circuit breaker has three states:
 | `recoveryTimeMs` | `number` | `30000` | Time in ms before transitioning from OPEN to HALF_OPEN |
 | `halfOpenMaxRequests` | `number` | `3` | Trial requests allowed in HALF_OPEN state |
 | `failureWindowMs` | `number` | `60000` | Sliding window in ms for counting failures. Older failures are forgotten. |
-| `isFailure` | `(error: Error) => boolean` | All errors count | Custom classifier — return `false` to treat an error as a success (e.g., 404s) |
+| `isFailure` | `(error: Error) => boolean` | All errors count | Custom classifier – return `false` to treat an error as a success (e.g., 404s) |
 | `onStateChange` | `(from, to) => void` | – | Callback when the circuit transitions between states |
 | `observability` | `ObservabilityInstance` | – | Optional observability instance for automatic metric tracking |
 | `metricPrefix` | `string` | `"circuit_breaker"` | Metric name prefix when observability is provided |

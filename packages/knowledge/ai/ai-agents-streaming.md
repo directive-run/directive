@@ -18,11 +18,11 @@ Need the complete result?
         └── Default          → strategy: "buffer"
 ```
 
-## AgentLike — What the Runner Receives
+## AgentLike – What the Runner Receives
 
 ```typescript
 interface AgentLike {
-  // Required — unique identifier
+  // Required – unique identifier
   name: string;
 
   // System prompt / instructions
@@ -44,7 +44,7 @@ const agent: AgentLike = {
 };
 ```
 
-## RunResult — What the Runner Returns
+## RunResult – What the Runner Returns
 
 ```typescript
 interface RunResult<T = unknown> {
@@ -143,7 +143,7 @@ Control behavior when the consumer cannot keep up with token production:
 
 ```typescript
 const stream = orchestrator.runStream(agent, "Generate long report", {
-  backpressure: "buffer",  // default — buffer all tokens in memory
+  backpressure: "buffer",  // default – buffer all tokens in memory
 });
 
 const stream = orchestrator.runStream(agent, "Generate long report", {
@@ -228,12 +228,12 @@ eventSource.onmessage = (event) => {
 ### Not checking chunk.type before accessing fields
 
 ```typescript
-// WRONG — not all chunks have .data
+// WRONG – not all chunks have .data
 for await (const chunk of stream) {
   console.log(chunk.data); // undefined for non-token chunks
 }
 
-// CORRECT — switch on chunk.type
+// CORRECT – switch on chunk.type
 for await (const chunk of stream) {
   if (chunk.type === "token") {
     console.log(chunk.data);
@@ -244,12 +244,12 @@ for await (const chunk of stream) {
 ### Ignoring the stopped flag on guardrail chunks
 
 ```typescript
-// WRONG — continuing after a stopping guardrail
+// WRONG – continuing after a stopping guardrail
 case "guardrail_triggered":
   console.log("Guardrail triggered, continuing...");
   break;
 
-// CORRECT — check if the stream was stopped
+// CORRECT – check if the stream was stopped
 case "guardrail_triggered":
   if (chunk.stopped) {
     console.error(`Stopped by ${chunk.guardrailName}: ${chunk.reason}`);

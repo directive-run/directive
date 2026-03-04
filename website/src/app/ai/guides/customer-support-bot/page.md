@@ -43,7 +43,7 @@ const orchestrator = createAgentOrchestrator({
     escalate: {
       requirement: 'ESCALATE',
       resolve: async (req, context) => {
-        // Your notification function — Directive doesn't provide this
+        // Your notification function – Directive doesn't provide this
         await notifyHumanAgent(context.facts.agent.conversationId, req.reason);
         context.facts.agent.status = 'paused';
       },
@@ -126,7 +126,7 @@ const orchestrator = createAgentOrchestrator({
     hardEscalate: {
       requirement: 'HARD_ESCALATE',
       resolve: async (req, context) => {
-        // Your notification function — Directive doesn't provide this
+        // Your notification function – Directive doesn't provide this
         await notifyHumanAgent(context.facts.agent.conversationId, req.reason);
         context.facts.agent.status = 'paused';
       },
@@ -137,7 +137,7 @@ const orchestrator = createAgentOrchestrator({
 
 ## Related
 
-- [Guardrails reference](/ai/guardrails) — PII detection, moderation, and custom guardrails
-- [Orchestrator reference](/ai/orchestrator) — constraints, resolvers, and lifecycle
-- [Prevent Off-Topic Responses guide](/ai/guides/prevent-off-topic-responses) — topic boundary guardrails
-- [Control AI Costs guide](/ai/guides/control-ai-costs) — detailed budget management
+- [Guardrails reference](/ai/guardrails) – PII detection, moderation, and custom guardrails
+- [Orchestrator reference](/ai/orchestrator) – constraints, resolvers, and lifecycle
+- [Prevent Off-Topic Responses guide](/ai/guides/prevent-off-topic-responses) – topic boundary guardrails
+- [Control AI Costs guide](/ai/guides/control-ai-costs) – detailed budget management

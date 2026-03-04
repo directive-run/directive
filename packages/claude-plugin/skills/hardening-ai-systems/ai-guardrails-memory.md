@@ -28,7 +28,7 @@ interface GuardrailResult {
   // Why it failed (when passed: false)
   reason?: string;
 
-  // Modified data — guardrail can transform the input/output
+  // Modified data – guardrail can transform the input/output
   transformed?: unknown;
 }
 ```
@@ -60,7 +60,7 @@ const piiGuardrail = createPIIGuardrail({
 import { createModerationGuardrail } from "@directive-run/ai";
 
 const moderationGuardrail = createModerationGuardrail({
-  // Custom check function — return true if content is safe
+  // Custom check function – return true if content is safe
   checkFn: async (content) => {
     const result = await moderationAPI.check(content);
 
@@ -171,7 +171,7 @@ const orchestrator = createAgentOrchestrator({
 ## Anti-Pattern #25: Catching Error Instead of GuardrailError
 
 ```typescript
-// WRONG — loses guardrail-specific metadata
+// WRONG – loses guardrail-specific metadata
 try {
   const result = await orchestrator.run(agent, prompt);
 } catch (error) {
@@ -180,7 +180,7 @@ try {
   }
 }
 
-// CORRECT — catch GuardrailError for full context
+// CORRECT – catch GuardrailError for full context
 import { GuardrailError } from "@directive-run/ai";
 
 try {
@@ -259,7 +259,7 @@ When messages are evicted, a summarizer condenses them:
 ```typescript
 import { createTruncationSummarizer } from "@directive-run/ai";
 
-// Simply drops old messages — no summary generated
+// Simply drops old messages – no summary generated
 const summarizer = createTruncationSummarizer();
 ```
 
@@ -299,14 +299,14 @@ const orchestrator = createAgentOrchestrator({
 ## Anti-Pattern #31: Async Summarizer Without autoManage: false
 
 ```typescript
-// WRONG — LLM summarizer is async but autoManage runs synchronously
+// WRONG – LLM summarizer is async but autoManage runs synchronously
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 20 }),
   summarizer: createLLMSummarizer(runner),
   autoManage: true, // Will not await the summarizer properly
 });
 
-// CORRECT — disable autoManage, call memory.manage() manually
+// CORRECT – disable autoManage, call memory.manage() manually
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 20 }),
   summarizer: createLLMSummarizer(runner),

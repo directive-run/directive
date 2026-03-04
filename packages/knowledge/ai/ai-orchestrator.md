@@ -156,13 +156,13 @@ const restored = createAgentOrchestrator({
 ### #21: TypeScript types instead of t.*() for factsSchema
 
 ```typescript
-// WRONG — TS types are erased at runtime, no schema validation
+// WRONG – TS types are erased at runtime, no schema validation
 const orchestrator = createAgentOrchestrator({
   runner,
   factsSchema: {} as { confidence: number; analysis: string },
 });
 
-// CORRECT — use t.*() builders for runtime schema
+// CORRECT – use t.*() builders for runtime schema
 const orchestrator = createAgentOrchestrator({
   runner,
   factsSchema: {
@@ -175,24 +175,24 @@ const orchestrator = createAgentOrchestrator({
 ### #22: Mutating arrays/objects in place
 
 ```typescript
-// WRONG — proxy cannot detect in-place mutations
+// WRONG – proxy cannot detect in-place mutations
 context.facts.cache.push("new-item");
 
-// CORRECT — replace the entire value
+// CORRECT – replace the entire value
 context.facts.cache = [...context.facts.cache, "new-item"];
 ```
 
 ### #23: Returning data from resolve
 
 ```typescript
-// WRONG — resolvers return void, not data
+// WRONG – resolvers return void, not data
 resolve: async (req, context) => {
   const result = await analyzeData(req.input);
 
   return result; // Return value is ignored
 },
 
-// CORRECT — mutate context.facts to store results
+// CORRECT – mutate context.facts to store results
 resolve: async (req, context) => {
   const result = await analyzeData(req.input);
   context.facts.analysis = result;
@@ -202,11 +202,11 @@ resolve: async (req, context) => {
 ### #24: Forgetting start() for multi-agent
 
 ```typescript
-// WRONG — multi-agent orchestrators require explicit start()
+// WRONG – multi-agent orchestrators require explicit start()
 const orchestrator = createMultiAgentOrchestrator({ agents, runner });
 const result = await orchestrator.runPattern("pipeline", "prompt");
 
-// CORRECT — call start() before running patterns
+// CORRECT – call start() before running patterns
 const orchestrator = createMultiAgentOrchestrator({ agents, runner });
 orchestrator.start();
 const result = await orchestrator.runPattern("pipeline", "prompt");

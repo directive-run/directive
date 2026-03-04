@@ -6,14 +6,14 @@
 
 ```typescript
 // Example: counter
-// Source: examples/counter/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/counter/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Number Match — DOM Rendering & System Wiring
+ * Number Match – Directive Module
  *
- * Creates the Directive system, subscribes to state changes,
- * renders the game grid and event timeline.
+ * Types, schema, helpers, module definition, timeline, and system creation
+ * for a tile-matching game where pairs must add to 10.
  */
 
 import {
@@ -28,17 +28,21 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-interface Tile {
+export interface Tile {
   id: string;
   value: number;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
   type: string;
 }
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 // Create a pool of numbered tiles (1-9, four of each = 36 tiles)
 function createPool(): Tile[] {
@@ -62,9 +66,9 @@ function createPool(): Tile[] {
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function log(msg: string) {
+export function addLog(msg: string) {
   console.log(`[NumberMatch] ${msg}`);
 
   // Classify and add significant events to the timeline
@@ -108,15 +112,15 @@ function log(msg: string) {
 }
 
 // ============================================================================
-// Schema - same structure as eleven-up
+// Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
-    pool: t.object<Tile[]>(),
-    table: t.object<Tile[]>(),
-    removed: t.object<Tile[]>(),
-    selected: t.object<string[]>(),
+    pool: t.array<Tile>(),
+    table: t.array<Tile>(),
+    removed: t.array<Tile>(),
+    selected: t.array<string>(),
     message: t.string(),
     moveCount: t.number(),
     gameOver: t.boolean(),
@@ -124,7 +128,7 @@ const schema = {
   derivations: {
     poolCount: t.number(),
     removedCount: t.number(),
-    selectedTiles: t.object<Tile[]>(),
+    selectedTiles: t.array<Tile>(),
     hasValidMoves: t.boolean(),
   },
   events: {
@@ -134,7 +138,7 @@ const schema = {
     clearSelection: {},
   },
   requirements: {
-    REMOVE_TILES: { tileIds: t.object<string[]>() },
+    REMOVE_TILES: { tileIds: t.array<string>() },
     REFILL_TABLE: { count: t.number() },
     END_GAME: { reason: t.string() },
   },
@@ -167,9 +171,12 @@ const numberMatch = createModule("number-match", {
       const nums = facts.table.map((t: Tile) => t.value);
       for (let i = 0; i < nums.length; i++) {
         for (let j = i + 1; j < nums.length; j++) {
-          if (nums[i] + nums[j] === 10) return true;
+          if (nums[i] + nums[j] === 10) {
+            return true;
+          }
         }
       }
+
       return false;
     },
   },
@@ -188,7 +195,7 @@ const numberMatch = createModule("number-match", {
     selectTile: (facts, { tileId }) => {
       if (!facts.selected.includes(tileId) && !facts.gameOver) {
         facts.selected = [...facts.selected, tileId];
-        log(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
+        addLog(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
       }
     },
     deselectTile: (facts, { tileId }) => {
@@ -200,27 +207,34 @@ const numberMatch = createModule("number-match", {
   },
 
   // ============================================================================
-  // Constraints - same pattern as eleven-up
+  // Constraints
   // ============================================================================
   constraints: {
     // When two selected tiles add to 10 -> remove them
     pairAddsTen: {
       priority: 100,
       when: (facts) => {
-        if (facts.gameOver) return false;
+        if (facts.gameOver) {
+          return false;
+        }
         const selected = facts.table.filter((tile: Tile) =>
           facts.selected.includes(tile.id),
         );
-        if (selected.length !== 2) return false;
+        if (selected.length !== 2) {
+          return false;
+        }
         const result = selected[0].value + selected[1].value === 10;
-        if (result)
-          log(
+        if (result) {
+          addLog(
             `CONSTRAINT pairAddsTen: TRUE (${selected[0].value} + ${selected[1].value})`,
           );
+        }
+
         return result;
       },
       require: (facts) => {
-        log("CONSTRAINT pairAddsTen: producing REMOVE_TILES");
+        addLog("CONSTRAINT pairAddsTen: producing REMOVE_TILES");
+
         return {
           type: "REMOVE_TILES",
           tileIds: [...facts.selected],
@@ -234,15 +248,18 @@ const numberMatch = createModule("number-match", {
       when: (facts) => {
         const result =
           !facts.gameOver && facts.table.length < 9 && facts.pool.length > 0;
-        if (result)
-          log(
+        if (result) {
+          addLog(
             `CONSTRAINT refillTable: TRUE (table: ${facts.table.length}, pool: ${facts.pool.length})`,
           );
+        }
+
         return result;
       },
       require: (facts) => {
         const count = Math.min(9 - facts.table.length, facts.pool.length);
-        log(`CONSTRAINT refillTable: producing REFILL_TABLE count=${count}`);
+        addLog(`CONSTRAINT refillTable: producing REFILL_TABLE count=${count}`);
+
         return { type: "REFILL_TABLE", count };
       },
     },
@@ -251,16 +268,25 @@ const numberMatch = createModule("number-match", {
     noMovesLeft: {
       priority: 190,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        if (facts.table.length === 0) return false;
-        if (facts.pool.length > 0) return false;
+        if (facts.gameOver) {
+          return false;
+        }
+        if (facts.table.length === 0) {
+          return false;
+        }
+        if (facts.pool.length > 0) {
+          return false;
+        }
         const nums = facts.table.map((t: Tile) => t.value);
         for (let i = 0; i < nums.length; i++) {
           for (let j = i + 1; j < nums.length; j++) {
-            if (nums[i] + nums[j] === 10) return false;
+            if (nums[i] + nums[j] === 10) {
+              return false;
+            }
           }
         }
-        log("CONSTRAINT noMovesLeft: TRUE");
+        addLog("CONSTRAINT noMovesLeft: TRUE");
+
         return true;
       },
       require: (facts) => ({
@@ -277,7 +303,10 @@ const numberMatch = createModule("number-match", {
           !facts.gameOver &&
           facts.table.length === 0 &&
           facts.pool.length === 0;
-        if (result) log("CONSTRAINT allCleared: TRUE");
+        if (result) {
+          addLog("CONSTRAINT allCleared: TRUE");
+        }
+
         return result;
       },
       require: (facts) => ({
@@ -288,42 +317,42 @@ const numberMatch = createModule("number-match", {
   },
 
   // ============================================================================
-  // Resolvers - same multi-fact mutation pattern as eleven-up
+  // Resolvers
   // ============================================================================
   resolvers: {
     removeTiles: {
       requirement: "REMOVE_TILES",
       resolve: async (req, context) => {
-        log("RESOLVER removeTiles: START");
+        addLog("RESOLVER removeTiles: START");
         const tilesToRemove = context.facts.table.filter((tile: Tile) =>
           req.tileIds.includes(tile.id),
         );
 
         // Multiple fact mutations
-        log("RESOLVER removeTiles: setting table");
+        addLog("RESOLVER removeTiles: setting table");
         context.facts.table = context.facts.table.filter(
           (tile: Tile) => !req.tileIds.includes(tile.id),
         );
-        log("RESOLVER removeTiles: setting removed");
+        addLog("RESOLVER removeTiles: setting removed");
         context.facts.removed = [...context.facts.removed, ...tilesToRemove];
-        log("RESOLVER removeTiles: clearing selected");
+        addLog("RESOLVER removeTiles: clearing selected");
         context.facts.selected = [];
-        log("RESOLVER removeTiles: incrementing moveCount");
+        addLog("RESOLVER removeTiles: incrementing moveCount");
         context.facts.moveCount++;
-        log("RESOLVER removeTiles: setting message");
+        addLog("RESOLVER removeTiles: setting message");
         context.facts.message = `Removed ${tilesToRemove[0].value} + ${tilesToRemove[1].value} = 10!`;
-        log("RESOLVER removeTiles: DONE");
+        addLog("RESOLVER removeTiles: DONE");
       },
     },
 
     refillTable: {
       requirement: "REFILL_TABLE",
       resolve: async (req, context) => {
-        log(`RESOLVER refillTable: START (count: ${req.count})`);
+        addLog(`RESOLVER refillTable: START (count: ${req.count})`);
         const newTiles = context.facts.pool.slice(0, req.count);
         context.facts.pool = context.facts.pool.slice(req.count);
         context.facts.table = [...context.facts.table, ...newTiles];
-        log(
+        addLog(
           `RESOLVER refillTable: DONE (table now: ${context.facts.table.length})`,
         );
       },
@@ -332,7 +361,7 @@ const numberMatch = createModule("number-match", {
     endGame: {
       requirement: "END_GAME",
       resolve: async (req, context) => {
-        log(`RESOLVER endGame: ${req.reason}`);
+        addLog(`RESOLVER endGame: ${req.reason}`);
         context.facts.gameOver = true;
         context.facts.message = req.reason;
       },
@@ -344,60 +373,11 @@ const numberMatch = createModule("number-match", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: numberMatch,
   plugins: [devtoolsPlugin({ name: "number-match" })],
   debug: { timeTravel: true, runHistory: true },
 });
-system.start();
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-// Stats
-
-// Timeline
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-system.subscribe(
-  [
-    "table",
-    "selected",
-    "pool",
-    "removed",
-    "moveCount",
-    "message",
-    "gameOver",
-    "poolCount",
-    "removedCount",
-    "selectedTiles",
-    "hasValidMoves",
-  ],
-  render,
-);
-
-// Button handlers
-
-
-// Initial render
-render();
-log("Game started. Select two numbers that add to 10.");
-
-// Signal to tests that initialization is complete
 ```
 
 ## auth-flow
@@ -405,10 +385,10 @@ log("Game started. Select two numbers that add to 10.");
 ```typescript
 // Example: auth-flow
 // Source: examples/auth-flow/src/auth-flow.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Auth Flow — Directive Module
+ * Auth Flow – Directive Module
  *
  * Demonstrates constraint `after` ordering, auto-tracked derivations
  * driving constraints, resolvers with retry, effects for cleanup,
@@ -459,7 +439,7 @@ export const authFlowSchema = {
     refreshBuffer: t.number(),
     loginFailRate: t.number(),
     refreshFailRate: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isAuthenticated: t.boolean(),
@@ -492,7 +472,7 @@ export const authFlowSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   facts.eventLog = log;
 }
@@ -781,10 +761,10 @@ export const authFlowModule = createModule("auth-flow", {
 ```typescript
 // Example: shopping-cart
 // Source: examples/shopping-cart/src/shopping-cart.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Shopping Cart — Directive Modules
+ * Shopping Cart – Directive Modules
  *
  * Two modules:
  * - cart: Items, coupons, checkout with cross-module auth dependency
@@ -969,22 +949,22 @@ export const cartModule = createModule("cart", {
     },
 
     discount: (facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub * (facts.self.couponDiscount / 100);
     },
 
     tax: (facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
 
       return (sub - disc) * 0.08;
     },
 
     total: (_facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
-      const tx = derive.tax as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
+      const tx = derive.tax;
 
       return sub - disc + tx;
     },
@@ -996,7 +976,7 @@ export const cartModule = createModule("cart", {
     },
 
     freeShipping: (_facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub >= 75;
     },
@@ -1098,7 +1078,7 @@ export const cartModule = createModule("cart", {
       priority: 60,
       after: ["quantityLimit", "couponValidation"],
       when: (facts) => {
-        const items = facts.self.items as CartItem[];
+        const items = facts.self.items;
         const notEmpty = items.length > 0;
         const noOverstock = !items.some(
           (item: CartItem) => item.quantity > item.maxStock,
@@ -1198,6 +1178,7 @@ export const system = createSystem({
   debug: {
     timeTravel: true,
     maxSnapshots: 50,
+    runHistory: true,
   },
 });
 ```
@@ -1207,10 +1188,10 @@ export const system = createSystem({
 ```typescript
 // Example: dashboard-loader
 // Source: examples/dashboard-loader/src/dashboard-loader.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Dashboard Loader — Directive Module
+ * Dashboard Loader – Directive Module
  *
  * Demonstrates loading & error states with concurrent resource fetching,
  * configurable delays/failure rates, retry with exponential backoff,
@@ -1277,7 +1258,7 @@ export const dashboardLoaderSchema = {
     preferencesFailRate: t.number(),
     permissionsFailRate: t.number(),
     loadRequested: t.boolean(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     loadedCount: t.number(),
@@ -1313,7 +1294,7 @@ function addLogEntry(
   resource: string,
   detail: string,
 ): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, resource, detail });
   facts.eventLog = log;
 }
@@ -1388,9 +1369,9 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     combinedStatus: (facts, derive) => {
-      const loaded = derive.loadedCount as number;
-      const anyErr = derive.anyError as boolean;
-      const anyLoad = derive.anyLoading as boolean;
+      const loaded = derive.loadedCount;
+      const anyErr = derive.anyError;
+      const anyLoad = derive.anyLoading;
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -1423,7 +1404,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     canStart: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -1444,7 +1425,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     start: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       if (id.length === 0) {
         return;
       }
@@ -1500,54 +1481,42 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     needsProfile: {
       priority: 100,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const profile = facts.profile as ResourceState<Profile>;
+        const id = facts.userId.trim();
+        const profile = facts.profile;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          profile.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && profile.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PROFILE",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPreferences: {
       priority: 90,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const prefs = facts.preferences as ResourceState<Preferences>;
+        const id = facts.userId.trim();
+        const prefs = facts.preferences;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          prefs.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && prefs.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PREFERENCES",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPermissions: {
       priority: 80,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const perms = facts.permissions as ResourceState<Permissions>;
+        const id = facts.userId.trim();
+        const perms = facts.permissions;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          perms.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && perms.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PERMISSIONS",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
   },
@@ -1562,7 +1531,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 10000,
       resolve: async (req, context) => {
-        const prev = context.facts.profile as ResourceState<Profile>;
+        const prev = context.facts.profile;
         context.facts.profile = {
           ...prev,
           status: "loading",
@@ -1579,24 +1548,22 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockProfile(
             req.userId,
-            context.facts.profileDelay as number,
-            context.facts.profileFailRate as number,
+            context.facts.profileDelay,
+            context.facts.profileFailRate,
           );
           context.facts.profile = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.profile as ResourceState<Profile>)
-              .attempts,
-            startedAt: (context.facts.profile as ResourceState<Profile>)
-              .startedAt,
+            attempts: context.facts.profile.attempts,
+            startedAt: context.facts.profile.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(context.facts, "success", "profile", data.name);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.profile = {
-            ...(context.facts.profile as ResourceState<Profile>),
+            ...context.facts.profile,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -1611,7 +1578,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       requirement: "FETCH_PREFERENCES",
       retry: { attempts: 2, backoff: "exponential" },
       resolve: async (req, context) => {
-        const prev = context.facts.preferences as ResourceState<Preferences>;
+        const prev = context.facts.preferences;
         context.facts.preferences = {
           ...prev,
           status: "loading",
@@ -1628,17 +1595,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPreferences(
             req.userId,
-            context.facts.preferencesDelay as number,
-            context.facts.preferencesFailRate as number,
+            context.facts.preferencesDelay,
+            context.facts.preferencesFailRate,
           );
           context.facts.preferences = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.preferences as ResourceState<Preferences>)
-              .attempts,
-            startedAt: (context.facts.preferences as ResourceState<Preferences>)
-              .startedAt,
+            attempts: context.facts.preferences.attempts,
+            startedAt: context.facts.preferences.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -1650,7 +1615,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.preferences = {
-            ...(context.facts.preferences as ResourceState<Preferences>),
+            ...context.facts.preferences,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -1666,7 +1631,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 15000,
       resolve: async (req, context) => {
-        const prev = context.facts.permissions as ResourceState<Permissions>;
+        const prev = context.facts.permissions;
         context.facts.permissions = {
           ...prev,
           status: "loading",
@@ -1683,17 +1648,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPermissions(
             req.userId,
-            context.facts.permissionsDelay as number,
-            context.facts.permissionsFailRate as number,
+            context.facts.permissionsDelay,
+            context.facts.permissionsFailRate,
           );
           context.facts.permissions = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.permissions as ResourceState<Permissions>)
-              .attempts,
-            startedAt: (context.facts.permissions as ResourceState<Permissions>)
-              .startedAt,
+            attempts: context.facts.permissions.attempts,
+            startedAt: context.facts.permissions.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -1705,7 +1668,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.permissions = {
-            ...(context.facts.permissions as ResourceState<Permissions>),
+            ...context.facts.permissions,
             status: "error",
             error: msg,
             completedAt: Date.now(),

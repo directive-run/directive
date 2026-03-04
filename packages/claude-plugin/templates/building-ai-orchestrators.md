@@ -19,9 +19,9 @@ This skill applies when the project uses `@directive-run/ai`. If not found in `p
 - User asks about `orchestrator.run()` or `orchestrator.runStream()`
 
 ## Exclusions
-- Do NOT invoke for general Directive (non-AI) patterns — use core Directive docs instead
-- Do NOT invoke for testing orchestrators — use `testing-ai-systems` skill
-- Do NOT invoke for guardrails, budgets, or security — use `hardening-ai-systems` skill
+- Do NOT invoke for general Directive (non-AI) patterns – use core Directive docs instead
+- Do NOT invoke for testing orchestrators – use `testing-ai-systems` skill
+- Do NOT invoke for guardrails, budgets, or security – use `hardening-ai-systems` skill
 
 ---
 
@@ -40,7 +40,7 @@ Need AI orchestration?
     └── Dynamic routing → coordinator constraints
 ```
 
-## createAgentOrchestrator — Core Pattern
+## createAgentOrchestrator – Core Pattern
 
 ```typescript
 import { createAgentOrchestrator } from "@directive-run/ai";
@@ -53,7 +53,7 @@ const orchestrator = createAgentOrchestrator({
     apiKey: process.env.ANTHROPIC_API_KEY,
   }),
 
-  // ALWAYS use t.*() builders — never TypeScript type annotations
+  // ALWAYS use t.*() builders – never TypeScript type annotations
   factsSchema: {
     input: t.string(),
     output: t.string().optional(),
@@ -62,7 +62,7 @@ const orchestrator = createAgentOrchestrator({
     error: t.string().optional(),
   },
 
-  // init() is required — sets starting state
+  // init() is required – sets starting state
   init: (facts) => {
     facts.status = "idle";
     facts.attempt = 0;
@@ -104,7 +104,7 @@ const result = await orchestrator.run({ input: "Summarize this text..." });
 console.log(result.facts.output);
 ```
 
-## createMultiAgentOrchestrator — Core Pattern
+## createMultiAgentOrchestrator – Core Pattern
 
 ```typescript
 import { createMultiAgentOrchestrator } from "@directive-run/ai";
@@ -129,7 +129,7 @@ const orchestrator = createMultiAgentOrchestrator({
   agents: {
     researcher: {
       runner: createAnthropicRunner({ model: "claude-haiku-4-5" }),
-      // Per-agent schema — merged with coordinator facts
+      // Per-agent schema – merged with coordinator facts
       factsSchema: {
         searchDepth: t.number(),
       },
@@ -218,7 +218,7 @@ for await (const event of stream) {
 }
 ```
 
-## createTask — Structured Work Units
+## createTask – Structured Work Units
 
 ```typescript
 import { createTask } from "@directive-run/ai";
@@ -331,13 +331,13 @@ constraints: {
 ## Using TypeScript types instead of t.*() in factsSchema
 
 ```typescript
-// WRONG — TypeScript type annotations, not schema builders
+// WRONG – TypeScript type annotations, not schema builders
 factsSchema: {
   status: "idle" | "running" | "done",  // type annotation, not runtime schema
   count: number,
 }
 
-// CORRECT — t.*() builders provide runtime validation + TypeScript inference
+// CORRECT – t.*() builders provide runtime validation + TypeScript inference
 factsSchema: {
   status: t.string<"idle" | "running" | "done">(),
   count: t.number(),
@@ -347,7 +347,7 @@ factsSchema: {
 ## Forgetting init()
 
 ```typescript
-// WRONG — facts start undefined, constraints fail immediately
+// WRONG – facts start undefined, constraints fail immediately
 const orchestrator = createAgentOrchestrator({
   factsSchema: { status: t.string() },
   // missing init: facts.status is undefined
@@ -363,7 +363,7 @@ init: (facts) => {
 ```
 
 ### Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ## Single-line returns without braces
 
@@ -371,7 +371,7 @@ Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 // WRONG
 when: (facts) => facts.status === "idle" ? true : false,
 
-// CORRECT — always use multi-line blocks when branching
+// CORRECT – always use multi-line blocks when branching
 when: (facts) => {
   return facts.status === "idle";
 },
@@ -380,10 +380,10 @@ when: (facts) => {
 ## Mutating facts outside resolvers
 
 ```typescript
-// WRONG — direct mutation bypasses reactivity
+// WRONG – direct mutation bypasses reactivity
 orchestrator.facts.status = "done";
 
-// CORRECT — always via context.facts inside resolvers
+// CORRECT – always via context.facts inside resolvers
 resolve: async (req, context) => {
   context.facts.status = "done";
 },
@@ -393,9 +393,9 @@ resolve: async (req, context) => {
 
 ## Reference Files
 
-- `ai-orchestrator.md` — Full createAgentOrchestrator API, options, lifecycle
-- `ai-multi-agent.md` — createMultiAgentOrchestrator, coordinator pattern, agent communication
-- `ai-tasks.md` — createTask API, task composition, input/output validation
-- `examples/ai-orchestrator.ts` — Complete single-agent example
-- `examples/ai-checkpoint.ts` — Checkpoint/resume pattern
-- `examples/fraud-analysis.ts` — Multi-agent fraud detection example
+- `ai-orchestrator.md` – Full createAgentOrchestrator API, options, lifecycle
+- `ai-multi-agent.md` – createMultiAgentOrchestrator, coordinator pattern, agent communication
+- `ai-tasks.md` – createTask API, task composition, input/output validation
+- `examples/ai-orchestrator.ts` – Complete single-agent example
+- `examples/ai-checkpoint.ts` – Checkpoint/resume pattern
+- `examples/fraud-analysis.ts` – Multi-agent fraud detection example

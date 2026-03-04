@@ -6,14 +6,14 @@
 
 ```typescript
 // Example: ai-guardrails
-// Source: examples/ai-guardrails/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/ai-guardrails/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * AI Safety Shield — Prompt Injection & PII Detection
+ * AI Safety Shield – Directive Module
  *
- * Chat interface where every message passes through prompt injection detection,
- * PII detection, and compliance checks. All run locally using built-in patterns.
+ * Types, schema, module definition, timeline, analysis functions,
+ * and system creation for prompt injection & PII detection guardrails.
  */
 
 import {
@@ -34,7 +34,7 @@ import { devtoolsPlugin, emitDevToolsEvent } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   text: string;
   blocked: boolean;
@@ -43,22 +43,22 @@ interface ChatMessage {
   piiResult: PIIDetectionResult | null;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
   type: "pass" | "injection" | "pii" | "compliance" | "info";
 }
 
-type ComplianceMode = "standard" | "gdpr" | "hipaa";
+export type ComplianceMode = "standard" | "gdpr" | "hipaa";
 
 // ============================================================================
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function addTimeline(
+export function addTimeline(
   event: string,
   detail: string,
   type: TimelineEntry["type"],
@@ -73,9 +73,9 @@ function addTimeline(
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
-    messages: t.object<ChatMessage[]>(),
+    messages: t.array<ChatMessage>(),
     complianceMode: t.string<ComplianceMode>(),
     redactionEnabled: t.boolean(),
     blockedCount: t.number(),
@@ -166,17 +166,17 @@ const guardrailModule = createModule("guardrails", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: guardrailModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ai-guardrails" })],
 });
-system.start();
 
 // ============================================================================
 // Analysis Functions
 // ============================================================================
 
-function analyzeMessage(text: string): ChatMessage {
+export function analyzeMessage(text: string): ChatMessage {
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   let blocked = false;
 
@@ -187,6 +187,7 @@ function analyzeMessage(text: string): ChatMessage {
     system.facts.injectionAttempts =
       (system.facts.injectionAttempts as number) + 1;
     for (const p of injectionResult.patterns) {
+      addTimeline("injection", `${p.name} (${p.severity})`, "injection");
     }
   }
 
@@ -206,6 +207,7 @@ function analyzeMessage(text: string): ChatMessage {
   if (piiResult.detected) {
     system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
     for (const item of piiResult.items) {
+      addTimeline("pii", `${item.type} found`, "pii");
     }
   }
 
@@ -234,12 +236,14 @@ function analyzeMessage(text: string): ChatMessage {
       blocked = true;
       system.facts.complianceBlocks =
         (system.facts.complianceBlocks as number) + 1;
+      addTimeline("compliance", "HIPAA: PHI detected", "compliance");
     }
 
     if (mode === "gdpr" && hasContactInfo) {
       blocked = true;
       system.facts.complianceBlocks =
         (system.facts.complianceBlocks as number) + 1;
+      addTimeline("compliance", "GDPR: personal data detected", "compliance");
     }
   }
 
@@ -256,8 +260,10 @@ function analyzeMessage(text: string): ChatMessage {
   }
 
   if (!blocked && !piiResult.detected) {
+    addTimeline("pass", "message passed all checks", "pass");
   }
 
+  const redactedText = piiResult.redactedText ?? text;
 
   return {
     id,
@@ -268,61 +274,6 @@ function analyzeMessage(text: string): ChatMessage {
     piiResult: piiResult.detected ? piiResult : null,
   };
 }
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-  "gs-compliance",
-  "gs-redaction",
-
-// Timeline
-
-// Pre-built test buttons
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-const allKeys = [
-  ...Object.keys(schema.facts),
-  ...Object.keys(schema.derivations),
-];
-system.subscribe(allKeys, render);
-
-// ============================================================================
-// Controls
-// ============================================================================
-
-function sendMessage(text: string) {
-  if (!text.trim()) {
-    return;
-  }
-
-  const msg = analyzeMessage(text);
-  const messages = [...(system.facts.messages as ChatMessage[]), msg];
-  system.facts.messages = messages;
-}
-
-
-// Test buttons
-
-
-// ============================================================================
-// Initial Render
-// ============================================================================
-
-render();
 ```
 
 ## topic-guard
@@ -330,10 +281,10 @@ render();
 ```typescript
 // Example: topic-guard
 // Source: examples/topic-guard/src/topic-guard.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Topic Guard — Directive Module
+ * Topic Guard – Directive Module
  *
  * Demonstrates input guardrails for AI agents. Messages are checked against
  * configurable guardrails before reaching the mock agent. Blocked messages
@@ -372,11 +323,11 @@ export interface GuardrailLogEntry {
 export const topicGuardSchema = {
   facts: {
     input: t.string(),
-    messages: t.object<ChatMessage[]>(),
+    messages: t.array<ChatMessage>(),
     isProcessing: t.boolean(),
     lastGuardrailResult: t.object<GuardrailResult | null>(),
-    guardrailLog: t.object<GuardrailLogEntry[]>(),
-    allowedTopics: t.object<string[]>(),
+    guardrailLog: t.array<GuardrailLogEntry>(),
+    allowedTopics: t.array<string>(),
   },
   derivations: {
     messageCount: t.number(),
@@ -423,42 +374,36 @@ export const topicGuardModule = createModule("topic-guard", {
 
   derive: {
     messageCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter((m) => m.role === "user")
-        .length;
+      return facts.messages.filter((m) => m.role === "user").length;
     },
 
     blockedCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter(
-        (m) => m.role === "user" && m.blocked,
-      ).length;
+      return facts.messages.filter((m) => m.role === "user" && m.blocked)
+        .length;
     },
 
     allowedCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter(
-        (m) => m.role === "user" && !m.blocked,
-      ).length;
+      return facts.messages.filter((m) => m.role === "user" && !m.blocked)
+        .length;
     },
 
     blockRate: (facts, derive) => {
-      const total = derive.messageCount as number;
+      const total = derive.messageCount;
       if (total === 0) {
         return "0%";
       }
-      const blocked = derive.blockedCount as number;
+      const blocked = derive.blockedCount;
       const rate = Math.round((blocked / total) * 100);
 
       return `${rate}%`;
     },
 
     canSend: (facts) => {
-      return (
-        (facts.input as string).trim().length > 0 &&
-        !(facts.isProcessing as boolean)
-      );
+      return facts.input.trim().length > 0 && !facts.isProcessing;
     },
 
     lastMessageBlocked: (facts) => {
-      const msgs = facts.messages as ChatMessage[];
+      const msgs = facts.messages;
       if (msgs.length === 0) {
         return false;
       }
@@ -473,13 +418,13 @@ export const topicGuardModule = createModule("topic-guard", {
 
   events: {
     send: (facts) => {
-      const text = (facts.input as string).trim();
+      const text = facts.input.trim();
       if (text.length === 0 || facts.isProcessing) {
         return;
       }
 
       // Add user message
-      const messages = [...(facts.messages as ChatMessage[])];
+      const messages = [...facts.messages];
       messages.push({ role: "user", text, blocked: false });
       facts.messages = messages;
 
@@ -495,7 +440,7 @@ export const topicGuardModule = createModule("topic-guard", {
 
       const classifierResult = checkTopicClassifier(
         text,
-        facts.allowedTopics as string[],
+        facts.allowedTopics,
       );
       facts.lastGuardrailResult = classifierResult;
       facts.isProcessing = true;
@@ -514,7 +459,7 @@ export const topicGuardModule = createModule("topic-guard", {
     },
 
     toggleTopic: (facts, { topic }) => {
-      const topics = [...(facts.allowedTopics as string[])];
+      const topics = [...facts.allowedTopics];
       const idx = topics.indexOf(topic);
       if (idx >= 0) {
         topics.splice(idx, 1);
@@ -533,12 +478,12 @@ export const topicGuardModule = createModule("topic-guard", {
     offTopicDetected: {
       priority: 100,
       when: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
-
-        return result?.blocked === true && (facts.isProcessing as boolean);
+        return (
+          facts.lastGuardrailResult?.blocked === true && facts.isProcessing
+        );
       },
       require: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult;
+        const result = facts.lastGuardrailResult!;
 
         return {
           type: "BLOCK_MESSAGE",
@@ -551,9 +496,9 @@ export const topicGuardModule = createModule("topic-guard", {
     onTopicConfirmed: {
       priority: 90,
       when: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
-
-        return result?.blocked === false && (facts.isProcessing as boolean);
+        return (
+          facts.lastGuardrailResult?.blocked === false && facts.isProcessing
+        );
       },
       require: () => ({
         type: "ALLOW_MESSAGE",
@@ -569,7 +514,7 @@ export const topicGuardModule = createModule("topic-guard", {
     blockMessage: {
       requirement: "BLOCK_MESSAGE",
       resolve: async (req, context) => {
-        const messages = [...(context.facts.messages as ChatMessage[])];
+        const messages = [...context.facts.messages];
         // Mark the last user message as blocked
         const lastUserIdx = messages.length - 1;
         if (lastUserIdx >= 0) {
@@ -594,7 +539,7 @@ export const topicGuardModule = createModule("topic-guard", {
     allowMessage: {
       requirement: "ALLOW_MESSAGE",
       resolve: async (_req, context) => {
-        const messages = [...(context.facts.messages as ChatMessage[])];
+        const messages = [...context.facts.messages];
         const lastUserMsg = messages.filter((m) => m.role === "user").pop();
         const responseText = getMockAgentResponse(lastUserMsg?.text ?? "");
         messages.push({
@@ -616,14 +561,15 @@ export const topicGuardModule = createModule("topic-guard", {
     logGuardrailResult: {
       deps: ["lastGuardrailResult"],
       run: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
+        const result = facts.lastGuardrailResult;
         if (!result) {
           return;
         }
 
-        const msgs = facts.messages as ChatMessage[];
-        const lastUserMsg = [...msgs].reverse().find((m) => m.role === "user");
-        const log = [...(facts.guardrailLog as GuardrailLogEntry[])];
+        const lastUserMsg = [...facts.messages]
+          .reverse()
+          .find((m) => m.role === "user");
+        const log = [...facts.guardrailLog];
         log.push({
           timestamp: Date.now(),
           input: lastUserMsg?.text ?? "",

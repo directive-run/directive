@@ -4,7 +4,7 @@ description: Full release orchestration – version, build, test, publish to npm
 
 # Release
 
-The release process is automated via GitHub Actions (`changesets/action`). You just need to create a changeset and push — CI handles the rest.
+The release process is automated via GitHub Actions (`changesets/action`). You just need to create a changeset and push – CI handles the rest.
 
 ## How It Works
 

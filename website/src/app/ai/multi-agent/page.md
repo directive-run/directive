@@ -222,7 +222,7 @@ orchestrator.unregisterAgent('editor');  // Must be idle
 
 ## Task Registration
 
-Register imperative code tasks alongside agents. Tasks and agents share an ID namespace — patterns reference both by ID.
+Register imperative code tasks alongside agents. Tasks and agents share an ID namespace – patterns reference both by ID.
 
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
@@ -257,10 +257,10 @@ orchestrator.getTaskIds(); // ['validate']
 |--------|------|---------|-------------|
 | `run` | `(input, signal, context) => unknown` | required | The function to execute |
 | `label` | `string` | task ID | Display label for DevTools |
-| `description` | `string` | — | DevTools tooltip text |
-| `timeout` | `number` | — | Timeout in milliseconds |
+| `description` | `string` | – | DevTools tooltip text |
+| `timeout` | `number` | – | Timeout in milliseconds |
 | `maxConcurrent` | `number` | `1` | Max parallel executions |
-| `retry` | `object` | — | Retry config: `attempts`, `backoff`, `delayMs` |
+| `retry` | `object` | – | Retry config: `attempts`, `backoff`, `delayMs` |
 
 ---
 

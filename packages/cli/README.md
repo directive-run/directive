@@ -1,6 +1,6 @@
 # @directive-run/cli
 
-CLI for [Directive](https://directive.run) — project scaffolding, system introspection, AI coding rules, and more.
+CLI for [Directive](https://directive.run) – project scaffolding, system introspection, AI coding rules, and more.
 
 ## Installation
 
@@ -30,9 +30,9 @@ directive init --dir ./my-project       # Target directory
 ```
 
 Templates:
-- **counter** — Minimal: schema, init, derive, events
-- **auth-flow** — Login flow with constraints, resolvers, retry, and effects
-- **ai-orchestrator** — Agent module with memory, guardrails, and streaming
+- **counter** – Minimal: schema, init, derive, events
+- **auth-flow** – Login flow with constraints, resolvers, retry, and effects
+- **ai-orchestrator** – Agent module with memory, guardrails, and streaming
 
 ### `directive new module <name>`
 
@@ -109,7 +109,7 @@ Exits non-zero on failures.
 Install AI coding rules for your AI coding assistant.
 
 ```bash
-directive ai-rules init                 # Interactive — detect tools, prompt
+directive ai-rules init                 # Interactive – detect tools, prompt
 directive ai-rules init --tool cursor   # Specific tool
 directive ai-rules init --force         # Overwrite existing files
 directive ai-rules init --merge         # Update Directive section only
@@ -127,7 +127,7 @@ directive ai-rules update --dir ./project
 
 ### `directive ai-rules check`
 
-Validate rules are current. Exits non-zero if stale — designed for CI.
+Validate rules are current. Exits non-zero if stale – designed for CI.
 
 ```bash
 directive ai-rules check
@@ -179,10 +179,6 @@ const inspection = system.inspect();
 const tools = detectTools("./my-project");
 ```
 
-## Development
+## Contributing
 
-```bash
-pnpm --filter @directive-run/cli build
-pnpm --filter @directive-run/cli test
-pnpm --filter @directive-run/cli typecheck
-```
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development setup and contribution guidelines.

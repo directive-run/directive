@@ -140,6 +140,6 @@ describe('content pipeline', () => {
 
 ## Related
 
-- [Testing reference](/ai/testing) — full testing utilities API
-- [Multi-Step Pipeline guide](/ai/guides/multi-step-pipeline) — the pipeline being tested above
-- [Evals reference](/ai/evals) — automated evaluation of agent quality
+- [Testing reference](/ai/testing) – full testing utilities API
+- [Multi-Step Pipeline guide](/ai/guides/multi-step-pipeline) – the pipeline being tested above
+- [Evals reference](/ai/evals) – automated evaluation of agent quality

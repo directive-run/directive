@@ -24,7 +24,7 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 
 ---
 
-## Module Shape — Canonical Form
+## Module Shape – Canonical Form
 
 ```typescript
 import { createModule, t } from "@directive-run/core";
@@ -36,15 +36,15 @@ const myModule = createModule("name", {
       count: t.number(),
       user: t.object<{ id: string; name: string } | null>(),
     },
-    derivations: {      // Optional — declare types here, define in derive
+    derivations: {      // Optional – declare types here, define in derive
       isLoading: t.boolean(),
       displayName: t.string(),
     },
-    events: {           // Optional — declare event payloads here
+    events: {           // Optional – declare event payloads here
       increment: {},
       setUser: { user: t.object<{ id: string; name: string }>() },
     },
-    requirements: {     // Optional — declare requirement payloads here
+    requirements: {     // Optional – declare requirement payloads here
       FETCH_USER: { userId: t.string() },
     },
   },
@@ -55,7 +55,7 @@ const myModule = createModule("name", {
     facts.user = null;
   },
 
-  derive: {             // Auto-tracked — no manual deps needed
+  derive: {             // Auto-tracked – no manual deps needed
     isLoading: (facts) => facts.phase === "loading",
     displayName: (facts) => {
       if (!facts.user) {
@@ -208,7 +208,7 @@ require: (facts) => {
 },
 ```
 
-### Array/object mutation — always replace, never mutate in place
+### Array/object mutation – always replace, never mutate in place
 
 ```typescript
 // CORRECT
@@ -233,7 +233,7 @@ schema: { facts: { phase: t.string(), count: t.number() } }
 ### 2. Nonexistent type builders
 
 ```typescript
-// WRONG — these do not exist
+// WRONG – these do not exist
 t.map<string, User>()
 t.set<string>()
 t.date()
@@ -251,23 +251,23 @@ t.object<unknown>()
 ### 3. Async init
 
 ```typescript
-// WRONG — init is synchronous
+// WRONG – init is synchronous
 init: async (facts) => { facts.config = await fetch("/api/config").then(r => r.json()); }
 
-// CORRECT — init sets defaults; async work goes in constraints/resolvers
+// CORRECT – init sets defaults; async work goes in constraints/resolvers
 init: (facts) => { facts.config = null; }
 ```
 
 ### 4. Resolver parameter naming
-Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
+Always use `(req, context)` – never `(req, ctx)` or `(request, context)`.
 
 ### 5. Resolver returning data
 
 ```typescript
-// WRONG — return value is ignored
+// WRONG – return value is ignored
 resolve: async (req, context) => { return await fetchUser(req.userId); }
 
-// CORRECT — mutate context.facts
+// CORRECT – mutate context.facts
 resolve: async (req, context) => { context.facts.user = await fetchUser(req.userId); }
 ```
 
@@ -277,17 +277,17 @@ resolve: async (req, context) => { context.facts.user = await fetchUser(req.user
 // WRONG
 const profile = system.facts.profile as UserProfile;
 
-// CORRECT — schema provides the type
+// CORRECT – schema provides the type
 const profile = system.facts.profile;
 ```
 
 ### 7. Passthrough derivations
 
 ```typescript
-// WRONG — derivation just returns a fact unchanged
+// WRONG – derivation just returns a fact unchanged
 derive: { count: (facts) => facts.count }
 
-// CORRECT — read the fact directly: system.facts.count
+// CORRECT – read the fact directly: system.facts.count
 ```
 
 ### 8. String require instead of object
@@ -336,7 +336,7 @@ import { createModule } from "@directive-run/core";
 
 ## Reference Files
 
-- `core-patterns.md` — decision trees, full module example, system creation patterns
-- `schema-types.md` — complete t.* builder reference, chainable methods, nonexistent types
-- `naming.md` — req/context rules, return style, blank-line conventions, multi-module naming
-- `anti-patterns.md` — 20 ranked anti-patterns with correct/wrong examples
+- `core-patterns.md` – decision trees, full module example, system creation patterns
+- `schema-types.md` – complete t.* builder reference, chainable methods, nonexistent types
+- `naming.md` – req/context rules, return style, blank-line conventions, multi-module naming
+- `anti-patterns.md` – 20 ranked anti-patterns with correct/wrong examples

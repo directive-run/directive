@@ -20,9 +20,9 @@ function renderLayout(flags: FeatureFlags) {
   const playgroundVisible = flags.playgroundEnabled && !flags.maintenanceMode;
   const shareVisible = flags.shareButtonEnabled;
 
-  // Onboarding toast needs brand switcher — but who enforces that?
+  // Onboarding toast needs brand switcher – but who enforces that?
   if (flags.onboardingToastEnabled && !flags.brandSwitcherEnabled) {
-    console.warn("onboardingToast enabled without brandSwitcher — toast won't render");
+    console.warn("onboardingToast enabled without brandSwitcher – toast won't render");
   }
 
   const showToast = flags.onboardingToastEnabled && flags.brandSwitcherEnabled;

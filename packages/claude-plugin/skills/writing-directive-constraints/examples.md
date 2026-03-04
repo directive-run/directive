@@ -7,10 +7,10 @@
 ```typescript
 // Example: auth-flow
 // Source: examples/auth-flow/src/auth-flow.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Auth Flow — Directive Module
+ * Auth Flow – Directive Module
  *
  * Demonstrates constraint `after` ordering, auto-tracked derivations
  * driving constraints, resolvers with retry, effects for cleanup,
@@ -61,7 +61,7 @@ export const authFlowSchema = {
     refreshBuffer: t.number(),
     loginFailRate: t.number(),
     refreshFailRate: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isAuthenticated: t.boolean(),
@@ -94,7 +94,7 @@ export const authFlowSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   facts.eventLog = log;
 }
@@ -383,10 +383,10 @@ export const authFlowModule = createModule("auth-flow", {
 ```typescript
 // Example: async-chains
 // Source: examples/async-chains/src/async-chains.ts
-// Pure module file — no DOM wiring
+// Pure module file – no DOM wiring
 
 /**
- * Async Chains — Three Directive Modules
+ * Async Chains – Three Directive Modules
  *
  * Demonstrates cross-module constraint chaining with `after` ordering:
  *   Auth → Permissions → Dashboard
@@ -557,7 +557,7 @@ export const permissionsModule = createModule("permissions", {
     loadPermissions: {
       after: ["auth::validateSession"],
       when: (facts) => {
-        // Use the fact directly — derivation values aren't available in the
+        // Use the fact directly – derivation values aren't available in the
         // facts proxy passed to constraints (they live in the derive layer).
         return facts.auth.status === "valid" && !facts.self.loaded;
       },
@@ -675,10 +675,10 @@ export const dashboardModule = createModule("dashboard", {
 ```typescript
 // Example: debounce-constraints
 // Source: examples/debounce-constraints/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Extracted for AI rules – DOM wiring stripped
 
 /**
- * Debounce Constraints — DOM Rendering & System Wiring
+ * Debounce Constraints – DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the search input, debounce progress bar, results list,
@@ -689,8 +689,6 @@ export const dashboardModule = createModule("dashboard", {
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  type EventLogEntry,
-  type SearchResult,
   debounceSearchModule,
   debounceSearchSchema,
 } from "./debounce-search.js";
@@ -701,6 +699,7 @@ import {
 
 const system = createSystem({
   module: debounceSearchModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "debounce-constraints" })],
 });
 system.start();
@@ -745,7 +744,7 @@ const allKeys = [
 
 system.subscribe(allKeys, render);
 
-// Timer — tick every 100ms for smooth debounce progress bar
+// Timer – tick every 100ms for smooth debounce progress bar
 const tickInterval = setInterval(() => {
   system.events.tick();
 }, 100);
@@ -754,7 +753,7 @@ const tickInterval = setInterval(() => {
 // Controls
 // ============================================================================
 
-// Search input — fire on every keystroke
+// Search input – fire on every keystroke
 
 // Clear
 
@@ -783,15 +782,14 @@ render();
 
 ```typescript
 // Example: batch-resolver
-// Source: examples/batch-resolver/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/batch-resolver/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Batch Data Loader — Batched Resolution & Schema Validation
+ * Batch Data Loader – Directive Module
  *
- * User directory that loads profiles. Multiple constraints fire simultaneously;
- * the batch resolver groups them into one call. Dev-mode schema validation
- * catches type mismatches.
+ * Types, schema, mock data, module definition, timeline, and system creation
+ * for a batched user profile loader with schema validation.
  */
 
 import {
@@ -806,14 +804,14 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-interface UserProfile {
+export interface UserProfile {
   id: number;
   name: string;
   email: string;
   role: string;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
@@ -851,9 +849,9 @@ const MOCK_USERS: Record<number, UserProfile> = {
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function addTimeline(
+export function addTimeline(
   event: string,
   detail: string,
   type: TimelineEntry["type"],
@@ -868,15 +866,15 @@ function addTimeline(
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
-    users: t.object<UserProfile[]>(),
-    loadingIds: t.object<number[]>(),
+    users: t.array<UserProfile>(),
+    loadingIds: t.array<number>(),
     batchCount: t.number(),
     totalRequests: t.number(),
     batchWindowMs: t.number(),
     failItemId: t.number(),
-    validationErrors: t.object<string[]>(),
+    validationErrors: t.array<string>(),
   },
   derivations: {
     userCount: t.number(),
@@ -966,6 +964,7 @@ const batchModule = createModule("batch-loader", {
         ...facts.validationErrors,
         "schema: expected array for 'users', got string",
       ];
+      addTimeline(
         "validation",
         "schema error: expected array for 'users'",
         "validation",
@@ -992,7 +991,7 @@ const batchModule = createModule("batch-loader", {
       priority: 50,
       when: (facts) => facts.loadingIds.length > 0,
       require: (facts) => {
-        // Emit one requirement per loading ID — the batch resolver groups them
+        // Emit one requirement per loading ID – the batch resolver groups them
         const id = facts.loadingIds[0];
 
         return { type: "LOAD_USER", userId: id };
@@ -1009,6 +1008,7 @@ const batchModule = createModule("batch-loader", {
       },
       resolveBatchWithResults: async (requirements, context) => {
         const ids = requirements.map((r) => r.userId);
+        addTimeline(
           "batch",
           `batch formed: ${ids.length} items [${ids.join(", ")}]`,
           "batch",
@@ -1023,6 +1023,7 @@ const batchModule = createModule("batch-loader", {
         const failId = context.facts.failItemId;
         const results = ids.map((id) => {
           if (id === failId) {
+            addTimeline("error", `user ${id}: simulated failure`, "error");
 
             return {
               success: false as const,
@@ -1032,6 +1033,7 @@ const batchModule = createModule("batch-loader", {
 
           const user = MOCK_USERS[id];
           if (!user) {
+            addTimeline("error", `user ${id}: not found`, "error");
 
             return {
               success: false as const,
@@ -1059,6 +1061,7 @@ const batchModule = createModule("batch-loader", {
         );
 
         const successCount = results.filter((r) => r.success).length;
+        addTimeline(
           "success",
           `batch resolved: ${successCount}/${ids.length} success`,
           "success",
@@ -1074,65 +1077,22 @@ const batchModule = createModule("batch-loader", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: batchModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "batch-resolver" })],
 });
-system.start();
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-  "bl-fail-item",
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-const allKeys = [
-  ...Object.keys(schema.facts),
-  ...Object.keys(schema.derivations),
-];
-system.subscribe(allKeys, render);
-
-// ============================================================================
-// Controls
-// ============================================================================
-
-// Individual load buttons (1-5)
-for (let i = 1; i <= 5; i++) {
-    system.events.loadUser({ id: i });
-  });
-}
-
-
-// ============================================================================
-// Initial Render
-// ============================================================================
-
-render();
 ```
 
 ## error-boundaries
 
 ```typescript
 // Example: error-boundaries
-// Source: examples/error-boundaries/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/error-boundaries/src/module.ts
+// Pure module file – no DOM wiring
 
 /**
- * Resilient API Dashboard — Error Boundaries, Retry, Circuit Breaker, Performance
+ * Resilient API Dashboard – Module Definition
  *
  * 3 simulated API services with configurable failure rates. Users inject errors
  * and watch recovery strategies, circuit breaker state transitions, retry-later
@@ -1146,17 +1106,18 @@ import {
   createSystem,
   t,
 } from "@directive-run/core";
-import { devtoolsPlugin, performancePlugin } from "@directive-run/core/plugins";
 import {
   type CircuitState,
   createCircuitBreaker,
+  devtoolsPlugin,
+  performancePlugin,
 } from "@directive-run/core/plugins";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface ServiceState {
+export interface ServiceState {
   name: string;
   status: "idle" | "loading" | "success" | "error";
   lastResult: string;
@@ -1165,7 +1126,7 @@ interface ServiceState {
   lastError: string;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
@@ -1173,12 +1134,12 @@ interface TimelineEntry {
 }
 
 // ============================================================================
-// Circuit Breakers (one per service)
+// Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function addTimeline(
+export function addTimeline(
   event: string,
   detail: string,
   type: TimelineEntry["type"],
@@ -1189,13 +1150,18 @@ function addTimeline(
   }
 }
 
-const circuitBreakers = {
+// ============================================================================
+// Circuit Breakers (one per service)
+// ============================================================================
+
+export const circuitBreakers = {
   users: createCircuitBreaker({
     name: "users-api",
     failureThreshold: 3,
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
     onStateChange: (from, to) => {
+      addTimeline("circuit", `users: ${from} → ${to}`, "circuit");
     },
   }),
   orders: createCircuitBreaker({
@@ -1204,6 +1170,7 @@ const circuitBreakers = {
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
     onStateChange: (from, to) => {
+      addTimeline("circuit", `orders: ${from} → ${to}`, "circuit");
     },
   }),
   analytics: createCircuitBreaker({
@@ -1212,6 +1179,7 @@ const circuitBreakers = {
     recoveryTimeMs: 5000,
     halfOpenMaxRequests: 2,
     onStateChange: (from, to) => {
+      addTimeline("circuit", `analytics: ${from} → ${to}`, "circuit");
     },
   }),
 };
@@ -1220,7 +1188,7 @@ const circuitBreakers = {
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
     usersService: t.object<ServiceState>(),
     ordersService: t.object<ServiceState>(),
@@ -1419,15 +1387,16 @@ const dashboardModule = createModule("dashboard", {
           });
 
           // Success
-          const current = context.facts[serviceKey] as ServiceState;
+          const current = context.facts[serviceKey];
           context.facts[serviceKey] = {
             ...current,
             status: "success",
             lastResult: `Loaded at ${new Date().toLocaleTimeString()}`,
             successCount: current.successCount + 1,
           };
+          addTimeline("success", `${service} fetched`, "success");
         } catch (error) {
-          const current = context.facts[serviceKey] as ServiceState;
+          const current = context.facts[serviceKey];
           const msg = error instanceof Error ? error.message : String(error);
           context.facts[serviceKey] = {
             ...current,
@@ -1436,6 +1405,7 @@ const dashboardModule = createModule("dashboard", {
             errorCount: current.errorCount + 1,
           };
           context.facts.totalErrors = context.facts.totalErrors + 1;
+          addTimeline("error", `${service}: ${msg.slice(0, 60)}`, "error");
 
           // Re-throw so the error boundary handles recovery
           throw error;
@@ -1449,8 +1419,9 @@ const dashboardModule = createModule("dashboard", {
 // Performance Plugin
 // ============================================================================
 
-const perf = performancePlugin({
+export const perf = performancePlugin({
   onSlowResolver: (id, ms) => {
+    addTimeline("perf", `slow resolver: ${id} (${Math.round(ms)}ms)`, "info");
   },
 });
 
@@ -1460,11 +1431,13 @@ const perf = performancePlugin({
 
 let currentStrategy: RecoveryStrategy = "retry-later";
 
-const system = createSystem({
+export const system = createSystem({
   module: dashboardModule,
+  debug: { runHistory: true },
   plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
     onResolverError: (_error, resolver) => {
+      addTimeline(
         "recovery",
         `${resolver}: strategy=${currentStrategy}`,
         "recovery",
@@ -1480,80 +1453,17 @@ const system = createSystem({
       backoffMultiplier: 2,
     },
     onError: (error) => {
+      addTimeline("error", `boundary: ${error.message.slice(0, 60)}`, "error");
     },
   },
 });
-system.start();
 
 // Track strategy changes to update error boundary (via re-dispatch)
 system.subscribe(["strategy"], () => {
-  const newStrategy = system.facts.strategy as RecoveryStrategy;
+  const newStrategy = system.facts.strategy;
   if (newStrategy !== currentStrategy) {
     currentStrategy = newStrategy;
+    addTimeline("recovery", `strategy → ${newStrategy}`, "recovery");
   }
 });
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-// Service cards
-
-// Sliders
-  "eb-users-failrate",
-  "eb-orders-failrate",
-  "eb-analytics-failrate",
-
-// Strategy dropdown
-  "eb-strategy",
-
-// Timeline
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-  service: ServiceState,
-): void {
-  if (service.lastError) {
-  } else {
-  }
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-const allKeys = [
-  ...Object.keys(schema.facts),
-  ...Object.keys(schema.derivations),
-];
-system.subscribe(allKeys, render);
-
-// Periodic refresh for circuit breaker state transitions + retry queue
-setInterval(() => {
-  render();
-}, 1000);
-
-// ============================================================================
-// Controls
-// ============================================================================
-
-// Fetch buttons
-
-// Strategy selector
-
-// Sliders
-
-// ============================================================================
-// Initial Render
-// ============================================================================
-
-render();
 ```

@@ -172,7 +172,7 @@ const obs = createObservability({
 });
 ```
 
-Sampled-out spans are no-ops — `startSpan` returns immediately and `endSpan`/`addSpanLog`/`addSpanTag` are skipped.
+Sampled-out spans are no-ops – `startSpan` returns immediately and `endSpan`/`addSpanLog`/`addSpanTag` are skipped.
 
 ---
 
@@ -206,11 +206,11 @@ const obs = createObservability({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `metric` | `string` | — | Metric name to watch |
-| `threshold` | `number` | — | Value that triggers the alert |
+| `metric` | `string` | – | Metric name to watch |
+| `threshold` | `number` | – | Value that triggers the alert |
 | `operator` | `">" \| "<" \| ">=" \| "<=" \| "=="` | `">"` | Comparison operator |
-| `action` | `"log" \| "warn" \| "alert" \| "callback"` | — | What to do when triggered |
-| `callback` | `(metric, threshold) => void` | — | Custom handler (when action is `"callback"`) |
+| `action` | `"log" \| "warn" \| "alert" \| "callback"` | – | What to do when triggered |
+| `callback` | `(metric, threshold) => void` | – | Custom handler (when action is `"callback"`) |
 | `cooldownMs` | `number` | `60000` | Minimum time between repeated alerts |
 
 ---

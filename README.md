@@ -303,13 +303,13 @@ constraints: {
     require: { type: "FETCH_DATA" },
   },
 
-  // Function — dynamic requirement based on current facts
+  // Function – dynamic requirement based on current facts
   dynamic: {
     when: (facts) => facts.userId && !facts.user,
     require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
   },
 
-  // Array — produce multiple requirements at once
+  // Array – produce multiple requirements at once
   multiple: {
     when: (facts) => facts.isNewUser,
     require: [
@@ -318,7 +318,7 @@ constraints: {
     ],
   },
 
-  // Conditional — function returning null to skip
+  // Conditional – function returning null to skip
   conditional: {
     when: (facts) => facts.needsSync,
     require: (facts) => facts.isCritical
@@ -428,7 +428,7 @@ Every resolver receives a context object with:
 ```typescript
 resolve: async (req, context) => {
   context.facts;        // Read/write facts (mutations are auto-batched)
-  context.signal;       // AbortSignal — check context.signal.aborted or pass to fetch()
+  context.signal;       // AbortSignal – check context.signal.aborted or pass to fetch()
   context.snapshot();   // Get a read-only snapshot of current facts
 }
 ```
@@ -447,7 +447,7 @@ resolvers: {
     resolve: async (req, context) => { /* ... */ },
   },
 
-  // Function: prefix match — handles any "API_*" requirement
+  // Function: prefix match – handles any "API_*" requirement
   apiHandler: {
     requirement: (req): req is Requirement => req.type.startsWith("API_"),
     resolve: async (req, context) => { /* ... */ },

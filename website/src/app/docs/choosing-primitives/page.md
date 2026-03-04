@@ -3,7 +3,7 @@ title: Choosing the Right Primitive
 description: A decision guide for picking between facts, derivations, constraints, resolvers, effects, and events.
 ---
 
-When to use each Directive primitive — and when not to. {% .lead %}
+When to use each Directive primitive – and when not to. {% .lead %}
 
 ---
 
@@ -25,7 +25,7 @@ If you're still unsure, ask: _does this thing produce requirements, or consume t
 
 | Primitive | Purpose | Sync/Async | Reads State | Writes State | Example |
 |-----------|---------|------------|-------------|--------------|---------|
-| **Fact** | Source of truth | Sync | — | Yes | `facts.user = data` |
+| **Fact** | Source of truth | Sync | – | Yes | `facts.user = data` |
 | **Derivation** | Computed value | Sync | Yes | No | `isAdmin: (facts) => facts.role === 'admin'` |
 | **Event** | Synchronous mutation | Sync | Yes | Yes | `events.addItem(facts, payload)` |
 | **Constraint** | Declares a requirement | Sync or Async | Yes | No | `when: (facts) => !facts.user` → `require: { type: 'FETCH_USER' }` |
@@ -45,7 +45,7 @@ Key distinctions:
 ### Putting async logic in events
 
 ```typescript
-// Wrong — events are synchronous
+// Wrong – events are synchronous
 events: {
   fetchUser: async (facts) => {
     const res = await fetch('/api/user'); // Don't do this
@@ -53,7 +53,7 @@ events: {
   },
 },
 
-// Right — use a constraint + resolver
+// Right – use a constraint + resolver
 constraints: {
   needsUser: {
     when: (facts) => !facts.user && facts.token,
@@ -78,7 +78,7 @@ resolvers: {
 ### Mutating facts in effects
 
 ```typescript
-// Wrong — effects shouldn't write to facts
+// Wrong – effects shouldn't write to facts
 effects: {
   syncTheme: {
     run: (facts) => {
@@ -88,7 +88,7 @@ effects: {
   },
 },
 
-// Right — use a constraint + resolver to read the system preference
+// Right – use a constraint + resolver to read the system preference
 constraints: {
   needsThemeDetection: {
     when: (facts) => !facts.themeDetected,
@@ -110,7 +110,7 @@ resolvers: {
 ### Using constraints for synchronous transforms
 
 ```typescript
-// Wrong — constraint + resolver for a simple computation
+// Wrong – constraint + resolver for a simple computation
 constraints: {
   needsFullName: {
     when: (facts) => !facts.fullName && facts.firstName,
@@ -118,7 +118,7 @@ constraints: {
   },
 },
 
-// Right — just use a derivation
+// Right – just use a derivation
 derive: {
   fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
 },
@@ -127,7 +127,7 @@ derive: {
 ### Over-constraining: when a simple event is enough
 
 ```typescript
-// Overkill — constraint + resolver for a synchronous toggle
+// Overkill – constraint + resolver for a synchronous toggle
 constraints: {
   needsToggle: {
     when: (facts) => facts.toggleRequested,
@@ -135,7 +135,7 @@ constraints: {
   },
 },
 
-// Right — just use an event
+// Right – just use an event
 events: {
   toggleSidebar: (facts) => {
     facts.sidebarOpen = !facts.sidebarOpen;
@@ -308,10 +308,10 @@ resolvers: {
 
 ## Related
 
-- [Core Concepts](/docs/core-concepts) — overview of all primitives
-- [Facts](/docs/facts) — proxy-based state
-- [Derivations](/docs/derivations) — auto-tracked computed values
-- [Constraints](/docs/constraints) — declaring requirements
-- [Resolvers](/docs/resolvers) — fulfilling requirements
-- [Effects](/docs/effects) — fire-and-forget side effects
-- [Events](/docs/events) — synchronous mutations
+- [Core Concepts](/docs/core-concepts) – overview of all primitives
+- [Facts](/docs/facts) – proxy-based state
+- [Derivations](/docs/derivations) – auto-tracked computed values
+- [Constraints](/docs/constraints) – declaring requirements
+- [Resolvers](/docs/resolvers) – fulfilling requirements
+- [Effects](/docs/effects) – fire-and-forget side effects
+- [Events](/docs/events) – synchronous mutations

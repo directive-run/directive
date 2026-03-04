@@ -70,7 +70,7 @@ export const <Name>Diagram = memo(function <Name>Diagram() {
     [currentStepName],
   )
 
-  // 4. Define nodes — position is { x, y } in pixels
+  // 4. Define nodes – position is { x, y } in pixels
   const nodes = useMemo<Node[]>(() => [
     {
       id: 'step1',
@@ -184,7 +184,7 @@ In the target `.md` page:
 
 ## Step 4: Verify
 
-1. `pnpm --filter directive-website dev` — check the page renders
+1. `pnpm --filter directive-website dev` – check the page renders
 2. Animation cycles through all steps
 3. DiagramToolbar shows step indicators and play/pause
 4. Nodes and edges look correct in both light and dark mode
@@ -194,6 +194,6 @@ In the target `.md` page:
 
 - Keep node width consistent (280px is standard)
 - DiagramWrapper `height` should be tall enough to contain all nodes with padding
-- Animation `interval` of 2400-3000ms works well — faster feels rushed
+- Animation `interval` of 2400-3000ms works well – faster feels rushed
 - Use `colorScheme` on edges matching the source node's color for visual consistency
 - Icons from `@phosphor-icons/react` with `size={28} weight="duotone"`

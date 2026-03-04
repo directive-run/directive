@@ -19,10 +19,10 @@ A constraint has two parts: `when` (condition) and `require` (what's needed).
 ```typescript
 constraints: {
   fetchUserWhenReady: {
-    // when() returns boolean — evaluated on every fact change
+    // when() returns boolean – evaluated on every fact change
     when: (facts) => facts.isAuthenticated && !facts.user,
 
-    // require — the requirement to emit when condition is true
+    // require – the requirement to emit when condition is true
     require: { type: "FETCH_USER", userId: facts.userId },
   },
 },
@@ -31,7 +31,7 @@ constraints: {
 ### Static vs Dynamic Requirements
 
 ```typescript
-// Static requirement — same object every time
+// Static requirement – same object every time
 constraints: {
   loadConfig: {
     when: (facts) => facts.config === null,
@@ -39,7 +39,7 @@ constraints: {
   },
 },
 
-// Dynamic requirement — function that reads facts
+// Dynamic requirement – function that reads facts
 constraints: {
   fetchUser: {
     when: (facts) => facts.isAuthenticated && !facts.profile,
@@ -47,7 +47,7 @@ constraints: {
   },
 },
 
-// Multiple requirements — return an array
+// Multiple requirements – return an array
 constraints: {
   loadAll: {
     when: (facts) => facts.phase === "init",
@@ -137,7 +137,7 @@ constraints: {
 Synchronous constraints use auto-tracking (proxy-based). Async constraints cannot be auto-tracked because the function is suspended across await boundaries. The `deps` array tells the engine which facts to watch.
 
 ```typescript
-// WRONG — async without deps, engine cannot track dependencies
+// WRONG – async without deps, engine cannot track dependencies
 constraints: {
   check: {
     async: true,
@@ -146,7 +146,7 @@ constraints: {
   },
 },
 
-// CORRECT — deps tells the engine to re-evaluate when token changes
+// CORRECT – deps tells the engine to re-evaluate when token changes
 constraints: {
   check: {
     async: true,
@@ -163,13 +163,13 @@ constraints: {
 const system = createSystem({ module: myModule });
 system.start();
 
-// Disable a constraint — it won't be evaluated
+// Disable a constraint – it won't be evaluated
 system.constraints.disable("fetchUserWhenReady");
 
 // Check if disabled
 system.constraints.isDisabled("fetchUserWhenReady"); // true
 
-// Re-enable — triggers re-evaluation on next cycle
+// Re-enable – triggers re-evaluation on next cycle
 system.constraints.enable("fetchUserWhenReady");
 ```
 
@@ -178,7 +178,7 @@ system.constraints.enable("fetchUserWhenReady");
 ### Putting async logic in resolvers instead of constraints
 
 ```typescript
-// WRONG — resolver checks conditions (constraint's job)
+// WRONG – resolver checks conditions (constraint's job)
 resolvers: {
   fetchData: {
     requirement: "FETCH",
@@ -191,7 +191,7 @@ resolvers: {
   },
 },
 
-// CORRECT — constraint declares when, resolver just does the work
+// CORRECT – constraint declares when, resolver just does the work
 constraints: {
   fetchWhenAuth: {
     when: (facts) => facts.isAuthenticated && !facts.data,
@@ -213,16 +213,16 @@ resolvers: {
 ### String literal for require
 
 ```typescript
-// WRONG — require must be an object
+// WRONG – require must be an object
 require: "FETCH_DATA",
 
-// CORRECT — object with type property
+// CORRECT – object with type property
 require: { type: "FETCH_DATA" },
 
-// CORRECT — with payload
+// CORRECT – with payload
 require: { type: "FETCH_DATA", endpoint: "/api/users" },
 
-// CORRECT — dynamic from facts
+// CORRECT – dynamic from facts
 require: (facts) => ({ type: "FETCH_DATA", userId: facts.currentUserId }),
 ```
 

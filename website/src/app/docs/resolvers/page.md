@@ -410,7 +410,7 @@ resolvers: {
       windowMs: 50,
     },
 
-    // Individual resolve — called once per batched requirement
+    // Individual resolve – called once per batched requirement
     resolve: async (req, context) => {
       context.facts.user = await api.getUser(req.userId);
     },

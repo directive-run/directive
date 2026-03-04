@@ -11,7 +11,7 @@ Each feature follows the same pattern: wrap a runner, get a runner back. Stack t
 
 ## Composition Model
 
-Every wrapper has the signature `(runner, config) => AgentRunner` — except `withFallback`, which takes an array of runners: `([runners...], config) => AgentRunner`. Chain them like middleware.
+Every wrapper has the signature `(runner, config) => AgentRunner` – except `withFallback`, which takes an array of runners: `([runners...], config) => AgentRunner`. Chain them like middleware.
 
 {% callout title="Composition order matters" %}
 Apply wrappers from inside out:

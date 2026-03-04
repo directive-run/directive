@@ -1,6 +1,6 @@
 ---
 title: How to Chain Async Operations Across Modules
-description: Build cross-module async chains with after ordering, error propagation, and retry — auth to permissions to dashboard data.
+description: Build cross-module async chains with after ordering, error propagation, and retry – auth to permissions to dashboard data.
 ---
 
 Auth → permissions → feature flags → dashboard data. Cross-module `after` chains with error propagation, retry, and parallel branches. {% .lead %}
@@ -203,15 +203,15 @@ function App({ system }) {
 
 ## Step by Step
 
-1. **`after` blocks constraint evaluation** — `loadPermissions` won't even evaluate its `when` until `auth::validateSession`'s resolver has settled (fulfilled or rejected). This is a hard dependency on completion, not just on a fact value.
+1. **`after` blocks constraint evaluation** – `loadPermissions` won't even evaluate its `when` until `auth::validateSession`'s resolver has settled (fulfilled or rejected). This is a hard dependency on completion, not just on a fact value.
 
-2. **`crossModuleDeps` enables cross-module access** — declared at the module level, it gives constraints, derivations, and effects typed access to other modules' facts via `facts.{dep}.*`. Own module facts are accessed via `facts.self.*`. Permissions reads `facts.auth.isValid`, dashboard reads `facts.permissions.role`.
+2. **`crossModuleDeps` enables cross-module access** – declared at the module level, it gives constraints, derivations, and effects typed access to other modules' facts via `facts.{dep}.*`. Own module facts are accessed via `facts.self.*`. Permissions reads `facts.auth.isValid`, dashboard reads `facts.permissions.role`.
 
-3. **`after` vs `crossModuleDeps`** — `after` is about _ordering_ (wait for that constraint's resolver to finish). `crossModuleDeps` is about _data_ (read facts and derivations from other modules). You often use both together: wait for auth to finish (`after`), then check if it succeeded (`facts.auth.isValid`).
+3. **`after` vs `crossModuleDeps`** – `after` is about _ordering_ (wait for that constraint's resolver to finish). `crossModuleDeps` is about _data_ (read facts and derivations from other modules). You often use both together: wait for auth to finish (`after`), then check if it succeeded (`facts.auth.isValid`).
 
-4. **Error propagation** — if `validateSession` throws (after retries), it stays in rejected state. `loadPermissions` never evaluates because `auth.isValid` is false. `loadDashboard` is doubly blocked: its `after` dependency (`loadPermissions`) never ran.
+4. **Error propagation** – if `validateSession` throws (after retries), it stays in rejected state. `loadPermissions` never evaluates because `auth.isValid` is false. `loadDashboard` is doubly blocked: its `after` dependency (`loadPermissions`) never ran.
 
-5. **Retry a single step** — dispatching a new `VALIDATE_SESSION` requirement restarts only the auth step. If it succeeds, the chain resumes from where it left off — permissions and dashboard load automatically.
+5. **Retry a single step** – dispatching a new `VALIDATE_SESSION` requirement restarts only the auth step. If it succeeds, the chain resumes from where it left off – permissions and dashboard load automatically.
 
 6. **`devtoolsPlugin({ trace: true })`** logs the full chain trace: which constraints are waiting on which `after` dependencies, and the timestamp of each resolver start/end.
 
@@ -238,7 +238,7 @@ constraints: {
 },
 ```
 
-Both fire simultaneously once auth settles — no need to serialize them.
+Both fire simultaneously once auth settles – no need to serialize them.
 
 ### Chain timeout
 
@@ -265,8 +265,8 @@ events: {
 
 ## Related
 
-- [Interactive Example](/docs/examples/async-chains) — try it in your browser
-- [Constraints](/docs/constraints) — `after` and `crossModuleDeps` reference
-- [Resolvers](/docs/resolvers) — retry policies and timeout
-- [Multi-Module](/docs/advanced/multi-module) — module composition
-- [Authentication Flow](/docs/guides/auth-flow) — single-module auth chain
+- [Interactive Example](/docs/examples/async-chains) – try it in your browser
+- [Constraints](/docs/constraints) – `after` and `crossModuleDeps` reference
+- [Resolvers](/docs/resolvers) – retry policies and timeout
+- [Multi-Module](/docs/advanced/multi-module) – module composition
+- [Authentication Flow](/docs/guides/auth-flow) – single-module auth chain
