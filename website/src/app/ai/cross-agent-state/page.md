@@ -193,7 +193,7 @@ const orchestrator = createMultiAgentOrchestrator({
     costAlert: derivedConstraint(
       'totalCost',
       (value) => (value as number) > 0.50,
-      { agent: 'optimizer', input: (value) => `Reduce token usage — current cost: $${value}`, priority: 100 }
+      { agent: 'optimizer', input: (value) => `Reduce token usage – current cost: $${value}`, priority: 100 }
     ),
   },
 });

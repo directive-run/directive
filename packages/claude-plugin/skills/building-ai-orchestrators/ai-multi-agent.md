@@ -67,7 +67,7 @@ const orchestrator = createMultiAgentOrchestrator({
   runner,
 });
 
-// REQUIRED for multi-agent — must call start() before running patterns
+// REQUIRED for multi-agent – must call start() before running patterns
 orchestrator.start();
 
 const result = await orchestrator.runPattern("pipeline", "Write about AI");
@@ -75,7 +75,7 @@ const result = await orchestrator.runPattern("pipeline", "Write about AI");
 
 ## Pattern Details
 
-### parallel — Run agents concurrently, merge results
+### parallel – Run agents concurrently, merge results
 
 ```typescript
 const brainstorm = parallel(
@@ -91,21 +91,21 @@ const brainstorm = parallel(
 );
 ```
 
-### sequential — Chain agents in order
+### sequential – Chain agents in order
 
 ```typescript
 // Each agent receives the previous agent's output as its prompt
 const pipeline = sequential(["researcher", "writer", "editor"]);
 ```
 
-### supervisor — One agent delegates to workers
+### supervisor – One agent delegates to workers
 
 ```typescript
 // Editor decides which worker to invoke and when to stop
 const managed = supervisor("editor", ["researcher", "writer"]);
 ```
 
-### dag — Directed acyclic graph of dependencies
+### dag – Directed acyclic graph of dependencies
 
 ```typescript
 // DagNode shape
@@ -132,7 +132,7 @@ const workflow = dag([
 ]);
 ```
 
-### reflect — Agent critiques and revises its own output
+### reflect – Agent critiques and revises its own output
 
 ```typescript
 const selfImprove = reflect("writer", {
@@ -143,7 +143,7 @@ const selfImprove = reflect("writer", {
 });
 ```
 
-### race — First agent to finish wins
+### race – First agent to finish wins
 
 ```typescript
 const fastest = race(["researcher", "writer"], {
@@ -152,7 +152,7 @@ const fastest = race(["researcher", "writer"], {
 });
 ```
 
-### debate — Agents argue to consensus
+### debate – Agents argue to consensus
 
 ```typescript
 const consensus = debate(["researcher", "writer"], {
@@ -161,7 +161,7 @@ const consensus = debate(["researcher", "writer"], {
 });
 ```
 
-### goal — Iterate until a condition is met
+### goal – Iterate until a condition is met
 
 ```typescript
 const iterative = goal("researcher", {
@@ -220,7 +220,7 @@ const workflow = dag([
 ### #24: Forgetting start() for multi-agent
 
 ```typescript
-// WRONG — multi-agent orchestrators require explicit start()
+// WRONG – multi-agent orchestrators require explicit start()
 const orchestrator = createMultiAgentOrchestrator({ agents, runner });
 const result = await orchestrator.runPattern("pipeline", "prompt");
 // Error: Orchestrator not started
@@ -234,12 +234,12 @@ const result = await orchestrator.runPattern("pipeline", "prompt");
 ### #30: race minSuccess greater than agent count
 
 ```typescript
-// WRONG — minSuccess cannot exceed the number of agents
+// WRONG – minSuccess cannot exceed the number of agents
 const broken = race(["researcher", "writer"], {
   minSuccess: 3, // Only 2 agents, will never satisfy
 });
 
-// CORRECT — minSuccess <= agents.length
+// CORRECT – minSuccess <= agents.length
 const working = race(["researcher", "writer"], {
   minSuccess: 1,
 });
@@ -248,13 +248,13 @@ const working = race(["researcher", "writer"], {
 ### Reusing agent names across patterns
 
 ```typescript
-// WRONG — agent names must match keys in the agents config
+// WRONG – agent names must match keys in the agents config
 patterns: {
   pipeline: sequential(["research-agent", "write-agent"]),
   // These don't match the keys "researcher", "writer"
 },
 
-// CORRECT — use the exact keys from agents config
+// CORRECT – use the exact keys from agents config
 patterns: {
   pipeline: sequential(["researcher", "writer"]),
 },

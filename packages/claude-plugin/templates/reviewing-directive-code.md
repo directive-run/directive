@@ -18,7 +18,7 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 - User asks about Directive best practices for existing code
 - User suspects they have anti-patterns or performance issues
 
-### Exclusions — Use a Different Skill
+### Exclusions – Use a Different Skill
 - User wants to write NEW code from scratch → `writing-directive-modules`
 - User wants to write tests → `testing-directive-code`
 - User wants to migrate FROM another library → `migrating-to-directive`
@@ -34,7 +34,7 @@ This skill applies when the project uses `@directive-run/core`. If not found in 
 ✓ Schema keys are camelCase
 ✓ All facts have explicit type builders (t.string(), t.number(), etc.)
 ✓ init() sets ALL schema keys (no undefined facts)
-✓ No business logic in init() — just defaults
+✓ No business logic in init() – just defaults
 ```
 
 ### Anti-Patterns
@@ -125,7 +125,7 @@ constraints: {
 ## 4. Resolvers
 
 ```
-✓ Resolver params use (req, context) — not (req, ctx)
+✓ Resolver params use (req, context) – not (req, ctx)
 ✓ Resolver handles errors (try/catch or error boundaries)
 ✓ Deduplication key set for idempotent requirements
 ✓ Retry policy configured for network/external calls
@@ -227,6 +227,6 @@ When reviewing, output findings as:
 ## Reference Files
 
 Supporting knowledge files loaded with this skill:
-- `anti-patterns.md` — Full anti-pattern catalog with fixes
-- `core-patterns.md` — Correct patterns to recommend
-- `naming.md` — Naming conventions reference
+- `anti-patterns.md` – Full anti-pattern catalog with fixes
+- `core-patterns.md` – Correct patterns to recommend
+- `naming.md` – Naming conventions reference

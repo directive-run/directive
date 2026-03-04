@@ -54,7 +54,7 @@ const contentPipeline = dag(
   },
 );
 
-// Run with: orchestrator.runPattern('contentPipeline', input) — see Full Example below
+// Run with: orchestrator.runPattern('contentPipeline', input) – see Full Example below
 ```
 
 ## How It Works
@@ -83,11 +83,11 @@ const contentPipeline = dag(
 - **`transform`** shapes the input for a node based on upstream outputs. The `context` object has `outputs`, `statuses`, `errors`, and the original `input`.
 - **`deps`** creates edges in the DAG. `writer` waits for both `researcher` and `factChecker`.
 - **`onNodeError`** controls failure behavior:
-  - `"fail"` — abort the entire DAG on any node failure
-  - `"skip-downstream"` — skip nodes that depend on the failed node, but run everything else
-  - `"continue"` — run everything, passing `undefined` for failed upstream outputs
+  - `"fail"` – abort the entire DAG on any node failure
+  - `"skip-downstream"` – skip nodes that depend on the failed node, but run everything else
+  - `"continue"` – run everything, passing `undefined` for failed upstream outputs
 - **`maxConcurrent`** limits how many nodes run simultaneously.
-- **`when`** adds conditional edges — a node only runs if the condition is true.
+- **`when`** adds conditional edges – a node only runs if the condition is true.
 
 ## Full Example
 
@@ -212,6 +212,6 @@ Task nodes appear as hexagons in Mermaid diagrams and violet dashed-border nodes
 
 ## Related
 
-- [Execution Patterns](/ai/patterns) — DAG, reflect, and other patterns reference
-- [Multi-Agent Orchestrator](/ai/multi-agent) — orchestrator configuration
-- [Multi-Step Pipeline guide](/ai/guides/multi-step-pipeline) — simpler sequential pipelines
+- [Execution Patterns](/ai/patterns) – DAG, reflect, and other patterns reference
+- [Multi-Agent Orchestrator](/ai/multi-agent) – orchestrator configuration
+- [Multi-Step Pipeline guide](/ai/guides/multi-step-pipeline) – simpler sequential pipelines

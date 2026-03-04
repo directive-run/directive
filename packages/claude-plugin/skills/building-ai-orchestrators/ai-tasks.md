@@ -21,7 +21,7 @@ Does this work need an LLM?
 
 ```typescript
 interface TaskRegistration {
-  // The work function — input is ALWAYS a string
+  // The work function – input is ALWAYS a string
   run: (input: string, context: TaskContext) => Promise<string>;
 
   // Human-readable label for debugging/logging
@@ -184,11 +184,11 @@ tasks: {
 ### #33: Tasks calling agents internally
 
 ```typescript
-// WRONG — tasks cannot invoke agents
+// WRONG – tasks cannot invoke agents
 tasks: {
   enhance: {
     run: async (input, context) => {
-      // Tasks have no runner access — this won't work
+      // Tasks have no runner access – this won't work
       const result = await runner.run(someAgent, input);
 
       return result.output;
@@ -196,7 +196,7 @@ tasks: {
   },
 },
 
-// CORRECT — use a pattern to compose agents and tasks
+// CORRECT – use a pattern to compose agents and tasks
 patterns: {
   enhance: sequential(["enhancer-agent", "format-task"]),
 },
@@ -205,17 +205,17 @@ patterns: {
 ### #34: Expecting structured input (not a string)
 
 ```typescript
-// WRONG — task input is always a string
+// WRONG – task input is always a string
 tasks: {
   process: {
     run: async (input, context) => {
-      // input.items is undefined — input is a string
+      // input.items is undefined – input is a string
       return input.items.map((i) => i.name).join(", ");
     },
   },
 },
 
-// CORRECT — parse the string input
+// CORRECT – parse the string input
 tasks: {
   process: {
     run: async (input, context) => {
@@ -230,7 +230,7 @@ tasks: {
 ### #35: Task and agent IDs collide
 
 ```typescript
-// WRONG — "researcher" exists as both agent and task
+// WRONG – "researcher" exists as both agent and task
 agents: {
   researcher: { name: "researcher", instructions: "...", model: "claude-sonnet-4-5" },
 },
@@ -238,7 +238,7 @@ tasks: {
   researcher: { run: async (input) => input }, // Name collision!
 },
 
-// CORRECT — use distinct names
+// CORRECT – use distinct names
 agents: {
   researcher: { name: "researcher", instructions: "...", model: "claude-sonnet-4-5" },
 },

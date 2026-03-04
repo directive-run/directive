@@ -254,7 +254,7 @@ const evaluator = createEvaluator({
 ### Anti-Pattern #32: Side effects in evaluator scorer
 
 ```typescript
-// WRONG — scorers must be pure functions
+// WRONG – scorers must be pure functions
 {
   name: "quality",
   scorer: (input, output) => {
@@ -266,7 +266,7 @@ const evaluator = createEvaluator({
   },
 }
 
-// CORRECT — scorers are pure, return score + reason only
+// CORRECT – scorers are pure, return score + reason only
 {
   name: "quality",
   scorer: (input, output) => {

@@ -34,7 +34,7 @@ const search = createModule('search', {
   },
 
   // Note: This effect intentionally writes to facts. The debounce pattern is
-  // a valid exception to the "effects shouldn't mutate facts" guideline — the
+  // a valid exception to the "effects shouldn't mutate facts" guideline – the
   // delayed copy is specifically designed to throttle downstream constraint
   // evaluation without triggering re-entrant loops.
   effects: {

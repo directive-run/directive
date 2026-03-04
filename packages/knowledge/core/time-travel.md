@@ -9,7 +9,7 @@ What's the use case?
 ├── Debugging during development → Yes, enable with maxSnapshots cap
 ├── Production app → No, disable for performance
 ├── Bug reproduction → Enable, use exportHistory() to share
-├── Testing → Usually no — use assertFact/assertDerivation instead
+├── Testing → Usually no – use assertFact/assertDerivation instead
 └── Demo / presentation → Yes, great for showing state changes
 ```
 
@@ -37,8 +37,8 @@ Access via `system.debug.timeTravel`:
 const tt = system.debug.timeTravel;
 
 // Navigation
-tt.canUndo();           // boolean — is there a previous snapshot?
-tt.canRedo();           // boolean — is there a next snapshot?
+tt.canUndo();           // boolean – is there a previous snapshot?
+tt.canRedo();           // boolean – is there a next snapshot?
 tt.undo();              // Restore previous snapshot
 tt.redo();              // Restore next snapshot
 
@@ -48,10 +48,10 @@ tt.goToSnapshot(index); // Jump to a specific snapshot by index
 
 // Each snapshot contains:
 // {
-//   facts: { ... },        — full fact state at that point
-//   timestamp: number,     — when the snapshot was taken
-//   label?: string,        — optional label from changeset
-//   changedKeys: string[], — which facts changed
+//   facts: { ... },        – full fact state at that point
+//   timestamp: number,     – when the snapshot was taken
+//   label?: string,        – optional label from changeset
+//   changedKeys: string[], – which facts changed
 // }
 ```
 
@@ -94,12 +94,12 @@ Multiple fact mutations can be grouped into a single undoable unit.
 ```typescript
 const tt = system.debug.timeTravel;
 
-// Without changeset — each mutation is a separate snapshot
+// Without changeset – each mutation is a separate snapshot
 system.facts.firstName = "Alice";
 system.facts.lastName = "Smith";
 // Two snapshots, two undos needed
 
-// With changeset — grouped into one snapshot
+// With changeset – grouped into one snapshot
 tt.beginChangeset("Update user name");
 system.facts.firstName = "Alice";
 system.facts.lastName = "Smith";
@@ -120,12 +120,12 @@ Serialize the full snapshot history for bug reports or debugging.
 ```typescript
 const tt = system.debug.timeTravel;
 
-// Export — returns a serializable object
+// Export – returns a serializable object
 const historyData = tt.exportHistory();
 // Send to server, save to file, attach to bug report
 console.log(JSON.stringify(historyData));
 
-// Import — restore history from exported data
+// Import – restore history from exported data
 tt.importHistory(historyData);
 
 // Now you can step through the user's exact state sequence
@@ -159,10 +159,10 @@ console.log(system.facts); // State as of snapshot 3
 Every fact mutation creates a snapshot. Cap the number to control memory:
 
 ```typescript
-// Low memory — keeps last 20 snapshots, discards oldest
+// Low memory – keeps last 20 snapshots, discards oldest
 debug: { timeTravel: true, maxSnapshots: 20 },
 
-// Development — generous cap for deep debugging
+// Development – generous cap for deep debugging
 debug: { timeTravel: true, maxSnapshots: 500 },
 
 // Default if not specified
@@ -176,13 +176,13 @@ When the cap is reached, the oldest snapshot is discarded (FIFO). Redo history b
 ### Enabling time-travel in production
 
 ```typescript
-// WRONG — snapshots consume memory on every mutation
+// WRONG – snapshots consume memory on every mutation
 const system = createSystem({
   module: myModule,
   debug: { timeTravel: true },
 });
 
-// CORRECT — gate on environment
+// CORRECT – gate on environment
 const system = createSystem({
   module: myModule,
   debug: {
@@ -195,13 +195,13 @@ const system = createSystem({
 ### Forgetting to end a changeset
 
 ```typescript
-// WRONG — changeset never closed, all subsequent mutations are grouped
+// WRONG – changeset never closed, all subsequent mutations are grouped
 tt.beginChangeset("update");
 system.facts.name = "Alice";
 // ... forgot endChangeset()
 system.facts.unrelated = true; // Still part of the changeset!
 
-// CORRECT — always close changesets
+// CORRECT – always close changesets
 tt.beginChangeset("update");
 system.facts.name = "Alice";
 tt.endChangeset();
@@ -210,11 +210,11 @@ tt.endChangeset();
 ### Accessing time-travel when disabled
 
 ```typescript
-// WRONG — timeTravel not enabled, system.debug.timeTravel is null
+// WRONG – timeTravel not enabled, system.debug.timeTravel is null
 const system = createSystem({ module: myModule });
 system.debug.timeTravel.undo(); // TypeError!
 
-// CORRECT — check before using
+// CORRECT – check before using
 const tt = system.debug.timeTravel;
 if (tt) {
   tt.undo();
@@ -230,7 +230,7 @@ const system = createSystem({
 ### No maxSnapshots cap with frequent mutations
 
 ```typescript
-// WRONG — unbounded snapshots in a high-frequency update loop
+// WRONG – unbounded snapshots in a high-frequency update loop
 debug: { timeTravel: true }, // Default cap is 50, which is fine
 
 // Be explicit when mutation rate is high

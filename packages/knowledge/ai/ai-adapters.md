@@ -24,7 +24,7 @@ Which LLM provider?
 Every adapter MUST be imported from its subpath. The main `@directive-run/ai` entry does NOT export adapters.
 
 ```typescript
-// CORRECT — subpath imports
+// CORRECT – subpath imports
 import { createAnthropicRunner } from "@directive-run/ai/anthropic";
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 import { createOllamaRunner } from "@directive-run/ai/ollama";
@@ -34,11 +34,11 @@ import { createGeminiRunner } from "@directive-run/ai/gemini";
 ### Anti-Pattern #26: Importing adapters from the main entry
 
 ```typescript
-// WRONG — adapters are NOT exported from the main package
+// WRONG – adapters are NOT exported from the main package
 import { createOpenAIRunner } from "@directive-run/ai";
 import { createAnthropicRunner } from "@directive-run/ai";
 
-// CORRECT — use subpath imports
+// CORRECT – use subpath imports
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 import { createAnthropicRunner } from "@directive-run/ai/anthropic";
 ```
@@ -136,12 +136,12 @@ const runner = createGeminiRunner({
 ### Anti-Pattern #27: Assuming provider-specific token structure
 
 ```typescript
-// WRONG — Anthropic returns { input_tokens, output_tokens } natively
+// WRONG – Anthropic returns { input_tokens, output_tokens } natively
 // but adapters normalize this
 const result = await runner.run(agent, prompt);
 console.log(result.tokenUsage.input_tokens); // undefined!
 
-// CORRECT — adapters normalize to camelCase
+// CORRECT – adapters normalize to camelCase
 const result = await runner.run(agent, prompt);
 console.log(result.tokenUsage.inputTokens);   // number
 console.log(result.tokenUsage.outputTokens);   // number
@@ -201,7 +201,7 @@ const runner = createAnthropicRunner({
 // Single-agent
 const orchestrator = createAgentOrchestrator({ runner });
 
-// Multi-agent — same runner shared across all agents
+// Multi-agent – same runner shared across all agents
 const multiOrchestrator = createMultiAgentOrchestrator({
   agents: { /* ... */ },
   runner,
@@ -219,7 +219,7 @@ const runner = createAnthropicRunner({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// After: OpenAI — same orchestrator, different runner
+// After: OpenAI – same orchestrator, different runner
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 const runner = createOpenAIRunner({
   apiKey: process.env.OPENAI_API_KEY,

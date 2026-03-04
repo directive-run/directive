@@ -13,7 +13,7 @@ The goal pattern infers agent execution order from `produces`/`requires` declara
 
 | | DAG | Goal |
 |---|-----|------|
-| **Topology** | Static — you wire edges with `deps` | Dynamic — inferred from `produces`/`requires` |
+| **Topology** | Static – you wire edges with `deps` | Dynamic – inferred from `produces`/`requires` |
 | **Completion** | All nodes run | `when()` condition is met |
 | **Stall handling** | None | Progressive relaxation |
 | **Progress** | Node count | Satisfaction score (0–1) |
@@ -95,7 +95,7 @@ const result = await orchestrator.runGoal(
   // Initial facts (seed input)
   { topic: 'AI safety trends in 2026' },
 
-  // Goal condition — stop when this returns true
+  // Goal condition – stop when this returns true
   (facts) => facts.report != null,
 
   // Options

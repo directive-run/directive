@@ -97,6 +97,6 @@ console.log(`Spent: $${hourlySpend.toFixed(2)}/hr, $${dailySpend.toFixed(2)}/day
 
 ## Related
 
-- [Orchestrator reference](/ai/orchestrator) — `maxTokenBudget` and warning configuration
-- [Resilience & Routing](/ai/resilience-routing) — `withBudget`, `withRetry`, and other middleware
-- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) — handling `BudgetExceededError`
+- [Orchestrator reference](/ai/orchestrator) – `maxTokenBudget` and warning configuration
+- [Resilience & Routing](/ai/resilience-routing) – `withBudget`, `withRetry`, and other middleware
+- [Handle Agent Errors guide](/ai/guides/handle-agent-errors) – handling `BudgetExceededError`

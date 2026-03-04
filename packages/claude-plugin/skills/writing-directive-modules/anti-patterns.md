@@ -5,17 +5,17 @@
 ## 1. Unnecessary Type Casting on Facts/Derivations
 
 ```typescript
-// WRONG — schema already provides the type
+// WRONG – schema already provides the type
 const profile = system.facts.profile as ResourceState<Profile>;
 
-// CORRECT — trust the schema
+// CORRECT – trust the schema
 const profile = system.facts.profile;
 ```
 
 ## 2. Flat Schema (Missing facts Wrapper)
 
 ```typescript
-// WRONG — facts must be nested under schema.facts
+// WRONG – facts must be nested under schema.facts
 createModule("counter", {
   schema: {
     phase: t.string(),
@@ -37,7 +37,7 @@ createModule("counter", {
 ## 3. Bare `facts.*` in Multi-Module Constraints
 
 ```typescript
-// WRONG — multi-module constraints use facts.self for own module
+// WRONG – multi-module constraints use facts.self for own module
 constraints: {
   checkItems: {
     when: (facts) => facts.items.length > 0,
@@ -45,7 +45,7 @@ constraints: {
   },
 },
 
-// CORRECT — use facts.self.* for own module facts
+// CORRECT – use facts.self.* for own module facts
 constraints: {
   checkItems: {
     when: (facts) => facts.self.items.length > 0,
@@ -57,7 +57,7 @@ constraints: {
 ## 4. Nonexistent Schema Builders
 
 ```typescript
-// WRONG — t.map(), t.set(), t.promise() do not exist
+// WRONG – t.map(), t.set(), t.promise() do not exist
 schema: {
   facts: {
     cache: t.map<string, User>(),
@@ -66,7 +66,7 @@ schema: {
   },
 },
 
-// CORRECT — use t.object() with type parameter
+// CORRECT – use t.object() with type parameter
 schema: {
   facts: {
     cache: t.object<Map<string, User>>(),
@@ -79,12 +79,12 @@ schema: {
 ## 5. Abbreviating `context` to `ctx`
 
 ```typescript
-// WRONG — never abbreviate context
+// WRONG – never abbreviate context
 resolve: async (req, ctx) => {
   ctx.facts.status = "done";
 },
 
-// CORRECT — always spell out context
+// CORRECT – always spell out context
 resolve: async (req, context) => {
   context.facts.status = "done";
 },
@@ -93,13 +93,13 @@ resolve: async (req, context) => {
 ## 6. Flat Module Config (No schema Wrapper)
 
 ```typescript
-// WRONG — properties must be inside schema.facts
+// WRONG – properties must be inside schema.facts
 createModule("timer", {
   phase: t.string(),
   elapsed: t.number(),
 });
 
-// CORRECT — wrap in schema: { facts: {} }
+// CORRECT – wrap in schema: { facts: {} }
 createModule("timer", {
   schema: {
     facts: {
@@ -113,21 +113,21 @@ createModule("timer", {
 ## 7. String-Based Event Dispatch
 
 ```typescript
-// WRONG — events are not dispatched by string
+// WRONG – events are not dispatched by string
 system.dispatch("login", { token: "abc" });
 
-// CORRECT — use the events accessor
+// CORRECT – use the events accessor
 system.events.login({ token: "abc" });
 ```
 
 ## 8. Direct Array/Object Mutation
 
 ```typescript
-// WRONG — proxy cannot detect in-place mutations
+// WRONG – proxy cannot detect in-place mutations
 facts.items.push(item);
 facts.config.theme = "dark";
 
-// CORRECT — replace the entire value
+// CORRECT – replace the entire value
 facts.items = [...facts.items, item];
 facts.config = { ...facts.config, theme: "dark" };
 ```
@@ -135,10 +135,10 @@ facts.config = { ...facts.config, theme: "dark" };
 ## 9. Nonexistent `useDirective` Hook
 
 ```typescript
-// WRONG — there is no useDirective hook
+// WRONG – there is no useDirective hook
 const state = useDirective(system);
 
-// CORRECT — use useSelector with a selector function
+// CORRECT – use useSelector with a selector function
 const count = useSelector(system, (s) => s.facts.count);
 const isLoading = useSelector(system, (s) => s.derive.isLoading);
 ```
@@ -146,11 +146,11 @@ const isLoading = useSelector(system, (s) => s.derive.isLoading);
 ## 10. Bracket Notation for Namespaced Facts
 
 ```typescript
-// WRONG — internal separator is not part of the public API
+// WRONG – internal separator is not part of the public API
 const status = facts["auth::status"];
 const token = facts["auth_token"];
 
-// CORRECT — use dot notation through the namespace proxy
+// CORRECT – use dot notation through the namespace proxy
 const status = facts.auth.status;
 const token = facts.auth.token;
 ```
@@ -158,12 +158,12 @@ const token = facts.auth.token;
 ## 11. Builder/Chaining API
 
 ```typescript
-// WRONG — there is no builder pattern
+// WRONG – there is no builder pattern
 const mod = module("counter")
   .schema({ count: t.number() })
   .build();
 
-// CORRECT — use createModule with object syntax
+// CORRECT – use createModule with object syntax
 const mod = createModule("counter", {
   schema: {
     facts: { count: t.number() },
@@ -174,14 +174,14 @@ const mod = createModule("counter", {
 ## 12. Returning Data from Resolvers
 
 ```typescript
-// WRONG — resolvers return void, not data
+// WRONG – resolvers return void, not data
 resolve: async (req, context) => {
   const user = await fetchUser(req.userId);
 
   return user; // Return value is ignored
 },
 
-// CORRECT — mutate context.facts to store results
+// CORRECT – mutate context.facts to store results
 resolve: async (req, context) => {
   const user = await fetchUser(req.userId);
   context.facts.user = user;
@@ -191,13 +191,13 @@ resolve: async (req, context) => {
 ## 13. Async Logic in `init`
 
 ```typescript
-// WRONG — init is synchronous, facts assignment only
+// WRONG – init is synchronous, facts assignment only
 init: async (facts) => {
   const data = await fetch("/api/config");
   facts.config = await data.json();
 },
 
-// CORRECT — init sets defaults; use constraints/resolvers for async work
+// CORRECT – init sets defaults; use constraints/resolvers for async work
 init: (facts) => {
   facts.config = null;
   facts.phase = "loading";
@@ -214,11 +214,11 @@ constraints: {
 ## 14. Missing `settle()` After `start()`
 
 ```typescript
-// WRONG — constraints fire on start, resolvers are async
+// WRONG – constraints fire on start, resolvers are async
 system.start();
 console.log(system.facts.data); // May still be null
 
-// CORRECT — wait for resolvers to complete
+// CORRECT – wait for resolvers to complete
 system.start();
 await system.settle();
 console.log(system.facts.data); // Resolved
@@ -227,7 +227,7 @@ console.log(system.facts.data); // Resolved
 ## 15. Missing `crossModuleDeps` Declaration
 
 ```typescript
-// WRONG — accessing auth facts without declaring dependency
+// WRONG – accessing auth facts without declaring dependency
 const dataModule = createModule("data", {
   schema: { facts: { items: t.array(t.string()) } },
   constraints: {
@@ -238,7 +238,7 @@ const dataModule = createModule("data", {
   },
 });
 
-// CORRECT — declare crossModuleDeps for type-safe cross-module access
+// CORRECT – declare crossModuleDeps for type-safe cross-module access
 const dataModule = createModule("data", {
   schema: { facts: { items: t.array(t.string()) } },
   crossModuleDeps: { auth: authSchema },
@@ -254,7 +254,7 @@ const dataModule = createModule("data", {
 ## 16. String Literal for `require`
 
 ```typescript
-// WRONG — require must be an object with type property
+// WRONG – require must be an object with type property
 constraints: {
   check: {
     when: (facts) => facts.ready,
@@ -262,7 +262,7 @@ constraints: {
   },
 },
 
-// CORRECT — use object form with type
+// CORRECT – use object form with type
 constraints: {
   check: {
     when: (facts) => facts.ready,
@@ -274,23 +274,23 @@ constraints: {
 ## 17. Passthrough Derivations
 
 ```typescript
-// WRONG — derivation just returns a fact value unchanged
+// WRONG – derivation just returns a fact value unchanged
 derive: {
   count: (facts) => facts.count,
 },
 
-// CORRECT — remove it, read the fact directly instead
+// CORRECT – remove it, read the fact directly instead
 // system.facts.count instead of system.derive.count
 ```
 
 ## 18. Deep Import Paths
 
 ```typescript
-// WRONG — internal module paths are not public API
+// WRONG – internal module paths are not public API
 import { createModule } from "@directive-run/core/module";
 import { createSystem } from "@directive-run/core/system";
 
-// CORRECT — import from package root
+// CORRECT – import from package root
 import { createModule, createSystem } from "@directive-run/core";
 
 // Exception: plugins have their own entry point
@@ -300,7 +300,7 @@ import { loggingPlugin } from "@directive-run/core/plugins";
 ## 19. Async `when()` Without `deps`
 
 ```typescript
-// WRONG — async constraints need explicit deps for tracking
+// WRONG – async constraints need explicit deps for tracking
 constraints: {
   validate: {
     async: true,
@@ -313,7 +313,7 @@ constraints: {
   },
 },
 
-// CORRECT — add deps array for async constraints
+// CORRECT – add deps array for async constraints
 constraints: {
   validate: {
     async: true,
@@ -331,7 +331,7 @@ constraints: {
 ## 20. No Error Handling on Failing Resolvers
 
 ```typescript
-// WRONG — unhandled errors crash the system
+// WRONG – unhandled errors crash the system
 resolvers: {
   fetchData: {
     requirement: "FETCH",
@@ -342,7 +342,7 @@ resolvers: {
   },
 },
 
-// CORRECT — use retry policy and/or module error boundary
+// CORRECT – use retry policy and/or module error boundary
 resolvers: {
   fetchData: {
     requirement: "FETCH",

@@ -82,7 +82,7 @@ type SSEEvent =
 
 ### `toResponse(streamable, agentId, input, opts?)`
 
-Creates a full `Response` object with SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`). The `agentId` identifies which agent handles this request — it is passed through to the streamable's `.stream()` method for logging, routing, and timeline correlation. Pass the response directly as the return value from a route handler.
+Creates a full `Response` object with SSE headers (`Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`). The `agentId` identifies which agent handles this request – it is passed through to the streamable's `.stream()` method for logging, routing, and timeline correlation. Pass the response directly as the return value from a route handler.
 
 ```typescript
 export async function POST(request: Request) {

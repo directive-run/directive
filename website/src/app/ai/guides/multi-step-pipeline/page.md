@@ -3,7 +3,7 @@ title: Multi-Step Pipeline
 description: Build sequential agent pipelines where multiple agents work in series with handoffs.
 ---
 
-Build pipelines where multiple agents work in sequence — research, write, review. {% .lead %}
+Build pipelines where multiple agents work in sequence – research, write, review. {% .lead %}
 
 ---
 
@@ -119,6 +119,6 @@ const result = await runContentPipeline('The future of quantum computing');
 
 ## Related
 
-- [Multi-Agent Orchestrator](/ai/multi-agent) — full multi-agent reference
-- [Execution Patterns](/ai/patterns) — DAG, reflect, and other execution patterns
-- [DAG Pipeline guide](/ai/guides/dag-pipeline) — parallel and conditional agent workflows
+- [Multi-Agent Orchestrator](/ai/multi-agent) – full multi-agent reference
+- [Execution Patterns](/ai/patterns) – DAG, reflect, and other execution patterns
+- [DAG Pipeline guide](/ai/guides/dag-pipeline) – parallel and conditional agent workflows

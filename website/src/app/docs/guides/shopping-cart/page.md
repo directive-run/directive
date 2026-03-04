@@ -3,7 +3,7 @@ title: How to Build Shopping Cart Business Rules
 description: Implement quantity limits, coupon validation, inventory checks, and checkout gating with Directive constraints.
 ---
 
-Quantity limits, coupon validation, inventory checks, and checkout gating — the constraint-driven business rules that make Directive shine. {% .lead %}
+Quantity limits, coupon validation, inventory checks, and checkout gating – the constraint-driven business rules that make Directive shine. {% .lead %}
 
 ---
 
@@ -242,17 +242,17 @@ function CartSummary({ system }) {
 
 ## Step by Step
 
-1. **`quantityLimit` constraint** (priority 80) fires first — when any item exceeds stock, the resolver clamps all quantities. This runs before checkout so the cart is always valid.
+1. **`quantityLimit` constraint** (priority 80) fires first – when any item exceeds stock, the resolver clamps all quantities. This runs before checkout so the cart is always valid.
 
 2. **`couponValidation` constraint** fires when a coupon code is set and status is `idle`. The resolver calls the API and sets `couponStatus` to `valid` or `invalid`.
 
-3. **`checkoutReady` uses `after`** — it waits for both `quantityLimit` and `couponValidation` to settle before evaluating. This ensures checkout never proceeds with invalid quantities or an unchecked coupon.
+3. **`checkoutReady` uses `after`** – it waits for both `quantityLimit` and `couponValidation` to settle before evaluating. This ensures checkout never proceeds with invalid quantities or an unchecked coupon.
 
-4. **Module-level `crossModuleDeps`** — `crossModuleDeps: { auth: authSchema }` is declared on the cart module, giving all constraints and derivations access to `facts.auth.*`. Own-module facts are accessed via `facts.self.*` (e.g., `facts.self.items`, `facts.self.checkoutRequested`). The `authSchema` is defined above the cart module so it can be referenced. The `auth` module then reuses the same schema object: `schema: authSchema`.
+4. **Module-level `crossModuleDeps`** – `crossModuleDeps: { auth: authSchema }` is declared on the cart module, giving all constraints and derivations access to `facts.auth.*`. Own-module facts are accessed via `facts.self.*` (e.g., `facts.self.items`, `facts.self.checkoutRequested`). The `authSchema` is defined above the cart module so it can be referenced. The `auth` module then reuses the same schema object: `schema: authSchema`.
 
-5. **Derivation composition** — `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection. Note that `derive` callbacks use `facts.self.*` for own-module facts, while the `derive` parameter (e.g., `derive.subtotal`) is always scoped to the current module.
+5. **Derivation composition** – `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection. Note that `derive` callbacks use `facts.self.*` for own-module facts, while the `derive` parameter (e.g., `derive.subtotal`) is always scoped to the current module.
 
-6. **`devtoolsPlugin({ panel: true })`** opens the DevTools panel, showing real-time constraint evaluation, resolver status, and fact changes — invaluable for debugging business rules.
+6. **`devtoolsPlugin({ panel: true })`** opens the DevTools panel, showing real-time constraint evaluation, resolver status, and fact changes – invaluable for debugging business rules.
 
 ## Common Variations
 
@@ -300,8 +300,8 @@ constraints: {
 
 ## Related
 
-- [Interactive Example](/docs/examples/shopping-cart) — try it in your browser
-- [Constraints](/docs/constraints) — `after`, priority, and cross-module deps
-- [Authentication Flow](/docs/guides/auth-flow) — login/logout patterns
-- [DevTools Plugin](/docs/plugins/devtools) — debugging constraints in real time
-- [Error Boundaries](/docs/advanced/errors) — handling checkout failures
+- [Interactive Example](/docs/examples/shopping-cart) – try it in your browser
+- [Constraints](/docs/constraints) – `after`, priority, and cross-module deps
+- [Authentication Flow](/docs/guides/auth-flow) – login/logout patterns
+- [DevTools Plugin](/docs/plugins/devtools) – debugging constraints in real time
+- [Error Boundaries](/docs/advanced/errors) – handling checkout failures

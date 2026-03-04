@@ -69,7 +69,7 @@ const orchestrator = createAgentOrchestrator({
 
     // Queue dangerous operations for human review
     pendingApprovals.set(request.id, request);
-    notifyHuman({ // Your notification function — Directive doesn't provide this
+    notifyHuman({ // Your notification function – Directive doesn't provide this
       id: request.id,
       agent: request.agentName,
       action: request.description,
@@ -78,7 +78,7 @@ const orchestrator = createAgentOrchestrator({
   },
 });
 
-// Your UI handler — wire this to your approval UI
+// Your UI handler – wire this to your approval UI
 function handleHumanDecision(requestId: string, approved: boolean, reason?: string) {
   if (approved) {
     orchestrator.approve(requestId);
@@ -91,5 +91,5 @@ function handleHumanDecision(requestId: string, approved: boolean, reason?: stri
 
 ## Related
 
-- [Orchestrator reference](/ai/orchestrator) — full orchestrator options including approval configuration
-- [Guardrails reference](/ai/guardrails) — tool guardrails for allowlist/denylist control
+- [Orchestrator reference](/ai/orchestrator) – full orchestrator options including approval configuration
+- [Guardrails reference](/ai/guardrails) – tool guardrails for allowlist/denylist control
