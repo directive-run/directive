@@ -21,6 +21,7 @@ import {
 // Panel Creation
 // ============================================================================
 
+/** @internal Create the floating devtools panel DOM structure. */
 export function createPanel(
   systemName: string,
   position: NonNullable<DevtoolsPluginOptions["position"]>,
@@ -576,7 +577,7 @@ export function createPanel(
 // Panel Update Helpers
 // ============================================================================
 
-/** Upsert a key/value row in a table. Returns true if the row was new. */
+/** @internal Upsert a key/value row in a panel table. */
 export function upsertTableRow(
   rowMap: Map<string, HTMLTableRowElement>,
   tbody: HTMLTableSectionElement,
@@ -618,6 +619,7 @@ export function upsertTableRow(
   }
 }
 
+/** @internal Remove a key/value row from a panel table. */
 export function removeTableRow(
   rowMap: Map<string, HTMLTableRowElement>,
   key: string,
@@ -629,7 +631,7 @@ export function removeTableRow(
   }
 }
 
-/** Render inflight + unmet requirement lists */
+/** @internal Render inflight and unmet requirement lists. */
 export function renderRequirements(
   refs: PanelRefs,
   inflight: Array<{ id: string; resolverId: string; startedAt: number }>,
@@ -674,7 +676,7 @@ export function renderRequirements(
   }
 }
 
-/** Render status indicator */
+/** @internal Render the settled/working status indicator. */
 export function renderStatus(
   refs: PanelRefs,
   inflightCount: number,
@@ -690,6 +692,7 @@ export function renderStatus(
   );
 }
 
+/** @internal Refresh derivation rows in the devtools panel. */
 export function updateDerivations(
   refs: PanelRefs,
   derivRowMap: Map<string, HTMLTableRowElement>,
@@ -743,7 +746,7 @@ export function updateDerivations(
   }
 }
 
-// Safe event row creation — textContent only, no innerHTML
+/** @internal Append an event entry to the devtools event log. */
 export function addEventRow(
   refs: PanelRefs,
   type: string,
@@ -799,6 +802,7 @@ export function addEventRow(
   refs.eventsCount.textContent = String(eventCount);
 }
 
+/** @internal Render performance metrics in the devtools panel. */
 export function updatePerfSection(refs: PanelRefs, perf: PerfMetrics) {
   refs.perfBody.replaceChildren();
 
@@ -844,6 +848,7 @@ export function updatePerfSection(refs: PanelRefs, perf: PerfMetrics) {
   }
 }
 
+/** @internal Update time-travel button states and snapshot label. */
 export function updateTimeTravelControls(
   refs: PanelRefs,
   system: System<ModuleSchema>,
@@ -869,6 +874,7 @@ export function updateTimeTravelControls(
   refs.redoBtn.style.opacity = canRedo ? "1" : "0.4";
 }
 
+/** @internal Wire click handlers for undo/redo time-travel buttons. */
 export function setupTimeTravelButtons(
   refs: PanelRefs,
   system: System<ModuleSchema>,

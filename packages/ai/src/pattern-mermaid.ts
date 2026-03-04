@@ -524,7 +524,7 @@ function renderDebate(
  * //   fetch[fetcher] --> report[reporter]
  * ```
  *
- * @throws {Error} If pattern type is not one of the 8 known types.
+ * @throws If pattern type is not one of the 8 known types.
  */
 export function patternToMermaid(
   pattern: ExecutionPattern<unknown> | SerializedPattern,

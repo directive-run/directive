@@ -1,5 +1,8 @@
 import { getFeatureFlagSystem } from "@/lib/feature-flags/config";
-import { createStreamingRunner } from "@directive-run/ai";
+import {
+  createPromptInjectionGuardrail,
+  createStreamingRunner,
+} from "@directive-run/ai";
 import { createAnthropicStreamingRunner } from "@directive-run/ai/anthropic";
 import { createOpenAIStreamingRunner } from "@directive-run/ai/openai";
 /**
@@ -24,6 +27,7 @@ import {
   chatbotSystem,
   getEnricher,
   getOrchestrator,
+  getStorage,
   transport,
 } from "./orchestrator-singleton";
 
@@ -49,6 +53,7 @@ interface ChatRequestBody {
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_HISTORY_MESSAGES = 20;
 const ENRICH_TIMEOUT_MS = 5_000;
+const BYOK_MAX_PER_MINUTE = 30;
 
 const ALLOWED_ORIGINS = new Set([
   "https://directive.run",
@@ -56,22 +61,80 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// BYOK Key Validation
+// ---------------------------------------------------------------------------
+
+const BYOK_RATE_MAP = new Map<string, number[]>();
+
+function isValidApiKeyFormat(key: string, provider: string): boolean {
+  if (provider === "openai") {
+    return key.startsWith("sk-");
+  }
+
+  return key.startsWith("sk-ant-");
+}
+
+function isByokRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const windowStart = now - 60_000;
+  let timestamps = BYOK_RATE_MAP.get(ip);
+
+  if (!timestamps) {
+    timestamps = [];
+    BYOK_RATE_MAP.set(ip, timestamps);
+  }
+
+  // Evict expired entries
+  const firstValid = timestamps.findIndex((t) => t >= windowStart);
+  if (firstValid > 0) {
+    timestamps.splice(0, firstValid);
+  } else if (firstValid === -1) {
+    timestamps.length = 0;
+  }
+
+  if (timestamps.length >= BYOK_MAX_PER_MINUTE) {
+    return true;
+  }
+
+  timestamps.push(now);
+
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Query-Intent Classification
 // ---------------------------------------------------------------------------
 
-type QueryIntent = "api" | "conceptual";
+type QueryIntent = "api" | "conceptual" | "pattern" | "debug" | "page-context";
+
+const PAGE_CONTEXT_SIGNAL =
+  /\b(this\s+page|this\s+doc|current\s+page|what.{0,20}page.{0,20}about|explain.{0,20}page|what.{0,10}reading|page.{0,10}cover|summarize\s+this)\b/i;
 
 const API_SIGNAL_PATTERN =
   /\b(function|parameter|return|signature|api|method|createModule|createSystem|createEngine|t\.\w+|type\s+\w+|interface\s+\w+)\b/i;
 
+const PATTERN_SIGNAL =
+  /\b(how\s+(?:to|do|should)|best\s+practice|right\s+way|pattern|recommend|approach|when\s+(?:to|should))\b/i;
+
+const DEBUG_SIGNAL =
+  /\b(not\s+working|error|bug|issue|wrong|fail|broken|unexpected|why\s+(?:does|is|doesn't|won't))\b/i;
+
 /**
- * Classify a user query as "api" (looking for specific function/type details)
- * or "conceptual" (asking about how things work, best practices, etc.).
- * Regex-based, zero-cost at runtime.
+ * Classify a user query into one of five intent buckets.
+ * Regex-based, zero-cost at runtime. Page-context checked first.
  */
 function classifyIntent(msg: string): QueryIntent {
+  if (PAGE_CONTEXT_SIGNAL.test(msg)) {
+    return "page-context";
+  }
   if (API_SIGNAL_PATTERN.test(msg) || /`[^`]+`/.test(msg)) {
     return "api";
+  }
+  if (DEBUG_SIGNAL.test(msg)) {
+    return "debug";
+  }
+  if (PATTERN_SIGNAL.test(msg)) {
+    return "pattern";
   }
 
   return "conceptual";
@@ -180,7 +243,6 @@ export async function POST(request: NextRequest) {
 
   // Track request in Directive module
   const ip = getClientIp(request);
-  chatbotSystem.events.incomingRequest({ ip });
 
   // -------------------------------------------------------------------------
   // Dual-path: BYOK (skip rate limit) vs server key (rate limited)
@@ -189,12 +251,11 @@ export async function POST(request: NextRequest) {
   const clientApiKey = request.headers.get("x-api-key");
   const isByok = Boolean(clientApiKey);
 
-  // Rate limiting only applies to server key usage
+  // Rate limiting only applies to server key usage.
+  // Check BEFORE incrementing so guardrail-rejected messages don't consume a credit.
   const entry = chatbotSystem.facts.requestCounts[ip];
-  const hourlyCount = entry ? entry.count : 0;
-  const hourlyRemaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - hourlyCount);
 
-  if (!isByok && entry && entry.count > MAX_REQUESTS_PER_WINDOW) {
+  if (!isByok && entry && entry.count >= MAX_REQUESTS_PER_WINDOW) {
     return new Response(
       JSON.stringify({
         error:
@@ -262,69 +323,123 @@ export async function POST(request: NextRequest) {
   // Over-fetch top 7 chunks, re-rank with intent-aware boosting, slice to top 5
   const enricher = await getEnricher();
   let enrichedInput = message;
+  const intent = classifyIntent(message);
+
   if (enricher) {
-    const intent = classifyIntent(message);
+    const MAX_PAGE_CHUNKS = 8;
+
     try {
-      const matches = await Promise.race([
-        enricher.retrieve(message, 7),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("RAG retrieval timed out")),
-            ENRICH_TIMEOUT_MS,
+      let contextParts: string[] = [];
+
+      if (intent === "page-context" && safePath) {
+        // Direct URL-based retrieval — skip embedding call entirely
+        const storage = getStorage();
+        if (storage) {
+          const allChunks = await Promise.race([
+            storage.getChunks(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Storage timeout")),
+                ENRICH_TIMEOUT_MS,
+              ),
+            ),
+          ]);
+          const pagePath = safePath.split("#")[0];
+          const pageChunks = allChunks.filter((chunk) => {
+            const url = (chunk.metadata.url as string) ?? "";
+
+            return url.startsWith(pagePath);
+          });
+          const selected = pageChunks.slice(0, MAX_PAGE_CHUNKS);
+
+          contextParts = selected.map((chunk) => {
+            const title = (chunk.metadata.title as string) ?? "";
+            const section = (chunk.metadata.section as string) ?? "";
+            const url = (chunk.metadata.url as string) ?? "";
+            const header =
+              title && section && url
+                ? `[${title} — ${section}](${url})`
+                : title || chunk.id;
+
+            return `${header}\n${chunk.content}`;
+          });
+        }
+      } else {
+        // Semantic retrieval path (existing behavior)
+        const matches = await Promise.race([
+          enricher.retrieve(message, 7),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("RAG retrieval timed out")),
+              ENRICH_TIMEOUT_MS,
+            ),
           ),
-        ),
-      ]);
+        ]);
 
-      // Re-rank: apply source-type boost based on query intent
-      const ranked = matches.map((chunk) => {
-        const meta = chunk.metadata as {
-          sourceType?: string;
-          symbolName?: string;
-          url?: string;
-        };
-        const sourceType = meta.sourceType ?? "guide";
+        // Re-rank: apply source-type boost based on query intent
+        const ranked = matches.map((chunk) => {
+          const meta = chunk.metadata as {
+            sourceType?: string;
+            symbolName?: string;
+            url?: string;
+          };
+          const sourceType = meta.sourceType ?? "guide";
 
-        let boost = 0;
-        if (intent === "api" && sourceType === "api-reference") boost += 0.1;
-        if (intent === "conceptual" && sourceType === "guide") boost += 0.05;
-        if (safePath && meta.url?.startsWith(safePath)) boost += 0.05;
+          let boost = 0;
+          if (intent === "api" && sourceType === "api-reference") boost += 0.1;
+          if (intent === "conceptual" && sourceType === "guide") boost += 0.05;
+          if (intent === "pattern" && sourceType === "knowledge") boost += 0.1;
+          if (intent === "pattern" && sourceType === "guide") boost += 0.05;
+          if (intent === "debug" && sourceType === "knowledge") boost += 0.1;
+          if (intent === "debug" && sourceType === "api-reference")
+            boost += 0.05;
+          if (safePath && meta.url?.startsWith(safePath)) boost += 0.05;
 
-        return { ...chunk, boostedScore: chunk.similarity + boost };
-      });
+          return { ...chunk, boostedScore: chunk.similarity + boost };
+        });
 
-      // Sort by boosted score
-      ranked.sort((a, b) => b.boostedScore - a.boostedScore);
+        // Sort by boosted score
+        ranked.sort((a, b) => b.boostedScore - a.boostedScore);
 
-      // Diversity cap: max 2 chunks per symbolName
-      const symbolCounts = new Map<string, number>();
-      const diverse = ranked.filter((chunk) => {
-        const sym = (chunk.metadata as { symbolName?: string }).symbolName;
-        if (!sym) return true;
-        const count = symbolCounts.get(sym) ?? 0;
-        if (count >= 2) return false;
-        symbolCounts.set(sym, count + 1);
+        // Diversity cap: max 2 chunks per symbolName
+        const symbolCounts = new Map<string, number>();
+        const diverse = ranked.filter((chunk) => {
+          const sym = (chunk.metadata as { symbolName?: string }).symbolName;
+          if (!sym) return true;
+          const count = symbolCounts.get(sym) ?? 0;
+          if (count >= 2) return false;
+          symbolCounts.set(sym, count + 1);
 
-        return true;
-      });
+          return true;
+        });
 
-      // Take top 5
-      const top5 = diverse.slice(0, 5);
+        // Take top 5
+        const top5 = diverse.slice(0, 5);
 
-      // Format into enriched input
-      const contextParts = top5.map((chunk) => {
-        const title = (chunk.metadata.title as string) ?? "";
-        const section = (chunk.metadata.section as string) ?? "";
-        const url = (chunk.metadata.url as string) ?? "";
-        const header =
-          title && section && url
-            ? `[${title} — ${section}](${url})`
-            : title || chunk.id;
+        contextParts = top5.map((chunk) => {
+          const title = (chunk.metadata.title as string) ?? "";
+          const section = (chunk.metadata.section as string) ?? "";
+          const url = (chunk.metadata.url as string) ?? "";
+          const header =
+            title && section && url
+              ? `[${title} — ${section}](${url})`
+              : title || chunk.id;
 
-        return `${header}\n${chunk.content}`;
-      });
+          return `${header}\n${chunk.content}`;
+        });
+      }
 
+      // Assemble enriched input
       const parts: string[] = [];
-      if (safePath) parts.push(`The user is currently viewing: ${safePath}`);
+      if (intent === "page-context" && safePath) {
+        parts.push(
+          `The user is asking about the page they are currently viewing: ${safePath}. ` +
+            `Use the documentation content below to explain what this page covers. ` +
+            `Do not include the URL path in your response title — use the page's actual topic name instead.`,
+        );
+      } else if (safePath) {
+        parts.push(`The user is currently viewing: ${safePath}`);
+      }
       if (contextParts.length > 0) {
         parts.push(
           `Relevant documentation context:\n\n${contextParts.join("\n\n")}`,
@@ -332,10 +447,7 @@ export async function POST(request: NextRequest) {
       }
       if (history.length > 0) {
         const historyBlock = history
-          .map(
-            (m) =>
-              `${m.role.charAt(0).toUpperCase() + m.role.slice(1)}: ${m.content}`,
-          )
+          .map((m) => `[${m.role}] ${m.content}`)
           .join("\n\n");
         parts.push(`Previous conversation:\n${historyBlock}`);
       }
@@ -353,6 +465,49 @@ export async function POST(request: NextRequest) {
   const clientProvider = request.headers.get("x-provider") || "anthropic";
 
   if (isByok) {
+    // M3: Validate key format
+    if (!isValidApiKeyFormat(clientApiKey!, clientProvider)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid API key format." }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // C1: BYOK per-IP rate limit
+    if (isByokRateLimited(ip)) {
+      return new Response(
+        JSON.stringify({
+          error: `Rate limit exceeded (${BYOK_MAX_PER_MINUTE} requests/min). Please slow down.`,
+        }),
+        { status: 429, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // C1: Run prompt-injection guardrail on BYOK path too
+    const injectionGuardrail = createPromptInjectionGuardrail({
+      strictMode: false,
+    });
+    const guardResult = injectionGuardrail(
+      { input: enrichedInput, agentName: "directive-docs-qa" },
+      { agentName: "directive-docs-qa", input: enrichedInput, facts: {} },
+    );
+    const resolved =
+      guardResult instanceof Promise ? await guardResult : guardResult;
+    if (resolved && typeof resolved === "object" && "passed" in resolved) {
+      if (!resolved.passed) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Your message was flagged by our safety filter. Please rephrase your question.",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    // Track request only after guardrail passes (don't consume credit on rejection)
+    chatbotSystem.events.incomingRequest({ ip });
+
     // User-provided key: create a one-shot streaming runner (no budget/rate-limit tracking)
     const callbackRunner =
       clientProvider === "openai"
@@ -402,10 +557,12 @@ export async function POST(request: NextRequest) {
 
           await result;
           send({ type: "done" });
-        } catch (err) {
+        } catch (_err) {
+          // M3: Sanitize error messages — never leak raw API errors to client
           send({
             type: "error",
-            message: err instanceof Error ? err.message : "Stream failed",
+            message:
+              "An error occurred while processing your request. Please check your API key and try again.",
           });
         } finally {
           try {
@@ -439,6 +596,35 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Run prompt-injection guardrail BEFORE counting the request so blocked
+  // messages don't consume the user's hourly allowance.
+  const injectionGuardrail = createPromptInjectionGuardrail({
+    strictMode: false,
+  });
+  const guardResult = injectionGuardrail(
+    { input: enrichedInput, agentName: "directive-docs-qa" },
+    { agentName: "directive-docs-qa", input: enrichedInput, facts: {} },
+  );
+  const resolved =
+    guardResult instanceof Promise ? await guardResult : guardResult;
+  if (resolved && typeof resolved === "object" && "passed" in resolved) {
+    if (!resolved.passed) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Your message was flagged by our safety filter. Please rephrase your question.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  }
+
+  // Track request only after guardrail passes (don't consume credit on rejection)
+  chatbotSystem.events.incomingRequest({ ip });
+  const updatedEntry = chatbotSystem.facts.requestCounts[ip];
+  const hourlyCount = updatedEntry ? updatedEntry.count : 0;
+  const hourlyRemaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - hourlyCount);
+
   // Stream via SSE transport (propagate request abort signal)
   const sseResponse = transport.toResponse(
     instance.streamable,
@@ -462,4 +648,23 @@ export async function POST(request: NextRequest) {
   }
 
   return sseResponse;
+}
+
+// ---------------------------------------------------------------------------
+// CORS Preflight (M5)
+// ---------------------------------------------------------------------------
+
+export function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, x-api-key, x-provider",
+    "Access-Control-Max-Age": "86400",
+  };
+
+  if (origin && isAllowedOrigin(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return new Response(null, { status: 204, headers });
 }

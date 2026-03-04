@@ -160,9 +160,14 @@ export interface AgentMemory {
 const APPROX_CHARS_PER_TOKEN = 4;
 
 /**
- * Estimate token count for a message.
- * Uses a simple heuristic: ~4 characters per token.
- * For more accurate counts, use a tokenizer like tiktoken.
+ * Estimate the token count for a single message.
+ *
+ * Uses a simple heuristic (~4 characters per token) by default.
+ * For more accurate counts, pass a custom tokenizer function.
+ *
+ * @param message - The message to estimate tokens for.
+ * @param tokenizer - Optional custom tokenizer function (e.g., tiktoken).
+ * @returns The estimated number of tokens.
  *
  * @example
  * ```typescript
@@ -190,7 +195,11 @@ export function estimateTokens(
 }
 
 /**
- * Estimate total tokens for an array of messages.
+ * Estimate the total token count for an array of messages.
+ *
+ * @param messages - The messages to estimate tokens for.
+ * @param tokenizer - Optional custom tokenizer function.
+ * @returns The total estimated token count across all messages.
  */
 export function estimateTotalTokens(
   messages: Message[],
@@ -204,9 +213,13 @@ export function estimateTotalTokens(
 // ============================================================================
 
 /**
- * Create a sliding window memory strategy.
+ * Create a sliding window memory strategy that keeps the most recent N messages.
  *
- * Keeps the most recent N messages, moving older ones to summarization.
+ * Messages beyond `maxMessages` are moved to the summarization queue.
+ * The most recent `preserveRecentCount` messages are always kept.
+ *
+ * @param defaultConfig - Default strategy configuration (can be overridden per-call).
+ * @returns A {@link MemoryStrategy} function.
  *
  * @example
  * ```typescript
@@ -215,6 +228,7 @@ export function estimateTotalTokens(
  *   preserveRecentCount: 10,
  * });
  * ```
+ * @public
  */
 export function createSlidingWindowStrategy(
   defaultConfig: MemoryStrategyConfig = {},
@@ -252,9 +266,13 @@ export function createSlidingWindowStrategy(
 }
 
 /**
- * Create a token-based memory strategy.
+ * Create a token-based memory strategy that keeps messages until a token limit is reached.
  *
- * Keeps messages until a token limit is reached, then moves older ones to summarization.
+ * Adds messages from newest to oldest until `maxTokens` would be exceeded,
+ * then moves the remaining older messages to the summarization queue.
+ *
+ * @param defaultConfig - Default strategy configuration (can be overridden per-call).
+ * @returns A {@link MemoryStrategy} function.
  *
  * @example
  * ```typescript
@@ -263,6 +281,7 @@ export function createSlidingWindowStrategy(
  *   preserveRecentCount: 5,
  * });
  * ```
+ * @public
  */
 export function createTokenBasedStrategy(
   defaultConfig: MemoryStrategyConfig = {},
@@ -313,6 +332,12 @@ export function createTokenBasedStrategy(
 /**
  * Create a hybrid strategy that combines message count and token limits.
  *
+ * Applies both {@link createSlidingWindowStrategy} and {@link createTokenBasedStrategy},
+ * then uses whichever result keeps fewer messages (the more restrictive outcome).
+ *
+ * @param defaultConfig - Default strategy configuration (can be overridden per-call).
+ * @returns A {@link MemoryStrategy} function.
+ *
  * @example
  * ```typescript
  * const strategy = createHybridStrategy({
@@ -321,6 +346,7 @@ export function createTokenBasedStrategy(
  *   preserveRecentCount: 5,
  * });
  * ```
+ * @public
  */
 export function createHybridStrategy(
   defaultConfig: MemoryStrategyConfig = {},
@@ -348,7 +374,14 @@ export function createHybridStrategy(
 // ============================================================================
 
 /**
- * Create an agent memory instance.
+ * Create an agent memory instance for managing conversation history.
+ *
+ * Provides sliding window management, automatic summarization of older messages,
+ * and import/export for persistence. Pass the returned instance to an orchestrator's
+ * `memory` option to auto-inject context and auto-store results.
+ *
+ * @param config - Memory configuration including strategy, optional summarizer, and auto-manage settings.
+ * @returns An {@link AgentMemory} instance with `addMessage`, `getContextMessages`, `manage`, and `export`/`import` APIs.
  *
  * @example
  * ```typescript
@@ -367,6 +400,7 @@ export function createHybridStrategy(
  *   autoManage: true,
  * });
  * ```
+ * @public
  */
 export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
   const {
@@ -569,8 +603,14 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
 // ============================================================================
 
 /**
- * Create a simple truncation "summarizer" that just returns key points.
- * Useful for testing or when LLM summarization isn't needed.
+ * Create a simple truncation summarizer that clips messages to a maximum length.
+ *
+ * Useful for testing or when LLM-based summarization is not needed.
+ * Concatenates non-system messages with role prefixes and truncates to `maxLength`.
+ *
+ * @param maxLength - Maximum character length of the summary (default: 500).
+ * @returns A {@link MessageSummarizer} function.
+ * @public
  */
 export function createTruncationSummarizer(maxLength = 500): MessageSummarizer {
   return async (messages: Message[]) => {
@@ -592,7 +632,12 @@ export function createTruncationSummarizer(maxLength = 500): MessageSummarizer {
 }
 
 /**
- * Create a summarizer that extracts only user questions and key assistant answers.
+ * Create a summarizer that extracts user questions from messages.
+ *
+ * Scans for sentences ending with `?` in user messages and lists them as key topics.
+ *
+ * @returns A {@link MessageSummarizer} function.
+ * @public
  */
 export function createKeyPointsSummarizer(): MessageSummarizer {
   return async (messages: Message[]) => {
@@ -621,8 +666,14 @@ export function createKeyPointsSummarizer(): MessageSummarizer {
 }
 
 /**
- * Create a summarizer factory for LLM-based summarization.
- * You provide the LLM call function, this handles the prompt.
+ * Create a summarizer that delegates to an LLM for conversation compression.
+ *
+ * You provide the LLM call function; this handles prompt construction
+ * including length limits and key-fact preservation instructions.
+ *
+ * @param llmCall - Async function that sends a prompt to an LLM and returns the response text.
+ * @param options - Optional `maxSummaryLength` and `preserveKeyFacts` settings.
+ * @returns A {@link MessageSummarizer} function.
  *
  * @example
  * ```typescript
@@ -634,6 +685,7 @@ export function createKeyPointsSummarizer(): MessageSummarizer {
  *   return response.choices[0].message.content ?? '';
  * });
  * ```
+ * @public
  */
 export function createLLMSummarizer(
   llmCall: (prompt: string) => Promise<string>,

@@ -32,7 +32,7 @@
   ```ts
   function createDerivationsManager(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D>
   ```
-- `createDisabledTimeTravel` — Create a no-op time-travel manager used when `debug.timeTravel` is
+- `createDisabledTimeTravel` — Create a no-op time-travel manager for use when `debug.timeTravel` is disabled.
   ```ts
   function createDisabledTimeTravel(): TimeTravelManager<S>
   ```
@@ -68,7 +68,7 @@
   ```ts
   export function createModuleFactory<const M extends ModuleSchema>(
   ```
-- `createPluginManager` — Create a manager that broadcasts lifecycle events to registered plugins.
+- `createPluginManager` — Create a {@link PluginManager} that broadcasts lifecycle events to registered plugins.
   ```ts
   function createPluginManager(): PluginManager<S>
   ```
@@ -87,12 +87,12 @@
   ```ts
   function createSystemWithStatus(options: CreateSystemWithStatusOptions<M>): SystemWithStatus<M>
   ```
-- `createTimeTravelManager` — Create a snapshot-based time-travel debugger with a ring buffer of state
+- `createTimeTravelManager` — Create a snapshot-based time-travel debugger backed by a ring buffer.
   ```ts
   function createTimeTravelManager(options: CreateTimeTravelOptions<S>): TimeTravelManager<S>
   ```
 - `diffSnapshots` — Compare two distributable snapshots and return the differences.
-- `forType` — Create a type guard for resolver `requirement` predicate.
+- `forType` — Create a type-guard function suitable for a resolver's `requirement`
   ```ts
   export function forType<R extends Requirement>(
   ```
@@ -104,7 +104,7 @@
   ```ts
   function generateModuleCode(structure: DirectiveModuleStructure): string
   ```
-- `generateRequirementId` — Generate a stable ID for a requirement.
+- `generateRequirementId` — Generate a stable identity string for a requirement.
   ```ts
   function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
   ```
@@ -116,7 +116,7 @@
   ```ts
   function isNamespacedSystem(system: AnySystem): boolean
   ```
-- `isRequirementType` — Check if a requirement matches a type.
+- `isRequirementType` — Type-narrowing guard that checks whether a requirement's `type` matches the
   ```ts
   function isRequirementType(req: Requirement, type: T): boolean
   ```
@@ -136,11 +136,11 @@
   ```ts
   function isTracking(): boolean
   ```
-- `module` — Create a new module builder.
+- `module` — Create a new module using the fluent builder pattern.
   ```ts
   function module(id: string): ModuleBuilder<ModuleSchema>
   ```
-- `req` — Helper to create typed requirements with a fluent API.
+- `req` — Create a typed requirement factory for a given requirement type string.
   ```ts
   function req(type: T): <P extends Record<string, unknown>>(props: P) => Requirement & { type: T; } & P
   ```
@@ -153,7 +153,7 @@
   ```ts
   function signSnapshot(snapshot: DistributableSnapshotLike<T>, secret: string | Uint8Array): Promise<SignedSnapshot<T>>
   ```
-- `system` — Create a system using the fluent builder pattern.
+- `system` — Create a Directive system using the fluent builder pattern.
   ```ts
   function system(): SystemBuilderStart
   ```
@@ -196,7 +196,7 @@
   ```ts
   class DirectiveError
   ```
-- `RequirementSet` — A set of requirements with automatic deduplication by ID.
+- `RequirementSet` — A deduplicated collection of {@link RequirementWithId} entries keyed by
   ```ts
   class RequirementSet
   ```
@@ -295,11 +295,11 @@
   ```ts
   export interface FactsStore<S extends Schema = Schema>
   ```
-- `InflightInfo` — Inflight resolver info
+- `InflightInfo` — Summary of a resolver that is currently in flight.
   ```ts
   export interface InflightInfo {
   ```
-- `ModuleBuilder` — Module builder interface - provides fluent API for building modules.
+- `ModuleBuilder` — Fluent builder interface for constructing {@link ModuleDef} instances step by step.
   ```ts
   export interface ModuleBuilder<M extends ModuleSchema = ModuleSchema> {
   ```
@@ -327,11 +327,11 @@
   ```ts
   export interface NamespacedSystem<Modules extends ModulesMap> {
   ```
-- `NamespacedSystemBuilder` — Builder for namespaced multi-module system
+- `NamespacedSystemBuilder` — Builder for a namespaced multi-module system.
   ```ts
   export interface NamespacedSystemBuilder<Modules extends ModulesMap> {
   ```
-- `PendingRetry` — Pending retry entry.
+- `PendingRetry` — A queued retry entry tracking its source, attempt count, and scheduled time.
   ```ts
   export interface PendingRetry {
   ```
@@ -391,7 +391,7 @@
   ```ts
   export interface SingleModuleSystem<S extends ModuleSchema> {
   ```
-- `SingleModuleSystemBuilder` — Builder for single-module system
+- `SingleModuleSystemBuilder` — Builder for a single-module system with direct access to facts, derivations, and events.
   ```ts
   export interface SingleModuleSystemBuilder<S extends ModuleSchema> {
   ```
@@ -411,7 +411,7 @@
   ```ts
   export interface SnapshotMeta {
   ```
-- `SystemBuilderStart` — Initial builder — must choose .module() or .modules()
+- `SystemBuilderStart` — Entry point of the system builder, returned by {@link system}.
   ```ts
   export interface SystemBuilderStart {
   ```
@@ -457,7 +457,7 @@
   ```
 - `TypedResolverDef` — Typed resolver definition for a specific requirement type.
   ```ts
-  export interface TypedResolverDef<M extends ModuleSchema, T extends keyof GetRequirementsSchema<M> & string> {
+  export interface TypedResolverDef<
   ```
 - `WhenBuilder` — Result from when() — must call .require()
   ```ts
@@ -512,11 +512,11 @@
   ```
 - `DerivationKeys` — Derivation keys from module schema.
   ```ts
-  export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] & string;
+  export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] &
   ```
 - `DerivationReturnType` — Get derivation return type from module schema.
   ```ts
-  export type DerivationReturnType<M extends ModuleSchema, K extends keyof M["derivations"]> =
+  export type DerivationReturnType<
   ```
 - `DerivationsDef` — Map of derivation definitions.
   ```ts
@@ -548,7 +548,7 @@
   ```
 - `ErrorSource` — Error source types
   ```ts
-  export type ErrorSource = "constraint" | "resolver" | "effect" | "derivation" | "system";
+  export type ErrorSource =
   ```
 - `EventPayloadSchema` — Event payload schema - maps property names to their types.
   ```ts
@@ -556,7 +556,7 @@
   ```
 - `EventsAccessor` — Events accessor from module schema.
   ```ts
-  export type EventsAccessor<M extends ModuleSchema> = EventsAccessorFromSchema<M>;
+  export type EventsAccessor<M extends ModuleSchema> =
   ```
 - `EventsAccessorFromSchema` — Events accessor type from a module schema.
   ```ts
@@ -564,7 +564,7 @@
   ```
 - `EventsDef` — Events definition - accepts any event handler signature
   ```ts
-  export type EventsDef<S extends Schema> = Record<string, FlexibleEventHandler<S>>;
+  export type EventsDef<S extends Schema> = Record<
   ```
 - `EventsSchema` — Events schema - maps event names to their payload schemas.
   ```ts
@@ -576,7 +576,7 @@
   ```
 - `FactReturnType` — Get fact return type from module schema.
   ```ts
-  export type FactReturnType<M extends ModuleSchema, K extends keyof M["facts"]> =
+  export type FactReturnType<
   ```
 - `Facts` — Proxy-based facts accessor (cleaner API)
   ```ts
@@ -604,7 +604,7 @@
   ```
 - `InferRequirementPayloadFromSchema` — Infer requirement payload type from a requirement payload schema.
   ```ts
-  export type InferRequirementPayloadFromSchema<P extends RequirementPayloadSchema> = {
+  export type InferRequirementPayloadFromSchema<
   ```
 - `InferRequirements` — Infer all requirements from a module schema as a discriminated union.
   ```ts
@@ -612,7 +612,7 @@
   ```
 - `InferRequirementTypes` — Infer requirement type names from a module schema.
   ```ts
-  export type InferRequirementTypes<M extends ModuleSchema> = keyof GetRequirements<M> & string;
+  export type InferRequirementTypes<M extends ModuleSchema> =
   ```
 - `InferSchema` — Extract the TypeScript type from a schema (removes readonly from const type params)
   ```ts
@@ -620,11 +620,11 @@
   ```
 - `InferSchemaType` — Infer a single type from a SchemaType, Zod schema, or plain type.
   ```ts
-  export type InferSchemaType<T> =
+  export type InferSchemaType<T> = T extends SchemaType<infer U>
   ```
 - `InferSelectorState` — Combined facts + derivations — matches the useSelector proxy at runtime.
   ```ts
-  export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> & InferDerivations<M>;
+  export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> &
   ```
 - `ModulesMap` — Map of module name to module definition (object form).
   ```ts
@@ -648,11 +648,11 @@
   ```
 - `ObservableKeys` — All observable keys (facts + derivations) from module schema.
   ```ts
-  export type ObservableKeys<M extends ModuleSchema> = FactKeys<M> | DerivationKeys<M>;
+  export type ObservableKeys<M extends ModuleSchema> =
   ```
 - `RecoveryStrategy` — Recovery strategy for errors
   ```ts
-  export type RecoveryStrategy = "skip" | "retry" | "retry-later" | "disable" | "throw";
+  export type RecoveryStrategy =
   ```
 - `RequirementKeyFn` — Requirement key function for custom deduplication
   ```ts
@@ -664,7 +664,7 @@
   ```
 - `RequirementPayloadSchema` — Requirement payload schema - maps property names to their types.
   ```ts
-  export type RequirementPayloadSchema = Record<string, SchemaType<unknown> | unknown>;
+  export type RequirementPayloadSchema = Record<
   ```
 - `RequirementsSchema` — Requirements schema definition - maps requirement type names to their payload schemas.
   ```ts
@@ -688,7 +688,7 @@
   ```
 - `TypedConstraintsDef` — Typed constraints definition using the module schema.
   ```ts
-  export type TypedConstraintsDef<M extends ModuleSchema> = Record<string, TypedConstraintDef<M>>;
+  export type TypedConstraintsDef<M extends ModuleSchema> = Record<
   ```
 - `TypedDerivationsDef` — Typed derivations definition using the module schema.
   ```ts
@@ -700,7 +700,7 @@
   ```
 - `TypedResolversDef` — Typed resolvers definition using the module schema.
   ```ts
-  export type TypedResolversDef<M extends ModuleSchema> = Record<string, AnyTypedResolverDef<M>>;
+  export type TypedResolversDef<M extends ModuleSchema> = Record<
   ```
 - `UnionEvents` — Union of all module events (not namespaced).
   ```ts
@@ -731,11 +731,11 @@
   ```ts
   function adaptOutputGuardrail(name: string, guardrail: GuardrailFn<OutputGuardrailData>, options: {
   ```
-- `aggregateTokens` — Aggregate token counts from results.
+- `aggregateTokens` — Sum the total token counts from an array of run results.
   ```ts
   function aggregateTokens(results: RunResult<unknown>[]): number
   ```
-- `allReadyStrategy` — Selection strategy: run all ready agents (default).
+- `allReadyStrategy` — Create a selection strategy that runs all ready agents concurrently.
   ```ts
   function allReadyStrategy(): AgentSelectionStrategy
   ```
@@ -751,8 +751,8 @@
   ```ts
   function byPattern(pattern: RegExp, model: string): ModelRule
   ```
-- `capabilityRoute` — Create a constraint that auto-routes to an agent based on capabilities.
-- `collectOutputs` — Merge results into an array of outputs.
+- `capabilityRoute` — Create a constraint that auto-routes to an agent based on required capabilities.
+- `collectOutputs` — Extract the `output` value from each run result into an array.
   ```ts
   function collectOutputs(results: RunResult<T>[]): T[]
   ```
@@ -761,19 +761,19 @@
   function collectTokens(stream: AsyncIterable<StreamChunk>): Promise<string>
   ```
 - `combineStreamingGuardrails` — Combine multiple streaming guardrails into one.
-- `composePatterns` — Compose multiple patterns into a pipeline where each pattern's
-- `concatResults` — Merge results by concatenating outputs.
+- `composePatterns` — Compose multiple execution patterns into a pipeline where each pattern's
+- `concatResults` — Merge run results by concatenating their outputs into a single string.
   ```ts
   function concatResults(results: RunResult<unknown>[], separator = "\n\n"): string
   ```
 - `connectDevTools` — Connect DevTools to an orchestrator instance.
 - `convertToolsForLLM` — Convert MCP tools to a format suitable for LLM tool calling.
-- `costEfficientStrategy` — Selection strategy: prefer agents that consume fewer tokens per satisfaction delta.
+- `costEfficientStrategy` — Create a selection strategy that prefers agents with lower token cost per satisfaction delta.
   ```ts
   function costEfficientStrategy(): AgentSelectionStrategy
   ```
 - `createAgentAuditHandlers` — Create audit event handlers for agent orchestrator integration.
-- `createAgentMemory` — Create an agent memory instance.
+- `createAgentMemory` — Create an agent memory instance for managing conversation history.
   ```ts
   function createAgentMemory(config: AgentMemoryConfig): AgentMemory
   ```
@@ -785,7 +785,7 @@
   ```ts
   function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork
   ```
-- `createAgentOrchestrator` — Create a constraint-driven agent orchestrator.
+- `createAgentOrchestrator` — Create a constraint-driven agent orchestrator backed by a Directive System.
   ```ts
   function createAgentOrchestrator(options: OrchestratorOptions<F>): AgentOrchestrator<F>
   ```
@@ -826,7 +826,7 @@
   ```ts
   function createConstraintRouter(config: ConstraintRouterConfig): ConstraintRouterRunner
   ```
-- `createContentFilterGuardrail` — Create a content filter guardrail that blocks output matching specific patterns.
+- `createContentFilterGuardrail` — Create an output guardrail that blocks content matching any of the provided patterns.
   ```ts
   function createContentFilterGuardrail(options: {
   ```
@@ -872,11 +872,11 @@
   ```ts
   function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage
   ```
-- `createKeyPointsSummarizer` — Create a summarizer that extracts only user questions and key assistant answers.
+- `createKeyPointsSummarizer` — Create a summarizer that extracts user questions from messages.
   ```ts
   function createKeyPointsSummarizer(): MessageSummarizer
   ```
-- `createLengthGuardrail` — Create a length guardrail that limits output size.
+- `createLengthGuardrail` — Create an output guardrail that enforces maximum length constraints on agent output,
   ```ts
   function createLengthGuardrail(options: {
   ```
@@ -884,7 +884,7 @@
   ```ts
   function createLengthStreamingGuardrail(options: {
   ```
-- `createLLMSummarizer` — Create a summarizer factory for LLM-based summarization.
+- `createLLMSummarizer` — Create a summarizer that delegates to an LLM for conversation compression.
   ```ts
   function createLLMSummarizer(llmCall: (prompt: string) => Promise<string>, options: {
   ```
@@ -896,7 +896,7 @@
   ```ts
   function createMessageBus(config: MessageBusConfig = {}): MessageBus
   ```
-- `createModerationGuardrail` — Create a content moderation guardrail.
+- `createModerationGuardrail` — Create a content moderation guardrail that delegates to a user-supplied check function.
   ```ts
   function createModerationGuardrail(options: {
   ```
@@ -920,11 +920,11 @@
   ```ts
   function createOutputPIIGuardrail(options: EnhancedPIIGuardrailOptions = {}): GuardrailFn<OutputGuardrailData>
   ```
-- `createOutputSchemaGuardrail` — Create an output schema validation guardrail.
+- `createOutputSchemaGuardrail` — Create an output guardrail that validates agent output against a schema using
   ```ts
   function createOutputSchemaGuardrail(options: {
   ```
-- `createOutputTypeGuardrail` — Create a simple type check guardrail for common output types.
+- `createOutputTypeGuardrail` — Create an output guardrail that performs lightweight runtime type checks without
   ```ts
   function createOutputTypeGuardrail(options: {
   ```
@@ -932,7 +932,7 @@
   ```ts
   function createPatternStreamingGuardrail(options: {
   ```
-- `createPIIGuardrail` — Create a PII detection guardrail.
+- `createPIIGuardrail` — Create a PII detection guardrail that scans input text for personally identifiable
   ```ts
   function createPIIGuardrail(options: {
   ```
@@ -945,12 +945,12 @@
   ```ts
   function createRAGEnricher(config: RAGEnricherConfig): RAGEnricher
   ```
-- `createRateLimitGuardrail` — Create a rate limit guardrail based on token usage.
+- `createRateLimitGuardrail` — Create a rate limit guardrail that tracks token and request counts over a sliding
   ```ts
   function createRateLimitGuardrail(options: {
   ```
 - `createResponder` — Create a request-response helper for handling incoming requests.
-- `createRunner` — Create an AgentRunner from buildRequest/parseResponse helpers.
+- `createRunner` — Create an {@link AgentRunner} from `buildRequest`/`parseResponse` helpers, reducing
   ```ts
   function createRunner(options: CreateRunnerOptions): AgentRunner
   ```
@@ -962,7 +962,7 @@
   ```ts
   function createSemanticCacheGuardrail(config: {
   ```
-- `createSlidingWindowStrategy` — Create a sliding window memory strategy.
+- `createSlidingWindowStrategy` — Create a sliding window memory strategy that keeps the most recent N messages.
   ```ts
   function createSlidingWindowStrategy(defaultConfig: MemoryStrategyConfig = {}): MemoryStrategy
   ```
@@ -982,11 +982,11 @@
   ```ts
   function createTestEmbedder(dimensions = 128): EmbedderFn
   ```
-- `createTokenBasedStrategy` — Create a token-based memory strategy.
+- `createTokenBasedStrategy` — Create a token-based memory strategy that keeps messages until a token limit is reached.
   ```ts
   function createTokenBasedStrategy(defaultConfig: MemoryStrategyConfig = {}): MemoryStrategy
   ```
-- `createToolGuardrail` — Create a tool allowlist/denylist guardrail.
+- `createToolGuardrail` — Create a tool-call guardrail that restricts which tools an agent may invoke.
   ```ts
   function createToolGuardrail(options: {
   ```
@@ -994,7 +994,7 @@
   ```ts
   function createToxicityStreamingGuardrail(options: {
   ```
-- `createTruncationSummarizer` — Create a simple truncation "summarizer" that just returns key points.
+- `createTruncationSummarizer` — Create a simple truncation summarizer that clips messages to a maximum length.
   ```ts
   function createTruncationSummarizer(maxLength = 500): MessageSummarizer
   ```
@@ -1010,7 +1010,7 @@
   ```ts
   function createWsTransport(config: WsTransportConfig = {}): Promise<DevToolsTransport>
   ```
-- `dag` — Create a DAG execution pattern.
+- `dag` — Create a directed acyclic graph (DAG) execution pattern.
   ```ts
   function dag(nodes: Record<string, DagNode>, merge?: (context: DagExecutionContext) => T | Promise<T>, options?: {
   ```
@@ -1027,11 +1027,11 @@
   function detectPII(text: string, options: {
   ```
 - `detectPromptInjection` — Detect prompt injection patterns in text.
-- `diffCheckpoints` — Compute the diff between two checkpoint states
+- `diffCheckpoints` — Compute the diff between two checkpoint states of the same pattern type.
   ```ts
   function diffCheckpoints(a: PatternCheckpointState, b: PatternCheckpointState): CheckpointDiff
   ```
-- `estimateCost` — Get total cost estimate based on token usage.
+- `estimateCost` — Estimate the dollar cost of an agent run based on total token usage.
   ```ts
   function estimateCost(tokenUsage: number, ratePerMillionTokens: number): number
   ```
@@ -1051,9 +1051,17 @@
   ```ts
   function evalFaithfulness(options: EvalSemanticOptions): EvalCriterion
   ```
+- `evalJudge` — Evaluate output quality by delegating to a judge agent that scores from 0.0 to 1.0.
+  ```ts
+  function evalJudge(options: EvalJudgeOptions): EvalCriterion
+  ```
 - `evalLatency` — Evaluate latency — scores based on agent run duration.
   ```ts
   function evalLatency(options: EvalLatencyOptions): EvalCriterion
+  ```
+- `evalMatch` — Evaluate exact or substring match against expected output.
+  ```ts
+  function evalMatch(options: EvalMatchOptions = {}): EvalCriterion
   ```
 - `evalOutputLength` — Evaluate output length — ensures output is within an acceptable range.
   ```ts
@@ -1080,12 +1088,12 @@
   function extractJsonFromOutput(output: string): unknown
   ```
 - `filterStream` — Filter stream chunks by type.
-- `findAgentsByCapability` — Create a capability-based agent selector.
+- `findAgentsByCapability` — Find agents in a registry that match all required capabilities.
   ```ts
   function findAgentsByCapability(registry: AgentRegistry, requiredCapabilities: string[]): string[]
   ```
 - `forkFromCheckpoint` — Fork an orchestrator from a checkpoint — creates a new independent orchestrator
-- `getCheckpointProgress` — Compute progress from a pattern checkpoint state
+- `getCheckpointProgress` — Compute progress metrics from a pattern checkpoint state.
   ```ts
   function getCheckpointProgress(state: PatternCheckpointState): CheckpointProgress
   ```
@@ -1093,23 +1101,23 @@
   ```ts
   function getDependencyGraph(agents: Record<string, GoalAgentDeclaration>): GoalDependencyGraph
   ```
-- `getPatternStep` — Get the current step/round/iteration count from a pattern checkpoint state
+- `getPatternStep` — Get the current step/round/iteration count from a pattern checkpoint state.
   ```ts
   function getPatternStep(state: PatternCheckpointState): number
   ```
-- `goal` — Create a goal execution pattern.
+- `goal` — Create a goal-driven execution pattern where agents are selected and run
   ```ts
   function goal(nodes: Record<string, GoalNode>, when: (facts: Record<string, unknown>) => boolean, options?: {
   ```
-- `hasPendingApprovals` — Check if there are pending approvals.
+- `hasPendingApprovals` — Check whether there are tool-call approvals waiting for user confirmation.
   ```ts
   function hasPendingApprovals(state: ApprovalState): boolean
   ```
-- `highestImpactStrategy` — Selection strategy: pick agents with the highest historical impact.
+- `highestImpactStrategy` — Create a selection strategy that picks agents with the highest historical impact.
   ```ts
-  function highestImpactStrategy(opts?: { topN?: number }): AgentSelectionStrategy
+  function highestImpactStrategy(opts?: {
   ```
-- `isAgentRunning` — Check if agent is currently running.
+- `isAgentRunning` — Check whether an agent is currently executing a run.
   ```ts
   function isAgentRunning(state: AgentState): boolean
   ```
@@ -1146,7 +1154,11 @@
   ```ts
   function mergeStreams(...sources: AsyncIterable<T>[]): AsyncIterable<T>
   ```
-- `parallel` — Create a parallel pattern configuration.
+- `mergeTaggedStreams` — Merge multiple tagged async iterables into a single multiplexed stream.
+  ```ts
+  function mergeTaggedStreams(sources: TaggedSource[]): MergedTaggedStreamResult
+  ```
+- `parallel` — Create a parallel execution pattern that runs handlers concurrently and merges results.
 - `parseHttpStatus` — Extract HTTP status code from error message or error properties.
   ```ts
   function parseHttpStatus(error: Error): number | null
@@ -1155,7 +1167,7 @@
   ```ts
   function parseRetryAfter(error: Error): number | null
   ```
-- `patternFromJSON` — Restore an execution pattern from its serialized form.
+- `patternFromJSON` — Restore an execution pattern from its serialized JSON form.
   ```ts
   function patternFromJSON(json: SerializedPattern, overrides?: Partial<ExecutionPattern<T>>): ExecutionPattern<T>
   ```
@@ -1167,7 +1179,7 @@
   ```ts
   function patternToMermaid(pattern: ExecutionPattern<unknown> | SerializedPattern, options?: MermaidOptions): string
   ```
-- `pickBestResult` — Merge results by picking the best one based on a scoring function.
+- `pickBestResult` — Pick the highest-scoring result from an array using a scoring function.
   ```ts
   function pickBestResult(results: RunResult<T>[], score: (result: RunResult<T>) => number): RunResult<T>
   ```
@@ -1177,7 +1189,7 @@
   ```
 - `pipeThrough` — Pipe one stream channel through a transform function into another.
 - `planGoal` — Dry-run goal execution to preview the plan without running agents.
-- `race` — Create a race pattern configuration.
+- `race` — Create a race pattern that runs handlers concurrently and returns the first successful result.
   ```ts
   function race(handlers: string[], options?: {
   ```
@@ -1185,35 +1197,35 @@
   ```ts
   function redactPII(text: string, items: DetectedPII[], style: RedactionStyle = "typed"): string
   ```
-- `reflect` — Create a reflect pattern configuration.
+- `reflect` — Create a reflect pattern that iterates between a producer and evaluator until quality is met.
   ```ts
   function reflect(handler: string, evaluator: string, options?: {
   ```
-- `runAgentRequirement` — Create a RUN_AGENT requirement.
+- `runAgentRequirement` — Create a `RUN_AGENT` requirement object for use in constraint `require()` functions.
   ```ts
   function runAgentRequirement(agent: string, input: string, context?: Record<string, unknown>): RunAgentRequirement
   ```
-- `runDebate` — Run a debate imperatively on an orchestrator (no pattern registration needed).
+- `runDebate` — Run a debate imperatively on an orchestrator without pattern registration.
 - `sanitizeInjection` — Sanitize text by removing detected injection patterns.
   ```ts
   function sanitizeInjection(text: string, patterns: InjectionPattern[] = DEFAULT_INJECTION_PATTERNS): string
   ```
-- `selectAgent` — Create an agent selection constraint.
-- `sequential` — Create a sequential pattern configuration.
+- `selectAgent` — Create a constraint that routes to a specific agent when a condition is met.
+- `sequential` — Create a sequential execution pattern that pipes output from one handler to the next.
   ```ts
   function sequential(handlers: string[], options?: {
   ```
-- `spawnOnCondition` — Create a constraint that auto-runs an agent when a condition is met.
+- `spawnOnCondition` — Create a constraint that auto-runs a single agent when a condition is met.
   ```ts
   function spawnOnCondition(config: {
   ```
 - `spawnPool` — Create a constraint that spawns a pool of agent instances when a condition is met.
-- `supervisor` — Create a supervisor pattern configuration.
+- `supervisor` — Create a supervisor pattern where a coordinating agent delegates work to a pool of workers.
   ```ts
   function supervisor(supervisorAgent: string, workers: string[], options?: {
   ```
 - `tapStream` — Tap into a stream without consuming it.
-- `validateBaseURL` — Validate that a baseURL uses http or https.
+- `validateBaseURL` — Validate that a base URL uses the `http:` or `https:` protocol.
   ```ts
   function validateBaseURL(baseURL: string): void
   ```
@@ -1997,7 +2009,7 @@
   ```
 - `OrchestratorResolverContext` — Resolver context for orchestrator
   ```ts
-  export interface OrchestratorResolverContext<F extends Record<string, unknown>> {
+  export interface OrchestratorResolverContext<
   ```
 - `OrchestratorState` — Combined orchestrator state
   ```ts
@@ -2221,7 +2233,7 @@
   ```
 - `Scratchpad` — Shared scratchpad interface for multi-agent collaboration
   ```ts
-  export interface Scratchpad<T extends Record<string, unknown> = Record<string, unknown>> {
+  export interface Scratchpad<
   ```
 - `ScratchpadUpdateEvent` — Scratchpad update event
   ```ts
@@ -2416,15 +2428,15 @@
   ```
 - `ConstraintRouterRunner` — Helper type for accessing router facts.
   ```ts
-  export type ConstraintRouterRunner = AgentRunner & { readonly facts: RoutingFacts };
+  export type ConstraintRouterRunner = AgentRunner & {
   ```
 - `CrossAgentDerivationFn` — Function that computes a derived value from a cross-agent snapshot
   ```ts
-  export type CrossAgentDerivationFn<T = unknown> = (snapshot: CrossAgentSnapshot) => T;
+  export type CrossAgentDerivationFn<T = unknown> = (
   ```
 - `DagNodeStatus` — Status of a DAG node during execution
   ```ts
-  export type DagNodeStatus = "pending" | "ready" | "running" | "completed" | "error" | "skipped";
+  export type DagNodeStatus =
   ```
 - `DebateConfig` — Configuration for the debate() factory and runDebate() imperative API.
   ```ts
@@ -2460,7 +2472,7 @@
   ```
 - `EvalCriterionFn` — Eval criterion function — scores an agent's output
   ```ts
-  export type EvalCriterionFn = (context: EvalContext) => EvalScore | Promise<EvalScore>;
+  export type EvalCriterionFn = (
   ```
 - `ExecutionPattern` — Union of all patterns
   ```ts
@@ -2488,7 +2500,7 @@
   ```
 - `MessageHandler` — Message handler function
   ```ts
-  export type MessageHandler = (message: TypedAgentMessage) => void | Promise<void>;
+  export type MessageHandler = (
   ```
 - `MessageSummarizer` — Summarizer function to compress older messages
   ```ts

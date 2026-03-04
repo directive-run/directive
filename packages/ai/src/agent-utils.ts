@@ -18,12 +18,22 @@ import type {
 // State Query Helpers
 // ============================================================================
 
-/** Check if agent is currently running. */
+/**
+ * Check whether an agent is currently executing a run.
+ *
+ * @param state - The current {@link AgentState} to inspect.
+ * @returns `true` when the agent status is `"running"`.
+ */
 export function isAgentRunning(state: AgentState): boolean {
   return state.status === "running";
 }
 
-/** Check if there are pending approvals. */
+/**
+ * Check whether there are tool-call approvals waiting for user confirmation.
+ *
+ * @param state - The current {@link ApprovalState} to inspect.
+ * @returns `true` when one or more approvals are pending.
+ */
 export function hasPendingApprovals(state: ApprovalState): boolean {
   return state.pending.length > 0;
 }
@@ -33,11 +43,15 @@ export function hasPendingApprovals(state: ApprovalState): boolean {
 // ============================================================================
 
 /**
- * Get total cost estimate based on token usage.
+ * Estimate the dollar cost of an agent run based on total token usage.
  *
- * @param tokenUsage - Total token count
- * @param ratePerMillionTokens - Cost per million tokens (required, no default to avoid stale pricing)
- * @returns Estimated cost in dollars
+ * @remarks
+ * No default rate is provided — callers must supply the current per-million-token
+ * price to avoid silently using stale pricing.
+ *
+ * @param tokenUsage - Total number of tokens consumed (input + output).
+ * @param ratePerMillionTokens - Cost in dollars per one million tokens.
+ * @returns Estimated cost in dollars.
  */
 export function estimateCost(
   tokenUsage: number,
@@ -53,8 +67,12 @@ export function estimateCost(
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);
 
 /**
- * Validate that a baseURL uses http or https.
- * Throws immediately at adapter creation time (not at call time) to catch config errors early.
+ * Validate that a base URL uses the `http:` or `https:` protocol.
+ * Throws immediately at adapter creation time (not at call time) to surface
+ * configuration errors before any LLM requests are made.
+ *
+ * @param baseURL - The base URL string to validate.
+ * @throws When the URL is malformed or uses a protocol other than `http:` or `https:`.
  */
 export function validateBaseURL(baseURL: string): void {
   try {
@@ -107,13 +125,20 @@ export interface CreateRunnerOptions {
 }
 
 /**
- * Create an AgentRunner from buildRequest/parseResponse helpers.
- * Reduces ~50 lines of fetch boilerplate to ~20 lines of configuration.
+ * Create an {@link AgentRunner} from `buildRequest`/`parseResponse` helpers, reducing
+ * ~50 lines of fetch boilerplate to ~20 lines of configuration.
  *
+ * @remarks
  * Supports lifecycle hooks for observability:
  * - `onBeforeCall` fires before each API request
  * - `onAfterCall` fires after a successful response (includes token breakdown)
  * - `onError` fires when the request fails
+ *
+ * Output parsing defaults to `JSON.parse` with a string fallback. Supply a custom
+ * `parseOutput` to override (e.g. for structured output schemas).
+ *
+ * @param options - Configuration for the runner, including request building, response parsing, and hooks.
+ * @returns An {@link AgentRunner} function that performs LLM calls via fetch.
  *
  * @example
  * ```typescript
@@ -148,6 +173,8 @@ export interface CreateRunnerOptions {
  *   },
  * });
  * ```
+ *
+ * @public
  */
 export function createRunner(options: CreateRunnerOptions): AgentRunner {
   const {

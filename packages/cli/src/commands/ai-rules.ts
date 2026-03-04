@@ -278,3 +278,113 @@ function writeFile(filePath: string, content: string) {
 
   writeFileSync(filePath, content, "utf-8");
 }
+
+// ---------------------------------------------------------------------------
+// ai-rules update — regenerate all existing rule files
+// ---------------------------------------------------------------------------
+
+export async function aiRulesUpdateCommand(args: string[]) {
+  const opts = parseArgs(args);
+  const targetDir = opts.dir;
+
+  const ruleFiles: Array<{ id: DetectedTool["id"]; path: string }> = [
+    { id: "cursor", path: join(targetDir, ".cursorrules") },
+    { id: "claude", path: join(targetDir, ".claude/CLAUDE.md") },
+    { id: "copilot", path: join(targetDir, ".github/copilot-instructions.md") },
+    { id: "windsurf", path: join(targetDir, ".windsurfrules") },
+    { id: "cline", path: join(targetDir, ".clinerules") },
+  ];
+
+  let updated = 0;
+
+  for (const file of ruleFiles) {
+    if (!existsSync(file.path)) {
+      continue;
+    }
+
+    const existing = readFileSync(file.path, "utf-8");
+    if (!hasDirectiveSection(existing)) {
+      continue;
+    }
+
+    const newContent = getTemplate(file.id);
+    const merged = mergeSection(existing, newContent);
+
+    writeFile(file.path, merged);
+    console.log(
+      `${pc.green("Updated")} ${pc.dim(relative(targetDir, file.path))}`,
+    );
+    updated++;
+  }
+
+  if (updated === 0) {
+    console.log(
+      pc.dim(
+        `No existing rule files found. Run ${pc.cyan(`${CLI_NAME} ai-rules init`)} first.`,
+      ),
+    );
+  } else {
+    console.log(
+      pc.green(`\nUpdated ${updated} file(s) to latest knowledge version.`),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ai-rules check — exit non-zero if rules are stale (CI-friendly)
+// ---------------------------------------------------------------------------
+
+export async function aiRulesCheckCommand(args: string[]) {
+  const opts = parseArgs(args);
+  const targetDir = opts.dir;
+
+  const ruleFiles: Array<{ id: DetectedTool["id"]; path: string; name: string }> = [
+    { id: "cursor", path: join(targetDir, ".cursorrules"), name: "Cursor" },
+    { id: "claude", path: join(targetDir, ".claude/CLAUDE.md"), name: "Claude Code" },
+    { id: "copilot", path: join(targetDir, ".github/copilot-instructions.md"), name: "GitHub Copilot" },
+    { id: "windsurf", path: join(targetDir, ".windsurfrules"), name: "Windsurf" },
+    { id: "cline", path: join(targetDir, ".clinerules"), name: "Cline" },
+  ];
+
+  let checked = 0;
+  let stale = 0;
+
+  for (const file of ruleFiles) {
+    if (!existsSync(file.path)) {
+      continue;
+    }
+
+    const existing = readFileSync(file.path, "utf-8");
+    if (!hasDirectiveSection(existing)) {
+      continue;
+    }
+
+    checked++;
+
+    // Generate fresh content and merge, then compare
+    const freshContent = getTemplate(file.id);
+    const merged = mergeSection(existing, freshContent);
+
+    if (merged !== existing) {
+      console.log(`${pc.red("✗")} ${file.name} rules are ${pc.yellow("stale")}`);
+      stale++;
+    } else {
+      console.log(`${pc.green("✓")} ${file.name} rules are ${pc.green("current")}`);
+    }
+  }
+
+  if (checked === 0) {
+    console.log(pc.dim("No rule files found to check."));
+
+    return;
+  }
+
+  if (stale > 0) {
+    console.log(
+      `\n${pc.yellow(`${stale} file(s) are stale.`)} Run ${pc.cyan(`${CLI_NAME} ai-rules update`)} to refresh.`,
+    );
+    process.exit(1);
+  } else {
+    console.log(pc.green("\nAll rule files are current."));
+  }
+}

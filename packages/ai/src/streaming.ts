@@ -890,6 +890,12 @@ export interface MergedTaggedStreamResult {
   getDroppedCount: () => number;
 }
 
+/**
+ * Merge multiple tagged async iterables into a single multiplexed stream.
+ *
+ * @param sources - Array of tagged source streams to merge.
+ * @returns A merged stream result with a `getDroppedCount` accessor.
+ */
 export function mergeTaggedStreams(
   sources: TaggedSource[],
 ): MergedTaggedStreamResult {

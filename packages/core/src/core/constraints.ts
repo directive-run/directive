@@ -28,43 +28,120 @@ type RequirementOutput = Requirement | Requirement[] | null;
 // Constraints Manager
 // ============================================================================
 
+/**
+ * Manager returned by {@link createConstraintsManager} that evaluates
+ * constraint rules against the current facts and produces unmet
+ * {@link RequirementWithId | requirements}.
+ *
+ * @internal
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface ConstraintsManager<_S extends Schema> {
-  /** Evaluate all constraints and return unmet requirements */
+  /**
+   * Evaluate all enabled constraints and return unmet requirements.
+   *
+   * @remarks
+   * On the first call (or when `changedKeys` is empty), every enabled
+   * constraint is evaluated. On subsequent calls, only constraints whose
+   * tracked dependencies overlap with `changedKeys` are re-evaluated.
+   * Sync constraints run first, async constraints run in parallel, and
+   * `after` ordering is respected across multiple passes.
+   *
+   * @param changedKeys - Fact keys that changed since the last evaluation.
+   *   When omitted or empty, all constraints are evaluated.
+   * @returns An array of {@link RequirementWithId} representing unmet requirements.
+   */
   evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]>;
-  /** Get the current state of a constraint */
+  /**
+   * Get the current state of a constraint by its definition ID.
+   *
+   * @param id - The constraint definition ID.
+   * @returns The {@link ConstraintState}, or `undefined` if the ID is unknown.
+   */
   getState(id: string): ConstraintState | undefined;
-  /** Get all constraint states */
+  /**
+   * Get the state of every registered constraint.
+   *
+   * @returns An array of all {@link ConstraintState} objects.
+   */
   getAllStates(): ConstraintState[];
-  /** Disable a constraint */
+  /**
+   * Disable a constraint so it is skipped during evaluation.
+   *
+   * @param id - The constraint definition ID.
+   */
   disable(id: string): void;
-  /** Enable a constraint */
+  /**
+   * Re-enable a previously disabled constraint.
+   *
+   * @param id - The constraint definition ID.
+   */
   enable(id: string): void;
-  /** Invalidate constraints that depend on the given fact key */
+  /**
+   * Mark all constraints that depend on `factKey` as dirty so they are
+   * re-evaluated on the next {@link ConstraintsManager.evaluate | evaluate} call.
+   *
+   * @param factKey - The fact store key that changed.
+   */
   invalidate(factKey: string): void;
-  /** Get the tracked dependencies for a constraint */
+  /**
+   * Get the auto-tracked or explicit dependency set for a constraint.
+   *
+   * @param id - The constraint definition ID.
+   * @returns A `Set` of fact keys, or `undefined` if no dependencies have been recorded.
+   */
   getDependencies(id: string): Set<string> | undefined;
-  /** Mark a constraint's resolver as completed (for `after` ordering) */
+  /**
+   * Record that a constraint's resolver completed successfully, unblocking
+   * any constraints that list it in their `after` array.
+   *
+   * @param constraintId - The constraint definition ID whose resolver finished.
+   */
   markResolved(constraintId: string): void;
-  /** Check if a constraint is currently disabled */
+  /**
+   * Check whether a constraint is currently disabled.
+   *
+   * @param id - The constraint definition ID.
+   * @returns `true` if the constraint has been disabled via {@link ConstraintsManager.disable | disable}.
+   */
   isDisabled(id: string): boolean;
-  /** Check if a constraint has been resolved (for `after` ordering) */
+  /**
+   * Check whether a constraint has been marked as resolved.
+   *
+   * @param constraintId - The constraint definition ID.
+   * @returns `true` if {@link ConstraintsManager.markResolved | markResolved} was called for this constraint.
+   */
   isResolved(constraintId: string): boolean;
-  /** Register new constraint definitions (for dynamic module registration) */
+  /**
+   * Register additional constraint definitions at runtime (used for dynamic
+   * module registration).
+   *
+   * @remarks
+   * Rebuilds the topological order and reverse dependency map so new `after`
+   * dependencies are validated for cycles and indexed.
+   *
+   * @param newDefs - New constraint definitions to merge into the manager.
+   */
   registerDefinitions(newDefs: ConstraintsDef<Schema>): void;
 }
 
-/** Options for creating a constraints manager */
+/**
+ * Configuration options accepted by {@link createConstraintsManager}.
+ *
+ * @internal
+ */
 export interface CreateConstraintsOptions<S extends Schema> {
+  /** Constraint definitions keyed by ID. */
   definitions: ConstraintsDef<S>;
+  /** Proxy-based facts object used to evaluate `when()` predicates. */
   facts: Facts<S>;
-  /** Custom key functions for requirements (by constraint ID) */
+  /** Custom key functions for requirement deduplication, keyed by constraint ID. */
   requirementKeys?: Record<string, RequirementKeyFn>;
-  /** Default timeout for async constraints (ms) */
+  /** Default timeout in milliseconds for async constraint evaluation (defaults to 5 000). */
   defaultTimeout?: number;
-  /** Callback when a constraint is evaluated */
+  /** Called after each constraint evaluation with the constraint ID and whether `when()` was active. */
   onEvaluate?: (id: string, active: boolean) => void;
-  /** Callback when a constraint errors */
+  /** Called when a constraint's `when()` or `require()` throws. */
   onError?: (id: string, error: unknown) => void;
 }
 
@@ -75,13 +152,37 @@ const DEFAULT_TIMEOUT = 5000;
  * Create a manager that evaluates constraint rules and produces unmet
  * requirements.
  *
- * Constraints are evaluated in priority order (higher first), with
+ * @remarks
+ * Constraints are evaluated in priority order (higher priority first), with
  * topological ordering for same-priority constraints connected by `after`
- * dependencies. Supports sync and async `when()` predicates, incremental
- * evaluation based on changed fact keys, and per-constraint enable/disable.
+ * dependencies. The manager supports sync and async `when()` predicates,
+ * incremental evaluation based on changed fact keys, and per-constraint
+ * enable/disable toggling. Cycle detection runs eagerly at construction time
+ * to prevent deadlocks in production.
  *
- * @param options - Constraint definitions, facts proxy, custom requirement key functions, and lifecycle callbacks
- * @returns A `ConstraintsManager` with evaluate/invalidate/enable/disable/markResolved methods
+ * @param options - Configuration including constraint definitions, facts proxy,
+ *   custom requirement key functions, and lifecycle callbacks.
+ * @returns A {@link ConstraintsManager} for evaluating, invalidating, and
+ *   managing constraint lifecycle.
+ *
+ * @example
+ * ```typescript
+ * const constraints = createConstraintsManager({
+ *   definitions: {
+ *     mustTransition: {
+ *       priority: 50,
+ *       when: (facts) => facts.phase === "red" && facts.elapsed > 30,
+ *       require: { type: "TRANSITION", to: "green" },
+ *     },
+ *   },
+ *   facts: factsProxy,
+ *   onEvaluate: (id, active) => console.log(id, active),
+ * });
+ *
+ * const unmet = await constraints.evaluate();
+ * ```
+ *
+ * @internal
  */
 export function createConstraintsManager<S extends Schema>(
   options: CreateConstraintsOptions<S>,

@@ -102,6 +102,7 @@ function updateAnimationAttrs(
 // Full Dependency Graph (facts→derivations→constraints→reqs→resolvers)
 // ============================================================================
 
+/** @internal Rebuild the full dependency graph SVG from current system state. */
 export function updateDependencyGraph(
   refs: PanelRefs,
   system: System<ModuleSchema>,
@@ -499,6 +500,7 @@ export function scheduleAnimationClear(depGraph: DepGraph) {
 // Timeline/Flamechart Rendering
 // ============================================================================
 
+/** @internal Render the resolver execution timeline SVG. */
 export function updateTimeline(refs: PanelRefs, timeline: TimelineState) {
   const entries = timeline.entries.toArray();
   if (entries.length === 0) {

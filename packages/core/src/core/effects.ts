@@ -49,21 +49,62 @@ import type {
 // Effects Manager
 // ============================================================================
 
+/**
+ * Manager returned by {@link createEffectsManager} that runs fire-and-forget
+ * side effects after facts stabilize.
+ *
+ * @internal
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface EffectsManager<_S extends Schema = Schema> {
-  /** Run all effects that should trigger based on changes */
+  /**
+   * Run all effects whose tracked dependencies overlap with `changedKeys`.
+   *
+   * @remarks
+   * Effects with no recorded dependencies (first run or auto-tracked with no
+   * reads) run on any change. After execution, a snapshot of current facts is
+   * stored for the `prev` parameter on the next invocation.
+   *
+   * @param changedKeys - Fact keys that changed since the last run.
+   */
   runEffects(changedKeys: Set<string>): Promise<void>;
-  /** Run all effects unconditionally */
+  /**
+   * Run every enabled effect unconditionally, regardless of dependencies.
+   */
   runAll(): Promise<void>;
-  /** Disable an effect */
+  /**
+   * Disable an effect so it is skipped during subsequent runs.
+   *
+   * @param id - The effect definition ID.
+   */
   disable(id: string): void;
-  /** Enable an effect */
+  /**
+   * Re-enable a previously disabled effect.
+   *
+   * @param id - The effect definition ID.
+   */
   enable(id: string): void;
-  /** Check if an effect is enabled */
+  /**
+   * Check whether an effect is currently enabled.
+   *
+   * @param id - The effect definition ID.
+   * @returns `true` if the effect has not been disabled.
+   */
   isEnabled(id: string): boolean;
-  /** Run all stored cleanup functions (called on system stop/destroy) */
+  /**
+   * Invoke every stored cleanup function and mark the manager as stopped.
+   *
+   * @remarks
+   * After this call, any cleanup functions returned by in-flight async effects
+   * will be invoked immediately rather than stored.
+   */
   cleanupAll(): void;
-  /** Register new effect definitions (for dynamic module registration) */
+  /**
+   * Register additional effect definitions at runtime (used for dynamic
+   * module registration).
+   *
+   * @param newDefs - New effect definitions to merge into the manager.
+   */
   registerDefinitions(newDefs: EffectsDef<Schema>): void;
 }
 
@@ -76,14 +117,21 @@ interface EffectState {
   cleanup: (() => void) | null; // cleanup function returned by last run()
 }
 
-/** Options for creating an effects manager */
+/**
+ * Configuration options accepted by {@link createEffectsManager}.
+ *
+ * @internal
+ */
 export interface CreateEffectsOptions<S extends Schema> {
+  /** Effect definitions keyed by ID. */
   definitions: EffectsDef<S>;
+  /** Proxy-based facts object passed to effect `run()` functions. */
   facts: Facts<S>;
+  /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
-  /** Callback when an effect runs (deps = the fact keys that triggered it) */
+  /** Called when an effect executes, with the fact keys that triggered it. */
   onRun?: (id: string, deps: string[]) => void;
-  /** Callback when an effect errors */
+  /** Called when an effect's `run()` or cleanup function throws. */
   onError?: (id: string, error: unknown) => void;
 }
 
@@ -91,14 +139,48 @@ export interface CreateEffectsOptions<S extends Schema> {
  * Create a manager for fire-and-forget side effects that run after facts
  * stabilize.
  *
- * Effects support auto-tracked dependencies (re-tracked on every run to
- * capture conditional reads) or explicit `deps` arrays. Each effect can
- * return a cleanup function that runs before the next execution or on
- * system stop. Errors in effects are isolated and never break the
- * reconciliation loop.
+ * @remarks
+ * Effects support two dependency modes:
  *
- * @param options - Effect definitions, facts proxy, store, and optional lifecycle callbacks
- * @returns An `EffectsManager` with runEffects/runAll/enable/disable/cleanupAll methods
+ * - **Auto-tracked** (no `deps`): Dependencies are re-tracked on every run
+ *   via {@link withTracking}, so conditional fact reads are always captured.
+ *   Only synchronous reads are tracked; reads after an `await` are invisible.
+ *
+ * - **Explicit `deps`**: A fixed array of fact keys declared on the definition.
+ *   Preferred for async effects where auto-tracking cannot cross `await`
+ *   boundaries.
+ *
+ * Each effect can return a cleanup function that runs before the next
+ * execution or when {@link EffectsManager.cleanupAll | cleanupAll} is called.
+ * Errors in effects are isolated via try-catch and never break the
+ * reconciliation loop. Synchronous fact mutations inside effects are
+ * coalesced with `store.batch()`.
+ *
+ * @param options - Configuration including effect definitions, facts proxy,
+ *   store, and lifecycle callbacks.
+ * @returns An {@link EffectsManager} for running, enabling/disabling, and
+ *   cleaning up effects.
+ *
+ * @example
+ * ```typescript
+ * const effects = createEffectsManager({
+ *   definitions: {
+ *     logPhase: {
+ *       run: (facts, prev) => {
+ *         if (prev?.phase !== facts.phase) {
+ *           console.log(`Phase changed to ${facts.phase}`);
+ *         }
+ *       },
+ *     },
+ *   },
+ *   facts: factsProxy,
+ *   store: factsStore,
+ * });
+ *
+ * await effects.runEffects(new Set(["phase"]));
+ * ```
+ *
+ * @internal
  */
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,

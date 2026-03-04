@@ -339,11 +339,19 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
 // ============================================================================
 
 /**
- * Create a constraint-driven agent orchestrator.
+ * Create a constraint-driven agent orchestrator backed by a Directive System.
+ *
+ * Wraps a single agent runner with reactive state, guardrails, streaming,
+ * approval workflows, breakpoints, structured output, and lifecycle hooks.
+ * Constraints and resolvers let you declaratively control agent behavior
+ * based on runtime facts.
+ *
+ * @param options - Orchestrator configuration including runner, guardrails, constraints, and plugins.
+ * @returns An {@link AgentOrchestrator} instance with `run`, `runStream`, `approve`/`reject`, and checkpoint APIs.
  *
  * @example
  * ```typescript
- * import { run as runner } from '@openai/agents'
+ * import { run as runner } from '@openai/agents';
  *
  * const orchestrator = createAgentOrchestrator({
  *   runner,
@@ -380,7 +388,8 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
  * const result = await orchestrator.run(myAgent, 'Hello, can you help me?');
  * ```
  *
- * @throws {Error} If autoApproveToolCalls is false but no onApprovalRequest callback is provided
+ * @throws If autoApproveToolCalls is false but no onApprovalRequest callback is provided
+ * @public
  */
 export function createAgentOrchestrator<
   F extends Record<string, unknown> = Record<string, never>,
