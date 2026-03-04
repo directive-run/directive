@@ -325,6 +325,7 @@ export const system = createSystem({
     wizard: wizardModule,
     validation: validationModule,
   },
+  debug: { runHistory: true },
   plugins: [
     devtoolsPlugin({ name: "form-wizard" }),
     persistencePlugin({

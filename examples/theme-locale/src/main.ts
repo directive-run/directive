@@ -25,6 +25,7 @@ const system = createSystem({
     preferences: preferencesModule,
     layout: layoutModule,
   },
+  debug: { runHistory: true },
   plugins: [
     devtoolsPlugin({ name: "theme-locale" }),
     persistencePlugin({

@@ -17,6 +17,7 @@ import type { NodeStatus, StrategyId } from "./goal-module.js";
 
 const system = createSystem({
   module: heistModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "goal-heist" })],
 });
 system.start();

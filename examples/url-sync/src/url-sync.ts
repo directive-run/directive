@@ -324,5 +324,6 @@ export const system = createSystem({
     url: urlModule,
     products: productsModule,
   },
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "url-sync" })],
 });
