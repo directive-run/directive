@@ -25,6 +25,35 @@ import type { DirectiveError } from "./types.js";
 // Plugin Manager
 // ============================================================================
 
+/**
+ * Internal manager that broadcasts lifecycle events to registered {@link Plugin} instances.
+ *
+ * @remarks
+ * PluginManager uses `Schema` (flat) internally because the engine works with
+ * flat schemas. The public API uses `ModuleSchema` (consolidated), and the
+ * conversion happens in `createSystem`.
+ *
+ * Plugins execute in registration order. All hook invocations are wrapped in
+ * try-catch so a misbehaving plugin never breaks the engine. Duplicate plugin
+ * names are detected and the older registration is replaced with a warning.
+ *
+ * Lifecycle hook categories:
+ * - **System lifecycle:** `emitInit`, `emitStart`, `emitStop`, `emitDestroy`
+ * - **Facts:** `emitFactSet`, `emitFactDelete`, `emitFactsBatch`
+ * - **Derivations:** `emitDerivationCompute`, `emitDerivationInvalidate`
+ * - **Reconciliation:** `emitReconcileStart`, `emitReconcileEnd`
+ * - **Constraints:** `emitConstraintEvaluate`, `emitConstraintError`
+ * - **Requirements:** `emitRequirementCreated`, `emitRequirementMet`, `emitRequirementCanceled`
+ * - **Resolvers:** `emitResolverStart`, `emitResolverComplete`, `emitResolverError`, `emitResolverRetry`, `emitResolverCancel`
+ * - **Effects:** `emitEffectRun`, `emitEffectError`
+ * - **Time-travel:** `emitSnapshot`, `emitTimeTravel`
+ * - **Errors:** `emitError`, `emitErrorRecovery`
+ * - **Run history:** `emitRunComplete`
+ *
+ * @typeParam _S - The flat schema type (unused at runtime).
+ *
+ * @internal
+ */
 // Note: PluginManager uses Schema (flat) internally because the engine works with flat schemas.
 // The public API uses ModuleSchema (consolidated), and the conversion happens in createSystem.
 // biome-ignore lint/suspicious/noExplicitAny: Internal type - plugins are schema-agnostic at runtime
@@ -107,14 +136,17 @@ export interface PluginManager<_S extends Schema = any> {
 }
 
 /**
- * Create a manager that broadcasts lifecycle events to registered plugins.
+ * Create a {@link PluginManager} that broadcasts lifecycle events to registered plugins.
  *
- * Plugins are called in registration order. All hook invocations are
- * wrapped in try-catch so a misbehaving plugin never breaks the engine.
- * Duplicate plugin names are detected and the older registration is
- * replaced with a warning.
+ * @remarks
+ * Plugins are called in registration order. All hook invocations are wrapped
+ * in try-catch so a misbehaving plugin never breaks the engine. Duplicate
+ * plugin names are detected and the older registration is replaced with a
+ * console warning.
  *
- * @returns A `PluginManager` with register/unregister/getPlugins and emit* methods for every lifecycle event
+ * @returns A {@link PluginManager} with `register`/`unregister`/`getPlugins` and `emit*` methods for every lifecycle event.
+ *
+ * @internal
  */
 // biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
 export function createPluginManager<

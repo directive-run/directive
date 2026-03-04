@@ -133,6 +133,63 @@ function getStatus(facts) {
 }
 ```
 
+## Multi-Line Code Formatting
+
+Never put properties or statements on a single line inside braces. Always expand to one item per line with proper indentation. This applies everywhere: schema definitions, init functions, events, effects, requirement types, and any other object or block.
+
+```typescript
+// WRONG — properties crammed on one line
+schema: {
+  facts: { phase: t.string(), count: t.number() },
+  requirements: { FETCH_USER: { id: t.string() }, RESET: {} },
+},
+
+// CORRECT — one property per line, always expanded
+schema: {
+  facts: {
+    phase: t.string(),
+    count: t.number(),
+  },
+  requirements: {
+    FETCH_USER: {
+      id: t.string(),
+    },
+    RESET: {},
+  },
+},
+
+// WRONG — statements crammed on one line
+init: (facts) => { facts.phase = "idle"; facts.count = 0; },
+
+// CORRECT — one statement per line
+init: (facts) => {
+  facts.phase = "idle";
+  facts.count = 0;
+},
+
+// WRONG
+events: { reset: (facts) => { facts.count = 0; facts.phase = "idle"; } },
+
+// CORRECT
+events: {
+  reset: (facts) => {
+    facts.count = 0;
+    facts.phase = "idle";
+  },
+},
+```
+
+Single-expression arrows (no braces) are fine on one line. Empty objects `{}` are fine inline.
+```typescript
+// OK — single expression, no braces
+derive: {
+  isReady: (facts) => facts.phase === "ready",
+},
+
+// OK — empty object
+RESET: {},
+```
+
 ## Multi-Module Naming
 
 ### `facts.self.*` for Own Module

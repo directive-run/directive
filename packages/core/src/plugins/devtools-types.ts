@@ -147,6 +147,7 @@ export function isDevMode(): boolean {
   return true;
 }
 
+/** @internal Format a value for display in the devtools panel. */
 export function formatValue(value: unknown): string {
   try {
     if (value === undefined) {
@@ -182,6 +183,7 @@ export function formatValue(value: unknown): string {
   }
 }
 
+/** @internal Truncate a string to a maximum length with ellipsis. */
 export function truncate(str: string, max: number): string {
   if (str.length <= max) {
     return str;
@@ -190,6 +192,7 @@ export function truncate(str: string, max: number): string {
   return str.slice(0, max - 3) + "...";
 }
 
+/** @internal Safely call system.inspect(), returning null on error. */
 export function safeInspect(system: System<ModuleSchema>) {
   try {
     return system.inspect();
@@ -245,6 +248,7 @@ export interface PerfMetrics {
   lastReconcileStartMs: number;
 }
 
+/** @internal Create initial performance metrics state. */
 export function createPerfMetrics(): PerfMetrics {
   return {
     reconcileCount: 0,
@@ -287,6 +291,7 @@ export interface TimelineState {
   inflight: Map<string, number>;
 }
 
+/** @internal Create initial timeline state for resolver flamechart. */
 export function createTimelineState(): TimelineState {
   return {
     entries: new CircularBuffer<TimelineEntry>(MAX_TIMELINE_ENTRIES),
@@ -313,6 +318,7 @@ export interface DepGraph {
   animationTimer: ReturnType<typeof setTimeout> | null;
 }
 
+/** @internal Create initial dependency graph tracking state. */
 export function createDepGraph(): DepGraph {
   return {
     derivationDeps: new Map(),
@@ -338,6 +344,7 @@ export interface RecordingState {
   snapshots: Array<{ timestamp: number; facts: Record<string, unknown> }>;
 }
 
+/** @internal Create initial recording state for event capture. */
 export function createRecordingState(): RecordingState {
   return {
     isRecording: false,

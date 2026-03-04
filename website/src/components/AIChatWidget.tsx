@@ -48,9 +48,9 @@ interface Message {
 // ---------------------------------------------------------------------------
 
 const EXAMPLE_QUESTIONS = [
+  "Explain this page to me",
   "How do constraints work?",
   "What is the difference between effects and resolvers?",
-  "How do I use Directive with React?",
   "Can you show me a data fetching example?",
 ];
 

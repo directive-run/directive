@@ -21,7 +21,9 @@ import {
 // ============================================================================
 
 /**
- * Pending retry entry.
+ * A queued retry entry tracking its source, attempt count, and scheduled time.
+ *
+ * @internal
  */
 export interface PendingRetry {
   source: ErrorSource;
@@ -35,13 +37,18 @@ export interface PendingRetry {
 /**
  * Create a manager for deferred retry scheduling with exponential backoff.
  *
- * Retries are stored in a Map keyed by source ID. Each retry tracks its
- * attempt number and next retry time. When `processDueRetries()` is called
- * (typically during reconciliation), entries whose time has elapsed are
- * returned and removed from the queue.
+ * @remarks
+ * Retries are stored in a Map keyed by source ID. Each entry tracks its
+ * attempt number and the timestamp of the next eligible retry. When
+ * {@link createRetryLaterManager | processDueRetries} is called (typically
+ * during reconciliation), entries whose scheduled time has elapsed are
+ * returned and removed from the queue. The delay grows exponentially:
+ * `delayMs * backoffMultiplier^(attempt - 1)`, capped at `maxDelayMs`.
  *
- * @param config - Backoff configuration: `delayMs`, `maxRetries`, `backoffMultiplier`, `maxDelayMs`
- * @returns A manager with `scheduleRetry`, `getPendingRetries`, `processDueRetries`, `cancelRetry`, and `clearAll` methods
+ * @param config - Backoff configuration including `delayMs`, `maxRetries`, `backoffMultiplier`, and `maxDelayMs`.
+ * @returns A manager exposing `scheduleRetry`, `getPendingRetries`, `processDueRetries`, `cancelRetry`, and `clearAll` methods.
+ *
+ * @internal
  */
 export function createRetryLaterManager(config: RetryLaterConfig = {}): {
   /** Schedule a retry */
@@ -134,34 +141,73 @@ export function createRetryLaterManager(config: RetryLaterConfig = {}): {
 // Error Boundary Manager
 // ============================================================================
 
+/**
+ * Handle returned by {@link createErrorBoundaryManager} for routing errors
+ * through configurable recovery strategies.
+ *
+ * @internal
+ */
 export interface ErrorBoundaryManager {
-  /** Handle an error from a specific source */
+  /**
+   * Route an error through the configured recovery strategy for its source.
+   *
+   * @param source - The subsystem that produced the error.
+   * @param sourceId - Identifier of the specific constraint, resolver, effect, or derivation.
+   * @param error - The thrown value (coerced to {@link DirectiveError} internally).
+   * @param context - Optional context forwarded to callbacks and retry entries.
+   * @returns The {@link RecoveryStrategy} that was applied.
+   */
   handleError(
     source: ErrorSource,
     sourceId: string,
     error: unknown,
     context?: unknown,
   ): RecoveryStrategy;
-  /** Get the last error */
+  /**
+   * Return the most recently recorded error, or `null` if none exist.
+   *
+   * @returns The last {@link DirectiveError}, or `null`.
+   */
   getLastError(): DirectiveError | null;
-  /** Get all errors */
+  /**
+   * Return a snapshot array of all recorded errors (up to the last 100).
+   *
+   * @returns A shallow copy of the internal error ring buffer.
+   */
   getAllErrors(): DirectiveError[];
-  /** Clear all errors */
+  /** Clear all recorded errors. */
   clearErrors(): void;
-  /** Get retry-later manager */
+  /**
+   * Access the underlying retry-later manager for advanced scheduling.
+   *
+   * @returns The {@link createRetryLaterManager} instance used internally.
+   */
   getRetryLaterManager(): ReturnType<typeof createRetryLaterManager>;
-  /** Process due retries (call periodically or on reconcile) */
+  /**
+   * Drain and return retry entries whose scheduled time has elapsed.
+   *
+   * @returns An array of {@link PendingRetry} entries that are now due.
+   */
   processDueRetries(): PendingRetry[];
-  /** Clear retry attempts for a source ID (call on success) */
+  /**
+   * Reset retry attempt tracking for a source, typically after a successful resolution.
+   *
+   * @param sourceId - The source identifier whose retry counter should be cleared.
+   */
   clearRetryAttempts(sourceId: string): void;
 }
 
-/** Options for creating an error boundary manager */
+/**
+ * Options accepted by {@link createErrorBoundaryManager}.
+ *
+ * @internal
+ */
 export interface CreateErrorBoundaryOptions {
+  /** Per-source recovery strategies and retry-later tuning. */
   config?: ErrorBoundaryConfig;
-  /** Callback when an error occurs */
+  /** Invoked every time an error is recorded, before the recovery strategy runs. */
   onError?: (error: DirectiveError) => void;
-  /** Callback when recovery is attempted */
+  /** Invoked after a recovery strategy has been selected for an error. */
   onRecovery?: (error: DirectiveError, strategy: RecoveryStrategy) => void;
 }
 
@@ -178,29 +224,25 @@ const DEFAULT_STRATEGIES: Record<ErrorSource, RecoveryStrategy> = {
  * Create a manager that handles errors from constraints, resolvers, effects,
  * and derivations with configurable per-source recovery strategies.
  *
- * Supported strategies: `"skip"` (ignore), `"retry"` (immediate),
- * `"retry-later"` (deferred with backoff), `"disable"` (turn off source),
- * and `"throw"` (re-throw). Recent errors are kept in a ring buffer
- * (last 100) for inspection. The retry-later strategy delegates to an
- * internal {@link createRetryLaterManager}.
+ * @remarks
+ * Five recovery strategies are available:
  *
- * @param options - Error boundary configuration, plus `onError` and `onRecovery` callbacks for plugin integration
- * @returns An `ErrorBoundaryManager` with handleError/getLastError/getAllErrors/clearErrors/processDueRetries methods
+ * - `"skip"` -- Swallow the error and continue.
+ * - `"retry"` -- Signal the caller to retry immediately.
+ * - `"retry-later"` -- Enqueue a deferred retry with exponential backoff
+ *   (delegated to an internal {@link createRetryLaterManager}).
+ * - `"disable"` -- Permanently disable the failing source.
+ * - `"throw"` -- Re-throw the error as a {@link DirectiveError}.
  *
- * @example
- * ```ts
- * const boundary = createErrorBoundaryManager({
- *   config: {
- *     onResolverError: "retry-later",
- *     onEffectError: "skip",
- *     retryLater: { maxRetries: 5, delayMs: 500 },
- *   },
- *   onError: (err) => console.error(err.source, err.message),
- * });
+ * Recent errors are kept in a ring buffer (last 100) for inspection via
+ * {@link ErrorBoundaryManager.getAllErrors | getAllErrors}. Each strategy
+ * can be configured per source type (`onConstraintError`, `onResolverError`,
+ * etc.) or as a callback that dynamically selects a strategy.
  *
- * const strategy = boundary.handleError("resolver", "fetchUser", new Error("timeout"));
- * // strategy === "retry-later"
- * ```
+ * @param options - Error boundary configuration, plus `onError` and `onRecovery` callbacks for plugin integration.
+ * @returns An {@link ErrorBoundaryManager} for routing errors through the configured strategies.
+ *
+ * @internal
  */
 export function createErrorBoundaryManager(
   options: CreateErrorBoundaryOptions = {},

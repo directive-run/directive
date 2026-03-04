@@ -144,12 +144,16 @@ export const docsChatbot = createModule("docs-chatbot", {
     logMetrics: {
       deps: ["totalRequests", "totalTokensUsed", "consecutiveErrors"],
       run: (facts) => {
-        if (process.env.NODE_ENV !== "development") return;
+        if (process.env.NODE_ENV !== "development") {
+          return undefined;
+        }
         if (facts.totalRequests > 0) {
           console.log(
             `[docs-chatbot] requests=${facts.totalRequests} tokens=${facts.totalTokensUsed} errors=${facts.consecutiveErrors}`,
           );
         }
+
+        return undefined;
       },
     },
   },

@@ -29,34 +29,99 @@ import type {
 // Resolvers Manager
 // ============================================================================
 
-/** Inflight resolver info */
+/**
+ * Summary of a resolver that is currently in flight.
+ *
+ * @internal
+ */
 export interface InflightInfo {
+  /** The unique requirement ID being resolved. */
   id: string;
+  /** The definition ID of the resolver handling this requirement. */
   resolverId: string;
+  /** Epoch timestamp (ms) when resolution started. */
   startedAt: number;
 }
 
+/**
+ * Manager returned by {@link createResolversManager} that matches
+ * requirements to resolver handlers and manages their execution lifecycle.
+ *
+ * @internal
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface ResolversManager<_S extends Schema> {
-  /** Start resolving a requirement */
+  /**
+   * Start resolving a requirement by matching it to a resolver handler.
+   *
+   * @remarks
+   * Duplicate in-flight requirements (same `req.id`) are silently ignored.
+   * If the matched resolver has `batch.enabled`, the requirement is queued
+   * for batch processing instead of being resolved immediately.
+   *
+   * @param req - The requirement (with a stable identity ID) to resolve.
+   */
   resolve(req: RequirementWithId): void;
-  /** Cancel a resolver by requirement ID */
+  /**
+   * Cancel an in-flight or batch-queued resolver by requirement ID.
+   *
+   * @remarks
+   * Aborts the `AbortController` for in-flight resolvers. For batch-queued
+   * requirements, removes the requirement from the pending batch.
+   *
+   * @param requirementId - The unique requirement ID to cancel.
+   */
   cancel(requirementId: string): void;
-  /** Cancel all inflight resolvers */
+  /**
+   * Cancel every in-flight resolver and flush all pending batch queues.
+   */
   cancelAll(): void;
-  /** Get status of a resolver by requirement ID */
+  /**
+   * Get the current status of a resolver by requirement ID.
+   *
+   * @param requirementId - The unique requirement ID to look up.
+   * @returns The {@link ResolverStatus} (idle, pending, running, success, error, or canceled).
+   */
   getStatus(requirementId: string): ResolverStatus;
-  /** Get all inflight requirement IDs */
+  /**
+   * Get the requirement IDs of all currently in-flight resolvers.
+   *
+   * @returns An array of requirement ID strings.
+   */
   getInflight(): string[];
-  /** Get full info for all inflight resolvers */
+  /**
+   * Get detailed info for every in-flight resolver.
+   *
+   * @returns An array of {@link InflightInfo} objects.
+   */
   getInflightInfo(): InflightInfo[];
-  /** Check if a requirement is being resolved */
+  /**
+   * Check whether a requirement is currently being resolved.
+   *
+   * @param requirementId - The unique requirement ID to check.
+   * @returns `true` if the requirement has an active in-flight resolver.
+   */
   isResolving(requirementId: string): boolean;
-  /** Process batched requirements (called periodically) */
+  /**
+   * Immediately flush all pending batch queues, executing their resolvers.
+   */
   processBatches(): void;
-  /** Check if there are pending batched requirements waiting to be processed */
+  /**
+   * Check whether any batch queues have requirements waiting to be processed.
+   *
+   * @returns `true` if at least one batch queue is non-empty.
+   */
   hasPendingBatches(): boolean;
-  /** Register new resolver definitions (for dynamic module registration) */
+  /**
+   * Register additional resolver definitions at runtime (used for dynamic
+   * module registration).
+   *
+   * @remarks
+   * Clears the resolver-by-type cache so newly registered resolvers are
+   * discoverable on the next {@link ResolversManager.resolve | resolve} call.
+   *
+   * @param newDefs - New resolver definitions to merge into the manager.
+   */
   registerDefinitions(newDefs: ResolversDef<Schema>): void;
 }
 
@@ -79,26 +144,33 @@ interface BatchState {
   timer: ReturnType<typeof setTimeout> | null;
 }
 
-/** Options for creating a resolvers manager */
+/**
+ * Configuration options accepted by {@link createResolversManager}.
+ *
+ * @internal
+ */
 export interface CreateResolversOptions<S extends Schema> {
+  /** Resolver definitions keyed by ID. */
   definitions: ResolversDef<S>;
+  /** Proxy-based facts object passed to resolver contexts. */
   facts: Facts<S>;
+  /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
-  /** Callback when a resolver starts */
+  /** Called when a resolver begins execution. */
   onStart?: (resolver: string, req: RequirementWithId) => void;
-  /** Callback when a resolver completes */
+  /** Called when a resolver completes successfully, with the wall-clock duration in ms. */
   onComplete?: (
     resolver: string,
     req: RequirementWithId,
     duration: number,
   ) => void;
-  /** Callback when a resolver errors */
+  /** Called when a resolver exhausts all retry attempts. */
   onError?: (resolver: string, req: RequirementWithId, error: unknown) => void;
-  /** Callback when a resolver retries */
+  /** Called before each retry attempt with the upcoming attempt number. */
   onRetry?: (resolver: string, req: RequirementWithId, attempt: number) => void;
-  /** Callback when a resolver is canceled */
+  /** Called when a resolver is canceled via {@link ResolversManager.cancel | cancel}. */
   onCancel?: (resolver: string, req: RequirementWithId) => void;
-  /** Callback when resolution cycle completes (for reconciliation) */
+  /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
   onResolutionComplete?: () => void;
 }
 
@@ -146,14 +218,49 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
  * Create a manager that fulfills requirements by matching them to resolver
  * handlers.
  *
- * Resolvers are matched by requirement type (string or predicate). Each
- * resolution runs with an `AbortController` for cancellation, configurable
- * retry policies (none/linear/exponential backoff), and optional batching
- * for grouping similar requirements. Duplicate in-flight requirements are
- * automatically deduplicated.
+ * @remarks
+ * Resolvers are matched by requirement type (string equality) or a predicate
+ * function. Each resolution runs with an `AbortController` for cancellation
+ * and configurable retry policies (none, linear, or exponential backoff).
  *
- * @param options - Resolver definitions, facts proxy, store, and lifecycle callbacks (onStart/onComplete/onError/onRetry/onCancel/onResolutionComplete)
- * @returns A `ResolversManager` with resolve/cancel/cancelAll/getStatus/processBatches methods
+ * **Batching:** When a resolver sets `batch.enabled`, incoming requirements
+ * are queued and flushed either when `batch.maxSize` is reached or after
+ * `batch.windowMs` elapses, whichever comes first. Batch resolvers can use
+ * `resolveBatch` (all-or-nothing) or `resolveBatchWithResults` (per-item
+ * success/failure). If only `resolve` is provided with batching enabled, the
+ * manager falls back to individual resolution calls.
+ *
+ * Duplicate in-flight requirements (same requirement ID) are automatically
+ * deduplicated. Resolver-by-type lookups are cached with FIFO eviction at
+ * 1 000 entries to handle dynamic requirement types.
+ *
+ * @param options - Configuration including resolver definitions, facts proxy,
+ *   store, and lifecycle callbacks.
+ * @returns A {@link ResolversManager} for dispatching, canceling, and
+ *   inspecting requirement resolution.
+ *
+ * @example
+ * ```typescript
+ * const resolvers = createResolversManager({
+ *   definitions: {
+ *     transition: {
+ *       requirement: "TRANSITION",
+ *       retry: { attempts: 3, backoff: "exponential" },
+ *       resolve: async (req, context) => {
+ *         context.facts.phase = req.to;
+ *         context.facts.elapsed = 0;
+ *       },
+ *     },
+ *   },
+ *   facts: factsProxy,
+ *   store: factsStore,
+ *   onComplete: (id, req, ms) => console.log(`${id} resolved in ${ms}ms`),
+ * });
+ *
+ * resolvers.resolve(requirementWithId);
+ * ```
+ *
+ * @internal
  */
 export function createResolversManager<S extends Schema>(
   options: CreateResolversOptions<S>,

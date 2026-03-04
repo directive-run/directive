@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_ROOT = join(__dirname, "..", "..", "..", "examples");
@@ -171,7 +172,7 @@ function discoverExamples(): ExampleSource[] {
       .map((d) => d.name)
       .sort();
   } catch {
-    console.warn(`Warning: ${EXAMPLES_ROOT} not found`);
+    log.warn(`${EXAMPLES_ROOT} not found`);
 
     return [];
   }
@@ -192,13 +193,12 @@ function discoverExamples(): ExampleSource[] {
         pure: found.pure,
       });
     } else {
-      console.warn(`  [SKIP] ${name}: no suitable source file found`);
+      log.warn(`${name}: no suitable source file found`);
     }
   }
 
   if (excluded.length > 0) {
-    console.log(`  Excluded examples (${excluded.length}): ${excluded.join(", ")}`);
-    console.log(`  (Review EXCLUDED_EXAMPLES in extract-examples.ts to update)`);
+    log.item(`Excluded (${excluded.length})`, excluded.join(", "));
   }
 
   return sources;
@@ -208,7 +208,7 @@ function extractExample(source: ExampleSource): string {
   const fullPath = join(EXAMPLES_ROOT, source.sourcePath);
 
   if (!existsSync(fullPath)) {
-    console.warn(`  Warning: ${fullPath} not found, skipping.`);
+    log.warn(`${fullPath} not found, skipping`);
 
     return `// Source not found: ${source.sourcePath}\n`;
   }
@@ -372,10 +372,15 @@ function addHeader(source: ExampleSource, content: string): string {
 }
 
 function main() {
+  const PHASE = "Extract Examples";
+  log.header(PHASE);
+
   // Ensure output directory exists
   mkdirSync(OUTPUT_DIR, { recursive: true });
 
   const sources = discoverExamples();
+  log.step(`Scanning examples/ (${sources.length} found, ${EXCLUDED_EXAMPLES.length} excluded)`);
+
   let extracted = 0;
   let warnings = 0;
 
@@ -387,16 +392,21 @@ function main() {
     const lineCount = result.split("\n").length;
     if (result.includes("Source not found")) {
       warnings++;
-      console.log(`  [WARN] ${source.name}: source not found`);
+      log.warn(`${source.name}: source not found`);
     } else {
       extracted++;
-      console.log(`  ${source.name}: ${lineCount} lines`);
+      log.io(`examples/${source.sourcePath}`, `${source.name}.ts (${lineCount} lines)`);
     }
   }
 
-  console.log(
-    `\nExtracted ${extracted} examples (${warnings} warnings)`,
-  );
+  log.writes(`packages/knowledge/examples/`, `${extracted} files`);
+
+  if (warnings > 0) {
+    log.warn(`${warnings} examples had warnings`);
+  }
+
+  log.success(`${extracted} examples extracted`);
+  log.done(PHASE);
 }
 
 main();

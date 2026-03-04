@@ -7,15 +7,18 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, "..");
 const SKILLS_DIR = join(PKG_ROOT, "skills");
 const KNOWLEDGE_PKG = join(PKG_ROOT, "..", "knowledge");
+const KNOWLEDGE_ROOT = KNOWLEDGE_PKG;
 const CORE_DIR = join(KNOWLEDGE_PKG, "core");
 const AI_DIR = join(KNOWLEDGE_PKG, "ai");
 
 function getAllKnowledgeFiles(): string[] {
   const files: string[] = [];
 
-  for (const dir of [CORE_DIR, AI_DIR]) {
+  for (const dir of [KNOWLEDGE_ROOT, CORE_DIR, AI_DIR]) {
     try {
-      for (const f of readdirSync(dir).filter((f) => f.endsWith(".md"))) {
+      for (const f of readdirSync(dir).filter(
+        (f) => f.endsWith(".md") && f !== "README.md",
+      )) {
         files.push(f.replace(".md", ""));
       }
     } catch {
@@ -76,10 +79,15 @@ describe("skill sync", () => {
           const skillPath = join(SKILLS_DIR, skill, `${file}.md`);
           const skillContent = readFileSync(skillPath, "utf-8");
 
-          // Find the source file
+          // Find the source file (check root, core, then ai)
+          const rootPath = join(KNOWLEDGE_ROOT, `${file}.md`);
           const corePath = join(CORE_DIR, `${file}.md`);
           const aiPath = join(AI_DIR, `${file}.md`);
-          const sourcePath = existsSync(corePath) ? corePath : aiPath;
+          const sourcePath = existsSync(rootPath)
+            ? rootPath
+            : existsSync(corePath)
+              ? corePath
+              : aiPath;
 
           expect(
             existsSync(sourcePath),

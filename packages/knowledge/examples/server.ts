@@ -303,14 +303,14 @@ app.listen(PORT, () => {
   console.log();
   console.log("Endpoints:");
   console.log(
-    `  GET  /snapshot/:userId           Distributable snapshot with TTL`,
+    "  GET  /snapshot/:userId           Distributable snapshot with TTL",
   );
-  console.log(`  POST /snapshot/:userId/verify     Sign and verify snapshots`);
-  console.log(`  GET  /audit                      Query audit entries`);
-  console.log(`  GET  /audit/verify               Verify hash chain integrity`);
-  console.log(`  POST /compliance/:subjectId/export  GDPR data export`);
-  console.log(`  POST /compliance/:subjectId/delete  GDPR right to erasure`);
-  console.log(`  GET  /health                     Health check`);
+  console.log("  POST /snapshot/:userId/verify     Sign and verify snapshots");
+  console.log("  GET  /audit                      Query audit entries");
+  console.log("  GET  /audit/verify               Verify hash chain integrity");
+  console.log("  POST /compliance/:subjectId/export  GDPR data export");
+  console.log("  POST /compliance/:subjectId/delete  GDPR right to erasure");
+  console.log("  GET  /health                     Health check");
   console.log();
   console.log("Try: curl http://localhost:3000/snapshot/user-1");
 });
