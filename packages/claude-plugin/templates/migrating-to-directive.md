@@ -5,22 +5,26 @@ description: "Migrate state management code from Redux, Zustand, XState, MobX, R
 
 # Migrating to Directive
 
-# When Claude Should Use This Skill
+## Prerequisites
 
-## Auto-Invoke Triggers
+This skill applies when migrating TO Directive. The user should have or plan to install `@directive-run/core`: `npm install @directive-run/core`.
+
+## When Claude Should Use This Skill
+
+### Auto-Invoke Triggers
 - User mentions migrating FROM Redux, Zustand, XState, MobX, Recoil, or Jotai
 - User asks "how do I convert this Redux code to Directive"
 - User wants to replace their state management with Directive
 - User asks about Directive equivalents of concepts from other libraries
 - User has existing code in another library and wants Directive version
 
-## Exclusions — Use a Different Skill
+### Exclusions — Use a Different Skill
 - User is writing Directive from scratch (no migration) → `writing-directive-modules`
 - User wants to understand Directive basics → `getting-started-with-directive`
 
 ---
 
-# Concept Mapping
+## Concept Mapping
 
 ## Redux → Directive
 
@@ -189,7 +193,7 @@ const system = createSystem({ module: toggle });
 
 ---
 
-# Migration Steps
+## Migration Steps
 
 ## Step-by-Step Process
 

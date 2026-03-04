@@ -5,6 +5,10 @@ description: "Test Directive modules and systems using createTestSystem, mockRes
 
 # Testing Directive Code
 
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
 ## When Claude Should Use This Skill
 
 **Auto-invoke when the user:**
@@ -386,15 +390,8 @@ await system.settle();
 assertFact(system, "result", "done");
 ```
 
-### 3. Abbreviating context in mock resolvers
-
-```typescript
-// WRONG
-mockResolver("FETCH", async (req, ctx) => { ctx.facts.data = "ok"; })
-
-// CORRECT
-mockResolver("FETCH", async (req, context) => { context.facts.data = "ok"; })
-```
+### 3. Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`. Applies to `mockResolver` callbacks too.
 
 ### 4. Testing implementation details instead of behavior
 

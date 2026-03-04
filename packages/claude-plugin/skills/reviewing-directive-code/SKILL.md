@@ -5,23 +5,27 @@ description: "Review Directive code for anti-patterns, naming violations, missin
 
 # Reviewing Directive Code
 
-# When Claude Should Use This Skill
+## Prerequisites
 
-## Auto-Invoke Triggers
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
+## When Claude Should Use This Skill
+
+### Auto-Invoke Triggers
 - User asks to "review my Directive code" or "audit this module"
 - User asks "is this the right pattern" or "am I doing this correctly"
 - User wants a code review of constraint/resolver/module code
 - User asks about Directive best practices for existing code
 - User suspects they have anti-patterns or performance issues
 
-## Exclusions — Use a Different Skill
+### Exclusions — Use a Different Skill
 - User wants to write NEW code from scratch → `writing-directive-modules`
 - User wants to write tests → `testing-directive-code`
 - User wants to migrate FROM another library → `migrating-to-directive`
 
 ---
 
-# Review Checklist
+## Review Checklist
 
 ## 1. Module Structure
 

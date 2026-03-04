@@ -5,6 +5,10 @@ description: "Create and structure Directive modules with schema definitions, in
 
 # Writing Directive Modules
 
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
 ## When Claude Should Use This Skill
 
 **Auto-invoke when the user:**
@@ -254,15 +258,8 @@ init: async (facts) => { facts.config = await fetch("/api/config").then(r => r.j
 init: (facts) => { facts.config = null; }
 ```
 
-### 4. Resolver using ctx instead of context
-
-```typescript
-// WRONG
-resolve: async (req, ctx) => { ctx.facts.status = "done"; }
-
-// CORRECT
-resolve: async (req, context) => { context.facts.status = "done"; }
-```
+### 4. Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ### 5. Resolver returning data
 

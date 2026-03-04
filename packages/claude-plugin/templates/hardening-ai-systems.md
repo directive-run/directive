@@ -5,7 +5,11 @@ description: "Add guardrails (input/output validation), memory strategies, token
 
 # Hardening AI Systems
 
-# When Claude Should Use This Skill
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/ai`. If not found in `package.json`, suggest installing it: `npm install @directive-run/ai`.
+
+## When Claude Should Use This Skill
 
 ## Auto-Invoke Triggers
 - User asks about input/output validation for LLM calls
@@ -22,7 +26,7 @@ description: "Add guardrails (input/output validation), memory strategies, token
 
 ---
 
-# Quick Reference
+## Quick Reference
 
 ## Decision Tree: Which Hardening Feature?
 
@@ -302,7 +306,7 @@ resolvers: {
 
 ---
 
-# Critical Anti-Patterns
+## Critical Anti-Patterns
 
 ## Guardrails that modify content
 
@@ -359,22 +363,15 @@ const orchestrator = createAgentOrchestrator({
 }
 ```
 
-## Using ctx instead of context
-
-```typescript
-// WRONG
-resolve: async (req, ctx) => { ctx.facts.output = "..."; }
-
-// CORRECT
-resolve: async (req, context) => { context.facts.output = "..."; }
-```
+### Resolver parameter naming
+Always use `(req, context)` — never `(req, ctx)` or `(request, context)`.
 
 ---
 
-# Reference Files
+## Reference Files
 
-- `knowledge/ai-guardrails-memory.md` — Full guardrail API, all memory strategies, configuration options
-- `knowledge/ai-budget-resilience.md` — Budget configuration, circuit breaker, retry policies, estimateTokens
-- `knowledge/ai-security.md` — PII patterns, injection detection, security best practices
+- `ai-guardrails-memory.md` — Full guardrail API, all memory strategies, configuration options
+- `ai-budget-resilience.md` — Budget configuration, circuit breaker, retry policies, estimateTokens
+- `ai-security.md` — PII patterns, injection detection, security best practices
 - `examples/auth-flow.ts` — Auth-gated orchestrator with security guardrails
 - `examples/fraud-analysis.ts` — Budget-aware multi-agent fraud detection

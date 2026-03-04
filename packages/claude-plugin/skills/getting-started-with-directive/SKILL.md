@@ -5,16 +5,20 @@ description: "Understand Directive fundamentals: what modules, facts, derivation
 
 # Getting Started with Directive
 
-# When Claude Should Use This Skill
+## Prerequisites
 
-## Auto-Invoke Triggers
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
+## When Claude Should Use This Skill
+
+### Auto-Invoke Triggers
 - User asks "what is Directive" or "how does Directive work"
 - User is new to Directive and needs orientation
 - User asks about the relationship between facts, constraints, and resolvers
 - User asks "should I use a constraint or an effect" or similar conceptual questions
 - User wants to understand the Directive mental model before writing code
 
-## Exclusions — Use a Different Skill
+### Exclusions — Use a Different Skill
 - User already knows Directive and wants to write a specific module → `writing-directive-modules`
 - User asks about specific constraint/resolver patterns → `writing-directive-constraints`
 - User asks about multi-module systems or React → `building-directive-systems`
@@ -23,7 +27,7 @@ description: "Understand Directive fundamentals: what modules, facts, derivation
 
 ---
 
-# Directive Mental Model
+## Directive Mental Model
 
 Directive is a **constraint-driven runtime** for TypeScript. Instead of imperative state management, you:
 
@@ -65,8 +69,10 @@ import { createModule, createSystem, t } from "@directive-run/core";
 
 const counter = createModule("counter", {
   schema: {
-    count: t.number(),
-    limit: t.number(),
+    facts: {
+      count: t.number(),
+      limit: t.number(),
+    },
   },
 
   init: (facts) => {
@@ -139,13 +145,15 @@ Is it a business rule (if X then Y)?
 
 ```typescript
 schema: {
-  name: t.string(),                           // string
-  age: t.number(),                            // number
-  active: t.boolean(),                        // boolean
-  role: t.string<"admin" | "user">(),         // union type
-  profile: t.object<{ name: string }>(),      // typed object
-  tags: t.array<string>(),                    // typed array
-  data: t.object<Profile | null>(),           // nullable
+  facts: {
+    name: t.string(),                           // string
+    age: t.number(),                            // number
+    active: t.boolean(),                        // boolean
+    role: t.string<"admin" | "user">(),         // union type
+    profile: t.object<{ name: string }>(),      // typed object
+    tags: t.array<string>(),                    // typed array
+    data: t.object<Profile | null>(),           // nullable
+  },
 }
 ```
 
@@ -160,8 +168,31 @@ Resolver:       camelCase        → resolvers: { fetchProfile: ... }
 Requirement:    UPPER_SNAKE_CASE → require: { type: "FETCH_PROFILE" }
 ```
 
+## Skill Map
+
+All available Directive skills, grouped by use case:
+
+**Learning:**
+- `getting-started-with-directive` — This skill. Fundamentals and mental model
+- `migrating-to-directive` — Convert from Redux, Zustand, XState, MobX
+
+**Building (Core):**
+- `writing-directive-modules` — Schema, type builders, derivations, naming
+- `writing-directive-constraints` — Constraints, resolvers, error boundaries, retry
+- `building-directive-systems` — Multi-module, plugins, React integration
+- `scaffolding-directive-modules` — Generate module + test boilerplate
+
+**Building (AI):**
+- `building-ai-orchestrators` — Single and multi-agent orchestrators
+- `building-ai-agents` — Streaming, provider adapters, cross-agent communication
+- `hardening-ai-systems` — Guardrails, budgets, PII detection, security
+
+**Quality:**
+- `testing-directive-code` — createTestSystem, mockResolver, time-travel
+- `testing-ai-systems` — Mock runners, evaluations, observability
+- `reviewing-directive-code` — Anti-pattern scanner, naming audit
+
 ## Reference Files
 
 Supporting knowledge files loaded with this skill:
 - `core-patterns.md` — Core patterns and API reference
-- `api-skeleton.md` — Full API surface
