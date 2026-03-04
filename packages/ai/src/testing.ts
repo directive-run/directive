@@ -1733,6 +1733,12 @@ export interface BreakpointCapable {
   cancelBreakpoint(id: string, reason?: string): void;
 }
 
+/**
+ * Create a breakpoint simulator that auto-resolves breakpoints for testing.
+ *
+ * @param options - Simulator options including `autoResumeDelay` and `modifications`.
+ * @returns An object with `handler`, `hits`, and `attachTo` for test assertions.
+ */
 export function createBreakpointSimulator(
   options: BreakpointSimulatorOptions = {},
 ): {

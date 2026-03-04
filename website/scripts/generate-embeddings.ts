@@ -18,12 +18,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { glob } from "fast-glob";
+import { log } from "../../scripts/lib/log";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SourceType = "guide" | "api-reference" | "blog";
+type SourceType = "guide" | "api-reference" | "blog" | "knowledge";
 
 interface EmbeddingEntry {
   id: string;
@@ -137,6 +138,52 @@ function extractSections(node: any, sections: Section[], isRoot = true): void {
       extractSections(child, sections, false);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Markdown Heading Splitter (for knowledge files)
+// ---------------------------------------------------------------------------
+
+interface MarkdownSection {
+  heading: string;
+  content: string;
+}
+
+/**
+ * Split a markdown file into sections by ## headings.
+ * The content before the first ## goes under the file name as heading.
+ */
+function splitMarkdownByHeading(
+  markdown: string,
+  fallbackTitle: string,
+): MarkdownSection[] {
+  const lines = markdown.split("\n");
+  const sections: MarkdownSection[] = [];
+  let currentHeading = fallbackTitle;
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^##\s+(.+)/);
+    if (headingMatch) {
+      // Flush previous section
+      const content = currentLines.join("\n").trim();
+      if (content) {
+        sections.push({ heading: currentHeading, content });
+      }
+      currentHeading = headingMatch[1].trim();
+      currentLines = [line];
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  // Flush last section
+  const content = currentLines.join("\n").trim();
+  if (content) {
+    sections.push({ heading: currentHeading, content });
+  }
+
+  return sections;
 }
 
 // ---------------------------------------------------------------------------
@@ -424,35 +471,53 @@ const EMBEDDING_DIMENSIONS = 1536;
 // under ~100KB and limits retry blast radius if a batch fails.
 const BATCH_SIZE = 100;
 
+const EMBED_MAX_RETRIES = 3;
+const EMBED_BASE_DELAY_MS = 1_000;
+
 async function embedBatch(texts: string[]): Promise<number[][]> {
   if (!OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY environment variable is required");
   }
 
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: texts,
-      dimensions: EMBEDDING_DIMENSIONS,
-    }),
-  });
+  for (let attempt = 0; attempt < EMBED_MAX_RETRIES; attempt++) {
+    const response = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: EMBEDDING_MODEL,
+        input: texts,
+        dimensions: EMBEDDING_DIMENSIONS,
+      }),
+    });
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`OpenAI API error ${response.status}: ${body}`);
+    if (response.ok) {
+      const data = (await response.json()) as {
+        data: Array<{ embedding: number[]; index: number }>;
+      };
+
+      // Sort by index to maintain order
+      return data.data
+        .sort((a, b) => a.index - b.index)
+        .map((d) => d.embedding);
+    }
+
+    // Retry on transient errors (429, 5xx)
+    const isRetryable = response.status === 429 || response.status >= 500;
+    if (!isRetryable || attempt === EMBED_MAX_RETRIES - 1) {
+      const body = await response.text();
+      throw new Error(`OpenAI API error ${response.status}: ${body}`);
+    }
+
+    const delay = EMBED_BASE_DELAY_MS * 2 ** attempt;
+    log.warn(`Retrying embedding batch (attempt ${attempt + 1}/${EMBED_MAX_RETRIES}, waiting ${delay}ms)...`);
+    await new Promise((r) => setTimeout(r, delay));
   }
 
-  const data = (await response.json()) as {
-    data: Array<{ embedding: number[]; index: number }>;
-  };
-
-  // Sort by index to maintain order
-  return data.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+  // Unreachable, but satisfies TypeScript
+  throw new Error("Embedding retry loop exhausted");
 }
 
 // ---------------------------------------------------------------------------
@@ -460,18 +525,17 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 // ---------------------------------------------------------------------------
 
 async function main() {
+  const PHASE = "Generate Embeddings";
+  log.header(PHASE);
+
   // Graceful skip when OPENAI_API_KEY is not available (CI, local dev)
   if (!OPENAI_API_KEY) {
-    console.warn(
-      "\n⚠ OPENAI_API_KEY not set — skipping embedding generation.\n" +
-        "  The site will build without chatbot search.\n" +
-        "  Set OPENAI_API_KEY to generate embeddings.\n",
-    );
+    log.warn("OPENAI_API_KEY not set — skipping embedding generation");
+    log.item("The site will build without chatbot search");
+    log.done(PHASE);
 
     return;
   }
-
-  console.log("Generating embeddings for Directive docs...\n");
 
   // =========================================================================
   // Phase 1: Markdoc doc pages → paragraph chunks
@@ -479,7 +543,8 @@ async function main() {
 
   const pagesDir = path.resolve(__dirname, "../src/app");
   const files = glob.sync("**/page.md", { cwd: pagesDir });
-  console.log(`Phase 1: Found ${files.length} doc pages`);
+  log.step(`Phase 1: Markdoc docs (${files.length} pages)`);
+  log.reads([`website/src/app/**/page.md (${files.length} files)`]);
 
   const Markdoc = await import("@markdoc/markdoc").then((m) => m.default ?? m);
 
@@ -507,7 +572,7 @@ async function main() {
     }
   }
 
-  console.log(`  → ${allChunks.length} doc chunks`);
+  log.item(`${allChunks.length} chunks`);
 
   // =========================================================================
   // Phase 2: Generated API reference → function-level chunks
@@ -518,10 +583,14 @@ async function main() {
     "../docs/generated/api-reference.json",
   );
 
+  log.step("Phase 2: API reference");
+
   if (fs.existsSync(apiRefPath)) {
     const apiEntries: ApiDocEntry[] = JSON.parse(
       fs.readFileSync(apiRefPath, "utf-8"),
     );
+
+    log.reads([`docs/generated/api-reference.json (${apiEntries.length} entries)`]);
 
     let apiChunkCount = 0;
     for (const entry of apiEntries) {
@@ -530,30 +599,117 @@ async function main() {
       apiChunkCount += chunks.length;
     }
 
-    console.log(
-      `Phase 2: ${apiEntries.length} API entries → ${apiChunkCount} chunks`,
-    );
+    log.item(`${apiChunkCount} chunks`);
   } else {
-    console.log(
-      "Phase 2: No api-reference.json found, skipping (run pnpm build:api-docs first)",
-    );
+    log.error("api-reference.json not found — run `pnpm build:api-docs` first");
+    process.exit(1);
   }
 
   // =========================================================================
-  // Phase 3: Deduplication
+  // Phase 3: Knowledge package files → section chunks
+  // =========================================================================
+
+  const knowledgeDirs = [
+    path.resolve(__dirname, "../../packages/knowledge/core"),
+    path.resolve(__dirname, "../../packages/knowledge/ai"),
+  ];
+
+  log.step("Phase 3: Knowledge files");
+
+  let knowledgeChunkCount = 0;
+  const knowledgeReadFiles: string[] = [];
+  for (const dir of knowledgeDirs) {
+    if (!fs.existsSync(dir)) continue;
+
+    const mdFiles = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .sort();
+
+    const dirName = path.basename(path.dirname(dir)) + "/" + path.basename(dir);
+    knowledgeReadFiles.push(`${dirName}/*.md (${mdFiles.length} files)`);
+
+    for (const file of mdFiles) {
+      const content = fs.readFileSync(path.join(dir, file), "utf-8");
+      const fileName = file.replace(/\.md$/, "");
+
+      // Split by ## headings (same pattern as doc page sections)
+      const sections = splitMarkdownByHeading(content, fileName);
+
+      for (const section of sections) {
+        const tokens = estimateTokens(section.content);
+        if (tokens < MIN_CHUNK_TOKENS) continue;
+
+        // If it fits in one chunk, use it
+        if (tokens <= MAX_CHUNK_TOKENS) {
+          allChunks.push({
+            content: section.content,
+            url: `/docs/knowledge/${fileName}#${slugify(section.heading)}`,
+            title: `Knowledge: ${fileName}`,
+            section: section.heading,
+            sourceType: "knowledge",
+          });
+          knowledgeChunkCount++;
+        } else {
+          // Split large sections at paragraph boundaries
+          const paragraphs = section.content.split(/\n\n+/);
+          let currentParts: string[] = [section.heading];
+          let currentTokens = estimateTokens(section.heading);
+
+          for (const para of paragraphs) {
+            const paraTokens = estimateTokens(para);
+            if (
+              currentTokens + paraTokens > MAX_CHUNK_TOKENS &&
+              currentParts.length > 1
+            ) {
+              allChunks.push({
+                content: currentParts.join("\n\n"),
+                url: `/docs/knowledge/${fileName}#${slugify(section.heading)}`,
+                title: `Knowledge: ${fileName}`,
+                section: section.heading,
+                sourceType: "knowledge",
+              });
+              knowledgeChunkCount++;
+              currentParts = [`${section.heading} (continued)`];
+              currentTokens = estimateTokens(currentParts[0]);
+            }
+            currentParts.push(para);
+            currentTokens += paraTokens;
+          }
+
+          if (currentParts.length > 1 && currentTokens >= MIN_CHUNK_TOKENS) {
+            allChunks.push({
+              content: currentParts.join("\n\n"),
+              url: `/docs/knowledge/${fileName}#${slugify(section.heading)}`,
+              title: `Knowledge: ${fileName}`,
+              section: section.heading,
+              sourceType: "knowledge",
+            });
+            knowledgeChunkCount++;
+          }
+        }
+      }
+    }
+  }
+
+  log.reads(knowledgeReadFiles);
+  log.item(`${knowledgeChunkCount} chunks`);
+
+  // =========================================================================
+  // Phase 4: Deduplication
   // =========================================================================
 
   const beforeDedup = allChunks.length;
   const dedupedChunks = deduplicateChunks(allChunks);
   const removed = beforeDedup - dedupedChunks.length;
   if (removed > 0) {
-    console.log(`Dedup: removed ${removed} duplicate chunks`);
+    log.step(`Dedup: removed ${removed} duplicate chunks`);
   }
 
-  console.log(`\nTotal: ${dedupedChunks.length} chunks to embed\n`);
+  log.success(`${dedupedChunks.length} chunks to embed`);
 
   if (dedupedChunks.length === 0) {
-    console.error("No chunks extracted. Check that doc pages exist.");
+    log.error("No chunks extracted. Check that doc pages exist.");
     process.exit(1);
   }
 
@@ -568,9 +724,7 @@ async function main() {
     const batch = dedupedChunks.slice(i, i + BATCH_SIZE);
     const batchNum = Math.floor(i / BATCH_SIZE) + 1;
     const pct = Math.round((batchNum / totalBatches) * 100);
-    console.log(
-      `Embedding batch ${batchNum}/${totalBatches} (${batch.length} chunks, ${pct}%)...`,
-    );
+    log.step(`Embedding batch ${batchNum}/${totalBatches} (${batch.length} chunks, ${pct}%)...`);
 
     const embeddings = await embedBatch(batch.map((c) => c.content));
 
@@ -605,22 +759,18 @@ async function main() {
   const sizeMB = (
     Buffer.byteLength(JSON.stringify(entries)) /
     (1024 * 1024)
-  ).toFixed(2);
-  console.log(
-    `\nWrote ${entries.length} embeddings to ${outPath} (${sizeMB} MB)`,
-  );
+  ).toFixed(1);
 
   // Summary by source type
-  const byType = new Map<string, number>();
+  const byType: Record<string, number> = {};
   for (const e of entries) {
     const t = e.metadata.sourceType;
-    byType.set(t, (byType.get(t) ?? 0) + 1);
+    byType[t] = (byType[t] ?? 0) + 1;
   }
-  console.log("\nBy source type:");
-  for (const [type, count] of [...byType.entries()].sort()) {
-    console.log(`  ${type}: ${count}`);
-  }
-  console.log("Done!");
+  log.summary(byType);
+
+  log.writes("public/embeddings.json", `${sizeMB} MB`);
+  log.done(PHASE);
 }
 
 main().catch((err) => {

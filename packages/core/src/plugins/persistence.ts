@@ -5,27 +5,61 @@
 import type { ModuleSchema, Plugin, System } from "../core/types.js";
 import { isPrototypeSafe } from "../utils/utils.js";
 
+/**
+ * Configuration for the {@link persistencePlugin}.
+ *
+ * @remarks
+ * At minimum, provide a `storage` backend and a `key`. Use `include` or
+ * `exclude` to control which fact keys are persisted. Saves are debounced
+ * by default (100 ms) to avoid excessive writes during rapid updates.
+ *
+ * | Field       | Default | Description |
+ * |-------------|---------|-------------|
+ * | `storage`   | *(required)* | A `Storage`-compatible backend (`localStorage`, `sessionStorage`, or custom). |
+ * | `key`       | *(required)* | The key used to read/write from storage. |
+ * | `include`   | all keys | Whitelist of fact keys to persist. |
+ * | `exclude`   | `[]`    | Blacklist of fact keys to skip. |
+ * | `debounce`  | `100`   | Milliseconds to debounce saves. |
+ * | `onRestore` | --      | Callback fired after state is restored from storage. |
+ * | `onSave`    | --      | Callback fired after state is written to storage. |
+ * | `onError`   | --      | Callback fired when a load or save error occurs. |
+ *
+ * @public
+ */
 export interface PersistencePluginOptions {
-  /** Storage backend (localStorage, sessionStorage, or custom) */
+  /** A `Storage`-compatible backend (`localStorage`, `sessionStorage`, or custom). */
   storage: Storage;
-  /** Key to use in storage */
+  /** The key used to read/write from the storage backend. */
   key: string;
-  /** Only persist these fact keys (default: all) */
+  /** Whitelist of fact keys to persist (default: all keys). */
   include?: string[];
-  /** Exclude these fact keys from persistence */
+  /** Fact keys to exclude from persistence. */
   exclude?: string[];
-  /** Debounce saves by this many ms (default: 100) */
+  /** Milliseconds to debounce saves (default: 100). */
   debounce?: number;
-  /** Called when state is restored */
+  /** Callback fired after state is restored from storage on init. */
   onRestore?: (data: Record<string, unknown>) => void;
-  /** Called when state is saved */
+  /** Callback fired after state is written to storage. */
   onSave?: (data: Record<string, unknown>) => void;
-  /** Called on error */
+  /** Callback fired when a load or save error occurs. */
   onError?: (error: Error) => void;
 }
 
 /**
- * Create a persistence plugin.
+ * Create a plugin that persists selected facts to a `Storage` backend and
+ * restores them on system init.
+ *
+ * @remarks
+ * On `onInit`, the plugin reads the storage key and batch-sets any persisted
+ * facts into the store. On every `onFactSet` / `onFactDelete` / `onFactsBatch`,
+ * a debounced save is scheduled. A final synchronous save runs on `onDestroy`
+ * to capture any pending changes.
+ *
+ * Stored data is validated against prototype pollution before restoration
+ * via {@link isPrototypeSafe}.
+ *
+ * @param options - Required {@link PersistencePluginOptions} specifying storage backend, key, and optional filters/callbacks.
+ * @returns A {@link Plugin} that can be passed to `createSystem`'s `plugins` array.
  *
  * @example
  * ```ts
@@ -40,6 +74,8 @@ export interface PersistencePluginOptions {
  *   ],
  * });
  * ```
+ *
+ * @public
  */
 export function persistencePlugin<M extends ModuleSchema = ModuleSchema>(
   options: PersistencePluginOptions,

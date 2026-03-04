@@ -335,9 +335,12 @@ export interface EvalCostOptions {
 /**
  * Evaluate cost efficiency — scores based on token usage relative to a budget.
  *
- * Score = 1.0 when tokens <= maxTokensPerRun * 0.5
- * Score = 0.0 when tokens >= maxTokensPerRun * 2
+ * Score = 1.0 when tokens \<= maxTokensPerRun * 0.5,
+ * Score = 0.0 when tokens \>= maxTokensPerRun * 2.
  * Linear interpolation between.
+ *
+ * @param options - Cost evaluation options including `maxTokensPerRun`.
+ * @returns An eval criterion that scores token usage against the budget.
  */
 export function evalCost(options: EvalCostOptions): EvalCriterion {
   return {
@@ -377,9 +380,12 @@ export interface EvalLatencyOptions {
 /**
  * Evaluate latency — scores based on agent run duration.
  *
- * Score = 1.0 when duration <= maxMs * 0.5
- * Score = 0.0 when duration >= maxMs * 2
+ * Score = 1.0 when duration \<= maxMs * 0.5,
+ * Score = 0.0 when duration \>= maxMs * 2.
  * Linear interpolation between.
+ *
+ * @param options - Latency evaluation options including `maxMs`.
+ * @returns An eval criterion that scores run duration against the limit.
  */
 export function evalLatency(options: EvalLatencyOptions): EvalCriterion {
   return {
@@ -634,6 +640,12 @@ export interface EvalJudgeOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Evaluate output quality by delegating to a judge agent that scores from 0.0 to 1.0.
+ *
+ * @param options - Judge evaluation options including `runner`, `judge` agent, and optional `promptTemplate`.
+ * @returns An eval criterion that runs a judge agent and returns its score.
+ */
 export function evalJudge(options: EvalJudgeOptions): EvalCriterion {
   const template =
     options.promptTemplate ??
@@ -711,6 +723,12 @@ export interface EvalMatchOptions {
   caseInsensitive?: boolean;
 }
 
+/**
+ * Evaluate exact or substring match against expected output.
+ *
+ * @param options - Match evaluation options including `mode` and `caseInsensitive`.
+ * @returns An eval criterion that checks output against the expected value.
+ */
 export function evalMatch(options: EvalMatchOptions = {}): EvalCriterion {
   const mode = options.mode ?? "contains";
   const ci = options.caseInsensitive ?? true;

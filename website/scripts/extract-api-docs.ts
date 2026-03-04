@@ -15,6 +15,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { log } from "../../scripts/lib/log";
 import {
   type ClassDeclaration,
   type ExportedDeclarations,
@@ -531,7 +532,8 @@ function generateMarkdown(entries: ApiDocEntry[]): string {
 // ============================================================================
 
 async function main() {
-  console.log("Extracting API documentation from TypeScript sources...\n");
+  const PHASE = "Extract API Docs";
+  log.header(PHASE);
 
   const rootDir = path.resolve(__dirname, "..");
   const corePackageDir = path.resolve(rootDir, "../packages/core");
@@ -558,6 +560,7 @@ async function main() {
 
   const allEntries: ApiDocEntry[] = [];
   const seenNames = new Set<string>();
+  const exportCounts: Record<string, number> = {};
 
   for (const entryFile of entryFiles) {
     const sourceFile = project.addSourceFileAtPath(entryFile.path);
@@ -566,6 +569,9 @@ async function main() {
     project.resolveSourceFileDependencies();
 
     const exportedDecls = sourceFile.getExportedDeclarations();
+    let moduleExports = 0;
+
+    log.step(`Reading ${entryFile.module}...`);
 
     for (const [name, decls] of exportedDecls) {
       // Skip duplicates across modules (core takes precedence)
@@ -589,14 +595,18 @@ async function main() {
             (entry.examples && entry.examples.length > 0)
           ) {
             allEntries.push(entry);
+            moduleExports++;
           }
           break; // Take the first successful processing
         }
       }
     }
+
+    log.item(`${moduleExports} documented exports`);
+    exportCounts[entryFile.module] = moduleExports;
   }
 
-  console.log(`Extracted ${allEntries.length} documented API entries\n`);
+  log.success(`${allEntries.length} API entries extracted`);
 
   // Sort entries
   allEntries.sort((a, b) => {
@@ -612,25 +622,32 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const jsonPath = path.join(outDir, "api-reference.json");
-  fs.writeFileSync(jsonPath, JSON.stringify(allEntries, null, 2));
-  console.log(`Wrote ${jsonPath}`);
+  const jsonContent = JSON.stringify(allEntries, null, 2);
+  fs.writeFileSync(jsonPath, jsonContent);
 
   // Write Markdown
   const mdPath = path.join(outDir, "api-reference.md");
   const markdown = generateMarkdown(allEntries);
   fs.writeFileSync(mdPath, markdown);
-  console.log(`Wrote ${mdPath}`);
 
   // Summary
   const byKind = new Map<string, number>();
   for (const entry of allEntries) {
     byKind.set(entry.kind, (byKind.get(entry.kind) ?? 0) + 1);
   }
-  console.log("\nSummary:");
+
+  const summaryData: Record<string, number> = {};
   for (const [kind, count] of [...byKind.entries()].sort()) {
-    console.log(`  ${kind}: ${count}`);
+    summaryData[kind] = count;
   }
-  console.log(`  total: ${allEntries.length}`);
+  log.summary(summaryData);
+
+  const jsonSize = `${(Buffer.byteLength(jsonContent) / 1024).toFixed(0)} KB`;
+  const mdSize = `${(Buffer.byteLength(markdown) / 1024).toFixed(0)} KB`;
+  log.writes("docs/generated/api-reference.json", jsonSize);
+  log.writes("docs/generated/api-reference.md", mdSize);
+
+  log.done(PHASE);
 }
 
 main().catch((err) => {

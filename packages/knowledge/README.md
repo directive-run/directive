@@ -26,6 +26,7 @@ import {
   getAllExamples,
   getKnowledgeFiles,
   getExampleFiles,
+  clearCache,
 } from "@directive-run/knowledge";
 
 // Get a single knowledge file
@@ -36,6 +37,9 @@ const combined = getKnowledgeFiles(["constraints", "resolvers"]);
 
 // Get all examples as a Map<name, content>
 const examples = getAllExamples();
+
+// Clear cached knowledge and examples (useful for dev/watch mode)
+clearCache();
 ```
 
 ## Scripts

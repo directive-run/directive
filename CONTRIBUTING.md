@@ -164,35 +164,105 @@ pnpm --filter website build        # Full website build (API docs → embeddings
 
 `pnpm -r build` runs tsup in each package. Build order follows the dependency graph automatically &ndash; core builds first, then framework adapters and AI.
 
-### Website Build Chain
+### Docs Pipeline
 
-The website build runs three steps in sequence:
+The full docs pipeline runs 6 steps across 3 packages, feeding outputs forward:
 
 ```
-extract-api-docs.ts ──→ generate-embeddings.ts ──→ next build
-      │                         │                       │
-      ▼                         ▼                       ▼
-  docs/generated/          public/                  .next/
-  ├── api-reference.json   └── embeddings.json      (production build)
-  └── api-reference.md
+  TS Source Files                    Knowledge Files
+  (core/src, ai/src)                 (core/*.md, ai/*.md)
+        │                                  │
+        ▼                                  │
+  ┌──────────────────┐                     │
+  │ extract-api-docs │ website/scripts     │
+  │ (ts-morph)       │                     │
+  └────────┬─────────┘                     │
+           │                               │
+           ▼                               │
+  docs/generated/                          │
+  ├── api-reference.json ──┐               │
+  └── api-reference.md     │               │
+                           │               │
+           ┌───────────────┘               │
+           ▼                               │
+  ┌─────────────────────┐                  │
+  │ generate-api-skeleton│ knowledge/      │
+  └────────┬────────────┘  scripts         │
+           │                               │
+           ▼                               │
+  knowledge/api-skeleton.md                │
+           │                               │
+           ├───────────────────────────────┐│
+           ▼                               ▼│
+  ┌──────────────────┐            ┌────────────────┐
+  │ extract-examples │            │validate-knowledge│
+  └────────┬─────────┘            └────────────────┘
+           │                               │
+           ▼                               │
+  knowledge/examples/*.ts                  │
+           │                               │
+           ├───────────────────────────────┘
+           ▼
+  ┌──────────────────┐
+  │ build-skills     │ claude-plugin/scripts
+  └────────┬─────────┘
+           │
+           ▼
+  claude-plugin/skills/
+  (12 skill directories)
+           │
+           ▼
+  ┌─────────────────────┐
+  │ generate-embeddings  │ website/scripts
+  │ (OpenAI API)         │
+  └────────┬─────────────┘
+           │
+           ▼
+  public/embeddings.json
 ```
 
-**Step 1: API Docs** (`tsx scripts/extract-api-docs.ts`)
-- Uses ts-morph to parse JSDoc from `packages/core/src/` and `packages/ai/src/`
-- Extracts function signatures, parameters, return types, examples
-- Outputs JSON (for embeddings) + Markdown (for human reference)
-- Reads source files directly &ndash; packages don't need to be built first
+### One-Command Pipeline
 
-**Step 2: Embeddings** (`tsx scripts/generate-embeddings.ts`)
-- Chunks Markdoc doc pages by paragraph
-- Chunks API reference entries by symbol
-- Deduplicates overlapping content
-- Embeds all chunks via OpenAI `text-embedding-3-small` (1536 dimensions)
-- Writes `public/embeddings.json` for the AI chatbot
-- Gracefully skips if `OPENAI_API_KEY` is missing (logs warning, doesn't fail)
+```bash
+pnpm build:docs-pipeline
+```
 
-**Step 3: Next.js Build** (`next build`)
-- Compiles the docs site with all generated content available
+Runs all 6 steps in sequence: package builds &rarr; extract API docs &rarr; knowledge build (skeleton + examples) &rarr; build skills &rarr; generate embeddings.
+
+### Individual Steps
+
+| Step | Command | Reads | Writes |
+|------|---------|-------|--------|
+| 1. Extract API Docs | `pnpm --filter directive-website build:api-docs` | `packages/{core,ai}/src/**/*.ts` | `docs/generated/api-reference.{json,md}` |
+| 2. Generate API Skeleton | `pnpm --filter @directive-run/knowledge generate` | `docs/generated/api-reference.json` | `packages/knowledge/api-skeleton.md` |
+| 3. Extract Examples | `pnpm --filter @directive-run/knowledge extract-examples` | `examples/*/src/*.ts` | `packages/knowledge/examples/*.ts` |
+| 4. Validate Knowledge | `pnpm --filter @directive-run/knowledge validate` | `api-skeleton.md`, `{core,ai}/*.md` | (validation only) |
+| 5. Build Skills | `pnpm --filter @directive-run/claude-plugin build` | `knowledge/{core,ai,examples}/*` | `claude-plugin/skills/` |
+| 6. Generate Embeddings | `pnpm --filter directive-website build:embeddings` | docs, api-reference.json, knowledge | `public/embeddings.json` |
+
+### Generated Files
+
+These files are gitignored and must be rebuilt:
+
+| File | Rebuilt By | When to Rebuild |
+|------|-----------|-----------------|
+| `docs/generated/api-reference.json` | Step 1 | JSDoc or exports change in core/ai |
+| `docs/generated/api-reference.md` | Step 1 | Same as above |
+| `packages/knowledge/api-skeleton.md` | Step 2 | After step 1, or manually |
+| `packages/knowledge/examples/*.ts` | Step 3 | Example source files change |
+| `claude-plugin/skills/*` | Step 5 | Knowledge files or templates change |
+| `public/embeddings.json` | Step 6 | Any content change (docs, API, knowledge) |
+
+### When to Run What
+
+| What Changed | Run |
+|--------------|-----|
+| TypeScript source (JSDoc, exports) | Full pipeline: `pnpm build:docs-pipeline` |
+| Knowledge files (`core/*.md`, `ai/*.md`) | Steps 4-6: validate &rarr; build-skills &rarr; embeddings |
+| Example source files | Steps 3-6: extract-examples &rarr; build-skills &rarr; embeddings |
+| Skill templates | Step 5: `pnpm --filter @directive-run/claude-plugin build` |
+| Doc pages (Markdoc) | Step 6: `pnpm --filter directive-website build:embeddings` |
+| Everything / not sure | `pnpm build:docs-pipeline` |
 
 ### LLMs.txt
 

@@ -4,24 +4,50 @@
 
 import type { ModuleSchema, Plugin } from "../core/types.js";
 
+/**
+ * Configuration for the {@link loggingPlugin}.
+ *
+ * @remarks
+ * All fields are optional. The defaults produce `[Directive]`-prefixed
+ * `console.info`-level output for every lifecycle event.
+ *
+ * | Field    | Default         | Description |
+ * |----------|-----------------|-------------|
+ * | `level`  | `"info"`        | Minimum severity to emit. |
+ * | `filter` | `() => true`    | Predicate that receives the event name (e.g., `"fact.set"`) and returns whether to log it. |
+ * | `logger` | `console`       | Any object implementing `debug`, `info`, `warn`, `error`, `group`, and `groupEnd`. |
+ * | `prefix` | `"[Directive]"` | String prepended to every log line. |
+ *
+ * @public
+ */
 export interface LoggingPluginOptions {
-  /** Log level */
+  /** Minimum log level; events below this severity are silenced. */
   level?: "debug" | "info" | "warn" | "error";
-  /** Filter function to include/exclude events */
+  /** Predicate that receives the event name and returns whether to log it. */
   filter?: (event: string) => boolean;
-  /** Custom logger (defaults to console) */
+  /** Custom logger object (defaults to `console`). */
   logger?: Pick<
     Console,
     "debug" | "info" | "warn" | "error" | "group" | "groupEnd"
   >;
-  /** Prefix for log messages */
+  /** String prepended to every log message. */
   prefix?: string;
 }
 
 const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 
 /**
- * Create a logging plugin.
+ * Create a plugin that logs Directive lifecycle events to a configurable logger.
+ *
+ * @remarks
+ * Every plugin hook is mapped to a log call at an appropriate severity:
+ * - `debug` -- init, destroy, fact changes, derivation compute/invalidate, reconcile, constraint evaluate, resolver start/cancel, effect run, snapshot
+ * - `info` -- start, stop, requirement met, resolver complete, time-travel jump
+ * - `warn` -- resolver retry, error recovery
+ * - `error` -- constraint error, resolver error, effect error, system error
+ *
+ * @param options - Optional {@link LoggingPluginOptions} to control level, filtering, logger backend, and prefix.
+ * @returns A {@link Plugin} that can be passed to `createSystem`'s `plugins` array.
  *
  * @example
  * ```ts
@@ -30,6 +56,8 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
  *   plugins: [loggingPlugin({ level: "debug" })],
  * });
  * ```
+ *
+ * @public
  */
 export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
   options: LoggingPluginOptions = {},

@@ -146,6 +146,14 @@ const moduleDeriveProxyCache = new WeakMap<
  * - **Single module**: Use `module` prop for direct access without namespace
  * - **Multiple modules**: Use `modules` prop for namespaced access
  *
+ * @remarks
+ * The system is the top-level runtime object. It owns the reconciliation loop,
+ * manages plugins, and exposes reactive accessors for facts, derivations, and events.
+ * Call `system.start()` to begin the lifecycle (init → ready → running → settled).
+ *
+ * @param options - System configuration with either `module` (single) or `modules` (namespaced)
+ * @returns A fully-typed {@link System} instance with reactive accessors
+ *
  * @example Single module (direct access)
  * ```ts
  * const system = createSystem({ module: counterModule });
@@ -161,6 +169,8 @@ const moduleDeriveProxyCache = new WeakMap<
  * system.facts.auth.token      // Namespaced access
  * system.events.auth.login()   // Namespaced events
  * ```
+ *
+ * @public
  */
 export function createSystem<S extends ModuleSchema>(
   options: CreateSystemOptionsSingle<S>,
@@ -168,6 +178,7 @@ export function createSystem<S extends ModuleSchema>(
 export function createSystem<const Modules extends ModulesMap>(
   options: CreateSystemOptionsNamed<Modules>,
 ): NamespacedSystem<Modules>;
+/** @internal Implementation overload — see public overloads above. */
 export function createSystem<
   S extends ModuleSchema,
   Modules extends ModulesMap,

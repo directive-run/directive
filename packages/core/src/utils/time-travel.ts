@@ -22,13 +22,39 @@ import { isPrototypeSafe } from "./utils.js";
 // Time-Travel Manager
 // ============================================================================
 
-/** A changeset groups multiple snapshots into a single undo/redo unit. */
+/**
+ * A changeset groups multiple snapshots into a single undo/redo unit.
+ *
+ * @remarks
+ * Use {@link TimeTravelManager.beginChangeset} and
+ * {@link TimeTravelManager.endChangeset} to create changesets. When navigating
+ * with `goBack`/`goForward`, the entire changeset is traversed as one step.
+ *
+ * @internal
+ */
 export interface Changeset {
   label: string;
   startIndex: number;
   endIndex: number;
 }
 
+/**
+ * Internal time-travel manager that extends the public {@link TimeTravelAPI}
+ * with snapshot capture, restoration, and pause/resume controls.
+ *
+ * @remarks
+ * - `takeSnapshot(trigger)` records the current facts into the ring buffer.
+ * - `restore(snapshot)` deserializes a snapshot back into the facts store,
+ *   setting `isRestoring = true` so the engine skips reconciliation.
+ * - `pause()` / `resume()` temporarily suspend snapshot recording (e.g.,
+ *   during bulk imports or programmatic state resets).
+ * - `beginChangeset(label)` / `endChangeset()` group consecutive snapshots
+ *   so `goBack`/`goForward` treat them as a single undo/redo unit.
+ *
+ * @typeParam _S - The schema type (unused at runtime but preserved for type safety).
+ *
+ * @internal
+ */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
   /** Take a snapshot of current state */
@@ -45,7 +71,13 @@ export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
   resume(): void;
 }
 
-/** Options for creating a time-travel manager */
+/**
+ * Options for creating a time-travel manager via {@link createTimeTravelManager}.
+ *
+ * @typeParam S - The facts schema type.
+ *
+ * @internal
+ */
 export interface CreateTimeTravelOptions<S extends Schema> {
   config: DebugConfig;
   facts: Facts<S>;
@@ -57,17 +89,22 @@ export interface CreateTimeTravelOptions<S extends Schema> {
 }
 
 /**
- * Create a snapshot-based time-travel debugger with a ring buffer of state
- * history.
+ * Create a snapshot-based time-travel debugger backed by a ring buffer.
  *
- * Snapshots are taken automatically after fact changes (during
- * reconciliation) and can be navigated with `goBack`/`goForward`/`goTo`.
- * Changesets group multiple snapshots into a single undo/redo unit.
- * The entire history can be exported to JSON and re-imported for
- * cross-session debugging.
+ * @remarks
+ * Snapshots are taken automatically after fact changes (during reconciliation)
+ * and can be navigated with `goBack`/`goForward`/`goTo`. Use
+ * `beginChangeset(label)` and `endChangeset()` to group multiple snapshots
+ * into a single undo/redo unit. The entire history can be exported to JSON
+ * via `export()` and re-imported with `import()` for cross-session debugging.
  *
- * @param options - Debug config (maxSnapshots, timeTravel flag), facts proxy, store, and snapshot/time-travel callbacks
- * @returns A `TimeTravelManager` with takeSnapshot/restore/goBack/goForward/goTo/replay/export/import and changeset methods
+ * Call `pause()` to temporarily stop recording snapshots (e.g., during bulk
+ * fact imports) and `resume()` to re-enable recording.
+ *
+ * @param options - Debug config, facts proxy, store, and optional snapshot/time-travel callbacks.
+ * @returns A {@link TimeTravelManager} with snapshot capture, navigation, changeset, and export/import methods.
+ *
+ * @internal
  */
 export function createTimeTravelManager<S extends Schema>(
   options: CreateTimeTravelOptions<S>,
@@ -396,10 +433,16 @@ export function createTimeTravelManager<S extends Schema>(
 }
 
 /**
- * Create a no-op time-travel manager used when `debug.timeTravel` is
- * disabled. All methods are safe to call but perform no work.
+ * Create a no-op time-travel manager for use when `debug.timeTravel` is disabled.
  *
- * @returns A `TimeTravelManager` where every method is a no-op and `isEnabled` is `false`
+ * @remarks
+ * All methods are safe to call but perform no work. This avoids null-checks
+ * throughout the engine -- callers can use the same {@link TimeTravelManager}
+ * interface regardless of whether time-travel is enabled.
+ *
+ * @returns A {@link TimeTravelManager} where every method is a no-op and `isEnabled` is `false`.
+ *
+ * @internal
  */
 export function createDisabledTimeTravel<
   S extends Schema,

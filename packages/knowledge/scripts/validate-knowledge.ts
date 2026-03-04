@@ -10,6 +10,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, "..");
@@ -152,6 +153,9 @@ function getKnowledgeFiles(): Array<{ name: string; content: string }> {
 }
 
 function main() {
+  const PHASE = "Validate Knowledge";
+  log.header(PHASE);
+
   const skeletonContent = readFileSync(API_SKELETON, "utf-8");
 
   // Extract all backtick-quoted identifiers from the skeleton
@@ -164,16 +168,21 @@ function main() {
     }
   }
 
-  console.log(`API skeleton has ${apiSymbols.size} symbols`);
+  log.reads(["api-skeleton.md"]);
+  log.item(`${apiSymbols.size} symbols`);
 
   // Check each knowledge file
   const files = getKnowledgeFiles();
+  log.step(`Checking ${files.length} knowledge files...`);
 
   let totalRefs = 0;
   let missingRefs = 0;
   const missing: Array<{ file: string; symbol: string }> = [];
+  const fileRefCounts: Record<string, number> = {};
 
   for (const file of files) {
+    let fileRefs = 0;
+
     // Extract identifier references that look like API symbols
     // (PascalCase or camelCase starting identifiers, not lowercase keywords)
     const refPattern = /`((?:create|use|with|assert|mock|estimate|validate|pipe|select|t\.|Module|System|Plugin|Constraint|Resolver|Requirement|Derivation|Effect|Schema|Facts|Engine|Orchestrator|Agent|Runner|Budget|Guardrail|Memory|Circuit)\w*)`/g;
@@ -185,30 +194,36 @@ function main() {
       }
 
       totalRefs++;
+      fileRefs++;
 
       if (!apiSymbols.has(symbol)) {
         missingRefs++;
         missing.push({ file: file.name, symbol });
       }
     }
+
+    fileRefCounts[file.name] = fileRefs;
   }
 
-  console.log(
-    `Checked ${totalRefs} API symbol references across ${files.length} files`,
-  );
+  for (const file of files) {
+    const refs = fileRefCounts[file.name] ?? 0;
+    const hasMissing = missing.some((m) => m.file === file.name);
+    const status = hasMissing ? "has warnings" : "";
+    log.item(file.name, `${refs} refs${status ? ` (${status})` : ""}`);
+  }
 
   if (missing.length > 0) {
-    console.warn(`\nWarning: ${missing.length} symbols not found in API skeleton:`);
+    log.warn(`${missing.length} symbols not found in API skeleton:`);
     for (const { file, symbol } of missing) {
-      console.warn(`  ${file}: \`${symbol}\``);
+      log.item(file, `\`${symbol}\``);
     }
-    console.warn(
-      "\nThese may be stale references. Run `pnpm --filter @directive-run/knowledge generate` to refresh.",
-    );
+    log.warn("Run `pnpm --filter @directive-run/knowledge generate` to refresh");
     process.exitCode = 1;
   } else {
-    console.log("All API symbol references are valid.");
+    log.success(`${totalRefs} symbol references valid across ${files.length} files`);
   }
+
+  log.done(PHASE);
 }
 
 main();

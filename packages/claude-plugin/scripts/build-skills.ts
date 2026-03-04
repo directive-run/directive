@@ -12,6 +12,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, "..");
@@ -36,67 +37,73 @@ interface SkillConfig {
 const SKILL_MAP: SkillConfig[] = [
   {
     name: "getting-started-with-directive",
-    knowledgeFiles: ["core-patterns"],
+    knowledgeFiles: ["api-skeleton", "core-patterns"],
     examples: ["counter"],
   },
   {
     name: "writing-directive-modules",
-    knowledgeFiles: ["core-patterns", "schema-types", "naming", "anti-patterns"],
+    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "naming", "anti-patterns"],
     examples: ["counter", "contact-form", "newsletter", "feature-flags", "shopping-cart", "form-wizard"],
   },
   {
     name: "writing-directive-constraints",
-    knowledgeFiles: ["constraints", "resolvers", "error-boundaries"],
+    knowledgeFiles: ["api-skeleton", "constraints", "resolvers", "error-boundaries"],
     examples: ["auth-flow", "async-chains", "debounce-constraints", "batch-resolver", "error-boundaries"],
   },
   {
     name: "building-directive-systems",
-    knowledgeFiles: ["multi-module", "system-api", "plugins", "react-adapter"],
+    knowledgeFiles: ["api-skeleton", "multi-module", "system-api", "plugins", "react-adapter"],
     examples: ["multi-module", "dynamic-modules", "theme-locale", "permissions", "notifications", "dashboard-loader", "pagination", "url-sync", "websocket", "server", "optimistic-updates", "ab-testing", "sudoku"],
   },
   {
     name: "testing-directive-code",
-    knowledgeFiles: ["testing", "time-travel"],
+    knowledgeFiles: ["api-skeleton", "testing", "time-travel"],
     examples: ["time-machine"],
   },
   {
     name: "building-ai-orchestrators",
-    knowledgeFiles: ["ai-orchestrator", "ai-multi-agent", "ai-tasks"],
+    knowledgeFiles: ["api-skeleton", "ai-orchestrator", "ai-multi-agent", "ai-tasks"],
     examples: ["checkers", "goal-heist", "fraud-analysis"],
   },
   {
     name: "building-ai-agents",
-    knowledgeFiles: ["ai-agents-streaming", "ai-adapters", "ai-communication"],
+    knowledgeFiles: ["api-skeleton", "ai-agents-streaming", "ai-adapters", "ai-communication"],
     examples: ["ai-checkpoint", "provider-routing"],
   },
   {
     name: "hardening-ai-systems",
-    knowledgeFiles: ["ai-guardrails-memory", "ai-budget-resilience", "ai-security"],
+    knowledgeFiles: ["api-skeleton", "ai-guardrails-memory", "ai-budget-resilience", "ai-security"],
     examples: ["ai-guardrails", "topic-guard"],
   },
   {
     name: "testing-ai-systems",
-    knowledgeFiles: ["ai-testing-evals", "ai-debug-observability", "ai-mcp-rag"],
+    knowledgeFiles: ["api-skeleton", "ai-testing-evals", "ai-debug-observability", "ai-mcp-rag"],
     examples: ["ai-orchestrator", "fraud-analysis"],
   },
   {
     name: "reviewing-directive-code",
-    knowledgeFiles: ["anti-patterns", "core-patterns", "naming"],
+    knowledgeFiles: ["api-skeleton", "anti-patterns", "core-patterns", "naming"],
     examples: ["counter", "auth-flow"],
   },
   {
     name: "scaffolding-directive-modules",
-    knowledgeFiles: ["core-patterns", "schema-types", "naming"],
+    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "naming"],
     examples: ["counter", "auth-flow", "shopping-cart", "dashboard-loader"],
   },
   {
     name: "migrating-to-directive",
-    knowledgeFiles: ["core-patterns", "schema-types", "anti-patterns"],
+    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "anti-patterns"],
     examples: ["counter", "shopping-cart"],
   },
 ];
 
 function findKnowledgeFile(name: string): string | null {
+  // Check package root first (e.g., api-skeleton.md)
+  const rootPath = join(KNOWLEDGE_PKG, `${name}.md`);
+  if (existsSync(rootPath)) {
+    return rootPath;
+  }
+
   const corePath = join(CORE_DIR, `${name}.md`);
   if (existsSync(corePath)) {
     return corePath;
@@ -121,7 +128,7 @@ function buildExamplesMd(examples: string[]): string {
   for (const name of examples) {
     const examplePath = join(EXAMPLES_DIR, `${name}.ts`);
     if (!existsSync(examplePath)) {
-      console.warn(`  [WARN] Example not found: ${name}.ts`);
+      log.warn(`Example not found: ${name}.ts`);
       continue;
     }
 
@@ -144,7 +151,7 @@ function buildSkill(config: SkillConfig): void {
   // 1. Copy SKILL.md template
   const templatePath = join(TEMPLATES_DIR, `${config.name}.md`);
   if (!existsSync(templatePath)) {
-    console.warn(`  [WARN] Template not found: ${config.name}.md — creating placeholder`);
+    log.warn(`Template not found: ${config.name}.md — creating placeholder`);
     writeFileSync(
       join(skillDir, "SKILL.md"),
       `---\nname: ${config.name}\ndescription: TODO\n---\n\n# ${config.name}\n\nTODO: Add content\n`,
@@ -159,7 +166,7 @@ function buildSkill(config: SkillConfig): void {
   for (const name of config.knowledgeFiles) {
     const srcPath = findKnowledgeFile(name);
     if (!srcPath) {
-      console.warn(`  [WARN] Knowledge file not found: ${name}.md`);
+      log.warn(`Knowledge file not found: ${name}.md`);
       continue;
     }
     writeFileSync(
@@ -177,27 +184,38 @@ function buildSkill(config: SkillConfig): void {
 
   // Count files
   const fileCount = readdirSync(skillDir).length;
-  console.log(`  ${config.name}: ${fileCount} files`);
+  log.item(config.name, `${fileCount} files`);
 }
 
 function main() {
-  console.log("Building Claude Code plugin skills...\n");
+  const PHASE = "Build Claude Code Skills";
+  log.header(PHASE);
 
   // Validate knowledge package exists
   if (!existsSync(CORE_DIR)) {
-    console.error(`Error: Knowledge package not found at ${KNOWLEDGE_PKG}`);
-    console.error("Run: pnpm --filter @directive-run/knowledge build");
+    log.error(`Knowledge package not found at ${KNOWLEDGE_PKG}`);
+    log.error("Run: pnpm --filter @directive-run/knowledge build");
     process.exit(1);
   }
 
+  log.reads([
+    "knowledge/core/",
+    "knowledge/ai/",
+    "knowledge/examples/",
+    "knowledge/api-skeleton.md",
+  ]);
+
   // Clean skills dir
   mkdirSync(SKILLS_DIR, { recursive: true });
+
+  log.step(`Building ${SKILL_MAP.length} skills...`);
 
   for (const config of SKILL_MAP) {
     buildSkill(config);
   }
 
-  console.log(`\nBuilt ${SKILL_MAP.length} skills`);
+  log.writes(`claude-plugin/skills/`, `${SKILL_MAP.length} directories`);
+  log.done(PHASE);
 }
 
 main();

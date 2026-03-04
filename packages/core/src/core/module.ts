@@ -135,6 +135,10 @@ export interface ModuleConfigWithDeps<
  * - Event dispatch (`system.dispatch({ type: "..." })` has autocomplete)
  * - Resolver requirements (`req.payload` is typed based on requirement type)
  *
+ * @param id - Unique module identifier (kebab-case recommended)
+ * @param config - Module configuration including schema, init, derive, constraints, resolvers, etc.
+ * @returns A frozen module definition ready for use with `createSystem`
+ *
  * @example
  * ```ts
  * const trafficLight = createModule("traffic-light", {
@@ -209,6 +213,8 @@ export interface ModuleConfigWithDeps<
  *   },
  * });
  * ```
+ *
+ * @public
  */
 // Overload 1: With crossModuleDeps
 export function createModule<
@@ -228,7 +234,7 @@ export function createModule<const M extends ModuleSchema>(
   config: ModuleConfigWithDeps<M, CrossModuleDeps> | ModuleConfig<M>,
 ): ModuleDef<M>;
 
-// Implementation (must immediately follow overload declarations)
+/** @internal Implementation overload — see public overloads above. */
 export function createModule<const M extends ModuleSchema>(
   id: string,
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
@@ -359,6 +365,9 @@ export function createModule<const M extends ModuleSchema>(
  * Useful for multi-instance UIs (tabs, panels, multi-tenant) where you need
  * isolated state from the same schema.
  *
+ * @param config - Module configuration (same shape as `createModule` minus the `id`)
+ * @returns A factory function that accepts a name and returns a `ModuleDef`
+ *
  * @example
  * ```typescript
  * const chatRoom = createModuleFactory({
@@ -377,6 +386,8 @@ export function createModule<const M extends ModuleSchema>(
  *   },
  * });
  * ```
+ *
+ * @public
  */
 export function createModuleFactory<const M extends ModuleSchema>(
   config: ModuleConfig<M>,
@@ -385,6 +396,7 @@ export function createModuleFactory<
   const M extends ModuleSchema,
   const Deps extends CrossModuleDeps,
 >(config: ModuleConfigWithDeps<M, Deps>): (name: string) => ModuleDef<M>;
+/** @internal Implementation overload — see public overloads above. */
 export function createModuleFactory<const M extends ModuleSchema>(
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): (name: string) => ModuleDef<M> {
