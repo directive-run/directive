@@ -81,16 +81,20 @@ export interface RetryLaterConfig {
 export interface ErrorBoundaryConfig {
   onConstraintError?:
     | RecoveryStrategy
-    | ((error: Error, constraint: string) => RecoveryStrategy | undefined);
+    // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+    | ((error: Error, constraint: string) => RecoveryStrategy | void);
   onResolverError?:
     | RecoveryStrategy
-    | ((error: Error, resolver: string) => RecoveryStrategy | undefined);
+    // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+    | ((error: Error, resolver: string) => RecoveryStrategy | void);
   onEffectError?:
     | RecoveryStrategy
-    | ((error: Error, effect: string) => RecoveryStrategy | undefined);
+    // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+    | ((error: Error, effect: string) => RecoveryStrategy | void);
   onDerivationError?:
     | RecoveryStrategy
-    | ((error: Error, derivation: string) => RecoveryStrategy | undefined);
+    // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+    | ((error: Error, derivation: string) => RecoveryStrategy | void);
   onError?: (error: DirectiveError) => void;
 
   /** Configuration for retry-later strategy */
