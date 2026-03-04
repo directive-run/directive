@@ -157,6 +157,7 @@ const guardrailModule = createModule("guardrails", {
 
 const system = createSystem({
   module: guardrailModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ai-guardrails" })],
 });
 system.start();

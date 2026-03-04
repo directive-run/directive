@@ -22,6 +22,7 @@ import {
 
 const system = createSystem({
   module: optimisticUpdatesModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "optimistic-updates" })],
 });
 system.start();

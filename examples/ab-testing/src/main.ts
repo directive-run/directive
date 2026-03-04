@@ -306,6 +306,7 @@ const abTesting = createModule("ab-testing", {
 
 const system = createSystem({
   module: abTesting,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ab-testing" })],
 });
 system.start();

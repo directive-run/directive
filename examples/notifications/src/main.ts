@@ -23,6 +23,7 @@ import {
 const system = createSystem({
   modules: { notifications: notificationsModule, app: appModule },
   tickMs: 1000,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "notifications" })],
 });
 system.start();

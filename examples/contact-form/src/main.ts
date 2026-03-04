@@ -299,6 +299,7 @@ const contactForm = createModule("contact-form", {
 
 const system = createSystem({
   module: contactForm,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "contact-form" })],
 });
 system.start();

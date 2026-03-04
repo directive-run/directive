@@ -194,6 +194,7 @@ const newsletter = createModule("newsletter", {
 
 const system = createSystem({
   module: newsletter,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "newsletter" })],
 });
 system.start();

@@ -217,6 +217,7 @@ const routerModule = createModule("router", {
 
 const system = createSystem({
   module: routerModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "provider-routing" })],
 });
 system.start();

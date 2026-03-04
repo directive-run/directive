@@ -17,7 +17,7 @@ import { sudokuGame, sudokuSchema } from "./sudoku.js";
 
 const system = createSystem({
   module: sudokuGame,
-  debug: { timeTravel: true, maxSnapshots: 200 },
+  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
   plugins: [devtoolsPlugin({ name: "sudoku" })],
 });
 system.start();

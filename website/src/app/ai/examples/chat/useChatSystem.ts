@@ -20,7 +20,7 @@ export function useChatSystem(apiEndpoint: string) {
     systemRef.current = createSystem({
       module: chatSession,
       plugins: [devtoolsPlugin({ name: "ai-chat" })],
-      debug: { timeTravel: true, maxSnapshots: 50, runHistory: true },
+      debug: { runHistory: true },
     });
   }
 
@@ -72,10 +72,37 @@ export function useChatSystem(apiEndpoint: string) {
     // Initial sync
     syncState();
 
-    // Subscribe to store changes
-    const unsubscribe = store.subscribe(syncState);
+    // Throttled sync — at most once per 200ms during streaming
+    let syncTimer: ReturnType<typeof setTimeout> | null = null;
+    function debouncedSync() {
+      if (syncTimer) {
+        return;
+      }
+      syncTimer = setTimeout(() => {
+        syncTimer = null;
+        syncState();
+      }, 200);
+    }
+
+    const unsubscribe = store.subscribe(() => {
+      const state = store.getSnapshot();
+      if (state.isLoading) {
+        debouncedSync();
+      } else {
+        // Final sync — immediate when streaming stops
+        if (syncTimer) {
+          clearTimeout(syncTimer);
+          syncTimer = null;
+        }
+        syncState();
+      }
+    });
 
     return () => {
+      if (syncTimer) {
+        clearTimeout(syncTimer);
+        syncTimer = null;
+      }
       unsubscribe();
       system.stop();
       system.destroy();

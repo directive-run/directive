@@ -20,6 +20,7 @@ import {
 
 const system = createSystem({
   module: topicGuardModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "topic-guard" })],
 });
 system.start();
