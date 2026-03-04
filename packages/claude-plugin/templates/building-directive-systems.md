@@ -5,6 +5,10 @@ description: "Compose Directive modules into systems: single-module and multi-mo
 
 # Building Directive Systems
 
+## Prerequisites
+
+This skill applies when the project uses `@directive-run/core`. If not found in `package.json`, suggest installing it: `npm install @directive-run/core`.
+
 ## When Claude Should Use This Skill
 
 **Auto-invoke when the user:**

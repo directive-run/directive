@@ -1,6 +1,6 @@
 {
   "name": "directive",
   "version": "0.1.0",
-  "description": "Coding guidance for Directive — the constraint-driven TypeScript runtime. Provides skills for writing modules, constraints, systems, tests, and AI orchestrators.",
+  "description": "Coding guidance for Directive — the constraint-driven TypeScript runtime. 12 skills covering modules, constraints, systems, testing, AI orchestrators, agents, guardrails, code review, scaffolding, and migration from Redux/Zustand/XState.",
   "skills_dir": "../skills"
 }
