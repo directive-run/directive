@@ -1101,7 +1101,7 @@ export function createFactsStore<S extends Schema>(
           pendingNonBatchedChanges.length = 0;
           throw new Error(
             `[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations. ` +
-              `A listener is repeatedly mutating facts that re-trigger notifications.`,
+              "A listener is repeatedly mutating facts that re-trigger notifications.",
           );
         }
 

@@ -69,7 +69,7 @@ export interface EffectDef<S extends Schema> {
   run(
     facts: Facts<S>,
     prev: InferSchema<S> | null,
-  ): void | EffectCleanup | Promise<void | EffectCleanup>;
+  ): undefined | EffectCleanup | Promise<undefined | EffectCleanup>;
   /** Optional explicit dependencies for optimization */
   deps?: Array<keyof InferSchema<S>>;
 }

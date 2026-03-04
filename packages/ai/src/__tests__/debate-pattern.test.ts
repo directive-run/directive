@@ -99,7 +99,7 @@ describe("debate pattern", () => {
           generate: (input) => {
             producerInputs.push(input);
 
-            return { output: `alpha-proposal`, totalTokens: 20 };
+            return { output: "alpha-proposal", totalTokens: 20 };
           },
         },
         beta: { output: "beta-proposal", totalTokens: 20 },

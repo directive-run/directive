@@ -123,7 +123,7 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(key)) {
           throw new Error(
             `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
-              `This could indicate a prototype pollution attempt.`,
+              "This could indicate a prototype pollution attempt.",
           );
         }
       }
@@ -195,7 +195,7 @@ export function createEngine<S extends Schema>(
       if (derivationNames.has(key)) {
         console.warn(
           `[Directive] "${key}" exists as both a fact and a derivation. ` +
-            `This may cause unexpected dependency tracking behavior.`,
+            "This may cause unexpected dependency tracking behavior.",
         );
       }
     }
@@ -712,7 +712,7 @@ export function createEngine<S extends Schema>(
       if (process.env.NODE_ENV !== "production") {
         console.warn(
           `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. ` +
-            `This usually means resolvers are creating circular requirement chains. ` +
+            "This usually means resolvers are creating circular requirement chains. " +
             `Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
         );
       }
@@ -995,7 +995,7 @@ export function createEngine<S extends Schema>(
           } else if (process.env.NODE_ENV !== "production") {
             console.warn(
               `[Directive] Unknown event type "${prop}". ` +
-                `No handler is registered for this event. ` +
+                "No handler is registered for this event. " +
                 `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
             );
           }
@@ -1193,7 +1193,7 @@ export function createEngine<S extends Schema>(
       } else if (process.env.NODE_ENV !== "production") {
         console.warn(
           `[Directive] Unknown event type "${event.type}". ` +
-            `No handler is registered for this event. ` +
+            "No handler is registered for this event. " +
             `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
         );
       }
@@ -1428,7 +1428,7 @@ export function createEngine<S extends Schema>(
       // Add relevant facts (limit to prevent huge output)
       const factEntries = Object.entries(relevantFacts).slice(0, 10);
       if (factEntries.length > 0) {
-        lines.push(`└─ Relevant facts:`);
+        lines.push("└─ Relevant facts:");
         factEntries.forEach(([k, v], i) => {
           const prefix = i === factEntries.length - 1 ? "   └─" : "   ├─";
           const valueStr =
@@ -1835,7 +1835,7 @@ export function createEngine<S extends Schema>(
     if (state.isReconciling) {
       throw new Error(
         `[Directive] Cannot register module "${module.id}" during reconciliation. ` +
-          `Wait for the current reconciliation cycle to complete.`,
+          "Wait for the current reconciliation cycle to complete.",
       );
     }
 

@@ -54,7 +54,7 @@ export function calculateRetryDelay(
   let delay: number;
   switch (backoff) {
     case "exponential":
-      delay = baseDelayMs * Math.pow(2, attempt - 1);
+      delay = baseDelayMs * 2 ** (attempt - 1);
       break;
     case "linear":
       delay = baseDelayMs * attempt;
@@ -140,7 +140,7 @@ export function calculateAgentRetryDelay(
   let delay: number;
   switch (backoff) {
     case "exponential":
-      delay = baseDelayMs * Math.pow(2, attempt - 1);
+      delay = baseDelayMs * 2 ** (attempt - 1);
       break;
     case "linear":
       delay = baseDelayMs * attempt;

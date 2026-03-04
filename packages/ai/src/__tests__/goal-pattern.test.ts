@@ -803,8 +803,8 @@ describe("goal pattern", () => {
     const json = patternToJSON(pattern);
     expect(json.type).toBe("goal");
     if (json.type === "goal") {
-      const nodeA = json.nodes["a"]!;
-      const nodeB = json.nodes["b"]!;
+      const nodeA = json.nodes.a!;
+      const nodeB = json.nodes.b!;
       expect(nodeA.handler).toBe("a");
       expect(nodeA.produces).toEqual(["x"]);
       expect(nodeA.requires).toEqual(["y"]);
