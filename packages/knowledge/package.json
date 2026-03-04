@@ -1,0 +1,65 @@
+{
+  "name": "@directive-run/knowledge",
+  "version": "0.1.0",
+  "description": "Knowledge files, examples, and validation for Directive — the constraint-driven TypeScript runtime.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/knowledge"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "knowledge",
+    "ai-rules",
+    "examples"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "core",
+    "ai",
+    "examples",
+    "api-skeleton.md"
+  ],
+  "scripts": {
+    "build": "tsx scripts/generate-api-skeleton.ts && tsx scripts/extract-examples.ts && tsup",
+    "generate": "tsx scripts/generate-api-skeleton.ts",
+    "extract-examples": "tsx scripts/extract-examples.ts",
+    "validate": "tsx scripts/validate-knowledge.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@directive-run/ai": "workspace:*",
+    "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

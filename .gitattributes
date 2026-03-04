@@ -1,0 +1,2 @@
+# Generated skill directories — exclude from GitHub language stats and diffs
+packages/claude-plugin/skills/** linguist-generated=true

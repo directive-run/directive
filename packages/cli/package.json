@@ -1,0 +1,74 @@
+{
+  "name": "@directive-run/cli",
+  "version": "0.1.0",
+  "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "cli",
+    "ai-rules",
+    "cursor",
+    "copilot",
+    "claude",
+    "windsurf",
+    "cline",
+    "llms-txt"
+  ],
+  "type": "module",
+  "bin": {
+    "directive": "./dist/cli.js",
+    "dr": "./dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./llms.txt": "./dist/llms.txt"
+  },
+  "llms": "./dist/llms.txt",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "@directive-run/knowledge": "workspace:*",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@directive-run/ai": "workspace:*",
+    "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}
