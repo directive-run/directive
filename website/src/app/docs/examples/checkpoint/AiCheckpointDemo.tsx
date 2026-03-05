@@ -1,14 +1,18 @@
 "use client";
 
 import { CodeTabs } from "@/components/CodeTabs";
-import { ExampleEmbed } from "@/components/ExampleEmbed";
+import { InlineInspector } from "@/components/InlineInspector";
+import { StackBlitzOpen } from "@/components/StackBlitzOpen";
+import type { ExampleProjectFiles } from "@/lib/examples";
 
 export function AiCheckpointDemo({
   build,
   sources,
+  projectFiles,
 }: {
   build: import("@/lib/examples").ExampleBuild | null;
   sources: import("@/lib/examples").ExampleSource[];
+  projectFiles: ExampleProjectFiles | null;
 }) {
   const mainSource = sources.find((s) => s.filename === "main.ts");
 
@@ -20,8 +24,9 @@ export function AiCheckpointDemo({
         </h2>
 
         {build ? (
-          <ExampleEmbed
+          <InlineInspector
             name="ai-checkpoint"
+            systemName="ai-checkpoint"
             css={build.css}
             html={build.html}
             scriptSrc={build.scriptSrc}
@@ -91,6 +96,11 @@ export function AiCheckpointDemo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
+        {projectFiles && (
+          <div className="mb-3">
+            <StackBlitzOpen title="AI Checkpoint" projectFiles={projectFiles} />
+          </div>
+        )}
         <CodeTabs
           tabs={[
             mainSource && {

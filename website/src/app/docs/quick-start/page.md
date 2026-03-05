@@ -292,7 +292,9 @@ console.log(system.derive.displayName); // "John"
 
 ## Try It Yourself
 
-{% playground /%}
+{% callout title="Interactive Examples" type="note" %}
+See the [Number Match example](/docs/examples/counter) for a live, interactive demo with a built-in state inspector.
+{% /callout %}
 
 ---
 

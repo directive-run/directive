@@ -1,4 +1,8 @@
-import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import {
+  parseExampleBuild,
+  readExampleProject,
+  readExampleSources,
+} from "@/lib/examples";
 import { buildPageMetadata } from "@/lib/metadata";
 import { FormWizardDemo } from "./FormWizardDemo";
 
@@ -16,6 +20,7 @@ export default function FormWizardPage() {
     "form-wizard.ts",
     "main.ts",
   ]);
+  const projectFiles = readExampleProject("form-wizard");
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -32,7 +37,7 @@ export default function FormWizardPage() {
         </p>
       </header>
 
-      <FormWizardDemo build={build} sources={sources} />
+      <FormWizardDemo build={build} sources={sources} projectFiles={projectFiles} />
     </div>
   );
 }

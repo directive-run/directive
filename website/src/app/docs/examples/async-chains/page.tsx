@@ -1,4 +1,8 @@
-import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import {
+  parseExampleBuild,
+  readExampleProject,
+  readExampleSources,
+} from "@/lib/examples";
 import { buildPageMetadata } from "@/lib/metadata";
 import { AsyncChainsDemo } from "./AsyncChainsDemo";
 
@@ -17,6 +21,7 @@ export default function AsyncChainsPage() {
     "mock-api.ts",
     "main.ts",
   ]);
+  const projectFiles = readExampleProject("async-chains");
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -33,7 +38,7 @@ export default function AsyncChainsPage() {
         </p>
       </header>
 
-      <AsyncChainsDemo build={build} sources={sources} />
+      <AsyncChainsDemo build={build} sources={sources} projectFiles={projectFiles} />
     </div>
   );
 }

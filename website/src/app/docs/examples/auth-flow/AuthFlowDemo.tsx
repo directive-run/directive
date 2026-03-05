@@ -1,14 +1,18 @@
 "use client";
 
 import { CodeTabs } from "@/components/CodeTabs";
-import { ExampleEmbed } from "@/components/ExampleEmbed";
+import { InlineInspector } from "@/components/InlineInspector";
+import { StackBlitzOpen } from "@/components/StackBlitzOpen";
+import type { ExampleProjectFiles } from "@/lib/examples";
 
 export function AuthFlowDemo({
   build,
   sources,
+  projectFiles,
 }: {
   build: import("@/lib/examples").ExampleBuild | null;
   sources: import("@/lib/examples").ExampleSource[];
+  projectFiles: ExampleProjectFiles | null;
 }) {
   const moduleSource = sources.find((s) => s.filename === "auth-flow.ts");
   const mockAuthSource = sources.find((s) => s.filename === "mock-auth.ts");
@@ -23,8 +27,9 @@ export function AuthFlowDemo({
         </h2>
 
         {build ? (
-          <ExampleEmbed
+          <InlineInspector
             name="auth-flow"
+            systemName="auth-flow"
             css={build.css}
             html={build.html}
             scriptSrc={build.scriptSrc}
@@ -62,7 +67,7 @@ export function AuthFlowDemo({
               </strong>{" "}
               &ndash; <code>token</code>, <code>refreshToken</code>,{" "}
               <code>expiresAt</code>, <code>user</code>, <code>status</code>,
-              and a ticking <code>now</code> fact updated every 500ms
+              and a ticking <code>now</code> fact updated every 1s
             </li>
             <li>
               <strong className="text-slate-900 dark:text-slate-200">
@@ -138,6 +143,11 @@ export function AuthFlowDemo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
+        {projectFiles && (
+          <div className="mb-3">
+            <StackBlitzOpen title="Auth Flow" projectFiles={projectFiles} />
+          </div>
+        )}
         <CodeTabs
           tabs={[
             moduleSource && {

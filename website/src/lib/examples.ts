@@ -123,6 +123,64 @@ export function parseExampleBuild(name: string): ExampleBuild | null {
   };
 }
 
+export type ExampleProjectFiles = Record<string, string>;
+
+/**
+ * Read all files needed to open an example as a StackBlitz project.
+ * Reads package.json, index.html, vite.config.ts, tsconfig.json, and all src/*.ts files.
+ * Returns a flat file map suitable for `@stackblitz/sdk`'s `openProject({ files })`.
+ */
+export function readExampleProject(name: string): ExampleProjectFiles | null {
+  if (!VALID_NAME.test(name)) {
+    throw new Error(`Invalid example name: "${name}"`);
+  }
+
+  const exampleDir = path.join(process.cwd(), "..", "examples", name);
+
+  if (!fs.existsSync(exampleDir)) {
+    return null;
+  }
+
+  const files: ExampleProjectFiles = {};
+
+  // Root config files
+  const rootFiles = [
+    "package.json",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json",
+  ];
+  for (const file of rootFiles) {
+    const filePath = path.join(exampleDir, file);
+    if (fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, "utf-8");
+
+      // Fix package.json: replace workspace:* with latest published version
+      if (file === "package.json") {
+        content = content.replace(/"workspace:\*"/g, '"latest"');
+      }
+
+      // Fix vite.config.ts: remove base path (StackBlitz serves from root)
+      if (file === "vite.config.ts") {
+        content = content.replace(/\s*base:\s*"[^"]*",?\n?/g, "\n");
+      }
+
+      files[file] = content;
+    }
+  }
+
+  // Source files
+  const srcDir = path.join(exampleDir, "src");
+  if (fs.existsSync(srcDir)) {
+    const srcFiles = fs.readdirSync(srcDir).filter((f) => f.endsWith(".ts"));
+    for (const file of srcFiles) {
+      files[`src/${file}`] = fs.readFileSync(path.join(srcDir, file), "utf-8");
+    }
+  }
+
+  return Object.keys(files).length > 0 ? files : null;
+}
+
 export type ExampleSource = {
   filename: string;
   code: string;
