@@ -21,7 +21,6 @@ import localFont from "next/font/local";
 import Script from "next/script";
 
 import { Providers } from "@/app/providers";
-import { ConditionalOnboardingToast } from "@/components/ConditionalOnboardingToast";
 import { SoftwareJsonLd, WebsiteJsonLd } from "@/components/JsonLd";
 import { Layout } from "@/components/Layout";
 import { buildPresetInlineScript } from "@/lib/preset-inline-script";
@@ -254,7 +253,6 @@ export default function RootLayout({
       <body className="flex min-h-full bg-brand-surface">
         <Providers>
           <Layout>{children}</Layout>
-          <ConditionalOnboardingToast />
         </Providers>
         {process.env.NEXT_PUBLIC_GA_ID && (
           <>

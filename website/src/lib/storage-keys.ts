@@ -4,7 +4,6 @@ export const STORAGE_KEYS = {
   COLOR: "directive-brand-color",
   TYPO: "directive-brand-typo",
   FIRST_VISIT: "directive-brand-first-visit",
-  ONBOARDED: "directive-brand-onboarded",
   FONT_SIZE: "directive-brand-font-size",
   EXPERIMENTS: "directive-labs-experiments",
   DISMISSED_NOTIFICATIONS: "directive-dismissed-notifications",
