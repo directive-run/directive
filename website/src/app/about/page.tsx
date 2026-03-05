@@ -1,3 +1,4 @@
+import { BrandHeading } from "@/components/BrandHeading";
 import { CardLink } from "@/components/CardLink";
 import { ConstraintFlowDiagram } from "@/components/ConstraintFlowDiagram";
 import { DirectiveCallout } from "@/components/DirectiveCallout";
@@ -211,6 +212,14 @@ export default function AboutPage() {
           </Link>
         </p>
 
+        <BrandHeading className="mt-20">
+          No limits.
+          <br />
+          No boundaries.
+          <br />
+          Just infinity.
+        </BrandHeading>
+
         {/* Built by Sizls */}
         <div className="mt-20">
           <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
@@ -219,7 +228,7 @@ export default function AboutPage() {
 
           <div className="mt-6 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
             <p>
-              Sizls is a small crew of talented individuals led by Jason
+              Sizls is a small collective of talented individuals led by Jason
               Comes{" "}
               <a
                 href="https://www.linkedin.com/in/jasonwcomes/"
@@ -248,8 +257,7 @@ export default function AboutPage() {
                 <GithubLogo weight="fill" className="h-4 w-4" />
                 GitHub
               </a>
-              &nbsp;&ndash; contributions, bug reports, and RFCs are welcome. No
-              limits, no boundaries, just infinity.
+              &nbsp;&ndash; contributions, bug reports, and RFCs are welcome.
             </p>
           </div>
 
