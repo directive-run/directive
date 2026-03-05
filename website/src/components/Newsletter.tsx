@@ -45,7 +45,7 @@ export function Newsletter() {
     <div className="relative isolate overflow-hidden border-t border-slate-200 bg-brand-surface pt-16 pb-16 sm:pt-24 sm:pb-24 dark:border-slate-800 dark:pt-24">
       <div className="mx-auto flex max-w-5xl flex-col items-center gap-10 px-4 text-center sm:px-6 lg:flex-row lg:items-center lg:text-left lg:px-8 xl:px-12">
         <h2 className="max-w-xl font-display text-5xl font-semibold tracking-tight text-balance sm:text-6xl lg:flex-auto">
-          <span className="newsletter-heading-gradient inline bg-clip-text text-transparent">
+          <span className="brand-heading-gradient inline bg-clip-text text-transparent">
             Stay in the loop. Sign up for our newsletter.
           </span>
         </h2>
