@@ -6,4 +6,9 @@ export default defineConfig({
   dts: true,
   clean: true,
   external: ["vite"],
+  sourcemap: true,
+  splitting: false,
+  treeshake: true,
+  target: "es2022",
+  minify: true,
 });
