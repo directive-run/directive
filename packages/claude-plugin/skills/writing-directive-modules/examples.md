@@ -7,10 +7,10 @@
 ```typescript
 // Example: counter
 // Source: examples/counter/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Number Match – Directive Module
+ * Number Match — Directive Module
  *
  * Types, schema, helpers, module definition, timeline, and system creation
  * for a tile-matching game where pairs must add to 10.
@@ -195,7 +195,9 @@ const numberMatch = createModule("number-match", {
     selectTile: (facts, { tileId }) => {
       if (!facts.selected.includes(tileId) && !facts.gameOver) {
         facts.selected = [...facts.selected, tileId];
-        addLog(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
+        addLog(
+          `EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`,
+        );
       }
     },
     deselectTile: (facts, { tileId }) => {
@@ -385,10 +387,10 @@ export const system = createSystem({
 ```typescript
 // Example: contact-form
 // Source: examples/contact-form/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Contact Form – Directive Module
+ * Contact Form — Directive Module
  *
  * Multi-field contact form showcasing validation, constraints, and resolvers:
  * - Facts: name, email, subject, message, touched, status, errorMessage, etc.
@@ -606,7 +608,7 @@ const contactForm = createModule("contact-form", {
     updateField: (facts, { field, value }) => {
       const key = field as "name" | "email" | "subject" | "message";
       if (key in facts && typeof facts[key] === "string") {
-        (facts as Record<string, string>)[key] = value;
+        (facts as unknown as Record<string, string>)[key] = value;
       }
     },
 
@@ -655,7 +657,7 @@ const contactForm = createModule("contact-form", {
         if (Math.random() < 0.2) {
           context.facts.status = "error";
           context.facts.errorMessage =
-            "Simulated error – try again (20% failure rate for demo).";
+            "Simulated error — try again (20% failure rate for demo).";
           log("Submission failed (simulated)");
 
           return;
@@ -717,10 +719,10 @@ export const system = createSystem({
 ```typescript
 // Example: newsletter
 // Source: examples/newsletter/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Newsletter Signup – Directive Module
+ * Newsletter Signup — Directive Module
  *
  * Demonstrates all six primitives with the simplest possible module:
  * - Facts: email, touched, status, errorMessage, lastSubmittedAt
@@ -865,7 +867,7 @@ const newsletter = createModule("newsletter", {
   },
 
   resolvers: {
-    // Simulated submission – no API account needed
+    // Simulated submission — no API account needed
     subscribe: {
       requirement: "SUBSCRIBE",
       resolve: async (req, context) => {
@@ -878,7 +880,7 @@ const newsletter = createModule("newsletter", {
         if (Math.random() < 0.2) {
           context.facts.status = "error";
           context.facts.errorMessage =
-            "Simulated error – try again (20% failure rate for demo).";
+            "Simulated error — try again (20% failure rate for demo).";
           addLog("Subscription failed (simulated)");
 
           return;
@@ -936,7 +938,7 @@ export const system = createSystem({
 ```typescript
 // Example: feature-flags
 // Source: examples/feature-flags/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
  * Feature Flags Directive Module (Example)
@@ -1161,10 +1163,10 @@ export const featureFlagsModule = createModule("feature-flags", {
 ```typescript
 // Example: shopping-cart
 // Source: examples/shopping-cart/src/shopping-cart.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Shopping Cart – Directive Modules
+ * Shopping Cart — Directive Modules
  *
  * Two modules:
  * - cart: Items, coupons, checkout with cross-module auth dependency
@@ -1588,10 +1590,10 @@ export const system = createSystem({
 ```typescript
 // Example: form-wizard
 // Source: examples/form-wizard/src/form-wizard.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Form Wizard – Directive Modules
+ * Form Wizard — Directive Modules
  *
  * Two-module system demonstrating multi-step form validation,
  * constraint-driven step advancement, cross-module async email

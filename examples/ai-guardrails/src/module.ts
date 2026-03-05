@@ -1,7 +1,3 @@
-// Example: ai-guardrails
-// Source: examples/ai-guardrails/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * AI Safety Shield — Directive Module
  *

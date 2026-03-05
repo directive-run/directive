@@ -49,7 +49,7 @@ export const websocketSchema = {
     url: t.string(),
     status: t.string<WsStatus>(),
     connectRequested: t.boolean(),
-    messages: t.object<WsMessage[]>(),
+    messages: t.array<WsMessage>(),
     retryCount: t.number(),
     maxRetries: t.number(),
     messageToSend: t.string(),
@@ -58,7 +58,7 @@ export const websocketSchema = {
     messageRate: t.number(),
     connectFailRate: t.number(),
     reconnectFailRate: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isConnected: t.boolean(),
@@ -100,7 +100,7 @@ export const websocketSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   // Cap at 100
   if (log.length > 100) {
@@ -312,7 +312,7 @@ export const websocketModule = createModule("websocket", {
               return;
             }
 
-            const messages = [...(context.facts.messages as WsMessage[])];
+            const messages = [...context.facts.messages];
             messages.push(msg);
             // Cap at 50
             if (messages.length > 50) {
@@ -369,7 +369,7 @@ export const websocketModule = createModule("websocket", {
       requirement: "RECONNECT",
       timeout: 60000,
       resolve: async (req, context) => {
-        const retryCount = context.facts.retryCount as number;
+        const retryCount = context.facts.retryCount;
         context.facts.status = "reconnecting";
         context.facts.reconnectTargetTime = Date.now() + req.delay;
         addLogEntry(

@@ -1,9 +1,9 @@
 // Example: ai-checkpoint
-// Source: examples/ai-checkpoint/src/main.ts
-// Extracted for AI rules — DOM wiring stripped
+// Source: examples/ai-checkpoint/src/module.ts
+// Pure module file — no DOM wiring
 
 /**
- * AI Pipeline Checkpoint — 4-Stage Document Processing with Save/Restore
+ * AI Pipeline Checkpoint — Module Definition
  *
  * 4-stage pipeline (extract → summarize → classify → archive) with checkpoint
  * at every stage. Save/restore/delete checkpoints. Retry with backoff on failures.
@@ -27,7 +27,7 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 // Types
 // ============================================================================
 
-type PipelineStage =
+export type PipelineStage =
   | "idle"
   | "extract"
   | "summarize"
@@ -36,21 +36,21 @@ type PipelineStage =
   | "done"
   | "error";
 
-interface StageResult {
+export interface StageResult {
   stage: string;
   output: string;
   tokens: number;
   durationMs: number;
 }
 
-interface CheckpointEntry {
+export interface CheckpointEntry {
   id: string;
   label: string;
   createdAt: string;
   stage: PipelineStage;
 }
 
-interface TimelineEntry {
+export interface TimelineEntry {
   time: number;
   event: string;
   detail: string;
@@ -61,7 +61,12 @@ interface TimelineEntry {
 // Constants
 // ============================================================================
 
-const STAGES: PipelineStage[] = ["extract", "summarize", "classify", "archive"];
+export const STAGES: PipelineStage[] = [
+  "extract",
+  "summarize",
+  "classify",
+  "archive",
+];
 
 const STAGE_CONFIG = {
   extract: {
@@ -92,9 +97,9 @@ const STAGE_CONFIG = {
 // Timeline
 // ============================================================================
 
-const timeline: TimelineEntry[] = [];
+export const timeline: TimelineEntry[] = [];
 
-function addTimeline(
+export function addTimeline(
   event: string,
   detail: string,
   type: TimelineEntry["type"],
@@ -109,23 +114,25 @@ function addTimeline(
 // Checkpoint Store
 // ============================================================================
 
-const checkpointStore = new InMemoryCheckpointStore({ maxCheckpoints: 20 });
+export const checkpointStore = new InMemoryCheckpointStore({
+  maxCheckpoints: 20,
+});
 
 // ============================================================================
 // Schema
 // ============================================================================
 
-const schema = {
+export const schema = {
   facts: {
     currentStage: t.string<PipelineStage>(),
-    stageResults: t.object<StageResult[]>(),
+    stageResults: t.array<StageResult>(),
     totalTokens: t.number(),
     retryCount: t.number(),
     maxRetries: t.number(),
     failStage: t.string(),
     isRunning: t.boolean(),
     lastError: t.string(),
-    checkpoints: t.object<CheckpointEntry[]>(),
+    checkpoints: t.array<CheckpointEntry>(),
     selectedCheckpoint: t.string(),
   },
   derivations: {
@@ -173,11 +180,11 @@ const pipelineModule = createModule("pipeline", {
         return 100;
       }
       if (facts.currentStage === "error") {
-        const idx = (facts.stageResults as StageResult[]).length;
+        const idx = facts.stageResults.length;
 
         return Math.round((idx / STAGES.length) * 100);
       }
-      const idx = STAGES.indexOf(facts.currentStage as PipelineStage);
+      const idx = STAGES.indexOf(facts.currentStage);
 
       return Math.round((idx / STAGES.length) * 100);
     },
@@ -189,7 +196,7 @@ const pipelineModule = createModule("pipeline", {
         return STAGES.length;
       }
 
-      return STAGES.indexOf(facts.currentStage as PipelineStage);
+      return STAGES.indexOf(facts.currentStage);
     },
     canAdvance: (facts) => {
       return (
@@ -229,11 +236,11 @@ const pipelineModule = createModule("pipeline", {
 // System
 // ============================================================================
 
-const system = createSystem({
+export const system = createSystem({
   module: pipelineModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "ai-checkpoint" })],
 });
-system.start();
 
 // ============================================================================
 // Pipeline Logic
@@ -262,8 +269,11 @@ async function runStage(stage: PipelineStage): Promise<StageResult> {
   };
 }
 
-async function runStageWithRetry(stage: PipelineStage): Promise<StageResult> {
-  const maxRetries = system.facts.maxRetries as number;
+export async function runStageWithRetry(
+  stage: PipelineStage,
+  renderCallback: () => void,
+): Promise<StageResult> {
+  const maxRetries = system.facts.maxRetries;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -271,30 +281,34 @@ async function runStageWithRetry(stage: PipelineStage): Promise<StageResult> {
       if (attempt > 0) {
         const delay = Math.min(500 * 2 ** (attempt - 1), 4000);
         const jitter = Math.random() * delay * 0.1;
-        system.facts.retryCount = (system.facts.retryCount as number) + 1;
+        system.facts.retryCount = system.facts.retryCount + 1;
+        addTimeline(
           "retry",
           `${stage}: attempt ${attempt + 1}/${maxRetries + 1} (delay ${Math.round(delay)}ms)`,
           "retry",
         );
-        render();
+        renderCallback();
         await new Promise((resolve) => setTimeout(resolve, delay + jitter));
       }
 
       return await runStage(stage);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      addTimeline("error", `${stage}: ${lastError.message}`, "error");
     }
   }
 
   throw lastError!;
 }
 
-async function advancePipeline() {
+export async function advancePipeline(
+  renderCallback: () => void,
+): Promise<void> {
   if (system.facts.isRunning) {
     return;
   }
 
-  const current = system.facts.currentStage as PipelineStage;
+  const current = system.facts.currentStage;
   let nextStage: PipelineStage;
 
   if (current === "idle") {
@@ -313,14 +327,15 @@ async function advancePipeline() {
 
   system.facts.isRunning = true;
   system.facts.currentStage = nextStage;
-  render();
+  addTimeline("stage", `${nextStage}: starting`, "stage");
+  renderCallback();
 
   try {
-    const result = await runStageWithRetry(nextStage);
-    const results = [...(system.facts.stageResults as StageResult[]), result];
+    const result = await runStageWithRetry(nextStage, renderCallback);
+    const results = [...system.facts.stageResults, result];
     system.facts.stageResults = results;
-    system.facts.totalTokens =
-      (system.facts.totalTokens as number) + result.tokens;
+    system.facts.totalTokens = system.facts.totalTokens + result.tokens;
+    addTimeline(
       "success",
       `${nextStage}: complete (${result.tokens} tokens)`,
       "success",
@@ -329,18 +344,20 @@ async function advancePipeline() {
     const idx = STAGES.indexOf(nextStage);
     if (idx >= STAGES.length - 1) {
       system.facts.currentStage = "done";
+      addTimeline("info", "pipeline complete", "info");
     } else {
       system.facts.currentStage = nextStage;
     }
   } catch (err) {
     system.facts.currentStage = "error";
     system.facts.lastError = err instanceof Error ? err.message : String(err);
+    addTimeline("error", `pipeline halted: ${system.facts.lastError}`, "error");
   } finally {
     system.facts.isRunning = false;
   }
 }
 
-async function autoRun() {
+export async function autoRun(renderCallback: () => void): Promise<void> {
   if (system.facts.isRunning) {
     return;
   }
@@ -350,18 +367,20 @@ async function autoRun() {
   system.facts.totalTokens = 0;
   system.facts.retryCount = 0;
   system.facts.lastError = "";
+  addTimeline("info", "auto-run started", "info");
 
   for (const stage of STAGES) {
     system.facts.isRunning = true;
     system.facts.currentStage = stage;
-    render();
+    addTimeline("stage", `${stage}: starting`, "stage");
+    renderCallback();
 
     try {
-      const result = await runStageWithRetry(stage);
-      const results = [...(system.facts.stageResults as StageResult[]), result];
+      const result = await runStageWithRetry(stage, renderCallback);
+      const results = [...system.facts.stageResults, result];
       system.facts.stageResults = results;
-      system.facts.totalTokens =
-        (system.facts.totalTokens as number) + result.tokens;
+      system.facts.totalTokens = system.facts.totalTokens + result.tokens;
+      addTimeline(
         "success",
         `${stage}: complete (${result.tokens} tokens)`,
         "success",
@@ -370,6 +389,7 @@ async function autoRun() {
       system.facts.currentStage = "error";
       system.facts.lastError = err instanceof Error ? err.message : String(err);
       system.facts.isRunning = false;
+      addTimeline(
         "error",
         `pipeline halted at ${stage}: ${system.facts.lastError}`,
         "error",
@@ -382,14 +402,15 @@ async function autoRun() {
   }
 
   system.facts.currentStage = "done";
+  addTimeline("info", "pipeline complete (auto-run)", "info");
 }
 
 // ============================================================================
 // Checkpoint Logic
 // ============================================================================
 
-async function saveCheckpoint() {
-  const stage = system.facts.currentStage as PipelineStage;
+export async function saveCheckpoint(): Promise<void> {
+  const stage = system.facts.currentStage;
   const id = createCheckpointId();
   const label = `Stage: ${stage} (${new Date().toLocaleTimeString()})`;
 
@@ -419,21 +440,21 @@ async function saveCheckpoint() {
     createdAt: checkpoint.createdAt,
     stage,
   };
-  system.facts.checkpoints = [
-    ...(system.facts.checkpoints as CheckpointEntry[]),
-    entry,
-  ];
+  system.facts.checkpoints = [...system.facts.checkpoints, entry];
 
+  addTimeline("checkpoint", `saved: ${label}`, "checkpoint");
 }
 
-async function restoreCheckpoint(checkpointId: string) {
+export async function restoreCheckpoint(checkpointId: string): Promise<void> {
   const checkpoint = await checkpointStore.load(checkpointId);
   if (!checkpoint) {
+    addTimeline("error", "checkpoint not found", "error");
 
     return;
   }
 
   if (!validateCheckpoint(checkpoint)) {
+    addTimeline("error", "invalid checkpoint data", "error");
 
     return;
   }
@@ -447,62 +468,23 @@ async function restoreCheckpoint(checkpointId: string) {
   system.facts.isRunning = false;
 
   if (checkpoint.timelineExport) {
+    const savedTimeline = JSON.parse(checkpoint.timelineExport);
     timeline.length = 0;
     for (const entry of savedTimeline) {
       timeline.push(entry);
     }
   }
 
+  addTimeline("checkpoint", `restored: ${checkpoint.label}`, "checkpoint");
 }
 
-async function deleteCheckpoint(checkpointId: string) {
+export async function deleteCheckpoint(checkpointId: string): Promise<void> {
   const deleted = await checkpointStore.delete(checkpointId);
   if (deleted) {
-    const checkpoints = (system.facts.checkpoints as CheckpointEntry[]).filter(
+    const checkpoints = system.facts.checkpoints.filter(
       (c) => c.id !== checkpointId,
     );
     system.facts.checkpoints = checkpoints;
+    addTimeline("checkpoint", "deleted checkpoint", "checkpoint");
   }
 }
-
-// ============================================================================
-// DOM References
-// ============================================================================
-
-
-// ============================================================================
-// Render
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
-
-
-// ============================================================================
-// Subscribe
-// ============================================================================
-
-const allKeys = [
-  ...Object.keys(schema.facts),
-  ...Object.keys(schema.derivations),
-];
-system.subscribe(allKeys, render);
-
-// ============================================================================
-// Controls
-// ============================================================================
-
-
-  "cp-fail-stage",
-
-// Delegated click for checkpoint restore/delete
-
-  "cp-max-retries",
-
-// ============================================================================
-// Initial Render
-// ============================================================================
-
-render();

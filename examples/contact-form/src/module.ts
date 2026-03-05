@@ -1,7 +1,3 @@
-// Example: contact-form
-// Source: examples/contact-form/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Contact Form — Directive Module
  *

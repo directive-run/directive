@@ -1,7 +1,3 @@
-// Example: batch-resolver
-// Source: examples/batch-resolver/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Batch Data Loader — Directive Module
  *

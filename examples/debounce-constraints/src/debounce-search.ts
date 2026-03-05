@@ -31,7 +31,7 @@ export const debounceSearchSchema = {
     queryChangedAt: t.number(),
     debouncedQuery: t.string(),
     lastSearchedQuery: t.string(),
-    results: t.object<SearchResult[]>(),
+    results: t.array<SearchResult>(),
     isSearching: t.boolean(),
     now: t.number(),
     keystrokeCount: t.number(),
@@ -39,7 +39,7 @@ export const debounceSearchSchema = {
     debounceDelay: t.number(),
     apiDelay: t.number(),
     minChars: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isDebouncing: t.boolean(),
@@ -68,7 +68,7 @@ export const debounceSearchSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 100) {
     log.splice(0, log.length - 100);
@@ -105,30 +105,24 @@ export const debounceSearchModule = createModule("debounce-search", {
 
   derive: {
     isDebouncing: (facts) => {
-      return (
-        facts.query !== facts.debouncedQuery &&
-        (facts.queryChangedAt as number) > 0
-      );
+      return facts.query !== facts.debouncedQuery && facts.queryChangedAt > 0;
     },
 
     debounceProgress: (facts, derive) => {
-      if (!(derive.isDebouncing as boolean)) {
+      if (!derive.isDebouncing) {
         return 0;
       }
 
-      const elapsed = (facts.now as number) - (facts.queryChangedAt as number);
-      const delay = facts.debounceDelay as number;
+      const elapsed = facts.now - facts.queryChangedAt;
+      const delay = facts.debounceDelay;
 
       return Math.min(1, elapsed / delay);
     },
 
-    resultCount: (facts) => (facts.results as SearchResult[]).length,
+    resultCount: (facts) => facts.results.length,
 
     savedCalls: (facts) => {
-      return Math.max(
-        0,
-        (facts.keystrokeCount as number) - (facts.apiCallCount as number),
-      );
+      return Math.max(0, facts.keystrokeCount - facts.apiCallCount);
     },
   },
 
@@ -140,7 +134,7 @@ export const debounceSearchModule = createModule("debounce-search", {
     setQuery: (facts, { value }) => {
       facts.query = value;
       facts.queryChangedAt = Date.now();
-      facts.keystrokeCount = (facts.keystrokeCount as number) + 1;
+      facts.keystrokeCount = facts.keystrokeCount + 1;
 
       if (value === "") {
         facts.debouncedQuery = "";
@@ -185,9 +179,8 @@ export const debounceSearchModule = createModule("debounce-search", {
       when: (facts) => {
         return (
           facts.query !== facts.debouncedQuery &&
-          (facts.queryChangedAt as number) > 0 &&
-          (facts.now as number) - (facts.queryChangedAt as number) >=
-            (facts.debounceDelay as number)
+          facts.queryChangedAt > 0 &&
+          facts.now - facts.queryChangedAt >= facts.debounceDelay
         );
       },
       require: () => ({
@@ -199,15 +192,14 @@ export const debounceSearchModule = createModule("debounce-search", {
       priority: 90,
       when: (facts) => {
         return (
-          (facts.debouncedQuery as string).length >=
-            (facts.minChars as number) &&
+          facts.debouncedQuery.length >= facts.minChars &&
           facts.debouncedQuery !== facts.lastSearchedQuery &&
-          !(facts.isSearching as boolean)
+          !facts.isSearching
         );
       },
       require: (facts) => ({
         type: "SEARCH",
-        query: facts.debouncedQuery as string,
+        query: facts.debouncedQuery,
       }),
     },
   },
@@ -220,12 +212,12 @@ export const debounceSearchModule = createModule("debounce-search", {
     settleDebounce: {
       requirement: "SETTLE_DEBOUNCE",
       resolve: async (_req, context) => {
-        const query = context.facts.query as string;
+        const query = context.facts.query;
         context.facts.debouncedQuery = query;
 
         addLogEntry(context.facts, "debounce-settled", `"${query}"`);
 
-        if (query === "" || query.length < (context.facts.minChars as number)) {
+        if (query === "" || query.length < context.facts.minChars) {
           context.facts.results = [];
           context.facts.lastSearchedQuery = "";
         }
@@ -238,15 +230,15 @@ export const debounceSearchModule = createModule("debounce-search", {
       timeout: 10000,
       resolve: async (req, context) => {
         context.facts.isSearching = true;
-        context.facts.apiCallCount = (context.facts.apiCallCount as number) + 1;
+        context.facts.apiCallCount = context.facts.apiCallCount + 1;
 
         addLogEntry(context.facts, "search-start", `"${req.query}"`);
 
-        const apiDelay = context.facts.apiDelay as number;
+        const apiDelay = context.facts.apiDelay;
         const results = await mockSearch(req.query, apiDelay);
 
         // Stale result prevention
-        if ((context.facts.debouncedQuery as string) === req.query) {
+        if (context.facts.debouncedQuery === req.query) {
           context.facts.results = results;
           context.facts.lastSearchedQuery = req.query;
           addLogEntry(

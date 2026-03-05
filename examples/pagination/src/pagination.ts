@@ -52,7 +52,7 @@ export const filtersModule = createModule("filters", {
       facts.search = value;
     },
     setSortBy: (facts, { value }) => {
-      facts.sortBy = value;
+      facts.sortBy = value as "newest" | "oldest" | "title";
     },
     setCategory: (facts, { value }) => {
       facts.category = value;
@@ -66,7 +66,7 @@ export const filtersModule = createModule("filters", {
 
 export const listSchema = {
   facts: {
-    items: t.object<ListItem[]>(),
+    items: t.array<ListItem>(),
     cursor: t.string(),
     hasMore: t.boolean(),
     isLoadingMore: t.boolean(),

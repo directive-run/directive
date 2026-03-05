@@ -7,10 +7,10 @@
 ```typescript
 // Example: ai-guardrails
 // Source: examples/ai-guardrails/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * AI Safety Shield – Directive Module
+ * AI Safety Shield — Directive Module
  *
  * Types, schema, module definition, timeline, analysis functions,
  * and system creation for prompt injection & PII detection guardrails.
@@ -281,10 +281,10 @@ export function analyzeMessage(text: string): ChatMessage {
 ```typescript
 // Example: topic-guard
 // Source: examples/topic-guard/src/topic-guard.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Topic Guard – Directive Module
+ * Topic Guard — Directive Module
  *
  * Demonstrates input guardrails for AI agents. Messages are checked against
  * configurable guardrails before reaching the mock agent. Blocked messages
@@ -438,10 +438,7 @@ export const topicGuardModule = createModule("topic-guard", {
         return;
       }
 
-      const classifierResult = checkTopicClassifier(
-        text,
-        facts.allowedTopics,
-      );
+      const classifierResult = checkTopicClassifier(text, facts.allowedTopics);
       facts.lastGuardrailResult = classifierResult;
       facts.isProcessing = true;
       facts.input = "";

@@ -42,11 +42,11 @@ export interface GuardrailLogEntry {
 export const topicGuardSchema = {
   facts: {
     input: t.string(),
-    messages: t.object<ChatMessage[]>(),
+    messages: t.array<ChatMessage>(),
     isProcessing: t.boolean(),
     lastGuardrailResult: t.object<GuardrailResult | null>(),
-    guardrailLog: t.object<GuardrailLogEntry[]>(),
-    allowedTopics: t.object<string[]>(),
+    guardrailLog: t.array<GuardrailLogEntry>(),
+    allowedTopics: t.array<string>(),
   },
   derivations: {
     messageCount: t.number(),
@@ -93,42 +93,36 @@ export const topicGuardModule = createModule("topic-guard", {
 
   derive: {
     messageCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter((m) => m.role === "user")
-        .length;
+      return facts.messages.filter((m) => m.role === "user").length;
     },
 
     blockedCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter(
-        (m) => m.role === "user" && m.blocked,
-      ).length;
+      return facts.messages.filter((m) => m.role === "user" && m.blocked)
+        .length;
     },
 
     allowedCount: (facts) => {
-      return (facts.messages as ChatMessage[]).filter(
-        (m) => m.role === "user" && !m.blocked,
-      ).length;
+      return facts.messages.filter((m) => m.role === "user" && !m.blocked)
+        .length;
     },
 
     blockRate: (facts, derive) => {
-      const total = derive.messageCount as number;
+      const total = derive.messageCount;
       if (total === 0) {
         return "0%";
       }
-      const blocked = derive.blockedCount as number;
+      const blocked = derive.blockedCount;
       const rate = Math.round((blocked / total) * 100);
 
       return `${rate}%`;
     },
 
     canSend: (facts) => {
-      return (
-        (facts.input as string).trim().length > 0 &&
-        !(facts.isProcessing as boolean)
-      );
+      return facts.input.trim().length > 0 && !facts.isProcessing;
     },
 
     lastMessageBlocked: (facts) => {
-      const msgs = facts.messages as ChatMessage[];
+      const msgs = facts.messages;
       if (msgs.length === 0) {
         return false;
       }
@@ -143,13 +137,13 @@ export const topicGuardModule = createModule("topic-guard", {
 
   events: {
     send: (facts) => {
-      const text = (facts.input as string).trim();
+      const text = facts.input.trim();
       if (text.length === 0 || facts.isProcessing) {
         return;
       }
 
       // Add user message
-      const messages = [...(facts.messages as ChatMessage[])];
+      const messages = [...facts.messages];
       messages.push({ role: "user", text, blocked: false });
       facts.messages = messages;
 
@@ -163,10 +157,7 @@ export const topicGuardModule = createModule("topic-guard", {
         return;
       }
 
-      const classifierResult = checkTopicClassifier(
-        text,
-        facts.allowedTopics as string[],
-      );
+      const classifierResult = checkTopicClassifier(text, facts.allowedTopics);
       facts.lastGuardrailResult = classifierResult;
       facts.isProcessing = true;
       facts.input = "";
@@ -184,7 +175,7 @@ export const topicGuardModule = createModule("topic-guard", {
     },
 
     toggleTopic: (facts, { topic }) => {
-      const topics = [...(facts.allowedTopics as string[])];
+      const topics = [...facts.allowedTopics];
       const idx = topics.indexOf(topic);
       if (idx >= 0) {
         topics.splice(idx, 1);
@@ -203,12 +194,12 @@ export const topicGuardModule = createModule("topic-guard", {
     offTopicDetected: {
       priority: 100,
       when: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
-
-        return result?.blocked === true && (facts.isProcessing as boolean);
+        return (
+          facts.lastGuardrailResult?.blocked === true && facts.isProcessing
+        );
       },
       require: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult;
+        const result = facts.lastGuardrailResult!;
 
         return {
           type: "BLOCK_MESSAGE",
@@ -221,9 +212,9 @@ export const topicGuardModule = createModule("topic-guard", {
     onTopicConfirmed: {
       priority: 90,
       when: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
-
-        return result?.blocked === false && (facts.isProcessing as boolean);
+        return (
+          facts.lastGuardrailResult?.blocked === false && facts.isProcessing
+        );
       },
       require: () => ({
         type: "ALLOW_MESSAGE",
@@ -239,7 +230,7 @@ export const topicGuardModule = createModule("topic-guard", {
     blockMessage: {
       requirement: "BLOCK_MESSAGE",
       resolve: async (req, context) => {
-        const messages = [...(context.facts.messages as ChatMessage[])];
+        const messages = [...context.facts.messages];
         // Mark the last user message as blocked
         const lastUserIdx = messages.length - 1;
         if (lastUserIdx >= 0) {
@@ -264,7 +255,7 @@ export const topicGuardModule = createModule("topic-guard", {
     allowMessage: {
       requirement: "ALLOW_MESSAGE",
       resolve: async (_req, context) => {
-        const messages = [...(context.facts.messages as ChatMessage[])];
+        const messages = [...context.facts.messages];
         const lastUserMsg = messages.filter((m) => m.role === "user").pop();
         const responseText = getMockAgentResponse(lastUserMsg?.text ?? "");
         messages.push({
@@ -286,14 +277,15 @@ export const topicGuardModule = createModule("topic-guard", {
     logGuardrailResult: {
       deps: ["lastGuardrailResult"],
       run: (facts) => {
-        const result = facts.lastGuardrailResult as GuardrailResult | null;
+        const result = facts.lastGuardrailResult;
         if (!result) {
           return;
         }
 
-        const msgs = facts.messages as ChatMessage[];
-        const lastUserMsg = [...msgs].reverse().find((m) => m.role === "user");
-        const log = [...(facts.guardrailLog as GuardrailLogEntry[])];
+        const lastUserMsg = [...facts.messages]
+          .reverse()
+          .find((m) => m.role === "user");
+        const log = [...facts.guardrailLog];
         log.push({
           timestamp: Date.now(),
           input: lastUserMsg?.text ?? "",

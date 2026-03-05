@@ -70,7 +70,7 @@ export const dashboardLoaderSchema = {
     preferencesFailRate: t.number(),
     permissionsFailRate: t.number(),
     loadRequested: t.boolean(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     loadedCount: t.number(),
@@ -106,7 +106,7 @@ function addLogEntry(
   resource: string,
   detail: string,
 ): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, resource, detail });
   facts.eventLog = log;
 }
@@ -181,9 +181,9 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     combinedStatus: (facts, derive) => {
-      const loaded = derive.loadedCount as number;
-      const anyErr = derive.anyError as boolean;
-      const anyLoad = derive.anyLoading as boolean;
+      const loaded = derive.loadedCount;
+      const anyErr = derive.anyError;
+      const anyLoad = derive.anyLoading;
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -216,7 +216,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     canStart: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       const allIdle = [
         facts.profile,
         facts.preferences,
@@ -237,7 +237,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     },
 
     start: (facts) => {
-      const id = (facts.userId as string).trim();
+      const id = facts.userId.trim();
       if (id.length === 0) {
         return;
       }
@@ -293,54 +293,42 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
     needsProfile: {
       priority: 100,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const profile = facts.profile as ResourceState<Profile>;
+        const id = facts.userId.trim();
+        const profile = facts.profile;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          profile.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && profile.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PROFILE",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPreferences: {
       priority: 90,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const prefs = facts.preferences as ResourceState<Preferences>;
+        const id = facts.userId.trim();
+        const prefs = facts.preferences;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          prefs.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && prefs.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PREFERENCES",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
 
     needsPermissions: {
       priority: 80,
       when: (facts) => {
-        const id = (facts.userId as string).trim();
-        const perms = facts.permissions as ResourceState<Permissions>;
+        const id = facts.userId.trim();
+        const perms = facts.permissions;
 
-        return (
-          (facts.loadRequested as boolean) &&
-          id !== "" &&
-          perms.status === "idle"
-        );
+        return facts.loadRequested && id !== "" && perms.status === "idle";
       },
       require: (facts) => ({
         type: "FETCH_PERMISSIONS",
-        userId: (facts.userId as string).trim(),
+        userId: facts.userId.trim(),
       }),
     },
   },
@@ -355,7 +343,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 10000,
       resolve: async (req, context) => {
-        const prev = context.facts.profile as ResourceState<Profile>;
+        const prev = context.facts.profile;
         context.facts.profile = {
           ...prev,
           status: "loading",
@@ -372,24 +360,22 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockProfile(
             req.userId,
-            context.facts.profileDelay as number,
-            context.facts.profileFailRate as number,
+            context.facts.profileDelay,
+            context.facts.profileFailRate,
           );
           context.facts.profile = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.profile as ResourceState<Profile>)
-              .attempts,
-            startedAt: (context.facts.profile as ResourceState<Profile>)
-              .startedAt,
+            attempts: context.facts.profile.attempts,
+            startedAt: context.facts.profile.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(context.facts, "success", "profile", data.name);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.profile = {
-            ...(context.facts.profile as ResourceState<Profile>),
+            ...context.facts.profile,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -404,7 +390,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       requirement: "FETCH_PREFERENCES",
       retry: { attempts: 2, backoff: "exponential" },
       resolve: async (req, context) => {
-        const prev = context.facts.preferences as ResourceState<Preferences>;
+        const prev = context.facts.preferences;
         context.facts.preferences = {
           ...prev,
           status: "loading",
@@ -421,17 +407,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPreferences(
             req.userId,
-            context.facts.preferencesDelay as number,
-            context.facts.preferencesFailRate as number,
+            context.facts.preferencesDelay,
+            context.facts.preferencesFailRate,
           );
           context.facts.preferences = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.preferences as ResourceState<Preferences>)
-              .attempts,
-            startedAt: (context.facts.preferences as ResourceState<Preferences>)
-              .startedAt,
+            attempts: context.facts.preferences.attempts,
+            startedAt: context.facts.preferences.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -443,7 +427,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.preferences = {
-            ...(context.facts.preferences as ResourceState<Preferences>),
+            ...context.facts.preferences,
             status: "error",
             error: msg,
             completedAt: Date.now(),
@@ -459,7 +443,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       retry: { attempts: 3, backoff: "exponential" },
       timeout: 15000,
       resolve: async (req, context) => {
-        const prev = context.facts.permissions as ResourceState<Permissions>;
+        const prev = context.facts.permissions;
         context.facts.permissions = {
           ...prev,
           status: "loading",
@@ -476,17 +460,15 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         try {
           const data = await fetchMockPermissions(
             req.userId,
-            context.facts.permissionsDelay as number,
-            context.facts.permissionsFailRate as number,
+            context.facts.permissionsDelay,
+            context.facts.permissionsFailRate,
           );
           context.facts.permissions = {
             data,
             status: "success",
             error: null,
-            attempts: (context.facts.permissions as ResourceState<Permissions>)
-              .attempts,
-            startedAt: (context.facts.permissions as ResourceState<Permissions>)
-              .startedAt,
+            attempts: context.facts.permissions.attempts,
+            startedAt: context.facts.permissions.startedAt,
             completedAt: Date.now(),
           };
           addLogEntry(
@@ -498,7 +480,7 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
           context.facts.permissions = {
-            ...(context.facts.permissions as ResourceState<Permissions>),
+            ...context.facts.permissions,
             status: "error",
             error: msg,
             completedAt: Date.now(),

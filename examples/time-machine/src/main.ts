@@ -1,146 +1,15 @@
 /**
- * Time Machine — Time-Travel Debugging
+ * Time Machine — DOM Rendering & System Wiring
  *
- * Drawing canvas where each stroke is a fact mutation. Full time-travel:
- * undo/redo, export/import JSON, replay animation, changesets, snapshot slider.
+ * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
-import {
-  type ModuleSchema,
-  createModule,
-  createSystem,
-  t,
-} from "@directive-run/core";
-import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { addTimeline, schema, system, timeline } from "./module.js";
 
 // ============================================================================
-// Types
+// System Startup
 // ============================================================================
 
-interface Stroke {
-  id: string;
-  x: number;
-  y: number;
-  color: string;
-  size: number;
-}
-
-interface TimelineEntry {
-  time: number;
-  event: string;
-  detail: string;
-  type:
-    | "stroke"
-    | "undo"
-    | "redo"
-    | "changeset"
-    | "export"
-    | "import"
-    | "replay"
-    | "goto";
-}
-
-// ============================================================================
-// Timeline
-// ============================================================================
-
-const timeline: TimelineEntry[] = [];
-
-function addTimeline(
-  event: string,
-  detail: string,
-  type: TimelineEntry["type"],
-) {
-  timeline.unshift({ time: Date.now(), event, detail, type });
-  if (timeline.length > 50) {
-    timeline.length = 50;
-  }
-}
-
-// ============================================================================
-// Schema
-// ============================================================================
-
-const schema = {
-  facts: {
-    strokes: t.object<Stroke[]>(),
-    currentColor: t.string(),
-    brushSize: t.number(),
-    changesetActive: t.boolean(),
-    changesetLabel: t.string(),
-  },
-  derivations: {
-    strokeCount: t.number(),
-    canUndo: t.boolean(),
-    canRedo: t.boolean(),
-    currentIndex: t.number(),
-    totalSnapshots: t.number(),
-  },
-  events: {
-    addStroke: { x: t.number(), y: t.number() },
-    setColor: { value: t.string() },
-    setBrushSize: { value: t.number() },
-    clearCanvas: {},
-  },
-  requirements: {},
-} satisfies ModuleSchema;
-
-// ============================================================================
-// Module
-// ============================================================================
-
-const canvasModule = createModule("canvas", {
-  schema,
-
-  init: (facts) => {
-    facts.strokes = [];
-    facts.currentColor = "#5ba3a3";
-    facts.brushSize = 12;
-    facts.changesetActive = false;
-    facts.changesetLabel = "";
-  },
-
-  derive: {
-    strokeCount: (facts) => facts.strokes.length,
-    // These will be updated from the time-travel manager
-    canUndo: () => false,
-    canRedo: () => false,
-    currentIndex: () => 0,
-    totalSnapshots: () => 0,
-  },
-
-  events: {
-    addStroke: (facts, { x, y }) => {
-      const stroke: Stroke = {
-        id: `s${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        x,
-        y,
-        color: facts.currentColor,
-        size: facts.brushSize,
-      };
-      facts.strokes = [...facts.strokes, stroke];
-    },
-    setColor: (facts, { value }) => {
-      facts.currentColor = value;
-    },
-    setBrushSize: (facts, { value }) => {
-      facts.brushSize = value;
-    },
-    clearCanvas: (facts) => {
-      facts.strokes = [];
-    },
-  },
-});
-
-// ============================================================================
-// System with Time-Travel
-// ============================================================================
-
-const system = createSystem({
-  module: canvasModule,
-  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
-  plugins: [devtoolsPlugin({ name: "time-machine" })],
-});
 system.start();
 
 const tt = system.debug!;
@@ -181,6 +50,17 @@ const changesetStatus = document.getElementById("tm-changeset-status")!;
 const timelineEl = document.getElementById("tm-timeline")!;
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+function escapeHtml(text: string): string {
+  const div = document.createElement("div");
+  div.textContent = text;
+
+  return div.innerHTML;
+}
+
+// ============================================================================
 // Canvas Rendering
 // ============================================================================
 
@@ -188,7 +68,7 @@ function drawCanvas(): void {
   ctx.fillStyle = "#0f172a";
   ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
 
-  const strokes = system.facts.strokes as Stroke[];
+  const strokes = system.facts.strokes;
   for (const stroke of strokes) {
     ctx.beginPath();
     ctx.arc(stroke.x, stroke.y, stroke.size / 2, 0, Math.PI * 2);
@@ -200,13 +80,6 @@ function drawCanvas(): void {
 // ============================================================================
 // Render
 // ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 function render(): void {
   drawCanvas();
@@ -224,7 +97,7 @@ function render(): void {
   snapshotInfo.textContent = `${tt.currentIndex} / ${tt.snapshots.length - 1}`;
 
   // Changeset status
-  const isActive = system.facts.changesetActive as boolean;
+  const isActive = system.facts.changesetActive;
   changesetStatus.textContent = isActive ? "Recording..." : "Inactive";
   changesetStatus.className = `tm-changeset-status ${isActive ? "active" : ""}`;
   beginChangesetBtn.disabled = isActive;

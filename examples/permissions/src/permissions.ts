@@ -97,7 +97,7 @@ export const authModule = createModule("auth", {
 
 export const permissionsSchema = {
   facts: {
-    permissions: t.object<string[]>(),
+    permissions: t.array<string>(),
     loaded: t.boolean(),
   },
   derivations: {
@@ -128,18 +128,14 @@ export const permissionsModule = createModule("permissions", {
   },
 
   derive: {
-    canEdit: (facts) =>
-      (facts.self.permissions as string[]).includes("content.edit"),
-    canPublish: (facts) =>
-      (facts.self.permissions as string[]).includes("content.publish"),
-    canDelete: (facts) =>
-      (facts.self.permissions as string[]).includes("content.delete"),
-    canManageUsers: (facts) =>
-      (facts.self.permissions as string[]).includes("users.manage"),
+    canEdit: (facts) => facts.self.permissions.includes("content.edit"),
+    canPublish: (facts) => facts.self.permissions.includes("content.publish"),
+    canDelete: (facts) => facts.self.permissions.includes("content.delete"),
+    canManageUsers: (facts) => facts.self.permissions.includes("users.manage"),
     canViewAnalytics: (facts) =>
-      (facts.self.permissions as string[]).includes("analytics.view"),
-    isAdmin: (_facts, derive) => derive.canManageUsers as boolean,
-    permissionCount: (facts) => (facts.self.permissions as string[]).length,
+      facts.self.permissions.includes("analytics.view"),
+    isAdmin: (_facts, derive) => derive.canManageUsers,
+    permissionCount: (facts) => facts.self.permissions.length,
   },
 
   events: {
@@ -152,13 +148,11 @@ export const permissionsModule = createModule("permissions", {
   constraints: {
     loadPermissions: {
       when: (facts) => {
-        return (
-          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
-        );
+        return facts.auth.token !== "" && !facts.self.loaded;
       },
       require: (facts) => ({
         type: "FETCH_PERMISSIONS",
-        role: facts.auth.role as string,
+        role: facts.auth.role,
       }),
     },
   },
@@ -182,7 +176,7 @@ export const permissionsModule = createModule("permissions", {
 
 export const contentSchema = {
   facts: {
-    articles: t.object<Article[]>(),
+    articles: t.array<Article>(),
     loaded: t.boolean(),
     publishRequested: t.string(),
     deleteRequested: t.string(),
@@ -217,9 +211,7 @@ export const contentModule = createModule("content", {
   constraints: {
     loadContent: {
       when: (facts) => {
-        return (
-          (facts.auth.token as string) !== "" && !(facts.self.loaded as boolean)
-        );
+        return facts.auth.token !== "" && !facts.self.loaded;
       },
       require: { type: "LOAD_CONTENT" },
     },
@@ -227,28 +219,26 @@ export const contentModule = createModule("content", {
     publishArticle: {
       when: (facts) => {
         return (
-          (facts.self.publishRequested as string) !== "" &&
-          (facts.permissions.permissions as string[]).includes(
-            "content.publish",
-          )
+          facts.self.publishRequested !== "" &&
+          facts.permissions.permissions.includes("content.publish")
         );
       },
       require: (facts) => ({
         type: "PUBLISH_ARTICLE",
-        articleId: facts.self.publishRequested as string,
+        articleId: facts.self.publishRequested,
       }),
     },
 
     deleteArticle: {
       when: (facts) => {
         return (
-          (facts.self.deleteRequested as string) !== "" &&
-          (facts.permissions.permissions as string[]).includes("content.delete")
+          facts.self.deleteRequested !== "" &&
+          facts.permissions.permissions.includes("content.delete")
         );
       },
       require: (facts) => ({
         type: "DELETE_ARTICLE",
-        articleId: facts.self.deleteRequested as string,
+        articleId: facts.self.deleteRequested,
       }),
     },
   },
@@ -271,8 +261,7 @@ export const contentModule = createModule("content", {
         context.facts.actionStatus = "publishing";
         await apiPublishArticle(req.articleId);
 
-        const articles = context.facts.articles as Article[];
-        context.facts.articles = articles.map((a) => {
+        context.facts.articles = context.facts.articles.map((a) => {
           if (a.id === req.articleId) {
             return { ...a, status: "published" as const };
           }
@@ -291,8 +280,9 @@ export const contentModule = createModule("content", {
         context.facts.actionStatus = "deleting";
         await apiDeleteArticle(req.articleId);
 
-        const articles = context.facts.articles as Article[];
-        context.facts.articles = articles.filter((a) => a.id !== req.articleId);
+        context.facts.articles = context.facts.articles.filter(
+          (a) => a.id !== req.articleId,
+        );
         context.facts.deleteRequested = "";
         context.facts.actionStatus = "done";
       },

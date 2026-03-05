@@ -10,8 +10,6 @@ import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin, persistencePlugin } from "@directive-run/core/plugins";
 import {
   type Breakpoint,
-  type ThemeChoice,
-  type Translations,
   layoutModule,
   preferencesModule,
 } from "./theme-locale.js";
@@ -108,13 +106,13 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const theme = facts.preferences.theme as ThemeChoice;
-  const locale = facts.preferences.locale as string;
-  const sidebarOpen = facts.preferences.sidebarOpen as boolean;
-  const translations = facts.preferences.translations as Translations;
-  const effectiveTheme = derive.preferences.effectiveTheme as string;
-  const isRTL = derive.preferences.isRTL as boolean;
-  const breakpoint = facts.layout.breakpoint as Breakpoint;
+  const theme = facts.preferences.theme;
+  const locale = facts.preferences.locale;
+  const sidebarOpen = facts.preferences.sidebarOpen;
+  const translations = facts.preferences.translations;
+  const effectiveTheme = derive.preferences.effectiveTheme;
+  const isRTL = derive.preferences.isRTL;
+  const breakpoint = facts.layout.breakpoint;
 
   // --- Header ---
   effectiveThemeEl.textContent = effectiveTheme;

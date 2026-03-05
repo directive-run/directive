@@ -82,7 +82,7 @@ export const urlModule = createModule("url", {
     const params = readUrlParams();
     facts.search = params.search;
     facts.category = params.category;
-    facts.sortBy = params.sortBy;
+    facts.sortBy = params.sortBy as "newest" | "price-asc" | "price-desc";
     facts.page = params.page;
     facts.syncingFromUrl = false;
   },
@@ -103,7 +103,7 @@ export const urlModule = createModule("url", {
     },
 
     setSortBy: (facts, { value }) => {
-      facts.sortBy = value;
+      facts.sortBy = value as "newest" | "price-asc" | "price-desc";
       facts.page = 1;
     },
 
@@ -115,7 +115,7 @@ export const urlModule = createModule("url", {
       facts.syncingFromUrl = true;
       facts.search = search;
       facts.category = category;
-      facts.sortBy = sortBy;
+      facts.sortBy = sortBy as "newest" | "price-asc" | "price-desc";
       facts.page = page;
     },
 
@@ -160,15 +160,15 @@ export const urlModule = createModule("url", {
         const params = new URLSearchParams();
 
         if (facts.search !== "") {
-          params.set("q", facts.search as string);
+          params.set("q", facts.search);
         }
         if (facts.category !== "" && facts.category !== "all") {
-          params.set("cat", facts.category as string);
+          params.set("cat", facts.category);
         }
         if (facts.sortBy !== "newest") {
-          params.set("sort", facts.sortBy as string);
+          params.set("sort", facts.sortBy);
         }
-        if ((facts.page as number) > 1) {
+        if (facts.page > 1) {
           params.set("page", String(facts.page));
         }
 
@@ -191,7 +191,7 @@ export const urlModule = createModule("url", {
 
 export const productsSchema = {
   facts: {
-    items: t.object<Product[]>(),
+    items: t.array<Product>(),
     totalItems: t.number(),
     isLoading: t.boolean(),
     itemsPerPage: t.number(),
@@ -328,5 +328,6 @@ export const system = createSystem({
     url: urlModule,
     products: productsModule,
   },
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "url-sync" })],
 });

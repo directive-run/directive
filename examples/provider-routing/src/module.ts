@@ -1,7 +1,3 @@
-// Example: provider-routing
-// Source: examples/provider-routing/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Smart Provider Router — Module Definition
  *

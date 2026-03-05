@@ -1,14 +1,3 @@
-# Examples
-
-> Auto-generated from extracted examples. Do not edit manually.
-
-## counter
-
-```typescript
-// Example: counter
-// Source: examples/counter/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Number Match — Directive Module
  *
@@ -380,4 +369,3 @@ export const system = createSystem({
   plugins: [devtoolsPlugin({ name: "number-match" })],
   debug: { timeTravel: true, runHistory: true },
 });
-```
