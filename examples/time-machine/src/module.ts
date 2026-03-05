@@ -1,14 +1,3 @@
-# Examples
-
-> Auto-generated from extracted examples. Do not edit manually.
-
-## time-machine
-
-```typescript
-// Example: time-machine
-// Source: examples/time-machine/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Time Machine — Directive Module
  *
@@ -152,4 +141,3 @@ export const system = createSystem({
   debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
   plugins: [devtoolsPlugin({ name: "time-machine" })],
 });
-```

@@ -5,12 +5,7 @@
  * and renders the cart items, order summary, coupon, and checkout.
  */
 
-import {
-  type CartItem,
-  authSchema,
-  cartSchema,
-  system,
-} from "./shopping-cart.js";
+import { authSchema, cartSchema, system } from "./shopping-cart.js";
 
 // ============================================================================
 // System Startup
@@ -81,24 +76,24 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const items = facts.cart.items as CartItem[];
-  const couponCode = facts.cart.couponCode as string;
-  const couponStatus = facts.cart.couponStatus as string;
-  const couponDiscount = facts.cart.couponDiscount as number;
-  const checkoutStatus = facts.cart.checkoutStatus as string;
-  const checkoutError = facts.cart.checkoutError as string;
-  const checkoutRequested = facts.cart.checkoutRequested as boolean;
+  const items = facts.cart.items;
+  const couponCode = facts.cart.couponCode;
+  const couponStatus = facts.cart.couponStatus;
+  const couponDiscount = facts.cart.couponDiscount;
+  const checkoutStatus = facts.cart.checkoutStatus;
+  const checkoutError = facts.cart.checkoutError;
+  const checkoutRequested = facts.cart.checkoutRequested;
 
-  const subtotal = derive.cart.subtotal as number;
-  const discount = derive.cart.discount as number;
-  const tax = derive.cart.tax as number;
-  const total = derive.cart.total as number;
-  const itemCount = derive.cart.itemCount as number;
-  const isEmpty = derive.cart.isEmpty as boolean;
-  const freeShipping = derive.cart.freeShipping as boolean;
+  const subtotal = derive.cart.subtotal;
+  const discount = derive.cart.discount;
+  const tax = derive.cart.tax;
+  const total = derive.cart.total;
+  const itemCount = derive.cart.itemCount;
+  const isEmpty = derive.cart.isEmpty;
+  const freeShipping = derive.cart.freeShipping;
 
-  const isAuthenticated = facts.auth.isAuthenticated as boolean;
-  const userName = facts.auth.userName as string;
+  const isAuthenticated = facts.auth.isAuthenticated;
+  const userName = facts.auth.userName;
 
   // ---- Item Count Badge ----
   itemCountEl.textContent = `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
@@ -257,16 +252,12 @@ document.addEventListener("click", (e) => {
   }
 
   if (action === "increase") {
-    const item = (system.facts.cart.items as CartItem[]).find(
-      (i) => i.id === id,
-    );
+    const item = system.facts.cart.items.find((i) => i.id === id);
     if (item) {
       system.events.cart.updateQuantity({ id, quantity: item.quantity + 1 });
     }
   } else if (action === "decrease") {
-    const item = (system.facts.cart.items as CartItem[]).find(
-      (i) => i.id === id,
-    );
+    const item = system.facts.cart.items.find((i) => i.id === id);
     if (item) {
       system.events.cart.updateQuantity({ id, quantity: item.quantity - 1 });
     }

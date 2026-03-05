@@ -18,7 +18,6 @@ import {
   permissionsModule,
   permissionsSchema,
 } from "./async-chains.js";
-import type { DashboardWidget } from "./mock-api.js";
 
 // ============================================================================
 // System
@@ -137,7 +136,7 @@ function getStepStatus(
   module: "auth" | "permissions" | "dashboard",
 ): "idle" | "running" | "success" | "error" {
   if (module === "auth") {
-    const status = system.facts.auth.status as string;
+    const status = system.facts.auth.status;
     if (status === "idle") {
       return "idle";
     }
@@ -152,9 +151,9 @@ function getStepStatus(
   }
 
   if (module === "permissions") {
-    const loaded = system.facts.permissions.loaded as boolean;
-    const role = system.facts.permissions.role as string;
-    const authValid = system.derive.auth.isValid as boolean;
+    const loaded = system.facts.permissions.loaded;
+    const role = system.facts.permissions.role;
+    const authValid = system.derive.auth.isValid;
 
     if (!authValid) {
       return "idle";
@@ -170,9 +169,9 @@ function getStepStatus(
   }
 
   // dashboard
-  const dashLoaded = system.facts.dashboard.loaded as boolean;
-  const dashWidgets = system.facts.dashboard.widgets as DashboardWidget[];
-  const permsRole = system.facts.permissions.role as string;
+  const dashLoaded = system.facts.dashboard.loaded;
+  const dashWidgets = system.facts.dashboard.widgets;
+  const permsRole = system.facts.permissions.role;
 
   if (permsRole === "") {
     return "idle";
@@ -262,7 +261,7 @@ function render(): void {
   } else if (dashStatus === "running") {
     dashDetail = "Loading dashboard...";
   } else if (dashStatus === "success") {
-    const count = dashDeriv.widgetCount as number;
+    const count = dashDeriv.widgetCount;
     dashDetail = `${count} widgets loaded`;
   } else {
     dashDetail = "Failed to load";
@@ -284,7 +283,7 @@ function render(): void {
   );
 
   // Timeline entries for state transitions
-  const currentAuthStatus = authFacts.status as string;
+  const currentAuthStatus = authFacts.status;
   if (currentAuthStatus !== prevAuthStatus) {
     if (prevAuthStatus !== "" && currentAuthStatus !== "idle") {
       addTimelineEntry("auth", currentAuthStatus, authDetail);
@@ -292,7 +291,7 @@ function render(): void {
     prevAuthStatus = currentAuthStatus;
   }
 
-  const currentPermsLoaded = permsFacts.loaded as boolean;
+  const currentPermsLoaded = permsFacts.loaded;
   if (currentPermsLoaded !== prevPermsLoaded) {
     if (currentPermsLoaded) {
       addTimelineEntry("permissions", "loaded", `Role: ${permsFacts.role}`);
@@ -302,10 +301,10 @@ function render(): void {
     prevPermsLoaded = currentPermsLoaded;
   }
 
-  const currentDashLoaded = dashFacts.loaded as boolean;
+  const currentDashLoaded = dashFacts.loaded;
   if (currentDashLoaded !== prevDashLoaded) {
     if (currentDashLoaded) {
-      const count = dashDeriv.widgetCount as number;
+      const count = dashDeriv.widgetCount;
       addTimelineEntry("dashboard", "loaded", `${count} widgets`);
     } else if (prevDashLoaded) {
       addTimelineEntry("dashboard", "reset", "Dashboard cleared");
@@ -319,7 +318,7 @@ function render(): void {
   dashFailVal.textContent = `${dashFacts.failRate}%`;
 
   // Buttons
-  const token = authFacts.token as string;
+  const token = authFacts.token;
   startBtn.disabled = token !== "" && currentAuthStatus !== "idle";
   resetBtn.disabled =
     currentAuthStatus === "idle" && !currentPermsLoaded && !currentDashLoaded;

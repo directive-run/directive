@@ -226,7 +226,7 @@ function render() {
 
   // ── SVG nodes ──
   for (const id of AGENT_ORDER) {
-    const nodeStatus = (nodeStatuses[id] ?? "pending") as NodeStatus;
+    const nodeStatus = nodeStatuses[id] ?? "pending";
     const group = document.querySelector(`[data-node="${id}"]`);
 
     if (!group) {
@@ -276,8 +276,8 @@ function render() {
       continue;
     }
 
-    const fromStatus = (nodeStatuses[from] ?? "pending") as NodeStatus;
-    const toStatus = (nodeStatuses[to] ?? "pending") as NodeStatus;
+    const fromStatus = nodeStatuses[from] ?? "pending";
+    const toStatus = nodeStatuses[to] ?? "pending";
 
     if (toStatus === "completed") {
       line.setAttribute("stroke", "#4ade80");
@@ -323,7 +323,7 @@ function render() {
 
   for (const id of AGENT_ORDER) {
     const agent = AGENTS[id];
-    const nodeStatus = (nodeStatuses[id] ?? "pending") as NodeStatus;
+    const nodeStatus = nodeStatuses[id] ?? "pending";
     const tokens = facts.nodeTokens[id] ?? 0;
     const row = document.createElement("div");
     row.className = "agent-row";

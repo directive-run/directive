@@ -201,6 +201,7 @@ function describeMoveForClaude(
   const [fr, fc] = toRowCol(from);
   const [tr, tc] = toRowCol(to);
   const captureStr = captured ? " (captured a piece)" : "";
+
   return `Moved from (${fr},${fc}) to (${tr},${tc})${captureStr}`;
 }
 
@@ -222,8 +223,9 @@ async function handleAITurn() {
     currentPlayer !== aiPlayer ||
     gameOver ||
     aiTurnPending
-  )
+  ) {
     return;
+  }
 
   aiTurnPending = true;
   system.events.chat.setThinking({ thinking: true });
@@ -611,7 +613,9 @@ if (savedKey) {
 // Chat input
 function sendChat() {
   const text = chatInput.value.trim();
-  if (!text || aiTurnPending) return;
+  if (!text || aiTurnPending) {
+    return;
+  }
   chatInput.value = "";
   system.events.chat.addMessage({ message: { sender: "user", text } });
   system.events.chat.startStream();

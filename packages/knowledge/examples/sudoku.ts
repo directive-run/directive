@@ -52,23 +52,23 @@ export const sudokuSchema = {
     won: t.boolean(),
     message: t.string(),
     notesMode: t.boolean(),
-    notes: t.object<Set<number>[]>(),
+    notes: t.array<Set<number>>(),
     hintsUsed: t.number(),
     errorsCount: t.number(),
     hintRequested: t.boolean(),
   },
   derivations: {
-    conflicts: t.object<Conflict[]>(),
+    conflicts: t.array<Conflict>(),
     conflictIndices: t.object<Set<number>>(),
     hasConflicts: t.boolean(),
     filledCount: t.number(),
     progress: t.number(),
     isComplete: t.boolean(),
     isSolved: t.boolean(),
-    selectedPeers: t.object<number[]>(),
+    selectedPeers: t.array<number>(),
     highlightValue: t.number(),
     sameValueIndices: t.object<Set<number>>(),
-    candidates: t.object<number[]>(),
+    candidates: t.array<number>(),
     timerDisplay: t.string(),
     timerUrgency: t.object<"normal" | "warning" | "critical">(),
   },
@@ -144,13 +144,13 @@ export const sudokuGame = createModule("sudoku", {
 
   derive: {
     conflicts: (facts) => {
-      return findConflicts(facts.grid as Grid);
+      return findConflicts(facts.grid);
     },
 
     conflictIndices: (facts, derive) => {
       const indices = new Set<number>();
-      const givens = facts.givens as Set<number>;
-      for (const c of derive.conflicts as Conflict[]) {
+      const givens = facts.givens;
+      for (const c of derive.conflicts) {
         // Only highlight player-placed cells, not givens
         if (!givens.has(c.index)) {
           indices.add(c.index);
@@ -161,12 +161,12 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     hasConflicts: (_facts, derive) => {
-      return (derive.conflicts as Conflict[]).length > 0;
+      return derive.conflicts.length > 0;
     },
 
     filledCount: (facts) => {
       let count = 0;
-      const grid = facts.grid as Grid;
+      const grid = facts.grid;
       for (let i = 0; i < 81; i++) {
         if (grid[i] !== 0) {
           count++;
@@ -177,21 +177,19 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     progress: (_facts, derive) => {
-      return Math.round(((derive.filledCount as number) / 81) * 100);
+      return Math.round((derive.filledCount / 81) * 100);
     },
 
     isComplete: (facts) => {
-      return isBoardComplete(facts.grid as Grid);
+      return isBoardComplete(facts.grid);
     },
 
     isSolved: (_facts, derive) => {
-      return (
-        (derive.isComplete as boolean) && !(derive.hasConflicts as boolean)
-      );
+      return derive.isComplete && !derive.hasConflicts;
     },
 
     selectedPeers: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return [];
       }
@@ -200,22 +198,22 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     highlightValue: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return 0;
       }
 
-      return (facts.grid as Grid)[sel];
+      return facts.grid[sel];
     },
 
     sameValueIndices: (facts, derive) => {
-      const val = derive.highlightValue as number;
+      const val = derive.highlightValue;
       if (val === 0) {
         return new Set<number>();
       }
 
       const indices = new Set<number>();
-      const grid = facts.grid as Grid;
+      const grid = facts.grid;
       for (let i = 0; i < 81; i++) {
         if (grid[i] === val) {
           indices.add(i);
@@ -226,16 +224,16 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     candidates: (facts) => {
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return [];
       }
 
-      return getCandidates(facts.grid as Grid, sel);
+      return getCandidates(facts.grid, sel);
     },
 
     timerDisplay: (facts) => {
-      const remaining = facts.timerRemaining as number;
+      const remaining = facts.timerRemaining;
       const mins = Math.max(0, Math.floor(remaining / 60));
       const secs = Math.max(0, remaining % 60);
 
@@ -243,7 +241,7 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     timerUrgency: (facts) => {
-      const remaining = facts.timerRemaining as number;
+      const remaining = facts.timerRemaining;
       if (remaining <= TIMER_CRITICAL_THRESHOLD) {
         return "critical";
       }
@@ -299,12 +297,12 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         facts.message = "That cell is locked.";
 
@@ -313,7 +311,7 @@ export const sudokuGame = createModule("sudoku", {
 
       if (facts.notesMode && value !== 0) {
         // In notes mode, toggle the pencil mark instead
-        const notes = [...(facts.notes as Set<number>[])];
+        const notes = [...facts.notes];
         notes[sel] = new Set(notes[sel]);
         if (notes[sel].has(value)) {
           notes[sel].delete(value);
@@ -327,13 +325,13 @@ export const sudokuGame = createModule("sudoku", {
       }
 
       // Place or clear a number
-      const grid = [...(facts.grid as Grid)];
+      const grid = [...facts.grid];
       grid[sel] = value;
       facts.grid = grid;
 
       // Clear notes for this cell when placing a number
       if (value !== 0) {
-        const notes = [...(facts.notes as Set<number>[])];
+        const notes = [...facts.notes];
         notes[sel] = new Set();
         // Also clear this value from peer notes
         for (const peer of getPeers(sel)) {
@@ -353,22 +351,22 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         return;
       }
 
       // Only allow notes on empty cells
-      if ((facts.grid as Grid)[sel] !== 0) {
+      if (facts.grid[sel] !== 0) {
         return;
       }
 
-      const notes = [...(facts.notes as Set<number>[])];
+      const notes = [...facts.notes];
       notes[sel] = new Set(notes[sel]);
       if (notes[sel].has(value)) {
         notes[sel].delete(value);
@@ -379,7 +377,7 @@ export const sudokuGame = createModule("sudoku", {
     },
 
     toggleNotesMode: (facts) => {
-      facts.notesMode = !(facts.notesMode as boolean);
+      facts.notesMode = !facts.notesMode;
     },
 
     requestHint: (facts) => {
@@ -392,21 +390,21 @@ export const sudokuGame = createModule("sudoku", {
         return;
       }
 
-      const sel = facts.selectedIndex as number | null;
+      const sel = facts.selectedIndex;
       if (sel === null) {
         facts.message = "Select a cell first.";
 
         return;
       }
 
-      const givens = facts.givens as Set<number>;
+      const givens = facts.givens;
       if (givens.has(sel)) {
         facts.message = "That cell is already filled.";
 
         return;
       }
 
-      if ((facts.grid as Grid)[sel] !== 0) {
+      if (facts.grid[sel] !== 0) {
         facts.message = "Clear the cell first, or select an empty cell.";
 
         return;
@@ -420,7 +418,7 @@ export const sudokuGame = createModule("sudoku", {
       if (!facts.timerRunning || facts.gameOver) {
         return;
       }
-      facts.timerRemaining = Math.max(0, (facts.timerRemaining as number) - 1);
+      facts.timerRemaining = Math.max(0, facts.timerRemaining - 1);
     },
   },
 
@@ -437,7 +435,7 @@ export const sudokuGame = createModule("sudoku", {
           return false;
         }
 
-        return (facts.timerRemaining as number) <= 0;
+        return facts.timerRemaining <= 0;
       },
       require: () => ({
         type: "GAME_OVER",
@@ -452,14 +450,14 @@ export const sudokuGame = createModule("sudoku", {
         if (facts.gameOver) {
           return false;
         }
-        const conflicts = findConflicts(facts.grid as Grid);
-        const givens = facts.givens as Set<number>;
+        const conflicts = findConflicts(facts.grid);
+        const givens = facts.givens;
 
         return conflicts.some((c) => !givens.has(c.index));
       },
       require: (facts) => {
-        const conflicts = findConflicts(facts.grid as Grid);
-        const givens = facts.givens as Set<number>;
+        const conflicts = findConflicts(facts.grid);
+        const givens = facts.givens;
         const playerConflict = conflicts.find((c) => !givens.has(c.index));
         const idx = playerConflict?.index ?? 0;
         const { row, col } = toRowCol(idx);
@@ -483,15 +481,14 @@ export const sudokuGame = createModule("sudoku", {
         }
 
         return (
-          isBoardComplete(facts.grid as Grid) &&
-          findConflicts(facts.grid as Grid).length === 0
+          isBoardComplete(facts.grid) && findConflicts(facts.grid).length === 0
         );
       },
       require: (facts) => ({
         type: "GAME_WON",
-        timeLeft: facts.timerRemaining as number,
-        hintsUsed: facts.hintsUsed as number,
-        errors: facts.errorsCount as number,
+        timeLeft: facts.timerRemaining,
+        hintsUsed: facts.hintsUsed,
+        errors: facts.errorsCount,
       }),
     },
 
@@ -506,16 +503,16 @@ export const sudokuGame = createModule("sudoku", {
           return false;
         }
 
-        const sel = facts.selectedIndex as number | null;
+        const sel = facts.selectedIndex;
         if (sel === null) {
           return false;
         }
 
-        return (facts.grid as Grid)[sel] === 0;
+        return facts.grid[sel] === 0;
       },
       require: (facts) => {
         const sel = facts.selectedIndex as number;
-        const solution = facts.solution as Grid;
+        const solution = facts.solution;
 
         return {
           type: "REVEAL_HINT",
@@ -534,7 +531,7 @@ export const sudokuGame = createModule("sudoku", {
     showConflict: {
       requirement: "SHOW_CONFLICT",
       resolve: async (req, context) => {
-        context.facts.errorsCount = (context.facts.errorsCount as number) + 1;
+        context.facts.errorsCount = context.facts.errorsCount + 1;
         context.facts.message = `Conflict at row ${req.row}, column ${req.col} – duplicate ${req.value}.`;
       },
     },
@@ -547,14 +544,10 @@ export const sudokuGame = createModule("sudoku", {
         context.facts.won = true;
 
         const mins = Math.floor(
-          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
-            req.timeLeft) /
-            60,
+          (TIMER_DURATIONS[context.facts.difficulty] - req.timeLeft) / 60,
         );
         const secs =
-          (TIMER_DURATIONS[context.facts.difficulty as Difficulty] -
-            req.timeLeft) %
-          60;
+          (TIMER_DURATIONS[context.facts.difficulty] - req.timeLeft) % 60;
         context.facts.message = `Solved in ${mins}m ${secs}s! Hints: ${req.hintsUsed}, Errors: ${req.errors}`;
       },
     },
@@ -572,12 +565,12 @@ export const sudokuGame = createModule("sudoku", {
     revealHint: {
       requirement: "REVEAL_HINT",
       resolve: async (req, context) => {
-        const grid = [...(context.facts.grid as Grid)];
+        const grid = [...context.facts.grid];
         grid[req.index] = req.value;
         context.facts.grid = grid;
 
         // Clear notes for the hinted cell and remove value from peer notes
-        const notes = [...(context.facts.notes as Set<number>[])];
+        const notes = [...context.facts.notes];
         notes[req.index] = new Set();
         for (const peer of getPeers(req.index)) {
           if (notes[peer].has(req.value)) {
@@ -588,8 +581,8 @@ export const sudokuGame = createModule("sudoku", {
         context.facts.notes = notes;
 
         context.facts.hintRequested = false;
-        context.facts.hintsUsed = (context.facts.hintsUsed as number) + 1;
-        context.facts.message = `Hint revealed! ${MAX_HINTS - (context.facts.hintsUsed as number)} remaining.`;
+        context.facts.hintsUsed = context.facts.hintsUsed + 1;
+        context.facts.message = `Hint revealed! ${MAX_HINTS - context.facts.hintsUsed} remaining.`;
       },
     },
   },
@@ -602,7 +595,7 @@ export const sudokuGame = createModule("sudoku", {
     timerWarning: {
       deps: ["timerRemaining"],
       run: (facts) => {
-        const remaining = facts.timerRemaining as number;
+        const remaining = facts.timerRemaining;
         if (remaining === TIMER_EFFECT_WARNING) {
           console.log("[Sudoku] 1 minute remaining!");
         }
