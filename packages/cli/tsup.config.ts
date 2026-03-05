@@ -10,6 +10,7 @@ export default defineConfig([
     splitting: false,
     treeshake: true,
     target: "es2022",
+    minify: true,
   },
   {
     entry: { cli: "src/cli.ts" },
@@ -19,5 +20,6 @@ export default defineConfig([
     splitting: false,
     treeshake: true,
     target: "es2022",
+    minify: true,
   },
 ]);
