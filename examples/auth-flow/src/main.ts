@@ -3,7 +3,7 @@
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the status bar, login form, config sliders,
- * and event timeline. A 500ms timer drives reactive token countdown.
+ * and event timeline. A 1s timer drives reactive token countdown.
  */
 
 import { createSystem } from "@directive-run/core";
@@ -170,10 +170,10 @@ function render(): void {
 
 system.subscribe(allKeys, render);
 
-// Timer — tick every 500ms for reactive countdown
+// Timer — tick every 1s for reactive countdown
 const tickInterval = setInterval(() => {
   system.events.tick();
-}, 500);
+}, 1000);
 
 // ============================================================================
 // Controls
