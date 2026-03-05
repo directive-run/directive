@@ -1,5 +1,7 @@
 # @directive-run/devtools
 
+## 0.4.2
+
 ## 0.3.0
 
 ### Minor Changes
