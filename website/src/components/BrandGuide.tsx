@@ -997,14 +997,16 @@ function ComboCard({
             {combo.accent.name}
           </span>
         </div>
-        <p
-          className={clsx(
-            "text-xs italic",
-            dark ? "text-slate-400" : "text-slate-500",
-          )}
-        >
-          AE Verdict: {combo.verdict}
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p
+            className={clsx(
+              "text-xs italic",
+              dark ? "text-slate-400" : "text-slate-500",
+            )}
+          >
+            AE Verdict: {combo.verdict}
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -2142,8 +2144,12 @@ export function BrandGuide() {
       <SemanticColorsSection />
       <hr className="border-slate-200 dark:border-slate-700" />
       <NeutralScaleSection />
-      <hr className="border-slate-200 dark:border-slate-700" />
-      <AEReviewSection />
+      {process.env.NODE_ENV === "development" && (
+        <>
+          <hr className="border-slate-200 dark:border-slate-700" />
+          <AEReviewSection />
+        </>
+      )}
     </div>
   );
 }
