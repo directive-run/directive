@@ -55,9 +55,16 @@ export const dataModule = createModule("data", {
   derive: {
     userCount: (facts) => facts.self.users.length,
     status: (facts) => {
-      if (facts.self.isLoading) return "loading";
-      if (facts.self.error) return "error";
-      if (facts.self.lastFetched) return "success";
+      if (facts.self.isLoading) {
+        return "loading";
+      }
+      if (facts.self.error) {
+        return "error";
+      }
+      if (facts.self.lastFetched) {
+        return "success";
+      }
+
       return "idle";
     },
   },

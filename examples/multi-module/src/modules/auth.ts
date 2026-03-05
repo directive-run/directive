@@ -45,8 +45,13 @@ export const authModule = createModule("auth", {
 
   derive: {
     status: (facts) => {
-      if (facts.isValidating) return "validating";
-      if (facts.isAuthenticated) return "authenticated";
+      if (facts.isValidating) {
+        return "validating";
+      }
+      if (facts.isAuthenticated) {
+        return "authenticated";
+      }
+
       return "unauthenticated";
     },
     displayName: (facts) => {

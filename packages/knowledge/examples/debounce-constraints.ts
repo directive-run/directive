@@ -14,8 +14,6 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  type EventLogEntry,
-  type SearchResult,
   debounceSearchModule,
   debounceSearchSchema,
 } from "./debounce-search.js";
@@ -26,6 +24,7 @@ import {
 
 const system = createSystem({
   module: debounceSearchModule,
+  debug: { runHistory: true },
   plugins: [devtoolsPlugin({ name: "debounce-constraints" })],
 });
 system.start();

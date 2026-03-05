@@ -45,10 +45,10 @@ export const checkersSchema = {
     aiPlayer: t.object<Player>(),
   },
   derivations: {
-    validMoves: t.object<Move[]>(),
+    validMoves: t.array<Move>(),
     jumpRequired: t.boolean(),
-    highlightSquares: t.object<number[]>(),
-    selectableSquares: t.object<number[]>(),
+    highlightSquares: t.array<number>(),
+    selectableSquares: t.array<number>(),
     redCount: t.number(),
     blackCount: t.number(),
     score: t.string(),
@@ -99,9 +99,11 @@ export const checkersGame = createModule("checkers", {
 
   derive: {
     validMoves: (facts) => {
-      const sel = facts.selectedIndex as number | null;
-      if (sel === null) return [];
-      return getValidMovesForPiece(facts.board, sel);
+      if (facts.selectedIndex === null) {
+        return [];
+      }
+
+      return getValidMovesForPiece(facts.board, facts.selectedIndex);
     },
 
     jumpRequired: (facts) => {
@@ -109,23 +111,30 @@ export const checkersGame = createModule("checkers", {
     },
 
     highlightSquares: (facts) => {
-      const sel = facts.selectedIndex as number | null;
-      if (sel === null) return [];
-      const moves = getValidMovesForPiece(facts.board, sel);
+      if (facts.selectedIndex === null) {
+        return [];
+      }
+      const moves = getValidMovesForPiece(facts.board, facts.selectedIndex);
+
       return moves.map((m) => m.to);
     },
 
     selectableSquares: (facts) => {
-      if (facts.gameOver) return [];
+      if (facts.gameOver) {
+        return [];
+      }
       if (
         facts.gameMode !== "2player" &&
         facts.currentPlayer === facts.aiPlayer
-      )
+      ) {
         return [];
-      const cont = facts.mustContinueFrom as number | null;
-      if (cont !== null) return [cont];
+      }
+      if (facts.mustContinueFrom !== null) {
+        return [facts.mustContinueFrom];
+      }
       const allMoves = getAllValidMoves(facts.board, facts.currentPlayer);
       const fromIndices = new Set(allMoves.map((m) => m.from));
+
       return [...fromIndices];
     },
 
@@ -145,18 +154,21 @@ export const checkersGame = createModule("checkers", {
 
   events: {
     clickSquare: (facts, { index }) => {
-      if (facts.gameOver) return;
+      if (facts.gameOver) {
+        return;
+      }
       // Ignore clicks during AI's turn in computer/ai mode
       if (
         facts.gameMode !== "2player" &&
         facts.currentPlayer === facts.aiPlayer
-      )
+      ) {
         return;
+      }
 
-      const board = facts.board as Board;
-      const player = facts.currentPlayer as Player;
-      const selected = facts.selectedIndex as number | null;
-      const cont = facts.mustContinueFrom as number | null;
+      const board = facts.board;
+      const player = facts.currentPlayer;
+      const selected = facts.selectedIndex;
+      const cont = facts.mustContinueFrom;
       const piece = board[index];
 
       // During multi-jump: only accept valid jump targets for the continuing piece
@@ -237,13 +249,19 @@ export const checkersGame = createModule("checkers", {
     },
 
     aiMove: (facts) => {
-      if (facts.gameOver) return;
-      if (facts.gameMode !== "computer") return;
-      if (facts.currentPlayer !== facts.aiPlayer) return;
+      if (facts.gameOver) {
+        return;
+      }
+      if (facts.gameMode !== "computer") {
+        return;
+      }
+      if (facts.currentPlayer !== facts.aiPlayer) {
+        return;
+      }
 
-      const board = facts.board as Board;
-      const player = facts.currentPlayer as Player;
-      const cont = facts.mustContinueFrom as number | null;
+      const board = facts.board;
+      const player = facts.currentPlayer;
+      const cont = facts.mustContinueFrom;
 
       if (cont !== null) {
         // Multi-jump continuation: pick best jump from the continuing piece
@@ -263,9 +281,15 @@ export const checkersGame = createModule("checkers", {
     },
 
     claudeMove: (facts, { from, to }) => {
-      if (facts.gameOver) return;
-      if (facts.gameMode !== "ai") return;
-      if (facts.currentPlayer !== facts.aiPlayer) return;
+      if (facts.gameOver) {
+        return;
+      }
+      if (facts.gameMode !== "ai") {
+        return;
+      }
+      if (facts.currentPlayer !== facts.aiPlayer) {
+        return;
+      }
 
       facts.selectedIndex = from;
       facts.targetIndex = to;
@@ -280,16 +304,19 @@ export const checkersGame = createModule("checkers", {
     executeMove: {
       priority: 100,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        const sel = facts.selectedIndex as number | null;
-        const target = facts.targetIndex as number | null;
-        if (sel === null || target === null) return false;
-        const moves = getValidMovesForPiece(facts.board, sel);
-        return moves.some((m) => m.to === target);
+        if (facts.gameOver) {
+          return false;
+        }
+        if (facts.selectedIndex === null || facts.targetIndex === null) {
+          return false;
+        }
+        const moves = getValidMovesForPiece(facts.board, facts.selectedIndex);
+
+        return moves.some((m) => m.to === facts.targetIndex);
       },
       require: (facts) => {
-        const sel = facts.selectedIndex as number;
-        const target = facts.targetIndex as number;
+        const sel = facts.selectedIndex!;
+        const target = facts.targetIndex!;
         const moves = getValidMovesForPiece(facts.board, sel);
         const move = moves.find((m) => m.to === target)!;
         return {
@@ -304,18 +331,21 @@ export const checkersGame = createModule("checkers", {
     kingPiece: {
       priority: 80,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        // Check the entire board for pieces that should be kinged
-        const board = facts.board as Board;
-        for (let i = 0; i < 64; i++) {
-          if (shouldKing(board, i)) return true;
+        if (facts.gameOver) {
+          return false;
         }
+        // Check the entire board for pieces that should be kinged
+        for (let i = 0; i < 64; i++) {
+          if (shouldKing(facts.board, i)) {
+            return true;
+          }
+        }
+
         return false;
       },
       require: (facts) => {
-        const board = facts.board as Board;
         for (let i = 0; i < 64; i++) {
-          if (shouldKing(board, i)) {
+          if (shouldKing(facts.board, i)) {
             return { type: "KING_PIECE", index: i };
           }
         }
@@ -327,9 +357,14 @@ export const checkersGame = createModule("checkers", {
     gameOver: {
       priority: 50,
       when: (facts) => {
-        if (facts.gameOver) return false;
+        if (facts.gameOver) {
+          return false;
+        }
         // Only check after a turn is fully complete (no pending multi-jump)
-        if (facts.mustContinueFrom !== null) return false;
+        if (facts.mustContinueFrom !== null) {
+          return false;
+        }
+
         return hasNoValidMoves(facts.board, facts.currentPlayer);
       },
       require: (facts) => ({
@@ -348,7 +383,7 @@ export const checkersGame = createModule("checkers", {
     executeMove: {
       requirement: "EXECUTE_MOVE",
       resolve: async (req, context) => {
-        const board = context.facts.board as Board;
+        const board = context.facts.board;
         const move: Move = {
           from: req.from,
           to: req.to,
@@ -362,12 +397,7 @@ export const checkersGame = createModule("checkers", {
         if (req.captured !== null) {
           const capturedPiece = board[req.captured];
           if (capturedPiece) {
-            const counts = {
-              ...(context.facts.capturedCount as {
-                red: number;
-                black: number;
-              }),
-            };
+            const counts = { ...context.facts.capturedCount };
             counts[capturedPiece.player]++;
             context.facts.capturedCount = counts;
           }

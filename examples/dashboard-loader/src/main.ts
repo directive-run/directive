@@ -8,7 +8,6 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  type EventLogEntry,
   type ResourceState,
   dashboardLoaderModule,
   dashboardLoaderSchema,
@@ -152,16 +151,16 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const profile = facts.profile as ResourceState<unknown>;
-  const prefs = facts.preferences as ResourceState<unknown>;
-  const perms = facts.permissions as ResourceState<unknown>;
-  const loaded = derive.loadedCount as number;
-  const combined = derive.combinedStatus as string;
-  const canStart = derive.canStart as boolean;
-  const anyLoading = derive.anyLoading as boolean;
-  const anyError = derive.anyError as boolean;
-  const allLoaded = derive.allLoaded as boolean;
-  const eventLog = facts.eventLog as EventLogEntry[];
+  const profile = facts.profile;
+  const prefs = facts.preferences;
+  const perms = facts.permissions;
+  const loaded = derive.loadedCount;
+  const combined = derive.combinedStatus;
+  const canStart = derive.canStart;
+  const anyLoading = derive.anyLoading;
+  const anyError = derive.anyError;
+  const allLoaded = derive.allLoaded;
+  const eventLog = facts.eventLog;
 
   // Status bar
   combinedStatusEl.textContent = combined;

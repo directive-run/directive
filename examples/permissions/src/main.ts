@@ -6,7 +6,6 @@
  * and admin panel.
  */
 
-import type { Article } from "./mock-api.js";
 import { system } from "./permissions.js";
 
 // ============================================================================
@@ -79,20 +78,20 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const isAuthenticated = derive.auth.isAuthenticated as boolean;
-  const userName = facts.auth.userName as string;
-  const role = facts.auth.role as string;
+  const isAuthenticated = derive.auth.isAuthenticated;
+  const userName = facts.auth.userName;
+  const role = facts.auth.role;
 
-  const canEdit = derive.permissions.canEdit as boolean;
-  const canPublish = derive.permissions.canPublish as boolean;
-  const canDelete = derive.permissions.canDelete as boolean;
-  const canManageUsers = derive.permissions.canManageUsers as boolean;
-  const canViewAnalytics = derive.permissions.canViewAnalytics as boolean;
-  const permissions = facts.permissions.permissions as string[];
+  const canEdit = derive.permissions.canEdit;
+  const canPublish = derive.permissions.canPublish;
+  const canDelete = derive.permissions.canDelete;
+  const canManageUsers = derive.permissions.canManageUsers;
+  const canViewAnalytics = derive.permissions.canViewAnalytics;
+  const permissions = facts.permissions.permissions;
 
-  const articles = facts.content.articles as Article[];
-  const contentLoaded = facts.content.loaded as boolean;
-  const actionStatus = facts.content.actionStatus as string;
+  const articles = facts.content.articles;
+  const contentLoaded = facts.content.loaded;
+  const actionStatus = facts.content.actionStatus;
 
   // --- User selector bar ---
   userAdminBtn.classList.toggle("active", role === "admin");
@@ -255,9 +254,9 @@ articleListEl.addEventListener("click", (e) => {
   }
 
   const derive = system.derive;
-  const canPublish = derive.permissions.canPublish as boolean;
-  const canDelete = derive.permissions.canDelete as boolean;
-  const canEdit = derive.permissions.canEdit as boolean;
+  const canPublish = derive.permissions.canPublish;
+  const canDelete = derive.permissions.canDelete;
+  const canEdit = derive.permissions.canEdit;
 
   if (action === "edit") {
     if (!canEdit) {

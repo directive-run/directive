@@ -7,10 +7,10 @@
 ```typescript
 // Example: auth-flow
 // Source: examples/auth-flow/src/auth-flow.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Auth Flow – Directive Module
+ * Auth Flow — Directive Module
  *
  * Demonstrates constraint `after` ordering, auto-tracked derivations
  * driving constraints, resolvers with retry, effects for cleanup,
@@ -383,10 +383,10 @@ export const authFlowModule = createModule("auth-flow", {
 ```typescript
 // Example: async-chains
 // Source: examples/async-chains/src/async-chains.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Async Chains – Three Directive Modules
+ * Async Chains — Three Directive Modules
  *
  * Demonstrates cross-module constraint chaining with `after` ordering:
  *   Auth → Permissions → Dashboard
@@ -557,7 +557,7 @@ export const permissionsModule = createModule("permissions", {
     loadPermissions: {
       after: ["auth::validateSession"],
       when: (facts) => {
-        // Use the fact directly – derivation values aren't available in the
+        // Use the fact directly — derivation values aren't available in the
         // facts proxy passed to constraints (they live in the derive layer).
         return facts.auth.status === "valid" && !facts.self.loaded;
       },
@@ -675,10 +675,10 @@ export const dashboardModule = createModule("dashboard", {
 ```typescript
 // Example: debounce-constraints
 // Source: examples/debounce-constraints/src/main.ts
-// Extracted for AI rules – DOM wiring stripped
+// Extracted for AI rules — DOM wiring stripped
 
 /**
- * Debounce Constraints – DOM Rendering & System Wiring
+ * Debounce Constraints — DOM Rendering & System Wiring
  *
  * Creates the Directive system, subscribes to state changes,
  * renders the search input, debounce progress bar, results list,
@@ -744,7 +744,7 @@ const allKeys = [
 
 system.subscribe(allKeys, render);
 
-// Timer – tick every 100ms for smooth debounce progress bar
+// Timer — tick every 100ms for smooth debounce progress bar
 const tickInterval = setInterval(() => {
   system.events.tick();
 }, 100);
@@ -753,7 +753,7 @@ const tickInterval = setInterval(() => {
 // Controls
 // ============================================================================
 
-// Search input – fire on every keystroke
+// Search input — fire on every keystroke
 
 // Clear
 
@@ -783,10 +783,10 @@ render();
 ```typescript
 // Example: batch-resolver
 // Source: examples/batch-resolver/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Batch Data Loader – Directive Module
+ * Batch Data Loader — Directive Module
  *
  * Types, schema, mock data, module definition, timeline, and system creation
  * for a batched user profile loader with schema validation.
@@ -991,7 +991,7 @@ const batchModule = createModule("batch-loader", {
       priority: 50,
       when: (facts) => facts.loadingIds.length > 0,
       require: (facts) => {
-        // Emit one requirement per loading ID – the batch resolver groups them
+        // Emit one requirement per loading ID — the batch resolver groups them
         const id = facts.loadingIds[0];
 
         return { type: "LOAD_USER", userId: id };
@@ -1089,10 +1089,10 @@ export const system = createSystem({
 ```typescript
 // Example: error-boundaries
 // Source: examples/error-boundaries/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Resilient API Dashboard – Module Definition
+ * Resilient API Dashboard — Module Definition
  *
  * 3 simulated API services with configurable failure rates. Users inject errors
  * and watch recovery strategies, circuit breaker state transitions, retry-later

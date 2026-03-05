@@ -1,7 +1,3 @@
-// Example: newsletter
-// Source: examples/newsletter/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Newsletter Signup — Directive Module
  *

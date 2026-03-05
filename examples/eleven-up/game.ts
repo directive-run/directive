@@ -64,13 +64,18 @@ function createDeck(): Card[] {
   for (const suit of suits) {
     for (const rank of ranks) {
       let value: number;
-      if (rank === "A") value = 1;
-      else if (rank === "J" || rank === "Q" || rank === "K") value = 0;
-      else value = Number.parseInt(rank);
+      if (rank === "A") {
+        value = 1;
+      } else if (rank === "J" || rank === "Q" || rank === "K") {
+        value = 0;
+      } else {
+        value = Number.parseInt(rank);
+      }
 
       cards.push({ id: `${rank}-${suit}`, suit, rank, value });
     }
   }
+
   return cards;
 }
 
@@ -80,6 +85,7 @@ function shuffle<T>(array: T[]): T[] {
     const j = Math.floor(Math.random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
   }
+
   return result;
 }
 
@@ -101,8 +107,12 @@ function findAutoCombo(
   selected: string[],
   newCardIds: string[],
 ): string[] | null {
-  if (selected.length > 0) return null;
-  if (newCardIds.length === 0) return null;
+  if (selected.length > 0) {
+    return null;
+  }
+  if (newCardIds.length === 0) {
+    return null;
+  }
 
   const newSet = new Set(newCardIds);
 
@@ -142,7 +152,9 @@ function countValidMoves(table: Card[]): {
   const numberCards = table.filter((c) => !isFaceCard(c));
   for (let i = 0; i < numberCards.length; i++) {
     for (let j = i + 1; j < numberCards.length; j++) {
-      if (numberCards[i].value + numberCards[j].value === 11) pairs++;
+      if (numberCards[i].value + numberCards[j].value === 11) {
+        pairs++;
+      }
     }
   }
 
@@ -442,13 +454,20 @@ export const elevenUpGame = createModule("eleven-up", {
     pairAddsToEleven: {
       priority: 100,
       when: (facts) => {
-        if (facts.gameOver) return false;
+        if (facts.gameOver) {
+          return false;
+        }
         const selected = facts.table.filter((c: Card) =>
           facts.selected.includes(c.id),
         );
-        if (selected.length !== 2) return false;
+        if (selected.length !== 2) {
+          return false;
+        }
         const [a, b] = selected;
-        if (isFaceCard(a) || isFaceCard(b)) return false;
+        if (isFaceCard(a) || isFaceCard(b)) {
+          return false;
+        }
+
         return a.value + b.value === 11;
       },
       require: (facts) => ({
@@ -462,12 +481,18 @@ export const elevenUpGame = createModule("eleven-up", {
     faceCardTrio: {
       priority: 100,
       when: (facts) => {
-        if (facts.gameOver) return false;
+        if (facts.gameOver) {
+          return false;
+        }
         const selected = facts.table.filter((c: Card) =>
           facts.selected.includes(c.id),
         );
-        if (selected.length !== 3) return false;
-        if (!selected.every((c: Card) => isFaceCard(c))) return false;
+        if (selected.length !== 3) {
+          return false;
+        }
+        if (!selected.every((c: Card) => isFaceCard(c))) {
+          return false;
+        }
         const ranks = selected.map((c: Card) => c.rank).sort();
         return ranks[0] === "J" && ranks[1] === "K" && ranks[2] === "Q";
       },
@@ -494,10 +519,18 @@ export const elevenUpGame = createModule("eleven-up", {
     autoCombo: {
       priority: 75,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        if (facts.moveCount === 0) return false;
-        if (facts.selected.length > 0) return false;
-        if (facts.table.length === 0) return false;
+        if (facts.gameOver) {
+          return false;
+        }
+        if (facts.moveCount === 0) {
+          return false;
+        }
+        if (facts.selected.length > 0) {
+          return false;
+        }
+        if (facts.table.length === 0) {
+          return false;
+        }
         return (
           findAutoCombo(facts.table, facts.selected, facts.newCardIds) !== null
         );
@@ -531,9 +564,15 @@ export const elevenUpGame = createModule("eleven-up", {
     playerLoses: {
       priority: 190,
       when: (facts) => {
-        if (facts.gameOver) return false;
-        if (facts.table.length === 0) return false;
-        if (facts.deck.length > 0) return false;
+        if (facts.gameOver) {
+          return false;
+        }
+        if (facts.table.length === 0) {
+          return false;
+        }
+        if (facts.deck.length > 0) {
+          return false;
+        }
         const { pairs, faceCardSets } = countValidMoves(facts.table);
         return pairs + faceCardSets === 0;
       },

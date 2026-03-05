@@ -9,8 +9,6 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  type EventLogEntry,
-  type SyncQueueEntry,
   type TodoItem,
   optimisticUpdatesModule,
   optimisticUpdatesSchema,
@@ -81,15 +79,15 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const items = facts.items as TodoItem[];
-  const syncQueue = facts.syncQueue as SyncQueueEntry[];
-  const toastMessage = facts.toastMessage as string;
-  const toastType = facts.toastType as string;
-  const totalCount = derive.totalCount as number;
-  const doneCount = derive.doneCount as number;
-  const pendingCount = derive.pendingCount as number;
-  const canAdd = derive.canAdd as boolean;
-  const eventLog = facts.eventLog as EventLogEntry[];
+  const items = facts.items;
+  const syncQueue = facts.syncQueue;
+  const toastMessage = facts.toastMessage;
+  const toastType = facts.toastType;
+  const totalCount = derive.totalCount;
+  const doneCount = derive.doneCount;
+  const pendingCount = derive.pendingCount;
+  const canAdd = derive.canAdd;
+  const eventLog = facts.eventLog;
 
   // Build set of pending item IDs
   const pendingItemIds = new Set(syncQueue.map((e) => e.itemId));
@@ -267,7 +265,7 @@ addInput.addEventListener("keydown", (e) => {
 });
 
 function handleAdd(): void {
-  const text = (system.facts.newItemText as string).trim();
+  const text = system.facts.newItemText.trim();
   if (!text) {
     return;
   }

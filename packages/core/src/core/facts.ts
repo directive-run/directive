@@ -484,12 +484,14 @@ export const t = {
   },
 
   /**
-   * Create an object schema type.
+   * Create an object schema type for any complex value.
    * Can be used with or without shape validation:
    * - `t.object<User>()` - Type-only, no property validation
    * - `t.object<User>().shape({ name: t.string(), age: t.number() })` - With property validation
+   *
+   * For arrays, prefer `t.array<T>()` which adds `Array.isArray` validation.
    */
-  object<T extends Record<string, unknown>>() {
+  object<T>() {
     type ChainableObject = ChainableSchemaType<T> & {
       shape(schema: { [K in keyof T]?: SchemaType<T[K]> }): ChainableObject;
       nonNull(): ChainableObject;

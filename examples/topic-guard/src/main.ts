@@ -7,12 +7,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import {
-  type ChatMessage,
-  type GuardrailLogEntry,
-  topicGuardModule,
-  topicGuardSchema,
-} from "./topic-guard.js";
+import { topicGuardModule, topicGuardSchema } from "./topic-guard.js";
 
 // ============================================================================
 // System
@@ -58,12 +53,12 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const messages = facts.messages as ChatMessage[];
-  const guardrailLog = facts.guardrailLog as GuardrailLogEntry[];
-  const canSend = derive.canSend as boolean;
-  const blockedCount = derive.blockedCount as number;
-  const allowedCount = derive.allowedCount as number;
-  const blockRate = derive.blockRate as string;
+  const messages = facts.messages;
+  const guardrailLog = facts.guardrailLog;
+  const canSend = derive.canSend;
+  const blockedCount = derive.blockedCount;
+  const allowedCount = derive.allowedCount;
+  const blockRate = derive.blockRate;
 
   // Send button state
   sendBtn.disabled = !canSend;
@@ -133,7 +128,7 @@ function render(): void {
   }
 
   // Sync topic checkboxes with state
-  const allowedTopics = facts.allowedTopics as string[];
+  const allowedTopics = facts.allowedTopics;
   const checkboxes =
     topicsEl.querySelectorAll<HTMLInputElement>("input[data-topic]");
   checkboxes.forEach((cb) => {

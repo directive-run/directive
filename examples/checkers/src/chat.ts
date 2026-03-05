@@ -24,7 +24,7 @@ export interface ChatMessage {
 
 export const chatSchema = {
   facts: {
-    messages: t.object<ChatMessage[]>(),
+    messages: t.array<ChatMessage>(),
     thinking: t.boolean(),
     totalTokens: t.number(),
     estimatedCost: t.number(),
@@ -84,7 +84,7 @@ export const checkersChat = createModule("checkers-chat", {
 
   events: {
     addMessage: (facts, { message }) => {
-      facts.messages = [...(facts.messages as ChatMessage[]), message];
+      facts.messages = [...facts.messages, message];
     },
 
     setThinking: (facts, { thinking }) => {
@@ -117,7 +117,7 @@ export const checkersChat = createModule("checkers-chat", {
     },
 
     appendStreamToken: (facts, { token }) => {
-      facts.streamingText = (facts.streamingText as string) + token;
+      facts.streamingText = facts.streamingText + token;
     },
 
     finishStream: (facts, { finalText }) => {

@@ -1,7 +1,3 @@
-// Example: error-boundaries
-// Source: examples/error-boundaries/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * Resilient API Dashboard — Module Definition
  *

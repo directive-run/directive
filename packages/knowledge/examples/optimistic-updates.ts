@@ -51,15 +51,15 @@ let nextOpId = 1;
 
 export const optimisticUpdatesSchema = {
   facts: {
-    items: t.object<TodoItem[]>(),
-    syncQueue: t.object<SyncQueueEntry[]>(),
+    items: t.array<TodoItem>(),
+    syncQueue: t.array<SyncQueueEntry>(),
     syncingOpId: t.string(),
     newItemText: t.string(),
     serverDelay: t.number(),
     failRate: t.number(),
     toastMessage: t.string(),
     toastType: t.string(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     totalCount: t.number(),
@@ -127,16 +127,15 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
   // ============================================================================
 
   derive: {
-    totalCount: (facts) => (facts.items as TodoItem[]).length,
+    totalCount: (facts) => facts.items.length,
 
-    doneCount: (facts) =>
-      (facts.items as TodoItem[]).filter((i) => i.done).length,
+    doneCount: (facts) => facts.items.filter((i) => i.done).length,
 
-    pendingCount: (facts) => (facts.syncQueue as SyncQueueEntry[]).length,
+    pendingCount: (facts) => facts.syncQueue.length,
 
-    canAdd: (facts) => (facts.newItemText as string).trim() !== "",
+    canAdd: (facts) => facts.newItemText.trim() !== "",
 
-    isSyncing: (facts) => (facts.syncingOpId as string) !== "",
+    isSyncing: (facts) => facts.syncingOpId !== "",
   },
 
   // ============================================================================
@@ -145,15 +144,14 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
 
   events: {
     toggleItem: (facts, { id }) => {
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
-      facts.items = items.map((i) =>
+      facts.items = facts.items.map((i) =>
         i.id === id ? { ...i, done: !i.done } : i,
       );
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId: id, op: "toggle", undoItems });
       facts.syncQueue = queue;
 
@@ -161,13 +159,12 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     },
 
     deleteItem: (facts, { id }) => {
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
-      facts.items = items.filter((i) => i.id !== id);
+      facts.items = facts.items.filter((i) => i.id !== id);
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId: id, op: "delete", undoItems });
       facts.syncQueue = queue;
 
@@ -175,20 +172,19 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     },
 
     addItem: (facts) => {
-      const text = (facts.newItemText as string).trim();
+      const text = facts.newItemText.trim();
       if (!text) {
         return;
       }
 
-      const items = facts.items as TodoItem[];
-      const undoItems = items.map((i) => ({ ...i }));
+      const undoItems = facts.items.map((i) => ({ ...i }));
 
       const itemId = String(nextId++);
-      facts.items = [...items, { id: itemId, text, done: false }];
+      facts.items = [...facts.items, { id: itemId, text, done: false }];
       facts.newItemText = "";
 
       const opId = String(nextOpId++);
-      const queue = [...(facts.syncQueue as SyncQueueEntry[])];
+      const queue = [...facts.syncQueue];
       queue.push({ opId, itemId, op: "add", undoItems });
       facts.syncQueue = queue;
 
@@ -221,17 +217,12 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
     needsSync: {
       priority: 100,
       when: (facts) => {
-        const queue = facts.syncQueue as SyncQueueEntry[];
-        const syncingOpId = facts.syncingOpId as string;
-
-        return queue.length > 0 && syncingOpId === "";
+        return facts.syncQueue.length > 0 && facts.syncingOpId === "";
       },
       require: (facts) => {
-        const queue = facts.syncQueue as SyncQueueEntry[];
-
         return {
           type: "SYNC_TODO",
-          opId: queue[0].opId,
+          opId: facts.syncQueue[0].opId,
         };
       },
     },
@@ -247,8 +238,7 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
       key: (req) => `sync-${req.opId}`,
       timeout: 10000,
       resolve: async (req, context) => {
-        const queue = context.facts.syncQueue as SyncQueueEntry[];
-        const entry = queue.find((e) => e.opId === req.opId);
+        const entry = context.facts.syncQueue.find((e) => e.opId === req.opId);
         if (!entry) {
           return;
         }
@@ -260,8 +250,8 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
           `Syncing ${entry.op} for item ${entry.itemId}...`,
         );
 
-        const serverDelay = context.facts.serverDelay as number;
-        const failRate = context.facts.failRate as number;
+        const serverDelay = context.facts.serverDelay;
+        const failRate = context.facts.failRate;
 
         try {
           await mockServerSync(entry.op, entry.itemId, serverDelay, failRate);
@@ -285,8 +275,7 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
         }
 
         // Remove entry from queue
-        const currentQueue = context.facts.syncQueue as SyncQueueEntry[];
-        context.facts.syncQueue = currentQueue.filter(
+        context.facts.syncQueue = context.facts.syncQueue.filter(
           (e) => e.opId !== req.opId,
         );
         context.facts.syncingOpId = "";
@@ -303,12 +292,18 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
       deps: ["syncingOpId"],
       run: (facts, prev) => {
         if (prev) {
-          const prevId = prev.syncingOpId as string;
-          const currId = facts.syncingOpId as string;
-          if (prevId === "" && currId !== "") {
-            addLogEntry(facts, "status", `Sync started: op ${currId}`);
-          } else if (prevId !== "" && currId === "") {
-            addLogEntry(facts, "status", `Sync completed: op ${prevId}`);
+          if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
+            addLogEntry(
+              facts,
+              "status",
+              `Sync started: op ${facts.syncingOpId}`,
+            );
+          } else if (prev.syncingOpId !== "" && facts.syncingOpId === "") {
+            addLogEntry(
+              facts,
+              "status",
+              `Sync completed: op ${prev.syncingOpId}`,
+            );
           }
         }
       },
