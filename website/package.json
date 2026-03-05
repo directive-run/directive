@@ -28,6 +28,7 @@
     "@markdoc/next.js": "^0.5.0",
     "@phosphor-icons/react": "^2.1.10",
     "@sindresorhus/slugify": "^2.2.1",
+    "@stackblitz/sdk": "^1.11.0",
     "@tailwindcss/postcss": "^4.1.15",
     "@tailwindcss/typography": "^0.5.16",
     "@types/react-highlight-words": "^0.20.0",

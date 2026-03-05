@@ -7,7 +7,6 @@ import { ConstraintPriorityDiagram } from "@/components/ConstraintPriorityDiagra
 import { DevToolsDemo } from "@/components/DevToolsDemo";
 import { ModuleLifecycleDiagram } from "@/components/ModuleLifecycleDiagram";
 import { OrchestratorDiagram } from "@/components/OrchestratorDiagram";
-import { Playground, StackBlitzButton } from "@/components/Playground";
 import { PluginLifecycleDiagram } from "@/components/PluginLifecycleDiagram";
 import { QuickLink, QuickLinks } from "@/components/QuickLinks";
 import { SecurityPipelineDiagram } from "@/components/SecurityPipelineDiagram";
@@ -60,25 +59,6 @@ const tags = {
       description: { type: String },
       icon: { type: String },
       href: { type: String },
-    },
-  },
-  playground: {
-    render: Playground,
-    selfClosing: true,
-    attributes: {
-      projectId: { type: String },
-      title: { type: String },
-      file: { type: String },
-      height: { type: Number },
-      view: { type: String },
-    },
-  },
-  "stackblitz-button": {
-    render: StackBlitzButton,
-    selfClosing: true,
-    attributes: {
-      projectId: { type: String },
-      text: { type: String },
     },
   },
   "use-case-cards": {
