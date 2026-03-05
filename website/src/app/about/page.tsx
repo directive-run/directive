@@ -8,7 +8,6 @@ import {
   Globe,
   Lightning,
   LinkedinLogo,
-  MapPin,
   Package,
   ShieldCheck,
   Sparkle,
@@ -24,13 +23,13 @@ export const metadata = buildPageMetadata({
 
 const projectStats = [
   {
-    label: "1,400+ Tests",
-    description: "Defense-in-depth coverage across the full runtime",
-    icon: ShieldCheck,
+    label: "Open Source",
+    description: "MIT licensed, built in the open",
+    icon: Globe,
   },
   {
-    label: "~3KB Gzipped",
-    description: "Tree-shakeable, zero dependencies",
+    label: "Zero Dependencies",
+    description: "Tree-shakeable, ~27KB gzipped",
     icon: Package,
   },
   {
@@ -50,18 +49,66 @@ export default function AboutPage() {
         </h1>
         <p className="mt-4 text-xl text-slate-600 dark:text-slate-400">
           Directive is an open-source runtime for TypeScript that replaces
-          manual state orchestration with declarative constraints. Built by a
-          solo engineer, hardened by 1,400+ tests, designed to scale from UI
-          state to AI agent coordination.
+          manual state orchestration with declarative constraints. Hardened by
+          1,400+ tests, designed to scale from UI state to AI agent
+          coordination.
         </p>
 
         {/* Constraint Flow Diagram */}
-        <div className="mt-12">
+        {/* <div className="mt-12">
           <ConstraintFlowDiagram />
+        </div> */}
+
+        {/* Engineering Standards */}
+        <div className="mt-12 rounded-xl border border-slate-200/60 bg-brand-surface-card px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
+          <div className="flex items-center gap-3">
+            <ShieldCheck
+              weight="duotone"
+              className="h-7 w-7 text-brand-primary dark:text-brand-primary-400"
+            />
+            <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
+              Engineering Standards
+            </h3>
+          </div>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            Every change goes through architecture review, security audit, and
+            runtime hardening analysis. The constraint engine, resolver
+            pipeline, and effects system are continuously stress-tested.
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                1,400+
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                tests passing
+              </p>
+            </div>
+            <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                0
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                runtime dependencies
+              </p>
+            </div>
+            <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
+              <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
+                12
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                packages
+              </p>
+            </div>
+          </div>
+          <p className="mt-5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+            Directive is built in the open. Contributions, bug reports, and
+            RFCs are welcome on GitHub.
+          </p>
         </div>
 
         {/* Stat Cards */}
-        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
           {projectStats.map((stat) => (
             <div
               key={stat.label}
@@ -164,52 +211,45 @@ export default function AboutPage() {
           </Link>
         </p>
 
-        {/* The Team */}
+        {/* Built by Sizls */}
         <div className="mt-20">
           <h2 className="font-display text-3xl font-semibold text-slate-900 dark:text-white">
-            The Team
+            Built by Sizls
           </h2>
 
-          <p className="mt-10 text-xs font-semibold uppercase tracking-widest text-brand-primary dark:text-brand-primary-400">
-            Creator &amp; Lead
-          </p>
-
-          <div className="mt-3 flex flex-col gap-8 sm:flex-row sm:items-start">
-            {/* Initials fallback */}
-            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl bg-brand-primary-50/30 ring-1 ring-brand-primary-200/40 dark:bg-brand-primary-950/20 dark:ring-brand-primary-800/20">
-              <span className="font-display text-3xl font-bold text-brand-primary dark:text-brand-primary-400">
-                JC
-              </span>
-            </div>
-
-            <div>
-              <h3 className="font-display text-2xl font-semibold text-slate-900 dark:text-white">
-                Jason Comes
-              </h3>
-              <p className="mt-1 text-base font-medium text-slate-500 dark:text-slate-400">
-                Engineer &middot; Tech Enthusiast &middot; Stack Strategist
-              </p>
-              <div className="mt-1.5 flex items-center gap-1.5 text-base text-slate-400 dark:text-slate-500">
-                <MapPin weight="fill" className="h-4 w-4" />
-                Somewhere in the middle, building for everywhere
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
+          <div className="mt-6 space-y-4 text-base leading-relaxed text-slate-600 dark:text-slate-400">
             <p>
-              20+ years building for the web &ndash; from freelance beginnings
-              to senior engineering roles. The idea behind Directive came from a
-              hobby project &ndash; building Minglingo, a real-time social app
-              where wrangling complex, interconnected systems demanded something
-              better. Instead of reaching for another library, the answer was to
-              build one that met entirely new constraints. So Directive was
-              born!
+              Sizls is a small crew of talented individuals led by Jason
+              Comes{" "}
+              <a
+                href="https://www.linkedin.com/in/jasonwcomes/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center transition-colors hover:text-[#0A66C2]"
+                aria-label="Jason Comes on LinkedIn"
+              >
+                <LinkedinLogo
+                  weight="fill"
+                  className="h-5 w-5 text-current"
+                />
+              </a>{" "}
+              that ships developer tools, apps, and interactive
+              experiences&nbsp;&ndash; relentlessly.
             </p>
             <p>
-              Equal parts engineer and visionary. Obsessed with application
-              development, user experience, UI design, site performance, SEO,
-              typography, and building tools that actually feel good to use.
+              Directive is our open-source work. Everything else is the stuff we
+              can&rsquo;t stop building. The source is on{" "}
+              <a
+                href="https://github.com/directive-run/directive"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+              >
+                <GithubLogo weight="fill" className="h-4 w-4" />
+                GitHub
+              </a>
+              &nbsp;&ndash; contributions, bug reports, and RFCs are welcome. No
+              limits, no boundaries, just infinity.
             </p>
           </div>
 
@@ -253,63 +293,16 @@ export default function AboutPage() {
             </CardLink>
           </div>
 
-          {/* Engineering Standards */}
-          <div className="mt-10 rounded-xl border border-slate-200/60 bg-brand-surface-card px-6 py-6 dark:border-slate-700/40 dark:bg-slate-800/30">
-            <div className="flex items-center gap-3">
-              <ShieldCheck
-                weight="duotone"
-                className="h-7 w-7 text-brand-primary dark:text-brand-primary-400"
-              />
-              <h3 className="font-display text-lg font-semibold text-slate-900 dark:text-white">
-                Engineering Standards
-              </h3>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Every change goes through architecture review, security audit, and
-              runtime hardening analysis. The constraint engine, resolver
-              pipeline, and effects system are continuously stress-tested.
-            </p>
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
-                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-                  1,400+
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  tests passing
-                </p>
-              </div>
-              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
-                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-                  20+
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  hardening fixes shipped
-                </p>
-              </div>
-              <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
-                <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-                  100+
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                  reviews completed
-                </p>
-              </div>
-            </div>
-            <p className="mt-5 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Directive is built in the open. Contributions, bug reports, and
-              RFCs are welcome on GitHub.
-            </p>
-          </div>
         </div>
 
         {/* Directive Callout */}
-        <div className="mt-6">
+        {/* <div className="mt-6">
           <DirectiveCallout
             subject="website"
             href="/docs/quick-start"
             linkLabel="Get started"
           />
-        </div>
+        </div> */}
       </div>
     </div>
   );
