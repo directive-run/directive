@@ -50,7 +50,7 @@ export const authFlowSchema = {
     refreshBuffer: t.number(),
     loginFailRate: t.number(),
     refreshFailRate: t.number(),
-    eventLog: t.object<EventLogEntry[]>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     isAuthenticated: t.boolean(),
@@ -83,7 +83,7 @@ export const authFlowSchema = {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   facts.eventLog = log;
 }

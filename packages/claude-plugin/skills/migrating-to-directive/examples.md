@@ -7,10 +7,10 @@
 ```typescript
 // Example: counter
 // Source: examples/counter/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Number Match – Directive Module
+ * Number Match — Directive Module
  *
  * Types, schema, helpers, module definition, timeline, and system creation
  * for a tile-matching game where pairs must add to 10.
@@ -195,7 +195,9 @@ const numberMatch = createModule("number-match", {
     selectTile: (facts, { tileId }) => {
       if (!facts.selected.includes(tileId) && !facts.gameOver) {
         facts.selected = [...facts.selected, tileId];
-        addLog(`EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`);
+        addLog(
+          `EVENT selectTile: ${tileId}, selected now: [${facts.selected}]`,
+        );
       }
     },
     deselectTile: (facts, { tileId }) => {
@@ -385,10 +387,10 @@ export const system = createSystem({
 ```typescript
 // Example: shopping-cart
 // Source: examples/shopping-cart/src/shopping-cart.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Shopping Cart – Directive Modules
+ * Shopping Cart — Directive Modules
  *
  * Two modules:
  * - cart: Items, coupons, checkout with cross-module auth dependency

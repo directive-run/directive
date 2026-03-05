@@ -1,237 +1,26 @@
 /**
- * Newsletter Signup - Vanilla Directive Example
+ * Newsletter Signup — DOM Rendering & System Wiring
  *
- * Demonstrates all six primitives with the simplest possible module:
- * - Facts: email, touched, status, errorMessage, lastSubmittedAt
- * - Derivations: emailError (touch-gated), isValid, canSubmit (rate-limited)
- * - Events: updateEmail, touchEmail, submit
- * - Constraints: subscribe (status === 'submitting'), resetAfterSuccess
- * - Resolvers: simulated async subscribe, auto-reset after delay
- * - Effects: logging status transitions
- *
- * Uses a simulated setTimeout instead of a real API so no account is needed.
+ * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
-import {
-  type ModuleSchema,
-  createModule,
-  createSystem,
-  t,
-} from "@directive-run/core";
-import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { addLog, logs, schema, system } from "./module.js";
 
 // ============================================================================
-// Constants
+// System Startup
 // ============================================================================
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const RATE_LIMIT_MS = 10_000; // 10 seconds (shorter for demo)
-
-// ============================================================================
-// Schema
-// ============================================================================
-
-const schema = {
-  facts: {
-    email: t.string(),
-    touched: t.boolean(),
-    status: t.string<"idle" | "submitting" | "success" | "error">(),
-    errorMessage: t.string(),
-    lastSubmittedAt: t.number(),
-  },
-  derivations: {
-    emailError: t.string(),
-    isValid: t.boolean(),
-    canSubmit: t.boolean(),
-  },
-  events: {
-    updateEmail: { value: t.string() },
-    touchEmail: {},
-    submit: {},
-  },
-  requirements: {
-    SUBSCRIBE: {},
-    RESET_AFTER_DELAY: {},
-  },
-} satisfies ModuleSchema;
-
-// ============================================================================
-// Module
-// ============================================================================
-
-const newsletter = createModule("newsletter", {
-  schema,
-
-  init: (facts) => {
-    facts.email = "";
-    facts.touched = false;
-    facts.status = "idle";
-    facts.errorMessage = "";
-    facts.lastSubmittedAt = 0;
-  },
-
-  derive: {
-    emailError: (facts) => {
-      if (!facts.touched) {
-        return "";
-      }
-      if (!facts.email.trim()) {
-        return "Email is required";
-      }
-      if (!EMAIL_REGEX.test(facts.email)) {
-        return "Enter a valid email address";
-      }
-
-      return "";
-    },
-
-    isValid: (facts) => EMAIL_REGEX.test(facts.email),
-
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
-        return false;
-      }
-      if (facts.status !== "idle") {
-        return false;
-      }
-      if (
-        facts.lastSubmittedAt > 0 &&
-        Date.now() - facts.lastSubmittedAt < RATE_LIMIT_MS
-      ) {
-        return false;
-      }
-
-      return true;
-    },
-  },
-
-  events: {
-    updateEmail: (facts, { value }) => {
-      facts.email = value;
-    },
-
-    touchEmail: (facts) => {
-      facts.touched = true;
-    },
-
-    submit: (facts) => {
-      facts.touched = true;
-      facts.status = "submitting";
-    },
-  },
-
-  constraints: {
-    subscribe: {
-      when: (facts) => facts.status === "submitting",
-      require: { type: "SUBSCRIBE" },
-    },
-
-    resetAfterSuccess: {
-      when: (facts) => facts.status === "success",
-      require: { type: "RESET_AFTER_DELAY" },
-    },
-  },
-
-  resolvers: {
-    // Simulated submission — no API account needed
-    subscribe: {
-      requirement: "SUBSCRIBE",
-      resolve: async (req, context) => {
-        log(`Subscribing: ${context.facts.email}`);
-
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        // Simulate occasional failure (20% chance)
-        if (Math.random() < 0.2) {
-          context.facts.status = "error";
-          context.facts.errorMessage =
-            "Simulated error — try again (20% failure rate for demo).";
-          log("Subscription failed (simulated)");
-
-          return;
-        }
-
-        context.facts.status = "success";
-        context.facts.lastSubmittedAt = Date.now();
-        log("Subscription succeeded");
-      },
-    },
-
-    resetAfterDelay: {
-      requirement: "RESET_AFTER_DELAY",
-      resolve: async (req, context) => {
-        log("Auto-resetting in 5 seconds...");
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-        context.facts.email = "";
-        context.facts.touched = false;
-        context.facts.status = "idle";
-        context.facts.errorMessage = "";
-        log("Form reset");
-      },
-    },
-  },
-
-  effects: {
-    logSubscription: {
-      deps: ["status"],
-      run: (facts, prev) => {
-        if (!prev) {
-          return;
-        }
-
-        if (facts.status !== prev.status) {
-          log(`Status: ${prev.status} → ${facts.status}`);
-        }
-      },
-    },
-  },
-});
-
-// ============================================================================
-// System
-// ============================================================================
-
-const system = createSystem({
-  module: newsletter,
-  debug: { runHistory: true },
-  plugins: [devtoolsPlugin({ name: "newsletter" })],
-});
 system.start();
 
 // ============================================================================
-// Logging helper
-// ============================================================================
-
-const logEl = document.getElementById("log")!;
-function log(msg: string) {
-  console.log(`[newsletter] ${msg}`);
-  const line = document.createElement("div");
-  line.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
-  logEl.appendChild(line);
-  logEl.scrollTop = logEl.scrollHeight;
-}
-
-// ============================================================================
-// DOM Bindings
+// DOM References
 // ============================================================================
 
 const emailInput = document.getElementById("email") as HTMLInputElement;
 const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
 const statusBanner = document.getElementById("status-banner")!;
 const emailErrorEl = document.getElementById("email-error")!;
-
-emailInput.addEventListener("input", () => {
-  system.events.updateEmail({ value: emailInput.value });
-});
-
-emailInput.addEventListener("blur", () => {
-  system.events.touchEmail({});
-});
-
-submitBtn.addEventListener("click", () => {
-  system.events.submit({});
-});
+const logEl = document.getElementById("log")!;
 
 // ============================================================================
 // Render
@@ -242,8 +31,8 @@ function render() {
   emailInput.value = system.facts.email;
 
   // Derivation values
-  const emailError = system.read("emailError") as string;
-  const canSubmit = system.read("canSubmit") as boolean;
+  const emailError = system.derive.emailError;
+  const canSubmit = system.derive.canSubmit;
 
   emailErrorEl.textContent = emailError;
   submitBtn.disabled = !canSubmit;
@@ -266,23 +55,45 @@ function render() {
     statusBanner.className = "status-banner hidden";
     statusBanner.textContent = "";
   }
+
+  // Render logs
+  logEl.innerHTML = "";
+  for (const entry of logs) {
+    const line = document.createElement("div");
+    line.textContent = entry;
+    logEl.appendChild(line);
+  }
+  logEl.scrollTop = logEl.scrollHeight;
 }
 
-// Subscribe to all relevant facts and derivations
+// ============================================================================
+// Subscribe
+// ============================================================================
+
 system.subscribe(
-  [
-    "email",
-    "touched",
-    "status",
-    "errorMessage",
-    "lastSubmittedAt",
-    "emailError",
-    "isValid",
-    "canSubmit",
-  ],
+  [...Object.keys(schema.facts), ...Object.keys(schema.derivations)],
   render,
 );
 
-// Initial render
+// ============================================================================
+// Controls
+// ============================================================================
+
+emailInput.addEventListener("input", () => {
+  system.events.updateEmail({ value: emailInput.value });
+});
+
+emailInput.addEventListener("blur", () => {
+  system.events.touchEmail();
+});
+
+submitBtn.addEventListener("click", () => {
+  system.events.submit();
+});
+
+// ============================================================================
+// Initial Render
+// ============================================================================
+
 render();
-log("Newsletter signup ready. Enter an email and subscribe.");
+addLog("Newsletter signup ready. Enter an email and subscribe.");

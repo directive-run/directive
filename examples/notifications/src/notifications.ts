@@ -26,13 +26,13 @@ export interface Notification {
 
 export const notificationsSchema = {
   facts: {
-    queue: t.object<Notification[]>(),
+    queue: t.array<Notification>(),
     maxVisible: t.number(),
     now: t.number(),
     idCounter: t.number(),
   },
   derivations: {
-    visibleNotifications: t.object<Notification[]>(),
+    visibleNotifications: t.array<Notification>(),
     hasNotifications: t.boolean(),
     oldestExpired: t.object<Notification | null>(),
   },
@@ -67,24 +67,20 @@ export const notificationsModule = createModule("notifications", {
 
   derive: {
     visibleNotifications: (facts) => {
-      return (facts.queue as Notification[]).slice(
-        0,
-        facts.maxVisible as number,
-      );
+      return facts.queue.slice(0, facts.maxVisible);
     },
 
     hasNotifications: (facts) => {
-      return (facts.queue as Notification[]).length > 0;
+      return facts.queue.length > 0;
     },
 
     oldestExpired: (facts) => {
-      const queue = facts.queue as Notification[];
-      const oldest = queue[0];
+      const oldest = facts.queue[0];
       if (!oldest) {
         return null;
       }
 
-      if ((facts.now as number) > oldest.createdAt + oldest.ttl) {
+      if (facts.now > oldest.createdAt + oldest.ttl) {
         return oldest;
       }
 
@@ -99,23 +95,28 @@ export const notificationsModule = createModule("notifications", {
   constraints: {
     autoDismiss: {
       priority: 50,
-      when: (_facts, derive) => derive.oldestExpired !== null,
-      require: (_facts, derive) => ({
+      when: (facts) => {
+        const oldest = facts.queue[0];
+        if (!oldest) {
+          return false;
+        }
+
+        return facts.now > oldest.createdAt + oldest.ttl;
+      },
+      require: (facts) => ({
         type: "DISMISS_NOTIFICATION" as const,
-        id: (derive.oldestExpired as Notification).id,
+        id: facts.queue[0].id,
       }),
     },
 
     overflow: {
       priority: 60,
       when: (facts) => {
-        const queue = facts.queue as Notification[];
-
-        return queue.length > (facts.maxVisible as number) + 5;
+        return facts.queue.length > facts.maxVisible + 5;
       },
       require: (facts) => ({
         type: "DISMISS_NOTIFICATION" as const,
-        id: (facts.queue as Notification[])[0].id,
+        id: facts.queue[0].id,
       }),
     },
   },
@@ -128,7 +129,7 @@ export const notificationsModule = createModule("notifications", {
     dismiss: {
       requirement: "DISMISS_NOTIFICATION",
       resolve: async (req, context) => {
-        context.facts.queue = (context.facts.queue as Notification[]).filter(
+        context.facts.queue = context.facts.queue.filter(
           (n) => n.id !== req.id,
         );
       },
@@ -150,7 +151,7 @@ export const notificationsModule = createModule("notifications", {
         warning: 6000,
         error: 10000,
       };
-      const counter = (facts.idCounter as number) + 1;
+      const counter = facts.idCounter + 1;
       facts.idCounter = counter;
 
       const notification: Notification = {
@@ -161,11 +162,11 @@ export const notificationsModule = createModule("notifications", {
         ttl: payload.ttl ?? ttlMap[payload.level] ?? 4000,
       };
 
-      facts.queue = [...(facts.queue as Notification[]), notification];
+      facts.queue = [...facts.queue, notification];
     },
 
     dismissNotification: (facts, { id }: { id: string }) => {
-      facts.queue = (facts.queue as Notification[]).filter((n) => n.id !== id);
+      facts.queue = facts.queue.filter((n) => n.id !== id);
     },
 
     tick: (facts) => {
@@ -184,7 +185,7 @@ export const notificationsModule = createModule("notifications", {
 
 export const appSchema = {
   facts: {
-    actionLog: t.object<string[]>(),
+    actionLog: t.array<string>(),
   },
   events: {
     simulateAction: { message: t.string(), level: t.string() },
@@ -200,7 +201,7 @@ export const appModule = createModule("app", {
 
   events: {
     simulateAction: (facts, { message }: { message: string }) => {
-      facts.actionLog = [...(facts.actionLog as string[]), message];
+      facts.actionLog = [...facts.actionLog, message];
     },
   },
 });

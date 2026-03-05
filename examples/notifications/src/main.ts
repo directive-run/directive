@@ -107,12 +107,12 @@ function randomMessage(messages: string[]): string {
 let renderedIds = new Set<string>();
 
 function render(): void {
-  const facts = system.facts as any;
-  const derive = system.derive as any;
+  const facts = system.facts;
+  const derive = system.derive;
 
-  const visible = derive.notifications.visibleNotifications as Notification[];
-  const maxVisible = facts.notifications.maxVisible as number;
-  const actionLog = facts.app.actionLog as string[];
+  const visible = derive.notifications.visibleNotifications;
+  const maxVisible = facts.notifications.maxVisible;
+  const actionLog = facts.app.actionLog;
 
   // --- Toast stack ---
   const currentIds = new Set(visible.map((n) => n.id));
@@ -218,7 +218,11 @@ function addNotification(level: Notification["level"]): void {
   system.events.app.simulateAction({ message: `${level}: ${message}`, level });
 
   // Add the notification in the notifications module
-  system.events.notifications.addNotification({ message, level });
+  system.events.notifications.addNotification({
+    message,
+    level,
+    ttl: undefined,
+  });
 }
 
 addInfoBtn.addEventListener("click", () => {

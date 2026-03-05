@@ -259,10 +259,7 @@ function render(): void {
   const criticalCount = derive.criticalCaseCount;
   const completionPct = derive.completionPercentage;
   const avgRisk = derive.averageRiskScore;
-  const dispositionSummary = derive.dispositionSummary as Record<
-    string,
-    number
-  >;
+  const dispositionSummary = derive.dispositionSummary;
   const ungroupedCount = derive.ungroupedCount;
   const pendingAnalysisCount = derive.pendingAnalysisCount;
 

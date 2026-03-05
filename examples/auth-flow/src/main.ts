@@ -8,13 +8,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import {
-  type AuthStatus,
-  type EventLogEntry,
-  authFlowModule,
-  authFlowSchema,
-} from "./auth-flow.js";
-import type { User } from "./mock-auth.js";
+import { authFlowModule, authFlowSchema } from "./auth-flow.js";
 
 // ============================================================================
 // System
@@ -83,12 +77,12 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const status = facts.status as AuthStatus;
-  const token = facts.token as string;
-  const user = facts.user as User | null;
-  const tokenTimeRemaining = derive.tokenTimeRemaining as number;
-  const canLogin = derive.canLogin as boolean;
-  const eventLog = facts.eventLog as EventLogEntry[];
+  const status = facts.status;
+  const token = facts.token;
+  const user = facts.user;
+  const tokenTimeRemaining = derive.tokenTimeRemaining;
+  const canLogin = derive.canLogin;
+  const eventLog = facts.eventLog;
 
   // --- Status bar ---
   statusBadge.textContent = status;
@@ -102,7 +96,7 @@ function render(): void {
 
   // Countdown
   if (token !== "") {
-    const ttl = facts.tokenTTL as number;
+    const ttl = facts.tokenTTL;
     const pct = Math.min(100, Math.round((tokenTimeRemaining / ttl) * 100));
     countdownFill.style.width = `${pct}%`;
     countdownFill.className = "af-countdown-fill";

@@ -24,7 +24,7 @@ export interface EventLogEntry {
 // ============================================================================
 
 function addLogEntry(facts: any, event: string, detail: string): void {
-  const log = [...(facts.eventLog as EventLogEntry[])];
+  const log = [...facts.eventLog];
   log.push({ timestamp: Date.now(), event, detail });
   if (log.length > 50) {
     log.splice(0, log.length - 50);
@@ -38,8 +38,8 @@ function addLogEntry(facts: any, event: string, detail: string): void {
 
 export const dashboardSchema = {
   facts: {
-    loadedModules: t.object<string[]>(),
-    eventLog: t.object<EventLogEntry[]>(),
+    loadedModules: t.array<string>(),
+    eventLog: t.array<EventLogEntry>(),
   },
   derivations: {
     loadedCount: t.number(),
@@ -59,12 +59,12 @@ export const dashboardModule = createModule("dashboard", {
   },
 
   derive: {
-    loadedCount: (facts) => (facts.loadedModules as string[]).length,
+    loadedCount: (facts) => facts.loadedModules.length,
   },
 
   events: {
     moduleLoaded: (facts, { name }) => {
-      facts.loadedModules = [...(facts.loadedModules as string[]), name];
+      facts.loadedModules = [...facts.loadedModules, name];
       addLogEntry(facts, "loaded", `Loaded "${name}" module`);
     },
   },
@@ -101,18 +101,15 @@ export const counterModule = createModule("counter", {
   },
 
   derive: {
-    isNearMax: (facts) => (facts.count as number) >= 90,
+    isNearMax: (facts) => facts.count >= 90,
   },
 
   events: {
     increment: (facts) => {
-      facts.count = (facts.count as number) + (facts.step as number);
+      facts.count = facts.count + facts.step;
     },
     decrement: (facts) => {
-      facts.count = Math.max(
-        0,
-        (facts.count as number) - (facts.step as number),
-      );
+      facts.count = Math.max(0, facts.count - facts.step);
     },
     setStep: (facts, { value }) => {
       facts.step = value;
@@ -122,7 +119,7 @@ export const counterModule = createModule("counter", {
   constraints: {
     overflow: {
       priority: 100,
-      when: (facts) => (facts.count as number) >= 100,
+      when: (facts) => facts.count >= 100,
       require: () => ({ type: "COUNTER_RESET" }),
     },
   },
@@ -179,13 +176,13 @@ export const weatherModule = createModule("weather", {
 
   derive: {
     summary: (facts) => {
-      if ((facts.city as string) === "") {
+      if (facts.city === "") {
         return "";
       }
 
       return `${facts.temperature}\u00B0F, ${facts.condition}`;
     },
-    hasFetched: (facts) => (facts.lastFetchedCity as string) !== "",
+    hasFetched: (facts) => facts.lastFetchedCity !== "",
   },
 
   events: {
@@ -201,12 +198,12 @@ export const weatherModule = createModule("weather", {
     needsFetch: {
       priority: 100,
       when: (facts) =>
-        (facts.city as string).length >= 2 &&
+        facts.city.length >= 2 &&
         facts.city !== facts.lastFetchedCity &&
-        !(facts.isLoading as boolean),
+        !facts.isLoading,
       require: (facts) => ({
         type: "FETCH_WEATHER",
-        city: facts.city as string,
+        city: facts.city,
       }),
     },
   },
@@ -222,7 +219,7 @@ export const weatherModule = createModule("weather", {
         const data = await mockFetchWeather(req.city, 800);
 
         // Stale check: only apply if city still matches
-        if ((context.facts.city as string) === req.city) {
+        if (context.facts.city === req.city) {
           context.facts.temperature = data.temperature;
           context.facts.condition = data.condition;
           context.facts.humidity = data.humidity;
@@ -265,7 +262,7 @@ export const diceModule = createModule("dice", {
   },
 
   derive: {
-    total: (facts) => (facts.die1 as number) + (facts.die2 as number),
+    total: (facts) => facts.die1 + facts.die2,
     isDoubles: (facts) => facts.die1 === facts.die2,
   },
 
@@ -273,7 +270,7 @@ export const diceModule = createModule("dice", {
     roll: (facts) => {
       facts.die1 = Math.floor(Math.random() * 6) + 1;
       facts.die2 = Math.floor(Math.random() * 6) + 1;
-      facts.rollCount = (facts.rollCount as number) + 1;
+      facts.rollCount = facts.rollCount + 1;
     },
   },
 });

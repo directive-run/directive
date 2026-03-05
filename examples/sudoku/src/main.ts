@@ -7,7 +7,6 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import type { Conflict, Difficulty, Grid } from "./rules.js";
 import { MAX_HINTS } from "./rules.js";
 import { sudokuGame, sudokuSchema } from "./sudoku.js";
 
@@ -80,24 +79,24 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const grid = facts.grid as Grid;
-  const givens = facts.givens as Set<number>;
-  const selectedIndex = facts.selectedIndex as number | null;
-  const difficulty = facts.difficulty as Difficulty;
-  const gameOver = facts.gameOver as boolean;
-  const won = facts.won as boolean;
-  const notesMode = facts.notesMode as boolean;
-  const notes = facts.notes as Set<number>[];
-  const hintsUsed = facts.hintsUsed as number;
-  const errorsCount = facts.errorsCount as number;
+  const grid = facts.grid;
+  const givens = facts.givens;
+  const selectedIndex = facts.selectedIndex;
+  const difficulty = facts.difficulty;
+  const gameOver = facts.gameOver;
+  const won = facts.won;
+  const notesMode = facts.notesMode;
+  const notes = facts.notes;
+  const hintsUsed = facts.hintsUsed;
+  const errorsCount = facts.errorsCount;
 
-  const conflicts = derive.conflicts as Conflict[];
-  const conflictIndices = derive.conflictIndices as Set<number>;
-  const selectedPeers = derive.selectedPeers as number[];
-  const sameValueIndices = derive.sameValueIndices as Set<number>;
-  const progress = derive.progress as number;
-  const timerDisplay = derive.timerDisplay as string;
-  const timerUrgency = derive.timerUrgency as string;
+  const conflicts = derive.conflicts;
+  const conflictIndices = derive.conflictIndices;
+  const selectedPeers = derive.selectedPeers;
+  const sameValueIndices = derive.sameValueIndices;
+  const progress = derive.progress;
+  const timerDisplay = derive.timerDisplay;
+  const timerUrgency = derive.timerUrgency;
 
   const peerSet = new Set(selectedPeers);
 
@@ -126,7 +125,7 @@ function render(): void {
   errorsEl.textContent = `${errorsCount}`;
 
   // Message
-  const msg = facts.message as string;
+  const msg = facts.message;
   if (msg) {
     messageEl.textContent = msg;
     messageEl.classList.remove("hidden");
@@ -293,12 +292,12 @@ redoBtn.addEventListener("click", () => {
 // New game
 newGameBtn.addEventListener("click", () => {
   stopTimer();
-  system.events.newGame({ difficulty: system.facts.difficulty as Difficulty });
+  system.events.newGame({ difficulty: system.facts.difficulty });
 });
 
 modalNewGame.addEventListener("click", () => {
   stopTimer();
-  system.events.newGame({ difficulty: system.facts.difficulty as Difficulty });
+  system.events.newGame({ difficulty: system.facts.difficulty });
 });
 
 // Difficulty mode buttons
@@ -323,7 +322,7 @@ modeHard.addEventListener("click", () => {
 
 document.addEventListener("keydown", (e) => {
   const facts = system.facts;
-  const sel = facts.selectedIndex as number | null;
+  const sel = facts.selectedIndex;
 
   // Arrow keys: move selection
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {

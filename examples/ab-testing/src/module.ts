@@ -1,7 +1,3 @@
-// Example: ab-testing
-// Source: examples/ab-testing/src/module.ts
-// Pure module file — no DOM wiring
-
 /**
  * A/B Testing Engine — Directive Module
  *

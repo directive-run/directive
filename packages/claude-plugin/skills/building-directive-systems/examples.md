@@ -7,7 +7,7 @@
 ```typescript
 // Example: multi-module
 // Source: examples/multi-module/src/main.ts
-// Extracted for AI rules – DOM wiring stripped
+// Extracted for AI rules — DOM wiring stripped
 
 /**
  * Multi-Module Example - Main Entry Point
@@ -69,10 +69,10 @@ console.log("3. UI module effects react to facts.data.* changes");
 ```typescript
 // Example: dynamic-modules
 // Source: examples/dynamic-modules/src/modules.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Dynamic Modules – Directive Module Definitions
+ * Dynamic Modules — Directive Module Definitions
  *
  * Dashboard module (always loaded) + 3 dynamic modules (Counter, Weather, Dice).
  * Demonstrates runtime module registration, namespaced fact access,
@@ -364,14 +364,14 @@ export const moduleRegistry: Record<string, { module: any; label: string }> = {
 ```typescript
 // Example: theme-locale
 // Source: examples/theme-locale/src/theme-locale.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Theme & Locale – Directive Modules
+ * Theme & Locale — Directive Modules
  *
  * Two modules:
- * - `preferences` – theme, locale, sidebar, translations, system dark preference
- * - `layout` – responsive breakpoint tracking
+ * - `preferences` — theme, locale, sidebar, translations, system dark preference
+ * - `layout` — responsive breakpoint tracking
  *
  * Demonstrates multi-module composition, auto-tracked derivations,
  * effects for DOM side-effects, and persistence plugin for user prefs.
@@ -509,7 +509,7 @@ export const preferencesModule = createModule("preferences", {
 
   events: {
     setTheme: (facts, { value }) => {
-      facts.theme = value;
+      facts.theme = value as ThemeChoice;
     },
 
     setLocale: (facts, { value }) => {
@@ -559,7 +559,7 @@ export const layoutModule = createModule("layout", {
 
   events: {
     setBreakpoint: (facts, { value }) => {
-      facts.breakpoint = value;
+      facts.breakpoint = value as Breakpoint;
     },
   },
 });
@@ -570,10 +570,10 @@ export const layoutModule = createModule("layout", {
 ```typescript
 // Example: permissions
 // Source: examples/permissions/src/permissions.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Role-Based Permissions – Directive Modules
+ * Role-Based Permissions — Directive Modules
  *
  * Three modules demonstrate cross-module constraint resolution:
  * - auth: manages login state (role, userName, token)
@@ -702,14 +702,10 @@ export const permissionsModule = createModule("permissions", {
   },
 
   derive: {
-    canEdit: (facts) =>
-      facts.self.permissions.includes("content.edit"),
-    canPublish: (facts) =>
-      facts.self.permissions.includes("content.publish"),
-    canDelete: (facts) =>
-      facts.self.permissions.includes("content.delete"),
-    canManageUsers: (facts) =>
-      facts.self.permissions.includes("users.manage"),
+    canEdit: (facts) => facts.self.permissions.includes("content.edit"),
+    canPublish: (facts) => facts.self.permissions.includes("content.publish"),
+    canDelete: (facts) => facts.self.permissions.includes("content.delete"),
+    canManageUsers: (facts) => facts.self.permissions.includes("users.manage"),
     canViewAnalytics: (facts) =>
       facts.self.permissions.includes("analytics.view"),
     isAdmin: (_facts, derive) => derive.canManageUsers,
@@ -906,10 +902,10 @@ export const system = createSystem({
 ```typescript
 // Example: notifications
 // Source: examples/notifications/src/notifications.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Notifications & Toasts – Directive Modules
+ * Notifications & Toasts — Directive Modules
  *
  * Two modules:
  * - notifications: queue management, auto-dismiss via constraints, overflow protection
@@ -1005,10 +1001,17 @@ export const notificationsModule = createModule("notifications", {
   constraints: {
     autoDismiss: {
       priority: 50,
-      when: (_facts, derive) => derive.oldestExpired !== null,
-      require: (_facts, derive) => ({
+      when: (facts) => {
+        const oldest = facts.queue[0];
+        if (!oldest) {
+          return false;
+        }
+
+        return facts.now > oldest.createdAt + oldest.ttl;
+      },
+      require: (facts) => ({
         type: "DISMISS_NOTIFICATION" as const,
-        id: derive.oldestExpired!.id,
+        id: facts.queue[0].id,
       }),
     },
 
@@ -1115,10 +1118,10 @@ export const appModule = createModule("app", {
 ```typescript
 // Example: dashboard-loader
 // Source: examples/dashboard-loader/src/dashboard-loader.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Dashboard Loader – Directive Module
+ * Dashboard Loader — Directive Module
  *
  * Demonstrates loading & error states with concurrent resource fetching,
  * configurable delays/failure rates, retry with exponential backoff,
@@ -1614,10 +1617,10 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
 ```typescript
 // Example: pagination
 // Source: examples/pagination/src/pagination.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Pagination & Infinite Scroll – Directive Modules
+ * Pagination & Infinite Scroll — Directive Modules
  *
  * Two modules: `filters` owns search/sort/category,
  * `list` owns items and pagination state with crossModuleDeps.
@@ -1670,7 +1673,7 @@ export const filtersModule = createModule("filters", {
       facts.search = value;
     },
     setSortBy: (facts, { value }) => {
-      facts.sortBy = value;
+      facts.sortBy = value as "newest" | "oldest" | "title";
     },
     setCategory: (facts, { value }) => {
       facts.category = value;
@@ -1879,10 +1882,10 @@ export const system = createSystem({
 ```typescript
 // Example: url-sync
 // Source: examples/url-sync/src/url-sync.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * URL Sync – Directive Modules
+ * URL Sync — Directive Modules
  *
  * Two modules that synchronize URL query parameters with product filtering:
  * - **url module**: Reads/writes URL params, dispatches filter changes
@@ -1902,7 +1905,7 @@ import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { type Product, allProducts, filterProducts } from "./mock-products.js";
 
 // ============================================================================
-// URL Module – Schema
+// URL Module — Schema
 // ============================================================================
 
 export const urlSchema = {
@@ -1931,7 +1934,7 @@ export const urlSchema = {
 } satisfies ModuleSchema;
 
 // ============================================================================
-// URL Module – Helpers
+// URL Module — Helpers
 // ============================================================================
 
 function readUrlParams(): {
@@ -1961,7 +1964,7 @@ export const urlModule = createModule("url", {
     const params = readUrlParams();
     facts.search = params.search;
     facts.category = params.category;
-    facts.sortBy = params.sortBy;
+    facts.sortBy = params.sortBy as "newest" | "price-asc" | "price-desc";
     facts.page = params.page;
     facts.syncingFromUrl = false;
   },
@@ -1982,7 +1985,7 @@ export const urlModule = createModule("url", {
     },
 
     setSortBy: (facts, { value }) => {
-      facts.sortBy = value;
+      facts.sortBy = value as "newest" | "price-asc" | "price-desc";
       facts.page = 1;
     },
 
@@ -1994,7 +1997,7 @@ export const urlModule = createModule("url", {
       facts.syncingFromUrl = true;
       facts.search = search;
       facts.category = category;
-      facts.sortBy = sortBy;
+      facts.sortBy = sortBy as "newest" | "price-asc" | "price-desc";
       facts.page = page;
     },
 
@@ -2065,7 +2068,7 @@ export const urlModule = createModule("url", {
 });
 
 // ============================================================================
-// Products Module – Schema
+// Products Module — Schema
 // ============================================================================
 
 export const productsSchema = {
@@ -2217,10 +2220,10 @@ export const system = createSystem({
 ```typescript
 // Example: websocket
 // Source: examples/websocket/src/websocket.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * WebSocket Connections – Directive Module
+ * WebSocket Connections — Directive Module
  *
  * Demonstrates resolver-driven connection lifecycle, automatic reconnection
  * via constraints with exponential backoff, live message streaming,
@@ -2626,7 +2629,7 @@ export const websocketModule = createModule("websocket", {
 ```typescript
 // Example: server
 // Source: examples/server/src/server.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
  * Directive Server Example
@@ -2947,10 +2950,10 @@ app.listen(PORT, () => {
 ```typescript
 // Example: optimistic-updates
 // Source: examples/optimistic-updates/src/optimistic-updates.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Optimistic Updates – Directive Module
+ * Optimistic Updates — Directive Module
  *
  * Demonstrates optimistic mutations via events (instant UI), server sync via
  * constraint-resolver pattern, per-operation rollback from a sync queue,
@@ -3215,9 +3218,9 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
           addLogEntry(
             context.facts,
             "rollback",
-            `Failed to ${entry.op} item ${entry.itemId} – rolled back`,
+            `Failed to ${entry.op} item ${entry.itemId} — rolled back`,
           );
-          context.facts.toastMessage = `Failed to ${entry.op} – rolled back`;
+          context.facts.toastMessage = `Failed to ${entry.op} — rolled back`;
           context.facts.toastType = "error";
         }
 
@@ -3240,9 +3243,17 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
       run: (facts, prev) => {
         if (prev) {
           if (prev.syncingOpId === "" && facts.syncingOpId !== "") {
-            addLogEntry(facts, "status", `Sync started: op ${facts.syncingOpId}`);
+            addLogEntry(
+              facts,
+              "status",
+              `Sync started: op ${facts.syncingOpId}`,
+            );
           } else if (prev.syncingOpId !== "" && facts.syncingOpId === "") {
-            addLogEntry(facts, "status", `Sync completed: op ${prev.syncingOpId}`);
+            addLogEntry(
+              facts,
+              "status",
+              `Sync completed: op ${prev.syncingOpId}`,
+            );
           }
         }
       },
@@ -3256,10 +3267,10 @@ export const optimisticUpdatesModule = createModule("optimistic-updates", {
 ```typescript
 // Example: ab-testing
 // Source: examples/ab-testing/src/module.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * A/B Testing Engine – Directive Module
+ * A/B Testing Engine — Directive Module
  *
  * Types, schema, helpers, module definition, timeline, and system creation
  * for a constraint-driven A/B testing engine with deterministic hashing.
@@ -3574,7 +3585,7 @@ export const system = createSystem({
 ```typescript
 // Example: sudoku
 // Source: examples/sudoku/src/sudoku.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
  * Sudoku – Directive Module
@@ -4055,8 +4066,7 @@ export const sudokuGame = createModule("sudoku", {
         }
 
         return (
-          isBoardComplete(facts.grid) &&
-          findConflicts(facts.grid).length === 0
+          isBoardComplete(facts.grid) && findConflicts(facts.grid).length === 0
         );
       },
       require: (facts) => ({

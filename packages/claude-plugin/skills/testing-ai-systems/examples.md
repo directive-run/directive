@@ -7,25 +7,25 @@
 ```typescript
 // Example: ai-orchestrator
 // Source: examples/checkers/src/ai-orchestrator.ts
-// Extracted for AI rules – DOM wiring stripped
+// Extracted for AI rules — DOM wiring stripped
 
 /**
  * Checkers AI Orchestrator
  *
  * Composes directive AI adapter features via explicit wiring:
  *
- * 1.  Agent Orchestrator      – Manages Claude API via generic AgentRunner + guardrails
- * 2.  Memory                  – Sliding window (30 messages) with auto-summarization
- * 3.  Output Guardrail        – Validates move JSON schema before accepting
- * 4.  Rate Limiter            – 10 requests/min to prevent runaway API calls
- * 5.  Circuit Breaker         – After 3 failures, falls back to local minimax for 30s
- * 6.  Cost Tracking           – Token count + estimated cost at Haiku rates
- * 7.  Streaming               – Token-by-token chat delivery with length guardrail
- * 8.  Multi-Agent             – Parallel move + analysis agents
- * 9.  Communication Bus       – Agent-to-agent INFORM messages for move/chat events
- * 10. Semantic Cache           – Hash-based position caching (0.98 threshold)
- * 11. Observability            – Metrics, tracing, alerting dashboard
- * 12. OTLP Exporter            – Periodic export to OpenTelemetry collector
+ * 1.  Agent Orchestrator      — Manages Claude API via generic AgentRunner + guardrails
+ * 2.  Memory                  — Sliding window (30 messages) with auto-summarization
+ * 3.  Output Guardrail        — Validates move JSON schema before accepting
+ * 4.  Rate Limiter            — 10 requests/min to prevent runaway API calls
+ * 5.  Circuit Breaker         — After 3 failures, falls back to local minimax for 30s
+ * 6.  Cost Tracking           — Token count + estimated cost at Haiku rates
+ * 7.  Streaming               — Token-by-token chat delivery with length guardrail
+ * 8.  Multi-Agent             — Parallel move + analysis agents
+ * 9.  Communication Bus       — Agent-to-agent INFORM messages for move/chat events
+ * 10. Semantic Cache           — Hash-based position caching (0.98 threshold)
+ * 11. Observability            — Metrics, tracing, alerting dashboard
+ * 12. OTLP Exporter            — Periodic export to OpenTelemetry collector
  */
 
 import {
@@ -403,12 +403,12 @@ export function createCheckersAI(): CheckersAI {
             isCached: true,
           };
         } catch {
-          // Invalid cache entry – fall through
+          // Invalid cache entry — fall through
         }
       }
       obs.incrementCounter("cache.misses");
     } catch {
-      // Cache lookup failed – treat as miss
+      // Cache lookup failed — treat as miss
     }
 
     const span = obs.startSpan("pattern.moveWithAnalysis");
@@ -483,7 +483,7 @@ export function createCheckersAI(): CheckersAI {
           board,
           player,
           legalMoves,
-          "Circuit breaker open – using local AI while I recover.",
+          "Circuit breaker open — using local AI while I recover.",
         );
       }
 
@@ -601,10 +601,10 @@ export function createCheckersAI(): CheckersAI {
 ```typescript
 // Example: fraud-analysis
 // Source: examples/fraud-analysis/src/fraud-analysis.ts
-// Pure module file – no DOM wiring
+// Pure module file — no DOM wiring
 
 /**
- * Fraud Case Analysis – Directive Module
+ * Fraud Case Analysis — Directive Module
  *
  * Multi-stage fraud detection pipeline showcasing every major Directive feature:
  * - 6 constraints with priority + `after` ordering (including competing constraints)
@@ -1030,7 +1030,7 @@ export const fraudAnalysisModule = createModule("fraud", {
         // mid-resolver reconcile canceling this resolver)
         await delay(300);
 
-        // All fact mutations at the end – no more awaits after this
+        // All fact mutations at the end — no more awaits after this
         context.facts.stage = "normalizing";
         context.facts.flagEvents = events;
         context.facts.totalPiiDetections =
@@ -1081,7 +1081,7 @@ export const fraudAnalysisModule = createModule("fraud", {
 
         await delay(200);
 
-        // All fact mutations at the end – no more awaits after this
+        // All fact mutations at the end — no more awaits after this
         context.facts.stage = "grouping";
         context.facts.flagEvents = markedEvents;
         context.facts.cases = existingCases;
@@ -1106,7 +1106,7 @@ export const fraudAnalysisModule = createModule("fraud", {
         // Simulate API call
         await delay(400);
 
-        // All fact mutations at the end – no more awaits after this
+        // All fact mutations at the end — no more awaits after this
         cases[idx] = {
           ...cases[idx],
           signals,
@@ -1147,7 +1147,7 @@ export const fraudAnalysisModule = createModule("fraud", {
             " Auto-flagged: below human review threshold.";
         }
 
-        // All fact mutations at the end – no more awaits after this
+        // All fact mutations at the end — no more awaits after this
         cases[idx] = { ...fraudCase, ...result, analyzed: true };
         context.facts.stage = "analyzing";
         context.facts.analysisBudget = Math.max(

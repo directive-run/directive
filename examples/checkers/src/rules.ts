@@ -72,6 +72,7 @@ export function createInitialBoard(): Board {
       }
     }
   }
+
   return board;
 }
 
@@ -106,7 +107,9 @@ export function getMoveDirections(piece: Piece): Direction[] {
 /** Non-capture diagonal moves for a piece at the given index */
 export function getSimpleMoves(board: Board, index: number): Move[] {
   const piece = board[index];
-  if (!piece) return [];
+  if (!piece) {
+    return [];
+  }
 
   const [row, col] = toRowCol(index);
   const moves: Move[] = [];
@@ -118,13 +121,16 @@ export function getSimpleMoves(board: Board, index: number): Move[] {
       moves.push({ from: index, to: toIndex(nr, nc), captured: null });
     }
   }
+
   return moves;
 }
 
 /** Capture moves (jump over opponent to empty square) */
 export function getJumpMoves(board: Board, index: number): Move[] {
   const piece = board[index];
-  if (!piece) return [];
+  if (!piece) {
+    return [];
+  }
 
   const [row, col] = toRowCol(index);
   const moves: Move[] = [];
@@ -149,13 +155,17 @@ export function getJumpMoves(board: Board, index: number): Move[] {
       moves.push({ from: index, to: landIdx, captured: midIdx });
     }
   }
+
   return moves;
 }
 
 /** Valid moves for a single piece. Jumps if available (forced capture), else simple moves. */
 export function getValidMovesForPiece(board: Board, index: number): Move[] {
   const jumps = getJumpMoves(board, index);
-  if (jumps.length > 0) return jumps;
+  if (jumps.length > 0) {
+    return jumps;
+  }
+
   return getSimpleMoves(board, index);
 }
 
@@ -179,8 +189,11 @@ export function playerHasJumps(board: Board, player: Player): boolean {
   for (let i = 0; i < 64; i++) {
     const piece = board[i];
     if (!piece || piece.player !== player) continue;
-    if (getJumpMoves(board, i).length > 0) return true;
+    if (getJumpMoves(board, i).length > 0) {
+      return true;
+    }
   }
+
   return false;
 }
 
@@ -196,14 +209,18 @@ export function applyMove(board: Board, move: Move): Board {
   if (move.captured !== null) {
     newBoard[move.captured] = null;
   }
+
   return newBoard;
 }
 
 /** Check if piece at index should be kinged (on opponent's back row and not already a king) */
 export function shouldKing(board: Board, index: number): boolean {
   const piece = board[index];
-  if (!piece || piece.king) return false;
+  if (!piece || piece.king) {
+    return false;
+  }
   const [row] = toRowCol(index);
+
   return (
     (piece.player === "red" && row === 0) ||
     (piece.player === "black" && row === 7)
@@ -213,9 +230,12 @@ export function shouldKing(board: Board, index: number): boolean {
 /** Return new board with piece at index promoted to king */
 export function promotePiece(board: Board, index: number): Board {
   const piece = board[index];
-  if (!piece) return board;
+  if (!piece) {
+    return board;
+  }
   const newBoard = [...board];
   newBoard[index] = { ...piece, king: true };
+
   return newBoard;
 }
 
@@ -230,6 +250,7 @@ export function countPieces(board: Board): { red: number; black: number } {
     if (cell?.player === "red") red++;
     else if (cell?.player === "black") black++;
   }
+
   return { red, black };
 }
 
@@ -268,16 +289,21 @@ export function evaluateBoard(board: Board, player: Player): number {
 
     score += piece.player === player ? val : -val;
   }
+
   return score;
 }
 
 /** Get all possible multi-jump chains from a piece (for AI lookahead) */
 export function getAllJumpSequences(board: Board, index: number): Move[][] {
   const piece = board[index];
-  if (!piece) return [];
+  if (!piece) {
+    return [];
+  }
 
   const jumps = getJumpMoves(board, index);
-  if (jumps.length === 0) return [];
+  if (jumps.length === 0) {
+    return [];
+  }
 
   const sequences: Move[][] = [];
 
@@ -297,6 +323,7 @@ export function getAllJumpSequences(board: Board, index: number): Move[][] {
       }
     }
   }
+
   return sequences;
 }
 
@@ -309,6 +336,7 @@ function applyMoveSequence(board: Board, moves: Move[]): Board {
       b = promotePiece(b, m.to);
     }
   }
+
   return b;
 }
 
@@ -354,8 +382,9 @@ function minimax(
         if (beta <= alpha) break;
       } else {
         let newBoard = applyMove(board, move);
-        if (shouldKing(newBoard, move.to))
+        if (shouldKing(newBoard, move.to)) {
           newBoard = promotePiece(newBoard, move.to);
+        }
         const score = minimax(
           newBoard,
           player,
@@ -370,32 +399,15 @@ function minimax(
         if (beta <= alpha) break;
       }
     }
+
     return best;
   }
-    let best = Number.POSITIVE_INFINITY;
-    for (const move of moves) {
-      if (move.captured !== null) {
-        const sequences = getAllJumpSequences(board, move.from);
-        for (const seq of sequences) {
-          const newBoard = applyMoveSequence(board, seq);
-          const score = minimax(
-            newBoard,
-            player,
-            depth - 1,
-            alpha,
-            beta,
-            true,
-            aiPlayer,
-          );
-          best = Math.min(best, score);
-          beta = Math.min(beta, score);
-          if (beta <= alpha) break;
-        }
-        if (beta <= alpha) break;
-      } else {
-        let newBoard = applyMove(board, move);
-        if (shouldKing(newBoard, move.to))
-          newBoard = promotePiece(newBoard, move.to);
+  let best = Number.POSITIVE_INFINITY;
+  for (const move of moves) {
+    if (move.captured !== null) {
+      const sequences = getAllJumpSequences(board, move.from);
+      for (const seq of sequences) {
+        const newBoard = applyMoveSequence(board, seq);
         const score = minimax(
           newBoard,
           player,
@@ -409,14 +421,36 @@ function minimax(
         beta = Math.min(beta, score);
         if (beta <= alpha) break;
       }
+      if (beta <= alpha) break;
+    } else {
+      let newBoard = applyMove(board, move);
+      if (shouldKing(newBoard, move.to)) {
+        newBoard = promotePiece(newBoard, move.to);
+      }
+      const score = minimax(
+        newBoard,
+        player,
+        depth - 1,
+        alpha,
+        beta,
+        true,
+        aiPlayer,
+      );
+      best = Math.min(best, score);
+      beta = Math.min(beta, score);
+      if (beta <= alpha) break;
     }
-    return best;
+  }
+
+  return best;
 }
 
 /** Pick the best move for the AI player. Returns null if no moves available. */
 export function pickAiMove(board: Board, player: Player): Move | null {
   const moves = getAllValidMoves(board, player);
-  if (moves.length === 0) return null;
+  if (moves.length === 0) {
+    return null;
+  }
 
   let bestScore = Number.NEGATIVE_INFINITY;
   let bestMove: Move = moves[0];
@@ -449,8 +483,9 @@ export function pickAiMove(board: Board, player: Player): Move | null {
       }
     } else {
       let newBoard = applyMove(board, move);
-      if (shouldKing(newBoard, move.to))
+      if (shouldKing(newBoard, move.to)) {
         newBoard = promotePiece(newBoard, move.to);
+      }
       const score = minimax(
         newBoard,
         player,
@@ -477,8 +512,12 @@ export function pickAiJumpFrom(
   player: Player,
 ): Move | null {
   const jumps = getJumpMoves(board, index);
-  if (jumps.length === 0) return null;
-  if (jumps.length === 1) return jumps[0];
+  if (jumps.length === 0) {
+    return null;
+  }
+  if (jumps.length === 1) {
+    return jumps[0];
+  }
 
   let bestScore = Number.NEGATIVE_INFINITY;
   let bestMove: Move = jumps[0];
@@ -491,5 +530,6 @@ export function pickAiJumpFrom(
       bestMove = jump;
     }
   }
+
   return bestMove;
 }

@@ -5,7 +5,6 @@
  * and renders the product grid, filters, and pagination.
  */
 
-import type { Product } from "./mock-products.js";
 import { productsSchema, system, urlSchema } from "./url-sync.js";
 
 // ============================================================================
@@ -96,7 +95,7 @@ function render(): void {
   }
 
   // Product list
-  const items = productFacts.items as Product[];
+  const items = productFacts.items;
   if (items.length === 0 && !productFacts.isLoading) {
     productList.innerHTML =
       '<div class="us-empty">No products found. Try adjusting your filters.</div>';
@@ -118,10 +117,10 @@ function render(): void {
   totalItems.textContent = `${productFacts.totalItems} items`;
 
   // Page display
-  pageDisplay.textContent = productDerive.currentPageDisplay as string;
+  pageDisplay.textContent = productDerive.currentPageDisplay;
 
   // Pagination
-  const totalPg = productDerive.totalPages as number;
+  const totalPg = productDerive.totalPages;
   const currentPg = urlFacts.page;
 
   prevBtn.disabled = currentPg <= 1;
@@ -215,7 +214,7 @@ prevBtn.addEventListener("click", () => {
 
 nextBtn.addEventListener("click", () => {
   const page = system.facts.url.page;
-  const totalPg = system.derive.products.totalPages as number;
+  const totalPg = system.derive.products.totalPages;
   if (page < totalPg) {
     system.events.url.setPage({ value: page + 1 });
   }

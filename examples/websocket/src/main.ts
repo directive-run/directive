@@ -8,10 +8,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import type { WsMessage } from "./mock-ws.js";
 import {
-  type EventLogEntry,
-  type WsStatus,
   getActiveSocket,
   websocketModule,
   websocketSchema,
@@ -97,13 +94,13 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const status = facts.status as WsStatus;
-  const url = facts.url as string;
-  const messages = facts.messages as WsMessage[];
-  const reconnectCountdown = derive.reconnectCountdown as number;
-  const canSend = derive.canSend as boolean;
-  const messageCount = derive.messageCount as number;
-  const eventLog = facts.eventLog as EventLogEntry[];
+  const status = facts.status;
+  const url = facts.url;
+  const messages = facts.messages;
+  const reconnectCountdown = derive.reconnectCountdown;
+  const canSend = derive.canSend;
+  const messageCount = derive.messageCount;
+  const eventLog = facts.eventLog;
 
   // --- Status bar ---
   statusBadge.textContent = status;
@@ -268,7 +265,7 @@ messageInput.addEventListener("keydown", (e) => {
 // Send
 function handleSend(): void {
   const socket = getActiveSocket();
-  const msg = (system.facts.messageToSend as string).trim();
+  const msg = system.facts.messageToSend.trim();
 
   if (!socket || !msg) {
     return;

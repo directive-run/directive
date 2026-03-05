@@ -10,8 +10,6 @@
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
-  type EventLogEntry,
-  type SearchResult,
   debounceSearchModule,
   debounceSearchSchema,
 } from "./debounce-search.js";
@@ -88,17 +86,17 @@ function render(): void {
   const facts = system.facts;
   const derive = system.derive;
 
-  const query = facts.query as string;
-  const debouncedQuery = facts.debouncedQuery as string;
-  const results = facts.results as SearchResult[];
-  const isSearching = facts.isSearching as boolean;
-  const keystrokeCount = facts.keystrokeCount as number;
-  const apiCallCount = facts.apiCallCount as number;
-  const isDebouncing = derive.isDebouncing as boolean;
-  const debounceProgress = derive.debounceProgress as number;
-  const resultCount = derive.resultCount as number;
-  const savedCalls = derive.savedCalls as number;
-  const eventLog = facts.eventLog as EventLogEntry[];
+  const query = facts.query;
+  const debouncedQuery = facts.debouncedQuery;
+  const results = facts.results;
+  const isSearching = facts.isSearching;
+  const keystrokeCount = facts.keystrokeCount;
+  const apiCallCount = facts.apiCallCount;
+  const isDebouncing = derive.isDebouncing;
+  const debounceProgress = derive.debounceProgress;
+  const resultCount = derive.resultCount;
+  const savedCalls = derive.savedCalls;
+  const eventLog = facts.eventLog;
 
   // --- Status indicator ---
   if (isDebouncing) {

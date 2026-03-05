@@ -39,7 +39,7 @@ function setupSubscriptions(): void {
 
   unsubs.push(system.subscribeModule("dashboard", render));
 
-  const loaded = system.facts.dashboard.loadedModules as string[];
+  const loaded = system.facts.dashboard.loadedModules;
   for (const ns of loaded) {
     unsubs.push(system.subscribeModule(ns, render));
   }
@@ -77,9 +77,9 @@ const DICE_FACES = ["\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
 
 function render(): void {
   const dashFacts = system.facts.dashboard;
-  const loaded = dashFacts.loadedModules as string[];
-  const loadedCount = system.derive.dashboard.loadedCount as number;
-  const eventLog = dashFacts.eventLog as EventLogEntry[];
+  const loaded = dashFacts.loadedModules;
+  const loadedCount = system.derive.dashboard.loadedCount;
+  const eventLog = dashFacts.eventLog;
 
   // --- Status badge ---
   statusText.textContent = `${loadedCount} / 3 loaded`;
@@ -113,9 +113,9 @@ function render(): void {
 function renderCounterWidget(): void {
   const facts = (system.facts as any).counter;
   const derive = (system.derive as any).counter;
-  const count = facts.count as number;
-  const step = facts.step as number;
-  const isNearMax = derive.isNearMax as boolean;
+  const count = facts.count;
+  const step = facts.step;
+  const isNearMax = derive.isNearMax;
 
   const card = document.createElement("div");
   card.className = "dm-widget-card counter";
@@ -162,11 +162,11 @@ function renderCounterWidget(): void {
 function renderWeatherWidget(): void {
   const facts = (system.facts as any).weather;
   const derive = (system.derive as any).weather;
-  const city = facts.city as string;
-  const isLoading = facts.isLoading as boolean;
-  const hasFetched = derive.hasFetched as boolean;
-  const summary = derive.summary as string;
-  const humidity = facts.humidity as number;
+  const city = facts.city;
+  const isLoading = facts.isLoading;
+  const hasFetched = derive.hasFetched;
+  const summary = derive.summary;
+  const humidity = facts.humidity;
 
   const card = document.createElement("div");
   card.className = "dm-widget-card weather";
@@ -236,11 +236,11 @@ function renderWeatherWidget(): void {
 function renderDiceWidget(): void {
   const facts = (system.facts as any).dice;
   const derive = (system.derive as any).dice;
-  const die1 = facts.die1 as number;
-  const die2 = facts.die2 as number;
-  const total = derive.total as number;
-  const isDoubles = derive.isDoubles as boolean;
-  const rollCount = facts.rollCount as number;
+  const die1 = facts.die1;
+  const die2 = facts.die2;
+  const total = derive.total;
+  const isDoubles = derive.isDoubles;
+  const rollCount = facts.rollCount;
 
   const card = document.createElement("div");
   card.className = "dm-widget-card dice";
@@ -331,7 +331,7 @@ function loadModule(name: string): void {
     return;
   }
 
-  const loaded = system.facts.dashboard.loadedModules as string[];
+  const loaded = system.facts.dashboard.loadedModules;
   if (loaded.includes(name)) {
     return;
   }
@@ -345,7 +345,7 @@ function loadModule(name: string): void {
 }
 
 function renderModuleManager(): void {
-  const loaded = system.facts.dashboard.loadedModules as string[];
+  const loaded = system.facts.dashboard.loadedModules;
 
   loadCounterBtn.disabled = loaded.includes("counter");
   loadCounterBtn.textContent = loaded.includes("counter") ? "Loaded" : "Load";

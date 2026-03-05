@@ -188,22 +188,22 @@ export const cartModule = createModule("cart", {
     },
 
     discount: (facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub * (facts.self.couponDiscount / 100);
     },
 
     tax: (facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
 
       return (sub - disc) * 0.08;
     },
 
     total: (_facts, derive) => {
-      const sub = derive.subtotal as number;
-      const disc = derive.discount as number;
-      const tx = derive.tax as number;
+      const sub = derive.subtotal;
+      const disc = derive.discount;
+      const tx = derive.tax;
 
       return sub - disc + tx;
     },
@@ -215,7 +215,7 @@ export const cartModule = createModule("cart", {
     },
 
     freeShipping: (_facts, derive) => {
-      const sub = derive.subtotal as number;
+      const sub = derive.subtotal;
 
       return sub >= 75;
     },
@@ -317,7 +317,7 @@ export const cartModule = createModule("cart", {
       priority: 60,
       after: ["quantityLimit", "couponValidation"],
       when: (facts) => {
-        const items = facts.self.items as CartItem[];
+        const items = facts.self.items;
         const notEmpty = items.length > 0;
         const noOverstock = !items.some(
           (item: CartItem) => item.quantity > item.maxStock,
@@ -417,5 +417,6 @@ export const system = createSystem({
   debug: {
     timeTravel: true,
     maxSnapshots: 50,
+    runHistory: true,
   },
 });

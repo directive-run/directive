@@ -131,7 +131,7 @@ export const preferencesModule = createModule("preferences", {
     isRTL: (facts) => {
       const rtlLocales = ["ar", "he", "fa", "ur"];
 
-      return rtlLocales.includes(facts.locale as string);
+      return rtlLocales.includes(facts.locale);
     },
   },
 
@@ -141,7 +141,7 @@ export const preferencesModule = createModule("preferences", {
 
   events: {
     setTheme: (facts, { value }) => {
-      facts.theme = value;
+      facts.theme = value as ThemeChoice;
     },
 
     setLocale: (facts, { value }) => {
@@ -172,10 +172,7 @@ export const preferencesModule = createModule("preferences", {
               ? "dark"
               : "light"
             : facts.theme;
-        document.documentElement.setAttribute(
-          "data-theme",
-          effective as string,
-        );
+        document.documentElement.setAttribute("data-theme", effective);
       },
     },
   },
@@ -194,7 +191,7 @@ export const layoutModule = createModule("layout", {
 
   events: {
     setBreakpoint: (facts, { value }) => {
-      facts.breakpoint = value;
+      facts.breakpoint = value as Breakpoint;
     },
   },
 });
