@@ -1,4 +1,8 @@
-import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import {
+  parseExampleBuild,
+  readExampleProject,
+  readExampleSources,
+} from "@/lib/examples";
 import { buildPageMetadata } from "@/lib/metadata";
 import { CounterDemo } from "./CounterDemo";
 
@@ -13,6 +17,7 @@ export const metadata = buildPageMetadata({
 export default function CounterPage() {
   const build = parseExampleBuild("counter");
   const sources = readExampleSources("counter", ["main.ts"]);
+  const projectFiles = readExampleProject("counter");
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -29,7 +34,7 @@ export default function CounterPage() {
         </p>
       </header>
 
-      <CounterDemo build={build} sources={sources} />
+      <CounterDemo build={build} sources={sources} projectFiles={projectFiles} />
     </div>
   );
 }

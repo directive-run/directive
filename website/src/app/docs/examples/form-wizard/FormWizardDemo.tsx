@@ -1,14 +1,18 @@
 "use client";
 
 import { CodeTabs } from "@/components/CodeTabs";
-import { ExampleEmbed } from "@/components/ExampleEmbed";
+import { InlineInspector } from "@/components/InlineInspector";
+import { StackBlitzOpen } from "@/components/StackBlitzOpen";
+import type { ExampleProjectFiles } from "@/lib/examples";
 
 export function FormWizardDemo({
   build,
   sources,
+  projectFiles,
 }: {
   build: import("@/lib/examples").ExampleBuild | null;
   sources: import("@/lib/examples").ExampleSource[];
+  projectFiles: ExampleProjectFiles | null;
 }) {
   const moduleSource = sources.find((s) => s.filename === "form-wizard.ts");
   const mainSource = sources.find((s) => s.filename === "main.ts");
@@ -22,8 +26,9 @@ export function FormWizardDemo({
         </h2>
 
         {build ? (
-          <ExampleEmbed
+          <InlineInspector
             name="form-wizard"
+            systemName="form-wizard"
             css={build.css}
             html={build.html}
             scriptSrc={build.scriptSrc}
@@ -130,6 +135,11 @@ export function FormWizardDemo({
         <h2 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
           Source code
         </h2>
+        {projectFiles && (
+          <div className="mb-3">
+            <StackBlitzOpen title="Form Wizard" projectFiles={projectFiles} />
+          </div>
+        )}
         <CodeTabs
           tabs={[
             moduleSource && {

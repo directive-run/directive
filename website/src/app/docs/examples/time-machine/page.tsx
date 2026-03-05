@@ -1,4 +1,8 @@
-import { parseExampleBuild, readExampleSources } from "@/lib/examples";
+import {
+  parseExampleBuild,
+  readExampleProject,
+  readExampleSources,
+} from "@/lib/examples";
 import { buildPageMetadata } from "@/lib/metadata";
 import { TimeMachineDemo } from "./TimeMachineDemo";
 
@@ -13,6 +17,7 @@ export const metadata = buildPageMetadata({
 export default function TimeMachinePage() {
   const build = parseExampleBuild("time-machine");
   const sources = readExampleSources("time-machine", ["main.ts"]);
+  const projectFiles = readExampleProject("time-machine");
 
   return (
     <div className="min-w-0 max-w-2xl flex-auto px-4 py-16 lg:max-w-none lg:pr-0 lg:pl-8 xl:px-16">
@@ -28,7 +33,7 @@ export default function TimeMachinePage() {
         </p>
       </header>
 
-      <TimeMachineDemo build={build} sources={sources} />
+      <TimeMachineDemo build={build} sources={sources} projectFiles={projectFiles} />
     </div>
   );
 }
