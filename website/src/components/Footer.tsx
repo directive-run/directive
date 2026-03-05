@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Logomark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeSelector";
+import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { GitHubIcon } from "@/components/icons/GitHubIcon";
 
 const footerLinkClass =
@@ -134,6 +135,15 @@ export function Footer() {
               aria-label="GitHub"
             >
               <GitHubIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
+            </Link>
+            <Link
+              href="https://discord.gg/SVzqPbHsy8"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-brand-surface-raised dark:hover:bg-slate-700"
+              aria-label="Discord"
+            >
+              <DiscordIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
             </Link>
           </div>
           <span>
