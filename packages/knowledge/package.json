@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/knowledge",
-  "version": "0.2.0",
+  "version": "0.4.2",
   "description": "Knowledge files, examples, and validation for Directive — the constraint-driven TypeScript runtime.",
   "license": "MIT",
   "author": "Jason Comes",

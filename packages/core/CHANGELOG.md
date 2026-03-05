@@ -1,5 +1,13 @@
 # @directive-run/core
 
+## 0.4.2
+
+### Patch Changes
+
+- [`4a0ca9d`](https://github.com/directive-run/directive/commit/4a0ca9d9ce710da4215b6d66f7dd1228187b0960) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix overly restrictive object schema type and update knowledge content.
+  - Loosen `t.object<T>()` generic constraint to accept any type, not just `Record<string, unknown>`
+  - Update AI docs, core docs, and all example files in knowledge package
+
 ## 0.4.1
 
 ### Patch Changes
