@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 
+import { BrandHeading } from "@/components/BrandHeading";
 import { CardLink } from "@/components/CardLink";
 import { DirectiveCallout } from "@/components/DirectiveCallout";
 import {
@@ -309,6 +310,14 @@ export default function ContactPage() {
             linkLabel="Read the blog post"
           />
         </div>
+
+        <BrandHeading className="mt-12">
+          No limits.
+          <br />
+          No boundaries.
+          <br />
+          Just infinity.
+        </BrandHeading>
 
         {/* Social / alternative contact */}
         <div className="mt-12">

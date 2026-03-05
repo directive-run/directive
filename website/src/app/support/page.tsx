@@ -1,3 +1,4 @@
+import { BrandHeading } from "@/components/BrandHeading";
 import { CardLink } from "@/components/CardLink";
 import { buildPageMetadata } from "@/lib/metadata";
 import {
@@ -500,6 +501,14 @@ export default function SupportPage() {
             <ArrowRight className="h-5 w-5 text-slate-400 transition-transform group-hover:translate-x-0.5" />
           </CardLink>
         </div>
+
+        <BrandHeading className="mt-16">
+          No limits.
+          <br />
+          No boundaries.
+          <br />
+          Just infinity.
+        </BrandHeading>
 
         {/* Sponsors */}
         <div className="mt-16">

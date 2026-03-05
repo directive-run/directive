@@ -190,7 +190,7 @@
   animation: fade-out-down 0.4s ease-in-out both;
 }
 
-@utility newsletter-heading-gradient {
+@utility brand-heading-gradient {
   background-image: linear-gradient(
     to right,
     var(--brand-primary-600),
