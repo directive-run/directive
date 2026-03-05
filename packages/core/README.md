@@ -182,6 +182,7 @@ system.events.addItem({ name: "Widget", price: 9.99 });
 | `@directive-run/core/testing` | Mock resolvers, fake timers, assertion helpers |
 | `@directive-run/core/migration` | Redux/Zustand/XState migration helpers |
 | `@directive-run/core/worker` | Web Worker support |
+| `@directive-run/core/adapter-utils` | Shared utilities for building framework adapters |
 
 ## Why Directive?
 

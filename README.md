@@ -941,6 +941,9 @@ interface MySnapshot extends DistributableSnapshotLike<{ permissions: string[] }
 | `@directive-run/ai/openai` | OpenAI / Azure / Together adapter |
 | `@directive-run/ai/anthropic` | Anthropic Claude adapter |
 | `@directive-run/ai/ollama` | Local Ollama inference adapter |
+| `@directive-run/ai/gemini` | Google Gemini adapter |
+| [`@directive-run/cli`](./packages/cli) | CLI – scaffolding, inspection, AI coding rules |
+| [`@directive-run/knowledge`](./packages/knowledge) | Knowledge files, examples, and validation scripts |
 
 ## Migration Guides
 
