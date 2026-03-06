@@ -62,7 +62,33 @@ export type {
   // Tools
   ArchitectToolDef,
   ArchitectToolParam,
-  // E1: removed QueuedTrigger, CircuitBreakerState, GuardConfig from public exports
+  // Discovery
+  DiscoveryOptions,
+  DiscoveryProgress,
+  DiscoveryPattern,
+  DiscoveryRecommendation,
+  DiscoveryReport,
+  DiscoveryTimelineEvent,
+  // What-If
+  WhatIfOptions,
+  WhatIfResult,
+  WhatIfStep,
+  // Graph
+  SystemGraph,
+  GraphNode,
+  GraphEdge,
+  GraphMetadata,
+  // Replay
+  ReplayRecording,
+  ReplayEvent,
+  ReplayOptions,
+  ReplayResult,
+  // Federation
+  FederationPattern,
+  FederationExport,
+  FederationImportResult,
+  // Service Hooks
+  ArchitectServiceHooks,
 } from "./types.js";
 
 // Sandbox (for advanced use / custom tool development)
@@ -73,3 +99,39 @@ export { createAuditLog, type AuditLog } from "./audit.js";
 
 // Kill switch (for emergency external use)
 export { killAll } from "./kill-switch.js";
+
+// Discovery
+export { createDiscoverySession, type DiscoverySession } from "./discovery.js";
+
+// What-If Analysis
+export { createWhatIfAnalysis } from "./what-if.js";
+
+// Visual Constraint Graph
+export { extractSystemGraph, type ExtractGraphOptions } from "./graph.js";
+
+// Architect Replay
+export {
+  createReplayRecorder,
+  replayWithArchitect,
+  type ReplayRecorder,
+} from "./replay.js";
+
+// Federation
+export { exportPattern, importPattern, type ExportPatternOptions } from "./federation.js";
+
+// Service Hooks
+export { wireServiceHooks, type WireServiceHooksOptions } from "./service.js";
+
+// Testing utilities
+export {
+  mockRunner,
+  createTestArchitect,
+  assertAnalysisActions,
+  assertActionTool,
+  assertApproved,
+  assertKilled,
+  assertBudgetWithin,
+  type MockRunnerResponse,
+  type TestArchitectOptions,
+  type TestArchitectResult,
+} from "./testing.js";
