@@ -283,6 +283,42 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onErrorRecovery?: (error: DirectiveError, strategy: RecoveryStrategy) => void;
 
   // ============================================================================
+  // Dynamic Definition Hooks
+  // ============================================================================
+
+  /**
+   * Called when a definition is dynamically registered at runtime.
+   * @param type - The definition type: "constraint", "resolver", "derivation", or "effect"
+   * @param id - The definition ID
+   * @param def - The definition object
+   */
+  onDefinitionRegister?: (type: string, id: string, def: unknown) => void;
+
+  /**
+   * Called when a definition is assigned (overridden) at runtime.
+   * @param type - The definition type: "constraint", "resolver", "derivation", or "effect"
+   * @param id - The definition ID
+   * @param def - The new definition object
+   * @param original - The previous definition that was overridden
+   */
+  onDefinitionAssign?: (type: string, id: string, def: unknown, original: unknown) => void;
+
+  /**
+   * Called when a dynamically registered definition is removed.
+   * @param type - The definition type: "constraint", "resolver", "derivation", or "effect"
+   * @param id - The definition ID
+   */
+  onDefinitionUnregister?: (type: string, id: string) => void;
+
+  /**
+   * Called when a definition is manually invoked via `call()`.
+   * @param type - The definition type: "constraint", "resolver", "derivation", or "effect"
+   * @param id - The definition ID
+   * @param props - Optional props passed to the call
+   */
+  onDefinitionCall?: (type: string, id: string, props?: unknown) => void;
+
+  // ============================================================================
   // Run History Hooks
   // ============================================================================
 

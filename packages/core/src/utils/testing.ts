@@ -758,3 +758,100 @@ export function createTestSystem<Modules extends ModulesMap>(
 
   return testSystem;
 }
+
+// ============================================================================
+// Dynamic Definition Assertions
+// ============================================================================
+
+/**
+ * Assert that a definition was dynamically registered on the system.
+ *
+ * @param system - The Directive system to check.
+ * @param type - The definition type: "constraint", "resolver", "derivation", or "effect".
+ * @param id - The definition ID.
+ * @throws Error if the definition is not dynamic.
+ *
+ * @example
+ * ```typescript
+ * system.constraints.register("myRule", { when: () => true, require: { type: "DO" } });
+ * assertDynamic(system, "constraint", "myRule"); // passes
+ * assertDynamic(system, "constraint", "staticRule"); // throws
+ * ```
+ *
+ * @public
+ */
+export function assertDynamic(
+  system: {
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
+  },
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): void {
+  const isDynamic = getDynamicCheck(system, type, id);
+  if (!isDynamic) {
+    throw new Error(
+      `Expected ${type} "${id}" to be dynamic, but it is not.`,
+    );
+  }
+}
+
+/**
+ * Assert that a definition is NOT dynamically registered (i.e., is static or does not exist).
+ *
+ * @param system - The Directive system to check.
+ * @param type - The definition type: "constraint", "resolver", "derivation", or "effect".
+ * @param id - The definition ID.
+ * @throws Error if the definition is dynamic.
+ *
+ * @example
+ * ```typescript
+ * assertNotDynamic(system, "constraint", "staticRule"); // passes
+ * system.constraints.register("myRule", def);
+ * assertNotDynamic(system, "constraint", "myRule"); // throws
+ * ```
+ *
+ * @public
+ */
+export function assertNotDynamic(
+  system: {
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
+  },
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): void {
+  const isDynamic = getDynamicCheck(system, type, id);
+  if (isDynamic) {
+    throw new Error(
+      `Expected ${type} "${id}" to NOT be dynamic, but it is.`,
+    );
+  }
+}
+
+/** @internal */
+function getDynamicCheck(
+  system: {
+    constraints: { isDynamic(id: string): boolean };
+    effects: { isDynamic(id: string): boolean };
+    resolvers: { isDynamic(id: string): boolean };
+    derive: { isDynamic(id: string): boolean };
+  },
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string,
+): boolean {
+  switch (type) {
+    case "constraint":
+      return system.constraints.isDynamic(id);
+    case "resolver":
+      return system.resolvers.isDynamic(id);
+    case "derivation":
+      return system.derive.isDynamic(id);
+    case "effect":
+      return system.effects.isDynamic(id);
+  }
+}

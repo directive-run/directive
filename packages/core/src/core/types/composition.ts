@@ -37,6 +37,7 @@ import type {
   DistributableSnapshot,
   DistributableSnapshotOptions,
   EffectsControl,
+  ResolversControl,
   RunChangelogEntry,
   SystemInspection,
   SystemSnapshot,
@@ -265,10 +266,12 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly derive: NamespacedDerivations<Modules>;
   /** Events accessor (union of all module events) */
   readonly events: NamespacedEventsAccessor<Modules>;
-  /** Runtime control for constraints (disable/enable/isDisabled) */
+  /** Runtime control for constraints (disable/enable/isDisabled + dynamic CRUD) */
   readonly constraints: ConstraintsControl;
-  /** Runtime control for effects (disable/enable/isEnabled) */
+  /** Runtime control for effects (disable/enable/isEnabled + dynamic CRUD) */
   readonly effects: EffectsControl;
+  /** Runtime control for resolvers (dynamic CRUD) */
+  readonly resolvers: ResolversControl;
   /** Per-run changelog entries (null if debug.runHistory is not enabled) */
   readonly runHistory: RunChangelogEntry[] | null;
 
@@ -629,6 +632,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly constraints: ConstraintsControl;
   /** Runtime control for effects (disable/enable/isEnabled) */
   readonly effects: EffectsControl;
+  /** Runtime control for resolvers (register/assign/unregister/call) */
+  readonly resolvers: ResolversControl;
   /** Per-run changelog entries (null if debug.runHistory is not enabled) */
   readonly runHistory: RunChangelogEntry[] | null;
 
