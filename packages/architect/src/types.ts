@@ -719,6 +719,18 @@ export interface AIArchitect {
   /** Unregister a custom tool by name. Returns true if found. */
   unregisterTool(name: string): boolean;
 
+  /**
+   * Pause the architect — automatic triggers queue instead of executing.
+   * Manual analyze("demand") still works while paused.
+   */
+  pause(): void;
+
+  /** Resume the architect — drains any queued trigger callbacks. */
+  resume(): void;
+
+  /** Whether the architect is currently paused. */
+  readonly isPaused: boolean;
+
   /** Get current architect status summary. */
   status(): ArchitectStatus;
 
@@ -742,6 +754,7 @@ export interface ArchitectStatus {
   auditEntries: number;
   uptime: number;
   isDestroyed: boolean;
+  isPaused: boolean;
 }
 
 // ============================================================================

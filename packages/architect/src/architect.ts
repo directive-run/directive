@@ -110,6 +110,8 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
   const createdAt = Date.now();
   let isDestroyedFlag = false;
+  let isPausedFlag = false;
+  const queuedWhilePaused: Array<() => void> = [];
 
   // M4: cost estimation for discovery/whatIf budget tracking
   const costPerThousandTokens = options.budget.costPerThousandTokens ?? 0.003;
@@ -191,15 +193,23 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
         }
 
         debounceTimer = setTimeout(() => {
-          // Item 2: inspect unmet requirements to determine trigger type
-          const inspection = options.system.inspect() as unknown as Record<string, unknown>;
-          const unmet = inspection.unmet ?? inspection.pendingRequirements ?? [];
-          const hasUnmet = Array.isArray(unmet) && unmet.length > 0;
-          const trigger = hasUnmet ? "unmet-requirement" : "error";
+          const triggerFn = () => {
+            // Item 2: inspect unmet requirements to determine trigger type
+            const inspection = options.system.inspect() as unknown as Record<string, unknown>;
+            const unmet = inspection.unmet ?? inspection.pendingRequirements ?? [];
+            const hasUnmet = Array.isArray(unmet) && unmet.length > 0;
+            const trigger = hasUnmet ? "unmet-requirement" : "error";
 
-          pipeline.analyze(trigger).catch(() => {
-            // Swallow — errors emitted via events
-          });
+            pipeline.analyze(trigger).catch(() => {
+              // Swallow — errors emitted via events
+            });
+          };
+
+          if (isPausedFlag) {
+            queuedWhilePaused.push(triggerFn);
+          } else {
+            triggerFn();
+          }
         }, 3000);
       });
 
@@ -233,9 +243,17 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
           }
 
           debounceTimer = setTimeout(() => {
-            pipeline.analyze("fact-change").catch(() => {
-              // Swallow — errors emitted via events
-            });
+            const triggerFn = () => {
+              pipeline.analyze("fact-change").catch(() => {
+                // Swallow — errors emitted via events
+              });
+            };
+
+            if (isPausedFlag) {
+              queuedWhilePaused.push(triggerFn);
+            } else {
+              triggerFn();
+            }
           }, 3000);
         },
       );
@@ -257,9 +275,17 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   if (options.triggers?.onSchedule) {
     const intervalMs = parseInterval(options.triggers.onSchedule);
     scheduleTimer = setInterval(() => {
-      pipeline.analyze("schedule").catch(() => {
-        // Swallow — errors emitted via events
-      });
+      if (isPausedFlag) {
+        queuedWhilePaused.push(() => {
+          pipeline.analyze("schedule").catch(() => {
+            // Swallow — errors emitted via events
+          });
+        });
+      } else {
+        pipeline.analyze("schedule").catch(() => {
+          // Swallow — errors emitted via events
+        });
+      }
     }, intervalMs);
   }
 
@@ -274,6 +300,10 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     let previousScore = 100; // Start optimistic
 
     healthTimer = setInterval(() => {
+      if (isPausedFlag) {
+        return;
+      }
+
       const health = computeHealthScore(options.system);
       const drop = previousScore - health.score;
       const shouldTrigger = health.score < threshold && drop >= minDrop;
@@ -498,6 +528,24 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return pipeline.customToolRegistry.unregister(name);
     },
 
+    pause() {
+      isPausedFlag = true;
+    },
+
+    resume() {
+      isPausedFlag = false;
+
+      // Drain queued triggers
+      const queued = queuedWhilePaused.splice(0);
+      for (const fn of queued) {
+        fn();
+      }
+    },
+
+    get isPaused() {
+      return isPausedFlag;
+    },
+
     // Item 24: status summary — E5: uses unified BudgetUsage shape
     status(): ArchitectStatus {
       const budgetUsage = pipeline.getBudgetUsage();
@@ -514,6 +562,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
         auditEntries: auditEntries.length,
         uptime: Date.now() - createdAt,
         isDestroyed: isDestroyedFlag,
+        isPaused: isPausedFlag,
       };
     },
 

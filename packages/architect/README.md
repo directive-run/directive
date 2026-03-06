@@ -79,7 +79,17 @@ architect.kill();
 A live Directive system (`createSystem()`) that the architect manages. The architect observes its facts, constraints, resolvers, and derivations.
 
 ### Runner
-An `AgentRunner` from `@directive-run/ai` that handles LLM communication. Bring your own model — OpenAI, Anthropic, Ollama, etc.
+An `AgentRunner` from `@directive-run/ai` that handles LLM communication. Bring your own model:
+
+```typescript
+// OpenAI
+import { createAgent, openai } from "@directive-run/ai";
+const runner = createAgent({ provider: openai({ model: "gpt-4o" }) });
+
+// Anthropic
+import { createAgent, anthropic } from "@directive-run/ai";
+const runner = createAgent({ provider: anthropic({ model: "claude-sonnet-4-20250514" }) });
+```
 
 ### Budget
 **Required.** Token and dollar limits to prevent bill shock. The architect tracks usage and stops when limits are reached.
