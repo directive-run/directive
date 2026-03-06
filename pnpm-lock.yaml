@@ -678,24 +678,6 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  packages/architect:
-    devDependencies:
-      '@directive-run/ai':
-        specifier: workspace:*
-        version: link:../ai
-      '@directive-run/core':
-        specifier: workspace:*
-        version: link:../core
-      '@types/node':
-        specifier: ^25.2.0
-        version: 25.2.0
-      tsup:
-        specifier: ^8.3.5
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-
   packages/claude-plugin:
     devDependencies:
       '@directive-run/knowledge':
