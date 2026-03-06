@@ -11,6 +11,8 @@ import type {
   CircuitBreakerState,
   GuardConfig,
 } from "./types.js";
+import type { MetricsProvider } from "./metrics.js";
+import type { GuardStateSnapshot } from "./persistence.js";
 
 // ============================================================================
 // Defaults
@@ -41,6 +43,7 @@ export function createGuards(
   config: GuardConfig,
   budget: ArchitectBudget,
   emitEvent: (event: ArchitectEvent) => void,
+  metrics?: MetricsProvider,
 ) {
   const cfg = { ...DEFAULTS, ...config };
 
@@ -226,6 +229,8 @@ export function createGuards(
   function recordTokens(tokens: number, dollars: number): void {
     tokensUsed += tokens;
     dollarsUsed += dollars;
+    metrics?.gauge("architect.budget.tokens_used", tokensUsed);
+    metrics?.gauge("architect.budget.dollars_used", dollarsUsed);
 
     // Check alert thresholds
     for (const threshold of [50, 80, 95]) {
@@ -276,17 +281,19 @@ export function createGuards(
 
   /** Run all pre-LLM-call checks. */
   function checkAll(): GuardCheckResult {
-    const checks = [
-      checkRateLimit(),
-      checkCircuitBreaker(),
-      checkCascadeDepth(),
-      checkBudget(),
-      checkPendingCount(),
+    const checks: Array<{ result: GuardCheckResult; type: string }> = [
+      { result: checkRateLimit(), type: "rate_limit" },
+      { result: checkCircuitBreaker(), type: "circuit_breaker" },
+      { result: checkCascadeDepth(), type: "cascade_depth" },
+      { result: checkBudget(), type: "budget" },
+      { result: checkPendingCount(), type: "pending_count" },
     ];
 
     for (const check of checks) {
-      if (!check.allowed) {
-        return check;
+      if (!check.result.allowed) {
+        metrics?.counter("architect.guard.blocked", 1, { guard_type: check.type });
+
+        return check.result;
       }
     }
 
@@ -328,6 +335,33 @@ export function createGuards(
     }
   }
 
+  /** Export guard state for checkpoint persistence. */
+  function exportState(): GuardStateSnapshot {
+    return {
+      tokensUsed,
+      dollarsUsed,
+      alertedThresholds: [...alertedThresholds],
+      circuitBreakerState: cbState,
+      failureCount: failureTimestamps.length,
+    };
+  }
+
+  /** Import guard state from a checkpoint. */
+  function importState(snapshot: GuardStateSnapshot): void {
+    tokensUsed = snapshot.tokensUsed;
+    dollarsUsed = snapshot.dollarsUsed;
+    alertedThresholds.clear();
+    for (const t of snapshot.alertedThresholds) {
+      alertedThresholds.add(t);
+    }
+
+    cbState = snapshot.circuitBreakerState;
+    failureTimestamps.length = 0;
+    for (let i = 0; i < snapshot.failureCount; i++) {
+      failureTimestamps.push(Date.now());
+    }
+  }
+
   return {
     checkAll,
     checkRateLimit,
@@ -349,6 +383,8 @@ export function createGuards(
     setPendingCount,
     debounce,
     getCircuitBreakerState,
+    exportState,
+    importState,
     destroy,
   };
 }
