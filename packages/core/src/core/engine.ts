@@ -1874,6 +1874,42 @@ export function createEngine<S extends Schema>(
       return lines.join("\n");
     },
 
+    getOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): unknown | undefined {
+      const typeMap: Record<string, Map<string, unknown>> = {
+        constraint: originals.constraints,
+        resolver: originals.resolvers,
+        derivation: originals.derivations,
+        effect: originals.effects,
+      };
+      const map = typeMap[type];
+
+      if (!map) {
+        return undefined;
+      }
+
+      return map.get(id);
+    },
+
+    restoreOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): boolean {
+      const typeMap: Record<string, Map<string, unknown>> = {
+        constraint: originals.constraints,
+        resolver: originals.resolvers,
+        derivation: originals.derivations,
+        effect: originals.effects,
+      };
+      const map = typeMap[type];
+
+      if (!map || !map.has(id)) {
+        return false;
+      }
+
+      const original = map.get(id);
+      assignDefinition(type, id, original);
+      map.delete(id);
+
+      return true;
+    },
+
     async settle(maxWait = 5000): Promise<void> {
       const startTime = Date.now();
 
