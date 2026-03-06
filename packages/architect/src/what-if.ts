@@ -25,6 +25,7 @@ export async function createWhatIfAnalysis(
   action: ArchitectAction,
   runner?: AgentRunner,
   options?: WhatIfOptions,
+  onTokens?: (tokens: number) => void,
 ): Promise<WhatIfResult> {
   const steps: WhatIfStep[] = [];
   let riskScore = 0;
@@ -74,7 +75,7 @@ export async function createWhatIfAnalysis(
   // Optional LLM summary
   let summary: string | undefined;
   if (options?.includeSummary && runner) {
-    summary = await getLLMSummary(runner, action, steps, facts);
+    summary = await getLLMSummary(runner, action, steps, facts, onTokens);
   }
 
   return {
@@ -247,6 +248,7 @@ async function getLLMSummary(
   action: ArchitectAction,
   steps: WhatIfStep[],
   facts: Record<string, unknown>,
+  onTokens?: (tokens: number) => void,
 ): Promise<string> {
   const prompt = [
     "## What-If Analysis Summary Request",
@@ -270,6 +272,11 @@ async function getLLMSummary(
       },
       prompt,
     );
+
+    // M4: track tokens through budget
+    if (onTokens && typeof result.totalTokens === "number") {
+      onTokens(result.totalTokens);
+    }
 
     return typeof result.output === "string"
       ? result.output

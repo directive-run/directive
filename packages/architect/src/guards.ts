@@ -85,11 +85,20 @@ export function createGuards(
     }
 
     if (callTimestamps.length >= cfg.maxCallsPerMinute) {
-      return { allowed: false, reason: `Rate limit: ${cfg.maxCallsPerMinute} calls/minute exceeded` };
+      // Item 15: include current values + recovery guidance
+      const oldestCall = callTimestamps[0]!;
+      const waitMs = Math.max(0, 60_000 - (now - oldestCall));
+      const waitSec = Math.ceil(waitMs / 1000);
+
+      return { allowed: false, reason: `Rate limit: ${callTimestamps.length}/${cfg.maxCallsPerMinute} calls/minute. Wait ~${waitSec}s or increase maxCallsPerMinute.` };
     }
 
     if (hourlyTimestamps.length >= cfg.maxPerHour) {
-      return { allowed: false, reason: `Rate limit: ${cfg.maxPerHour} actions/hour exceeded` };
+      const oldestHourly = hourlyTimestamps[0]!;
+      const waitMs = Math.max(0, 3_600_000 - (now - oldestHourly));
+      const waitMin = Math.ceil(waitMs / 60_000);
+
+      return { allowed: false, reason: `Rate limit: ${hourlyTimestamps.length}/${cfg.maxPerHour} actions/hour. Wait ~${waitMin}m or increase maxPerHour.` };
     }
 
     return { allowed: true };
@@ -176,7 +185,7 @@ export function createGuards(
     if (activeDefinitionCount >= cfg.maxDefinitions) {
       return {
         allowed: false,
-        reason: `Definition limit (${cfg.maxDefinitions}) reached`,
+        reason: `Definition limit: ${activeDefinitionCount}/${cfg.maxDefinitions} definitions active. Remove unused definitions or increase maxDefinitions.`,
       };
     }
 
@@ -187,7 +196,7 @@ export function createGuards(
     if (pendingCount >= cfg.maxPending) {
       return {
         allowed: false,
-        reason: `Pending action limit (${cfg.maxPending}) reached`,
+        reason: `Pending action limit: ${pendingCount}/${cfg.maxPending} pending. Approve or reject pending actions first.`,
       };
     }
 
@@ -204,11 +213,11 @@ export function createGuards(
 
   function checkBudget(): GuardCheckResult {
     if (tokensUsed >= budget.tokens) {
-      return { allowed: false, reason: "Token budget exceeded" };
+      return { allowed: false, reason: `Token budget: ${tokensUsed}/${budget.tokens} used. Call resetBudget() or increase budget.tokens.` };
     }
 
     if (dollarsUsed >= budget.dollars) {
-      return { allowed: false, reason: "Dollar budget exceeded" };
+      return { allowed: false, reason: `Dollar budget: $${dollarsUsed.toFixed(2)}/$${budget.dollars.toFixed(2)} used. Call resetBudget() or increase budget.dollars.` };
     }
 
     return { allowed: true };

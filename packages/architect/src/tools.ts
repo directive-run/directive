@@ -247,6 +247,16 @@ export function getAvailableTools(
   capabilities: ArchitectCapabilities,
 ): ArchitectToolDef[] {
   return TOOL_DEFINITIONS.filter((tool) => {
+    // C3: remove_definition and rollback require at least one mutation capability
+    if (tool.name === "remove_definition" || tool.name === "rollback") {
+      const hasMutation = capabilities.constraints !== false ||
+        capabilities.resolvers !== false ||
+        capabilities.effects !== false ||
+        capabilities.derivations !== false;
+
+      return hasMutation;
+    }
+
     if (!tool.requiredCapability) {
       return true;
     }
@@ -278,7 +288,7 @@ export interface ToolExecutionContext {
   dynamicIds: Set<string>;
   /** Rollback function provided by the architect. */
   rollbackFn: (actionId: string) => { success: boolean; reason?: string };
-  /** M2: Current capabilities for capability-gated operations. */
+  /** Current capabilities for capability-gated operations. */
   capabilities?: ArchitectCapabilities;
 }
 
@@ -643,6 +653,12 @@ function executeSetFact(
 
   if (!key || valueStr === undefined) {
     return { success: false, error: "key and value are required" };
+  }
+
+  // M13: block prototype pollution keys
+  const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+  if (BLOCKED_KEYS.has(key)) {
+    return { success: false, error: `Blocked fact key: "${key}"` };
   }
 
   try {

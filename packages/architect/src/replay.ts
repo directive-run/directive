@@ -132,6 +132,7 @@ export async function replayWithArchitect(
 ): Promise<ReplayResult> {
   const maxEvents = options?.maxEvents ?? recording.events.length;
   const eventsToProcess = recording.events.slice(0, maxEvents);
+  const maxTokens = options?.budget?.maxTokens ?? Infinity;
 
   const withArchitect: Array<{
     event: ReplayEvent;
@@ -140,8 +141,13 @@ export async function replayWithArchitect(
 
   let triggeredEvents = 0;
   let totalActions = 0;
+  let tokensUsed = 0;
 
   for (const event of eventsToProcess) {
+    // Item 16: break if budget exceeded
+    if (tokensUsed >= maxTokens) {
+      break;
+    }
     // Only analyze events that would typically trigger the architect
     if (event.type !== "settlement-change" && event.unmetRequirements.length === 0) {
       continue;
@@ -176,6 +182,9 @@ export async function replayWithArchitect(
         },
         prompt,
       );
+
+      // Item 16: track cumulative tokens
+      tokensUsed += result.totalTokens ?? 0;
 
       // Parse proposed actions from tool calls
       const actions: ArchitectAction[] = (result.toolCalls ?? []).map(
@@ -231,6 +240,7 @@ export async function replayWithArchitect(
       totalEvents: recording.events.length,
       triggeredEvents,
       totalActions,
+      tokensUsed,
     },
   };
 }

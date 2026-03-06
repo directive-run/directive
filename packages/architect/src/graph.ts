@@ -135,13 +135,30 @@ export function extractSystemGraph(
       },
     });
 
-    // Edges: resolvers resolve requirements (linked to constraints that produce them)
+    // Item 6: match resolver.requirement against constraint requirement types
     const reqType = String(resolver.requirement ?? "");
     if (reqType) {
-      // Find constraints that produce this requirement type
       for (const constraint of constraints) {
         const cId = String(constraint.id ?? constraint.name ?? "");
-        if (cId) {
+        if (!cId) {
+          continue;
+        }
+
+        // Check if constraint has an explicit requirement type
+        const constraintReqType = constraint.requirementType ?? constraint.requirement;
+
+        if (constraintReqType !== undefined) {
+          // Only create edge when requirement types match
+          if (String(constraintReqType) === reqType) {
+            edges.push({
+              source: nodeId,
+              target: `constraint::${cId}`,
+              type: "resolves",
+              label: reqType,
+            });
+          }
+        } else {
+          // No requirement type info available — create edge (backwards-compatible)
           edges.push({
             source: nodeId,
             target: `constraint::${cId}`,

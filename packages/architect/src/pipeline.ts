@@ -153,6 +153,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   const actions = new Map<string, ArchitectAction>();
   const MAX_ACTIONS = 1000;
   const rollbackEntries = new Map<string, RollbackEntry>();
+  const MAX_ROLLBACK_ENTRIES = 1000;
   const approvalTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let versionCounter = 0;
   let destroyed = false;
@@ -255,15 +256,8 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       return result;
     } catch (err) {
       // M1: catch StaleSnapshotError and retry at mutex level
+      // Note: do NOT release mutex here — finally block handles it to avoid double-release
       if (err instanceof StaleSnapshotError) {
-        analyzeInProgress = false;
-        const next = analyzeQueue.shift();
-        if (next) {
-          analyze(next.trigger, next.triggerContext, next.prompt)
-            .then(next.resolve)
-            .catch(next.reject);
-        }
-
         return analyze(trigger, triggerContext, prompt, err.retryCount + 1, mode, dryRun);
       }
 
@@ -854,6 +848,13 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       return level === "always";
     }
 
+    // C2: set_fact modifies system state — always require approval by default
+    if (toolName === "set_fact") {
+      const level = safety?.approval?.constraints ?? defaultLevel;
+
+      return level === "always" || level === "first-time";
+    }
+
     return false;
   }
 
@@ -910,6 +911,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   }
 
   const approvedDefinitions = new Set<string>();
+  const MAX_APPROVED_DEFINITIONS = 1000;
 
   function hasBeenApprovedBefore(type: string, id: string): boolean {
     return approvedDefinitions.has(`${type}::${id}`);
@@ -1010,6 +1012,24 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
     if (result.success && result.definition) {
       // Track for rollback
+      // M1: FIFO eviction for rollback entries
+      if (rollbackEntries.size >= MAX_ROLLBACK_ENTRIES) {
+        const oldest = rollbackEntries.keys().next().value;
+        if (oldest !== undefined) {
+          rollbackEntries.delete(oldest);
+        }
+      }
+      // M3: for unregister ops, capture original registration for rollback
+      let original: unknown;
+      if (action.tool === "remove_definition") {
+        for (const [, re] of rollbackEntries) {
+          if (re.type === result.definition.type && re.id === result.definition.id && re.operation === "register" && re.registered) {
+            original = re.registered;
+            break;
+          }
+        }
+      }
+
       rollbackEntries.set(action.id, {
         auditId: action.id,
         type: result.definition.type,
@@ -1020,6 +1040,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
           action.tool !== "remove_definition"
             ? result.definition
             : undefined,
+        original,
         rolledBack: false,
       });
 
@@ -1044,10 +1065,23 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       emitEvent({ type: "applied", timestamp: Date.now(), action });
 
       // Item 33: track for policy context
-      actionTimestamps.push(Date.now());
+      // M9: prune stale timestamps here (write site) instead of only in buildPolicyContext
+      const pruneNow = Date.now();
+      const pruneHourAgo = pruneNow - 3_600_000;
+      while (actionTimestamps.length > 0 && actionTimestamps[0]! < pruneHourAgo) {
+        actionTimestamps.shift();
+      }
+      actionTimestamps.push(pruneNow);
       lastAppliedAction = action;
 
       if (action.definition) {
+        // M2: FIFO eviction for approved definitions
+        if (approvedDefinitions.size >= MAX_APPROVED_DEFINITIONS) {
+          const oldest = approvedDefinitions.values().next().value;
+          if (oldest !== undefined) {
+            approvedDefinitions.delete(oldest);
+          }
+        }
         approvedDefinitions.add(
           `${action.definition.type}::${action.definition.id}`,
         );
@@ -1190,6 +1224,14 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         }
 
         dynamicIds.delete(`${entry.type}::${entry.id}`);
+      } else if (entry.operation === "unregister" && entry.original) {
+        // M3: undo an unregister by re-registering the original definition
+        const def = entry.original as Record<string, unknown>;
+        const result = executeTool(`create_${entry.type}`, def, toolContext);
+
+        if (result.success) {
+          dynamicIds.add(`${entry.type}::${entry.id}`);
+        }
       }
 
       entry.rolledBack = true;
