@@ -285,9 +285,9 @@ describe("integration", () => {
     // Trigger an analysis
     await architect.analyze("test");
 
-    // Manually fire the handler to simulate event routing
-    if (handlers["analysis"]) {
-      handlers["analysis"]({ trigger: "demand", actions: [], tokensUsed: 50 });
+    // Manually fire the handler to simulate event routing (uses "analysis-complete" event name)
+    if (handlers["analysis-complete"]) {
+      handlers["analysis-complete"]({ type: "analysis-complete", timestamp: Date.now(), analysis: { trigger: "demand", actions: [], tokensUsed: 50 } });
     }
 
     expect(analysisEvents).toHaveLength(1);

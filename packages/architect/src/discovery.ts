@@ -32,7 +32,7 @@ export interface DiscoverySession {
   stop(): Promise<DiscoveryReport>;
   /** Check current progress. */
   progress(): { eventCount: number; patternCount: number; elapsedMs: number };
-  /** E7: Promise that resolves when the session completes naturally (duration timer). */
+  /** Promise that resolves when the session completes naturally (duration timer). */
   done: Promise<DiscoveryReport>;
 }
 
@@ -44,6 +44,7 @@ export function createDiscoverySession(
   system: System,
   runner?: AgentRunner,
   options?: DiscoveryOptions,
+  onTokens?: (tokens: number) => void,
 ): DiscoverySession {
   const duration = options?.duration ?? DEFAULT_DURATION;
   const maxEvents = options?.maxEvents ?? DEFAULT_MAX_EVENTS;
@@ -258,6 +259,11 @@ export function createDiscoverySession(
         },
         prompt,
       );
+
+      // M4: track tokens through budget
+      if (onTokens && typeof result.totalTokens === "number") {
+        onTokens(result.totalTokens);
+      }
 
       const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output);
 

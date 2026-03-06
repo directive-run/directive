@@ -44,24 +44,26 @@ export function wireServiceHooks(options: WireServiceHooksOptions): () => void {
   const { hooks, subscribe, getAuditLog, auditPollInterval = 5000 } = options;
   const unsubscribers: Array<() => void> = [];
 
-  // Wire analysis events
+  // Item 3: Wire analysis events — use "analysis-complete" event name
   if (hooks.onAnalysis) {
     const handler = hooks.onAnalysis;
 
     unsubscribers.push(
-      subscribe("analysis", (...args: unknown[]) => {
-        safeCall(() => handler(args[0] as ArchitectAnalysis));
+      subscribe("analysis-complete", (...args: unknown[]) => {
+        const event = args[0] as Record<string, unknown> | undefined;
+        safeCall(() => handler((event?.analysis ?? event) as ArchitectAnalysis));
       }),
     );
   }
 
-  // Wire action events
+  // Item 3: Wire action events — use "applied" event name
   if (hooks.onAction) {
     const handler = hooks.onAction;
 
     unsubscribers.push(
-      subscribe("action", (...args: unknown[]) => {
-        safeCall(() => handler(args[0] as ArchitectAction));
+      subscribe("applied", (...args: unknown[]) => {
+        const event = args[0] as Record<string, unknown> | undefined;
+        safeCall(() => handler((event?.action ?? event) as ArchitectAction));
       }),
     );
   }
@@ -72,18 +74,20 @@ export function wireServiceHooks(options: WireServiceHooksOptions): () => void {
 
     unsubscribers.push(
       subscribe("error", (...args: unknown[]) => {
-        safeCall(() => handler(args[0] as Error));
+        const event = args[0] as Record<string, unknown> | undefined;
+        safeCall(() => handler((event?.error ?? event) as Error));
       }),
     );
   }
 
-  // Wire kill events
+  // Item 3: Wire kill events — use "killed" event name
   if (hooks.onKill) {
     const handler = hooks.onKill;
 
     unsubscribers.push(
-      subscribe("kill", (...args: unknown[]) => {
-        safeCall(() => handler(args[0] as KillResult));
+      subscribe("killed", (...args: unknown[]) => {
+        const event = args[0] as Record<string, unknown> | undefined;
+        safeCall(() => handler((event?.killResult ?? event) as KillResult));
       }),
     );
   }

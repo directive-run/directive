@@ -308,5 +308,53 @@ describe("audit log", () => {
       expect(log.importLog(validJson)).toBe(true);
       expect(log.size()).toBe(1);
     });
+
+    it("M12: rejects tampered entry hashes when verify=true", () => {
+      const log = createAuditLog();
+
+      // Create entries via append to get valid hashes
+      log.append({
+        trigger: "demand",
+        tool: "create_constraint",
+        arguments: { id: "c1" },
+        reasoning: mockReasoning,
+        approvalRequired: false,
+        approved: true,
+        applied: true,
+      });
+
+      const exported = log.exportLog();
+      const data = JSON.parse(exported);
+
+      // Tamper with the hash
+      data.entries[0].hash = "tampered-hash";
+
+      const log2 = createAuditLog();
+      const result = log2.importLog(JSON.stringify(data), true);
+
+      expect(result).toBe(false);
+    });
+
+    it("M12: accepts valid entry hashes when verify=true", () => {
+      const log = createAuditLog();
+
+      log.append({
+        trigger: "demand",
+        tool: "create_constraint",
+        arguments: { id: "c1" },
+        reasoning: mockReasoning,
+        approvalRequired: false,
+        approved: true,
+        applied: true,
+      });
+
+      const exported = log.exportLog();
+
+      const log2 = createAuditLog();
+      const result = log2.importLog(exported, true);
+
+      expect(result).toBe(true);
+      expect(log2.size()).toBe(1);
+    });
   });
 });
