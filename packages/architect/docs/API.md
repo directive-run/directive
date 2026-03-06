@@ -647,7 +647,7 @@ Import from `@directive-run/architect/testing`.
 ### mockRunner
 
 ```typescript
-function mockRunner(responses: MockRunnerResponse[]): AgentRunner
+function mockRunner(responses: MockRunnerResponse[]): MockAgentRunner
 ```
 
 Create a mock AgentRunner. Responses consumed in order; returns empty after exhaustion. Has `.calls` array for assertions.
@@ -704,7 +704,7 @@ interface AIArchitectOptions {
   capabilities?: ArchitectCapabilities;   // { constraints?, resolvers?, effects?, derivations?, facts? }
   triggers?: ArchitectTriggers;           // { onError?, onUnmetRequirement?, onFactChange?, onSchedule?, onDemand?, minInterval?, onHealthDecline? }
   context?: ArchitectContext;             // { description, goals?, notes? }
-  safety?: ArchitectSafety;               // { maxDefinitions?, approval?, sandbox?, rollback?, auditLog?, blockedPatterns?, allowedGlobals?, executionTimeout?, approvalTimeout? }
+  safety?: ArchitectSafety;               // { maxDefinitions?, approval?: { constraints?, resolvers?, effects?, derivations?, facts? }, sandbox?, rollback?, auditLog?, blockedPatterns?, allowedGlobals?, executionTimeout?, approvalTimeout? }
   model?: string;                         // Model override for runner
   policies?: ArchitectPolicy[];           // Meta-constraints on the architect
   serviceHooks?: ArchitectServiceHooks;   // External service integrations
@@ -713,7 +713,7 @@ interface AIArchitectOptions {
   templates?: ConstraintTemplate[];       // Custom constraint templates
   adaptiveContext?: AdaptiveContextConfig; // { includeOutcomes?, includeHealthTrend?, includeTemplateStats?, maxOutcomeEntries?, customBuilder? }
   persistence?: PersistenceConfig;        // { audit?, checkpoint?, checkpointInterval? }
-  fallback?: { strategies?, maxConsecutiveFailures? }; // LLM fallback config
+  fallback?: { strategies?: FallbackStrategy[], maxConsecutiveFailures? }; // LLM fallback config
   metrics?: MetricsProvider;              // Observability provider
   silent?: boolean;                       // Suppress BSL license notice
 }
