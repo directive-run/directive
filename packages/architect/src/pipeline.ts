@@ -1154,9 +1154,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       return level === "always";
     }
 
-    // C2: set_fact modifies system state — always require approval by default
+    // E10: set_fact uses its own approval level (falls back to "always")
     if (toolName === "set_fact") {
-      const level = safety?.approval?.constraints ?? defaultLevel;
+      const level = safety?.approval?.facts ?? defaultLevel;
 
       return level === "always" || level === "first-time";
     }
