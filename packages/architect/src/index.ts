@@ -55,6 +55,7 @@ export type {
   ArchitectPolicyWarningEvent,
   ArchitectApprovalTimeoutEvent,
   ArchitectFallbackEvent,
+  ArchitectFeedbackEvent,
   ArchitectHealthCheckEvent,
   ArchitectEventType,
   ArchitectEventListener,
@@ -232,6 +233,15 @@ export {
   type TemplateInstantiation,
 } from "./templates.js";
 
+// Learning / Feedback
+export {
+  createFeedbackStore,
+  type FeedbackStore,
+  type FeedbackEntry,
+  type FeedbackPattern,
+  type LearningConfig,
+} from "./learning.js";
+
 // Metrics & Observability
 export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
 
@@ -248,6 +258,7 @@ export {
   assertApproved,
   assertKilled,
   assertBudgetWithin,
+  assertFeedbackRecorded,
   createTestAuditStore,
   createTestCheckpointStore,
   type MockRunnerResponse,
