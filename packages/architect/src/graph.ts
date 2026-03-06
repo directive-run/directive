@@ -54,7 +54,7 @@ export function extractSystemGraph(
   }
 
   // Get inspection data from system
-  const inspection = system.inspect() as Record<string, unknown>;
+  const inspection = system.inspect() as unknown as Record<string, unknown>;
 
   // ---- Fact nodes ----
   if (includeFacts) {
