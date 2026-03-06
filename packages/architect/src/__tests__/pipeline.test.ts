@@ -570,7 +570,7 @@ describe("pipeline", () => {
     const toolCtx: ToolExecutionContext = {
       system: system as never,
       dynamicIds,
-      rollbackFn: () => false,
+      rollbackFn: () => ({ success: false }),
       capabilities: { constraints: true, resolvers: true, effects: false, derivations: false },
     };
 
@@ -587,7 +587,7 @@ describe("pipeline", () => {
     const toolCtx: ToolExecutionContext = {
       system: system as never,
       dynamicIds,
-      rollbackFn: () => false,
+      rollbackFn: () => ({ success: false }),
       capabilities: { constraints: true, resolvers: true, effects: false, derivations: false },
     };
 
@@ -607,7 +607,7 @@ describe("pipeline", () => {
     const toolCtx: ToolExecutionContext = {
       system: system as never,
       dynamicIds,
-      rollbackFn: () => false,
+      rollbackFn: () => ({ success: false }),
     };
 
     const result = executeTool("create_derivation", { id: "testD", deriveCode: "facts.x * 2" }, toolCtx);

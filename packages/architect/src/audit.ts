@@ -12,40 +12,13 @@ import type {
   AuditEntry,
   AuditQuery,
 } from "./types.js";
+import { fnv1a } from "./hash.js";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
 const DEFAULT_MAX_ENTRIES = 1000;
-
-// ============================================================================
-// Hash Utilities
-// ============================================================================
-
-/**
- * Synchronous FNV-1a hash.
- * Not cryptographically secure — used for tamper-evidence chain integrity.
- */
-function simpleHash(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  const unsigned = hash >>> 0;
-
-  return unsigned.toString(16).padStart(8, "0");
-}
-
-/**
- * Synchronous hash for chain computation.
- * Uses FNV-1a for deterministic, fast hashing.
- */
-function hashSync(input: string): string {
-  return simpleHash(input);
-}
 
 // ============================================================================
 // Audit Log
@@ -111,7 +84,7 @@ export function createAuditLog(options?: AuditLogOptions) {
       ...entry,
       hash: undefined,
     });
-    entry.hash = hashSync(hashInput);
+    entry.hash = fnv1a(hashInput);
 
     // Freeze to make append-only
     Object.freeze(entry);

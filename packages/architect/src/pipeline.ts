@@ -1151,10 +1151,15 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   // Rollback
   // ============================================================================
 
-  function rollbackAction(actionId: string): boolean {
+  // E11: rollbackAction returns { success, reason? }
+  function rollbackAction(actionId: string): { success: boolean; reason?: string } {
     const entry = rollbackEntries.get(actionId);
-    if (!entry || entry.rolledBack) {
-      return false;
+    if (!entry) {
+      return { success: false, reason: "No rollback entry found" };
+    }
+
+    if (entry.rolledBack) {
+      return { success: false, reason: "Already rolled back" };
     }
 
     try {
@@ -1181,9 +1186,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
       emitEvent({ type: "rollback", timestamp: Date.now() });
 
-      return true;
+      return { success: true };
     } catch {
-      return false;
+      return { success: false, reason: "Unregister failed" };
     }
   }
 
@@ -1194,9 +1199,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
     for (const id of actionIds) {
       try {
-        const success = rollbackAction(id);
-        results.push({ actionId: id, success });
-        if (success) {
+        const result = rollbackAction(id);
+        results.push({ actionId: id, success: result.success, error: result.reason });
+        if (result.success) {
           succeeded++;
         } else {
           failed++;
