@@ -1,0 +1,585 @@
+/**
+ * Type definitions for AI Architect — self-modifying Directive systems.
+ *
+ * The AI Architect gives an LLM architectural control over a Directive
+ * system: observe state, create/remove constraints and resolvers
+ * at runtime with safety guardrails, audit trails, and kill switches.
+ *
+ * @module
+ */
+
+import type { System } from "@directive-run/core";
+import type { AgentRunner } from "@directive-run/ai";
+
+// ============================================================================
+// Definition Types
+// ============================================================================
+
+export type ArchitectDefType =
+  | "constraint"
+  | "resolver"
+  | "effect"
+  | "derivation";
+
+// ============================================================================
+// Capabilities
+// ============================================================================
+
+/** Controls what the AI architect can do to the system. */
+export interface ArchitectCapabilities {
+  /** Can create/remove constraints. Default: true */
+  constraints?: boolean;
+  /** Can create/remove resolvers. Default: true */
+  resolvers?: boolean;
+  /** Can create/remove effects. Default: false (Phase 1 excluded) */
+  effects?: boolean;
+  /** Can create/remove derivations. Default: false (Phase 1 excluded) */
+  derivations?: boolean;
+  /**
+   * Fact access level.
+   * - 'read-only': Can observe facts but not mutate them directly.
+   * - 'read-write': Can also set facts directly.
+   * Default: 'read-only'
+   */
+  facts?: "read-only" | "read-write";
+}
+
+// ============================================================================
+// Triggers
+// ============================================================================
+
+/** When does the AI architect analyze the system? */
+export interface ArchitectTriggers {
+  /** Trigger when the system encounters an error. Default: false */
+  onError?: boolean;
+  /** Trigger when a requirement has no matching resolver. Default: false */
+  onUnmetRequirement?: boolean;
+  /** Trigger when specific fact keys change. */
+  onFactChange?: string[];
+  /** Periodic analysis interval (e.g., '5m', '30s', '1h'). */
+  onSchedule?: string;
+  /** Allow manual analysis via architect.analyze(). Default: true */
+  onDemand?: boolean;
+  /** Minimum interval between analyses in ms. Default: 60000 (60s). */
+  minInterval?: number;
+}
+
+// ============================================================================
+// Context
+// ============================================================================
+
+/** What the AI knows about the system it's managing. */
+export interface ArchitectContext {
+  /** Human-readable description of what the system does. */
+  description: string;
+  /** Goals the AI should optimize for. */
+  goals?: string[];
+  /** Additional context strings passed to the LLM. */
+  notes?: string[];
+}
+
+// ============================================================================
+// Safety
+// ============================================================================
+
+/** Approval requirement level per definition type. */
+export type ApprovalLevel =
+  /** Always require human approval. */
+  | "always"
+  /** Require approval for first registration; subsequent are auto-approved. */
+  | "first-time"
+  /** Auto-approve all changes (use with caution). */
+  | "never";
+
+/** Safety configuration for the AI architect. */
+export interface ArchitectSafety {
+  /** Maximum total dynamic definitions the AI can create. Default: 50 */
+  maxDefinitions?: number;
+
+  /** Approval requirements per definition type. */
+  approval?: {
+    constraints?: ApprovalLevel;
+    resolvers?: ApprovalLevel;
+    effects?: ApprovalLevel;
+    derivations?: ApprovalLevel;
+  };
+
+  /** Run AI-generated functions in a sandboxed scope. Default: true */
+  sandbox?: boolean;
+
+  /** Enable rollback of AI changes. Default: true */
+  rollback?: boolean;
+
+  /** Enable full audit logging. Default: true */
+  auditLog?: boolean;
+
+  /** Blocked patterns in AI-generated code (added to defaults). */
+  blockedPatterns?: string[];
+
+  /** Allowed global APIs in sandboxed code. Default: ['Math', 'Date', 'JSON', 'console'] */
+  allowedGlobals?: string[];
+
+  /** Execution timeout for AI-generated functions in ms. Default: 5000 */
+  executionTimeout?: number;
+
+  /** Auto-reject pending approvals after this many ms. Default: 300000 (5 min). */
+  approvalTimeout?: number;
+}
+
+// ============================================================================
+// Budget
+// ============================================================================
+
+/** Token and dollar budget for LLM calls. REQUIRED to prevent bill shock. */
+export interface ArchitectBudget {
+  /** Max tokens across all LLM calls. */
+  tokens: number;
+  /** Max dollar spend across all LLM calls. */
+  dollars: number;
+  /** C7: Cost per 1K tokens for dollar estimation. Default: 0.003 */
+  costPerThousandTokens?: number;
+}
+
+// ============================================================================
+// Architect Options
+// ============================================================================
+
+/** Configuration for createAIArchitect(). */
+export interface AIArchitectOptions {
+  /** The live Directive system to manage. */
+  system: System;
+
+  /** LLM runner for AI reasoning. */
+  runner: AgentRunner;
+
+  /** Token/dollar budget. REQUIRED to prevent bill shock. */
+  budget: ArchitectBudget;
+
+  /** What the AI can do. */
+  capabilities?: ArchitectCapabilities;
+
+  /** When the AI analyzes. */
+  triggers?: ArchitectTriggers;
+
+  /** System context for the AI. */
+  context?: ArchitectContext;
+
+  /** Safety configuration. */
+  safety?: ArchitectSafety;
+
+  /** Model override for the LLM runner. */
+  model?: string;
+}
+
+// ============================================================================
+// Structured Reasoning
+// ============================================================================
+
+/** Structured reasoning output from the AI architect. */
+export interface ActionReasoning {
+  /** What triggered this analysis. */
+  trigger: string;
+  /** What the AI observed about the system. */
+  observation: string;
+  /** Why this action is the right response. */
+  justification: string;
+  /** What the AI expects to happen after the action. */
+  expectedOutcome: string;
+  /** Raw reasoning text from the LLM. */
+  raw: string;
+}
+
+// ============================================================================
+// Actions & Events
+// ============================================================================
+
+/** An action the AI architect wants to take. */
+export interface ArchitectAction {
+  /** Unique ID for this action. */
+  id: string;
+  /** The tool the AI called. */
+  tool: string;
+  /** Arguments passed to the tool. */
+  arguments: Record<string, unknown>;
+  /** AI's structured reasoning for this action. */
+  reasoning: ActionReasoning;
+  /** Confidence score 0-1 from the AI. */
+  confidence: number;
+  /** Risk assessment. */
+  risk: "low" | "medium" | "high";
+  /** The definition that was created/removed (if applicable). */
+  definition?: {
+    type: ArchitectDefType;
+    id: string;
+    code?: string;
+  };
+  /** M13: the original trigger that caused this action. */
+  originalTrigger?: ArchitectAnalysis["trigger"];
+  /** Whether this action requires human approval. */
+  requiresApproval: boolean;
+  /** Current approval status. */
+  approvalStatus: "pending" | "approved" | "rejected" | "auto-approved";
+  /** Timestamp when action was created. */
+  timestamp: number;
+}
+
+/** Result of an AI analysis cycle. */
+export interface ArchitectAnalysis {
+  /** What triggered this analysis. */
+  trigger: "error" | "unmet-requirement" | "fact-change" | "schedule" | "demand";
+  /** Additional trigger context. */
+  triggerContext?: string;
+  /** Actions the AI decided to take. */
+  actions: ArchitectAction[];
+  /** Total tokens used in this analysis. */
+  tokensUsed: number;
+  /** Duration of the analysis in ms. */
+  durationMs: number;
+  /** Timestamp. */
+  timestamp: number;
+}
+
+// ============================================================================
+// Audit Log
+// ============================================================================
+
+/** A single entry in the architect's audit log. */
+export interface AuditEntry {
+  /** Unique ID. */
+  id: string;
+  /** Timestamp. */
+  timestamp: number;
+  /** What triggered this entry. */
+  trigger: ArchitectAnalysis["trigger"];
+  /** The tool that was called. */
+  tool: string;
+  /** Arguments to the tool. */
+  arguments: Record<string, unknown>;
+  /** AI's structured reasoning. */
+  reasoning: ActionReasoning;
+  /** Definition type (if applicable). */
+  definitionType?: ArchitectDefType;
+  /** Definition ID (if applicable). */
+  definitionId?: string;
+  /** The code string for generated functions. */
+  code?: string;
+  /** Whether approval was required. */
+  approvalRequired: boolean;
+  /** Whether it was approved. */
+  approved: boolean;
+  /** Whether the action was successfully applied. */
+  applied: boolean;
+  /** Error message if the action failed. */
+  error?: string;
+  /** Whether this action was later rolled back. */
+  rolledBack?: boolean;
+  /** M6: reference to original audit entry this is rolling back. */
+  rollbackOf?: string;
+  /** Hash of this entry for chain integrity. */
+  hash: string;
+  /** Hash of previous entry. null for first entry. */
+  prevHash: string | null;
+}
+
+/** Query options for filtering the audit log. */
+export interface AuditQuery {
+  /** Filter by trigger type. */
+  trigger?: ArchitectAnalysis["trigger"];
+  /** Filter by definition type. */
+  definitionType?: ArchitectDefType;
+  /** Filter entries after this timestamp. */
+  after?: number;
+  /** Filter entries before this timestamp. */
+  before?: number;
+  /** Filter by approval status. */
+  approved?: boolean;
+  /** Filter by applied status. */
+  applied?: boolean;
+  /** Maximum number of entries to return. */
+  limit?: number;
+}
+
+// ============================================================================
+// Rollback
+// ============================================================================
+
+/** Info about a rollback-capable change. */
+export interface RollbackEntry {
+  /** The audit entry ID this rollback corresponds to. */
+  auditId: string;
+  /** Definition type. */
+  type: ArchitectDefType;
+  /** Definition ID. */
+  id: string;
+  /** The operation that was performed. */
+  operation: "register" | "unregister";
+  /** The original definition (for unregister rollbacks). */
+  original?: unknown;
+  /** The definition that was registered (for register rollbacks). */
+  registered?: unknown;
+  /** Whether this has been rolled back. */
+  rolledBack: boolean;
+}
+
+/** Preview of what a rollback would do. */
+export interface RollbackPreview {
+  /** The action being rolled back. */
+  actionId: string;
+  /** What will be restored or removed. */
+  operations: Array<{
+    type: ArchitectDefType;
+    id: string;
+    action: "unregister" | "re-register";
+  }>;
+}
+
+/** Result of a batch rollback. */
+export interface RollbackBatchResult {
+  /** Number of actions successfully rolled back. */
+  succeeded: number;
+  /** Number of actions that failed to roll back. */
+  failed: number;
+  /** Details per action. */
+  results: Array<{
+    actionId: string;
+    success: boolean;
+    error?: string;
+  }>;
+}
+
+// ============================================================================
+// Active Definitions
+// ============================================================================
+
+/** An AI-created definition that is currently active. */
+export interface ActiveDefinition {
+  /** Definition type. */
+  type: ArchitectDefType;
+  /** Definition ID. */
+  id: string;
+  /** The audit entry that created it. */
+  auditId: string;
+  /** When it was created. */
+  createdAt: number;
+  /** The source code of the definition. */
+  code?: string;
+}
+
+// ============================================================================
+// Kill Switch
+// ============================================================================
+
+/** Result of a kill switch activation. */
+export interface KillResult {
+  /** Number of definitions removed. */
+  removed: number;
+  /** Definitions that were removed. */
+  definitions: Array<{ type: ArchitectDefType; id: string }>;
+  /** Timestamp of kill. */
+  timestamp: number;
+}
+
+// ============================================================================
+// Events
+// ============================================================================
+
+/** Event types emitted by the architect. */
+export type ArchitectEventType =
+  // Progress events
+  | "observing"
+  | "reasoning"
+  | "generating"
+  | "validating"
+  // Lifecycle events
+  | "analysis-start"
+  | "analysis-complete"
+  | "action"
+  | "approval-required"
+  | "approval-response"
+  | "applied"
+  | "rollback"
+  | "error"
+  // Budget events
+  | "budget-warning"
+  | "budget-exceeded"
+  // Kill switch
+  | "killed";
+
+/** Event data for architect events. */
+export interface ArchitectEvent {
+  type: ArchitectEventType;
+  timestamp: number;
+  analysis?: ArchitectAnalysis;
+  action?: ArchitectAction;
+  error?: Error;
+  budgetUsed?: { tokens: number; dollars: number };
+  budgetPercent?: number;
+  killResult?: KillResult;
+}
+
+/** Listener for architect events. */
+export type ArchitectEventListener = (event: ArchitectEvent) => void;
+
+// ============================================================================
+// AI Architect Instance
+// ============================================================================
+
+/** The AI Architect instance returned by createAIArchitect(). */
+export interface AIArchitect {
+  /**
+   * Manually trigger an analysis.
+   * The AI will observe the system, reason about it, and propose actions.
+   */
+  analyze(prompt?: string): Promise<ArchitectAnalysis>;
+
+  /**
+   * Approve a pending action by its ID.
+   * Returns true if the action was found and approved.
+   */
+  approve(actionId: string): Promise<boolean>;
+
+  /**
+   * Reject a pending action by its ID.
+   * Returns true if the action was found and rejected.
+   */
+  reject(actionId: string): boolean;
+
+  /**
+   * Roll back a previously applied action.
+   * Returns true if the rollback succeeded.
+   */
+  rollback(actionId: string): boolean;
+
+  /** Preview what a rollback would do without executing it. */
+  previewRollback(actionId: string): RollbackPreview | null;
+
+  /** Atomically rollback multiple actions. */
+  rollbackBatch(actionIds: string[]): RollbackBatchResult;
+
+  /** Export an approved action's code for copy-paste into codebase. */
+  toSource(actionId: string): string | null;
+
+  /** Synchronous kill switch — removes ALL AI definitions immediately. */
+  kill(): KillResult;
+
+  /** Reset budget counters. */
+  resetBudget(): void;
+
+  /** Get all AI-created definitions currently active. */
+  getActiveDefinitions(): ActiveDefinition[];
+
+  /** Listen to architect events. Returns unsubscribe function. */
+  on(listener: ArchitectEventListener): () => void;
+  on(type: ArchitectEventType, listener: ArchitectEventListener): () => void;
+
+  /** Query audit log with filters. */
+  getAuditLog(query?: AuditQuery): AuditEntry[];
+
+  /** Get all pending approval requests. */
+  getPendingApprovals(): ArchitectAction[];
+
+  /** Get all rollback-capable entries. */
+  getRollbackEntries(): RollbackEntry[];
+
+  /** Get current budget usage. */
+  getBudgetUsage(): { tokens: number; dollars: number; percent: { tokens: number; dollars: number } };
+
+  /** Stop the architect (clears scheduled triggers, removes watchers). */
+  destroy(): void;
+}
+
+// ============================================================================
+// Sandbox Types
+// ============================================================================
+
+/** Options for compiling AI-generated code. */
+export interface SandboxCompileOptions {
+  /** Execution timeout in ms. Default: 5000 */
+  timeout?: number;
+  /** Allowed global APIs. Default: ['Math', 'Date', 'JSON', 'console'] */
+  allowedGlobals?: string[];
+  /** Blocked code patterns (added to defaults). */
+  blockedPatterns?: string[];
+  /** Whether the generated function can write to facts. Default: false */
+  factWriteAccess?: boolean;
+  /** Maximum code size in bytes. Default: 2048 */
+  maxCodeSize?: number;
+}
+
+/** Result of static analysis on AI-generated code. */
+export interface StaticAnalysisResult {
+  /** Whether the code passed static analysis. */
+  safe: boolean;
+  /** Violations found. */
+  violations: string[];
+  /** Warnings (non-blocking). */
+  warnings: string[];
+}
+
+// ============================================================================
+// Tool Definition Types
+// ============================================================================
+
+/** Schema for an architect tool parameter. */
+export interface ArchitectToolParam {
+  type: "string" | "number" | "boolean" | "object" | "array";
+  description: string;
+  required?: boolean;
+  enum?: string[];
+}
+
+/** Definition of a tool the AI can call. */
+export interface ArchitectToolDef {
+  /** Tool name (e.g., 'observe_system'). */
+  name: string;
+  /** Human-readable description for the LLM. */
+  description: string;
+  /** Parameter schema. */
+  parameters: Record<string, ArchitectToolParam>;
+  /** Which capability this tool requires (null = always available). */
+  requiredCapability?: keyof ArchitectCapabilities | null;
+  /** Whether this tool mutates the system. */
+  mutates: boolean;
+}
+
+// ============================================================================
+// Guard Types
+// ============================================================================
+
+/** Circuit breaker state. */
+export type CircuitBreakerState = "closed" | "open" | "half-open";
+
+/** Guard configuration. */
+export interface GuardConfig {
+  /** Debounce window per trigger type in ms. Default: 3000 */
+  debounceMs?: number;
+  /** Max LLM calls per minute. Default: 6 */
+  maxCallsPerMinute?: number;
+  /** Failures before circuit opens. Default: 3 */
+  circuitBreakerThreshold?: number;
+  /** Circuit breaker window in ms. Default: 60000 */
+  circuitBreakerWindowMs?: number;
+  /** Max cascade depth (AI → trigger → AI cycles). Default: 3 */
+  maxCascadeDepth?: number;
+  /** Max sync execution time in ms. Default: 50 */
+  maxExecutionTimeMs?: number;
+  /** Max total AI-created definitions. Default: 50 */
+  maxDefinitions?: number;
+  /** Max pending actions. Default: 10 */
+  maxPending?: number;
+  /** Max actions per hour. Default: 20 */
+  maxPerHour?: number;
+}
+
+// ============================================================================
+// Pipeline Types
+// ============================================================================
+
+/** A queued trigger waiting for debounce. */
+export interface QueuedTrigger {
+  type: ArchitectAnalysis["trigger"];
+  context?: string;
+  /** Store generation counter at time of trigger. */
+  version: number;
+  timestamp: number;
+}
