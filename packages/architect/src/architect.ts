@@ -204,11 +204,34 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     );
   }
 
+  // ---- Helper for exportAction / exportPattern ----
+  function exportActionInternal(actionId: string, exportOptions?: Parameters<typeof exportPattern>[1]) {
+    const allActions = pipeline.getAuditLog({ applied: true });
+    const entry = allActions.find((e) => e.id === actionId || e.definitionId === actionId);
+    if (!entry) {
+      return null;
+    }
+
+    const action = {
+      id: actionId,
+      tool: entry.tool,
+      arguments: entry.arguments,
+      reasoning: entry.reasoning,
+      confidence: 0.8,
+      risk: "medium" as const,
+      requiresApproval: false,
+      approvalStatus: "approved" as const,
+      timestamp: entry.timestamp,
+    };
+
+    return exportPattern(action, exportOptions);
+  }
+
   // ---- Build the public interface ----
   // M7: fix on() — proper type discrimination
   const architect: AIArchitect = {
-    analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan" }): Promise<ArchitectAnalysis> {
-      return pipeline.analyze("demand", undefined, prompt, 0, analyzeOpts?.mode);
+    analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan"; dryRun?: boolean }): Promise<ArchitectAnalysis> {
+      return pipeline.analyze("demand", undefined, prompt, 0, analyzeOpts?.mode, analyzeOpts?.dryRun);
     },
 
     approve(actionId: string): Promise<boolean> {
@@ -310,25 +333,11 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     exportAction(actionId, exportOptions?) {
-      const allActions = pipeline.getAuditLog({ applied: true });
-      const entry = allActions.find((e) => e.id === actionId || e.definitionId === actionId);
-      if (!entry) {
-        return null;
-      }
+      return exportActionInternal(actionId, exportOptions);
+    },
 
-      const action = {
-        id: actionId,
-        tool: entry.tool,
-        arguments: entry.arguments,
-        reasoning: entry.reasoning,
-        confidence: 0.8,
-        risk: "medium" as const,
-        requiresApproval: false,
-        approvalStatus: "approved" as const,
-        timestamp: entry.timestamp,
-      };
-
-      return exportPattern(action, exportOptions);
+    exportPattern(actionId, exportOptions?) {
+      return exportActionInternal(actionId, exportOptions);
     },
 
     async importPattern(pattern: FederationPattern) {
@@ -381,7 +390,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 // Helpers
 // ============================================================================
 
-/** Item 23: Apply autonomy preset defaults. Explicit options override. */
+/** Apply autonomy preset defaults. Explicit options override. */
 function applyPreset(options: AIArchitectOptions): void {
   const preset = options.preset!;
 
