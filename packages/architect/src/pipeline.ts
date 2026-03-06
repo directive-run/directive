@@ -20,6 +20,7 @@ import type {
   ArchitectDefType,
   ArchitectEvent,
   ArchitectEventListener,
+  ArchitectPolicy,
   PolicyContext,
   RollbackEntry,
 } from "./types.js";
@@ -37,6 +38,16 @@ import {
   getBlockingViolation,
   requiresApprovalOverride,
 } from "./policies.js";
+
+// M1: StaleSnapshotError for retry at mutex level
+class StaleSnapshotError extends Error {
+  retryCount: number;
+  constructor(retryCount: number) {
+    super("Stale snapshot — system changed during analysis");
+    this.name = "StaleSnapshotError";
+    this.retryCount = retryCount;
+  }
+}
 
 // ============================================================================
 // Pipeline
@@ -106,7 +117,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       };
     }
 
-    const entry = { type: typeOrListener, fn: listener! };
+    // M5: validate listener arg before using
+    if (typeof listener !== "function") {
+      throw new Error("on(type, listener) requires a function as the second argument");
+    }
+
+    const entry = { type: typeOrListener, fn: listener };
     listeners.push(entry);
 
     return () => {
@@ -235,6 +251,21 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       const result = await analyzeInternal(trigger, triggerContext, prompt, _retryCount);
 
       return result;
+    } catch (err) {
+      // M1: catch StaleSnapshotError and retry at mutex level
+      if (err instanceof StaleSnapshotError) {
+        analyzeInProgress = false;
+        const next = analyzeQueue.shift();
+        if (next) {
+          analyze(next.trigger, next.triggerContext, next.prompt)
+            .then(next.resolve)
+            .catch(next.reject);
+        }
+
+        return analyze(trigger, triggerContext, prompt, err.retryCount + 1, mode);
+      }
+
+      throw err;
     } finally {
       analyzeInProgress = false;
 
@@ -314,13 +345,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     guards.recordSuccess();
     guards.recordTokens(result.totalTokens, estimateDollars(result.totalTokens));
 
-    // Check for stale state (optimistic concurrency)
-    // C5: pass _retryCount to cap retries
+    // M1: Check for stale state — throw StaleSnapshotError for retry at mutex level
     if (versionCounter > snapshotVersion + 10) {
       emitEvent({ type: "error", timestamp: Date.now(), error: new Error("Stale snapshot — system changed during analysis") });
       guards.resetCascade();
 
-      return analyze(trigger, triggerContext, prompt, _retryCount + 1);
+      throw new StaleSnapshotError(_retryCount);
     }
 
     emitEvent({ type: "generating", timestamp: Date.now() });
@@ -914,14 +944,14 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
           return;
         }
 
-        // Emit warnings for warn policies
+        // M4: Emit policy-warning events (not "error") for warn policies
         for (const v of violations) {
           if (v.action === "warn") {
             emitEvent({
-              type: "error",
+              type: "policy-warning",
               timestamp: Date.now(),
+              policy: v.policy,
               action,
-              error: new Error(`Policy warning "${v.policy.id}": ${v.policy.description}`),
             });
           }
         }
@@ -1031,6 +1061,13 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     const timer = setTimeout(() => {
       const action = actions.get(actionId);
       if (action && action.approvalStatus === "pending") {
+        // M8: emit approval-timeout event before rejection
+        emitEvent({
+          type: "approval-timeout",
+          timestamp: Date.now(),
+          action,
+        });
+
         action.approvalStatus = "rejected";
         emitEvent({
           type: "approval-response",
