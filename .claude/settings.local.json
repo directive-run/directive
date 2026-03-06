@@ -105,7 +105,19 @@
       "Bash(git -C /Users/jasonwcomes/Desktop/Sizls/projects/directive tag --sort=-v:refname | head -20)",
       "Bash(npm view @directive-run/ai-rules 2>&1 | head -3)",
       "Bash(npx biome lint --write packages/devtools/src 2>&1 | tail -5)",
-      "Bash(npx biome --version && npx biome lint --help 2>&1 | grep -E \"write|apply|fix|unsafe\" | head -10)"
+      "Bash(npx biome --version && npx biome lint --help 2>&1 | grep -E \"write|apply|fix|unsafe\" | head -10)",
+      "Bash(find /Users/jasonwcomes/Desktop/Sizls/projects/directive -maxdepth 3 -type f \\\\\\( -name \"*business*\" -o -name \"*strategy*\" -o -name \"*product*\" -o -name \"*vision*\" \\\\\\) 2>/dev/null | head -20)",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/directive/packages/architect && test -f README.md && echo \"README.md exists\" || echo \"README.md does NOT exist\" && test -d examples && echo \"examples/ exists\" || echo \"examples/ does NOT exist\" && test -d docs && echo \"docs/ exists\" || echo \"docs/ does NOT exist\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm biome check --fix --unsafe . 2>&1)",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint:fix 2>&1 | tail -10)",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check --max-diagnostics=100 packages/context packages/stories packages/studio/src/panels/context.ts examples/marketing-landing 2>&1 | grep \"━━\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint:fix 2>&1 | grep \"Found\\\\|Fixed\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint 2>&1 | grep \"Found\\\\|Checked\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/directive/packages/architect/examples && cp basic-observe.ts /Users/jasonwcomes/Desktop/Sizls/projects/architect/examples/basic-observe/src/index.ts && cp auto-healing.ts /Users/jasonwcomes/Desktop/Sizls/projects/architect/examples/auto-healing/src/index.ts && cp discovery-whatif.ts /Users/jasonwcomes/Desktop/Sizls/projects/architect/examples/discovery-whatif/src/index.ts)",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint 2>&1 | tail -5)",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint 2>&1 | grep \"Found\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check packages/core/src/surface.ts packages/react/src/components.tsx packages/context/src/sanitize.ts packages/stories/src/adapter.ts 2>&1 | grep -E \"any|error|warning|Checked\")",
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check packages/core/src/surface.ts packages/react/src/components.tsx packages/context/src/sanitize.ts packages/stories/src/adapter.ts 2>&1 | grep \"━━\")"
     ]
   }
 }
