@@ -608,6 +608,12 @@ function applyPreset(options: AIArchitectOptions): void {
 }
 
 /** Parse a human-readable interval string to milliseconds. */
+/**
+ * Parse a human-readable interval string into milliseconds.
+ *
+ * @param interval - Duration string (e.g., `"30s"`, `"5m"`, `"1h"`, `"1d"`).
+ * @returns Duration in milliseconds.
+ */
 export function parseInterval(interval: string): number {
   const match = /^(\d+)(ms|s|m|h|d)$/.exec(interval.trim());
   if (!match) {

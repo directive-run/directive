@@ -39,6 +39,19 @@ export interface DiscoverySession {
 /**
  * Create a discovery session that observes a running system
  * and identifies patterns for missing constraints/resolvers.
+ *
+ * @param system - The Directive system to observe.
+ * @param runner - Optional AgentRunner for AI-powered recommendations.
+ * @param options - Duration, max events, and whether to use AI.
+ * @param onTokens - Callback for token usage tracking.
+ * @returns A DiscoverySession with stop(), progress(), and done promise.
+ *
+ * @example
+ * ```typescript
+ * const session = createDiscoverySession(system, runner, { duration: 60_000 });
+ * const report = await session.done;
+ * console.log(report.patterns);
+ * ```
  */
 export function createDiscoverySession(
   system: System,

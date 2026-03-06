@@ -23,7 +23,10 @@ export interface PolicyViolation {
 
 /**
  * Evaluate all policies against the current context.
- * Returns an array of violations (empty if all policies pass).
+ *
+ * @param policies - Array of ArchitectPolicy rules to check.
+ * @param context - Current action and system state context.
+ * @returns Array of violations (empty if all policies pass).
  */
 export function evaluatePolicies(
   policies: ArchitectPolicy[],
@@ -46,7 +49,9 @@ export function evaluatePolicies(
 
 /**
  * Check if any violations block the action.
- * Returns the first blocking violation, or null if no blocks.
+ *
+ * @param violations - Array of policy violations to check.
+ * @returns The first blocking violation, or null if no blocks.
  */
 export function getBlockingViolation(violations: PolicyViolation[]): PolicyViolation | null {
   return violations.find((v) => v.action === "block") ?? null;
@@ -54,6 +59,9 @@ export function getBlockingViolation(violations: PolicyViolation[]): PolicyViola
 
 /**
  * Check if any violations require approval override.
+ *
+ * @param violations - Array of policy violations to check.
+ * @returns True if any violation has action `"require-approval"`.
  */
 export function requiresApprovalOverride(violations: PolicyViolation[]): boolean {
   return violations.some((v) => v.action === "require-approval");
@@ -65,6 +73,9 @@ export function requiresApprovalOverride(violations: PolicyViolation[]): boolean
 
 /**
  * Block creation of more than `n` constraints per hour.
+ *
+ * @param n - Maximum constraints allowed per hour.
+ * @returns An ArchitectPolicy that blocks when the limit is exceeded.
  */
 export function maxConstraintsPerHour(n: number): ArchitectPolicy {
   return {
@@ -84,6 +95,9 @@ export function maxConstraintsPerHour(n: number): ArchitectPolicy {
 /**
  * Protect specific fact keys from modification.
  * Patterns support simple glob-style `*` at the end (e.g., `"auth.*"` matches `"auth.token"`, `"auth.user"`).
+ *
+ * @param patterns - Fact key patterns to protect (supports trailing `*` glob).
+ * @returns An ArchitectPolicy that requires approval for matching modifications.
  */
 export function protectFactKeys(patterns: string[]): ArchitectPolicy {
   return {
@@ -104,6 +118,9 @@ export function protectFactKeys(patterns: string[]): ArchitectPolicy {
 
 /**
  * Require approval for actions above a given risk level.
+ *
+ * @param level - Risk threshold (`"low"`, `"medium"`, or `"high"`).
+ * @returns An ArchitectPolicy that requires approval for higher-risk actions.
  */
 export function requireApprovalAboveRisk(
   level: "low" | "medium" | "high",

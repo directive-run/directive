@@ -34,6 +34,9 @@ export interface HealthScore {
 /**
  * Compute a health score for the system.
  * Returns a normalized 0-100 score across 4 dimensions (25pts each).
+ *
+ * @param system - The Directive system to score.
+ * @returns A HealthScore with overall score, breakdown, and warnings.
  */
 export function computeHealthScore(system: System): HealthScore {
   const inspection = system.inspect() as unknown as Record<string, unknown>;
@@ -106,6 +109,9 @@ export interface GraphAnalysis {
 /**
  * Analyze a system graph for structural issues.
  * Uses Tarjan's SCC algorithm for cycle detection.
+ *
+ * @param graph - The SystemGraph to analyze.
+ * @returns A GraphAnalysis with cycles, orphans, dead resolvers, and recommendations.
  */
 export function analyzeGraph(graph: SystemGraph): GraphAnalysis {
   // Build adjacency list

@@ -7,6 +7,9 @@
 
 /**
  * Synchronous FNV-1a hash. Returns 8-character hex string.
+ *
+ * @param input - The string to hash.
+ * @returns 8-character zero-padded hexadecimal hash.
  */
 export function fnv1a(input: string): string {
   let hash = 0x811c9dc5;
