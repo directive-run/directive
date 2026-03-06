@@ -55,6 +55,7 @@ export type {
   ArchitectPolicyWarningEvent,
   ArchitectApprovalTimeoutEvent,
   ArchitectFallbackEvent,
+  ArchitectHealthCheckEvent,
   ArchitectEventType,
   ArchitectEventListener,
   ArchitectEventMap,
@@ -191,6 +192,15 @@ export {
   type GuardStateSnapshot,
   type PersistenceConfig,
 } from "./persistence.js";
+
+// Outcome Tracking
+export {
+  createOutcomeTracker,
+  type ActionOutcome,
+  type OutcomeTrackingConfig,
+  type OutcomePattern,
+  type OutcomeTracker,
+} from "./outcomes.js";
 
 // Metrics & Observability
 export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
