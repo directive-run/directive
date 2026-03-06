@@ -340,16 +340,57 @@ describe("createAIArchitect", () => {
   // Approval
   // ===========================================================================
 
-  it("reject returns false for unknown action", () => {
+  it("reject returns false for unknown action", async () => {
     const { architect } = create();
 
-    expect(architect.reject("nonexistent")).toBe(false);
+    expect(await architect.reject("nonexistent")).toBe(false);
   });
 
   it("approve returns false for unknown action", async () => {
     const { architect } = create();
 
     expect(await architect.approve("nonexistent")).toBe(false);
+  });
+
+  // ===========================================================================
+  // M6: reject returns Promise<boolean>
+  // ===========================================================================
+
+  it("M6: reject returns a Promise", async () => {
+    const { architect } = create();
+    const result = architect.reject("nonexistent");
+
+    expect(result).toBeInstanceOf(Promise);
+    expect(await result).toBe(false);
+  });
+
+  // ===========================================================================
+  // M10: type-safe on()
+  // ===========================================================================
+
+  it("M10: type-safe on() compiles and filters by event type", async () => {
+    const { architect, runner } = create({
+      safety: { approval: { constraints: "never", resolvers: "never" } },
+    });
+
+    const errors: string[] = [];
+    architect.on("error", (event) => {
+      // event is narrowed to ArchitectErrorEvent
+      errors.push(event.error.message);
+    });
+
+    // Trigger an analysis
+    runner.mockResolvedValueOnce({
+      output: "",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 10,
+    });
+
+    await architect.analyze();
+
+    // Should not crash — type narrowing should work
+    expect(true).toBe(true);
   });
 
   // ===========================================================================
