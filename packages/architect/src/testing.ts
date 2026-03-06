@@ -9,7 +9,8 @@
  *   { toolCalls: [{ name: 'observe_system', arguments: '{}' }] },
  * ]);
  *
- * const { architect, system } = createTestArchitect({ runner });
+ * // Item 9: system is first arg, returns { architect, runner, events }
+ * const { architect, runner: r, events } = createTestArchitect(system, { runner });
  * const analysis = await architect.analyze("test");
  * ```
  *
@@ -133,6 +134,189 @@ export function createTestArchitect(
   });
 
   return { architect, runner, events };
+}
+
+// ============================================================================
+// Item 21: Test System Factory
+// ============================================================================
+
+export interface TestSystem {
+  /** Facts proxy — set values directly. */
+  facts: Record<string, unknown>;
+  /** Full system.inspect() response. */
+  inspect(): Record<string, unknown>;
+  /** Subscribe to specific fact key changes. */
+  subscribe(keys: string[], listener: () => void): () => void;
+  /** Subscribe to settled changes. */
+  onSettledChange(listener: (settled: boolean) => void): () => void;
+  /** Batch mutations. */
+  batch(fn: () => void): void;
+  /** Explain a requirement. */
+  explain(id: string): unknown;
+  /** Constraints registration. */
+  constraints: {
+    register: (id: string, def: unknown) => void;
+    unregister: (id: string) => void;
+    listDynamic: () => string[];
+    isDynamic: (id: string) => boolean;
+  };
+  /** Resolvers registration. */
+  resolvers: {
+    register: (id: string, def: unknown) => void;
+    unregister: (id: string) => void;
+    listDynamic: () => string[];
+    isDynamic: (id: string) => boolean;
+  };
+  /** Effects registration. */
+  effects: {
+    register: (id: string, def: unknown) => void;
+    unregister: (id: string) => void;
+    listDynamic: () => string[];
+    isDynamic: (id: string) => boolean;
+  };
+  /** Test helper: emit a fact change notification. */
+  _emitFactChange(keys?: string[]): void;
+  /** Test helper: emit a settled change notification. */
+  _emitSettled(settled: boolean): void;
+  /** Test helper: set the initial facts. */
+  _setFacts(facts: Record<string, unknown>): void;
+  /** Test helper: set inspection overrides. */
+  _setInspection(overrides: Record<string, unknown>): void;
+}
+
+/**
+ * Create a mock System for testing architect features.
+ * Replaces duplicated mocks across test files.
+ */
+export function createTestSystem(initialFacts?: Record<string, unknown>): TestSystem {
+  const facts: Record<string, unknown> = { ...initialFacts };
+  const dynamicConstraints = new Map<string, unknown>();
+  const dynamicResolvers = new Map<string, unknown>();
+  const dynamicEffects = new Map<string, unknown>();
+  let inspectionOverrides: Record<string, unknown> = {};
+
+  const factListeners: Array<{ keys: string[]; fn: () => void }> = [];
+  const settledListeners: Array<(settled: boolean) => void> = [];
+
+  const system: TestSystem = {
+    facts,
+
+    inspect() {
+      return {
+        facts: { ...facts },
+        constraints: [],
+        resolvers: [],
+        derivations: [],
+        effects: [],
+        pendingRequirements: [],
+        ...inspectionOverrides,
+      };
+    },
+
+    subscribe(keys: string[], listener: () => void): () => void {
+      const entry = { keys, fn: listener };
+      factListeners.push(entry);
+
+      return () => {
+        const idx = factListeners.indexOf(entry);
+        if (idx >= 0) {
+          factListeners.splice(idx, 1);
+        }
+      };
+    },
+
+    onSettledChange(listener: (settled: boolean) => void): () => void {
+      settledListeners.push(listener);
+
+      return () => {
+        const idx = settledListeners.indexOf(listener);
+        if (idx >= 0) {
+          settledListeners.splice(idx, 1);
+        }
+      };
+    },
+
+    batch(fn: () => void): void {
+      fn();
+    },
+
+    explain(_id: string): unknown {
+      return null;
+    },
+
+    constraints: {
+      register(id: string, def: unknown) {
+        dynamicConstraints.set(id, def);
+      },
+      unregister(id: string) {
+        dynamicConstraints.delete(id);
+      },
+      listDynamic() {
+        return [...dynamicConstraints.keys()];
+      },
+      isDynamic(id: string) {
+        return dynamicConstraints.has(id);
+      },
+    },
+
+    resolvers: {
+      register(id: string, def: unknown) {
+        dynamicResolvers.set(id, def);
+      },
+      unregister(id: string) {
+        dynamicResolvers.delete(id);
+      },
+      listDynamic() {
+        return [...dynamicResolvers.keys()];
+      },
+      isDynamic(id: string) {
+        return dynamicResolvers.has(id);
+      },
+    },
+
+    effects: {
+      register(id: string, def: unknown) {
+        dynamicEffects.set(id, def);
+      },
+      unregister(id: string) {
+        dynamicEffects.delete(id);
+      },
+      listDynamic() {
+        return [...dynamicEffects.keys()];
+      },
+      isDynamic(id: string) {
+        return dynamicEffects.has(id);
+      },
+    },
+
+    _emitFactChange(keys?: string[]) {
+      for (const entry of factListeners) {
+        if (!keys || keys.some((k) => entry.keys.includes(k))) {
+          entry.fn();
+        }
+      }
+    },
+
+    _emitSettled(settled: boolean) {
+      for (const listener of settledListeners) {
+        listener(settled);
+      }
+    },
+
+    _setFacts(newFacts: Record<string, unknown>) {
+      for (const key of Object.keys(facts)) {
+        delete facts[key];
+      }
+
+      Object.assign(facts, newFacts);
+    },
+
+    _setInspection(overrides: Record<string, unknown>) {
+      inspectionOverrides = overrides;
+    },
+  };
+
+  return system;
 }
 
 // ============================================================================

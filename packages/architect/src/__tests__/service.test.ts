@@ -28,10 +28,10 @@ describe("wireServiceHooks", () => {
       subscribe,
     });
 
-    expect(subscribe).toHaveBeenCalledWith("analysis", expect.any(Function));
+    expect(subscribe).toHaveBeenCalledWith("analysis-complete", expect.any(Function));
 
-    // Simulate event
-    handlers["analysis"]!({ trigger: "demand", actions: [], tokensUsed: 50 });
+    // Simulate event (ArchitectEvent shape: { type, timestamp, analysis })
+    handlers["analysis-complete"]!({ type: "analysis-complete", timestamp: Date.now(), analysis: { trigger: "demand", actions: [], tokensUsed: 50 } });
 
     expect(onAnalysis).toHaveBeenCalledWith(
       expect.objectContaining({ trigger: "demand" }),
@@ -55,7 +55,7 @@ describe("wireServiceHooks", () => {
       subscribe,
     });
 
-    handlers["action"]!({ id: "act-1", tool: "create_constraint" });
+    handlers["applied"]!({ type: "applied", timestamp: Date.now(), action: { id: "act-1", tool: "create_constraint" } });
 
     expect(onAction).toHaveBeenCalledWith(
       expect.objectContaining({ id: "act-1" }),
@@ -80,7 +80,7 @@ describe("wireServiceHooks", () => {
     });
 
     const error = new Error("test error");
-    handlers["error"]!(error);
+    handlers["error"]!({ type: "error", timestamp: Date.now(), error });
 
     expect(onError).toHaveBeenCalledWith(error);
   });
@@ -102,7 +102,7 @@ describe("wireServiceHooks", () => {
       subscribe,
     });
 
-    handlers["kill"]!({ killed: true, reason: "emergency" });
+    handlers["killed"]!({ type: "killed", timestamp: Date.now(), killResult: { killed: true, reason: "emergency" } });
 
     expect(onKill).toHaveBeenCalledWith(
       expect.objectContaining({ killed: true }),
@@ -245,7 +245,7 @@ describe("wireServiceHooks", () => {
     });
 
     // Should not throw
-    expect(() => handlers["analysis"]!({ trigger: "demand" })).not.toThrow();
+    expect(() => handlers["analysis-complete"]!({ type: "analysis-complete", analysis: { trigger: "demand" } })).not.toThrow();
   });
 
   it("swallows async errors from hooks", async () => {
@@ -267,7 +267,7 @@ describe("wireServiceHooks", () => {
     });
 
     // Should not throw
-    expect(() => handlers["analysis"]!({ trigger: "demand" })).not.toThrow();
+    expect(() => handlers["analysis-complete"]!({ type: "analysis-complete", analysis: { trigger: "demand" } })).not.toThrow();
   });
 
   it("only subscribes to hooks that are provided", () => {
@@ -280,5 +280,33 @@ describe("wireServiceHooks", () => {
 
     expect(subscribe).toHaveBeenCalledTimes(1);
     expect(subscribe).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("extracts fields from ArchitectEvent shape", () => {
+    const onAnalysis = vi.fn();
+    const onAction = vi.fn();
+    const onKill = vi.fn();
+    const handlers: Record<string, (...args: unknown[]) => void> = {};
+
+    const subscribe = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+      handlers[event] = handler;
+
+      return () => {};
+    });
+
+    wireServiceHooks({
+      hooks: { onAnalysis, onAction, onKill },
+      subscribe,
+    });
+
+    // Pass ArchitectEvent objects — hooks should extract the relevant field
+    handlers["analysis-complete"]!({ type: "analysis-complete", timestamp: 1, analysis: { trigger: "demand", actions: [] } });
+    expect(onAnalysis).toHaveBeenCalledWith(expect.objectContaining({ trigger: "demand" }));
+
+    handlers["applied"]!({ type: "applied", timestamp: 1, action: { id: "a1", tool: "observe_system" } });
+    expect(onAction).toHaveBeenCalledWith(expect.objectContaining({ id: "a1" }));
+
+    handlers["killed"]!({ type: "killed", timestamp: 1, killResult: { removed: 0 } });
+    expect(onKill).toHaveBeenCalledWith(expect.objectContaining({ removed: 0 }));
   });
 });

@@ -110,6 +110,10 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   const createdAt = Date.now();
   let isDestroyedFlag = false;
 
+  // M4: cost estimation for discovery/whatIf budget tracking
+  const costPerThousandTokens = options.budget.costPerThousandTokens ?? 0.003;
+  const estimateDollars = (tokens: number) => (tokens / 1000) * costPerThousandTokens;
+
   // ---- Create pipeline ----
   const pipeline = createPipeline({
     system: options.system,
@@ -152,6 +156,11 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
           clearTimeout(debounceTimer);
         }
       });
+    } else {
+      // M5: warn when trigger configured but system lacks the required API
+      console.warn(
+        "[directive/architect] onError/onUnmetRequirement triggers configured but system.onSettledChange() is unavailable. These triggers will not fire.",
+      );
     }
   }
 
@@ -184,6 +193,11 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
           clearTimeout(debounceTimer);
         }
       });
+    } else {
+      // M5: warn when trigger configured but system lacks the required API
+      console.warn(
+        "[directive/architect] onFactChange triggers configured but system.subscribe() is unavailable. These triggers will not fire.",
+      );
     }
   }
 
@@ -301,7 +315,12 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
     // Item 19: convenience methods for innovation features
     discover(discoverOptions?) {
-      return createDiscoverySession(options.system, options.runner, discoverOptions);
+      // M4: route discovery LLM calls through budget tracking
+      const trackTokens = (tokens: number) => {
+        pipeline.guards.recordTokens(tokens, estimateDollars(tokens));
+      };
+
+      return createDiscoverySession(options.system, options.runner, discoverOptions, trackTokens);
     },
 
     whatIf(action, whatIfOptions?) {
@@ -318,7 +337,12 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
         timestamp: Date.now(),
       };
 
-      return createWhatIfAnalysis(options.system, fullAction, options.runner, whatIfOptions);
+      // M4: route what-if LLM calls through budget tracking
+      const trackTokens = (tokens: number) => {
+        pipeline.guards.recordTokens(tokens, estimateDollars(tokens));
+      };
+
+      return createWhatIfAnalysis(options.system, fullAction, options.runner, whatIfOptions, trackTokens);
     },
 
     graph(graphOptions?) {
