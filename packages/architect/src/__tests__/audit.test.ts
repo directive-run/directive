@@ -163,11 +163,15 @@ describe("audit log", () => {
     expect(success).toBe(true);
 
     const all = log.getAll();
-    const updated = all.find((e) => e.id === entry.id);
 
-    expect(updated!.rolledBack).toBe(true);
+    // Item 4: original entry is NOT mutated (append-only)
+    const original = all.find((e) => e.id === entry.id);
+    expect(original!.rolledBack).toBe(false); // unchanged
 
-    // M6: should also append a rollback entry referencing original
+    // Rollback status queried via rollbackOf entries
+    expect(log.isRolledBack(entry.id)).toBe(true);
+
+    // Should also append a rollback entry referencing original
     const rollbackEntry = all.find((e) => e.rollbackOf === entry.id);
 
     expect(rollbackEntry).toBeDefined();
@@ -236,6 +240,73 @@ describe("audit log", () => {
       const result = log.query({ limit: 3 });
 
       expect(result).toHaveLength(3);
+    });
+  });
+
+  // ===========================================================================
+  // M3: Genesis hash after eviction
+  // ===========================================================================
+
+  describe("genesis hash", () => {
+    it("M3: verifyChain succeeds after ring buffer eviction", () => {
+      const log = createAuditLog({ maxEntries: 3 });
+
+      // Fill to capacity
+      for (let i = 0; i < 5; i++) {
+        log.append({ trigger: "demand", tool: `t${i}`, arguments: {}, reasoning: mockReasoning, approvalRequired: false, approved: true, applied: true });
+      }
+
+      // Only 3 entries should remain after eviction
+      expect(log.size()).toBe(3);
+
+      // Chain should still be valid because genesisHash tracks the evicted entry
+      expect(log.verifyChain()).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // M9: importLog validation
+  // ===========================================================================
+
+  describe("importLog validation", () => {
+    it("M9: rejects entries missing required fields", () => {
+      const log = createAuditLog();
+
+      const invalidJson = JSON.stringify({
+        version: 1,
+        entries: [
+          { id: "a1" },
+          { id: "a2", timestamp: 123 },
+        ],
+      });
+
+      expect(log.importLog(invalidJson)).toBe(false);
+    });
+
+    it("M9: accepts entries with all required fields", () => {
+      const log = createAuditLog();
+
+      const validJson = JSON.stringify({
+        version: 1,
+        entries: [
+          {
+            id: "audit-1-1000",
+            timestamp: 1000,
+            trigger: "demand",
+            tool: "observe_system",
+            arguments: {},
+            reasoning: mockReasoning,
+            approvalRequired: false,
+            approved: true,
+            applied: true,
+            hash: "abc12345",
+            prevHash: null,
+          },
+        ],
+      });
+
+      expect(log.importLog(validJson)).toBe(true);
+      expect(log.size()).toBe(1);
     });
   });
 });
