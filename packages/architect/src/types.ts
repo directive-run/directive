@@ -169,6 +169,9 @@ export interface AIArchitectOptions {
 
   /** Model override for the LLM runner. */
   model?: string;
+
+  /** External service integration hooks. */
+  serviceHooks?: ArchitectServiceHooks;
 }
 
 // ============================================================================
@@ -583,3 +586,282 @@ export interface QueuedTrigger {
   version: number;
   timestamp: number;
 }
+
+// ============================================================================
+// Discovery Types
+// ============================================================================
+
+/** Options for constraint discovery mode. */
+export interface DiscoveryOptions {
+  /** Duration to observe in ms. Default: 300000 (5 min) */
+  duration?: number;
+  /** Max timeline events to collect. Default: 500 */
+  maxEvents?: number;
+  /** Whether to send patterns to LLM for recommendations. Default: true */
+  useAI?: boolean;
+}
+
+/** Progress callback for discovery. */
+export interface DiscoveryProgress {
+  /** Events collected so far. */
+  eventCount: number;
+  /** Patterns identified so far. */
+  patternCount: number;
+  /** Time elapsed in ms. */
+  elapsedMs: number;
+}
+
+/** A pattern identified during discovery. */
+export interface DiscoveryPattern {
+  /** Pattern type. */
+  type: "recurring-unmet" | "fact-oscillation" | "error-cycle" | "idle-state";
+  /** Human-readable description. */
+  description: string;
+  /** How many times this pattern was observed. */
+  occurrences: number;
+  /** Relevant fact keys. */
+  factKeys: string[];
+  /** Confidence 0-1. */
+  confidence: number;
+}
+
+/** A recommendation from discovery analysis. */
+export interface DiscoveryRecommendation {
+  /** What type of definition to create. */
+  type: ArchitectDefType;
+  /** Suggested ID. */
+  id: string;
+  /** Why this is recommended. */
+  reasoning: string;
+  /** Source code via toSource(). */
+  toSource: () => string;
+  /** Which pattern this addresses. */
+  pattern: DiscoveryPattern;
+}
+
+/** Complete discovery report. */
+export interface DiscoveryReport {
+  /** Patterns identified. */
+  patterns: DiscoveryPattern[];
+  /** AI recommendations (if useAI was true). */
+  recommendations: DiscoveryRecommendation[];
+  /** Timeline of events observed. */
+  timeline: DiscoveryTimelineEvent[];
+  /** Total observation duration in ms. */
+  durationMs: number;
+  /** Timestamp when discovery started. */
+  startedAt: number;
+}
+
+/** A single event in the discovery timeline. */
+export interface DiscoveryTimelineEvent {
+  /** Timestamp. */
+  timestamp: number;
+  /** Event type. */
+  type: "fact-change" | "unmet-requirement" | "error" | "settled";
+  /** Relevant data. */
+  data: Record<string, unknown>;
+}
+
+// ============================================================================
+// What-If Types
+// ============================================================================
+
+/** Options for what-if analysis. */
+export interface WhatIfOptions {
+  /** Whether to include LLM summary. Default: false */
+  includeSummary?: boolean;
+}
+
+/** Result of a what-if analysis. */
+export interface WhatIfResult {
+  /** The action being analyzed. */
+  action: ArchitectAction;
+  /** Predicted steps/effects. */
+  steps: WhatIfStep[];
+  /** Overall risk score (higher = riskier). */
+  riskScore: number;
+  /** LLM summary if requested. */
+  summary?: string;
+}
+
+/** A predicted step in what-if analysis. */
+export interface WhatIfStep {
+  /** What would happen. */
+  description: string;
+  /** Which facts would change. */
+  factChanges: Array<{ key: string; from: unknown; to: unknown }>;
+  /** Which constraints would fire. */
+  constraintsFiring: string[];
+  /** Which resolvers would activate. */
+  resolversActivating: string[];
+}
+
+// ============================================================================
+// Graph Types
+// ============================================================================
+
+/** A visual representation of the system's constraint graph. */
+export interface SystemGraph {
+  /** All nodes. */
+  nodes: GraphNode[];
+  /** All edges. */
+  edges: GraphEdge[];
+  /** Graph metadata. */
+  metadata: GraphMetadata;
+}
+
+/** A node in the system graph. */
+export interface GraphNode {
+  /** Unique node ID. */
+  id: string;
+  /** Node type. */
+  type: "fact" | "constraint" | "resolver" | "derivation" | "effect";
+  /** Display label. */
+  label: string;
+  /** Whether this was created by AI. */
+  aiCreated: boolean;
+  /** Additional metadata. */
+  metadata?: Record<string, unknown>;
+}
+
+/** An edge in the system graph. */
+export interface GraphEdge {
+  /** Source node ID. */
+  source: string;
+  /** Target node ID. */
+  target: string;
+  /** Edge type. */
+  type: "depends-on" | "resolves" | "produces" | "triggers";
+  /** Display label. */
+  label?: string;
+}
+
+/** Metadata about the graph. */
+export interface GraphMetadata {
+  /** Total node count. */
+  nodeCount: number;
+  /** Total edge count. */
+  edgeCount: number;
+  /** Number of AI-created nodes. */
+  aiNodeCount: number;
+  /** Timestamp when graph was extracted. */
+  extractedAt: number;
+}
+
+// ============================================================================
+// Replay Types
+// ============================================================================
+
+/** A recorded session for replay. */
+export interface ReplayRecording {
+  /** All recorded events. */
+  events: ReplayEvent[];
+  /** Initial system state. */
+  initialState: Record<string, unknown>;
+  /** Duration of recording in ms. */
+  durationMs: number;
+  /** Timestamp when recording started. */
+  startedAt: number;
+}
+
+/** A single event in a replay recording. */
+export interface ReplayEvent {
+  /** Timestamp relative to recording start. */
+  offsetMs: number;
+  /** Event type. */
+  type: "fact-snapshot" | "settlement-change" | "requirement-unmet" | "error";
+  /** Facts snapshot at this point. */
+  facts: Record<string, unknown>;
+  /** Unmet requirements at this point. */
+  unmetRequirements: string[];
+  /** Additional data. */
+  data?: Record<string, unknown>;
+}
+
+/** Options for replay with architect. */
+export interface ReplayOptions {
+  /** Maximum events to process. Default: all */
+  maxEvents?: number;
+}
+
+/** Result of replaying with an architect. */
+export interface ReplayResult {
+  /** What actually happened (from recording). */
+  original: ReplayEvent[];
+  /** What the architect would have done. */
+  withArchitect: Array<{
+    /** The event that triggered the architect. */
+    event: ReplayEvent;
+    /** Actions the architect proposed. */
+    proposedActions: ArchitectAction[];
+  }>;
+  /** Summary comparison. */
+  comparison: {
+    /** Total events in recording. */
+    totalEvents: number;
+    /** Events that would have triggered architect actions. */
+    triggeredEvents: number;
+    /** Total actions architect would have taken. */
+    totalActions: number;
+  };
+}
+
+// ============================================================================
+// Federation Types
+// ============================================================================
+
+/** A shareable, anonymized pattern. */
+export interface FederationPattern {
+  /** Unique hash of the pattern. */
+  hash: string;
+  /** Pattern type. */
+  type: ArchitectDefType;
+  /** Anonymized description. */
+  description: string;
+  /** Anonymized code template. */
+  template: string;
+  /** Effectiveness score 0-1. */
+  effectiveness: number;
+  /** Number of times this pattern has been used. */
+  useCount: number;
+  /** Tags for categorization. */
+  tags: string[];
+}
+
+/** Result of exporting a pattern for federation. */
+export interface FederationExport {
+  /** The exported pattern. */
+  pattern: FederationPattern;
+  /** Whether the export was successful. */
+  success: boolean;
+}
+
+/** Result of importing a federated pattern. */
+export interface FederationImportResult {
+  /** Whether the import was successful. */
+  success: boolean;
+  /** The adapted action. */
+  action?: ArchitectAction;
+  /** Error if import failed. */
+  error?: string;
+}
+
+// ============================================================================
+// Service Hooks Types
+// ============================================================================
+
+/** External service integration hooks. */
+export interface ArchitectServiceHooks {
+  /** Called when an analysis completes. */
+  onAnalysis?: (analysis: ArchitectAnalysis) => void | Promise<void>;
+  /** Called when an action is applied. */
+  onAction?: (action: ArchitectAction) => void | Promise<void>;
+  /** Called when an error occurs. */
+  onError?: (error: Error) => void | Promise<void>;
+  /** Called when the kill switch is activated. */
+  onKill?: (result: KillResult) => void | Promise<void>;
+  /** Called for every audit entry. */
+  onAudit?: (entry: AuditEntry) => void | Promise<void>;
+}
+
