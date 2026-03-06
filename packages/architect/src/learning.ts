@@ -15,7 +15,8 @@ import { RingBuffer } from "./ring-buffer.js";
 export interface FeedbackEntry {
   actionId: string;
   tool: string;
-  arguments: Record<string, unknown>;
+  /** Tool arguments for this action. Named `toolArguments` to avoid shadowing Function.arguments. */
+  toolArguments: Record<string, unknown>;
   approved: boolean;
   reason?: string;
   healthDelta?: number;
@@ -32,10 +33,12 @@ export interface LearningConfig {
 /** Aggregated feedback pattern for a tool. */
 export interface FeedbackPattern {
   tool: string;
+  /** Approval rate as a ratio 0–1 (e.g., 0.75 means 75% approved). */
   approvalRate: number;
   totalCount: number;
   approvedCount: number;
   rejectedCount: number;
+  /** Most common rejection reasons, sorted by frequency (max 5). */
   commonReasons: string[];
 }
 
@@ -54,6 +57,10 @@ export interface FeedbackStore {
   getPatterns(): FeedbackPattern[];
   /** Format feedback context for LLM prompt injection. */
   formatForPrompt(maxEntries?: number): string;
+  /** Get a snapshot of all entries for persistence. */
+  getSnapshot(): FeedbackEntry[];
+  /** Hydrate from a persisted snapshot. */
+  hydrate(snapshot: FeedbackEntry[]): void;
   /** Clean up. */
   destroy(): void;
 }
@@ -70,20 +77,27 @@ export interface FeedbackStore {
 export function createFeedbackStore(config?: LearningConfig): FeedbackStore {
   const maxEntries = config?.maxEntries ?? 500;
   const entries = new RingBuffer<FeedbackEntry>(maxEntries);
+  /** O(1) lookup index: actionId → FeedbackEntry. */
+  const entryIndex = new Map<string, FeedbackEntry>();
 
   function record(entry: Omit<FeedbackEntry, "timestamp">): void {
-    entries.push({
+    const full: FeedbackEntry = {
       ...entry,
       timestamp: Date.now(),
-    });
+    };
+    const evicted = entries.push(full);
+    entryIndex.set(full.actionId, full);
+
+    // Remove evicted entry from index
+    if (evicted) {
+      entryIndex.delete(evicted.actionId);
+    }
   }
 
   function updateHealthDelta(actionId: string, delta: number): void {
-    for (const e of entries) {
-      if (e.actionId === actionId) {
-        e.healthDelta = delta;
-        break;
-      }
+    const entry = entryIndex.get(actionId);
+    if (entry) {
+      entry.healthDelta = delta;
     }
   }
 
@@ -174,8 +188,22 @@ export function createFeedbackStore(config?: LearningConfig): FeedbackStore {
     return lines.join("\n");
   }
 
+  function getSnapshot(): FeedbackEntry[] {
+    return entries.toArray();
+  }
+
+  function hydrate(snapshot: FeedbackEntry[]): void {
+    entries.clear();
+    entryIndex.clear();
+    for (const entry of snapshot) {
+      entries.push(entry);
+      entryIndex.set(entry.actionId, entry);
+    }
+  }
+
   function destroy(): void {
     entries.clear();
+    entryIndex.clear();
   }
 
   return {
@@ -184,6 +212,8 @@ export function createFeedbackStore(config?: LearningConfig): FeedbackStore {
     getEntries,
     getPatterns,
     formatForPrompt,
+    getSnapshot,
+    hydrate,
     destroy,
   };
 }

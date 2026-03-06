@@ -58,6 +58,13 @@
 - [Templates](#templates)
   - [createTemplateRegistry](#createtemplateregistry)
   - [BUILT_IN_TEMPLATES](#built_in_templates)
+- [Intent / Stories](#intent--stories)
+  - [resolveStories](#resolvestories)
+  - [mergeStoryConfig](#mergestoryconfig)
+- [Learning / Feedback](#learning--feedback)
+  - [createFeedbackStore](#createfeedbackstore)
+- [Multi-System Orchestration](#multi-system-orchestration)
+  - [createMultiSystemArchitect](#createmultisystemarchitect)
 - [Testing](#testing)
   - [mockRunner](#mockrunner)
   - [createTestArchitect](#createtestarchitect)
@@ -87,7 +94,7 @@ See [Configuration Reference](#configuration-reference) for `AIArchitectOptions`
 |--------|---------|-------------|
 | `analyze(prompt?, options?)` | `Promise<ArchitectAnalysis>` | Trigger an analysis cycle |
 | `approve(actionId)` | `Promise<boolean>` | Approve a pending action |
-| `reject(actionId)` | `Promise<boolean>` | Reject a pending action |
+| `reject(actionId, reason?)` | `Promise<boolean>` | Reject a pending action (reason recorded in feedback store) |
 | `rollback(actionId)` | `RollbackResult` | Undo an applied action |
 | `previewRollback(actionId)` | `RollbackPreview \| null` | Preview what rollback would do |
 | `rollbackBatch(actionIds)` | `RollbackBatchResult` | Atomically rollback multiple actions |
@@ -115,6 +122,7 @@ See [Configuration Reference](#configuration-reference) for `AIArchitectOptions`
 | `resume()` | `void` | Resume triggers and drain queued callbacks |
 | `isPaused` | `boolean` | Whether the architect is paused |
 | `status()` | `ArchitectStatus` | Get architect status summary |
+| `ready()` | `Promise<void>` | Ensure stories are resolved (resolves immediately if no stories) |
 | `destroy()` | `void` | Stop the architect |
 
 ### parseInterval
@@ -643,6 +651,82 @@ Built-in templates: `rate-limit`, `circuit-breaker`, `retry-backoff`, `health-ch
 
 ---
 
+## Intent / Stories
+
+### resolveStories
+
+```typescript
+function resolveStories(
+  stories: Story[],
+  system: System,
+  runner: AgentRunner,
+  options?: StoryResolutionOptions,
+): Promise<StoryResolutionResult>
+```
+
+Resolve user stories into architect configuration via LLM. Stories can be plain strings or structured objects (`{ as?, when, iWant, soThat? }`). Returns the generated partial config and raw LLM response.
+
+### mergeStoryConfig
+
+```typescript
+function mergeStoryConfig(
+  base: Partial<AIArchitectOptions>,
+  storyDerived: Partial<AIArchitectOptions>,
+): Partial<AIArchitectOptions>
+```
+
+Deep merge story-derived config into base config. Explicit (base) config always takes precedence. Uses recursive merge with depth limit of 10.
+
+---
+
+## Learning / Feedback
+
+### createFeedbackStore
+
+```typescript
+function createFeedbackStore(config?: LearningConfig): FeedbackStore
+```
+
+Create a feedback store that tracks approval/rejection decisions. Enable via `learning: { maxEntries: 500 }` in architect options.
+
+**FeedbackStore methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `record(entry)` | `void` | Record a feedback entry |
+| `updateHealthDelta(actionId, delta)` | `void` | Update health delta for an action (O(1) via Map index) |
+| `getEntries()` | `FeedbackEntry[]` | Get all entries (newest first) |
+| `getPatterns()` | `FeedbackPattern[]` | Get aggregated patterns by tool |
+| `formatForPrompt(maxEntries?)` | `string` | Format feedback for LLM prompt |
+| `getSnapshot()` | `FeedbackEntry[]` | Get snapshot for persistence |
+| `hydrate(snapshot)` | `void` | Restore from persisted snapshot |
+| `destroy()` | `void` | Clean up |
+
+---
+
+## Multi-System Orchestration
+
+### createMultiSystemArchitect
+
+```typescript
+function createMultiSystemArchitect(
+  options: MultiSystemArchitectOptions,
+): MultiSystemArchitect
+```
+
+Create an AI Architect that manages multiple Directive systems. Facts are namespaced as `"systemName::factKey"`. The architect observes and modifies all systems through a single composite system proxy.
+
+**MultiSystemArchitect** extends `AIArchitect` with:
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getSystemHealth(name)` | `HealthScore` | Health score for a specific system |
+| `getAggregateHealth()` | `HealthScore & { perSystem }` | Weighted aggregate health |
+| `getSystems()` | `string[]` | All managed system names |
+| `getCrossSystemActions()` | `Array<{ sourceSystem, targetSystem, action }>` | Detected cross-system actions |
+
+---
+
 ## Testing
 
 Import from `@directive-run/architect/testing`.
@@ -690,6 +774,9 @@ Create a mock System for testing. Includes test helpers: `_emitFactChange()`, `_
 | `assertApproved(action)` | Assert approved/auto-approved |
 | `assertKilled(architect)` | Assert 0 active definitions |
 | `assertBudgetWithin(architect, tokens, dollars)` | Assert budget limits |
+| `assertFeedbackRecorded(events, actionId, approved)` | Assert feedback event emitted |
+| `createTestStories()` | Sample stories for testing |
+| `createTestMultiSystem(systemFacts)` | Named test systems for multi-system tests |
 | `createTestAuditStore(maxEntries?)` | In-memory audit store for tests |
 | `createTestCheckpointStore()` | In-memory checkpoint store for tests |
 
@@ -718,6 +805,9 @@ interface AIArchitectOptions {
   persistence?: PersistenceConfig;        // { audit?, checkpoint?, checkpointInterval? }
   fallback?: { strategies?: FallbackStrategy[], maxConsecutiveFailures? }; // LLM fallback config
   metrics?: MetricsProvider;              // Observability provider
+  learning?: LearningConfig;             // { maxEntries? } — track human feedback
+  stories?: Story[];                     // Intent-based config via user stories
+  storyResolution?: StoryResolutionOptions; // { model?, timeout? } — story resolution settings
   silent?: boolean;                       // Suppress BSL license notice
 }
 ```
@@ -751,6 +841,11 @@ All events extend `ArchitectEventBase` (`{ type, timestamp }`).
 | `approval-timeout` | `ArchitectApprovalTimeoutEvent` | `action: ArchitectAction` |
 | `fallback-activated` | `ArchitectFallbackEvent` | `strategy`, `error`, `consecutiveFailures` |
 | `health-check` | `ArchitectHealthCheckEvent` | `score`, `previousScore`, `threshold`, `triggered` |
+| `feedback-recorded` | `ArchitectFeedbackEvent` | `actionId`, `tool`, `approved`, `reason?` |
+| `stories-resolved` | `ArchitectStoriesResolvedEvent` | `config`, `rawResponse` |
+| `cross-system-action` | `ArchitectCrossSystemEvent` | `sourceSystem`, `targetSystem`, `action` |
+| `paused` | `ArchitectPauseEvent` | `queuedTriggers` |
+| `resumed` | `ArchitectPauseEvent` | `queuedTriggers` |
 
 ---
 

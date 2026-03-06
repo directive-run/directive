@@ -489,7 +489,9 @@ export type ArchitectEventType =
   | "health-check"
   | "feedback-recorded"
   | "stories-resolved"
-  | "cross-system-action";
+  | "cross-system-action"
+  | "paused"
+  | "resumed";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -597,6 +599,13 @@ export interface ArchitectStoriesResolvedEvent extends ArchitectEventBase {
   rawResponse: string;
 }
 
+/** Paused/resumed event — emitted when pause/resume is called. */
+export interface ArchitectPauseEvent extends ArchitectEventBase {
+  type: "paused" | "resumed";
+  /** Number of queued triggers at the time of the event. */
+  queuedTriggers: number;
+}
+
 /** Health check event — emitted on each health poll. */
 export interface ArchitectHealthCheckEvent extends ArchitectEventBase {
   type: "health-check";
@@ -624,7 +633,8 @@ export type ArchitectEvent =
   | ArchitectFeedbackEvent
   | ArchitectCrossSystemEvent
   | ArchitectStoriesResolvedEvent
-  | ArchitectHealthCheckEvent;
+  | ArchitectHealthCheckEvent
+  | ArchitectPauseEvent;
 
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
@@ -655,6 +665,8 @@ export interface ArchitectEventMap {
   "feedback-recorded": ArchitectFeedbackEvent;
   "stories-resolved": ArchitectStoriesResolvedEvent;
   "cross-system-action": ArchitectCrossSystemEvent;
+  "paused": ArchitectPauseEvent;
+  "resumed": ArchitectPauseEvent;
 }
 
 // ============================================================================

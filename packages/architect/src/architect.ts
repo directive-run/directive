@@ -113,6 +113,16 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   let isDestroyedFlag = false;
   let isPausedFlag = false;
   const queuedWhilePaused: Array<() => void> = [];
+  const MAX_QUEUED_TRIGGERS = 1000;
+
+  function queueTrigger(fn: () => void): void {
+    if (queuedWhilePaused.length >= MAX_QUEUED_TRIGGERS) {
+      // Drop oldest to prevent unbounded growth
+      queuedWhilePaused.shift();
+    }
+
+    queuedWhilePaused.push(fn);
+  }
 
   // ---- Story resolution state ----
   let storiesResolved = !options.stories || options.stories.length === 0;
@@ -300,7 +310,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
           };
 
           if (isPausedFlag) {
-            queuedWhilePaused.push(triggerFn);
+            queueTrigger(triggerFn);
           } else {
             triggerFn();
           }
@@ -344,7 +354,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
             };
 
             if (isPausedFlag) {
-              queuedWhilePaused.push(triggerFn);
+              queueTrigger(triggerFn);
             } else {
               triggerFn();
             }
@@ -370,7 +380,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     const intervalMs = parseInterval(options.triggers.onSchedule);
     scheduleTimer = setInterval(() => {
       if (isPausedFlag) {
-        queuedWhilePaused.push(() => {
+        queueTrigger(() => {
           pipeline.analyze("schedule").catch(() => {
             // Swallow — errors emitted via events
           });
@@ -625,6 +635,11 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
     pause() {
       isPausedFlag = true;
+      pipeline.emitEvent({
+        type: "paused",
+        timestamp: Date.now(),
+        queuedTriggers: queuedWhilePaused.length,
+      });
     },
 
     resume() {
@@ -632,6 +647,13 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
       // Drain queued triggers
       const queued = queuedWhilePaused.splice(0);
+
+      pipeline.emitEvent({
+        type: "resumed",
+        timestamp: Date.now(),
+        queuedTriggers: queued.length,
+      });
+
       for (const fn of queued) {
         fn();
       }
