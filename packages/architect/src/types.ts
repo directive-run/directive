@@ -518,6 +518,29 @@ export type ArchitectEvent =
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
 
+/** M10: Type-safe event map for discriminated on() overload. */
+export interface ArchitectEventMap {
+  "observing": ArchitectProgressEvent;
+  "reasoning": ArchitectProgressEvent;
+  "generating": ArchitectProgressEvent;
+  "validating": ArchitectProgressEvent;
+  "analysis-start": ArchitectAnalysisStartEvent;
+  "analysis-complete": ArchitectAnalysisCompleteEvent;
+  "action": ArchitectActionEvent;
+  "approval-required": ArchitectActionEvent;
+  "approval-response": ArchitectActionEvent;
+  "applied": ArchitectActionEvent;
+  "rollback": ArchitectRollbackEvent;
+  "error": ArchitectErrorEvent;
+  "budget-warning": ArchitectBudgetEvent;
+  "budget-exceeded": ArchitectBudgetEvent;
+  "killed": ArchitectKilledEvent;
+  "plan-step": ArchitectPlanStepEvent;
+  "reasoning-chunk": ArchitectReasoningChunkEvent;
+  "policy-warning": ArchitectPolicyWarningEvent;
+  "approval-timeout": ArchitectApprovalTimeoutEvent;
+}
+
 // ============================================================================
 // AI Architect Instance
 // ============================================================================
@@ -542,7 +565,7 @@ export interface AIArchitect {
    * Reject a pending action by its ID.
    * Returns true if the action was found and rejected.
    */
-  reject(actionId: string): boolean;
+  reject(actionId: string): Promise<boolean>;
 
   /**
    * Roll back a previously applied action.
@@ -570,7 +593,8 @@ export interface AIArchitect {
 
   /** Listen to architect events. Returns unsubscribe function. */
   on(listener: ArchitectEventListener): () => void;
-  on(type: ArchitectEventType, listener: ArchitectEventListener): () => void;
+  /** M10: Type-safe overload — listener receives the specific event type. */
+  on<T extends ArchitectEventType>(type: T, listener: (event: ArchitectEventMap[T]) => void): () => void;
 
   /** Query audit log with filters. */
   getAuditLog(query?: AuditQuery): AuditEntry[];
