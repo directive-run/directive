@@ -639,4 +639,50 @@ describe("createAIArchitect", () => {
       expect(setFactAction.requiresApproval).toBe(false);
     }
   });
+
+  // ===========================================================================
+  // M1: Pause/resume
+  // ===========================================================================
+
+  it("M1: isPaused is false by default", () => {
+    const { architect } = create();
+
+    expect(architect.isPaused).toBe(false);
+  });
+
+  it("M1: pause sets isPaused to true", () => {
+    const { architect } = create();
+
+    architect.pause();
+    expect(architect.isPaused).toBe(true);
+  });
+
+  it("M1: resume sets isPaused to false", () => {
+    const { architect } = create();
+
+    architect.pause();
+    architect.resume();
+    expect(architect.isPaused).toBe(false);
+  });
+
+  it("M1: analyze('demand') still works when paused", async () => {
+    const { architect } = create();
+
+    architect.pause();
+
+    const analysis = await architect.analyze("Test while paused");
+    expect(analysis.trigger).toBe("demand");
+  });
+
+  it("M1: status includes isPaused", () => {
+    const { architect } = create();
+
+    expect(architect.status().isPaused).toBe(false);
+
+    architect.pause();
+    expect(architect.status().isPaused).toBe(true);
+
+    architect.resume();
+    expect(architect.status().isPaused).toBe(false);
+  });
 });
