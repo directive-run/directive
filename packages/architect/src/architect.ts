@@ -12,14 +12,24 @@ import type {
   ArchitectAnalysis,
   ArchitectEventType,
   ArchitectEventListener,
+  ArchitectStatus,
+  FederationPattern,
 } from "./types.js";
 import { createPipeline } from "./pipeline.js";
+import { createDiscoverySession } from "./discovery.js";
+import { createWhatIfAnalysis } from "./what-if.js";
+import { extractSystemGraph } from "./graph.js";
+import { createReplayRecorder } from "./replay.js";
+import { exportPattern, importPattern } from "./federation.js";
 
 // ============================================================================
 // Mutex: one architect per system
 // ============================================================================
 
 const attachedSystems = new WeakMap<System, true>();
+
+// Item 14: BSL notice once per process
+let bslPrinted = false;
 
 // ============================================================================
 // Factory
@@ -82,6 +92,11 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
   attachedSystems.set(options.system, true);
 
+  // Item 23: apply preset if specified — preset provides defaults, explicit options override
+  if (options.preset) {
+    applyPreset(options);
+  }
+
   // ---- Warn on short schedule intervals ----
   if (options.triggers?.onSchedule) {
     const scheduleMs = parseInterval(options.triggers.onSchedule);
@@ -91,6 +106,9 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       );
     }
   }
+
+  const createdAt = Date.now();
+  let isDestroyedFlag = false;
 
   // ---- Create pipeline ----
   const pipeline = createPipeline({
@@ -116,7 +134,13 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
         }
 
         debounceTimer = setTimeout(() => {
-          pipeline.analyze("schedule").catch(() => {
+          // Item 2: inspect unmet requirements to determine trigger type
+          const inspection = options.system.inspect() as unknown as Record<string, unknown>;
+          const unmet = inspection.unmet ?? inspection.pendingRequirements ?? [];
+          const hasUnmet = Array.isArray(unmet) && unmet.length > 0;
+          const trigger = hasUnmet ? "unmet-requirement" : "error";
+
+          pipeline.analyze(trigger).catch(() => {
             // Swallow — errors emitted via events
           });
         }, 3000);
@@ -131,23 +155,28 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     }
   }
 
-  // M3: wire onFactChange via system.subscribe()
+  // Item 1: wire onFactChange via system.subscribe(keys, listener)
   if (options.triggers?.onFactChange && options.triggers.onFactChange.length > 0) {
     const sys = options.system as unknown as Record<string, unknown>;
     if (typeof sys.subscribe === "function") {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+      const factKeys = options.triggers.onFactChange;
 
-      const unsub = (sys.subscribe as (cb: () => void) => () => void)(() => {
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
+      // Pass fact keys array to system.subscribe for key-level subscription
+      const unsub = (sys.subscribe as (keys: string[], cb: () => void) => () => void)(
+        factKeys,
+        () => {
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+          }
 
-        debounceTimer = setTimeout(() => {
-          pipeline.analyze("fact-change").catch(() => {
-            // Swallow — errors emitted via events
-          });
-        }, 3000);
-      });
+          debounceTimer = setTimeout(() => {
+            pipeline.analyze("fact-change").catch(() => {
+              // Swallow — errors emitted via events
+            });
+          }, 3000);
+        },
+      );
 
       unsubscribers.push(() => {
         unsub();
@@ -167,8 +196,9 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     }, intervalMs);
   }
 
-  // E4: gate BSL notice behind NODE_ENV !== 'test'
-  if (typeof console !== "undefined" && typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
+  // Item 14: BSL notice once per process
+  if (!bslPrinted && typeof console !== "undefined" && typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
+    bslPrinted = true;
     console.info(
       "[directive/architect] AI Architect — BSL 1.1 licensed. Free for open source, personal use, and companies <$1M ARR.",
     );
@@ -177,8 +207,8 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   // ---- Build the public interface ----
   // M7: fix on() — proper type discrimination
   const architect: AIArchitect = {
-    analyze(prompt?: string): Promise<ArchitectAnalysis> {
-      return pipeline.analyze("demand", undefined, prompt);
+    analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan" }): Promise<ArchitectAnalysis> {
+      return pipeline.analyze("demand", undefined, prompt, 0, analyzeOpts?.mode);
     },
 
     approve(actionId: string): Promise<boolean> {
@@ -245,7 +275,79 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return pipeline.getBudgetUsage();
     },
 
+    // Item 19: convenience methods for innovation features
+    discover(discoverOptions?) {
+      return createDiscoverySession(options.system, options.runner, discoverOptions);
+    },
+
+    whatIf(action, whatIfOptions?) {
+      return createWhatIfAnalysis(options.system, action, options.runner, whatIfOptions);
+    },
+
+    graph(graphOptions?) {
+      return extractSystemGraph(options.system, {
+        ...graphOptions,
+        dynamicIds: pipeline._dynamicIds,
+      });
+    },
+
+    record() {
+      return createReplayRecorder(options.system);
+    },
+
+    exportAction(actionId, exportOptions?) {
+      const allActions = pipeline.getAuditLog({ applied: true });
+      const entry = allActions.find((e) => e.id === actionId || e.definitionId === actionId);
+      if (!entry) {
+        return null;
+      }
+
+      const action = {
+        id: actionId,
+        tool: entry.tool,
+        arguments: entry.arguments,
+        reasoning: entry.reasoning,
+        confidence: 0.8,
+        risk: "medium" as const,
+        requiresApproval: false,
+        approvalStatus: "approved" as const,
+        timestamp: entry.timestamp,
+      };
+
+      return exportPattern(action, exportOptions);
+    },
+
+    async importPattern(pattern: FederationPattern) {
+      return importPattern(pattern, options.system, options.runner);
+    },
+
+    // Item 24: status summary
+    status(): ArchitectStatus {
+      const budgetUsage = pipeline.getBudgetUsage();
+      const cbState = pipeline.guards.getCircuitBreakerState();
+      const activeDefs = pipeline.getActiveDefinitions();
+      const pendingApprovals = pipeline.getPendingApprovals();
+      const auditEntries = pipeline.getAuditLog();
+
+      return {
+        budget: {
+          tokens: budgetUsage.tokens,
+          dollars: budgetUsage.dollars,
+          percentTokens: budgetUsage.percent.tokens,
+          percentDollars: budgetUsage.percent.dollars,
+        },
+        circuitBreaker: cbState,
+        activeDefinitions: activeDefs.length,
+        pendingApprovals: pendingApprovals.length,
+        auditEntries: auditEntries.length,
+        uptime: Date.now() - createdAt,
+        isDestroyed: isDestroyedFlag,
+      };
+    },
+
     destroy() {
+      isDestroyedFlag = true;
+
       // Clean up triggers
       for (const unsub of unsubscribers) {
         unsub();
@@ -269,6 +371,70 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/** Item 23: Apply autonomy preset defaults. Explicit options override. */
+function applyPreset(options: AIArchitectOptions): void {
+  const preset = options.preset!;
+
+  // Only set values that weren't explicitly provided
+  if (!options.capabilities) {
+    options.capabilities = {};
+  }
+
+  if (!options.safety) {
+    options.safety = {};
+  }
+
+  if (!options.safety.approval) {
+    options.safety.approval = {};
+  }
+
+  switch (preset) {
+    case "observer":
+      // Read-only, no mutations
+      options.capabilities.constraints = options.capabilities.constraints ?? false;
+      options.capabilities.resolvers = options.capabilities.resolvers ?? false;
+      options.capabilities.effects = options.capabilities.effects ?? false;
+      options.capabilities.derivations = options.capabilities.derivations ?? false;
+      options.capabilities.facts = options.capabilities.facts ?? "read-only";
+      break;
+
+    case "advisor":
+      // Constraints + resolvers, facts read-only, always approve
+      options.capabilities.constraints = options.capabilities.constraints ?? true;
+      options.capabilities.resolvers = options.capabilities.resolvers ?? true;
+      options.capabilities.effects = options.capabilities.effects ?? false;
+      options.capabilities.derivations = options.capabilities.derivations ?? false;
+      options.capabilities.facts = options.capabilities.facts ?? "read-only";
+      options.safety.approval.constraints = options.safety.approval.constraints ?? "always";
+      options.safety.approval.resolvers = options.safety.approval.resolvers ?? "always";
+      break;
+
+    case "operator":
+      // Constraints + resolvers, facts read-write, first-time approval
+      options.capabilities.constraints = options.capabilities.constraints ?? true;
+      options.capabilities.resolvers = options.capabilities.resolvers ?? true;
+      options.capabilities.effects = options.capabilities.effects ?? false;
+      options.capabilities.derivations = options.capabilities.derivations ?? false;
+      options.capabilities.facts = options.capabilities.facts ?? "read-write";
+      options.safety.approval.constraints = options.safety.approval.constraints ?? "first-time";
+      options.safety.approval.resolvers = options.safety.approval.resolvers ?? "first-time";
+      break;
+
+    case "autonomous":
+      // Full autonomy within budget
+      options.capabilities.constraints = options.capabilities.constraints ?? true;
+      options.capabilities.resolvers = options.capabilities.resolvers ?? true;
+      options.capabilities.effects = options.capabilities.effects ?? true;
+      options.capabilities.derivations = options.capabilities.derivations ?? true;
+      options.capabilities.facts = options.capabilities.facts ?? "read-write";
+      options.safety.approval.constraints = options.safety.approval.constraints ?? "never";
+      options.safety.approval.resolvers = options.safety.approval.resolvers ?? "never";
+      options.safety.approval.effects = options.safety.approval.effects ?? "never";
+      options.safety.approval.derivations = options.safety.approval.derivations ?? "never";
+      break;
+  }
+}
 
 /** Parse a human-readable interval string to milliseconds. */
 function parseInterval(interval: string): number {

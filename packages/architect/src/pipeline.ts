@@ -20,6 +20,7 @@ import type {
   ArchitectDefType,
   ArchitectEvent,
   ArchitectEventListener,
+  PolicyContext,
   RollbackEntry,
 } from "./types.js";
 import { createAuditLog } from "./audit.js";
@@ -31,6 +32,11 @@ import {
   type ToolExecutionContext,
 } from "./tools.js";
 import { killAll } from "./kill-switch.js";
+import {
+  evaluatePolicies,
+  getBlockingViolation,
+  requiresApprovalOverride,
+} from "./policies.js";
 
 // ============================================================================
 // Pipeline
@@ -43,8 +49,9 @@ export interface PipelineOptions {
 }
 
 // M2: sanitize IDs/code for toSource() safety
+// Item 8: also strip newlines from justification text
 function sanitizeId(id: string): string {
-  return id.replace(/[\\"`${}]/g, "");
+  return id.replace(/[\\"`${}]/g, "").replace(/[\r\n]/g, " ");
 }
 
 function escapeCodeString(code: string): string {
@@ -145,6 +152,10 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     prompt?: string;
   }> = [];
 
+  // ---- Policy tracking (Item 33) ----
+  const actionTimestamps: number[] = [];
+  let lastAppliedAction: ArchitectAction | undefined;
+
   // ---- Min interval tracking ----
   let lastAnalysisTime = 0;
   const minInterval = options.triggers?.minInterval ?? 60_000;
@@ -188,6 +199,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     triggerContext?: string,
     prompt?: string,
     _retryCount = 0,
+    mode: "single" | "plan" = "single",
   ): Promise<ArchitectAnalysis> {
     if (destroyed) {
       throw new Error("Architect has been destroyed");
@@ -199,7 +211,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     // M16: mutex — queue if analysis already in progress
+    // Item 11: cap analyzeQueue at 5
     if (analyzeInProgress) {
+      if (analyzeQueue.length >= 5) {
+        throw new Error("Analysis queue full (5 pending). Try again later.");
+      }
+
       return new Promise<ArchitectAnalysis>((resolve, reject) => {
         analyzeQueue.push({ resolve, reject, trigger, triggerContext, prompt });
       });
@@ -208,6 +225,13 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     analyzeInProgress = true;
 
     try {
+      // Item 26: plan mode — multi-step reasoning
+      if (mode === "plan") {
+        const result = await analyzePlan(trigger, triggerContext, prompt);
+
+        return result;
+      }
+
       const result = await analyzeInternal(trigger, triggerContext, prompt, _retryCount);
 
       return result;
@@ -268,25 +292,13 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
     emitEvent({ type: "reasoning", timestamp: Date.now() });
 
-    // Call LLM
+    // Call LLM (Item 27: with streaming support if available)
     guards.recordCall();
     guards.markHalfOpenAttempted();
 
     let result;
     try {
-      result = await runner(
-        {
-          name: "directive-architect",
-          instructions: systemPrompt,
-          model: options.model,
-          tools: availableTools.map((t) => ({
-            name: t.name,
-            description: t.description,
-            parameters: t.parameters,
-          })),
-        },
-        userPrompt,
-      );
+      result = await runnerWithStreaming(userPrompt);
     } catch (err) {
       guards.recordFailure();
       guards.resetCascade();
@@ -362,6 +374,245 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   }
 
   // ============================================================================
+  // Item 26: Plan Mode — Multi-Step Reasoning
+  // ============================================================================
+
+  const MAX_PLAN_STEPS = 5;
+
+  async function analyzePlan(
+    trigger: ArchitectAnalysis["trigger"],
+    triggerContext?: string,
+    prompt?: string,
+  ): Promise<ArchitectAnalysis> {
+    const startTime = Date.now();
+    const allActions: ArchitectAction[] = [];
+    let totalTokens = 0;
+
+    // Step 1: Ask LLM for a plan (sequence of steps)
+    const guardCheck = guards.checkAll();
+    if (!guardCheck.allowed) {
+      throw new Error(`Guard blocked: ${guardCheck.reason}`);
+    }
+
+    guards.incrementCascade();
+    lastAnalysisTime = Date.now();
+
+    emitEvent({ type: "analysis-start", timestamp: Date.now() });
+    emitEvent({ type: "observing", timestamp: Date.now() });
+
+    const systemState = system.inspect();
+    const planPrompt = buildPlanPrompt(trigger, triggerContext, prompt, systemState);
+
+    emitEvent({ type: "reasoning", timestamp: Date.now() });
+
+    guards.recordCall();
+    guards.markHalfOpenAttempted();
+
+    let planResult;
+    try {
+      planResult = await runnerWithStreaming(planPrompt);
+    } catch (err) {
+      guards.recordFailure();
+      guards.resetCascade();
+      emitEvent({
+        type: "error",
+        timestamp: Date.now(),
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+
+      throw err;
+    }
+
+    guards.recordSuccess();
+    guards.recordTokens(planResult.totalTokens, estimateDollars(planResult.totalTokens));
+    totalTokens += planResult.totalTokens;
+
+    // Parse plan steps from the response
+    const planSteps = parsePlanSteps(planResult.output);
+    const stepsToExecute = planSteps.slice(0, MAX_PLAN_STEPS);
+
+    // Step 2: Execute each step sequentially
+    for (let i = 0; i < stepsToExecute.length; i++) {
+      const step = stepsToExecute[i]!;
+
+      emitEvent({
+        type: "plan-step",
+        timestamp: Date.now(),
+        stepIndex: i,
+        totalSteps: stepsToExecute.length,
+      });
+
+      // Budget check before each step
+      const budgetCheck = guards.checkAll();
+      if (!budgetCheck.allowed) {
+        break;
+      }
+
+      // Re-observe system state after previous step's changes
+      const currentState = system.inspect();
+      const stepPrompt = buildStepPrompt(step, currentState, i, stepsToExecute.length);
+
+      emitEvent({ type: "reasoning", timestamp: Date.now() });
+
+      guards.recordCall();
+
+      let stepResult;
+      try {
+        stepResult = await runnerWithStreaming(stepPrompt);
+      } catch (err) {
+        guards.recordFailure();
+        emitEvent({
+          type: "error",
+          timestamp: Date.now(),
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+
+        break;
+      }
+
+      guards.recordSuccess();
+      guards.recordTokens(stepResult.totalTokens, estimateDollars(stepResult.totalTokens));
+      totalTokens += stepResult.totalTokens;
+
+      emitEvent({ type: "generating", timestamp: Date.now() });
+
+      // Parse and process actions for this step
+      const stepActions = parseToolCalls(stepResult, trigger);
+
+      emitEvent({ type: "validating", timestamp: Date.now() });
+
+      for (const action of stepActions) {
+        if (actions.size >= MAX_ACTIONS) {
+          const firstKey = actions.keys().next().value;
+          if (firstKey) {
+            actions.delete(firstKey);
+          }
+        }
+
+        actions.set(action.id, action);
+
+        emitEvent({ type: "action", timestamp: Date.now(), action });
+
+        emitEvent({
+          type: "plan-step",
+          timestamp: Date.now(),
+          stepIndex: i,
+          totalSteps: stepsToExecute.length,
+          action,
+        });
+
+        if (action.requiresApproval) {
+          emitEvent({ type: "approval-required", timestamp: Date.now(), action });
+          startApprovalTimeout(action.id);
+        } else {
+          await applyAction(action, trigger);
+        }
+
+        allActions.push(action);
+      }
+    }
+
+    guards.resetCascade();
+
+    const analysis: ArchitectAnalysis = {
+      trigger,
+      triggerContext,
+      actions: allActions,
+      tokensUsed: totalTokens,
+      durationMs: Date.now() - startTime,
+      timestamp: startTime,
+    };
+
+    emitEvent({
+      type: "analysis-complete",
+      timestamp: Date.now(),
+      analysis,
+    });
+
+    return analysis;
+  }
+
+  function parsePlanSteps(output: unknown): string[] {
+    const raw = typeof output === "string" ? output : JSON.stringify(output);
+
+    // Try JSON array first
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(String).slice(0, MAX_PLAN_STEPS);
+      }
+
+      if (parsed && Array.isArray(parsed.steps)) {
+        return parsed.steps.map(String).slice(0, MAX_PLAN_STEPS);
+      }
+
+      if (parsed && Array.isArray(parsed.plan)) {
+        return parsed.plan.map(String).slice(0, MAX_PLAN_STEPS);
+      }
+    } catch {
+      // Not JSON
+    }
+
+    // Fallback: split numbered lines (e.g., "1. Do X\n2. Do Y")
+    const lines = raw.split("\n").filter((line) => /^\s*\d+[.)]\s/.test(line));
+    if (lines.length > 0) {
+      return lines.map((l) => l.replace(/^\s*\d+[.)]\s*/, "")).slice(0, MAX_PLAN_STEPS);
+    }
+
+    // Last resort: treat entire output as a single step
+    return [raw.slice(0, 500)];
+  }
+
+  // Item 27: Runner wrapper that supports streaming if available
+  async function runnerWithStreaming(
+    userPrompt: string,
+  ): Promise<{ toolCalls: Array<{ name: string; arguments: string; result?: string }>; output: unknown; totalTokens: number }> {
+    const runnerConfig = {
+      name: "directive-architect",
+      instructions: systemPrompt,
+      model: options.model,
+      tools: availableTools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      })),
+    };
+
+    // Duck-type check for streaming support
+    const runnerAny = runner as unknown as Record<string, unknown>;
+    if (typeof runnerAny.stream === "function") {
+      let accumulated = "";
+      const streamFn = runnerAny.stream as (
+        config: unknown,
+        prompt: string,
+      ) => AsyncIterable<{ type: string; chunk?: string; result?: { toolCalls: Array<{ name: string; arguments: string }>; output: unknown; totalTokens: number } }>;
+
+      let finalResult: { toolCalls: Array<{ name: string; arguments: string }>; output: unknown; totalTokens: number } | undefined;
+
+      for await (const event of streamFn(runnerConfig, userPrompt)) {
+        if (event.type === "chunk" && event.chunk) {
+          accumulated += event.chunk;
+          emitEvent({
+            type: "reasoning-chunk",
+            timestamp: Date.now(),
+            chunk: event.chunk,
+            accumulated,
+          });
+        } else if (event.type === "done" && event.result) {
+          finalResult = event.result;
+        }
+      }
+
+      if (finalResult) {
+        return finalResult;
+      }
+    }
+
+    // Non-streaming fallback
+    return runner(runnerConfig, userPrompt);
+  }
+
+  // ============================================================================
   // Action Processing
   // ============================================================================
 
@@ -409,12 +660,19 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       };
 
       // Add definition info for mutation tools
-      if (call.name === "create_constraint" || call.name === "create_resolver") {
-        const defType = call.name === "create_constraint" ? "constraint" : "resolver";
+      if (call.name === "create_constraint" || call.name === "create_resolver" ||
+          call.name === "create_effect" || call.name === "create_derivation") {
+        const defTypeMap: Record<string, ArchitectDefType> = {
+          create_constraint: "constraint",
+          create_resolver: "resolver",
+          create_effect: "effect",
+          create_derivation: "derivation",
+        };
+        const defType = defTypeMap[call.name]!;
         action.definition = {
           type: defType,
           id: args.id as string,
-          code: (args.whenCode ?? args.resolveCode) as string | undefined,
+          code: (args.whenCode ?? args.resolveCode ?? args.runCode ?? args.deriveCode) as string | undefined,
         };
       } else if (call.name === "remove_definition") {
         action.definition = {
@@ -533,6 +791,18 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       return level === "always" || (level === "first-time" && !hasBeenApprovedBefore("resolver", args.id as string));
     }
 
+    if (toolName === "create_effect") {
+      const level = safety?.approval?.effects ?? defaultLevel;
+
+      return level === "always" || (level === "first-time" && !hasBeenApprovedBefore("effect", args.id as string));
+    }
+
+    if (toolName === "create_derivation") {
+      const level = safety?.approval?.derivations ?? defaultLevel;
+
+      return level === "always" || (level === "first-time" && !hasBeenApprovedBefore("derivation", args.id as string));
+    }
+
     if (toolName === "remove_definition") {
       const type = args.type as ArchitectDefType;
       const level = safety?.approval?.[`${type}s` as keyof typeof safety.approval] ?? defaultLevel;
@@ -541,6 +811,58 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     return false;
+  }
+
+  // Item 33: Build policy context from pipeline state
+  function buildPolicyContext(action: ArchitectAction): PolicyContext {
+    const now = Date.now();
+    const oneHourAgo = now - 3_600_000;
+
+    // C3: prune stale timestamps (>1hr) to prevent unbounded growth
+    while (actionTimestamps.length > 0 && actionTimestamps[0]! < oneHourAgo) {
+      actionTimestamps.shift();
+    }
+
+    const actionsThisHour = actionTimestamps.length;
+
+    // Count by type from dynamicIds
+    let constraintsCreated = 0;
+    let resolversCreated = 0;
+    let effectsCreated = 0;
+    let derivationsCreated = 0;
+    for (const entry of dynamicIds) {
+      if (entry.startsWith("constraint::")) {
+        constraintsCreated++;
+      } else if (entry.startsWith("resolver::")) {
+        resolversCreated++;
+      } else if (entry.startsWith("effect::")) {
+        effectsCreated++;
+      } else if (entry.startsWith("derivation::")) {
+        derivationsCreated++;
+      }
+    }
+
+    // C2: Extract fact keys from set_fact tool args (fixed tool name + key extraction)
+    const factKeysModified: string[] = [];
+    if (action.tool === "set_fact" && typeof action.arguments.key === "string") {
+      factKeysModified.push(action.arguments.key);
+    }
+
+    const budgetUsage = guards.getBudgetUsage();
+    const budgetUsedPercent = Math.max(budgetUsage.percent.tokens, budgetUsage.percent.dollars);
+
+    return {
+      actionsThisHour,
+      constraintsCreated,
+      resolversCreated,
+      effectsCreated,
+      derivationsCreated,
+      factKeysModified,
+      budgetUsedPercent,
+      activeDefinitions: dynamicIds.size,
+      lastAction: lastAppliedAction,
+      currentAction: action,
+    };
   }
 
   const approvedDefinitions = new Set<string>();
@@ -556,6 +878,66 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     const tool = availableTools.find((t) => t.name === action.tool);
     if (!tool) {
       return;
+    }
+
+    // Item 33: Evaluate policies before applying
+    if (options.policies && options.policies.length > 0) {
+      const policyCtx = buildPolicyContext(action);
+      const violations = evaluatePolicies(options.policies, policyCtx);
+
+      if (violations.length > 0) {
+        const blocking = getBlockingViolation(violations);
+        if (blocking) {
+          const reason = `Policy "${blocking.policy.id}" blocked: ${blocking.policy.description}`;
+
+          auditLog.append({
+            trigger,
+            tool: action.tool,
+            arguments: action.arguments,
+            reasoning: action.reasoning,
+            definitionType: action.definition?.type,
+            definitionId: action.definition?.id,
+            code: action.definition?.code,
+            approvalRequired: action.requiresApproval,
+            approved: true,
+            applied: false,
+            error: reason,
+          });
+
+          emitEvent({
+            type: "error",
+            timestamp: Date.now(),
+            action,
+            error: new Error(reason),
+          });
+
+          return;
+        }
+
+        // Emit warnings for warn policies
+        for (const v of violations) {
+          if (v.action === "warn") {
+            emitEvent({
+              type: "error",
+              timestamp: Date.now(),
+              action,
+              error: new Error(`Policy warning "${v.policy.id}": ${v.policy.description}`),
+            });
+          }
+        }
+
+        // Override approval for require-approval policies
+        if (requiresApprovalOverride(violations)) {
+          if (action.approvalStatus === "auto-approved") {
+            action.approvalStatus = "pending";
+            action.requiresApproval = true;
+            emitEvent({ type: "approval-required", timestamp: Date.now(), action });
+            startApprovalTimeout(action.id);
+
+            return;
+          }
+        }
+      }
     }
 
     // Check definition count before mutating
@@ -617,6 +999,10 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     if (result.success) {
       emitEvent({ type: "applied", timestamp: Date.now(), action });
 
+      // Item 33: track for policy context
+      actionTimestamps.push(Date.now());
+      lastAppliedAction = action;
+
       if (action.definition) {
         approvedDefinitions.add(
           `${action.definition.type}::${action.definition.id}`,
@@ -661,6 +1047,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
   // M13: preserve originalTrigger through approval
   async function approve(actionId: string): Promise<boolean> {
+    // Item 12: guard against use after destroy
+    if (destroyed) {
+      return false;
+    }
+
     const action = actions.get(actionId);
     if (!action || action.approvalStatus !== "pending") {
       return false;
@@ -682,6 +1073,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   }
 
   function reject(actionId: string): boolean {
+    // Item 12: guard against use after destroy
+    if (destroyed) {
+      return false;
+    }
+
     const action = actions.get(actionId);
     if (!action || action.approvalStatus !== "pending") {
       return false;
@@ -869,6 +1265,38 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       return lines.join("\n");
     }
 
+    // Item 22: toSource for effects
+    if (action.tool === "create_effect") {
+      const args = action.arguments;
+      const safeId = sanitizeId(def.id);
+      const safeCode = escapeCodeString(String(args.runCode ?? ""));
+      const lines = [
+        `// AI-generated effect: ${safeId}`,
+        `// Reasoning: ${sanitizeId(action.reasoning.justification)}`,
+        `system.effects.register("${safeId}", {`,
+        `  run: (facts) => {`,
+        `    ${safeCode}`,
+        `  },`,
+        `});`,
+      ];
+
+      return lines.join("\n");
+    }
+
+    // Item 22: toSource for derivations
+    if (action.tool === "create_derivation") {
+      const args = action.arguments;
+      const safeId = sanitizeId(def.id);
+      const safeCode = escapeCodeString(String(args.deriveCode ?? ""));
+      const lines = [
+        `// AI-generated derivation: ${safeId}`,
+        `// Reasoning: ${sanitizeId(action.reasoning.justification)}`,
+        `system.derive.${safeId} = (facts) => ${safeCode};`,
+      ];
+
+      return lines.join("\n");
+    }
+
     return null;
   }
 
@@ -989,6 +1417,62 @@ function buildAnalysisPrompt(
     "Analyze the system state and determine if any constraints or resolvers should be created, modified, or removed.",
     "For each action, provide your structured reasoning.",
     "Use the available tools to implement your recommendations.",
+  );
+
+  return parts.join("\n");
+}
+
+/** Item 26: Build a prompt asking the LLM to propose a multi-step plan. */
+function buildPlanPrompt(
+  trigger: ArchitectAnalysis["trigger"],
+  triggerContext: string | undefined,
+  prompt: string | undefined,
+  systemState: unknown,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`## Trigger: ${trigger}`);
+  if (triggerContext) {
+    parts.push(`Context: ${triggerContext}`);
+  }
+
+  if (prompt) {
+    parts.push(`\n## User Prompt\n${prompt}`);
+  }
+
+  parts.push(`\n## Current System State\n${JSON.stringify(systemState, null, 2)}`);
+
+  parts.push(
+    "\n## Instructions — Plan Mode",
+    "Analyze the system and produce a PLAN of sequential steps (max 5 steps).",
+    "Each step should describe ONE action to take. Steps will be executed in order.",
+    "After each step, the system state will be re-observed before the next step.",
+    "",
+    "Respond with a JSON object: { \"steps\": [\"step 1 description\", \"step 2 description\", ...] }",
+    "Each step description should clearly describe the constraint, resolver, or other action to create.",
+  );
+
+  return parts.join("\n");
+}
+
+/** Item 26: Build a prompt for executing a single step of a plan. */
+function buildStepPrompt(
+  step: string,
+  systemState: unknown,
+  stepIndex: number,
+  totalSteps: number,
+): string {
+  const parts: string[] = [];
+
+  parts.push(`## Plan Step ${stepIndex + 1} of ${totalSteps}`);
+  parts.push(`\n## Step Description\n${step}`);
+  parts.push(`\n## Current System State\n${JSON.stringify(systemState, null, 2)}`);
+
+  parts.push(
+    "\n## Instructions",
+    "Execute this specific step of the plan.",
+    "Use the available tools to implement the described action.",
+    "Provide your structured reasoning for the action taken.",
   );
 
   return parts.join("\n");
