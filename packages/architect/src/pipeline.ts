@@ -212,6 +212,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
   // ---- State ----
   const dynamicIds = new Set<string>();
+
+  // M11: cache getActiveDefinitions() — invalidated on dynamicIds mutation
+  let activeDefsCache: Array<{ type: ArchitectDefType; id: string; auditId: string; createdAt: number; code?: string }> | null = null;
+  function invalidateActiveDefsCache() {
+    activeDefsCache = null;
+  }
   // E15: cap actions Map at 1000 with FIFO eviction
   const actions = new Map<string, ArchitectAction>();
   const MAX_ACTIONS = 1000;
@@ -1369,6 +1375,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       });
 
       guards.setDefinitionCount(dynamicIds.size);
+      invalidateActiveDefsCache();
     }
 
     const applyEntry = auditLog.append({
@@ -1586,6 +1593,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       auditLog.markRolledBack(entry.auditId);
       outcomeTracker?.markRolledBack(actionId);
       guards.setDefinitionCount(dynamicIds.size);
+      invalidateActiveDefsCache();
       metrics.counter("architect.rollback.total", 1, { success: "true" });
       metrics.gauge("architect.definitions.active", dynamicIds.size);
       scheduleCheckpoint();
@@ -1653,6 +1661,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
   function kill() {
     const result = killAll(system, dynamicIds);
+    invalidateActiveDefsCache();
     metrics.counter("architect.kill.total");
     metrics.gauge("architect.definitions.active", 0);
     scheduleCheckpoint();
@@ -1760,6 +1769,10 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   // ============================================================================
 
   function getActiveDefinitions() {
+    if (activeDefsCache !== null) {
+      return activeDefsCache;
+    }
+
     const active = [];
     for (const entry of dynamicIds) {
       const sepIndex = entry.indexOf("::");
@@ -1787,6 +1800,8 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         code: creating?.code,
       });
     }
+
+    activeDefsCache = active;
 
     return active;
   }
@@ -1862,6 +1877,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     // Restore guard state
     guards.importState(checkpoint.guardState);
     guards.setDefinitionCount(dynamicIds.size);
+    invalidateActiveDefsCache();
 
     return true;
   }
