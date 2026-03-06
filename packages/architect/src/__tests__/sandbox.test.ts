@@ -5,6 +5,7 @@ import {
   createMembrane,
   createSandboxScope,
   SandboxError,
+  validateSingleExpression,
 } from "../sandbox.js";
 
 describe("sandbox", () => {
@@ -532,6 +533,117 @@ describe("sandbox", () => {
       expect(() =>
         createWorkerSandbox('facts["__proto__"].polluted = true'),
       ).toThrow(SandboxError);
+    });
+  });
+
+  // ===========================================================================
+  // M8: Arrow Function Blocking
+  // ===========================================================================
+
+  describe("arrow function blocking", () => {
+    it("blocks arrow functions", () => {
+      const result = staticAnalysis("return (x) => x + 1");
+
+      expect(result.safe).toBe(false);
+      expect(result.violations.some((v) => v.includes("=>"))).toBe(true);
+    });
+
+    it("does not false-positive on >= operator", () => {
+      const result = staticAnalysis("return facts.count >= 5");
+
+      // >= should NOT be blocked
+      const arrowViolation = result.violations.find((v) => v.includes("=>"));
+      expect(arrowViolation).toBeUndefined();
+    });
+
+    it("blocks fat arrow in template literal-like patterns", () => {
+      const result = staticAnalysis("return (a, b) => a + b");
+
+      expect(result.safe).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // C5: Object/Array Facade Constraints
+  // ===========================================================================
+
+  describe("Object/Array facades", () => {
+    it("provides Object.keys but not Object.defineProperty", () => {
+      const scope = createSandboxScope({}, ["Object"]);
+      const obj = scope.Object as Record<string, unknown>;
+
+      expect(typeof obj.keys).toBe("function");
+      expect(typeof obj.values).toBe("function");
+      expect(typeof obj.entries).toBe("function");
+      expect(typeof obj.freeze).toBe("function");
+      expect(typeof obj.assign).toBe("function");
+      expect(typeof obj.hasOwn).toBe("function");
+      // Dangerous methods should NOT exist
+      expect(obj.defineProperty).toBeUndefined();
+      expect(obj.setPrototypeOf).toBeUndefined();
+      expect(obj.getPrototypeOf).toBeUndefined();
+      expect(obj.create).toBeUndefined();
+    });
+
+    it("provides Array.isArray but not Array.prototype", () => {
+      const scope = createSandboxScope({}, ["Array"]);
+      const arr = scope.Array as Record<string, unknown>;
+
+      expect(typeof arr.isArray).toBe("function");
+      // Should NOT have constructor or prototype access
+      expect(arr.prototype).toBeUndefined();
+      expect(arr.from).toBeUndefined();
+      expect(arr.of).toBeUndefined();
+    });
+
+    it("Object facade is frozen", () => {
+      const scope = createSandboxScope({}, ["Object"]);
+      const obj = scope.Object as Record<string, unknown>;
+
+      expect(Object.isFrozen(obj)).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // M9: validateSingleExpression
+  // ===========================================================================
+
+  describe("validateSingleExpression", () => {
+    it("accepts simple expressions", () => {
+      expect(validateSingleExpression("facts.count > 3")).toBeNull();
+    });
+
+    it("accepts expressions with string containing semicolons", () => {
+      expect(validateSingleExpression('facts.name === "a;b"')).toBeNull();
+    });
+
+    it("rejects multi-statement code", () => {
+      const result = validateSingleExpression("facts.a = 1; facts.b = 2");
+
+      expect(result).not.toBeNull();
+      expect(result).toContain("single expression");
+    });
+
+    it("accepts ternary expressions", () => {
+      expect(validateSingleExpression("facts.x > 0 ? true : false")).toBeNull();
+    });
+
+    it("ignores semicolons in single-quoted strings", () => {
+      expect(validateSingleExpression("facts.x === ';'")).toBeNull();
+    });
+
+    it("ignores semicolons in template literals", () => {
+      expect(validateSingleExpression("facts.x === `;`")).toBeNull();
+    });
+
+    it("allows a single trailing semicolon", () => {
+      expect(validateSingleExpression("return facts.count > 3;")).toBeNull();
+    });
+
+    it("rejects multiple statements even with trailing semicolons", () => {
+      const result = validateSingleExpression("var x = 1; return x;");
+
+      expect(result).not.toBeNull();
     });
   });
 });

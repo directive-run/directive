@@ -747,7 +747,15 @@ export interface ArchitectStatus {
 
 /** Options for compiling AI-generated code. */
 export interface SandboxCompileOptions {
-  /** Execution timeout in ms. Default: 5000 */
+  /**
+   * Execution timeout in ms. Default: 5000.
+   *
+   * **Advisory only** — cannot forcibly terminate synchronous JavaScript.
+   * Static analysis (blocking loops, `while`, `for`, `do`) is the primary
+   * defense against runaway code. For real timeout enforcement, use
+   * `useWorker: true` which runs code in a worker thread that can be
+   * terminated by the host.
+   */
   timeout?: number;
   /** Allowed global APIs. Default: ['Math', 'Date', 'JSON', 'console'] */
   allowedGlobals?: string[];

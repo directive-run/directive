@@ -12,7 +12,7 @@ import type {
   ArchitectToolDef,
 } from "./types.js";
 import type { SandboxCompileOptions } from "./types.js";
-import { compileSandboxed, SandboxError } from "./sandbox.js";
+import { compileSandboxed, SandboxError, validateSingleExpression } from "./sandbox.js";
 
 // ============================================================================
 // Item 7: ID validation
@@ -430,6 +430,12 @@ function executeCreateConstraint(
     return { success: false, error: idError };
   }
 
+  // M9: whenCode must be a single expression
+  const exprError = validateSingleExpression(whenCode);
+  if (exprError) {
+    return { success: false, error: `whenCode: ${exprError}` };
+  }
+
   try {
     // Compile the when function in sandbox
     const compiled = compileSandboxed(
@@ -604,6 +610,12 @@ function executeCreateDerivation(
   const idError = validateId(id, "derivation");
   if (idError) {
     return { success: false, error: idError };
+  }
+
+  // M9: deriveCode must be a single expression
+  const exprError = validateSingleExpression(deriveCode);
+  if (exprError) {
+    return { success: false, error: `deriveCode: ${exprError}` };
   }
 
   try {
