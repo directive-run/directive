@@ -218,6 +218,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     prompt?: string,
     _retryCount = 0,
     mode: "single" | "plan" = "single",
+    dryRun = false,
   ): Promise<ArchitectAnalysis> {
     if (destroyed) {
       throw new Error("Architect has been destroyed");
@@ -250,7 +251,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         return result;
       }
 
-      const result = await analyzeInternal(trigger, triggerContext, prompt, _retryCount);
+      const result = await analyzeInternal(trigger, triggerContext, prompt, _retryCount, dryRun);
 
       return result;
     } catch (err) {
@@ -264,7 +265,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
             .catch(next.reject);
         }
 
-        return analyze(trigger, triggerContext, prompt, err.retryCount + 1, mode);
+        return analyze(trigger, triggerContext, prompt, err.retryCount + 1, mode, dryRun);
       }
 
       throw err;
@@ -286,6 +287,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     triggerContext?: string,
     prompt?: string,
     _retryCount = 0,
+    dryRun = false,
   ): Promise<ArchitectAnalysis> {
     // Check min interval
     const now = Date.now();
@@ -364,6 +366,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
     // Process each action
     for (const action of analysisActions) {
+      // E14: dryRun — mark all actions as pending, skip apply
+      if (dryRun) {
+        action.approvalStatus = "pending";
+        action.requiresApproval = true;
+      }
+
       // E15: FIFO eviction on actions Map
       if (actions.size >= MAX_ACTIONS) {
         const firstKey = actions.keys().next().value;
@@ -375,6 +383,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       actions.set(action.id, action);
 
       emitEvent({ type: "action", timestamp: Date.now(), action });
+
+      if (dryRun) {
+        // Skip apply and approval timers in dry run mode
+        continue;
+      }
 
       if (action.requiresApproval) {
         emitEvent({ type: "approval-required", timestamp: Date.now(), action });
@@ -1466,7 +1479,7 @@ function buildAnalysisPrompt(
   return parts.join("\n");
 }
 
-/** Item 26: Build a prompt asking the LLM to propose a multi-step plan. */
+/** Build a prompt asking the LLM to propose a multi-step plan. */
 function buildPlanPrompt(
   trigger: ArchitectAnalysis["trigger"],
   triggerContext: string | undefined,
@@ -1499,7 +1512,7 @@ function buildPlanPrompt(
   return parts.join("\n");
 }
 
-/** Item 26: Build a prompt for executing a single step of a plan. */
+/** Build a prompt for executing a single step of a plan. */
 function buildStepPrompt(
   step: string,
   systemState: unknown,
