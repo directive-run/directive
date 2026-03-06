@@ -16,6 +16,7 @@ import type { ExtractGraphOptions } from "./graph.js";
 import type { MetricsProvider } from "./metrics.js";
 import type { OutcomeTrackingConfig, ActionOutcome, OutcomePattern } from "./outcomes.js";
 import type { CustomToolDef } from "./custom-tools.js";
+import type { ConstraintTemplate } from "./templates.js";
 import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 
@@ -217,6 +218,8 @@ export interface AIArchitectOptions {
   outcomeTracking?: OutcomeTrackingConfig;
   /** Custom tools to extend the AI's toolkit. */
   customTools?: CustomToolDef[];
+  /** Custom constraint templates for the pattern library. */
+  templates?: ConstraintTemplate[];
 }
 
 // ============================================================================
