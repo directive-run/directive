@@ -124,6 +124,11 @@ function normalizeEscapes(code: string): string {
  * NOTE: The timeout in compileSandboxed is advisory — it sets a flag after
  * the timeout period but cannot forcibly terminate synchronous JS execution.
  * Static analysis is the primary defense against infinite loops (C1).
+ *
+ * @param code - The AI-generated code string to analyze.
+ * @param extraBlocked - Additional patterns to block (added to defaults).
+ * @param maxCodeSize - Maximum code size in bytes. Default: 2048.
+ * @returns A StaticAnalysisResult with safe flag, violations, and warnings.
  */
 export function staticAnalysis(
   code: string,
@@ -458,6 +463,10 @@ export interface CompiledFunction {
  *
  * The code is wrapped in a `new Function()` with a restricted scope.
  * All objects passed in are wrapped in recursive Proxy membranes.
+ *
+ * @param code - The AI-generated function body to compile.
+ * @param options - Sandbox configuration (timeout, allowed globals, blocked patterns).
+ * @returns A CompiledFunction with an execute() method.
  */
 export function compileSandboxed(
   code: string,
@@ -554,6 +563,10 @@ export interface WorkerCompiledFunction {
  * Falls back to compileSandboxed if worker_threads is not available.
  *
  * Static analysis still runs first (defense in depth).
+ *
+ * @param code - The AI-generated function body to compile.
+ * @param options - Sandbox configuration (timeout, allowed globals, blocked patterns).
+ * @returns A WorkerCompiledFunction with an async execute() method.
  */
 export function createWorkerSandbox(
   code: string,

@@ -45,6 +45,20 @@ export interface AppendOptions {
   rollbackOf?: string;
 }
 
+/**
+ * Create a hash-chained append-only audit log.
+ *
+ * @param options - Optional configuration (max entries before eviction).
+ * @returns Audit log with append, query, verify, and markRolledBack methods.
+ *
+ * @example
+ * ```typescript
+ * const log = createAuditLog({ maxEntries: 500 });
+ * log.append({ trigger: "demand", tool: "observe_system", ... });
+ * const entries = log.query({ trigger: "demand" });
+ * const valid = log.verify();
+ * ```
+ */
 export function createAuditLog(options?: AuditLogOptions) {
   const maxEntries = options?.maxEntries ?? DEFAULT_MAX_ENTRIES;
   const entries: AuditEntry[] = [];

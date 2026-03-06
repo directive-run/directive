@@ -67,6 +67,9 @@ export interface ResilientHookConfig<T> {
 
 /**
  * Execute a handler with retry logic. Never throws.
+ *
+ * @param payload - The data to pass to the handler.
+ * @param config - Resilient hook config with retry policy, timeout, and dead letter handler.
  */
 export async function executeWithRetry<T>(
   payload: T,
@@ -221,7 +224,9 @@ function wrapHook<T>(
 
 /**
  * Wire service hooks to architect events.
- * Returns an unsubscribe function that cleans up all subscriptions.
+ *
+ * @param options - Hooks, subscribe function, and optional audit polling config.
+ * @returns An unsubscribe function that cleans up all subscriptions.
  */
 export function wireServiceHooks(options: WireServiceHooksOptions): () => void {
   const { hooks, subscribe, getAuditLog, auditPollInterval = 5000 } = options;

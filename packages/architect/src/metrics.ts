@@ -46,6 +46,8 @@ const NOOP_SPAN: SpanHandle = {
 /**
  * Create a no-op metrics provider. All methods are empty — zero overhead.
  * Used as the default when no provider is configured.
+ *
+ * @returns A MetricsProvider where all methods are no-ops.
  */
 export function createNoopMetrics(): MetricsProvider {
   return {

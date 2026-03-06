@@ -33,6 +33,10 @@ export interface ExtractGraphOptions {
 /**
  * Extract a graph representation of the system's structure.
  * Returns data-only nodes and edges — no rendering logic.
+ *
+ * @param system - The Directive system to extract the graph from.
+ * @param options - Include/exclude facts, derivations, and AI-created markers.
+ * @returns A SystemGraph with nodes, edges, and metadata.
  */
 export function extractSystemGraph(
   system: System,

@@ -20,6 +20,13 @@ import { compileSandboxed, SandboxError } from "./sandbox.js";
 /**
  * Analyze what would happen if an action were applied,
  * without actually modifying the system.
+ *
+ * @param system - The Directive system to simulate against.
+ * @param action - The ArchitectAction to simulate.
+ * @param runner - Optional AgentRunner for LLM summary.
+ * @param options - Cascade steps, summary inclusion, and timeout.
+ * @param onTokens - Callback for token usage tracking.
+ * @returns A WhatIfResult with predicted steps, risk score, and optional cascade.
  */
 export async function createWhatIfAnalysis(
   system: System,
