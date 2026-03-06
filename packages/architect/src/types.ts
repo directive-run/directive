@@ -21,6 +21,7 @@ import type { AdaptiveContextConfig } from "./adaptive-context.js";
 import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 import type { FallbackStrategy } from "./fallback.js";
+import type { LearningConfig } from "./learning.js";
 
 // ============================================================================
 // Definition Types
@@ -226,6 +227,8 @@ export interface AIArchitectOptions {
   templates?: ConstraintTemplate[];
   /** Adaptive context configuration for LLM prompt enrichment. */
   adaptiveContext?: AdaptiveContextConfig;
+  /** Learning mode: track human feedback to improve AI decisions over time. */
+  learning?: LearningConfig;
 }
 
 // ============================================================================
@@ -478,7 +481,8 @@ export type ArchitectEventType =
   // G3: LLM fallback activated
   | "fallback-activated"
   // Phase 2: Health auto-trigger
-  | "health-check";
+  | "health-check"
+  | "feedback-recorded";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -562,6 +566,15 @@ export interface ArchitectFallbackEvent extends ArchitectEventBase {
   consecutiveFailures: number;
 }
 
+/** Feedback recorded event — emitted when an action is approved/rejected with learning mode. */
+export interface ArchitectFeedbackEvent extends ArchitectEventBase {
+  type: "feedback-recorded";
+  actionId: string;
+  tool: string;
+  approved: boolean;
+  reason?: string;
+}
+
 /** Health check event — emitted on each health poll. */
 export interface ArchitectHealthCheckEvent extends ArchitectEventBase {
   type: "health-check";
@@ -586,6 +599,7 @@ export type ArchitectEvent =
   | ArchitectPolicyWarningEvent
   | ArchitectApprovalTimeoutEvent
   | ArchitectFallbackEvent
+  | ArchitectFeedbackEvent
   | ArchitectHealthCheckEvent;
 
 /** Listener for architect events. */
@@ -614,6 +628,7 @@ export interface ArchitectEventMap {
   "approval-timeout": ArchitectApprovalTimeoutEvent;
   "fallback-activated": ArchitectFallbackEvent;
   "health-check": ArchitectHealthCheckEvent;
+  "feedback-recorded": ArchitectFeedbackEvent;
 }
 
 // ============================================================================
@@ -639,8 +654,9 @@ export interface AIArchitect {
   /**
    * Reject a pending action by its ID.
    * Returns true if the action was found and rejected.
+   * @param reason - Optional reason for rejection (recorded in feedback store).
    */
-  reject(actionId: string): Promise<boolean>;
+  reject(actionId: string, reason?: string): Promise<boolean>;
 
   /**
    * Roll back a previously applied action.
