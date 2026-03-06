@@ -51,6 +51,7 @@ import type { AuditStore, CheckpointStore, ArchitectCheckpoint } from "./persist
 import { createOutcomeTracker, type OutcomeTracker } from "./outcomes.js";
 import { createCustomToolRegistry, type CustomToolRegistry, type CustomToolContext } from "./custom-tools.js";
 import { createTemplateRegistry, type TemplateRegistry } from "./templates.js";
+import { createHealthTrend, buildAdaptiveContext, type HealthTrend } from "./adaptive-context.js";
 import { computeHealthScore } from "./health.js";
 
 // M1: StaleSnapshotError for retry at mutex level
@@ -204,6 +205,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   // ---- Template Registry ----
   const templateRegistry: TemplateRegistry = createTemplateRegistry(options.templates);
 
+  // ---- Adaptive Context ----
+  const healthTrend: HealthTrend = createHealthTrend(
+    options.adaptiveContext?.maxOutcomeEntries ?? 20,
+  );
+
   // ---- State ----
   const dynamicIds = new Set<string>();
   // E15: cap actions Map at 1000 with FIFO eviction
@@ -333,7 +339,24 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     );
 
     // Append template catalog
-    return prompt + "\n\n" + templateRegistry.formatForPrompt();
+    let enriched = prompt + "\n\n" + templateRegistry.formatForPrompt();
+
+    // Append adaptive context if data available
+    const adaptiveConfig = options.adaptiveContext;
+    if (outcomeTracker || healthTrend.getSamples().length > 0) {
+      const contextData = {
+        outcomes: outcomeTracker?.getOutcomes() ?? [],
+        patterns: outcomeTracker?.getPatterns() ?? [],
+        healthTrend: healthTrend.getSamples(),
+        templateStats: [] as Array<{ templateId: string; timesUsed: number; avgHealthDelta: number }>,
+      };
+      const adaptiveText = buildAdaptiveContext(contextData, adaptiveConfig);
+      if (adaptiveText) {
+        enriched += "\n\n" + adaptiveText;
+      }
+    }
+
+    return enriched;
   }
 
   // ---- Tool execution context ----
@@ -492,6 +515,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     _retryCount = 0,
     dryRun = false,
   ): Promise<ArchitectAnalysis> {
+    // Record health sample for adaptive context
+    healthTrend.record(computeHealthScore(system).score);
+
     // Check min interval
     const now = Date.now();
     if (now - lastAnalysisTime < minInterval && trigger !== "demand") {
@@ -1886,6 +1912,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     outcomeTracker,
     customToolRegistry,
     templateRegistry,
+    healthTrend,
     on,
     emitEvent,
     destroy,
