@@ -213,6 +213,15 @@ export {
   type CustomToolRegistry,
 } from "./custom-tools.js";
 
+// Adaptive Context
+export {
+  createHealthTrend,
+  buildAdaptiveContext,
+  type HealthTrend,
+  type AdaptiveContextData,
+  type AdaptiveContextConfig,
+} from "./adaptive-context.js";
+
 // Constraint Templates
 export {
   createTemplateRegistry,
