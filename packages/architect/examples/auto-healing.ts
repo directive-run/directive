@@ -120,10 +120,9 @@ architect.on("applied", (event) => {
 // 7. Simulate degradation
 console.log("\n--- Simulating API overload ---");
 
-const facts = system.facts as Record<string, unknown>;
-facts.requestCount = 500;
-facts.errorRate = 0.75;
-facts.status = "overloaded";
+system.facts.requestCount = 500;
+system.facts.errorRate = 0.75;
+system.facts.status = "overloaded";
 
 // Check health before
 const healthBefore = computeHealthScore(system);

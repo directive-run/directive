@@ -20,6 +20,7 @@ import type { ConstraintTemplate } from "./templates.js";
 import type { AdaptiveContextConfig } from "./adaptive-context.js";
 import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
+import type { FallbackStrategy } from "./fallback.js";
 
 // ============================================================================
 // Definition Types
@@ -211,7 +212,7 @@ export interface AIArchitectOptions {
 
   /** LLM fallback configuration for graceful degradation. */
   fallback?: {
-    strategies?: Array<{ name: string; handle: (context: unknown) => unknown }>;
+    strategies?: FallbackStrategy[];
     maxConsecutiveFailures?: number;
   };
 

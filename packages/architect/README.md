@@ -155,7 +155,7 @@ const architect = createAIArchitect({
 
   // Optional features
   model: "gpt-4",                              // Model override for runner
-  outcomeTracking: { windowMs: 3_600_000 },    // Track action outcomes
+  outcomeTracking: { measurementDelay: 10_000 }, // Track action outcomes
   customTools: [/* CustomToolDef[] */],         // Additional tools for the AI
   templates: [/* ConstraintTemplate[] */],      // Custom constraint templates
   adaptiveContext: { maxTrendPoints: 20 },     // Adaptive LLM context
@@ -225,7 +225,7 @@ const { architect } = createTestArchitect({ system });
 
 const analysis = await architect.analyze("Check the system");
 assertAnalysisActions(analysis, 1);
-await assertApproved(architect, analysis.actions[0].id);
+assertApproved(analysis.actions[0]);
 ```
 
 ## Examples
