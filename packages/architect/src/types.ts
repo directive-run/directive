@@ -14,6 +14,7 @@ import type { DiscoverySession } from "./discovery.js";
 import type { ExportPatternOptions } from "./federation.js";
 import type { ExtractGraphOptions } from "./graph.js";
 import type { MetricsProvider } from "./metrics.js";
+import type { OutcomeTrackingConfig, ActionOutcome, OutcomePattern } from "./outcomes.js";
 import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 
@@ -68,6 +69,15 @@ export interface ArchitectTriggers {
   onDemand?: boolean;
   /** Minimum interval between analyses in ms. Default: 60000 (60s). */
   minInterval?: number;
+  /** Trigger analysis when system health score declines below a threshold. */
+  onHealthDecline?: {
+    /** Health score threshold (0-100). Triggers when score falls below this. Default: 50 */
+    threshold?: number;
+    /** Polling interval for health checks (e.g., '30s', '1m'). Default: '30s' */
+    pollInterval?: `${number}${"ms" | "s" | "m" | "h" | "d"}`;
+    /** Minimum score drop to trigger (avoids noise). Default: 10 */
+    minDrop?: number;
+  };
 }
 
 // ============================================================================
@@ -202,6 +212,8 @@ export interface AIArchitectOptions {
 
   /** Persistence configuration for audit trail and state checkpointing. */
   persistence?: PersistenceConfig;
+  /** Track outcomes of applied actions (health delta, success rate). */
+  outcomeTracking?: OutcomeTrackingConfig;
 }
 
 // ============================================================================
@@ -259,7 +271,7 @@ export interface ArchitectAction {
 /** Result of an AI analysis cycle. */
 export interface ArchitectAnalysis {
   /** What triggered this analysis. */
-  trigger: "error" | "unmet-requirement" | "fact-change" | "schedule" | "demand";
+  trigger: "error" | "unmet-requirement" | "fact-change" | "schedule" | "demand" | "health-decline";
   /** Additional trigger context. */
   triggerContext?: string;
   /** Actions the AI decided to take. */
@@ -452,7 +464,9 @@ export type ArchitectEventType =
   // M8: Approval timeout
   | "approval-timeout"
   // G3: LLM fallback activated
-  | "fallback-activated";
+  | "fallback-activated"
+  // Phase 2: Health auto-trigger
+  | "health-check";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -536,6 +550,15 @@ export interface ArchitectFallbackEvent extends ArchitectEventBase {
   consecutiveFailures: number;
 }
 
+/** Health check event — emitted on each health poll. */
+export interface ArchitectHealthCheckEvent extends ArchitectEventBase {
+  type: "health-check";
+  score: number;
+  previousScore: number;
+  threshold: number;
+  triggered: boolean;
+}
+
 /** Discriminated union of all event types. Backward-compatible — consumers already switch on event.type. */
 export type ArchitectEvent =
   | ArchitectProgressEvent
@@ -550,7 +573,8 @@ export type ArchitectEvent =
   | ArchitectReasoningChunkEvent
   | ArchitectPolicyWarningEvent
   | ArchitectApprovalTimeoutEvent
-  | ArchitectFallbackEvent;
+  | ArchitectFallbackEvent
+  | ArchitectHealthCheckEvent;
 
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
@@ -577,6 +601,7 @@ export interface ArchitectEventMap {
   "policy-warning": ArchitectPolicyWarningEvent;
   "approval-timeout": ArchitectApprovalTimeoutEvent;
   "fallback-activated": ArchitectFallbackEvent;
+  "health-check": ArchitectHealthCheckEvent;
 }
 
 // ============================================================================
@@ -669,6 +694,12 @@ export interface AIArchitect {
 
   /** Import a federated pattern and register for approval. */
   importPattern(pattern: FederationPattern): Promise<FederationImportResult>;
+
+  /** Get recorded action outcomes (newest first). */
+  getOutcomes(): ActionOutcome[];
+
+  /** Get aggregated outcome patterns by tool. */
+  getOutcomePatterns(): OutcomePattern[];
 
   /** Get current architect status summary. */
   status(): ArchitectStatus;

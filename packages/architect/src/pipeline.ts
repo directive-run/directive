@@ -48,6 +48,8 @@ import {
   type FallbackResult,
 } from "./fallback.js";
 import type { AuditStore, CheckpointStore, ArchitectCheckpoint } from "./persistence.js";
+import { createOutcomeTracker, type OutcomeTracker } from "./outcomes.js";
+import { computeHealthScore } from "./health.js";
 
 // M1: StaleSnapshotError for retry at mutex level
 class StaleSnapshotError extends Error {
@@ -183,6 +185,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   const checkpointStore: CheckpointStore | undefined = options.persistence?.checkpoint;
   let checkpointDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   const CHECKPOINT_DEBOUNCE_MS = 1000;
+
+  // ---- Outcome Tracking ----
+  const outcomeTracker: OutcomeTracker | undefined = options.outcomeTracking
+    ? createOutcomeTracker(options.outcomeTracking)
+    : undefined;
 
   // ---- State ----
   const dynamicIds = new Set<string>();
@@ -1246,6 +1253,19 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
       scheduleCheckpoint();
 
+      // Outcome tracking: schedule health measurement after action
+      if (outcomeTracker) {
+        const healthBefore = computeHealthScore(system).score;
+        outcomeTracker.scheduleOutcome(
+          action.id,
+          action.tool,
+          trigger,
+          action.reasoning.justification.slice(0, 100),
+          healthBefore,
+          () => computeHealthScore(system).score,
+        );
+      }
+
       if (action.definition) {
         // M2: FIFO eviction for approved definitions
         if (approvedDefinitions.size >= MAX_APPROVED_DEFINITIONS) {
@@ -1413,6 +1433,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
       entry.rolledBack = true;
       auditLog.markRolledBack(entry.auditId);
+      outcomeTracker?.markRolledBack(actionId);
       guards.setDefinitionCount(dynamicIds.size);
       metrics.counter("architect.rollback.total", 1, { success: "true" });
       metrics.gauge("architect.definitions.active", dynamicIds.size);
@@ -1717,6 +1738,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     approvalTimers.clear();
+    outcomeTracker?.destroy();
     guards.destroy();
   }
 
@@ -1736,7 +1758,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     getBudgetUsage: guards.getBudgetUsage,
     resetBudget: guards.resetBudget,
     guards,
+    outcomeTracker,
     on,
+    emitEvent,
     destroy,
     hydrate,
     /** Exposed for checkpointing. */
