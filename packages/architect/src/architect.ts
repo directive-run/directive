@@ -114,12 +114,64 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   const costPerThousandTokens = options.budget.costPerThousandTokens ?? 0.003;
   const estimateDollars = (tokens: number) => (tokens / 1000) * costPerThousandTokens;
 
+  // ---- Initialize metrics ----
+  if (options.metrics?.init) {
+    options.metrics.init().catch(() => {
+      // Swallow — metrics init failure should not crash the architect
+    });
+  }
+
   // ---- Create pipeline ----
   const pipeline = createPipeline({
     system: options.system,
     runner: options.runner,
     options,
   });
+
+  // ---- Initialize persistence ----
+  let checkpointTimer: ReturnType<typeof setInterval> | undefined;
+
+  if (options.persistence) {
+    const initPromises: Promise<void>[] = [];
+
+    if (options.persistence.audit?.init) {
+      initPromises.push(options.persistence.audit.init());
+    }
+
+    if (options.persistence.checkpoint?.init) {
+      initPromises.push(options.persistence.checkpoint.init());
+    }
+
+    // Hydrate from checkpoint after stores are initialized
+    if (options.persistence.checkpoint) {
+      const doInit = async () => {
+        await Promise.all(initPromises);
+        await pipeline.hydrate();
+      };
+      doInit().catch(() => {
+        // Swallow — persistence init failure should not crash the architect
+      });
+    } else if (initPromises.length > 0) {
+      Promise.all(initPromises).catch(() => {
+        // Swallow
+      });
+    }
+
+    // Start periodic checkpoint timer
+    const checkpointInterval = options.persistence.checkpointInterval;
+    if (checkpointInterval !== null && options.persistence.checkpoint) {
+      const intervalStr = checkpointInterval ?? "5m";
+      const intervalMs = parseInterval(intervalStr);
+      const cpStore = options.persistence.checkpoint;
+      checkpointTimer = setInterval(() => {
+        // Pipeline's scheduleCheckpoint handles debouncing; force one here
+        const checkpoint = pipeline._buildCheckpoint();
+        cpStore.save(checkpoint).catch(() => {
+          // Swallow — periodic checkpoint failure is non-fatal
+        });
+      }, intervalMs);
+    }
+  }
 
   // ---- Wire triggers ----
   const unsubscribers: Array<() => void> = [];
@@ -397,6 +449,27 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
       if (scheduleTimer) {
         clearInterval(scheduleTimer);
+      }
+
+      // Close metrics provider
+      if (options.metrics?.close) {
+        options.metrics.close().catch(() => {
+          // Swallow — metrics close failure should not crash cleanup
+        });
+      }
+
+      // Clean up checkpoint timer
+      if (checkpointTimer) {
+        clearInterval(checkpointTimer);
+      }
+
+      // Close persistence stores
+      if (options.persistence?.audit?.close) {
+        options.persistence.audit.close().catch(() => {});
+      }
+
+      if (options.persistence?.checkpoint?.close) {
+        options.persistence.checkpoint.close().catch(() => {});
       }
 
       // Release mutex

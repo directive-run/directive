@@ -20,6 +20,7 @@ import type {
   ArchitectDefType,
   ArchitectEvent,
   ArchitectEventListener,
+  AuditEntry,
   PolicyContext,
   RollbackEntry,
 } from "./types.js";
@@ -37,6 +38,16 @@ import {
   getBlockingViolation,
   requiresApprovalOverride,
 } from "./policies.js";
+import { createNoopMetrics, type MetricsProvider } from "./metrics.js";
+import {
+  runFallback,
+  cachedResponseStrategy,
+  blockStrategy,
+  type FallbackStrategy,
+  type FallbackContext,
+  type FallbackResult,
+} from "./fallback.js";
+import type { AuditStore, CheckpointStore, ArchitectCheckpoint } from "./persistence.js";
 
 // M1: StaleSnapshotError for retry at mutex level
 class StaleSnapshotError extends Error {
@@ -132,6 +143,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     };
   }
 
+  // ---- Metrics ----
+  const metrics: MetricsProvider = options.metrics ?? createNoopMetrics();
+
   // ---- Guards ----
   const guards = createGuards(
     {
@@ -142,10 +156,33 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     },
     options.budget,
     emitEvent,
+    metrics,
   );
 
   // ---- Audit log ----
   const auditLog = createAuditLog({ maxEntries: 1000 });
+
+  // ---- Fallback ----
+  const fallbackConfig = options.fallback;
+  const fallbackEnabled = !!fallbackConfig;
+  const defaultCachedStrategy = fallbackEnabled ? cachedResponseStrategy() : null;
+  const fallbackStrategies: FallbackStrategy[] = fallbackConfig?.strategies
+    ? (fallbackConfig.strategies as FallbackStrategy[])
+    : fallbackEnabled
+      ? [defaultCachedStrategy!, blockStrategy()]
+      : [];
+  const maxConsecutiveFailures = fallbackConfig?.maxConsecutiveFailures ?? 5;
+  let consecutiveFailures = 0;
+  // If using default strategies, wire cached strategy for auto-caching
+  const cachedStrategy = fallbackConfig?.strategies
+    ? (fallbackConfig.strategies.find((s) => s.name === "cached") as ReturnType<typeof cachedResponseStrategy> | undefined)
+    : defaultCachedStrategy;
+
+  // ---- Persistence ----
+  const auditStore: AuditStore | undefined = options.persistence?.audit;
+  const checkpointStore: CheckpointStore | undefined = options.persistence?.checkpoint;
+  let checkpointDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  const CHECKPOINT_DEBOUNCE_MS = 1000;
 
   // ---- State ----
   const dynamicIds = new Set<string>();
@@ -182,6 +219,60 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
   function estimateDollars(tokens: number): number {
     return (tokens / 1000) * costPerThousandTokens;
+  }
+
+  // ---- Checkpoint helpers ----
+
+  /** Build a checkpoint snapshot of current pipeline state. */
+  function buildCheckpoint(): ArchitectCheckpoint {
+    return {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      dynamicIds: [...dynamicIds],
+      actions: [...actions.entries()],
+      rollbackEntries: [...rollbackEntries.entries()],
+      approvedDefinitions: [...approvedDefinitions],
+      actionTimestamps: [...actionTimestamps],
+      versionCounter,
+      guardState: guards.exportState(),
+      auditCounter: auditLog.size(),
+    };
+  }
+
+  /** Save a checkpoint (debounced). */
+  function scheduleCheckpoint(): void {
+    if (!checkpointStore) {
+      return;
+    }
+
+    if (checkpointDebounceTimer) {
+      clearTimeout(checkpointDebounceTimer);
+    }
+
+    checkpointDebounceTimer = setTimeout(() => {
+      checkpointDebounceTimer = undefined;
+      const checkpoint = buildCheckpoint();
+      checkpointStore.save(checkpoint).catch(() => {
+        emitEvent({
+          type: "error",
+          timestamp: Date.now(),
+          error: new Error("Failed to save checkpoint"),
+        });
+      });
+    }, CHECKPOINT_DEBOUNCE_MS);
+  }
+
+  /** Route an audit entry to the external AuditStore if configured. */
+  function routeAuditEntry(entry: AuditEntry): void {
+    if (auditStore) {
+      auditStore.append(entry).catch(() => {
+        emitEvent({
+          type: "error",
+          timestamp: Date.now(),
+          error: new Error("Failed to persist audit entry"),
+        });
+      });
+    }
   }
 
   // ---- Available tools ----
@@ -303,6 +394,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     lastAnalysisTime = startTime;
     const snapshotVersion = ++versionCounter;
 
+    metrics.counter("architect.analysis.total", 1, { trigger, mode: "single" });
+    const analyzeSpan = metrics.startSpan?.("architect.analyze", { trigger, mode: "single" });
+
     emitEvent({ type: "analysis-start", timestamp: startTime });
     emitEvent({ type: "observing", timestamp: Date.now() });
 
@@ -324,22 +418,83 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     guards.recordCall();
     guards.markHalfOpenAttempted();
 
+    const llmSpan = metrics.startSpan?.("architect.llm_call");
     let result;
+    let fallbackUsed: FallbackResult | null = null;
     try {
       result = await runnerWithStreaming(userPrompt);
-    } catch (err) {
-      guards.recordFailure();
-      guards.resetCascade();
-      emitEvent({
-        type: "error",
-        timestamp: Date.now(),
-        error: err instanceof Error ? err : new Error(String(err)),
-      });
+      llmSpan?.end();
 
-      throw err;
+      // LLM succeeded — reset failure counter and cache response
+      consecutiveFailures = 0;
+      if (cachedStrategy && result.toolCalls.length > 0) {
+        const reasoning = parseReasoning(result.output, trigger);
+        cachedStrategy.cache(trigger, result.toolCalls, reasoning);
+      }
+    } catch (err) {
+      llmSpan?.setError(err instanceof Error ? err : new Error(String(err)));
+      llmSpan?.end();
+      metrics.counter("architect.analysis.errors", 1, { trigger });
+
+      consecutiveFailures++;
+      const llmError = err instanceof Error ? err : new Error(String(err));
+
+      // Try fallback strategies
+      const forcedBlock = consecutiveFailures >= maxConsecutiveFailures;
+      const budgetUsage = guards.getBudgetUsage();
+      const fallbackContext: FallbackContext = {
+        error: llmError,
+        trigger,
+        prompt: userPrompt,
+        systemState,
+        consecutiveFailures,
+        budgetRemaining: {
+          tokens: options.budget.tokens - budgetUsage.tokens,
+          dollars: options.budget.dollars - budgetUsage.dollars,
+        },
+      };
+
+      if (forcedBlock) {
+        // Force block strategy after too many failures
+        fallbackUsed = blockStrategy().handle(fallbackContext);
+      } else {
+        fallbackUsed = runFallback(fallbackStrategies, fallbackContext);
+      }
+
+      if (fallbackUsed) {
+        emitEvent({
+          type: "fallback-activated",
+          timestamp: Date.now(),
+          strategy: fallbackUsed.strategy,
+          error: llmError,
+          consecutiveFailures,
+        });
+
+        // Synthesize a result from the fallback
+        result = {
+          toolCalls: fallbackUsed.toolCalls.map((tc) => ({ ...tc, result: undefined })),
+          output: JSON.stringify(fallbackUsed.reasoning),
+          totalTokens: fallbackUsed.tokensUsed,
+        };
+      } else {
+        // No fallback handled it — throw as before
+        analyzeSpan?.setError(llmError);
+        analyzeSpan?.end();
+        guards.recordFailure();
+        guards.resetCascade();
+        emitEvent({
+          type: "error",
+          timestamp: Date.now(),
+          error: llmError,
+        });
+
+        throw err;
+      }
     }
 
-    guards.recordSuccess();
+    if (!fallbackUsed) {
+      guards.recordSuccess();
+    }
     guards.recordTokens(result.totalTokens, estimateDollars(result.totalTokens));
 
     // M1: Check for stale state — throw StaleSnapshotError for retry at mutex level
@@ -383,6 +538,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       }
 
       if (action.requiresApproval) {
+        metrics.gauge("architect.approvals.pending", getPendingApprovals().length + 1);
         emitEvent({ type: "approval-required", timestamp: Date.now(), action });
         startApprovalTimeout(action.id);
       } else {
@@ -393,12 +549,17 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     // M17: reset cascade after analysis completes
     guards.resetCascade();
 
+    const durationMs = Date.now() - startTime;
+    metrics.histogram("architect.analysis.duration_ms", durationMs, { trigger });
+    metrics.histogram("architect.analysis.tokens", result.totalTokens);
+    analyzeSpan?.end();
+
     const analysis: ArchitectAnalysis = {
       trigger,
       triggerContext,
       actions: analysisActions,
       tokensUsed: result.totalTokens,
-      durationMs: Date.now() - startTime,
+      durationMs,
       timestamp: startTime,
     };
 
@@ -934,9 +1095,10 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       if (violations.length > 0) {
         const blocking = getBlockingViolation(violations);
         if (blocking) {
+          metrics.counter("architect.policy.violation", 1, { policy_id: blocking.policy.id, action: "block" });
           const reason = `Policy "${blocking.policy.id}" blocked: ${blocking.policy.description}`;
 
-          auditLog.append({
+          const policyEntry = auditLog.append({
             trigger,
             tool: action.tool,
             arguments: action.arguments,
@@ -949,6 +1111,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
             applied: false,
             error: reason,
           });
+          routeAuditEntry(policyEntry);
 
           emitEvent({
             type: "error",
@@ -963,6 +1126,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         // M4: Emit policy-warning events (not "error") for warn policies
         for (const v of violations) {
           if (v.action === "warn") {
+            metrics.counter("architect.policy.violation", 1, { policy_id: v.policy.id, action: "warn" });
             emitEvent({
               type: "policy-warning",
               timestamp: Date.now(),
@@ -990,7 +1154,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     if (tool.mutates) {
       const defCheck = guards.checkDefinitionCount();
       if (!defCheck.allowed) {
-        auditLog.append({
+        const defLimitEntry = auditLog.append({
           trigger,
           tool: action.tool,
           arguments: action.arguments,
@@ -1003,11 +1167,13 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
           applied: false,
           error: defCheck.reason,
         });
+        routeAuditEntry(defLimitEntry);
 
         return;
       }
     }
 
+    const applySpan = metrics.startSpan?.("architect.apply_action", { tool: action.tool, risk: action.risk });
     const result = executeTool(action.tool, action.arguments, toolContext);
 
     if (result.success && result.definition) {
@@ -1047,7 +1213,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       guards.setDefinitionCount(dynamicIds.size);
     }
 
-    auditLog.append({
+    const applyEntry = auditLog.append({
       trigger,
       tool: action.tool,
       arguments: action.arguments,
@@ -1060,8 +1226,12 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       applied: result.success,
       error: result.error,
     });
+    routeAuditEntry(applyEntry);
 
     if (result.success) {
+      metrics.counter("architect.action.applied", 1, { tool: action.tool, risk: action.risk });
+      metrics.gauge("architect.definitions.active", dynamicIds.size);
+      applySpan?.end();
       emitEvent({ type: "applied", timestamp: Date.now(), action });
 
       // Item 33: track for policy context
@@ -1073,6 +1243,8 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       }
       actionTimestamps.push(pruneNow);
       lastAppliedAction = action;
+
+      scheduleCheckpoint();
 
       if (action.definition) {
         // M2: FIFO eviction for approved definitions
@@ -1087,6 +1259,8 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         );
       }
     } else {
+      applySpan?.setError(new Error(result.error ?? "Tool execution failed"));
+      applySpan?.end();
       guards.recordFailure();
 
       // Auto-disable on throw
@@ -1175,9 +1349,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     action.approvalStatus = "rejected";
+    metrics.counter("architect.action.rejected", 1, { tool: action.tool });
+    metrics.gauge("architect.approvals.pending", getPendingApprovals().length);
     emitEvent({ type: "approval-response", timestamp: Date.now(), action });
 
-    auditLog.append({
+    const rejectEntry = auditLog.append({
       trigger: action.originalTrigger ?? "demand",
       tool: action.tool,
       arguments: action.arguments,
@@ -1189,6 +1365,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       approved: false,
       applied: false,
     });
+    routeAuditEntry(rejectEntry);
 
     return true;
   }
@@ -1237,11 +1414,16 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       entry.rolledBack = true;
       auditLog.markRolledBack(entry.auditId);
       guards.setDefinitionCount(dynamicIds.size);
+      metrics.counter("architect.rollback.total", 1, { success: "true" });
+      metrics.gauge("architect.definitions.active", dynamicIds.size);
+      scheduleCheckpoint();
 
       emitEvent({ type: "rollback", timestamp: Date.now() });
 
       return { success: true };
     } catch {
+      metrics.counter("architect.rollback.total", 1, { success: "false" });
+
       return { success: false, reason: "Unregister failed" };
     }
   }
@@ -1299,6 +1481,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
   function kill() {
     const result = killAll(system, dynamicIds);
+    metrics.counter("architect.kill.total");
+    metrics.gauge("architect.definitions.active", 0);
+    scheduleCheckpoint();
 
     emitEvent({
       type: "killed",
@@ -1448,8 +1633,83 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   // Lifecycle
   // ============================================================================
 
+  /** Hydrate pipeline state from a checkpoint. */
+  async function hydrate(): Promise<boolean> {
+    if (!checkpointStore) {
+      return false;
+    }
+
+    const checkpoint = await checkpointStore.load();
+    if (!checkpoint || checkpoint.version !== 1) {
+      return false;
+    }
+
+    // Restore dynamic IDs — skip stale ones that no longer exist in the system
+    dynamicIds.clear();
+    for (const id of checkpoint.dynamicIds) {
+      const sepIndex = id.indexOf("::");
+      if (sepIndex === -1) {
+        continue;
+      }
+
+      const type = id.slice(0, sepIndex);
+      const defId = id.slice(sepIndex + 2);
+
+      // Check if the definition still exists in the system
+      const registry = (system as unknown as Record<string, { isDynamic?: (id: string) => boolean }>)[`${type}s`];
+      if (registry && typeof registry.isDynamic === "function" && registry.isDynamic(defId)) {
+        dynamicIds.add(id);
+      }
+    }
+
+    // Restore actions
+    actions.clear();
+    for (const [actionId, action] of checkpoint.actions) {
+      actions.set(actionId, action);
+    }
+
+    // Restore rollback entries
+    rollbackEntries.clear();
+    for (const [actionId, entry] of checkpoint.rollbackEntries) {
+      rollbackEntries.set(actionId, entry);
+    }
+
+    // Restore approved definitions
+    approvedDefinitions.clear();
+    for (const key of checkpoint.approvedDefinitions) {
+      approvedDefinitions.add(key);
+    }
+
+    // Restore action timestamps
+    actionTimestamps.length = 0;
+    actionTimestamps.push(...checkpoint.actionTimestamps);
+
+    // Restore version counter
+    versionCounter = checkpoint.versionCounter;
+
+    // Restore guard state
+    guards.importState(checkpoint.guardState);
+    guards.setDefinitionCount(dynamicIds.size);
+
+    return true;
+  }
+
   function destroy() {
+    // Save final checkpoint
+    if (checkpointStore && !destroyed) {
+      const checkpoint = buildCheckpoint();
+      checkpointStore.save(checkpoint).catch(() => {
+        // Best-effort on shutdown
+      });
+    }
+
     destroyed = true;
+
+    // Clear checkpoint debounce timer
+    if (checkpointDebounceTimer) {
+      clearTimeout(checkpointDebounceTimer);
+      checkpointDebounceTimer = undefined;
+    }
 
     // Clear all approval timers
     for (const timer of approvalTimers.values()) {
@@ -1478,6 +1738,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     guards,
     on,
     destroy,
+    hydrate,
+    /** Exposed for checkpointing. */
+    _buildCheckpoint: buildCheckpoint,
     /** Exposed for testing. */
     _dynamicIds: dynamicIds,
     _versionCounter: () => versionCounter,
