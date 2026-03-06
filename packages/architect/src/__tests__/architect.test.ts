@@ -305,10 +305,13 @@ describe("createAIArchitect", () => {
   // Rollback
   // ===========================================================================
 
-  it("rollback returns false for unknown action", () => {
+  it("rollback returns result with reason for unknown action", () => {
     const { architect } = create();
 
-    expect(architect.rollback("nonexistent")).toBe(false);
+    const result = architect.rollback("nonexistent");
+
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe("No rollback entry found");
   });
 
   it("previewRollback returns null for unknown action", () => {
