@@ -41,7 +41,7 @@ export interface AppendOptions {
   approved: boolean;
   applied: boolean;
   error?: string;
-  /** M6: reference to original audit entry this is rolling back */
+  /** reference to original audit entry this is rolling back */
   rollbackOf?: string;
 }
 
@@ -201,7 +201,7 @@ export function createAuditLog(options?: AuditLogOptions) {
     return entries.length;
   }
 
-  /** Item 25: Export the full audit log as a JSON string for persistence. */
+  /** Export the full audit log as a JSON string for persistence. */
   function exportLog(): string {
     return JSON.stringify({
       version: 1,
@@ -210,7 +210,7 @@ export function createAuditLog(options?: AuditLogOptions) {
     });
   }
 
-  /** Item 25: Import a previously exported audit log. Optionally verify chain integrity. */
+  /** Import a previously exported audit log. Optionally verify chain integrity. */
   function importLog(json: string, verify = false): boolean {
     try {
       const data = JSON.parse(json);
@@ -236,13 +236,22 @@ export function createAuditLog(options?: AuditLogOptions) {
       }
 
       // Verify chain if requested
-      if (verify && imported.length > 1) {
-        for (let i = 1; i < imported.length; i++) {
+      if (verify) {
+        for (let i = 0; i < imported.length; i++) {
           const current = imported[i]!;
-          const previous = imported[i - 1]!;
 
-          if (current.prevHash !== previous.hash) {
+          // M12: verify content hash matches
+          const recomputed = fnv1a(JSON.stringify({ ...current, hash: undefined }));
+          if (recomputed !== current.hash) {
             return false;
+          }
+
+          // Verify chain links
+          if (i > 0) {
+            const previous = imported[i - 1]!;
+            if (current.prevHash !== previous.hash) {
+              return false;
+            }
           }
         }
       }
