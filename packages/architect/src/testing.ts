@@ -448,6 +448,31 @@ export function createTestCheckpointStore(): CheckpointStore {
 }
 
 /**
+ * Assert that a feedback-recorded event was emitted for the given action.
+ *
+ * @param events - The events array from createTestArchitect.
+ * @param actionId - The action ID to look for.
+ * @param approved - Expected approval status.
+ */
+export function assertFeedbackRecorded(
+  events: Array<{ type: string; [key: string]: unknown }>,
+  actionId: string,
+  approved: boolean,
+): void {
+  const found = events.find(
+    (e) =>
+      e.type === "feedback-recorded" &&
+      e.actionId === actionId &&
+      e.approved === approved,
+  );
+  if (!found) {
+    throw new Error(
+      `Expected feedback-recorded event for action "${actionId}" with approved=${approved}`,
+    );
+  }
+}
+
+/**
  * Assert budget usage is within expected bounds.
  *
  * @param architect - The AIArchitect instance to check.
