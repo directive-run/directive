@@ -26,6 +26,12 @@ import type {
   ArchitectAnalysis,
 } from "./types.js";
 import { createAIArchitect } from "./architect.js";
+import {
+  createInMemoryAuditStore,
+  createInMemoryCheckpointStore,
+  type AuditStore,
+  type CheckpointStore,
+} from "./persistence.js";
 
 // ============================================================================
 // Mock Runner
@@ -367,6 +373,16 @@ export function assertKilled(architect: AIArchitect): void {
       `Expected 0 active definitions after kill, got ${active.length}`,
     );
   }
+}
+
+/** Create an in-memory audit store for testing. */
+export function createTestAuditStore(maxEntries?: number): AuditStore {
+  return createInMemoryAuditStore(maxEntries);
+}
+
+/** Create an in-memory checkpoint store for testing. */
+export function createTestCheckpointStore(): CheckpointStore {
+  return createInMemoryCheckpointStore();
 }
 
 /** Assert budget usage is within expected bounds. */

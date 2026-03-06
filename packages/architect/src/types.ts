@@ -13,6 +13,8 @@ import type { AgentRunner } from "@directive-run/ai";
 import type { DiscoverySession } from "./discovery.js";
 import type { ExportPatternOptions } from "./federation.js";
 import type { ExtractGraphOptions } from "./graph.js";
+import type { MetricsProvider } from "./metrics.js";
+import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 
 // ============================================================================
@@ -188,6 +190,18 @@ export interface AIArchitectOptions {
 
   /** Suppress the BSL license notice on startup. */
   silent?: boolean;
+
+  /** Pluggable metrics/observability provider. */
+  metrics?: MetricsProvider;
+
+  /** LLM fallback configuration for graceful degradation. */
+  fallback?: {
+    strategies?: Array<{ name: string; handle: (context: unknown) => unknown }>;
+    maxConsecutiveFailures?: number;
+  };
+
+  /** Persistence configuration for audit trail and state checkpointing. */
+  persistence?: PersistenceConfig;
 }
 
 // ============================================================================
@@ -436,7 +450,9 @@ export type ArchitectEventType =
   // M4: Policy warnings (distinct from errors)
   | "policy-warning"
   // M8: Approval timeout
-  | "approval-timeout";
+  | "approval-timeout"
+  // G3: LLM fallback activated
+  | "fallback-activated";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -512,6 +528,14 @@ export interface ArchitectApprovalTimeoutEvent extends ArchitectEventBase {
   action: ArchitectAction;
 }
 
+/** Fallback activated event — emitted when LLM fails and fallback is used. */
+export interface ArchitectFallbackEvent extends ArchitectEventBase {
+  type: "fallback-activated";
+  strategy: string;
+  error: Error;
+  consecutiveFailures: number;
+}
+
 /** Discriminated union of all event types. Backward-compatible — consumers already switch on event.type. */
 export type ArchitectEvent =
   | ArchitectProgressEvent
@@ -525,7 +549,8 @@ export type ArchitectEvent =
   | ArchitectPlanStepEvent
   | ArchitectReasoningChunkEvent
   | ArchitectPolicyWarningEvent
-  | ArchitectApprovalTimeoutEvent;
+  | ArchitectApprovalTimeoutEvent
+  | ArchitectFallbackEvent;
 
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
@@ -551,6 +576,7 @@ export interface ArchitectEventMap {
   "reasoning-chunk": ArchitectReasoningChunkEvent;
   "policy-warning": ArchitectPolicyWarningEvent;
   "approval-timeout": ArchitectApprovalTimeoutEvent;
+  "fallback-activated": ArchitectFallbackEvent;
 }
 
 // ============================================================================
@@ -1045,18 +1071,36 @@ export interface FederationImportResult {
 // Service Hooks Types
 // ============================================================================
 
-/** External service integration hooks. */
+/** Resilient hook configuration with retry, dead letter, and filtering. */
+export interface ResilientHookConfig<T> {
+  handler: (payload: T) => void | Promise<void>;
+  retry?: {
+    maxAttempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    strategy?: "fixed" | "exponential" | "linear";
+    jitter?: number;
+  };
+  onDeadLetter?: (payload: T, error: Error, attempts: number) => void | Promise<void>;
+  filter?: (payload: T) => boolean;
+  timeoutMs?: number;
+}
+
+/** A hook value: either a raw function or a ResilientHookConfig. */
+export type HookValue<T> = ((payload: T) => void | Promise<void>) | ResilientHookConfig<T>;
+
+/** External service integration hooks. Each hook accepts a raw function or a ResilientHookConfig. */
 export interface ArchitectServiceHooks {
   /** Called when an analysis completes. */
-  onAnalysis?: (analysis: ArchitectAnalysis) => void | Promise<void>;
+  onAnalysis?: HookValue<ArchitectAnalysis>;
   /** Called when an action is applied. */
-  onAction?: (action: ArchitectAction) => void | Promise<void>;
+  onAction?: HookValue<ArchitectAction>;
   /** Called when an error occurs. */
-  onError?: (error: Error) => void | Promise<void>;
+  onError?: HookValue<Error>;
   /** Called when the kill switch is activated. */
-  onKill?: (result: KillResult) => void | Promise<void>;
+  onKill?: HookValue<KillResult>;
   /** Called for every audit entry. */
-  onAudit?: (entry: AuditEntry) => void | Promise<void>;
+  onAudit?: HookValue<AuditEntry>;
 }
 
 // ============================================================================

@@ -54,6 +54,7 @@ export type {
   ArchitectReasoningChunkEvent,
   ArchitectPolicyWarningEvent,
   ArchitectApprovalTimeoutEvent,
+  ArchitectFallbackEvent,
   ArchitectEventType,
   ArchitectEventListener,
   ArchitectEventMap,
@@ -148,7 +149,13 @@ export { exportPattern, importPattern, type ExportPatternOptions } from "./feder
 export { computeHealthScore, analyzeGraph, type HealthScore, type GraphAnalysis } from "./health.js";
 
 // Service Hooks
-export { wireServiceHooks, type WireServiceHooksOptions } from "./service.js";
+export {
+  wireServiceHooks,
+  executeWithRetry,
+  type WireServiceHooksOptions,
+  type ResilientHookConfig,
+  type RetryPolicy,
+} from "./service.js";
 
 // Policies
 export {
@@ -160,6 +167,33 @@ export {
   requireApprovalAboveRisk,
   type PolicyViolation,
 } from "./policies.js";
+
+// LLM Fallback & Degradation
+export {
+  cachedResponseStrategy,
+  heuristicStrategy,
+  blockStrategy,
+  runFallback,
+  type FallbackStrategy,
+  type FallbackContext,
+  type FallbackResult,
+  type FallbackConfig,
+  type HeuristicRule,
+} from "./fallback.js";
+
+// Persistence Layer
+export {
+  createInMemoryAuditStore,
+  createInMemoryCheckpointStore,
+  type AuditStore,
+  type CheckpointStore,
+  type ArchitectCheckpoint,
+  type GuardStateSnapshot,
+  type PersistenceConfig,
+} from "./persistence.js";
+
+// Metrics & Observability
+export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
 
 // Hash utility
 export { fnv1a } from "./hash.js";
@@ -174,6 +208,8 @@ export {
   assertApproved,
   assertKilled,
   assertBudgetWithin,
+  createTestAuditStore,
+  createTestCheckpointStore,
   type MockRunnerResponse,
   type TestArchitectOptions,
   type TestArchitectResult,
