@@ -148,10 +148,9 @@ if (graphAnalysis.recommendations.length > 0) {
 console.log("\n=== Step 2: Discovery Session ===\n");
 
 // Simulate some system activity before discovery
-const facts = system.facts as Record<string, unknown>;
-facts.pendingOrders = 75;
-facts.failedPayments = 3;
-facts.status = "backlogged";
+system.facts.pendingOrders = 75;
+system.facts.failedPayments = 3;
+system.facts.status = "backlogged";
 
 // Short discovery (50ms for demo — normally 5+ minutes)
 const session = architect.discover({ duration: 50, useAI: false });
