@@ -365,6 +365,23 @@ export function createTestSystem(initialFacts?: Record<string, unknown>): TestSy
 // ============================================================================
 
 /**
+ * Create multiple test systems for multi-system orchestration testing.
+ *
+ * @param systemFacts - Named initial facts per system.
+ * @returns A Record of TestSystem instances keyed by name.
+ */
+export function createTestMultiSystem(
+  systemFacts: Record<string, Record<string, unknown>>,
+): Record<string, TestSystem> {
+  const result: Record<string, TestSystem> = {};
+  for (const [name, facts] of Object.entries(systemFacts)) {
+    result[name] = createTestSystem(facts);
+  }
+
+  return result;
+}
+
+/**
  * Assert that an analysis produced the expected number of actions.
  *
  * @param analysis - The ArchitectAnalysis to check.
