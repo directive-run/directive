@@ -395,6 +395,60 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 
 ---
 
+## Runtime Registration
+
+Register, override, or remove effects at runtime — useful for plugin-provided side effects, analytics toggles, or dev tools:
+
+```typescript
+// Register a new effect at runtime
+system.effects.register("analytics", {
+  run: (facts) => {
+    trackEvent("page_view", { page: facts.currentPage });
+  },
+});
+
+// Override an existing effect's logic
+system.effects.assign("log", {
+  run: (facts, prev) => {
+    if (prev?.status !== facts.status) {
+      console.log(`Status changed: ${facts.status}`);
+    }
+  },
+});
+
+// Remove a dynamically registered effect
+system.effects.unregister("analytics");
+
+// Execute an effect immediately
+await system.effects.call("log");
+```
+
+### Introspection
+
+```typescript
+system.effects.isDynamic("analytics");  // true
+system.effects.listDynamic();           // ["analytics"]
+```
+
+### Semantics
+
+| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
+|--------|-------------------|---------------------|--------------------|
+| `register` | throws | throws | creates |
+| `assign` | overrides | overrides | throws |
+| `unregister` | dev warning, no-op | removes | dev warning, no-op |
+| `call` | executes | executes | throws |
+
+{% callout type="note" title="Disabled effects" %}
+`call()` respects the disabled state — calling a disabled effect is a no-op and does not execute the `run` function. Use `enable()` to re-enable it before calling.
+{% /callout %}
+
+{% callout type="note" title="Deferred during reconciliation" %}
+If you call `register`, `assign`, or `unregister` during a reconciliation cycle, the operation is automatically deferred and applied after the current cycle completes.
+{% /callout %}
+
+---
+
 ## Next Steps
 
 - [Constraints](/docs/constraints) – Declarative rules

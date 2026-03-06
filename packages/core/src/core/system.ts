@@ -771,6 +771,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     events: namespacedEventsProxy,
     constraints: engine.constraints,
     effects: engine.effects,
+    resolvers: engine.resolvers,
 
     get runHistory() {
       return engine.runHistory;
@@ -1918,6 +1919,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     events: eventsProxy as SingleModuleSystem<S>["events"],
     constraints: engine.constraints,
     effects: engine.effects,
+    resolvers: engine.resolvers,
 
     get runHistory() {
       return engine.runHistory;

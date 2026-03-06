@@ -416,6 +416,55 @@ This is useful for feature flags, A/B testing, or temporarily suppressing constr
 
 ---
 
+## Runtime Registration
+
+Register, override, or remove constraints at runtime — useful for A/B testing, plugin-provided rules, or admin overrides:
+
+```typescript
+// Register a new constraint at runtime
+system.constraints.register("emergencyOverride", {
+  when: (facts) => facts.emergencyVehicle === true,
+  require: { type: "TRANSITION", to: "green" },
+  priority: 100,
+});
+
+// Override an existing constraint's logic
+system.constraints.assign("transition", {
+  when: (facts) => facts.phase === "red" && facts.elapsed > 10,
+  require: { type: "TRANSITION", to: "green" },
+  priority: 200,
+});
+
+// Remove a dynamically registered constraint
+system.constraints.unregister("emergencyOverride");
+
+// Invoke a constraint manually (returns its requirements)
+const reqs = await system.constraints.call("transition");
+```
+
+### Introspection
+
+```typescript
+system.constraints.isDynamic("emergencyOverride"); // true
+system.constraints.isDynamic("transition");         // false (module-defined)
+system.constraints.listDynamic();                   // ["emergencyOverride"]
+```
+
+### Semantics
+
+| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
+|--------|-------------------|---------------------|-----------------|
+| `register` | throws | throws | creates |
+| `assign` | overrides | overrides | throws |
+| `unregister` | dev warning, no-op | removes | dev warning, no-op |
+| `call` | evaluates | evaluates | throws |
+
+{% callout type="note" title="Deferred during reconciliation" %}
+If you call `register`, `assign`, or `unregister` during a reconciliation cycle (e.g., inside a resolver), the operation is automatically deferred and applied after the current cycle completes.
+{% /callout %}
+
+---
+
 ## Next Steps
 
 - [Resolvers](/docs/resolvers) – Handling requirements
