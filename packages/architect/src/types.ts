@@ -10,6 +10,7 @@
 
 import type { System } from "@directive-run/core";
 import type { AgentRunner } from "@directive-run/ai";
+import type { DiscoverySession } from "./discovery.js";
 
 // ============================================================================
 // Definition Types
@@ -144,6 +145,9 @@ export interface ArchitectBudget {
 // Architect Options
 // ============================================================================
 
+/** Item 23: autonomy presets. */
+export type ArchitectPreset = "observer" | "advisor" | "operator" | "autonomous";
+
 /** Configuration for createAIArchitect(). */
 export interface AIArchitectOptions {
   /** The live Directive system to manage. */
@@ -172,6 +176,12 @@ export interface AIArchitectOptions {
 
   /** External service integration hooks. */
   serviceHooks?: ArchitectServiceHooks;
+
+  /** Item 23: autonomy preset. Applied first, explicit options override. */
+  preset?: ArchitectPreset;
+
+  /** Item 33: policies — meta-constraints on the architect itself. */
+  policies?: ArchitectPolicy[];
 }
 
 // ============================================================================
@@ -406,19 +416,104 @@ export type ArchitectEventType =
   | "budget-warning"
   | "budget-exceeded"
   // Kill switch
-  | "killed";
+  | "killed"
+  // Item 26: Multi-step reasoning
+  | "plan-step"
+  // Item 27: Streaming
+  | "reasoning-chunk"
+  // M4: Policy warnings (distinct from errors)
+  | "policy-warning"
+  // M8: Approval timeout
+  | "approval-timeout";
 
-/** Event data for architect events. */
-export interface ArchitectEvent {
+/** Item 20: Discriminated union event types. */
+export interface ArchitectEventBase {
   type: ArchitectEventType;
   timestamp: number;
-  analysis?: ArchitectAnalysis;
-  action?: ArchitectAction;
-  error?: Error;
-  budgetUsed?: { tokens: number; dollars: number };
-  budgetPercent?: number;
-  killResult?: KillResult;
 }
+
+export interface ArchitectProgressEvent extends ArchitectEventBase {
+  type: "observing" | "reasoning" | "generating" | "validating";
+}
+
+export interface ArchitectAnalysisStartEvent extends ArchitectEventBase {
+  type: "analysis-start";
+}
+
+export interface ArchitectAnalysisCompleteEvent extends ArchitectEventBase {
+  type: "analysis-complete";
+  analysis: ArchitectAnalysis;
+}
+
+export interface ArchitectActionEvent extends ArchitectEventBase {
+  type: "action" | "approval-required" | "approval-response" | "applied";
+  action: ArchitectAction;
+}
+
+export interface ArchitectRollbackEvent extends ArchitectEventBase {
+  type: "rollback";
+  action?: ArchitectAction;
+}
+
+export interface ArchitectErrorEvent extends ArchitectEventBase {
+  type: "error";
+  error: Error;
+  action?: ArchitectAction;
+}
+
+export interface ArchitectBudgetEvent extends ArchitectEventBase {
+  type: "budget-warning" | "budget-exceeded";
+  budgetUsed: { tokens: number; dollars: number };
+  budgetPercent: number;
+}
+
+export interface ArchitectKilledEvent extends ArchitectEventBase {
+  type: "killed";
+  killResult: KillResult;
+}
+
+/** Item 26: Plan step event for multi-step reasoning. */
+export interface ArchitectPlanStepEvent extends ArchitectEventBase {
+  type: "plan-step";
+  stepIndex: number;
+  totalSteps: number;
+  action?: ArchitectAction;
+}
+
+/** Item 27: Streaming reasoning chunk event. */
+export interface ArchitectReasoningChunkEvent extends ArchitectEventBase {
+  type: "reasoning-chunk";
+  chunk: string;
+  accumulated: string;
+}
+
+/** M4: Policy warning event — distinct from errors for non-blocking policy violations. */
+export interface ArchitectPolicyWarningEvent extends ArchitectEventBase {
+  type: "policy-warning";
+  policy: ArchitectPolicy;
+  action: ArchitectAction;
+}
+
+/** M8: Approval timeout event — emitted before auto-rejection. */
+export interface ArchitectApprovalTimeoutEvent extends ArchitectEventBase {
+  type: "approval-timeout";
+  action: ArchitectAction;
+}
+
+/** Discriminated union of all event types. Backward-compatible — consumers already switch on event.type. */
+export type ArchitectEvent =
+  | ArchitectProgressEvent
+  | ArchitectAnalysisStartEvent
+  | ArchitectAnalysisCompleteEvent
+  | ArchitectActionEvent
+  | ArchitectRollbackEvent
+  | ArchitectErrorEvent
+  | ArchitectBudgetEvent
+  | ArchitectKilledEvent
+  | ArchitectPlanStepEvent
+  | ArchitectReasoningChunkEvent
+  | ArchitectPolicyWarningEvent
+  | ArchitectApprovalTimeoutEvent;
 
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
@@ -432,8 +527,10 @@ export interface AIArchitect {
   /**
    * Manually trigger an analysis.
    * The AI will observe the system, reason about it, and propose actions.
+   * @param prompt - Optional prompt for the analysis.
+   * @param options - Optional analysis options.
    */
-  analyze(prompt?: string): Promise<ArchitectAnalysis>;
+  analyze(prompt?: string, options?: { mode?: "single" | "plan" }): Promise<ArchitectAnalysis>;
 
   /**
    * Approve a pending action by its ID.
@@ -487,8 +584,45 @@ export interface AIArchitect {
   /** Get current budget usage. */
   getBudgetUsage(): { tokens: number; dollars: number; percent: { tokens: number; dollars: number } };
 
+  /** Item 19: Start a discovery session to observe the system for patterns. */
+  discover(options?: DiscoveryOptions): DiscoverySession;
+
+  /** Item 19: Run a what-if analysis for a proposed action. */
+  whatIf(action: ArchitectAction, options?: WhatIfOptions): Promise<WhatIfResult>;
+
+  /** Item 19: Extract the system's constraint graph. */
+  graph(options?: Omit<import("./graph.js").ExtractGraphOptions, "dynamicIds">): SystemGraph;
+
+  /** Item 19: Create a replay recorder for this system. */
+  record(): import("./replay.js").ReplayRecorder;
+
+  /** Item 19: Export an applied action as a shareable federation pattern. */
+  exportAction(actionId: string, options?: import("./federation.js").ExportPatternOptions): FederationExport | null;
+
+  /** Item 19: Import a federated pattern and register for approval. */
+  importPattern(pattern: FederationPattern): Promise<FederationImportResult>;
+
+  /** Item 24: Get current architect status summary. */
+  status(): ArchitectStatus;
+
   /** Stop the architect (clears scheduled triggers, removes watchers). */
   destroy(): void;
+}
+
+/** Item 24: Status summary of the architect. */
+export interface ArchitectStatus {
+  budget: {
+    tokens: number;
+    dollars: number;
+    percentTokens: number;
+    percentDollars: number;
+  };
+  circuitBreaker: CircuitBreakerState;
+  activeDefinitions: number;
+  pendingApprovals: number;
+  auditEntries: number;
+  uptime: number;
+  isDestroyed: boolean;
 }
 
 // ============================================================================
@@ -507,6 +641,8 @@ export interface SandboxCompileOptions {
   factWriteAccess?: boolean;
   /** Maximum code size in bytes. Default: 2048 */
   maxCodeSize?: number;
+  /** Item 18: Use worker thread for real timeout enforcement (Node.js only). Default: false */
+  useWorker?: boolean;
 }
 
 /** Result of static analysis on AI-generated code. */
@@ -783,6 +919,8 @@ export interface ReplayEvent {
 export interface ReplayOptions {
   /** Maximum events to process. Default: all */
   maxEvents?: number;
+  /** Item 16: token budget cap for replay. Stop processing when exceeded. */
+  budget?: { maxTokens: number };
 }
 
 /** Result of replaying with an architect. */
@@ -804,6 +942,8 @@ export interface ReplayResult {
     triggeredEvents: number;
     /** Total actions architect would have taken. */
     totalActions: number;
+    /** Item 16: total tokens used during replay. */
+    tokensUsed?: number;
   };
 }
 
@@ -835,6 +975,8 @@ export interface FederationExport {
   pattern: FederationPattern;
   /** Whether the export was successful. */
   success: boolean;
+  /** Item 13: error message if export failed. */
+  error?: string;
 }
 
 /** Result of importing a federated pattern. */
@@ -863,5 +1005,45 @@ export interface ArchitectServiceHooks {
   onKill?: (result: KillResult) => void | Promise<void>;
   /** Called for every audit entry. */
   onAudit?: (entry: AuditEntry) => void | Promise<void>;
+}
+
+// ============================================================================
+// Policy Types (Item 33)
+// ============================================================================
+
+/** Context passed to policy evaluation functions. */
+export interface PolicyContext {
+  /** Number of actions taken in the last hour. */
+  actionsThisHour: number;
+  /** Number of constraints created by the architect. */
+  constraintsCreated: number;
+  /** Number of resolvers created by the architect. */
+  resolversCreated: number;
+  /** Number of effects created by the architect. */
+  effectsCreated: number;
+  /** Number of derivations created by the architect. */
+  derivationsCreated: number;
+  /** Fact keys modified by the current action. */
+  factKeysModified: string[];
+  /** Percentage of budget used (0-100). */
+  budgetUsedPercent: number;
+  /** Total active definitions. */
+  activeDefinitions: number;
+  /** The last action taken (if any). */
+  lastAction?: ArchitectAction;
+  /** The current action being evaluated. */
+  currentAction: ArchitectAction;
+}
+
+/** A meta-constraint on the architect's behavior. */
+export interface ArchitectPolicy {
+  /** Unique ID for this policy. */
+  id: string;
+  /** Human-readable description of the policy. */
+  description: string;
+  /** Predicate that determines when this policy applies. */
+  when: (ctx: PolicyContext) => boolean;
+  /** What to do when the policy is triggered. */
+  action: "block" | "warn" | "require-approval";
 }
 
