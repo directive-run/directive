@@ -77,8 +77,8 @@ architect.on((event) => {
 });
 
 // 6. Simulate some errors
-(system.facts as Record<string, unknown>).errorCount = 8;
-(system.facts as Record<string, unknown>).status = "degraded";
+system.facts.errorCount = 8;
+system.facts.status = "degraded";
 
 // 7. Run an analysis
 const analysis = await architect.analyze("Why is the system degraded?");

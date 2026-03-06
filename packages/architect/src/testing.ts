@@ -47,6 +47,11 @@ export interface MockRunnerResponse {
   totalTokens?: number;
 }
 
+/** A mock AgentRunner with an attached `calls` array for assertions. */
+export interface MockAgentRunner extends AgentRunner {
+  calls: Array<{ agent: unknown; input: string }>;
+}
+
 /**
  * Create a mock AgentRunner that returns pre-configured responses.
  * Responses are consumed in order. After exhaustion, returns empty results.
@@ -56,7 +61,7 @@ export interface MockRunnerResponse {
  */
 export function mockRunner(
   responses: MockRunnerResponse[],
-): AgentRunner {
+): MockAgentRunner {
   let callIndex = 0;
   const calls: Array<{ agent: unknown; input: string }> = [];
 
@@ -89,7 +94,7 @@ export function mockRunner(
   // Attach call history for assertions
   (runner as unknown as { calls: typeof calls }).calls = calls;
 
-  return runner;
+  return runner as MockAgentRunner;
 }
 
 // ============================================================================
@@ -135,6 +140,7 @@ export function createTestArchitect(
         resolvers: "never",
       },
     },
+    silent: true,
     ...options?.overrides,
   });
 
@@ -183,6 +189,13 @@ export interface TestSystem {
     listDynamic: () => string[];
     isDynamic: (id: string) => boolean;
   };
+  /** Derivations registration. */
+  derivations: {
+    register: (id: string, def: unknown) => void;
+    unregister: (id: string) => void;
+    listDynamic: () => string[];
+    isDynamic: (id: string) => boolean;
+  };
   /** Test helper: emit a fact change notification. */
   _emitFactChange(keys?: string[]): void;
   /** Test helper: emit a settled change notification. */
@@ -205,6 +218,7 @@ export function createTestSystem(initialFacts?: Record<string, unknown>): TestSy
   const dynamicConstraints = new Map<string, unknown>();
   const dynamicResolvers = new Map<string, unknown>();
   const dynamicEffects = new Map<string, unknown>();
+  const dynamicDerivations = new Map<string, unknown>();
   let inspectionOverrides: Record<string, unknown> = {};
 
   const factListeners: Array<{ keys: string[]; fn: () => void }> = [];
@@ -298,6 +312,21 @@ export function createTestSystem(initialFacts?: Record<string, unknown>): TestSy
       },
       isDynamic(id: string) {
         return dynamicEffects.has(id);
+      },
+    },
+
+    derivations: {
+      register(id: string, def: unknown) {
+        dynamicDerivations.set(id, def);
+      },
+      unregister(id: string) {
+        dynamicDerivations.delete(id);
+      },
+      listDynamic() {
+        return [...dynamicDerivations.keys()];
+      },
+      isDynamic(id: string) {
+        return dynamicDerivations.has(id);
       },
     },
 
