@@ -49,6 +49,7 @@ import {
 } from "./fallback.js";
 import type { AuditStore, CheckpointStore, ArchitectCheckpoint } from "./persistence.js";
 import { createOutcomeTracker, type OutcomeTracker } from "./outcomes.js";
+import { createCustomToolRegistry, type CustomToolRegistry, type CustomToolContext } from "./custom-tools.js";
 import { computeHealthScore } from "./health.js";
 
 // M1: StaleSnapshotError for retry at mutex level
@@ -191,6 +192,14 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     ? createOutcomeTracker(options.outcomeTracking)
     : undefined;
 
+  // ---- Custom Tools ----
+  const customToolRegistry: CustomToolRegistry = createCustomToolRegistry();
+  if (options.customTools) {
+    for (const tool of options.customTools) {
+      customToolRegistry.register(tool);
+    }
+  }
+
   // ---- State ----
   const dynamicIds = new Set<string>();
   // E15: cap actions Map at 1000 with FIFO eviction
@@ -282,14 +291,22 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
   }
 
-  // ---- Available tools ----
-  const availableTools = getAvailableTools(capabilities);
-  const systemPrompt = buildSystemPrompt(
-    availableTools,
-    options.context?.description,
-    options.context?.goals,
-    options.context?.notes,
-  );
+  // ---- Available tools (dynamic to include custom tools) ----
+  function getAllTools() {
+    const builtIn = getAvailableTools(capabilities);
+    const custom = customToolRegistry.getToolDefs();
+
+    return custom.length > 0 ? [...builtIn, ...custom] : builtIn;
+  }
+
+  function getSystemPrompt() {
+    return buildSystemPrompt(
+      getAllTools(),
+      options.context?.description,
+      options.context?.goals,
+      options.context?.notes,
+    );
+  }
 
   // ---- Tool execution context ----
   const toolContext: ToolExecutionContext = {
@@ -775,9 +792,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   ): Promise<{ toolCalls: Array<{ name: string; arguments: string; result?: string }>; output: unknown; totalTokens: number }> {
     const runnerConfig = {
       name: "directive-architect",
-      instructions: systemPrompt,
+      instructions: getSystemPrompt(),
       model: options.model,
-      tools: availableTools.map((t) => ({
+      tools: getAllTools().map((t) => ({
         name: t.name,
         description: t.description,
         parameters: t.parameters,
@@ -839,7 +856,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
         args = {};
       }
 
-      const tool = availableTools.find((t) => t.name === call.name);
+      const tool = getAllTools().find((t) => t.name === call.name);
       if (!tool) {
         continue;
       }
@@ -1089,7 +1106,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     action: ArchitectAction,
     trigger: ArchitectAnalysis["trigger"],
   ): Promise<void> {
-    const tool = availableTools.find((t) => t.name === action.tool);
+    const tool = getAllTools().find((t) => t.name === action.tool);
     if (!tool) {
       return;
     }
@@ -1181,7 +1198,20 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     const applySpan = metrics.startSpan?.("architect.apply_action", { tool: action.tool, risk: action.risk });
-    const result = executeTool(action.tool, action.arguments, toolContext);
+    let result = executeTool(action.tool, action.arguments, toolContext);
+
+    // If built-in tool not found, try custom tool registry
+    if (!result.success && result.error?.startsWith("Unknown tool:") && customToolRegistry.size() > 0) {
+      const customCtx: CustomToolContext = {
+        facts: Object.freeze({ ...system.facts }),
+        inspect: () => system.inspect() as unknown as Record<string, unknown>,
+      };
+      const customResult = customToolRegistry.execute(action.tool, action.arguments, customCtx);
+      if (customResult) {
+        const resolved = await customResult;
+        result = { success: resolved.success, data: resolved.data, error: resolved.error };
+      }
+    }
 
     if (result.success && result.definition) {
       // Track for rollback
@@ -1759,6 +1789,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     resetBudget: guards.resetBudget,
     guards,
     outcomeTracker,
+    customToolRegistry,
     on,
     emitEvent,
     destroy,
