@@ -329,23 +329,38 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     return exportPattern(action, exportOptions);
   }
 
+  // M7: assertNotDestroyed guard for mutation methods
+  function assertNotDestroyed(): void {
+    if (isDestroyedFlag) {
+      throw new Error("Architect has been destroyed");
+    }
+  }
+
   // ---- Build the public interface ----
   // M7: fix on() — proper type discrimination
   const architect: AIArchitect = {
     analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan"; dryRun?: boolean }): Promise<ArchitectAnalysis> {
+      assertNotDestroyed();
+
       return pipeline.analyze("demand", undefined, prompt, 0, analyzeOpts?.mode, analyzeOpts?.dryRun);
     },
 
     approve(actionId: string): Promise<boolean> {
+      assertNotDestroyed();
+
       return pipeline.approve(actionId);
     },
 
     // M6: reject returns Promise<boolean> for consistency with approve
     reject(actionId: string): Promise<boolean> {
+      assertNotDestroyed();
+
       return Promise.resolve(pipeline.reject(actionId));
     },
 
     rollback(actionId: string) {
+      assertNotDestroyed();
+
       return pipeline.rollback(actionId);
     },
 
@@ -354,6 +369,8 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     rollbackBatch(actionIds: string[]) {
+      assertNotDestroyed();
+
       return pipeline.rollbackBatch(actionIds);
     },
 
@@ -401,8 +418,9 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return pipeline.getBudgetUsage();
     },
 
-    // Item 19: convenience methods for innovation features
+    // Item 19: convenience methods for innovation features — M7: all guarded
     discover(discoverOptions?) {
+      assertNotDestroyed();
       // M4: route discovery LLM calls through budget tracking
       const trackTokens = (tokens: number) => {
         pipeline.guards.recordTokens(tokens, estimateDollars(tokens));
@@ -412,6 +430,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     whatIf(action, whatIfOptions?) {
+      assertNotDestroyed();
       // E3: normalize WhatIfInput to full ArchitectAction
       const fullAction = "id" in action ? action : {
         id: `whatif-${Date.now()}`,
@@ -434,6 +453,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     graph(graphOptions?) {
+      assertNotDestroyed();
       return extractSystemGraph(options.system, {
         ...graphOptions,
         dynamicIds: pipeline._dynamicIds,
@@ -441,18 +461,22 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     record() {
+      assertNotDestroyed();
       return createReplayRecorder(options.system);
     },
 
     exportAction(actionId, exportOptions?) {
+      assertNotDestroyed();
       return exportActionInternal(actionId, exportOptions);
     },
 
     exportPattern(actionId, exportOptions?) {
+      assertNotDestroyed();
       return exportActionInternal(actionId, exportOptions);
     },
 
     async importPattern(pattern: FederationPattern) {
+      assertNotDestroyed();
       return importPattern(pattern, options.system, options.runner);
     },
 
@@ -465,10 +489,12 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     registerTool(def) {
+      assertNotDestroyed();
       pipeline.customToolRegistry.register(def);
     },
 
     unregisterTool(name) {
+      assertNotDestroyed();
       return pipeline.customToolRegistry.unregister(name);
     },
 

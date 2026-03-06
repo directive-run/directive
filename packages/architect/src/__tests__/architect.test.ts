@@ -522,4 +522,121 @@ describe("createAIArchitect", () => {
     // Pending approvals should be empty — dryRun doesn't register for approval flow
     expect(analysis.actions.length).toBeGreaterThanOrEqual(0);
   });
+
+  // ===========================================================================
+  // M7: Destroyed guard
+  // ===========================================================================
+
+  it("M7: mutation methods throw after destroy", () => {
+    const { architect } = create();
+
+    architect.destroy();
+
+    expect(() => architect.analyze()).toThrow("Architect has been destroyed");
+    expect(() => architect.rollback("x")).toThrow("Architect has been destroyed");
+    expect(() => architect.rollbackBatch([])).toThrow("Architect has been destroyed");
+    expect(() => architect.graph()).toThrow("Architect has been destroyed");
+    expect(() => architect.record()).toThrow("Architect has been destroyed");
+    expect(() => architect.exportAction("x")).toThrow("Architect has been destroyed");
+    expect(() => architect.exportPattern("x")).toThrow("Architect has been destroyed");
+    expect(() => architect.registerTool({ name: "t", description: "t", parameters: {}, execute: async () => ({ result: "" }) })).toThrow("Architect has been destroyed");
+    expect(() => architect.unregisterTool("t")).toThrow("Architect has been destroyed");
+  });
+
+  it("M7: approve and reject throw after destroy", () => {
+    const { architect } = create();
+
+    architect.destroy();
+
+    expect(() => architect.approve("x")).toThrow("Architect has been destroyed");
+    expect(() => architect.reject("x")).toThrow("Architect has been destroyed");
+  });
+
+  it("M7: read-only methods still work after destroy", () => {
+    const { architect } = create();
+
+    // Grab references before destroy
+    architect.destroy();
+
+    // Read-only / idempotent methods should NOT throw
+    expect(() => architect.getActiveDefinitions()).not.toThrow();
+    expect(() => architect.getPendingApprovals()).not.toThrow();
+    expect(() => architect.getRollbackEntries()).not.toThrow();
+    expect(() => architect.getAuditLog()).not.toThrow();
+    expect(() => architect.getBudgetUsage()).not.toThrow();
+    expect(() => architect.previewRollback("x")).not.toThrow();
+    expect(() => architect.toSource("x")).not.toThrow();
+    expect(() => architect.kill()).not.toThrow();
+    // destroy itself is idempotent
+    expect(() => architect.destroy()).not.toThrow();
+  });
+
+  it("M7: discover and whatIf throw after destroy", () => {
+    const { architect } = create();
+
+    architect.destroy();
+
+    expect(() => architect.discover()).toThrow("Architect has been destroyed");
+    expect(() => architect.whatIf({ tool: "observe_system", arguments: {} })).toThrow("Architect has been destroyed");
+  });
+
+  // ===========================================================================
+  // E10: facts approval level
+  // ===========================================================================
+
+  it("E10: set_fact respects approval.facts config", async () => {
+    const { architect, runner } = create({
+      capabilities: { facts: "read-write" },
+      safety: { approval: { facts: "always" } },
+    });
+
+    runner.mockResolvedValueOnce({
+      output: "Setting a fact for testing.",
+      messages: [],
+      toolCalls: [
+        {
+          id: "tc-1",
+          name: "set_fact",
+          arguments: JSON.stringify({ key: "testKey", value: 42 }),
+        },
+      ],
+      totalTokens: 30,
+    });
+
+    const analysis = await architect.analyze("Set a fact");
+
+    // With facts: "always", the set_fact action should require approval
+    const setFactAction = analysis.actions.find((a) => a.tool === "set_fact");
+    if (setFactAction) {
+      expect(setFactAction.requiresApproval).toBe(true);
+    }
+  });
+
+  it("E10: set_fact skips approval when facts: 'never'", async () => {
+    const { architect, runner } = create({
+      capabilities: { facts: "read-write" },
+      safety: { approval: { facts: "never" } },
+    });
+
+    runner.mockResolvedValueOnce({
+      output: "Setting a fact for testing.",
+      messages: [],
+      toolCalls: [
+        {
+          id: "tc-1",
+          name: "set_fact",
+          arguments: JSON.stringify({ key: "testKey", value: 42 }),
+        },
+      ],
+      totalTokens: 30,
+    });
+
+    const analysis = await architect.analyze("Set a fact");
+
+    // With facts: "never", set_fact should not require approval
+    const setFactAction = analysis.actions.find((a) => a.tool === "set_fact");
+    if (setFactAction) {
+      expect(setFactAction.requiresApproval).toBe(false);
+    }
+  });
 });

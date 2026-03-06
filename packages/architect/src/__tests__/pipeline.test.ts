@@ -163,7 +163,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -235,7 +235,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -325,7 +325,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -390,7 +390,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -463,7 +463,7 @@ describe("pipeline", () => {
         runner,
         budget: { tokens: 10_000, dollars: 10 },
         capabilities: { facts: "read-write" },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
         policies: [{
           id: "test-warn",
@@ -640,7 +640,7 @@ describe("pipeline", () => {
         runner,
         budget: { tokens: 10_000, dollars: 10 },
         capabilities: { facts: "read-write" },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
         policies: [{
           id: "test-protect",
@@ -690,7 +690,7 @@ describe("pipeline", () => {
         runner,
         budget: { tokens: 100_000, dollars: 100 },
         capabilities: { facts: "read-write" },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
         policies: [{
           id: "test-count",
@@ -736,7 +736,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 100_000, dollars: 100 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -782,7 +782,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -828,7 +828,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -870,7 +870,7 @@ describe("pipeline", () => {
         runner,
         budget: { tokens: 10_000, dollars: 10 },
         capabilities: { effects: true },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -919,7 +919,7 @@ describe("pipeline", () => {
         runner,
         budget: { tokens: 10_000, dollars: 10 },
         capabilities: { derivations: true },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });
@@ -959,7 +959,7 @@ describe("pipeline", () => {
         system: system as never,
         runner,
         budget: { tokens: 10_000, dollars: 10 },
-        safety: { approval: { constraints: "never", resolvers: "never" } },
+        safety: { approval: { constraints: "never", resolvers: "never", facts: "never" } },
         triggers: { minInterval: 0 },
       },
     });

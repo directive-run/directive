@@ -121,6 +121,8 @@ export interface ArchitectSafety {
     resolvers?: ApprovalLevel;
     effects?: ApprovalLevel;
     derivations?: ApprovalLevel;
+    /** Approval level for direct fact mutations via set_fact tool. Default: 'always' */
+    facts?: ApprovalLevel;
   };
 
   /** Run AI-generated functions in a sandboxed scope. Default: true */
