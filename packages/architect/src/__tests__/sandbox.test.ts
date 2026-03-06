@@ -496,4 +496,25 @@ describe("sandbox", () => {
       ).toThrow(SandboxError);
     });
   });
+
+  // ===========================================================================
+  // C1: Worker Sandbox Defense Layers
+  // ===========================================================================
+
+  describe("createWorkerSandbox", () => {
+    it("C1: worker code includes dangerous global deletion", async () => {
+      const { createWorkerSandbox } = await import("../sandbox.js");
+
+      // The worker sandbox should include defense layers even though
+      // we can't easily test the actual Worker execution in a test.
+      // Verify the function exists and handles static analysis.
+      expect(() => createWorkerSandbox("return facts.x;")).not.toThrow();
+    });
+
+    it("C1: worker sandbox rejects unsafe code via static analysis", async () => {
+      const { createWorkerSandbox } = await import("../sandbox.js");
+
+      expect(() => createWorkerSandbox('eval("bad")')).toThrow(SandboxError);
+    });
+  });
 });

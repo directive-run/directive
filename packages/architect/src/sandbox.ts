@@ -35,8 +35,12 @@ const DEFAULT_BLOCKED_PATTERNS = [
   // C1: loops moved from WARN to BLOCKED
   "while",
   "for",
+  // Item 10: block do keyword
+  "do",
   // M8: block arguments object
   "arguments",
+  // Item 10: block function keyword for recursive declarations
+  "function",
   // M9: block metaprogramming primitives
   "Symbol",
   "Reflect",
@@ -176,6 +180,14 @@ export function staticAnalysis(
 
   if (bracketAccessRegex.test(code) || bracketAccessRegex.test(normalized)) {
     violations.push('Blocked bracket-notation access to __proto__/constructor/prototype');
+  }
+
+  // Item 10: detect iteration methods (dot+name+open-paren to avoid false positives)
+  const iterationMethods = [".forEach(", ".map(", ".reduce(", ".filter(", ".some(", ".every(", ".find(", ".flatMap("];
+  for (const method of iterationMethods) {
+    if (code.includes(method) || normalized.includes(method)) {
+      violations.push(`Blocked iteration method: "${method.slice(1, -1)}". Iteration is not allowed in sandboxed code.`);
+    }
   }
 
   return {
@@ -521,6 +533,129 @@ export function compileSandboxed(
       }
 
       return result;
+    },
+  };
+}
+
+// ============================================================================
+// Item 18: Worker-Thread Sandbox
+// ============================================================================
+
+export interface WorkerCompiledFunction {
+  /** Execute the sandboxed function with given facts. Returns Promise (async). */
+  execute(facts: Record<string, unknown>): Promise<unknown>;
+  /** The source code. */
+  source: string;
+}
+
+/**
+ * Create a worker-thread sandbox for real timeout enforcement.
+ * Node.js only — uses worker_threads to run code in an isolated Worker.
+ * Falls back to compileSandboxed if worker_threads is not available.
+ *
+ * Static analysis still runs first (defense in depth).
+ */
+export function createWorkerSandbox(
+  code: string,
+  options?: SandboxCompileOptions,
+): WorkerCompiledFunction {
+  const maxSize = options?.maxCodeSize ?? MAX_CODE_SIZE;
+  const timeout = options?.timeout ?? 5000;
+
+  // Static analysis runs first regardless
+  const analysis = staticAnalysis(code, options?.blockedPatterns, maxSize);
+  if (!analysis.safe) {
+    throw new SandboxError(
+      `Code failed static analysis: ${analysis.violations.join(", ")}`,
+    );
+  }
+
+  return {
+    source: code,
+    async execute(facts: Record<string, unknown>): Promise<unknown> {
+      // Try to load worker_threads dynamically
+      let workerThreads: typeof import("node:worker_threads") | undefined;
+      try {
+        workerThreads = await import("node:worker_threads");
+      } catch {
+        // worker_threads not available — fall back to sync sandbox
+        const compiled = compileSandboxed(code, options);
+
+        return compiled.execute(facts);
+      }
+
+      const { Worker } = workerThreads;
+
+      // Worker script: receives facts, executes code, returns result
+      // C1: defense-in-depth — null-proto facts, delete dangerous globals, strict mode
+      const workerCode = `
+        const { parentPort, workerData } = require("node:worker_threads");
+
+        // C1: Delete dangerous globals before executing user code
+        const DANGEROUS_GLOBALS = [
+          "eval", "Function", "require", "process", "globalThis",
+          "fetch", "setTimeout", "setInterval", "setImmediate",
+          "queueMicrotask", "Atomics", "SharedArrayBuffer", "Worker",
+          "crypto", "Blob", "URL", "TextEncoder", "TextDecoder",
+          "navigator", "XMLHttpRequest", "WebSocket",
+          "importScripts", "Deno", "Bun",
+        ];
+        for (const name of DANGEROUS_GLOBALS) {
+          try { delete globalThis[name]; } catch {}
+          try { globalThis[name] = undefined; } catch {}
+        }
+
+        // C1: Convert facts to null-prototype objects recursively
+        function toNullProto(value) {
+          if (value === null || typeof value !== "object") return value;
+          if (Array.isArray(value)) return value.map(toNullProto);
+          const result = Object.create(null);
+          for (const key of Object.keys(value)) {
+            result[key] = toNullProto(value[key]);
+          }
+          return result;
+        }
+
+        const facts = toNullProto(workerData.facts);
+        try {
+          const fn = new Function("facts", '"use strict";\\n' + workerData.code);
+          const result = fn(facts);
+          parentPort.postMessage({ success: true, result: JSON.parse(JSON.stringify(result ?? null)) });
+        } catch (err) {
+          parentPort.postMessage({ success: false, error: "Sandboxed function threw an error" });
+        }
+      `;
+
+      return new Promise<unknown>((resolve, reject) => {
+        const worker = new Worker(workerCode, {
+          eval: true,
+          workerData: {
+            facts: JSON.parse(JSON.stringify(facts)),
+            code,
+          },
+        });
+
+        const timer = setTimeout(() => {
+          worker.terminate();
+          reject(new SandboxError(`Execution timed out after ${timeout}ms`));
+        }, timeout);
+
+        worker.on("message", (msg: { success: boolean; result?: unknown; error?: string }) => {
+          clearTimeout(timer);
+          worker.terminate();
+
+          if (msg.success) {
+            resolve(msg.result);
+          } else {
+            reject(new SandboxError(msg.error ?? "Sandboxed function threw an error"));
+          }
+        });
+
+        worker.on("error", () => {
+          clearTimeout(timer);
+          reject(new SandboxError("Worker execution failed"));
+        });
+      });
     },
   };
 }
