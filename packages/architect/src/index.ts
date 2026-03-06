@@ -91,6 +91,8 @@ export type {
   WhatIfOptions,
   WhatIfResult,
   WhatIfStep,
+  WhatIfCascade,
+  WhatIfCascadeRound,
   // Graph
   SystemGraph,
   GraphNode,
