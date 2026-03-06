@@ -543,6 +543,19 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   restore(snapshot: SystemSnapshot): void;
 
   /**
+   * Get the original definition that was overridden by `assign()`.
+   * Returns undefined if no original exists for this type/id.
+   */
+  getOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): unknown | undefined;
+
+  /**
+   * Restore the original definition that was overridden by `assign()`.
+   * Re-assigns the original definition and removes the override tracking.
+   * Returns true if restoration succeeded, false if no original exists.
+   */
+  restoreOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): boolean;
+
+  /**
    * Get a distributable snapshot of computed derivations.
    * This creates a serializable object that can be stored in Redis, JWT, etc.
    * for use outside the Directive runtime.
