@@ -79,6 +79,9 @@ export function createAuditLog(options?: AuditLogOptions) {
   // C8: counter scoped to this audit log instance
   let auditCounter = 0;
 
+  // M3: track genesis hash after eviction for chain verification
+  let genesisHash: string | null = null;
+
   function append(opts: AppendOptions): AuditEntry {
     const prevHash =
       entries.length > 0 ? entries[entries.length - 1]!.hash : null;
@@ -113,9 +116,10 @@ export function createAuditLog(options?: AuditLogOptions) {
     // Freeze to make append-only
     Object.freeze(entry);
 
-    // Ring buffer eviction
+    // Ring buffer eviction — M3: track evicted hash as genesis
     if (entries.length >= maxEntries) {
-      entries.shift();
+      const evicted = entries.shift()!;
+      genesisHash = evicted.hash;
     }
 
     entries.push(entry);
@@ -123,34 +127,22 @@ export function createAuditLog(options?: AuditLogOptions) {
     return entry;
   }
 
-  // M6: markRolledBack appends a new "rollback" entry referencing the original
+  // Item 4: markRolledBack — append-only, no in-place mutation.
+  // Query rollback status via rollbackOf entries in the chain.
   function markRolledBack(auditId: string): boolean {
-    const index = entries.findIndex((e) => e.id === auditId);
-    if (index === -1) {
+    const original = entries.find((e) => e.id === auditId);
+    if (!original) {
       return false;
     }
 
-    // Replace the frozen entry with an updated frozen copy
-    const old = entries[index]!;
-    const updated: AuditEntry = {
-      ...old,
-      rolledBack: true,
-    };
-
-    // Re-hash with updated rolledBack status
-    const hashInput = JSON.stringify({ ...updated, hash: undefined });
-    (updated as { hash: string }).hash = hashSync(hashInput);
-    Object.freeze(updated);
-    entries[index] = updated;
-
-    // Append a new "rollback" entry referencing the original
+    // Append a new "rollback" entry referencing the original — chain stays intact
     append({
-      trigger: old.trigger,
+      trigger: original.trigger,
       tool: "rollback",
       arguments: { originalAuditId: auditId },
-      reasoning: old.reasoning,
-      definitionType: old.definitionType,
-      definitionId: old.definitionId,
+      reasoning: original.reasoning,
+      definitionType: original.definitionType,
+      definitionId: original.definitionId,
       approvalRequired: false,
       approved: true,
       applied: true,
@@ -158,6 +150,11 @@ export function createAuditLog(options?: AuditLogOptions) {
     });
 
     return true;
+  }
+
+  /** Check if an entry has been rolled back by searching for rollbackOf entries. */
+  function isRolledBack(auditId: string): boolean {
+    return entries.some((e) => e.rollbackOf === auditId);
   }
 
   function query(q?: AuditQuery): AuditEntry[] {
@@ -201,6 +198,16 @@ export function createAuditLog(options?: AuditLogOptions) {
   }
 
   function verifyChain(): boolean {
+    if (entries.length === 0) {
+      return true;
+    }
+
+    // M3: after eviction, first entry's prevHash should match genesisHash
+    const first = entries[0]!;
+    if (genesisHash !== null && first.prevHash !== genesisHash) {
+      return false;
+    }
+
     for (let i = 1; i < entries.length; i++) {
       const current = entries[i]!;
       const previous = entries[i - 1]!;
@@ -221,13 +228,84 @@ export function createAuditLog(options?: AuditLogOptions) {
     return entries.length;
   }
 
+  /** Item 25: Export the full audit log as a JSON string for persistence. */
+  function exportLog(): string {
+    return JSON.stringify({
+      version: 1,
+      entries: entries.map((e) => ({ ...e })),
+      exportedAt: Date.now(),
+    });
+  }
+
+  /** Item 25: Import a previously exported audit log. Optionally verify chain integrity. */
+  function importLog(json: string, verify = false): boolean {
+    try {
+      const data = JSON.parse(json);
+
+      if (!data || typeof data !== "object" || !Array.isArray(data.entries)) {
+        return false;
+      }
+
+      const imported = data.entries as AuditEntry[];
+
+      // M9: validate required fields on each entry
+      for (const entry of imported) {
+        if (
+          typeof entry.id !== "string" ||
+          typeof entry.timestamp !== "number" ||
+          typeof entry.tool !== "string" ||
+          typeof entry.hash !== "string" ||
+          typeof entry.approved !== "boolean" ||
+          typeof entry.applied !== "boolean"
+        ) {
+          return false;
+        }
+      }
+
+      // Verify chain if requested
+      if (verify && imported.length > 1) {
+        for (let i = 1; i < imported.length; i++) {
+          const current = imported[i]!;
+          const previous = imported[i - 1]!;
+
+          if (current.prevHash !== previous.hash) {
+            return false;
+          }
+        }
+      }
+
+      // Replace current entries
+      entries.length = 0;
+      for (const entry of imported) {
+        const frozen = Object.freeze({ ...entry });
+        entries.push(frozen);
+      }
+
+      // Reset counter to continue after imported entries
+      if (imported.length > 0) {
+        const lastId = imported[imported.length - 1]!.id;
+        const match = /audit-(\d+)-/.exec(lastId);
+        if (match) {
+          auditCounter = Number.parseInt(match[1]!, 10);
+        }
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   return {
     append,
     markRolledBack,
+    isRolledBack,
     query,
     verifyChain,
     getAll,
     size,
+    exportLog,
+    importLog,
   };
 }
 

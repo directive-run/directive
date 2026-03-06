@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createPipeline } from "../pipeline.js";
+import { executeTool, type ToolExecutionContext } from "../tools.js";
 import type { AIArchitectOptions, ArchitectEvent } from "../types.js";
 
 function mockRunner(responses: unknown[] = []) {
@@ -556,6 +557,63 @@ describe("pipeline", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // ===========================================================================
+  // M2: capability-gated remove_definition
+  // ===========================================================================
+
+  it("M2: remove_definition blocked when capability is disabled", () => {
+    const system = mockSystem();
+    const dynamicIds = new Set(["effect::test-effect"]);
+
+    const toolCtx: ToolExecutionContext = {
+      system: system as never,
+      dynamicIds,
+      rollbackFn: () => false,
+      capabilities: { constraints: true, resolvers: true, effects: false, derivations: false },
+    };
+
+    const result = executeTool("remove_definition", { type: "effect", id: "test-effect" }, toolCtx);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("effects capability is disabled");
+  });
+
+  it("M2: remove_definition allowed when capability is enabled", () => {
+    const system = mockSystem();
+    const dynamicIds = new Set(["constraint::test-c"]);
+
+    const toolCtx: ToolExecutionContext = {
+      system: system as never,
+      dynamicIds,
+      rollbackFn: () => false,
+      capabilities: { constraints: true, resolvers: true, effects: false, derivations: false },
+    };
+
+    const result = executeTool("remove_definition", { type: "constraint", id: "test-c" }, toolCtx);
+
+    expect(result.success).toBe(true);
+  });
+
+  // ===========================================================================
+  // M7: create_derivation error when system.derivations unavailable
+  // ===========================================================================
+
+  it("M7: create_derivation returns error when system.derivations unavailable", () => {
+    const system = mockSystem();
+    const dynamicIds = new Set<string>();
+
+    const toolCtx: ToolExecutionContext = {
+      system: system as never,
+      dynamicIds,
+      rollbackFn: () => false,
+    };
+
+    const result = executeTool("create_derivation", { id: "testD", deriveCode: "facts.x * 2" }, toolCtx);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("system.derivations API unavailable");
   });
 
   // ===========================================================================
