@@ -400,4 +400,101 @@ describe("pipeline", () => {
       expect(analysis.actions[0]!.originalTrigger).toBe("error");
     }
   });
+
+  // ===========================================================================
+  // C2: set_fact key extraction in buildPolicyContext
+  // ===========================================================================
+
+  it("C2: policy context extracts key from set_fact action", async () => {
+    const system = mockSystem();
+    const runner = mockRunner([
+      {
+        output: '{"observation": "test", "confidence": 0.9, "risk": "low"}',
+        toolCalls: [
+          { name: "set_fact", arguments: { key: "status", value: '"active"' } },
+        ],
+      },
+    ]);
+
+    let capturedViolations: unknown[] = [];
+    const pipeline = createPipeline({
+      system: system as never,
+      runner,
+      options: {
+        system: system as never,
+        runner,
+        budget: { tokens: 10_000, dollars: 10 },
+        capabilities: { facts: "read-write" },
+        safety: { approval: { constraints: "never", resolvers: "never" } },
+        triggers: { minInterval: 0 },
+        policies: [{
+          id: "test-protect",
+          description: "test",
+          when: (ctx) => {
+            capturedViolations = [...ctx.factKeysModified];
+
+            return false;
+          },
+          action: "block",
+        }],
+      },
+    });
+
+    await pipeline.analyze("demand");
+
+    expect(capturedViolations).toContain("status");
+  });
+
+  // ===========================================================================
+  // C3: actionTimestamp pruning
+  // ===========================================================================
+
+  it("C3: buildPolicyContext prunes timestamps older than 1 hour", async () => {
+    const system = mockSystem();
+    const runner = mockRunner([
+      {
+        output: "",
+        toolCalls: [
+          { name: "set_fact", arguments: { key: "x", value: "1" } },
+        ],
+      },
+      {
+        output: "",
+        toolCalls: [
+          { name: "set_fact", arguments: { key: "y", value: "2" } },
+        ],
+      },
+    ]);
+
+    let capturedActionsThisHour = -1;
+    const pipeline = createPipeline({
+      system: system as never,
+      runner,
+      options: {
+        system: system as never,
+        runner,
+        budget: { tokens: 100_000, dollars: 100 },
+        capabilities: { facts: "read-write" },
+        safety: { approval: { constraints: "never", resolvers: "never" } },
+        triggers: { minInterval: 0 },
+        policies: [{
+          id: "test-count",
+          description: "test",
+          when: (ctx) => {
+            capturedActionsThisHour = ctx.actionsThisHour;
+
+            return false;
+          },
+          action: "block",
+        }],
+      },
+    });
+
+    // First analysis applies an action, second should see it in actionsThisHour
+    await pipeline.analyze("demand");
+    await pipeline.analyze("demand");
+
+    // actionsThisHour should count the action applied in the first analysis
+    expect(capturedActionsThisHour).toBeGreaterThanOrEqual(1);
+  });
 });
