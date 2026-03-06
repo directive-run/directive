@@ -60,7 +60,16 @@ export interface OutcomeTracker {
 }
 
 /**
- * Create an outcome tracker.
+ * Create an outcome tracker for measuring action health impact.
+ *
+ * @param config - Measurement delay and max outcomes to retain.
+ * @returns An OutcomeTracker that schedules health measurements after actions.
+ *
+ * @example
+ * ```typescript
+ * const tracker = createOutcomeTracker({ measurementDelay: 5_000 });
+ * tracker.scheduleOutcome("act-1", "create_constraint", "demand", "Added rate limit", 80, () => computeHealthScore(system).score);
+ * ```
  */
 export function createOutcomeTracker(config?: OutcomeTrackingConfig): OutcomeTracker {
   const measurementDelay = config?.measurementDelay ?? 10_000;

@@ -100,6 +100,9 @@ export interface PersistenceConfig {
 /**
  * Create an in-memory audit store. Useful for testing and as a reference
  * implementation. Wraps a simple array with hash chain verification.
+ *
+ * @param maxEntries - Maximum entries before FIFO eviction. Default: 10000.
+ * @returns An AuditStore backed by an in-memory array.
  */
 export function createInMemoryAuditStore(maxEntries = 10_000): AuditStore {
   const entries: AuditEntry[] = [];
@@ -188,6 +191,8 @@ export function createInMemoryAuditStore(maxEntries = 10_000): AuditStore {
 /**
  * Create an in-memory checkpoint store. Stores a single checkpoint
  * in memory. Useful for testing.
+ *
+ * @returns A CheckpointStore backed by a single in-memory slot.
  */
 export function createInMemoryCheckpointStore(): CheckpointStore {
   let stored: ArchitectCheckpoint | null = null;

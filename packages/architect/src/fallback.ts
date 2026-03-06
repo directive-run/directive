@@ -70,6 +70,9 @@ interface CachedEntry {
 /**
  * Cache successful LLM responses. On failure, replay the most recent
  * cached response for the same trigger type.
+ *
+ * @param opts - Max entries per trigger and max age for cache eviction.
+ * @returns A FallbackStrategy with additional cache() and size() methods.
  */
 export function cachedResponseStrategy(opts?: {
   /** Max cached entries per trigger type. Default: 5 */
@@ -167,6 +170,9 @@ export interface HeuristicRule {
 /**
  * Apply deterministic heuristic rules when the LLM is unavailable.
  * Rules are checked in order — first match wins.
+ *
+ * @param rules - Ordered list of condition → action rules.
+ * @returns A FallbackStrategy that applies the first matching rule.
  */
 export function heuristicStrategy(rules: HeuristicRule[]): FallbackStrategy {
   return {
@@ -201,6 +207,8 @@ export function heuristicStrategy(rules: HeuristicRule[]): FallbackStrategy {
 /**
  * Block all actions — the safest fallback. Always matches.
  * Returns empty tool calls so no mutations occur.
+ *
+ * @returns A FallbackStrategy that blocks all actions.
  */
 export function blockStrategy(): FallbackStrategy {
   return {
@@ -227,7 +235,11 @@ export function blockStrategy(): FallbackStrategy {
 // ============================================================================
 
 /**
- * Run fallback strategies in order. Returns the first result or null.
+ * Run fallback strategies in order until one handles the failure.
+ *
+ * @param strategies - Ordered list of fallback strategies.
+ * @param context - The failure context (error, trigger, system state).
+ * @returns The first successful result, or null if no strategy handled it.
  */
 export function runFallback(
   strategies: FallbackStrategy[],
