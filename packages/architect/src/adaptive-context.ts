@@ -6,6 +6,7 @@
  */
 
 import type { ActionOutcome, OutcomePattern } from "./outcomes.js";
+import { RingBuffer } from "./ring-buffer.js";
 
 // ============================================================================
 // Health Trend
@@ -37,27 +38,24 @@ export interface HealthTrend {
  * ```
  */
 export function createHealthTrend(maxSamples = 20): HealthTrend {
-  const samples: Array<{ score: number; timestamp: number }> = [];
+  const samples = new RingBuffer<{ score: number; timestamp: number }>(maxSamples);
 
   function record(score: number): void {
-    if (samples.length >= maxSamples) {
-      samples.shift();
-    }
-
     samples.push({ score, timestamp: Date.now() });
   }
 
   function getSamples(): Array<{ score: number; timestamp: number }> {
-    return [...samples];
+    return samples.toArray();
   }
 
   function direction(): "improving" | "declining" | "stable" {
-    if (samples.length < 2) {
+    if (samples.size < 2) {
       return "stable";
     }
 
     // Compare last 3 samples (or fewer)
-    const recent = samples.slice(-3);
+    const all = samples.toArray();
+    const recent = all.slice(-3);
     const first = recent[0]!.score;
     const last = recent[recent.length - 1]!.score;
     const delta = last - first;
@@ -74,13 +72,13 @@ export function createHealthTrend(maxSamples = 20): HealthTrend {
   }
 
   function formatForPrompt(): string {
-    if (samples.length === 0) {
+    if (samples.size === 0) {
       return "";
     }
 
     const dir = direction();
     const arrow = dir === "improving" ? "↗" : dir === "declining" ? "↘" : "→";
-    const scores = samples.slice(-5).map((s) => s.score).join(" → ");
+    const scores = samples.toArray().slice(-5).map((s) => s.score).join(" → ");
 
     return `### Health Trend: ${dir} ${arrow} (${scores})`;
   }

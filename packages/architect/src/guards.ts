@@ -78,13 +78,21 @@ export function createGuards(
     const oneMinuteAgo = now - 60_000;
     const oneHourAgo = now - 3_600_000;
 
-    // Clean old entries
-    while (callTimestamps.length > 0 && callTimestamps[0]! < oneMinuteAgo) {
-      callTimestamps.shift();
+    // Clean old entries — splice instead of N×shift()
+    let minuteCleanIdx = 0;
+    while (minuteCleanIdx < callTimestamps.length && callTimestamps[minuteCleanIdx]! < oneMinuteAgo) {
+      minuteCleanIdx++;
+    }
+    if (minuteCleanIdx > 0) {
+      callTimestamps.splice(0, minuteCleanIdx);
     }
 
-    while (hourlyTimestamps.length > 0 && hourlyTimestamps[0]! < oneHourAgo) {
-      hourlyTimestamps.shift();
+    let hourlyCleanIdx = 0;
+    while (hourlyCleanIdx < hourlyTimestamps.length && hourlyTimestamps[hourlyCleanIdx]! < oneHourAgo) {
+      hourlyCleanIdx++;
+    }
+    if (hourlyCleanIdx > 0) {
+      hourlyTimestamps.splice(0, hourlyCleanIdx);
     }
 
     if (callTimestamps.length >= cfg.maxCallsPerMinute) {
@@ -129,10 +137,14 @@ export function createGuards(
     const now = Date.now();
     failureTimestamps.push(now);
 
-    // Clean old failures outside window
+    // Clean old failures outside window — splice instead of N×shift()
     const windowStart = now - cfg.circuitBreakerWindowMs;
-    while (failureTimestamps.length > 0 && failureTimestamps[0]! < windowStart) {
-      failureTimestamps.shift();
+    let failCleanIdx = 0;
+    while (failCleanIdx < failureTimestamps.length && failureTimestamps[failCleanIdx]! < windowStart) {
+      failCleanIdx++;
+    }
+    if (failCleanIdx > 0) {
+      failureTimestamps.splice(0, failCleanIdx);
     }
 
     if (failureTimestamps.length >= cfg.circuitBreakerThreshold) {
