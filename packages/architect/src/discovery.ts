@@ -32,6 +32,8 @@ export interface DiscoverySession {
   stop(): Promise<DiscoveryReport>;
   /** Check current progress. */
   progress(): { eventCount: number; patternCount: number; elapsedMs: number };
+  /** E7: Promise that resolves when the session completes naturally (duration timer). */
+  done: Promise<DiscoveryReport>;
 }
 
 /**
@@ -55,6 +57,10 @@ export function createDiscoverySession(
 
   // Track fact values for oscillation detection
   const factHistory = new Map<string, unknown[]>();
+
+  // E6: cache identifyPatterns() with dirty flag
+  let cachedPatterns: DiscoveryPattern[] | null = null;
+  let patternsDirty = true;
 
   // ---- Subscribe to system events ----
 
@@ -87,6 +93,9 @@ export function createDiscoverySession(
         type: "fact-change",
         data: { facts },
       });
+
+      // E6: mark patterns dirty on new events
+      patternsDirty = true;
     });
 
     unsubscribers.push(unsub);
@@ -105,6 +114,9 @@ export function createDiscoverySession(
           type: "settled",
           data: { settled },
         });
+
+        // E6: mark patterns dirty on new events
+        patternsDirty = true;
       },
     );
 
@@ -128,6 +140,11 @@ export function createDiscoverySession(
   // ---- Pattern identification ----
 
   function identifyPatterns(): DiscoveryPattern[] {
+    // E6: return cached patterns if clean
+    if (!patternsDirty && cachedPatterns !== null) {
+      return cachedPatterns;
+    }
+
     const patterns: DiscoveryPattern[] = [];
 
     // Pattern 1: Recurring unmet requirements
@@ -200,6 +217,10 @@ export function createDiscoverySession(
       }
     }
 
+    // E6: cache result
+    cachedPatterns = patterns;
+    patternsDirty = false;
+
     return patterns;
   }
 
@@ -213,6 +234,7 @@ export function createDiscoverySession(
     }
 
     const facts = { ...system.facts } as Record<string, unknown>;
+    // Item 5: include pattern index in prompt for matching
     const prompt = [
       "## Discovery Analysis",
       "",
@@ -220,12 +242,12 @@ export function createDiscoverySession(
       JSON.stringify(facts, null, 2),
       "",
       "### Patterns Found",
-      ...patterns.map((p) => `- [${p.type}] ${p.description} (confidence: ${p.confidence})`),
+      ...patterns.map((p, i) => `- [${i}] [${p.type}] ${p.description} (confidence: ${p.confidence}, factKeys: ${p.factKeys.join(", ") || "none"})`),
       "",
       "### Instructions",
       "Based on these patterns, suggest constraints and/or resolvers to address them.",
-      "For each suggestion provide: type (constraint/resolver), id, reasoning, and code.",
-      "Respond as JSON array: [{ type, id, reasoning, code }]",
+      "For each suggestion provide: type (constraint/resolver), id, reasoning, code, and patternIndex (the [index] of the pattern it addresses).",
+      "Respond as JSON array: [{ type, id, reasoning, code, patternIndex }]",
     ].join("\n");
 
     try {
@@ -240,7 +262,7 @@ export function createDiscoverySession(
       const output = typeof result.output === "string" ? result.output : JSON.stringify(result.output);
 
       // Try to parse suggestions from LLM output
-      let suggestions: Array<{ type: string; id: string; reasoning: string; code: string }> = [];
+      let suggestions: Array<{ type: string; id: string; reasoning: string; code: string; patternIndex?: number }> = [];
       try {
         const parsed = JSON.parse(output);
         if (Array.isArray(parsed)) {
@@ -258,13 +280,45 @@ export function createDiscoverySession(
         }
       }
 
-      return suggestions.map((s, i) => ({
-        type: (s.type as "constraint" | "resolver") ?? "constraint",
-        id: s.id ?? `discovery-${i}`,
-        reasoning: s.reasoning ?? "",
-        toSource: () => s.code ?? "",
-        pattern: patterns[0]!,
-      }));
+      // Item 5: match recommendation to pattern by patternIndex, fallback to type/factKeys overlap
+      return suggestions.map((s, i) => {
+        let matchedPattern = patterns[0]!;
+
+        // Try patternIndex from LLM response
+        if (typeof s.patternIndex === "number" && patterns[s.patternIndex]) {
+          matchedPattern = patterns[s.patternIndex]!;
+        } else {
+          // Fallback: match by pattern type or factKeys overlap
+          const candidate = patterns.find((p) => {
+            if (s.type === "constraint" && p.type === "recurring-unmet") {
+              return true;
+            }
+
+            if (s.type === "resolver" && p.type === "recurring-unmet") {
+              return true;
+            }
+
+            // Check factKeys overlap
+            if (p.factKeys.length > 0 && s.code) {
+              return p.factKeys.some((k: string) => String(s.code).includes(k));
+            }
+
+            return false;
+          });
+
+          if (candidate) {
+            matchedPattern = candidate;
+          }
+        }
+
+        return {
+          type: (s.type as "constraint" | "resolver") ?? "constraint",
+          id: s.id ?? `discovery-${i}`,
+          reasoning: s.reasoning ?? "",
+          toSource: () => s.code ?? "",
+          pattern: matchedPattern,
+        };
+      });
     } catch {
       return [];
     }
@@ -291,9 +345,16 @@ export function createDiscoverySession(
 
   let reportPromise: Promise<DiscoveryReport> | undefined;
 
+  // E7: deferred promise for natural completion
+  let doneResolve: (report: DiscoveryReport) => void;
+  const donePromise = new Promise<DiscoveryReport>((resolve) => {
+    doneResolve = resolve;
+  });
+
   durationTimer = setTimeout(() => {
     if (!stopped) {
       reportPromise = buildReport();
+      reportPromise.then(doneResolve);
     }
   }, duration);
 
@@ -303,7 +364,10 @@ export function createDiscoverySession(
         return reportPromise;
       }
 
-      return buildReport();
+      const report = await buildReport();
+      doneResolve(report);
+
+      return report;
     },
 
     progress() {
@@ -313,5 +377,7 @@ export function createDiscoverySession(
         elapsedMs: Date.now() - startedAt,
       };
     },
+
+    done: donePromise,
   };
 }
