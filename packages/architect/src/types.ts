@@ -928,6 +928,10 @@ export interface WhatIfInput {
 export interface WhatIfOptions {
   /** Whether to include LLM summary. Default: false */
   includeSummary?: boolean;
+  /** Number of cascade steps to simulate. Default: 1 (static). Max: 5. */
+  cascadeSteps?: number;
+  /** Simulation timeout in ms. Default: 10000. */
+  simulationTimeout?: number;
 }
 
 /** Result of a what-if analysis. */
@@ -940,6 +944,31 @@ export interface WhatIfResult {
   riskScore: number;
   /** LLM summary if requested. */
   summary?: string;
+  /** Cascade simulation results (when cascadeSteps > 1). */
+  cascade?: WhatIfCascade;
+}
+
+/** Multi-round cascade simulation result. */
+export interface WhatIfCascade {
+  /** Simulation rounds. */
+  rounds: WhatIfCascadeRound[];
+  /** Facts after all simulation rounds. */
+  finalFacts: Record<string, unknown>;
+  /** Total constraints that fired across all rounds. */
+  totalConstraintsFired: number;
+  /** Total resolvers that activated across all rounds. */
+  totalResolversActivated: number;
+  /** Whether the simulation settled (no new constraints firing). */
+  settled: boolean;
+}
+
+/** A single round of cascade simulation. */
+export interface WhatIfCascadeRound {
+  round: number;
+  factsSnapshot: Record<string, unknown>;
+  constraintsFired: string[];
+  resolversActivated: string[];
+  factChanges: Array<{ key: string; from: unknown; to: unknown }>;
 }
 
 /** A predicted step in what-if analysis. */

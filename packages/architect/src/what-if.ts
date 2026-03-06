@@ -1,9 +1,8 @@
 /**
  * What-If Analysis — predict the effects of an action without applying it.
  *
- * Phase 1: Static evaluation (not true simulation).
- * Evaluates constraints/resolvers/set_fact against current facts
- * and predicts what would change.
+ * Phase 1: Static evaluation for single-step analysis.
+ * Phase 2: Multi-step cascade simulation when cascadeSteps > 1.
  */
 
 import type { System } from "@directive-run/core";
@@ -13,6 +12,8 @@ import type {
   WhatIfOptions,
   WhatIfResult,
   WhatIfStep,
+  WhatIfCascade,
+  WhatIfCascadeRound,
 } from "./types.js";
 import { compileSandboxed, SandboxError } from "./sandbox.js";
 
@@ -72,6 +73,18 @@ export async function createWhatIfAnalysis(
     }
   }
 
+  // Cascade simulation (Phase 2)
+  let cascade: WhatIfCascade | undefined;
+  const cascadeSteps = options?.cascadeSteps ?? 1;
+  if (cascadeSteps > 1) {
+    cascade = simulateCascade(system, facts, steps, cascadeSteps, options?.simulationTimeout ?? 10_000);
+    riskScore += cascade.rounds.length * 5;
+    riskScore += cascade.totalConstraintsFired * 3;
+    if (!cascade.settled) {
+      riskScore += 10;
+    }
+  }
+
   // Optional LLM summary
   let summary: string | undefined;
   if (options?.includeSummary && runner) {
@@ -83,6 +96,7 @@ export async function createWhatIfAnalysis(
     steps,
     riskScore,
     summary,
+    cascade,
   };
 }
 
@@ -237,6 +251,198 @@ function analyzeRemoveDefinition(action: ArchitectAction): WhatIfStep {
     constraintsFiring: [],
     resolversActivating: [],
   };
+}
+
+// ============================================================================
+// Cascade Simulation
+// ============================================================================
+
+function simulateCascade(
+  system: System,
+  initialFacts: Record<string, unknown>,
+  initialSteps: WhatIfStep[],
+  maxSteps: number,
+  timeoutMs: number,
+): WhatIfCascade {
+  const startTime = Date.now();
+  const clampedSteps = Math.min(Math.max(maxSteps, 2), 5);
+  const rounds: WhatIfCascadeRound[] = [];
+
+  // Deep clone facts — start from initial analysis state
+  let currentFacts: Record<string, unknown> = JSON.parse(JSON.stringify(initialFacts));
+
+  // Apply initial fact changes from the first static analysis
+  for (const step of initialSteps) {
+    for (const change of step.factChanges) {
+      currentFacts[change.key] = change.to;
+    }
+  }
+
+  let totalConstraintsFired = 0;
+  let totalResolversActivated = 0;
+  let settled = false;
+
+  // Get system constraints and resolvers for simulation
+  const inspection = system.inspect() as unknown as Record<string, unknown>;
+  const constraints = extractConstraintDefs(inspection);
+  const resolvers = extractResolverDefs(inspection);
+
+  for (let round = 1; round <= clampedSteps; round++) {
+    // Timeout check
+    if (Date.now() - startTime > timeoutMs) {
+      break;
+    }
+
+    const factsSnapshot = { ...currentFacts };
+    const constraintsFired: string[] = [];
+    const resolversActivated: string[] = [];
+    const factChanges: Array<{ key: string; from: unknown; to: unknown }> = [];
+
+    // Evaluate each constraint against current facts
+    for (const constraint of constraints) {
+      try {
+        const compiled = compileSandboxed(`return (${constraint.whenCode})`, {
+          timeout: 500,
+          maxCodeSize: 2048,
+        });
+        const result = compiled.execute(currentFacts);
+
+        if (Boolean(result)) {
+          constraintsFired.push(constraint.id);
+
+          // Find matching resolver and simulate
+          if (constraint.requirementType) {
+            const resolver = resolvers.find((r) => r.requirement === constraint.requirementType);
+            if (resolver) {
+              resolversActivated.push(resolver.id);
+
+              // Simulate resolver execution
+              try {
+                const factsCopy: Record<string, unknown> = {
+                  ...JSON.parse(JSON.stringify(currentFacts)),
+                  __req: constraint.requireObj ?? {},
+                };
+                const resolverCompiled = compileSandboxed(resolver.resolveCode, {
+                  timeout: 500,
+                  maxCodeSize: 2048,
+                  factWriteAccess: true,
+                });
+                resolverCompiled.execute(factsCopy);
+
+                // Diff and apply changes
+                for (const key of Object.keys(factsCopy)) {
+                  if (key === "__req") {
+                    continue;
+                  }
+
+                  if (JSON.stringify(factsCopy[key]) !== JSON.stringify(currentFacts[key])) {
+                    factChanges.push({
+                      key,
+                      from: currentFacts[key],
+                      to: factsCopy[key],
+                    });
+                    currentFacts[key] = factsCopy[key];
+                  }
+                }
+              } catch {
+                // Resolver simulation failed — skip
+              }
+            }
+          }
+        }
+      } catch {
+        // Constraint evaluation failed — skip
+      }
+    }
+
+    totalConstraintsFired += constraintsFired.length;
+    totalResolversActivated += resolversActivated.length;
+
+    rounds.push({
+      round,
+      factsSnapshot,
+      constraintsFired,
+      resolversActivated,
+      factChanges,
+    });
+
+    // Settled: no constraints fired this round
+    if (constraintsFired.length === 0) {
+      settled = true;
+      break;
+    }
+  }
+
+  return {
+    rounds,
+    finalFacts: { ...currentFacts },
+    totalConstraintsFired,
+    totalResolversActivated,
+    settled,
+  };
+}
+
+/** Extract constraint info from system inspection for simulation. */
+function extractConstraintDefs(inspection: Record<string, unknown>): Array<{
+  id: string;
+  whenCode: string;
+  requirementType: string;
+  requireObj?: Record<string, unknown>;
+}> {
+  const constraints: Array<{
+    id: string;
+    whenCode: string;
+    requirementType: string;
+    requireObj?: Record<string, unknown>;
+  }> = [];
+
+  // Try to extract from inspection.constraints
+  const rawConstraints = inspection.constraints as Record<string, unknown> | undefined;
+  if (rawConstraints && typeof rawConstraints === "object") {
+    for (const [id, def] of Object.entries(rawConstraints)) {
+      if (def && typeof def === "object") {
+        const d = def as Record<string, unknown>;
+        // Only simulate constraints that have whenCode (AI-created ones)
+        if (typeof d.whenCode === "string") {
+          constraints.push({
+            id,
+            whenCode: d.whenCode,
+            requirementType: typeof d.requirementType === "string" ? d.requirementType : "",
+            requireObj: d.require as Record<string, unknown> | undefined,
+          });
+        }
+      }
+    }
+  }
+
+  return constraints;
+}
+
+/** Extract resolver info from system inspection for simulation. */
+function extractResolverDefs(inspection: Record<string, unknown>): Array<{
+  id: string;
+  requirement: string;
+  resolveCode: string;
+}> {
+  const resolvers: Array<{ id: string; requirement: string; resolveCode: string }> = [];
+
+  const rawResolvers = inspection.resolvers as Record<string, unknown> | undefined;
+  if (rawResolvers && typeof rawResolvers === "object") {
+    for (const [id, def] of Object.entries(rawResolvers)) {
+      if (def && typeof def === "object") {
+        const d = def as Record<string, unknown>;
+        if (typeof d.resolveCode === "string" && typeof d.requirement === "string") {
+          resolvers.push({
+            id,
+            requirement: d.requirement,
+            resolveCode: d.resolveCode,
+          });
+        }
+      }
+    }
+  }
+
+  return resolvers;
 }
 
 // ============================================================================
