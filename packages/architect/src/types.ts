@@ -140,7 +140,7 @@ export interface ArchitectBudget {
   tokens: number;
   /** Max dollar spend across all LLM calls. */
   dollars: number;
-  /** C7: Cost per 1K tokens for dollar estimation. Default: 0.003 */
+  /** Cost per 1K tokens for dollar estimation. Default: 0.003 */
   costPerThousandTokens?: number;
 }
 
@@ -148,7 +148,7 @@ export interface ArchitectBudget {
 // Architect Options
 // ============================================================================
 
-/** Item 23: autonomy presets. */
+/** autonomy presets. */
 export type ArchitectPreset = "observer" | "advisor" | "operator" | "autonomous";
 
 /** Configuration for createAIArchitect(). */
@@ -180,13 +180,13 @@ export interface AIArchitectOptions {
   /** External service integration hooks. */
   serviceHooks?: ArchitectServiceHooks;
 
-  /** Item 23: autonomy preset. Applied first, explicit options override. */
+  /** autonomy preset. Applied first, explicit options override. */
   preset?: ArchitectPreset;
 
-  /** Item 33: policies — meta-constraints on the architect itself. */
+  /** policies — meta-constraints on the architect itself. */
   policies?: ArchitectPolicy[];
 
-  /** E10: Suppress the BSL license notice on startup. */
+  /** Suppress the BSL license notice on startup. */
   silent?: boolean;
 }
 
@@ -232,7 +232,7 @@ export interface ArchitectAction {
     id: string;
     code?: string;
   };
-  /** M13: the original trigger that caused this action. */
+  /** the original trigger that caused this action. */
   originalTrigger?: ArchitectAnalysis["trigger"];
   /** Whether this action requires human approval. */
   requiresApproval: boolean;
@@ -292,7 +292,7 @@ export interface AuditEntry {
   error?: string;
   /** Whether this action was later rolled back. */
   rolledBack?: boolean;
-  /** M6: reference to original audit entry this is rolling back. */
+  /** reference to original audit entry this is rolling back. */
   rollbackOf?: string;
   /** Hash of this entry for chain integrity. */
   hash: string;
@@ -340,7 +340,7 @@ export interface RollbackEntry {
   rolledBack: boolean;
 }
 
-/** E11: Result of a single rollback operation. */
+/** Result of a single rollback operation. */
 export interface RollbackResult {
   success: boolean;
   reason?: string;
@@ -438,7 +438,7 @@ export type ArchitectEventType =
   // M8: Approval timeout
   | "approval-timeout";
 
-/** Item 20: Discriminated union event types. */
+/** Discriminated union event types. */
 export interface ArchitectEventBase {
   type: ArchitectEventType;
   timestamp: number;
@@ -484,7 +484,7 @@ export interface ArchitectKilledEvent extends ArchitectEventBase {
   killResult: KillResult;
 }
 
-/** Item 26: Plan step event for multi-step reasoning. */
+/** Plan step event for multi-step reasoning. */
 export interface ArchitectPlanStepEvent extends ArchitectEventBase {
   type: "plan-step";
   stepIndex: number;
@@ -492,21 +492,21 @@ export interface ArchitectPlanStepEvent extends ArchitectEventBase {
   action?: ArchitectAction;
 }
 
-/** Item 27: Streaming reasoning chunk event. */
+/** Streaming reasoning chunk event. */
 export interface ArchitectReasoningChunkEvent extends ArchitectEventBase {
   type: "reasoning-chunk";
   chunk: string;
   accumulated: string;
 }
 
-/** M4: Policy warning event — distinct from errors for non-blocking policy violations. */
+/** Policy warning event — distinct from errors for non-blocking policy violations. */
 export interface ArchitectPolicyWarningEvent extends ArchitectEventBase {
   type: "policy-warning";
   policy: ArchitectPolicy;
   action: ArchitectAction;
 }
 
-/** M8: Approval timeout event — emitted before auto-rejection. */
+/** Approval timeout event — emitted before auto-rejection. */
 export interface ArchitectApprovalTimeoutEvent extends ArchitectEventBase {
   type: "approval-timeout";
   action: ArchitectAction;
@@ -530,7 +530,7 @@ export type ArchitectEvent =
 /** Listener for architect events. */
 export type ArchitectEventListener = (event: ArchitectEvent) => void;
 
-/** M10: Type-safe event map for discriminated on() overload. */
+/** Type-safe event map for discriminated on() overload. */
 export interface ArchitectEventMap {
   "observing": ArchitectProgressEvent;
   "reasoning": ArchitectProgressEvent;
@@ -565,7 +565,7 @@ export interface AIArchitect {
    * @param prompt - Optional prompt for the analysis.
    * @param options - Optional analysis options.
    */
-  analyze(prompt?: string, options?: { mode?: "single" | "plan" }): Promise<ArchitectAnalysis>;
+  analyze(prompt?: string, options?: { mode?: "single" | "plan"; dryRun?: boolean }): Promise<ArchitectAnalysis>;
 
   /**
    * Approve a pending action by its ID.
@@ -605,7 +605,7 @@ export interface AIArchitect {
 
   /** Listen to architect events. Returns unsubscribe function. */
   on(listener: ArchitectEventListener): () => void;
-  /** M10: Type-safe overload — listener receives the specific event type. */
+  /** Type-safe overload — listener receives the specific event type. */
   on<T extends ArchitectEventType>(type: T, listener: (event: ArchitectEventMap[T]) => void): () => void;
 
   /** Query audit log with filters. */
@@ -620,39 +620,45 @@ export interface AIArchitect {
   /** Get current budget usage. */
   getBudgetUsage(): BudgetUsage;
 
-  /** Item 19: Start a discovery session to observe the system for patterns. */
+  /** Start a discovery session to observe the system for patterns. */
   discover(options?: DiscoveryOptions): DiscoverySession;
 
-  /** Item 19: Run a what-if analysis for a proposed action. Accepts full ArchitectAction or simplified WhatIfInput. */
+  /** Run a what-if analysis for a proposed action. Accepts full ArchitectAction or simplified WhatIfInput. */
   whatIf(action: ArchitectAction | WhatIfInput, options?: WhatIfOptions): Promise<WhatIfResult>;
 
-  /** Item 19: Extract the system's constraint graph. */
+  /** Extract the system's constraint graph. */
   graph(options?: Omit<ExtractGraphOptions, "dynamicIds">): SystemGraph;
 
-  /** Item 19: Create a replay recorder for this system. */
+  /** Create a replay recorder for this system. */
   record(): ReplayRecorder;
 
-  /** Item 19: Export an applied action as a shareable federation pattern. */
+  /**
+   * Export an applied action as a shareable federation pattern.
+   * @deprecated Use exportPattern() instead.
+   */
   exportAction(actionId: string, options?: ExportPatternOptions): FederationExport | null;
 
-  /** Item 19: Import a federated pattern and register for approval. */
+  /** Export an applied action as a shareable federation pattern. */
+  exportPattern(actionId: string, options?: ExportPatternOptions): FederationExport | null;
+
+  /** Import a federated pattern and register for approval. */
   importPattern(pattern: FederationPattern): Promise<FederationImportResult>;
 
-  /** Item 24: Get current architect status summary. */
+  /** Get current architect status summary. */
   status(): ArchitectStatus;
 
   /** Stop the architect (clears scheduled triggers, removes watchers). */
   destroy(): void;
 }
 
-/** E5: Unified budget usage shape used by both getBudgetUsage() and status().budget. */
+/** Unified budget usage shape used by both getBudgetUsage() and status().budget. */
 export interface BudgetUsage {
   tokens: number;
   dollars: number;
   percent: { tokens: number; dollars: number };
 }
 
-/** Item 24: Status summary of the architect. */
+/** Status summary of the architect. */
 export interface ArchitectStatus {
   budget: BudgetUsage;
   circuitBreaker: CircuitBreakerState;
@@ -679,7 +685,7 @@ export interface SandboxCompileOptions {
   factWriteAccess?: boolean;
   /** Maximum code size in bytes. Default: 2048 */
   maxCodeSize?: number;
-  /** Item 18: Use worker thread for real timeout enforcement (Node.js only). Default: false */
+  /** Use worker thread for real timeout enforcement (Node.js only). Default: false */
   useWorker?: boolean;
 }
 
@@ -841,7 +847,7 @@ export interface DiscoveryTimelineEvent {
 // What-If Types
 // ============================================================================
 
-/** E3: Simplified input for whatIf() — no reasoning/approval fields needed. */
+/** Simplified input for whatIf() — no reasoning/approval fields needed. */
 export interface WhatIfInput {
   /** The tool the action calls. */
   tool: string;
@@ -965,7 +971,7 @@ export interface ReplayEvent {
 export interface ReplayOptions {
   /** Maximum events to process. Default: all */
   maxEvents?: number;
-  /** Item 16: token budget cap for replay. Stop processing when exceeded. */
+  /** token budget cap for replay. Stop processing when exceeded. */
   budget?: { maxTokens: number };
 }
 
@@ -988,7 +994,7 @@ export interface ReplayResult {
     triggeredEvents: number;
     /** Total actions architect would have taken. */
     totalActions: number;
-    /** Item 16: total tokens used during replay. */
+    /** total tokens used during replay. */
     tokensUsed?: number;
   };
 }
@@ -1021,7 +1027,7 @@ export interface FederationExport {
   pattern: FederationPattern;
   /** Whether the export was successful. */
   success: boolean;
-  /** Item 13: error message if export failed. */
+  /** error message if export failed. */
   error?: string;
 }
 

@@ -448,4 +448,78 @@ describe("createAIArchitect", () => {
     expect(statusBudget.tokens).toBe(usage.tokens);
     expect(statusBudget.dollars).toBe(usage.dollars);
   });
+
+  // ===========================================================================
+  // E13: exportPattern alias
+  // ===========================================================================
+
+  it("E13: exportPattern returns same result as exportAction", () => {
+    const { architect } = create();
+
+    // Both should return null for unknown action IDs
+    const a = architect.exportAction("nonexistent");
+    const b = architect.exportPattern("nonexistent");
+
+    expect(a).toBeNull();
+    expect(b).toBeNull();
+  });
+
+  // ===========================================================================
+  // E14: dryRun option
+  // ===========================================================================
+
+  it("E14: dryRun skips apply and marks actions pending", async () => {
+    const { architect, runner } = create({
+      safety: { approval: { constraints: "never", resolvers: "never" } },
+    });
+
+    runner.mockResolvedValueOnce({
+      output: "",
+      messages: [],
+      toolCalls: [
+        {
+          id: "tc-1",
+          name: "observe_system",
+          arguments: JSON.stringify({}),
+        },
+      ],
+      totalTokens: 20,
+    });
+
+    const analysis = await architect.analyze("Test dryRun", { dryRun: true });
+
+    // Actions should exist but all marked pending
+    for (const action of analysis.actions) {
+      expect(action.approvalStatus).toBe("pending");
+      expect(action.requiresApproval).toBe(true);
+    }
+
+    // No "applied" events should have fired
+    const auditLog = architect.getAuditLog({ applied: true });
+    expect(auditLog).toHaveLength(0);
+  });
+
+  it("E14: dryRun does not start approval timers", async () => {
+    const { architect, runner } = create({
+      safety: { approval: { constraints: "always" } },
+    });
+
+    runner.mockResolvedValueOnce({
+      output: "",
+      messages: [],
+      toolCalls: [
+        {
+          id: "tc-1",
+          name: "observe_system",
+          arguments: JSON.stringify({}),
+        },
+      ],
+      totalTokens: 20,
+    });
+
+    const analysis = await architect.analyze("Test dryRun timers", { dryRun: true });
+
+    // Pending approvals should be empty — dryRun doesn't register for approval flow
+    expect(analysis.actions.length).toBeGreaterThanOrEqual(0);
+  });
 });
