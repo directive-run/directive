@@ -20,7 +20,6 @@ import type {
   ArchitectDefType,
   ArchitectEvent,
   ArchitectEventListener,
-  ArchitectPolicy,
   PolicyContext,
   RollbackEntry,
 } from "./types.js";
