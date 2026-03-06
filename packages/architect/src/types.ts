@@ -488,7 +488,8 @@ export type ArchitectEventType =
   // Phase 2: Health auto-trigger
   | "health-check"
   | "feedback-recorded"
-  | "stories-resolved";
+  | "stories-resolved"
+  | "cross-system-action";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -581,6 +582,14 @@ export interface ArchitectFeedbackEvent extends ArchitectEventBase {
   reason?: string;
 }
 
+/** Cross-system action event — emitted when an action targets a different system than the trigger source. */
+export interface ArchitectCrossSystemEvent extends ArchitectEventBase {
+  type: "cross-system-action";
+  sourceSystem: string;
+  targetSystem: string;
+  action: ArchitectAction;
+}
+
 /** Stories resolved event — emitted when user stories are resolved into config. */
 export interface ArchitectStoriesResolvedEvent extends ArchitectEventBase {
   type: "stories-resolved";
@@ -613,6 +622,7 @@ export type ArchitectEvent =
   | ArchitectApprovalTimeoutEvent
   | ArchitectFallbackEvent
   | ArchitectFeedbackEvent
+  | ArchitectCrossSystemEvent
   | ArchitectStoriesResolvedEvent
   | ArchitectHealthCheckEvent;
 
@@ -644,6 +654,7 @@ export interface ArchitectEventMap {
   "health-check": ArchitectHealthCheckEvent;
   "feedback-recorded": ArchitectFeedbackEvent;
   "stories-resolved": ArchitectStoriesResolvedEvent;
+  "cross-system-action": ArchitectCrossSystemEvent;
 }
 
 // ============================================================================

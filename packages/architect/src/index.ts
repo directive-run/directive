@@ -56,6 +56,7 @@ export type {
   ArchitectApprovalTimeoutEvent,
   ArchitectFallbackEvent,
   ArchitectFeedbackEvent,
+  ArchitectCrossSystemEvent,
   ArchitectStoriesResolvedEvent,
   ArchitectHealthCheckEvent,
   ArchitectEventType,
@@ -256,6 +257,13 @@ export {
 // Metrics & Observability
 export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
 
+// Multi-System Orchestration
+export {
+  createMultiSystemArchitect,
+  type MultiSystemArchitect,
+  type MultiSystemArchitectOptions,
+} from "./multi-system.js";
+
 // Hash utility
 export { fnv1a } from "./hash.js";
 
@@ -271,6 +279,7 @@ export {
   assertBudgetWithin,
   assertFeedbackRecorded,
   createTestStories,
+  createTestMultiSystem,
   createTestAuditStore,
   createTestCheckpointStore,
   type MockRunnerResponse,
