@@ -274,6 +274,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       versionCounter,
       guardState: guards.exportState(),
       auditCounter: auditLog.size(),
+      feedbackEntries: feedbackStore?.getSnapshot(),
     };
   }
 
@@ -1531,7 +1532,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       feedbackStore.record({
         actionId,
         tool: action.tool,
-        arguments: action.arguments,
+        toolArguments: action.arguments,
         approved: true,
         risk: action.risk,
       });
@@ -1577,7 +1578,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       feedbackStore.record({
         actionId,
         tool: action.tool,
-        arguments: action.arguments,
+        toolArguments: action.arguments,
         approved: false,
         reason,
         risk: action.risk,
@@ -1939,6 +1940,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     guards.importState(checkpoint.guardState);
     guards.setDefinitionCount(dynamicIds.size);
     invalidateActiveDefsCache();
+
+    // Restore feedback entries
+    if (feedbackStore && checkpoint.feedbackEntries) {
+      feedbackStore.hydrate(checkpoint.feedbackEntries);
+    }
 
     return true;
   }

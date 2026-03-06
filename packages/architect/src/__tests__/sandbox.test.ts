@@ -576,9 +576,9 @@ describe("sandbox", () => {
       expect(typeof obj.values).toBe("function");
       expect(typeof obj.entries).toBe("function");
       expect(typeof obj.freeze).toBe("function");
-      expect(typeof obj.assign).toBe("function");
       expect(typeof obj.hasOwn).toBe("function");
-      // Dangerous methods should NOT exist
+      // Dangerous methods should NOT exist — assign copies prototype-polluting props
+      expect(obj.assign).toBeUndefined();
       expect(obj.defineProperty).toBeUndefined();
       expect(obj.setPrototypeOf).toBeUndefined();
       expect(obj.getPrototypeOf).toBeUndefined();

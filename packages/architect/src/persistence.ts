@@ -13,6 +13,7 @@ import type {
   RollbackEntry,
   CircuitBreakerState,
 } from "./types.js";
+import type { FeedbackEntry } from "./learning.js";
 
 // ============================================================================
 // Audit Store
@@ -69,6 +70,8 @@ export interface ArchitectCheckpoint {
   guardState: GuardStateSnapshot;
   /** Audit counter for continued ID generation. */
   auditCounter: number;
+  /** Feedback entries from the learning store (if enabled). */
+  feedbackEntries?: FeedbackEntry[];
 }
 
 /** Pluggable checkpoint storage interface. */
