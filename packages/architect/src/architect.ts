@@ -21,6 +21,7 @@ import { createWhatIfAnalysis } from "./what-if.js";
 import { extractSystemGraph } from "./graph.js";
 import { createReplayRecorder } from "./replay.js";
 import { exportPattern, importPattern } from "./federation.js";
+import { computeHealthScore } from "./health.js";
 
 // ============================================================================
 // Mutex: one architect per system
@@ -262,6 +263,41 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     }, intervalMs);
   }
 
+  // ---- Wire onHealthDecline — periodic health polling ----
+  let healthTimer: ReturnType<typeof setInterval> | undefined;
+
+  if (options.triggers?.onHealthDecline) {
+    const healthConfig = options.triggers.onHealthDecline;
+    const threshold = healthConfig.threshold ?? 50;
+    const minDrop = healthConfig.minDrop ?? 10;
+    const pollMs = parseInterval(healthConfig.pollInterval ?? "30s");
+    let previousScore = 100; // Start optimistic
+
+    healthTimer = setInterval(() => {
+      const health = computeHealthScore(options.system);
+      const drop = previousScore - health.score;
+      const shouldTrigger = health.score < threshold && drop >= minDrop;
+
+      pipeline.emitEvent({
+        type: "health-check",
+        timestamp: Date.now(),
+        score: health.score,
+        previousScore,
+        threshold,
+        triggered: shouldTrigger,
+      });
+
+      if (shouldTrigger) {
+        const context = `Health score dropped from ${previousScore} to ${health.score} (threshold: ${threshold}). Warnings: ${health.warnings.join("; ")}`;
+        pipeline.analyze("health-decline", context).catch(() => {
+          // Swallow — errors emitted via events
+        });
+      }
+
+      previousScore = health.score;
+    }, pollMs);
+  }
+
   // E10: BSL notice — gate behind NODE_ENV !== "production" and !silent
   if (!bslPrinted && typeof console !== "undefined" && typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && process.env?.NODE_ENV !== "production" && !options.silent) {
     bslPrinted = true;
@@ -420,6 +456,14 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return importPattern(pattern, options.system, options.runner);
     },
 
+    getOutcomes() {
+      return pipeline.outcomeTracker?.getOutcomes() ?? [];
+    },
+
+    getOutcomePatterns() {
+      return pipeline.outcomeTracker?.getPatterns() ?? [];
+    },
+
     // Item 24: status summary — E5: uses unified BudgetUsage shape
     status(): ArchitectStatus {
       const budgetUsage = pipeline.getBudgetUsage();
@@ -449,6 +493,10 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
       if (scheduleTimer) {
         clearInterval(scheduleTimer);
+      }
+
+      if (healthTimer) {
+        clearInterval(healthTimer);
       }
 
       // Close metrics provider
