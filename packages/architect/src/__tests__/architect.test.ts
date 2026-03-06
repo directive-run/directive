@@ -527,12 +527,12 @@ describe("createAIArchitect", () => {
   // M7: Destroyed guard
   // ===========================================================================
 
-  it("M7: mutation methods throw after destroy", () => {
+  it("M7: mutation methods throw after destroy", async () => {
     const { architect } = create();
 
     architect.destroy();
 
-    expect(() => architect.analyze()).toThrow("Architect has been destroyed");
+    await expect(architect.analyze()).rejects.toThrow("Architect has been destroyed");
     expect(() => architect.rollback("x")).toThrow("Architect has been destroyed");
     expect(() => architect.rollbackBatch([])).toThrow("Architect has been destroyed");
     expect(() => architect.graph()).toThrow("Architect has been destroyed");

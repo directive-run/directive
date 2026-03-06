@@ -473,6 +473,22 @@ export function assertFeedbackRecorded(
 }
 
 /**
+ * Create sample stories for testing story resolution.
+ *
+ * @returns An array of Story objects suitable for test scenarios.
+ */
+export function createTestStories(): Array<string | { as?: string; when: string; iWant: string; soThat?: string }> {
+  return [
+    "Keep error count under 10",
+    {
+      when: "errors spike above threshold",
+      iWant: "add a rate limiter",
+      soThat: "the system stays healthy",
+    },
+  ];
+}
+
+/**
  * Assert budget usage is within expected bounds.
  *
  * @param architect - The AIArchitect instance to check.
