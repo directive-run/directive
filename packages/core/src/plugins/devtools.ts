@@ -969,5 +969,29 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       });
       panelEvent("run.complete", { id: run.id });
     },
+
+    onDefinitionRegister: (type, id) => {
+      addEvent("definition.register", { type, id });
+      recordEvent("definition.register", { type, id });
+      panelEvent("definition.register", { type, id });
+    },
+
+    onDefinitionAssign: (type, id) => {
+      addEvent("definition.assign", { type, id });
+      recordEvent("definition.assign", { type, id });
+      panelEvent("definition.assign", { type, id });
+    },
+
+    onDefinitionUnregister: (type, id) => {
+      addEvent("definition.unregister", { type, id });
+      recordEvent("definition.unregister", { type, id });
+      panelEvent("definition.unregister", { type, id });
+    },
+
+    onDefinitionCall: (type, id, props) => {
+      addEvent("definition.call", { type, id, props });
+      recordEvent("definition.call", { type, id, props });
+      panelEvent("definition.call", { type, id, props });
+    },
   };
 }

@@ -131,6 +131,12 @@ export interface PluginManager<_S extends Schema = any> {
   emitError(error: DirectiveError): void;
   emitErrorRecovery(error: DirectiveError, strategy: RecoveryStrategy): void;
 
+  // Dynamic definition hooks
+  emitDefinitionRegister(type: string, id: string, def: unknown): void;
+  emitDefinitionAssign(type: string, id: string, def: unknown, original: unknown): void;
+  emitDefinitionUnregister(type: string, id: string): void;
+  emitDefinitionCall(type: string, id: string, props?: unknown): void;
+
   // Run history hooks
   emitRunComplete(run: RunChangelogEntry): void;
 }
@@ -390,6 +396,31 @@ export function createPluginManager<
     emitErrorRecovery(error: DirectiveError, strategy: RecoveryStrategy): void {
       for (const plugin of plugins) {
         safeCall(() => plugin.onErrorRecovery?.(error, strategy));
+      }
+    },
+
+    // Dynamic definition hooks
+    emitDefinitionRegister(type: string, id: string, def: unknown): void {
+      for (const plugin of plugins) {
+        safeCall(() => plugin.onDefinitionRegister?.(type, id, def));
+      }
+    },
+
+    emitDefinitionAssign(type: string, id: string, def: unknown, original: unknown): void {
+      for (const plugin of plugins) {
+        safeCall(() => plugin.onDefinitionAssign?.(type, id, def, original));
+      }
+    },
+
+    emitDefinitionUnregister(type: string, id: string): void {
+      for (const plugin of plugins) {
+        safeCall(() => plugin.onDefinitionUnregister?.(type, id));
+      }
+    },
+
+    emitDefinitionCall(type: string, id: string, props?: unknown): void {
+      for (const plugin of plugins) {
+        safeCall(() => plugin.onDefinitionCall?.(type, id, props));
       }
     },
 

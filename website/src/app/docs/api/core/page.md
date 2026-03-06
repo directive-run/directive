@@ -116,11 +116,19 @@ const count = system.facts.count;
 
 ### derive
 
-Read-only proxy for derivations.
+Read-only proxy for derivations. Also exposes runtime registration methods.
 
 ```typescript
-// Derivations recompute automatically when their tracked facts change
+// Read derivations (recompute automatically when tracked facts change)
 const total = system.derive.cartTotal;
+
+// Runtime registration
+system.derive.register("tripled", (facts) => facts.count * 3);
+system.derive.assign("doubled", (facts) => facts.count * 20);
+system.derive.unregister("tripled");
+system.derive.call("doubled");            // recompute, ignoring cache
+system.derive.isDynamic("tripled");       // true
+system.derive.listDynamic();              // ["tripled"]
 ```
 
 ### events
@@ -131,22 +139,64 @@ Accessor for the system's event definitions.
 
 Runtime control for constraints.
 
-```typescript
-// Temporarily suppress a constraint (e.g., during maintenance)
-system.constraints.disable("myConstraint");
+| Method | Description |
+|--------|-------------|
+| `disable(id)` | Skip constraint during reconciliation |
+| `enable(id)` | Re-enable a disabled constraint |
+| `isDisabled(id)` | Check if disabled |
+| `register(id, def)` | Add a new constraint at runtime |
+| `assign(id, def)` | Override an existing constraint |
+| `unregister(id)` | Remove a dynamically registered constraint |
+| `call(id, props?)` | Evaluate and return requirements |
+| `isDynamic(id)` | Check if dynamically registered |
+| `listDynamic()` | List all dynamic constraint IDs |
 
-// Re-enable it to resume normal evaluation
+```typescript
+system.constraints.disable("myConstraint");
 system.constraints.enable("myConstraint");
+system.constraints.register("newRule", { when: ..., require: ... });
+system.constraints.assign("newRule", { when: ..., require: ... });
+system.constraints.unregister("newRule");
 ```
 
 ### effects
 
 Runtime control for effects.
 
+| Method | Description |
+|--------|-------------|
+| `disable(id)` | Skip effect during reconciliation |
+| `enable(id)` | Re-enable a disabled effect |
+| `isEnabled(id)` | Check if enabled |
+| `register(id, def)` | Add a new effect at runtime |
+| `assign(id, def)` | Override an existing effect |
+| `unregister(id)` | Remove a dynamically registered effect |
+| `call(id)` | Execute effect immediately |
+| `isDynamic(id)` | Check if dynamically registered |
+| `listDynamic()` | List all dynamic effect IDs |
+
 ```typescript
-system.effects.disable("myEffect");     // pause a side effect
-system.effects.enable("myEffect");      // resume it
-system.effects.isEnabled("myEffect");   // check current state
+system.effects.disable("myEffect");
+system.effects.enable("myEffect");
+system.effects.register("logger", { run: (facts) => console.log(facts) });
+```
+
+### resolvers
+
+Runtime control for resolvers.
+
+| Method | Description |
+|--------|-------------|
+| `register(id, def)` | Add a new resolver at runtime |
+| `assign(id, def)` | Override an existing resolver |
+| `unregister(id)` | Remove a dynamically registered resolver |
+| `call(id, requirement)` | Execute resolver with a requirement |
+| `isDynamic(id)` | Check if dynamically registered |
+| `listDynamic()` | List all dynamic resolver IDs |
+
+```typescript
+system.resolvers.register("loadData", { requirement: "LOAD", resolve: ... });
+await system.resolvers.call("loadData", { type: "LOAD", id: "123" });
 ```
 
 ### debug

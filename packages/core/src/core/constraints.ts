@@ -123,6 +123,30 @@ export interface ConstraintsManager<_S extends Schema> {
    * @param newDefs - New constraint definitions to merge into the manager.
    */
   registerDefinitions(newDefs: ConstraintsDef<Schema>): void;
+  /**
+   * Override an existing constraint definition.
+   * Stores the original in an internal map for inspection.
+   *
+   * @param id - The constraint definition ID to override.
+   * @param def - The new constraint definition.
+   * @throws If no constraint with this ID exists.
+   */
+  assignDefinition(id: string, def: ConstraintsDef<Schema>[string]): void;
+  /**
+   * Remove a constraint definition and all its internal state.
+   *
+   * @param id - The constraint definition ID to remove.
+   */
+  unregisterDefinition(id: string): void;
+  /**
+   * Evaluate a single constraint and emit its requirement if active.
+   * Props are merged into the requirement object.
+   *
+   * @param id - The constraint definition ID.
+   * @param props - Optional properties to merge into the requirement.
+   * @returns The emitted requirements (if any).
+   */
+  callOne(id: string, props?: Record<string, unknown>): Promise<RequirementWithId[]>;
 }
 
 /**
@@ -231,6 +255,7 @@ export function createConstraintsManager<S extends Schema>(
    * Maps each constraint ID to the set of constraints that depend on it via `after`.
    */
   function buildReverseDependencyMap(): void {
+    dependsOnMe.clear();
     for (const [id, def] of Object.entries(definitions)) {
       if (def.after) {
         for (const depId of def.after) {
@@ -1024,6 +1049,112 @@ export function createConstraintsManager<S extends Schema>(
       // so new `after` deps are validated for cycles and indexed
       detectCyclesAndComputeTopoOrder();
       buildReverseDependencyMap();
+    },
+
+    assignDefinition(id: string, def: ConstraintsDef<Schema>[string]): void {
+      if (!definitions[id]) {
+        throw new Error(
+          `[Directive] Cannot assign constraint "${id}" — it does not exist. Use register() to create it.`,
+        );
+      }
+
+      // Replace definition
+      (definitions as Record<string, unknown>)[id] = def;
+      // Re-init state for the new definition
+      initState(id);
+      dirtyConstraints.add(id);
+      // Invalidate cached sort order (priority may have changed)
+      sortedConstraintIds = null;
+      // Rebuild topo order + reverse deps in case `after` changed
+      detectCyclesAndComputeTopoOrder();
+      buildReverseDependencyMap();
+    },
+
+    unregisterDefinition(id: string): void {
+      if (!definitions[id]) {
+        return;
+      }
+
+      // Remove from all internal maps
+      delete (definitions as Record<string, unknown>)[id];
+      states.delete(id);
+      disabled.delete(id);
+      asyncConstraintIds.delete(id);
+      dirtyConstraints.delete(id);
+      noFireConstraints.delete(id);
+      resolvedConstraints.delete(id);
+      lastRequirements.delete(id);
+      latestWhenDeps.delete(id);
+
+      // Clean dependency maps
+      const deps = constraintDeps.get(id);
+      if (deps) {
+        for (const dep of deps) {
+          const constraints = factToConstraints.get(dep);
+          if (constraints) {
+            constraints.delete(id);
+            if (constraints.size === 0) {
+              factToConstraints.delete(dep);
+            }
+          }
+        }
+        constraintDeps.delete(id);
+      }
+
+      // Clean reverse dependency map
+      dependsOnMe.delete(id);
+      for (const depSet of dependsOnMe.values()) {
+        depSet.delete(id);
+      }
+
+      // Invalidate cached sort order
+      sortedConstraintIds = null;
+      // Rebuild topo order
+      detectCyclesAndComputeTopoOrder();
+      buildReverseDependencyMap();
+    },
+
+    async callOne(id: string, props?: Record<string, unknown>): Promise<RequirementWithId[]> {
+      const def = definitions[id];
+      if (!def) {
+        throw new Error(
+          `[Directive] Cannot call constraint "${id}" — it does not exist.`,
+        );
+      }
+
+      // Respect disabled state
+      if (disabled.has(id)) {
+        return [];
+      }
+
+      const state = getState(id);
+      let active: boolean;
+
+      if (state.isAsync) {
+        active = await evaluateAsync(id);
+      } else {
+        const result = evaluateSync(id);
+        active = result instanceof Promise ? await result : result;
+      }
+
+      if (!active) {
+        return [];
+      }
+
+      // Get requirements and merge props if provided
+      const { requirements: reqs } = getRequirements(id);
+      if (reqs.length === 0) {
+        return [];
+      }
+
+      const keyFn = requirementKeys[id];
+      const result: RequirementWithId[] = [];
+      for (const req of reqs) {
+        const merged = props ? { ...req, ...props } : req;
+        result.push(createRequirementWithId(merged, id, keyFn));
+      }
+
+      return result;
     },
   };
 
