@@ -12,6 +12,7 @@ import type { System } from "@directive-run/core";
 import type {
   AIArchitect,
   AIArchitectOptions,
+  ArchitectAction,
 } from "./types.js";
 import { createAIArchitect } from "./architect.js";
 import { computeHealthScore, type HealthScore } from "./health.js";
@@ -36,6 +37,8 @@ export interface MultiSystemArchitect extends AIArchitect {
   getAggregateHealth(): HealthScore & { perSystem: Record<string, HealthScore> };
   /** Get all managed system names. */
   getSystems(): string[];
+  /** Get detected cross-system actions (actions referencing multiple systems). */
+  getCrossSystemActions(): Array<{ sourceSystem: string; targetSystem: string; action: ArchitectAction }>;
 }
 
 // ============================================================================
@@ -137,7 +140,12 @@ function createCompositeSystem(
 
       const sepIdx = prop.indexOf(SEPARATOR);
       if (sepIdx === -1) {
-        return false;
+        // Fall through to first system (consistent with get())
+        const [, firstSystem] = systemEntries[0] ?? [];
+
+        return firstSystem
+          ? prop in (firstSystem.facts as Record<string, unknown>)
+          : false;
       }
 
       const sysName = prop.slice(0, sepIdx);
@@ -162,14 +170,16 @@ function createCompositeSystem(
     for (const [name, sys] of systemEntries) {
       const inspection = sys.inspect() as unknown as Record<string, unknown>;
 
-      // Namespace constraint/resolver IDs
-      if (Array.isArray(inspection.constraints)) {
-        (result.constraints as unknown[]).push(
-          ...inspection.constraints.map((c: { id?: string }) => ({
-            ...c,
-            id: c.id ? `${name}${SEPARATOR}${c.id}` : c.id,
-          })),
-        );
+      // Namespace all definition IDs
+      for (const defType of ["constraints", "resolvers", "derivations", "effects"] as const) {
+        if (Array.isArray(inspection[defType])) {
+          (result[defType] as unknown[]).push(
+            ...inspection[defType].map((c: { id?: string }) => ({
+              ...c,
+              id: c.id ? `${name}${SEPARATOR}${c.id}` : c.id,
+            })),
+          );
+        }
       }
 
       if (Array.isArray(inspection.pendingRequirements)) {
@@ -228,15 +238,23 @@ function createCompositeSystem(
     };
   }
 
-  // Batch delegates to all systems
+  // Batch delegates to all systems — nest batches so all systems coalesce
   function batch(fn: () => void): void {
-    // Use first system's batch — mutations route through proxy
-    const [, firstSystem] = systemEntries[0] ?? [];
-    if (firstSystem) {
-      firstSystem.batch(fn);
-    } else {
+    if (systemEntries.length === 0) {
       fn();
+
+      return;
     }
+
+    // Nest batch calls: outermost system wraps fn, each inner system wraps the next
+    let wrapped = fn;
+    for (let i = systemEntries.length - 1; i >= 0; i--) {
+      const sys = systemEntries[i]![1];
+      const inner = wrapped;
+      wrapped = () => sys.batch(inner);
+    }
+
+    wrapped();
   }
 
   function explain(id: string): unknown {
@@ -356,6 +374,15 @@ export function createMultiSystemArchitect(
     throw new Error("createMultiSystemArchitect requires at least one system");
   }
 
+  // E7: validate health weights
+  if (healthWeights) {
+    for (const [name, weight] of Object.entries(healthWeights)) {
+      if (typeof weight !== "number" || weight < 0) {
+        throw new Error(`Invalid health weight for "${name}": must be a non-negative number`);
+      }
+    }
+  }
+
   // Build composite system
   const compositeSystem = createCompositeSystem(systems);
 
@@ -449,10 +476,47 @@ export function createMultiSystemArchitect(
     return [...systemNames];
   }
 
+  // C3: Detect cross-system actions and track them via event listeners.
+  // We collect cross-system action metadata alongside standard events.
+  const crossSystemActions: Array<{ sourceSystem: string; targetSystem: string; action: ArchitectAction }> = [];
+
+  architect.on("applied", (event) => {
+    const action = event.action;
+    const args = action.arguments;
+
+    // Detect which systems are referenced in the action's arguments
+    const referencedSystems = new Set<string>();
+    for (const value of Object.values(args)) {
+      if (typeof value === "string") {
+        const sepIdx = value.indexOf(SEPARATOR);
+        if (sepIdx > 0) {
+          const sysName = value.slice(0, sepIdx);
+          if (sysName in systems) {
+            referencedSystems.add(sysName);
+          }
+        }
+      }
+    }
+
+    // If the action references keys from multiple systems, record it
+    if (referencedSystems.size > 1) {
+      const arr = [...referencedSystems];
+      crossSystemActions.push({
+        sourceSystem: arr[0]!,
+        targetSystem: arr[1]!,
+        action,
+      });
+    }
+  });
+
   // Extend the architect with multi-system methods
   return Object.assign(architect, {
     getSystemHealth,
     getAggregateHealth,
     getSystems,
+    /** Get detected cross-system actions. */
+    getCrossSystemActions() {
+      return [...crossSystemActions];
+    },
   }) as MultiSystemArchitect;
 }

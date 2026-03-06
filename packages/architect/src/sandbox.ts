@@ -386,24 +386,26 @@ export function createSandboxScope(
   return scope;
 }
 
-// C5: Constrained Array facade — only safe static methods
+// C5: Constrained Array facade — only safe static methods (null-prototype)
 function createSafeArray(): Record<string, unknown> {
-  return Object.freeze({
-    isArray: Array.isArray.bind(Array),
-  });
+  const facade = Object.create(null) as Record<string, unknown>;
+  facade.isArray = Array.isArray.bind(Array);
+
+  return Object.freeze(facade);
 }
 
-// C5: Constrained Object facade — only safe static methods
+// C5: Constrained Object facade — only safe read-only static methods.
+// Object.assign is excluded: it copies all own properties including prototype-polluting ones.
 function createSafeObject(): Record<string, unknown> {
-  return Object.freeze({
-    keys: Object.keys.bind(Object),
-    values: Object.values.bind(Object),
-    entries: Object.entries.bind(Object),
-    freeze: Object.freeze.bind(Object),
-    assign: Object.assign.bind(Object),
-    hasOwn: (Object as { hasOwn?: (o: object, k: PropertyKey) => boolean }).hasOwn?.bind(Object)
-      ?? ((obj: object, key: PropertyKey) => Object.prototype.hasOwnProperty.call(obj, key)),
-  });
+  const facade = Object.create(null) as Record<string, unknown>;
+  facade.keys = Object.keys.bind(Object);
+  facade.values = Object.values.bind(Object);
+  facade.entries = Object.entries.bind(Object);
+  facade.freeze = Object.freeze.bind(Object);
+  facade.hasOwn = (Object as { hasOwn?: (o: object, k: PropertyKey) => boolean }).hasOwn?.bind(Object)
+    ?? ((obj: object, key: PropertyKey) => Object.prototype.hasOwnProperty.call(obj, key));
+
+  return Object.freeze(facade);
 }
 
 function getGlobal(name: string): unknown {

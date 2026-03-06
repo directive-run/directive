@@ -25,6 +25,7 @@ import type {
   ArchitectAction,
   ArchitectAnalysis,
 } from "./types.js";
+import type { Story } from "./intent.js";
 import { createAIArchitect } from "./architect.js";
 import {
   createInMemoryAuditStore,
@@ -494,7 +495,7 @@ export function assertFeedbackRecorded(
  *
  * @returns An array of Story objects suitable for test scenarios.
  */
-export function createTestStories(): Array<string | { as?: string; when: string; iWant: string; soThat?: string }> {
+export function createTestStories(): Story[] {
   return [
     "Keep error count under 10",
     {

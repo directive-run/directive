@@ -59,6 +59,7 @@ export type {
   ArchitectCrossSystemEvent,
   ArchitectStoriesResolvedEvent,
   ArchitectHealthCheckEvent,
+  ArchitectPauseEvent,
   ArchitectEventType,
   ArchitectEventListener,
   ArchitectEventMap,
