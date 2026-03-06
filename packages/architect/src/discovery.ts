@@ -58,7 +58,7 @@ export function createDiscoverySession(
 
   // ---- Subscribe to system events ----
 
-  const sys = system as Record<string, unknown>;
+  const sys = system as unknown as Record<string, unknown>;
 
   // Subscribe to fact changes
   if (typeof sys.subscribe === "function") {
@@ -140,7 +140,7 @@ export function createDiscoverySession(
       }
     }
 
-    for (const [key, count] of unmetCounts) {
+    for (const [_key, count] of unmetCounts) {
       if (count >= 3) {
         patterns.push({
           type: "recurring-unmet",

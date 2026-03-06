@@ -48,7 +48,7 @@ export function createReplayRecorder(system: System): ReplayRecorder {
     initialState = JSON.parse(JSON.stringify(system.facts ?? {}));
     events.length = 0;
 
-    const sys = system as Record<string, unknown>;
+    const sys = system as unknown as Record<string, unknown>;
 
     // Record fact snapshots on changes
     if (typeof sys.subscribe === "function") {
@@ -241,7 +241,7 @@ export async function replayWithArchitect(
 
 function getUnmetRequirements(system: System): string[] {
   try {
-    const inspection = system.inspect() as Record<string, unknown>;
+    const inspection = system.inspect() as unknown as Record<string, unknown>;
     const pending = inspection.pendingRequirements as Array<Record<string, unknown>> | undefined;
 
     if (Array.isArray(pending)) {

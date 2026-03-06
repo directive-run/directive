@@ -421,7 +421,7 @@ function executeCreateResolver(
         compiled.execute({ ...factsCopy, __req: req });
 
         // Diff and write back changed facts via system.batch() if available
-        const sys = toolCtx.system as Record<string, unknown>;
+        const sys = toolCtx.system as unknown as Record<string, unknown>;
         const batchFn = typeof sys.batch === "function" ? sys.batch.bind(sys) : null;
 
         const writeBack = () => {
@@ -483,7 +483,7 @@ function executeSetFact(
     }
 
     // Write via batch if available
-    const sys = toolCtx.system as Record<string, unknown>;
+    const sys = toolCtx.system as unknown as Record<string, unknown>;
     const batchFn = typeof sys.batch === "function" ? sys.batch.bind(sys) : null;
 
     const writeBack = () => {
