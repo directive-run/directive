@@ -56,6 +56,7 @@ export type {
   ArchitectApprovalTimeoutEvent,
   ArchitectFallbackEvent,
   ArchitectFeedbackEvent,
+  ArchitectStoriesResolvedEvent,
   ArchitectHealthCheckEvent,
   ArchitectEventType,
   ArchitectEventListener,
@@ -233,6 +234,16 @@ export {
   type TemplateInstantiation,
 } from "./templates.js";
 
+// Intent / Stories
+export {
+  resolveStories,
+  mergeStoryConfig,
+  type Story,
+  type StructuredStory,
+  type StoryResolutionOptions,
+  type StoryResolutionResult,
+} from "./intent.js";
+
 // Learning / Feedback
 export {
   createFeedbackStore,
@@ -259,6 +270,7 @@ export {
   assertKilled,
   assertBudgetWithin,
   assertFeedbackRecorded,
+  createTestStories,
   createTestAuditStore,
   createTestCheckpointStore,
   type MockRunnerResponse,

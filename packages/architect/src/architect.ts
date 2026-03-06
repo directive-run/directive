@@ -22,6 +22,7 @@ import { extractSystemGraph } from "./graph.js";
 import { createReplayRecorder } from "./replay.js";
 import { exportPattern, importPattern } from "./federation.js";
 import { computeHealthScore } from "./health.js";
+import { resolveStories, mergeStoryConfig } from "./intent.js";
 
 // ============================================================================
 // Mutex: one architect per system
@@ -112,6 +113,99 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   let isDestroyedFlag = false;
   let isPausedFlag = false;
   const queuedWhilePaused: Array<() => void> = [];
+
+  // ---- Story resolution state ----
+  let storiesResolved = !options.stories || options.stories.length === 0;
+  let storyResolutionPromise: Promise<void> | undefined;
+
+  async function ensureStoriesResolved(): Promise<void> {
+    if (storiesResolved) {
+      return;
+    }
+
+    if (storyResolutionPromise) {
+      return storyResolutionPromise;
+    }
+
+    storyResolutionPromise = (async () => {
+      try {
+        const result = await resolveStories(
+          options.stories!,
+          options.system,
+          options.runner,
+          options.storyResolution,
+        );
+
+        // Merge: explicit config overrides story-derived
+        const merged = mergeStoryConfig(options, result.config);
+
+        // Apply merged config — update mutable fields
+        // Story-derived context supplements but never overwrites required fields
+        if (merged.context) {
+          const storyCtx = merged.context;
+          if (!options.context) {
+            // Only set if story provides a description (required field)
+            if (storyCtx.description) {
+              options.context = {
+                description: storyCtx.description,
+                goals: storyCtx.goals,
+                notes: storyCtx.notes,
+              };
+            }
+          } else {
+            // Merge goals/notes from story, keep existing values
+            if (storyCtx.goals && !options.context.goals) {
+              options.context.goals = storyCtx.goals;
+            }
+
+            if (storyCtx.notes && !options.context.notes) {
+              options.context.notes = storyCtx.notes;
+            }
+          }
+        }
+
+        if (merged.triggers) {
+          options.triggers = {
+            ...options.triggers,
+            ...(merged.triggers as typeof options.triggers),
+          };
+        }
+
+        if (merged.capabilities) {
+          options.capabilities = {
+            ...options.capabilities,
+            ...(merged.capabilities as typeof options.capabilities),
+          };
+        }
+
+        if (merged.safety) {
+          options.safety = {
+            ...options.safety,
+            ...(merged.safety as typeof options.safety),
+          };
+        }
+
+        pipeline.emitEvent({
+          type: "stories-resolved",
+          timestamp: Date.now(),
+          config: result.config,
+          rawResponse: result.rawResponse,
+        });
+      } catch {
+        // Stories resolution is best-effort — don't crash the architect
+        pipeline.emitEvent({
+          type: "error",
+          timestamp: Date.now(),
+          error: new Error("Failed to resolve stories"),
+        });
+      } finally {
+        storiesResolved = true;
+        storyResolutionPromise = undefined;
+      }
+    })();
+
+    return storyResolutionPromise;
+  }
 
   // M4: cost estimation for discovery/whatIf budget tracking
   const costPerThousandTokens = options.budget.costPerThousandTokens ?? 0.003;
@@ -369,8 +463,9 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
   // ---- Build the public interface ----
   // M7: fix on() — proper type discrimination
   const architect: AIArchitect = {
-    analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan"; dryRun?: boolean }): Promise<ArchitectAnalysis> {
+    async analyze(prompt?: string, analyzeOpts?: { mode?: "single" | "plan"; dryRun?: boolean }): Promise<ArchitectAnalysis> {
       assertNotDestroyed();
+      await ensureStoriesResolved();
 
       return pipeline.analyze("demand", undefined, prompt, 0, analyzeOpts?.mode, analyzeOpts?.dryRun);
     },
@@ -544,6 +639,10 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
     get isPaused() {
       return isPausedFlag;
+    },
+
+    async ready(): Promise<void> {
+      await ensureStoriesResolved();
     },
 
     // Item 24: status summary — E5: uses unified BudgetUsage shape
