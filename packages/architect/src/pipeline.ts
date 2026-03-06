@@ -50,6 +50,7 @@ import {
 import type { AuditStore, CheckpointStore, ArchitectCheckpoint } from "./persistence.js";
 import { createOutcomeTracker, type OutcomeTracker } from "./outcomes.js";
 import { createCustomToolRegistry, type CustomToolRegistry, type CustomToolContext } from "./custom-tools.js";
+import { createTemplateRegistry, type TemplateRegistry } from "./templates.js";
 import { computeHealthScore } from "./health.js";
 
 // M1: StaleSnapshotError for retry at mutex level
@@ -200,6 +201,9 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
   }
 
+  // ---- Template Registry ----
+  const templateRegistry: TemplateRegistry = createTemplateRegistry(options.templates);
+
   // ---- State ----
   const dynamicIds = new Set<string>();
   // E15: cap actions Map at 1000 with FIFO eviction
@@ -291,21 +295,45 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
   }
 
-  // ---- Available tools (dynamic to include custom tools) ----
+  // ---- Available tools (dynamic to include custom tools + templates) ----
+  const templateTools: import("./types.js").ArchitectToolDef[] = [
+    {
+      name: "list_templates",
+      description: "List all available constraint templates with descriptions and parameters.",
+      parameters: {},
+      requiredCapability: null,
+      mutates: false,
+    },
+    {
+      name: "apply_template",
+      description: "Instantiate a constraint template with parameters. Creates the constraint (and resolver if applicable) in the system.",
+      parameters: {
+        templateId: { type: "string", description: "The template ID to instantiate.", required: true },
+        params: { type: "object", description: "Template parameters as key-value pairs.", required: true },
+      },
+      requiredCapability: "constraints",
+      mutates: true,
+    },
+  ];
+
   function getAllTools() {
     const builtIn = getAvailableTools(capabilities);
     const custom = customToolRegistry.getToolDefs();
+    const all = [...builtIn, ...templateTools, ...custom];
 
-    return custom.length > 0 ? [...builtIn, ...custom] : builtIn;
+    return all;
   }
 
   function getSystemPrompt() {
-    return buildSystemPrompt(
+    const prompt = buildSystemPrompt(
       getAllTools(),
       options.context?.description,
       options.context?.goals,
       options.context?.notes,
     );
+
+    // Append template catalog
+    return prompt + "\n\n" + templateRegistry.formatForPrompt();
   }
 
   // ---- Tool execution context ----
@@ -322,6 +350,73 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     // M2: pass capabilities for capability-gated operations
     capabilities,
   };
+
+  // ---- Template tool dispatch ----
+  function executeToolWithTemplates(
+    toolName: string,
+    args: Record<string, unknown>,
+    toolCtx: ToolExecutionContext,
+  ): import("./tools.js").ToolResult {
+    if (toolName === "list_templates") {
+      return {
+        success: true,
+        data: templateRegistry.list().map((t) => ({
+          id: t.id,
+          name: t.name,
+          description: t.description,
+          category: t.category,
+          type: t.type,
+          parameters: t.parameters,
+        })),
+      };
+    }
+
+    if (toolName === "apply_template") {
+      const templateId = args.templateId as string | undefined;
+      const params = args.params as Record<string, unknown> | undefined;
+
+      if (!templateId || !params) {
+        return { success: false, error: "templateId and params are required" };
+      }
+
+      const instantiation = templateRegistry.instantiate(templateId, params);
+      if (!instantiation) {
+        return { success: false, error: `Template "${templateId}" not found or missing required parameters.` };
+      }
+
+      // Apply constraint
+      if (instantiation.constraintArgs) {
+        const constraintResult = executeTool("create_constraint", instantiation.constraintArgs, toolCtx);
+        if (!constraintResult.success) {
+          return constraintResult;
+        }
+      }
+
+      // Apply resolver
+      if (instantiation.resolverArgs) {
+        const resolverResult = executeTool("create_resolver", instantiation.resolverArgs, toolCtx);
+        if (!resolverResult.success) {
+          return resolverResult;
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          templateId,
+          constraintCreated: !!instantiation.constraintArgs,
+          resolverCreated: !!instantiation.resolverArgs,
+          constraintId: instantiation.constraintArgs?.id,
+          resolverId: instantiation.resolverArgs?.id,
+        },
+        definition: instantiation.constraintArgs
+          ? { type: "constraint" as const, id: instantiation.constraintArgs.id, code: instantiation.constraintArgs.whenCode }
+          : undefined,
+      };
+    }
+
+    return executeTool(toolName, args, toolCtx);
+  }
 
   // ============================================================================
   // Core: Analyze
@@ -1198,7 +1293,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     }
 
     const applySpan = metrics.startSpan?.("architect.apply_action", { tool: action.tool, risk: action.risk });
-    let result = executeTool(action.tool, action.arguments, toolContext);
+    let result = executeToolWithTemplates(action.tool, action.arguments, toolContext);
 
     // If built-in tool not found, try custom tool registry
     if (!result.success && result.error?.startsWith("Unknown tool:") && customToolRegistry.size() > 0) {
@@ -1790,6 +1885,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     guards,
     outcomeTracker,
     customToolRegistry,
+    templateRegistry,
     on,
     emitEvent,
     destroy,

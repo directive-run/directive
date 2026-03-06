@@ -211,6 +211,16 @@ export {
   type CustomToolRegistry,
 } from "./custom-tools.js";
 
+// Constraint Templates
+export {
+  createTemplateRegistry,
+  BUILT_IN_TEMPLATES,
+  type ConstraintTemplate,
+  type TemplateParameter,
+  type TemplateRegistry,
+  type TemplateInstantiation,
+} from "./templates.js";
+
 // Metrics & Observability
 export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
 
