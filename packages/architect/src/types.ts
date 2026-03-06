@@ -22,6 +22,7 @@ import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 import type { FallbackStrategy } from "./fallback.js";
 import type { LearningConfig } from "./learning.js";
+import type { Story, StoryResolutionOptions } from "./intent.js";
 
 // ============================================================================
 // Definition Types
@@ -229,6 +230,10 @@ export interface AIArchitectOptions {
   adaptiveContext?: AdaptiveContextConfig;
   /** Learning mode: track human feedback to improve AI decisions over time. */
   learning?: LearningConfig;
+  /** Intent-based configuration via user stories. Resolved lazily on first analyze() or via ready(). */
+  stories?: Story[];
+  /** Options for story resolution. */
+  storyResolution?: StoryResolutionOptions;
 }
 
 // ============================================================================
@@ -482,7 +487,8 @@ export type ArchitectEventType =
   | "fallback-activated"
   // Phase 2: Health auto-trigger
   | "health-check"
-  | "feedback-recorded";
+  | "feedback-recorded"
+  | "stories-resolved";
 
 /** Discriminated union event types. */
 export interface ArchitectEventBase {
@@ -575,6 +581,13 @@ export interface ArchitectFeedbackEvent extends ArchitectEventBase {
   reason?: string;
 }
 
+/** Stories resolved event — emitted when user stories are resolved into config. */
+export interface ArchitectStoriesResolvedEvent extends ArchitectEventBase {
+  type: "stories-resolved";
+  config: Partial<AIArchitectOptions>;
+  rawResponse: string;
+}
+
 /** Health check event — emitted on each health poll. */
 export interface ArchitectHealthCheckEvent extends ArchitectEventBase {
   type: "health-check";
@@ -600,6 +613,7 @@ export type ArchitectEvent =
   | ArchitectApprovalTimeoutEvent
   | ArchitectFallbackEvent
   | ArchitectFeedbackEvent
+  | ArchitectStoriesResolvedEvent
   | ArchitectHealthCheckEvent;
 
 /** Listener for architect events. */
@@ -629,6 +643,7 @@ export interface ArchitectEventMap {
   "fallback-activated": ArchitectFallbackEvent;
   "health-check": ArchitectHealthCheckEvent;
   "feedback-recorded": ArchitectFeedbackEvent;
+  "stories-resolved": ArchitectStoriesResolvedEvent;
 }
 
 // ============================================================================
@@ -749,6 +764,12 @@ export interface AIArchitect {
 
   /** Get current architect status summary. */
   status(): ArchitectStatus;
+
+  /**
+   * Ensure the architect is fully initialized (stories resolved, etc.).
+   * Resolves immediately if no stories are configured or already resolved.
+   */
+  ready(): Promise<void>;
 
   /** Stop the architect (clears scheduled triggers, removes watchers). */
   destroy(): void;
