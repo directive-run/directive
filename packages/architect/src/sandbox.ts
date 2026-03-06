@@ -68,6 +68,7 @@ const DEFAULT_BLOCKED_PATTERNS = [
 const DEFAULT_ALLOWED_GLOBALS = ["Math", "JSON", "console"] as const;
 
 // E9: safe globals whitelist — allowedGlobals validated against this
+// C5: Array and Object provided as constrained facades (see getGlobal)
 const SAFE_GLOBALS = new Set([
   "Math",
   "JSON",
@@ -187,6 +188,13 @@ export function staticAnalysis(
     violations.push('Blocked bracket-notation access to __proto__/constructor/prototype');
   }
 
+  // M8: block arrow functions (=> but not >=)
+  // Match => that is NOT preceded by > (which would make >=)
+  const arrowRegex = /(?<!>)=>/;
+  if (arrowRegex.test(code) || arrowRegex.test(normalized)) {
+    violations.push('Blocked pattern found: "=>" (arrow functions are not allowed)');
+  }
+
   // Item 10: detect iteration methods (dot+name+open-paren to avoid false positives)
   const iterationMethods = [".forEach(", ".map(", ".reduce(", ".filter(", ".some(", ".every(", ".find(", ".flatMap("];
   for (const method of iterationMethods) {
@@ -204,6 +212,36 @@ export function staticAnalysis(
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// ============================================================================
+// M9: Single Expression Validation
+// ============================================================================
+
+/**
+ * Validate that code is a single expression (no semicolons outside string literals).
+ * Used for `whenCode` and `deriveCode` which should be expressions, not statements.
+ * Resolver code (`resolveCode`) can be multi-statement.
+ *
+ * @param code - The code string to validate.
+ * @returns `null` if valid, or an error message string if invalid.
+ */
+export function validateSingleExpression(code: string): string | null {
+  // Strip string literals to avoid false positives on semicolons inside strings
+  const stripped = code
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+    .trim();
+
+  // Remove a single trailing semicolon (valid for single-statement code like `return x;`)
+  const withoutTrailing = stripped.endsWith(";") ? stripped.slice(0, -1) : stripped;
+
+  if (withoutTrailing.includes(";")) {
+    return "Code must be a single expression (no semicolons). Multi-statement code is only allowed in resolveCode.";
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -348,6 +386,26 @@ export function createSandboxScope(
   return scope;
 }
 
+// C5: Constrained Array facade — only safe static methods
+function createSafeArray(): Record<string, unknown> {
+  return Object.freeze({
+    isArray: Array.isArray.bind(Array),
+  });
+}
+
+// C5: Constrained Object facade — only safe static methods
+function createSafeObject(): Record<string, unknown> {
+  return Object.freeze({
+    keys: Object.keys.bind(Object),
+    values: Object.values.bind(Object),
+    entries: Object.entries.bind(Object),
+    freeze: Object.freeze.bind(Object),
+    assign: Object.assign.bind(Object),
+    hasOwn: (Object as { hasOwn?: (o: object, k: PropertyKey) => boolean }).hasOwn?.bind(Object)
+      ?? ((obj: object, key: PropertyKey) => Object.prototype.hasOwnProperty.call(obj, key)),
+  });
+}
+
 function getGlobal(name: string): unknown {
   switch (name) {
     case "Math":
@@ -365,9 +423,9 @@ function getGlobal(name: string): unknown {
     case "Boolean":
       return Boolean;
     case "Array":
-      return Array;
+      return createSafeArray();
     case "Object":
-      return Object;
+      return createSafeObject();
     case "parseInt":
       return parseInt;
     case "parseFloat":
