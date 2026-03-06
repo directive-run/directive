@@ -53,6 +53,7 @@ import { createCustomToolRegistry, type CustomToolRegistry, type CustomToolConte
 import { createTemplateRegistry, type TemplateRegistry } from "./templates.js";
 import { createHealthTrend, buildAdaptiveContext, type HealthTrend } from "./adaptive-context.js";
 import { computeHealthScore } from "./health.js";
+import { createFeedbackStore, type FeedbackStore } from "./learning.js";
 
 // M1: StaleSnapshotError for retry at mutex level
 class StaleSnapshotError extends Error {
@@ -192,6 +193,11 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
   // ---- Outcome Tracking ----
   const outcomeTracker: OutcomeTracker | undefined = options.outcomeTracking
     ? createOutcomeTracker(options.outcomeTracking)
+    : undefined;
+
+  // ---- Learning / Feedback ----
+  const feedbackStore: FeedbackStore | undefined = options.learning
+    ? createFeedbackStore(options.learning)
     : undefined;
 
   // ---- Custom Tools ----
@@ -359,6 +365,14 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       const adaptiveText = buildAdaptiveContext(contextData, adaptiveConfig);
       if (adaptiveText) {
         enriched += "\n\n" + adaptiveText;
+      }
+    }
+
+    // Append human feedback context if available
+    if (feedbackStore) {
+      const feedbackText = feedbackStore.formatForPrompt();
+      if (feedbackText) {
+        enriched += "\n\n" + feedbackText;
       }
     }
 
@@ -1414,13 +1428,22 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
       // Outcome tracking: schedule health measurement after action
       if (outcomeTracker) {
         const healthBefore = computeHealthScore(system).score;
+        const actionId = action.id;
         outcomeTracker.scheduleOutcome(
-          action.id,
+          actionId,
           action.tool,
           trigger,
           action.reasoning.justification.slice(0, 100),
           healthBefore,
-          () => computeHealthScore(system).score,
+          () => {
+            const score = computeHealthScore(system).score;
+            // Bridge outcome to feedback store
+            if (feedbackStore) {
+              feedbackStore.updateHealthDelta(actionId, score - healthBefore);
+            }
+
+            return score;
+          },
         );
       }
 
@@ -1503,13 +1526,31 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     action.approvalStatus = "approved";
     emitEvent({ type: "approval-response", timestamp: Date.now(), action });
 
+    // Record feedback
+    if (feedbackStore) {
+      feedbackStore.record({
+        actionId,
+        tool: action.tool,
+        arguments: action.arguments,
+        approved: true,
+        risk: action.risk,
+      });
+      emitEvent({
+        type: "feedback-recorded",
+        timestamp: Date.now(),
+        actionId,
+        tool: action.tool,
+        approved: true,
+      });
+    }
+
     // Apply the action using the original trigger
     await applyAction(action, action.originalTrigger ?? "demand");
 
     return true;
   }
 
-  function reject(actionId: string): boolean {
+  function reject(actionId: string, reason?: string): boolean {
     // Item 12: guard against use after destroy
     if (destroyed) {
       return false;
@@ -1530,6 +1571,26 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     metrics.counter("architect.action.rejected", 1, { tool: action.tool });
     metrics.gauge("architect.approvals.pending", getPendingApprovals().length);
     emitEvent({ type: "approval-response", timestamp: Date.now(), action });
+
+    // Record feedback
+    if (feedbackStore) {
+      feedbackStore.record({
+        actionId,
+        tool: action.tool,
+        arguments: action.arguments,
+        approved: false,
+        reason,
+        risk: action.risk,
+      });
+      emitEvent({
+        type: "feedback-recorded",
+        timestamp: Date.now(),
+        actionId,
+        tool: action.tool,
+        approved: false,
+        reason,
+      });
+    }
 
     const rejectEntry = auditLog.append({
       trigger: action.originalTrigger ?? "demand",
@@ -1906,6 +1967,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
 
     approvalTimers.clear();
     outcomeTracker?.destroy();
+    feedbackStore?.destroy();
     guards.destroy();
   }
 
@@ -1926,6 +1988,7 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     resetBudget: guards.resetBudget,
     guards,
     outcomeTracker,
+    feedbackStore,
     customToolRegistry,
     templateRegistry,
     healthTrend,

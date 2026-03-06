@@ -382,10 +382,10 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     // M6: reject returns Promise<boolean> for consistency with approve
-    reject(actionId: string): Promise<boolean> {
+    reject(actionId: string, reason?: string): Promise<boolean> {
       assertNotDestroyed();
 
-      return Promise.resolve(pipeline.reject(actionId));
+      return Promise.resolve(pipeline.reject(actionId, reason));
     },
 
     rollback(actionId: string) {
