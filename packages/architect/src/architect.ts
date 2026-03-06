@@ -105,7 +105,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
   // M3: wire onError/onUnmetRequirement via system.onSettledChange()
   if (options.triggers?.onError || options.triggers?.onUnmetRequirement) {
-    const sys = options.system as Record<string, unknown>;
+    const sys = options.system as unknown as Record<string, unknown>;
     if (typeof sys.onSettledChange === "function") {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -133,7 +133,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
 
   // M3: wire onFactChange via system.subscribe()
   if (options.triggers?.onFactChange && options.triggers.onFactChange.length > 0) {
-    const sys = options.system as Record<string, unknown>;
+    const sys = options.system as unknown as Record<string, unknown>;
     if (typeof sys.subscribe === "function") {
       let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
