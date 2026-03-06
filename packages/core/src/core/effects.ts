@@ -106,6 +106,26 @@ export interface EffectsManager<_S extends Schema = Schema> {
    * @param newDefs - New effect definitions to merge into the manager.
    */
   registerDefinitions(newDefs: EffectsDef<Schema>): void;
+  /**
+   * Override an existing effect definition. Runs cleanup of the old effect first.
+   *
+   * @param id - The effect definition ID to override.
+   * @param def - The new effect definition.
+   * @throws If no effect with this ID exists.
+   */
+  assignDefinition(id: string, def: EffectsDef<Schema>[string]): void;
+  /**
+   * Remove an effect definition. Runs cleanup (try-catch) and removes from state.
+   *
+   * @param id - The effect definition ID to remove.
+   */
+  unregisterDefinition(id: string): void;
+  /**
+   * Execute an effect's `run()` function immediately.
+   *
+   * @param id - The effect definition ID.
+   */
+  callOne(id: string): Promise<void>;
 }
 
 /** Internal effect state */
@@ -406,6 +426,78 @@ export function createEffectsManager<S extends Schema>(
       for (const [key, def] of Object.entries(newDefs)) {
         (definitions as Record<string, unknown>)[key] = def;
         initState(key);
+      }
+    },
+
+    assignDefinition(id: string, def: EffectsDef<S>[string]): void {
+      if (!definitions[id]) {
+        throw new Error(
+          `[Directive] Cannot assign effect "${id}" — it does not exist. Use register() to create it.`,
+        );
+      }
+
+      // Run cleanup of old effect before replacing
+      const state = states.get(id);
+      if (state) {
+        runCleanup(state);
+      }
+
+      // Replace definition and re-init state
+      (definitions as Record<string, unknown>)[id] = def;
+      initState(id);
+    },
+
+    unregisterDefinition(id: string): void {
+      if (!definitions[id]) {
+        return;
+      }
+
+      // Run cleanup (try-catch inside runCleanup)
+      const state = states.get(id);
+      if (state) {
+        runCleanup(state);
+      }
+
+      // Remove from all maps
+      delete (definitions as Record<string, unknown>)[id];
+      states.delete(id);
+    },
+
+    async callOne(id: string): Promise<void> {
+      const def = definitions[id];
+      if (!def) {
+        throw new Error(
+          `[Directive] Cannot call effect "${id}" — it does not exist.`,
+        );
+      }
+
+      const state = getState(id);
+      if (!state.enabled) {
+        return;
+      }
+
+      // Run cleanup of previous run
+      runCleanup(state);
+
+      onRun?.(id, state.dependencies ? [...state.dependencies] : []);
+
+      try {
+        let effectPromise: unknown;
+        store.batch(() => {
+          effectPromise = def.run(
+            facts,
+            previousSnapshot as InferSchema<S> | null,
+          );
+        });
+        if (effectPromise instanceof Promise) {
+          const result = await effectPromise;
+          storeCleanup(state, result);
+        } else {
+          storeCleanup(state, effectPromise);
+        }
+      } catch (error) {
+        onError?.(id, error);
+        console.error(`[Directive] Effect "${id}" threw an error:`, error);
       }
     },
   };

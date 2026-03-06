@@ -45,6 +45,12 @@ export interface DerivationsManager<
   getDependencies(id: keyof D): Set<string>;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
+  /** Override an existing derivation function */
+  assignDefinition(id: string, fn: DerivationsDef<S>[keyof DerivationsDef<S>]): void;
+  /** Remove a derivation and clean up its state */
+  unregisterDefinition(id: string): void;
+  /** Compute a derivation immediately (ignores cache) */
+  callOne(id: string): unknown;
 }
 
 /** Options for creating a derivations manager */
@@ -411,6 +417,86 @@ export function createDerivationsManager<
         (definitions as Record<string, unknown>)[key] = fn;
         initState(key);
       }
+    },
+
+    assignDefinition(id: string, fn: DerivationsDef<S>[keyof DerivationsDef<S>]): void {
+      if (!definitions[id as keyof D]) {
+        throw new Error(
+          `[Directive] Cannot assign derivation "${id}" — it does not exist. Use register() to create it.`,
+        );
+      }
+
+      // Replace definition
+      (definitions as Record<string, unknown>)[id] = fn;
+
+      // Mark stale so it recomputes with the new function
+      const state = states.get(id);
+      if (state) {
+        state.isStale = true;
+        pendingNotifications.add(id);
+      }
+
+      flushNotifications();
+    },
+
+    unregisterDefinition(id: string): void {
+      if (!definitions[id as keyof D]) {
+        return;
+      }
+
+      // Clean up dependency maps
+      const state = states.get(id);
+      if (state) {
+        for (const dep of state.dependencies) {
+          if (states.has(dep)) {
+            const depSet = derivedToDerivedDeps.get(dep);
+            depSet?.delete(id);
+            if (depSet && depSet.size === 0) {
+              derivedToDerivedDeps.delete(dep);
+            }
+          } else {
+            const depSet = factToDerivedDeps.get(dep);
+            depSet?.delete(id);
+            if (depSet && depSet.size === 0) {
+              factToDerivedDeps.delete(dep);
+            }
+          }
+        }
+      }
+
+      // Invalidate dependents (derivations that depend on this one)
+      const dependents = derivedToDerivedDeps.get(id);
+      if (dependents) {
+        invalidationDepth++;
+        try {
+          for (const dependent of dependents) {
+            invalidateDerivation(dependent);
+          }
+        } finally {
+          invalidationDepth--;
+        }
+        derivedToDerivedDeps.delete(id);
+      }
+
+      // Remove from all maps
+      delete (definitions as Record<string, unknown>)[id];
+      states.delete(id);
+      listeners.delete(id);
+      pendingNotifications.delete(id);
+
+      flushNotifications();
+    },
+
+    callOne(id: string): unknown {
+      const def = definitions[id as keyof D];
+      if (!def) {
+        throw new Error(
+          `[Directive] Cannot call derivation "${id}" — it does not exist.`,
+        );
+      }
+
+      // Always recompute (call ignores cache)
+      return computeDerivation(id);
     },
   };
 

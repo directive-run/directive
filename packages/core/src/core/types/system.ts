@@ -323,6 +323,36 @@ export interface ConstraintsControl {
   enable(id: string): void;
   /** Check if a constraint is currently disabled */
   isDisabled(id: string): boolean;
+  /**
+   * Register a new constraint at runtime.
+   * @throws If a constraint with this ID already exists (use `assign` to override)
+   * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
+   */
+  register(id: string, def: Record<string, unknown>): void;
+  /**
+   * Override an existing constraint (static or dynamic).
+   * Stores the original definition for potential inspection.
+   * @throws If no constraint with this ID exists (use `register` to create)
+   * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
+   */
+  assign(id: string, def: Record<string, unknown>): void;
+  /**
+   * Remove a dynamically registered constraint.
+   * Static (module-defined) constraints cannot be unregistered — logs a dev warning and no-ops.
+   * @remarks During reconciliation, the unregistration is deferred and applied after the current cycle completes.
+   */
+  unregister(id: string): void;
+  /**
+   * Invoke a constraint's `when()` predicate. If true, evaluates its `require()` and returns the requirements
+   * (with optional props merged). The requirements are returned for inspection but NOT automatically dispatched
+   * to the resolver system.
+   * @throws If no constraint with this ID exists
+   */
+  call(id: string, props?: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+  /** Check if a constraint was dynamically registered (not from a module definition) */
+  isDynamic(id: string): boolean;
+  /** List all dynamically registered constraint IDs */
+  listDynamic(): string[];
 }
 
 /** Runtime control for effects */
@@ -333,6 +363,66 @@ export interface EffectsControl {
   enable(id: string): void;
   /** Check if an effect is currently enabled */
   isEnabled(id: string): boolean;
+  /**
+   * Register a new effect at runtime.
+   * @throws If an effect with this ID already exists (use `assign` to override)
+   * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
+   */
+  register(id: string, def: Record<string, unknown>): void;
+  /**
+   * Override an existing effect (static or dynamic).
+   * Runs cleanup of the old effect before replacing.
+   * @throws If no effect with this ID exists (use `register` to create)
+   * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
+   */
+  assign(id: string, def: Record<string, unknown>): void;
+  /**
+   * Remove a dynamically registered effect.
+   * Static (module-defined) effects cannot be unregistered — logs a dev warning and no-ops.
+   * @remarks During reconciliation, the unregistration is deferred and applied after the current cycle completes.
+   */
+  unregister(id: string): void;
+  /**
+   * Execute an effect's `run()` function immediately.
+   * @throws If no effect with this ID exists
+   */
+  call(id: string): Promise<void>;
+  /** Check if an effect was dynamically registered (not from a module definition) */
+  isDynamic(id: string): boolean;
+  /** List all dynamically registered effect IDs */
+  listDynamic(): string[];
+}
+
+/** Runtime control for resolvers */
+export interface ResolversControl {
+  /**
+   * Register a new resolver at runtime.
+   * @throws If a resolver with this ID already exists (use `assign` to override)
+   * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
+   */
+  register(id: string, def: Record<string, unknown>): void;
+  /**
+   * Override an existing resolver (static or dynamic).
+   * Clears the resolver-by-type cache.
+   * @throws If no resolver with this ID exists (use `register` to create)
+   * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
+   */
+  assign(id: string, def: Record<string, unknown>): void;
+  /**
+   * Remove a dynamically registered resolver.
+   * Static (module-defined) resolvers cannot be unregistered — logs a dev warning and no-ops.
+   * @remarks During reconciliation, the unregistration is deferred and applied after the current cycle completes.
+   */
+  unregister(id: string): void;
+  /**
+   * Execute a resolver's `resolve()` with a requirement object.
+   * @throws If no resolver with this ID exists
+   */
+  call(id: string, requirement: { type: string; [key: string]: unknown }): Promise<void>;
+  /** Check if a resolver was dynamically registered (not from a module definition) */
+  isDynamic(id: string): boolean;
+  /** List all dynamically registered resolver IDs */
+  listDynamic(): string[];
 }
 
 export interface System<M extends ModuleSchema = ModuleSchema> {
@@ -342,6 +432,7 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly events: EventsAccessorFromSchema<M>;
   readonly constraints: ConstraintsControl;
   readonly effects: EffectsControl;
+  readonly resolvers: ResolversControl;
   /** Per-run changelog entries (null if debug.runHistory is not enabled) */
   readonly runHistory: RunChangelogEntry[] | null;
 

@@ -211,5 +211,21 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
         strategy,
       });
     },
+
+    onDefinitionRegister: (type, id) => {
+      log("info", "definition.register", { type, id });
+    },
+
+    onDefinitionAssign: (type, id) => {
+      log("info", "definition.assign", { type, id });
+    },
+
+    onDefinitionUnregister: (type, id) => {
+      log("info", "definition.unregister", { type, id });
+    },
+
+    onDefinitionCall: (type, id, props) => {
+      log("debug", "definition.call", { type, id, props });
+    },
   };
 }

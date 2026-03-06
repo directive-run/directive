@@ -123,6 +123,27 @@ export interface ResolversManager<_S extends Schema> {
    * @param newDefs - New resolver definitions to merge into the manager.
    */
   registerDefinitions(newDefs: ResolversDef<Schema>): void;
+  /**
+   * Override an existing resolver definition.
+   *
+   * @param id - The resolver definition ID to override.
+   * @param def - The new resolver definition.
+   * @throws If no resolver with this ID exists.
+   */
+  assignDefinition(id: string, def: ResolversDef<Schema>[string]): void;
+  /**
+   * Remove a resolver definition. Cancels any inflight resolution.
+   *
+   * @param id - The resolver definition ID to remove.
+   */
+  unregisterDefinition(id: string): void;
+  /**
+   * Execute a resolver with a given requirement object.
+   *
+   * @param id - The resolver definition ID.
+   * @param requirement - The requirement to resolve.
+   */
+  callOne(id: string, requirement: Requirement): Promise<void>;
 }
 
 /** Internal resolver state */
@@ -983,6 +1004,84 @@ export function createResolversManager<S extends Schema>(
       }
       // Clear the resolver-by-type cache so new resolvers are discovered
       resolversByType.clear();
+    },
+
+    assignDefinition(id: string, def: ResolversDef<Schema>[string]): void {
+      if (!definitions[id]) {
+        throw new Error(
+          `[Directive] Cannot assign resolver "${id}" — it does not exist. Use register() to create it.`,
+        );
+      }
+
+      // Replace definition
+      (definitions as Record<string, unknown>)[id] = def;
+      // Clear cache so the new definition is discoverable
+      resolversByType.clear();
+    },
+
+    unregisterDefinition(id: string): void {
+      if (!definitions[id]) {
+        return;
+      }
+
+      // Cancel any inflight resolutions using this resolver
+      for (const [reqId, state] of inflight) {
+        if (state.resolverId === id) {
+          state.controller.abort();
+          inflight.delete(reqId);
+          statuses.set(reqId, {
+            state: "canceled",
+            requirementId: reqId,
+            canceledAt: Date.now(),
+          });
+          onCancel?.(id, state.originalRequirement);
+        }
+      }
+
+      // Remove from batch queues
+      const batch = batches.get(id);
+      if (batch) {
+        if (batch.timer) {
+          clearTimeout(batch.timer);
+        }
+        for (const req of batch.requirements) {
+          statuses.set(req.id, {
+            state: "canceled",
+            requirementId: req.id,
+            canceledAt: Date.now(),
+          });
+          onCancel?.(id, req);
+        }
+        batches.delete(id);
+      }
+
+      delete (definitions as Record<string, unknown>)[id];
+      resolversByType.clear();
+      cleanupStatuses();
+    },
+
+    async callOne(id: string, requirement: Requirement): Promise<void> {
+      const def = definitions[id];
+      if (!def) {
+        throw new Error(
+          `[Directive] Cannot call resolver "${id}" — it does not exist.`,
+        );
+      }
+
+      const controller = new AbortController();
+      const ctx = createContext(controller.signal);
+
+      if (def.resolve) {
+        let resolvePromise!: Promise<void>;
+        store.batch(() => {
+          resolvePromise = def.resolve!(
+            requirement as Parameters<NonNullable<typeof def.resolve>>[0],
+            ctx,
+          ) as Promise<void>;
+        });
+
+        await resolvePromise;
+      }
     },
   };
 
