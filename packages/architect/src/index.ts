@@ -202,6 +202,15 @@ export {
   type OutcomeTracker,
 } from "./outcomes.js";
 
+// Custom Tool Registration
+export {
+  createCustomToolRegistry,
+  type CustomToolDef,
+  type CustomToolContext,
+  type CustomToolResult,
+  type CustomToolRegistry,
+} from "./custom-tools.js";
+
 // Metrics & Observability
 export { createNoopMetrics, type MetricsProvider, type SpanHandle } from "./metrics.js";
 
