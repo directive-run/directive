@@ -406,4 +406,43 @@ describe("createAIArchitect", () => {
     // but the flag should have been set. Verify pre-destroy state was correct.
     expect(true).toBe(true);
   });
+
+  // ===========================================================================
+  // E2: parseInterval supports "d" unit
+  // ===========================================================================
+
+  it("E2: accepts day unit in onSchedule", () => {
+    // Creating with onSchedule: "1d" should not throw
+    const system = mockSystem();
+    const runner = mockRunner();
+
+    const architect = createAIArchitect({
+      system: system as never,
+      runner,
+      budget: { tokens: 10_000, dollars: 10 },
+      triggers: { onSchedule: "1d", minInterval: 0 },
+    });
+
+    architects.push(architect);
+
+    expect(architect.status().isDestroyed).toBe(false);
+  });
+
+  // ===========================================================================
+  // E5: budget shape consistency
+  // ===========================================================================
+
+  it("E5: status().budget has same shape as getBudgetUsage()", () => {
+    const { architect } = create();
+
+    const usage = architect.getBudgetUsage();
+    const statusBudget = architect.status().budget;
+
+    // Both should have .percent.tokens and .percent.dollars
+    expect(statusBudget.percent).toBeDefined();
+    expect(statusBudget.percent.tokens).toBe(usage.percent.tokens);
+    expect(statusBudget.percent.dollars).toBe(usage.percent.dollars);
+    expect(statusBudget.tokens).toBe(usage.tokens);
+    expect(statusBudget.dollars).toBe(usage.dollars);
+  });
 });
