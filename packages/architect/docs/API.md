@@ -111,6 +111,9 @@ See [Configuration Reference](#configuration-reference) for `AIArchitectOptions`
 | `getOutcomePatterns()` | `OutcomePattern[]` | Get aggregated outcome patterns |
 | `registerTool(def)` | `void` | Register a custom tool |
 | `unregisterTool(name)` | `boolean` | Unregister a custom tool |
+| `pause()` | `void` | Pause automatic triggers (demand analysis still works) |
+| `resume()` | `void` | Resume triggers and drain queued callbacks |
+| `isPaused` | `boolean` | Whether the architect is paused |
 | `status()` | `ArchitectStatus` | Get architect status summary |
 | `destroy()` | `void` | Stop the architect |
 
