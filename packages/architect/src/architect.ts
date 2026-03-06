@@ -215,8 +215,9 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return pipeline.approve(actionId);
     },
 
-    reject(actionId: string): boolean {
-      return pipeline.reject(actionId);
+    // M6: reject returns Promise<boolean> for consistency with approve
+    reject(actionId: string): Promise<boolean> {
+      return Promise.resolve(pipeline.reject(actionId));
     },
 
     rollback(actionId: string): boolean {
