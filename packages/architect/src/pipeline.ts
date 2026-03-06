@@ -204,6 +204,8 @@ export function createPipeline(pipelineOpts: PipelineOptions) {
     },
     dynamicIds,
     rollbackFn: rollbackAction,
+    // M2: pass capabilities for capability-gated operations
+    capabilities,
   };
 
   // ============================================================================

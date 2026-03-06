@@ -15,6 +15,20 @@ import type { SandboxCompileOptions } from "./types.js";
 import { compileSandboxed, SandboxError } from "./sandbox.js";
 
 // ============================================================================
+// Item 7: ID validation
+// ============================================================================
+
+const ID_REGEX = /^[a-zA-Z][a-zA-Z0-9_-]{0,99}$/;
+
+function validateId(id: string, context: string): string | null {
+  if (!ID_REGEX.test(id)) {
+    return `Invalid ${context} ID "${id}". Must start with a letter, contain only letters/numbers/underscores/hyphens, and be 1-100 characters.`;
+  }
+
+  return null;
+}
+
+// ============================================================================
 // E11: Error sanitization utility
 // ============================================================================
 
@@ -126,6 +140,48 @@ export const TOOL_DEFINITIONS: readonly ArchitectToolDef[] = [
     requiredCapability: "resolvers",
     mutates: true,
   },
+  // Item 22: create_effect tool
+  {
+    name: "create_effect",
+    description:
+      "Register a new effect in the system. Effects are fire-and-forget side effects that run when facts change. Provide a `run` function body.",
+    parameters: {
+      id: {
+        type: "string",
+        description: "Unique ID for the effect.",
+        required: true,
+      },
+      runCode: {
+        type: "string",
+        description:
+          'JavaScript function body for the `run` function. Receives `facts` as parameter. Example: "console.log(facts.status);"',
+        required: true,
+      },
+    },
+    requiredCapability: "effects",
+    mutates: true,
+  },
+  // Item 22: create_derivation tool
+  {
+    name: "create_derivation",
+    description:
+      "Register a new derivation (computed value) in the system. Derivations are pure functions that derive values from facts. Provide a `derive` expression.",
+    parameters: {
+      id: {
+        type: "string",
+        description: "Unique ID for the derivation.",
+        required: true,
+      },
+      deriveCode: {
+        type: "string",
+        description:
+          'JavaScript expression for the derivation. Receives `facts` as parameter. Must return a value. Example: "facts.count * 2"',
+        required: true,
+      },
+    },
+    requiredCapability: "derivations",
+    mutates: true,
+  },
   // M15: set_fact tool
   {
     name: "set_fact",
@@ -222,6 +278,8 @@ export interface ToolExecutionContext {
   dynamicIds: Set<string>;
   /** Rollback function provided by the architect. */
   rollbackFn: (actionId: string) => boolean;
+  /** M2: Current capabilities for capability-gated operations. */
+  capabilities?: ArchitectCapabilities;
 }
 
 export interface ToolResult {
@@ -261,6 +319,12 @@ export function executeTool(
 
     case "create_resolver":
       return executeCreateResolver(args, toolCtx);
+
+    case "create_effect":
+      return executeCreateEffect(args, toolCtx);
+
+    case "create_derivation":
+      return executeCreateDerivation(args, toolCtx);
 
     case "set_fact":
       return executeSetFact(args, toolCtx);
@@ -351,6 +415,11 @@ function executeCreateConstraint(
     return { success: false, error: "id, whenCode, and require are required" };
   }
 
+  const idError = validateId(id, "constraint");
+  if (idError) {
+    return { success: false, error: idError };
+  }
+
   try {
     // Compile the when function in sandbox
     const compiled = compileSandboxed(
@@ -400,6 +469,11 @@ function executeCreateResolver(
       success: false,
       error: "id, requirement, and resolveCode are required",
     };
+  }
+
+  const idError = validateId(id, "resolver");
+  if (idError) {
+    return { success: false, error: idError };
   }
 
   try {
@@ -452,6 +526,103 @@ function executeCreateResolver(
       success: true,
       data: { registered: true },
       definition: { type: "resolver", id, code: resolveCode },
+    };
+  } catch (err) {
+    if (err instanceof SandboxError) {
+      return { success: false, error: `Sandbox: ${err.message}` };
+    }
+
+    return { success: false, error: sanitizeError(err) };
+  }
+}
+
+// Item 22: create_effect tool execution
+function executeCreateEffect(
+  args: Record<string, unknown>,
+  toolCtx: ToolExecutionContext,
+): ToolResult {
+  const id = args.id as string | undefined;
+  const runCode = args.runCode as string | undefined;
+
+  if (!id || !runCode) {
+    return { success: false, error: "id and runCode are required" };
+  }
+
+  const idError = validateId(id, "effect");
+  if (idError) {
+    return { success: false, error: idError };
+  }
+
+  try {
+    const compiled = compileSandboxed(runCode, toolCtx.sandboxOptions);
+
+    const effectDef = {
+      run: (facts: Record<string, unknown>) => {
+        compiled.execute(facts);
+      },
+    };
+
+    toolCtx.system.effects.register(id, effectDef as never);
+    toolCtx.dynamicIds.add(`effect::${id}`);
+
+    return {
+      success: true,
+      data: { registered: true },
+      definition: { type: "effect" as const, id, code: runCode },
+    };
+  } catch (err) {
+    if (err instanceof SandboxError) {
+      return { success: false, error: `Sandbox: ${err.message}` };
+    }
+
+    return { success: false, error: sanitizeError(err) };
+  }
+}
+
+// Item 22: create_derivation tool execution
+function executeCreateDerivation(
+  args: Record<string, unknown>,
+  toolCtx: ToolExecutionContext,
+): ToolResult {
+  const id = args.id as string | undefined;
+  const deriveCode = args.deriveCode as string | undefined;
+
+  if (!id || !deriveCode) {
+    return { success: false, error: "id and deriveCode are required" };
+  }
+
+  const idError = validateId(id, "derivation");
+  if (idError) {
+    return { success: false, error: idError };
+  }
+
+  try {
+    // M7: check system.derivations availability before proceeding
+    const sys = toolCtx.system as unknown as Record<string, unknown>;
+    if (
+      !("derivations" in toolCtx.system) ||
+      typeof sys.derivations !== "object" ||
+      sys.derivations === null
+    ) {
+      return { success: false, error: "system.derivations API unavailable" };
+    }
+
+    const compiled = compileSandboxed(
+      `return (${deriveCode})`,
+      toolCtx.sandboxOptions,
+    );
+
+    const derivations = sys.derivations as { register: (id: string, def: unknown) => void };
+    derivations.register(id, {
+      derive: (facts: Record<string, unknown>) => compiled.execute(facts),
+    });
+
+    toolCtx.dynamicIds.add(`derivation::${id}`);
+
+    return {
+      success: true,
+      data: { registered: true },
+      definition: { type: "derivation" as const, id, code: deriveCode },
     };
   } catch (err) {
     if (err instanceof SandboxError) {
@@ -515,6 +686,17 @@ function executeRemoveDefinition(
 
   if (!type || !id) {
     return { success: false, error: "type and id are required" };
+  }
+
+  // M2: gate by definition type's capability
+  if (toolCtx.capabilities) {
+    const capKey = `${type}s` as keyof ArchitectCapabilities;
+    if (toolCtx.capabilities[capKey] === false) {
+      return {
+        success: false,
+        error: `Cannot remove ${type} — ${capKey} capability is disabled.`,
+      };
+    }
   }
 
   // C6: only allow removing AI-created definitions
