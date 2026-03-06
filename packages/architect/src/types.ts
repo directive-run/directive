@@ -15,6 +15,7 @@ import type { ExportPatternOptions } from "./federation.js";
 import type { ExtractGraphOptions } from "./graph.js";
 import type { MetricsProvider } from "./metrics.js";
 import type { OutcomeTrackingConfig, ActionOutcome, OutcomePattern } from "./outcomes.js";
+import type { CustomToolDef } from "./custom-tools.js";
 import type { PersistenceConfig } from "./persistence.js";
 import type { ReplayRecorder } from "./replay.js";
 
@@ -214,6 +215,8 @@ export interface AIArchitectOptions {
   persistence?: PersistenceConfig;
   /** Track outcomes of applied actions (health delta, success rate). */
   outcomeTracking?: OutcomeTrackingConfig;
+  /** Custom tools to extend the AI's toolkit. */
+  customTools?: CustomToolDef[];
 }
 
 // ============================================================================
@@ -700,6 +703,12 @@ export interface AIArchitect {
 
   /** Get aggregated outcome patterns by tool. */
   getOutcomePatterns(): OutcomePattern[];
+
+  /** Register a custom tool at runtime. */
+  registerTool(def: CustomToolDef): void;
+
+  /** Unregister a custom tool by name. Returns true if found. */
+  unregisterTool(name: string): boolean;
 
   /** Get current architect status summary. */
   status(): ArchitectStatus;

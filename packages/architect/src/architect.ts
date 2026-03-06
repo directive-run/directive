@@ -464,6 +464,14 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return pipeline.outcomeTracker?.getPatterns() ?? [];
     },
 
+    registerTool(def) {
+      pipeline.customToolRegistry.register(def);
+    },
+
+    unregisterTool(name) {
+      return pipeline.customToolRegistry.unregister(name);
+    },
+
     // Item 24: status summary — E5: uses unified BudgetUsage shape
     status(): ArchitectStatus {
       const budgetUsage = pipeline.getBudgetUsage();
