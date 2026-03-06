@@ -30,6 +30,10 @@ export interface ExportPatternOptions {
 /**
  * Export an architect action as a shareable, anonymized pattern.
  * Strips system-specific identifiers and creates a hash-addressed pattern.
+ *
+ * @param action - The applied ArchitectAction to export.
+ * @param options - Tags and initial effectiveness score.
+ * @returns A FederationExport with the pattern and success status.
  */
 export function exportPattern(
   action: ArchitectAction,
@@ -69,6 +73,11 @@ export function exportPattern(
 /**
  * Import a federated pattern by adapting it to the local system's schema
  * using an LLM runner.
+ *
+ * @param pattern - The federated pattern to import.
+ * @param system - The local Directive system to adapt the pattern for.
+ * @param runner - AgentRunner for LLM-powered adaptation.
+ * @returns Import result with adapted action or error.
  */
 export async function importPattern(
   pattern: FederationPattern,

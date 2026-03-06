@@ -23,7 +23,18 @@ export interface HealthTrend {
 }
 
 /**
- * Create a health trend tracker.
+ * Create a health trend tracker that records scores over time.
+ *
+ * @param maxSamples - Maximum samples to retain (FIFO eviction). Default: 20.
+ * @returns A HealthTrend instance with record, direction, and formatting methods.
+ *
+ * @example
+ * ```typescript
+ * const trend = createHealthTrend(10);
+ * trend.record(85);
+ * trend.record(72);
+ * console.log(trend.direction()); // "declining"
+ * ```
  */
 export function createHealthTrend(maxSamples = 20): HealthTrend {
   const samples: Array<{ score: number; timestamp: number }> = [];
@@ -105,6 +116,10 @@ export interface AdaptiveContextConfig {
 
 /**
  * Build adaptive context string for LLM prompt enrichment.
+ *
+ * @param data - Outcome history, health trend, and template stats.
+ * @param config - Which sections to include and custom builder.
+ * @returns Formatted markdown string for LLM prompt injection, or empty string if no data.
  */
 export function buildAdaptiveContext(
   data: AdaptiveContextData,

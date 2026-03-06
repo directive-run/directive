@@ -50,6 +50,9 @@ export interface MockRunnerResponse {
 /**
  * Create a mock AgentRunner that returns pre-configured responses.
  * Responses are consumed in order. After exhaustion, returns empty results.
+ *
+ * @param responses - Ordered list of mock responses the runner will return.
+ * @returns An AgentRunner with an attached `calls` array for assertion.
  */
 export function mockRunner(
   responses: MockRunnerResponse[],
@@ -193,6 +196,9 @@ export interface TestSystem {
 /**
  * Create a mock System for testing architect features.
  * Replaces duplicated mocks across test files.
+ *
+ * @param initialFacts - Initial fact values for the mock system.
+ * @returns A TestSystem with facts, constraints, resolvers, effects, and test helpers.
  */
 export function createTestSystem(initialFacts?: Record<string, unknown>): TestSystem {
   const facts: Record<string, unknown> = { ...initialFacts };
@@ -329,7 +335,12 @@ export function createTestSystem(initialFacts?: Record<string, unknown>): TestSy
 // Assertion Helpers
 // ============================================================================
 
-/** Assert that an analysis produced the expected number of actions. */
+/**
+ * Assert that an analysis produced the expected number of actions.
+ *
+ * @param analysis - The ArchitectAnalysis to check.
+ * @param expectedCount - Expected number of actions.
+ */
 export function assertAnalysisActions(
   analysis: ArchitectAnalysis,
   expectedCount: number,
@@ -341,7 +352,12 @@ export function assertAnalysisActions(
   }
 }
 
-/** Assert that an action has the expected tool name. */
+/**
+ * Assert that an action has the expected tool name.
+ *
+ * @param action - The ArchitectAction to check.
+ * @param expectedTool - Expected tool name string.
+ */
 export function assertActionTool(
   action: ArchitectAction,
   expectedTool: string,
@@ -353,7 +369,11 @@ export function assertActionTool(
   }
 }
 
-/** Assert that an action was approved. */
+/**
+ * Assert that an action was approved or auto-approved.
+ *
+ * @param action - The ArchitectAction to check.
+ */
 export function assertApproved(action: ArchitectAction): void {
   if (
     action.approvalStatus !== "approved" &&
@@ -365,7 +385,11 @@ export function assertApproved(action: ArchitectAction): void {
   }
 }
 
-/** Assert that all AI definitions have been killed (none active). */
+/**
+ * Assert that all AI definitions have been killed (none active).
+ *
+ * @param architect - The AIArchitect instance to check.
+ */
 export function assertKilled(architect: AIArchitect): void {
   const active = architect.getActiveDefinitions();
   if (active.length > 0) {
@@ -375,17 +399,32 @@ export function assertKilled(architect: AIArchitect): void {
   }
 }
 
-/** Create an in-memory audit store for testing. */
+/**
+ * Create an in-memory audit store for testing.
+ *
+ * @param maxEntries - Maximum entries before FIFO eviction.
+ * @returns An AuditStore backed by an in-memory array.
+ */
 export function createTestAuditStore(maxEntries?: number): AuditStore {
   return createInMemoryAuditStore(maxEntries);
 }
 
-/** Create an in-memory checkpoint store for testing. */
+/**
+ * Create an in-memory checkpoint store for testing.
+ *
+ * @returns A CheckpointStore backed by a single in-memory slot.
+ */
 export function createTestCheckpointStore(): CheckpointStore {
   return createInMemoryCheckpointStore();
 }
 
-/** Assert budget usage is within expected bounds. */
+/**
+ * Assert budget usage is within expected bounds.
+ *
+ * @param architect - The AIArchitect instance to check.
+ * @param maxTokens - Maximum allowed token usage.
+ * @param maxDollars - Maximum allowed dollar usage.
+ */
 export function assertBudgetWithin(
   architect: AIArchitect,
   maxTokens: number,

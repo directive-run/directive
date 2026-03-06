@@ -30,6 +30,17 @@ export interface ReplayRecorder {
 
 /**
  * Create a recorder that captures system events for replay.
+ *
+ * @param system - The Directive system to record events from.
+ * @returns A ReplayRecorder with start(), stop(), and isRecording() methods.
+ *
+ * @example
+ * ```typescript
+ * const recorder = createReplayRecorder(system);
+ * recorder.start();
+ * // ... system runs ...
+ * const recording = recorder.stop();
+ * ```
  */
 export function createReplayRecorder(system: System): ReplayRecorder {
   const events: ReplayEvent[] = [];
@@ -124,6 +135,11 @@ export function createReplayRecorder(system: System): ReplayRecorder {
 /**
  * Replay a recording through an AI architect to see what actions
  * would have been proposed at each event.
+ *
+ * @param recording - A previously captured ReplayRecording.
+ * @param runner - AgentRunner for AI analysis during replay.
+ * @param options - Max events to process and budget cap.
+ * @returns A ReplayResult comparing original events with architect proposals.
  */
 export async function replayWithArchitect(
   recording: ReplayRecording,

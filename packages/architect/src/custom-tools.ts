@@ -74,7 +74,22 @@ const DEFAULT_MAX_TOOLS = 20;
 const DEFAULT_HANDLER_TIMEOUT = 10_000;
 
 /**
- * Create a custom tool registry.
+ * Create a custom tool registry for extending the AI's toolkit.
+ *
+ * @param maxTools - Maximum number of custom tools. Default: 20.
+ * @param handlerTimeout - Timeout for handler execution in ms. Default: 10000.
+ * @returns A CustomToolRegistry with register, unregister, execute, and getToolDefs methods.
+ *
+ * @example
+ * ```typescript
+ * const registry = createCustomToolRegistry();
+ * registry.register({
+ *   name: "check_metrics",
+ *   description: "Check system metrics",
+ *   parameters: {},
+ *   handler: (args, context) => ({ success: true, data: context.inspect() }),
+ * });
+ * ```
  */
 export function createCustomToolRegistry(
   maxTools = DEFAULT_MAX_TOOLS,

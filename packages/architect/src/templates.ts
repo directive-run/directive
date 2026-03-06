@@ -191,6 +191,15 @@ export const BUILT_IN_TEMPLATES: ConstraintTemplate[] = [
 
 /**
  * Create a template registry with built-in and optional custom templates.
+ *
+ * @param customTemplates - Additional templates to register alongside built-ins.
+ * @returns A TemplateRegistry with list, get, register, instantiate, and formatForPrompt methods.
+ *
+ * @example
+ * ```typescript
+ * const registry = createTemplateRegistry();
+ * const result = registry.instantiate("rate-limit", { counterKey: "apiCalls", threshold: 100 });
+ * ```
  */
 export function createTemplateRegistry(
   customTemplates?: ConstraintTemplate[],
