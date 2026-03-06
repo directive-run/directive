@@ -516,5 +516,22 @@ describe("sandbox", () => {
 
       expect(() => createWorkerSandbox('eval("bad")')).toThrow(SandboxError);
     });
+
+    it("worker sandbox returns object with execute method", async () => {
+      const { createWorkerSandbox } = await import("../sandbox.js");
+
+      const sandbox = createWorkerSandbox("return facts.x + 1;");
+
+      expect(sandbox).toHaveProperty("execute");
+      expect(typeof sandbox.execute).toBe("function");
+    });
+
+    it("worker sandbox static analysis rejects prototype pollution", async () => {
+      const { createWorkerSandbox } = await import("../sandbox.js");
+
+      expect(() =>
+        createWorkerSandbox('facts["__proto__"].polluted = true'),
+      ).toThrow(SandboxError);
+    });
   });
 });
