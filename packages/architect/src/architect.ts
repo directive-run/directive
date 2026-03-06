@@ -282,7 +282,20 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     },
 
     whatIf(action, whatIfOptions?) {
-      return createWhatIfAnalysis(options.system, action, options.runner, whatIfOptions);
+      // E3: normalize WhatIfInput to full ArchitectAction
+      const fullAction = "id" in action ? action : {
+        id: `whatif-${Date.now()}`,
+        tool: action.tool,
+        arguments: action.arguments,
+        reasoning: { trigger: "demand", observation: "", justification: "", expectedOutcome: "", raw: "" },
+        confidence: 0.5,
+        risk: "low" as const,
+        requiresApproval: false,
+        approvalStatus: "pending" as const,
+        timestamp: Date.now(),
+      };
+
+      return createWhatIfAnalysis(options.system, fullAction, options.runner, whatIfOptions);
     },
 
     graph(graphOptions?) {
@@ -322,7 +335,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return importPattern(pattern, options.system, options.runner);
     },
 
-    // Item 24: status summary
+    // Item 24: status summary — E5: uses unified BudgetUsage shape
     status(): ArchitectStatus {
       const budgetUsage = pipeline.getBudgetUsage();
       const cbState = pipeline.guards.getCircuitBreakerState();
@@ -331,12 +344,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       const auditEntries = pipeline.getAuditLog();
 
       return {
-        budget: {
-          tokens: budgetUsage.tokens,
-          dollars: budgetUsage.dollars,
-          percentTokens: budgetUsage.percent.tokens,
-          percentDollars: budgetUsage.percent.dollars,
-        },
+        budget: budgetUsage,
         circuitBreaker: cbState,
         activeDefinitions: activeDefs.length,
         pendingApprovals: pendingApprovals.length,
@@ -438,11 +446,11 @@ function applyPreset(options: AIArchitectOptions): void {
 }
 
 /** Parse a human-readable interval string to milliseconds. */
-function parseInterval(interval: string): number {
-  const match = /^(\d+)(ms|s|m|h)$/.exec(interval.trim());
+export function parseInterval(interval: string): number {
+  const match = /^(\d+)(ms|s|m|h|d)$/.exec(interval.trim());
   if (!match) {
     throw new Error(
-      `Invalid interval: "${interval}". Use format like "30s", "5m", "1h".`,
+      `Invalid interval: "${interval}". Use format like "30s", "5m", "1h", "1d".`,
     );
   }
 
@@ -458,6 +466,8 @@ function parseInterval(interval: string): number {
       return value * 60_000;
     case "h":
       return value * 3_600_000;
+    case "d":
+      return value * 86_400_000;
     default:
       return value * 1000;
   }
