@@ -21,7 +21,7 @@
  */
 
 // Main API
-export { createAIArchitect } from "./architect.js";
+export { createAIArchitect, parseInterval } from "./architect.js";
 
 // Types
 export type {
@@ -41,13 +41,28 @@ export type {
   ArchitectDefType,
   // Events
   ArchitectEvent,
+  ArchitectEventBase,
+  ArchitectProgressEvent,
+  ArchitectAnalysisStartEvent,
+  ArchitectAnalysisCompleteEvent,
+  ArchitectActionEvent,
+  ArchitectRollbackEvent,
+  ArchitectErrorEvent,
+  ArchitectBudgetEvent,
+  ArchitectKilledEvent,
+  ArchitectPlanStepEvent,
+  ArchitectReasoningChunkEvent,
+  ArchitectPolicyWarningEvent,
+  ArchitectApprovalTimeoutEvent,
   ArchitectEventType,
   ArchitectEventListener,
+  ArchitectEventMap,
   // Audit
   AuditEntry,
   AuditQuery,
   // Rollback
   RollbackEntry,
+  RollbackResult,
   RollbackPreview,
   RollbackBatchResult,
   // Active Definitions
@@ -70,6 +85,7 @@ export type {
   DiscoveryReport,
   DiscoveryTimelineEvent,
   // What-If
+  WhatIfInput,
   WhatIfOptions,
   WhatIfResult,
   WhatIfStep,
@@ -89,10 +105,19 @@ export type {
   FederationImportResult,
   // Service Hooks
   ArchitectServiceHooks,
+  // Budget
+  BudgetUsage,
+  // Status
+  ArchitectStatus,
+  // Presets
+  ArchitectPreset,
+  // Policies
+  ArchitectPolicy,
+  PolicyContext,
 } from "./types.js";
 
 // Sandbox (for advanced use / custom tool development)
-export { staticAnalysis, compileSandboxed, SandboxError } from "./sandbox.js";
+export { staticAnalysis, compileSandboxed, createWorkerSandbox, SandboxError, type WorkerCompiledFunction } from "./sandbox.js";
 
 // Audit (for custom integrations)
 export { createAuditLog, type AuditLog } from "./audit.js";
@@ -119,13 +144,31 @@ export {
 // Federation
 export { exportPattern, importPattern, type ExportPatternOptions } from "./federation.js";
 
+// Health Scoring + Graph Analysis
+export { computeHealthScore, analyzeGraph, type HealthScore, type GraphAnalysis } from "./health.js";
+
 // Service Hooks
 export { wireServiceHooks, type WireServiceHooksOptions } from "./service.js";
+
+// Policies
+export {
+  evaluatePolicies,
+  getBlockingViolation,
+  requiresApprovalOverride,
+  maxConstraintsPerHour,
+  protectFactKeys,
+  requireApprovalAboveRisk,
+  type PolicyViolation,
+} from "./policies.js";
+
+// Hash utility
+export { fnv1a } from "./hash.js";
 
 // Testing utilities
 export {
   mockRunner,
   createTestArchitect,
+  createTestSystem,
   assertAnalysisActions,
   assertActionTool,
   assertApproved,
@@ -134,4 +177,5 @@ export {
   type MockRunnerResponse,
   type TestArchitectOptions,
   type TestArchitectResult,
+  type TestSystem,
 } from "./testing.js";
