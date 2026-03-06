@@ -13,6 +13,7 @@ import type {
   AuditQuery,
 } from "./types.js";
 import { fnv1a } from "./hash.js";
+import { RingBuffer } from "./ring-buffer.js";
 
 // ============================================================================
 // Constants
@@ -61,7 +62,7 @@ export interface AppendOptions {
  */
 export function createAuditLog(options?: AuditLogOptions) {
   const maxEntries = options?.maxEntries ?? DEFAULT_MAX_ENTRIES;
-  const entries: AuditEntry[] = [];
+  const entries = new RingBuffer<AuditEntry>(maxEntries);
 
   // C8: counter scoped to this audit log instance
   let auditCounter = 0;
@@ -70,8 +71,8 @@ export function createAuditLog(options?: AuditLogOptions) {
   let genesisHash: string | null = null;
 
   function append(opts: AppendOptions): AuditEntry {
-    const prevHash =
-      entries.length > 0 ? entries[entries.length - 1]!.hash : null;
+    const lastEntry = entries.last();
+    const prevHash = lastEntry ? lastEntry.hash : null;
 
     const entry: AuditEntry = {
       id: `audit-${++auditCounter}-${Date.now()}`,
@@ -104,12 +105,10 @@ export function createAuditLog(options?: AuditLogOptions) {
     Object.freeze(entry);
 
     // Ring buffer eviction — M3: track evicted hash as genesis
-    if (entries.length >= maxEntries) {
-      const evicted = entries.shift()!;
+    const evicted = entries.push(entry);
+    if (evicted) {
       genesisHash = evicted.hash;
     }
-
-    entries.push(entry);
 
     return entry;
   }
@@ -117,7 +116,8 @@ export function createAuditLog(options?: AuditLogOptions) {
   // Item 4: markRolledBack — append-only, no in-place mutation.
   // Query rollback status via rollbackOf entries in the chain.
   function markRolledBack(auditId: string): boolean {
-    const original = entries.find((e) => e.id === auditId);
+    const allEntries = entries.toArray();
+    const original = allEntries.find((e) => e.id === auditId);
     if (!original) {
       return false;
     }
@@ -141,15 +141,21 @@ export function createAuditLog(options?: AuditLogOptions) {
 
   /** Check if an entry has been rolled back by searching for rollbackOf entries. */
   function isRolledBack(auditId: string): boolean {
-    return entries.some((e) => e.rollbackOf === auditId);
+    for (const e of entries) {
+      if (e.rollbackOf === auditId) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   function query(q?: AuditQuery): AuditEntry[] {
     if (!q) {
-      return [...entries];
+      return entries.toArray();
     }
 
-    let result = entries;
+    let result: AuditEntry[] = entries.toArray();
 
     if (q.trigger !== undefined) {
       result = result.filter((e) => e.trigger === q.trigger);
@@ -181,23 +187,23 @@ export function createAuditLog(options?: AuditLogOptions) {
       result = result.slice(-q.limit);
     }
 
-    return [...result];
+    return result;
   }
 
   function verifyChain(): boolean {
-    if (entries.length === 0) {
+    if (entries.size === 0) {
       return true;
     }
 
     // M3: after eviction, first entry's prevHash should match genesisHash
-    const first = entries[0]!;
+    const first = entries.at(0)!;
     if (genesisHash !== null && first.prevHash !== genesisHash) {
       return false;
     }
 
-    for (let i = 1; i < entries.length; i++) {
-      const current = entries[i]!;
-      const previous = entries[i - 1]!;
+    for (let i = 1; i < entries.size; i++) {
+      const current = entries.at(i)!;
+      const previous = entries.at(i - 1)!;
 
       if (current.prevHash !== previous.hash) {
         return false;
@@ -208,18 +214,18 @@ export function createAuditLog(options?: AuditLogOptions) {
   }
 
   function getAll(): AuditEntry[] {
-    return [...entries];
+    return entries.toArray();
   }
 
   function size(): number {
-    return entries.length;
+    return entries.size;
   }
 
   /** Export the full audit log as a JSON string for persistence. */
   function exportLog(): string {
     return JSON.stringify({
       version: 1,
-      entries: entries.map((e) => ({ ...e })),
+      entries: entries.toArray().map((e) => ({ ...e })),
       exportedAt: Date.now(),
     });
   }
@@ -271,7 +277,7 @@ export function createAuditLog(options?: AuditLogOptions) {
       }
 
       // Replace current entries
-      entries.length = 0;
+      entries.clear();
       for (const entry of imported) {
         const frozen = Object.freeze({ ...entry });
         entries.push(frozen);

@@ -5,6 +5,8 @@
  * aggregates patterns by tool, and formats history for LLM context.
  */
 
+import { RingBuffer } from "./ring-buffer.js";
+
 /** A recorded outcome of an applied action. */
 export interface ActionOutcome {
   actionId: string;
@@ -75,7 +77,7 @@ export function createOutcomeTracker(config?: OutcomeTrackingConfig): OutcomeTra
   const measurementDelay = config?.measurementDelay ?? 10_000;
   const maxOutcomes = config?.maxOutcomes ?? 200;
 
-  const outcomes: ActionOutcome[] = [];
+  const outcomes = new RingBuffer<ActionOutcome>(maxOutcomes);
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function scheduleOutcome(
@@ -103,11 +105,6 @@ export function createOutcomeTracker(config?: OutcomeTrackingConfig): OutcomeTra
         summary,
       };
 
-      // FIFO eviction
-      if (outcomes.length >= maxOutcomes) {
-        outcomes.shift();
-      }
-
       outcomes.push(outcome);
     }, measurementDelay);
 
@@ -123,20 +120,22 @@ export function createOutcomeTracker(config?: OutcomeTrackingConfig): OutcomeTra
     }
 
     // Mark existing outcome as rolled back
-    const outcome = outcomes.find((o) => o.actionId === actionId);
-    if (outcome) {
-      outcome.rolledBack = true;
+    for (const o of outcomes) {
+      if (o.actionId === actionId) {
+        o.rolledBack = true;
+        break;
+      }
     }
   }
 
   function getOutcomes(): ActionOutcome[] {
-    return [...outcomes].reverse();
+    return outcomes.reversed();
   }
 
   function getPatterns(): OutcomePattern[] {
     const byTool = new Map<string, ActionOutcome[]>();
 
-    for (const o of outcomes) {
+    for (const o of outcomes.toArray()) {
       const existing = byTool.get(o.tool);
       if (existing) {
         existing.push(o);
@@ -167,7 +166,8 @@ export function createOutcomeTracker(config?: OutcomeTrackingConfig): OutcomeTra
   }
 
   function formatForPrompt(maxEntries = 10): string {
-    const recent = outcomes.slice(-maxEntries).reverse();
+    const all = outcomes.toArray();
+    const recent = all.slice(-maxEntries).reverse();
 
     if (recent.length === 0) {
       return "";
