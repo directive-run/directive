@@ -196,8 +196,8 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
     }, intervalMs);
   }
 
-  // Item 14: BSL notice once per process
-  if (!bslPrinted && typeof console !== "undefined" && typeof process !== "undefined" && process.env?.NODE_ENV !== "test") {
+  // E10: BSL notice — gate behind NODE_ENV !== "production" and !silent
+  if (!bslPrinted && typeof console !== "undefined" && typeof process !== "undefined" && process.env?.NODE_ENV !== "test" && process.env?.NODE_ENV !== "production" && !options.silent) {
     bslPrinted = true;
     console.info(
       "[directive/architect] AI Architect — BSL 1.1 licensed. Free for open source, personal use, and companies <$1M ARR.",
@@ -220,7 +220,7 @@ export function createAIArchitect(options: AIArchitectOptions): AIArchitect {
       return Promise.resolve(pipeline.reject(actionId));
     },
 
-    rollback(actionId: string): boolean {
+    rollback(actionId: string) {
       return pipeline.rollback(actionId);
     },
 

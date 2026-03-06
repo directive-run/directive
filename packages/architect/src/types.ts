@@ -185,6 +185,9 @@ export interface AIArchitectOptions {
 
   /** Item 33: policies — meta-constraints on the architect itself. */
   policies?: ArchitectPolicy[];
+
+  /** E10: Suppress the BSL license notice on startup. */
+  silent?: boolean;
 }
 
 // ============================================================================
@@ -335,6 +338,12 @@ export interface RollbackEntry {
   registered?: unknown;
   /** Whether this has been rolled back. */
   rolledBack: boolean;
+}
+
+/** E11: Result of a single rollback operation. */
+export interface RollbackResult {
+  success: boolean;
+  reason?: string;
 }
 
 /** Preview of what a rollback would do. */
@@ -572,9 +581,9 @@ export interface AIArchitect {
 
   /**
    * Roll back a previously applied action.
-   * Returns true if the rollback succeeded.
+   * Returns result with success flag and optional reason.
    */
-  rollback(actionId: string): boolean;
+  rollback(actionId: string): RollbackResult;
 
   /** Preview what a rollback would do without executing it. */
   previewRollback(actionId: string): RollbackPreview | null;

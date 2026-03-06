@@ -277,7 +277,7 @@ export interface ToolExecutionContext {
   /** Tracked AI-created definition IDs ("type::id"). */
   dynamicIds: Set<string>;
   /** Rollback function provided by the architect. */
-  rollbackFn: (actionId: string) => boolean;
+  rollbackFn: (actionId: string) => { success: boolean; reason?: string };
   /** M2: Current capabilities for capability-gated operations. */
   capabilities?: ArchitectCapabilities;
 }
@@ -756,12 +756,12 @@ function executeRollback(
     return { success: false, error: "actionId is required" };
   }
 
-  const success = toolCtx.rollbackFn(actionId);
+  const result = toolCtx.rollbackFn(actionId);
 
   return {
-    success,
-    data: { rolledBack: success },
-    error: success ? undefined : `Failed to rollback action ${actionId}`,
+    success: result.success,
+    data: { rolledBack: result.success },
+    error: result.success ? undefined : (result.reason ?? `Failed to rollback action ${actionId}`),
   };
 }
 
