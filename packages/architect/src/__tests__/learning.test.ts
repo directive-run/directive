@@ -20,7 +20,7 @@ describe("createFeedbackStore", () => {
     return {
       actionId: "a-1",
       tool: "add_constraint",
-      arguments: { id: "test" },
+      toolArguments: { id: "test" },
       approved: true,
       risk: "low",
       ...overrides,

@@ -72,6 +72,10 @@ architect.kill();
 | **Fallback** | Graceful degradation when LLM is unavailable |
 | **Persistence** | Pluggable audit and checkpoint stores |
 | **Metrics** | Pluggable observability provider with span tracking |
+| **Pause/Resume** | Pause automatic triggers, queue them, resume on demand |
+| **Learning Mode** | Track human approve/reject decisions, feed patterns back to LLM |
+| **Intent Stories** | Define behavior as user stories, resolve to config via LLM |
+| **Multi-System** | Orchestrate multiple Directive systems through a single architect |
 
 ## Core Concepts
 
@@ -178,6 +182,11 @@ const architect = createAIArchitect({
     maxConsecutiveFailures: 3,
   },
   metrics: createNoopMetrics(),                // Observability provider
+  learning: { maxEntries: 500 },               // Track human feedback
+  stories: [                                   // Intent-based configuration
+    "Keep error count under 10",
+    { when: "errors spike", iWant: "add a rate limiter", soThat: "the system stays healthy" },
+  ],
   silent: false,                               // Suppress BSL license notice
 });
 ```
@@ -218,6 +227,42 @@ architect.on("analysis-complete", (event) => {
 | `approval-timeout` | Pending approval timed out | `action` |
 | `fallback-activated` | LLM fallback strategy used | `strategy`, `error` |
 | `health-check` | Health score polled | `score`, `previousScore`, `triggered` |
+| `feedback-recorded` | Approve/reject recorded (learning mode) | `actionId`, `tool`, `approved` |
+| `stories-resolved` | User stories resolved into config | `config`, `rawResponse` |
+| `paused` | Architect paused | `queuedTriggers` |
+| `resumed` | Architect resumed | `queuedTriggers` |
+
+## Multi-System Orchestration
+
+Manage multiple Directive systems through a single architect:
+
+```typescript
+import { createMultiSystemArchitect } from "@directive-run/architect";
+
+const multi = createMultiSystemArchitect({
+  systems: { api: apiSystem, worker: workerSystem },
+  runner,
+  budget: { tokens: 100_000, dollars: 10 },
+});
+
+// Facts are namespaced: "api::errorRate", "worker::queueDepth"
+const analysis = await multi.analyze("Why is the API slow?");
+
+// Per-system and aggregate health
+const apiHealth = multi.getSystemHealth("api");
+const overall = multi.getAggregateHealth();
+
+multi.destroy();
+```
+
+## Pause/Resume
+
+```typescript
+architect.pause();  // Automatic triggers queue instead of executing
+// Manual analysis still works while paused:
+const analysis = await architect.analyze("Check status");
+architect.resume(); // Drains queued triggers
+```
 
 ## Testing
 

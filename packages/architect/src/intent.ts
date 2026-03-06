@@ -62,22 +62,36 @@ export interface StoryResolutionResult {
 // Story formatting
 // ============================================================================
 
+const MAX_STORY_LENGTH = 1000;
+
+/** Strip control characters and cap length to prevent prompt injection. */
+function sanitizeStoryText(text: string): string {
+  // Strip control characters (keep newlines/tabs for readability)
+  const cleaned = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+
+  if (cleaned.length > MAX_STORY_LENGTH) {
+    return cleaned.slice(0, MAX_STORY_LENGTH) + "…";
+  }
+
+  return cleaned;
+}
+
 function formatStories(stories: Story[]): string {
   return stories
     .map((story, i) => {
       if (typeof story === "string") {
-        return `${i + 1}. ${story}`;
+        return `${i + 1}. ${sanitizeStoryText(story)}`;
       }
 
       const parts: string[] = [];
       if (story.as) {
-        parts.push(`As ${story.as}`);
+        parts.push(`As ${sanitizeStoryText(story.as)}`);
       }
 
-      parts.push(`When ${story.when}`);
-      parts.push(`I want ${story.iWant}`);
+      parts.push(`When ${sanitizeStoryText(story.when)}`);
+      parts.push(`I want ${sanitizeStoryText(story.iWant)}`);
       if (story.soThat) {
-        parts.push(`So that ${story.soThat}`);
+        parts.push(`So that ${sanitizeStoryText(story.soThat)}`);
       }
 
       return `${i + 1}. ${parts.join(", ")}`;
@@ -205,10 +219,18 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === "object" && !Array.isArray(val);
 }
 
+const MAX_MERGE_DEPTH = 10;
+
 function deepMerge(
   story: Record<string, unknown>,
   base: Record<string, unknown>,
+  depth = 0,
 ): Record<string, unknown> {
+  if (depth >= MAX_MERGE_DEPTH) {
+    // At max depth, base (explicit) takes full precedence
+    return { ...story, ...base };
+  }
+
   const result = { ...story };
 
   for (const [key, value] of Object.entries(base)) {
@@ -219,7 +241,7 @@ function deepMerge(
     const existing = result[key];
 
     if (isPlainObject(existing) && isPlainObject(value)) {
-      result[key] = deepMerge(existing, value);
+      result[key] = deepMerge(existing, value, depth + 1);
     } else {
       // Base (explicit) takes precedence
       result[key] = value;
@@ -270,7 +292,7 @@ export async function resolveStories(
   stories: Story[],
   system: System,
   runner: AgentRunner,
-  _options?: StoryResolutionOptions,
+  options?: StoryResolutionOptions,
 ): Promise<StoryResolutionResult> {
   const systemSchema = Object.keys(system.facts);
   const storyText = formatStories(stories);
@@ -287,9 +309,12 @@ ${storyText}`;
     description: "Resolves user stories into architect configuration",
     instructions: "Output valid JSON only.",
     tools: [],
+    ...(options?.model ? { model: options.model } : {}),
   };
 
-  const result = await runner(agentDef, input);
+  const timeout = options?.timeout ?? 30_000;
+  const runOptions = { signal: AbortSignal.timeout(timeout) };
+  const result = await runner(agentDef, input, runOptions);
   const rawResponse = typeof result.output === "string"
     ? result.output
     : JSON.stringify(result.output);
