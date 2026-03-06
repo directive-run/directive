@@ -11,6 +11,9 @@
 import type { System } from "@directive-run/core";
 import type { AgentRunner } from "@directive-run/ai";
 import type { DiscoverySession } from "./discovery.js";
+import type { ExportPatternOptions } from "./federation.js";
+import type { ExtractGraphOptions } from "./graph.js";
+import type { ReplayRecorder } from "./replay.js";
 
 // ============================================================================
 // Definition Types
@@ -57,8 +60,8 @@ export interface ArchitectTriggers {
   onUnmetRequirement?: boolean;
   /** Trigger when specific fact keys change. */
   onFactChange?: string[];
-  /** Periodic analysis interval (e.g., '5m', '30s', '1h'). */
-  onSchedule?: string;
+  /** Periodic analysis interval (e.g., '5m', '30s', '1h', '1d'). */
+  onSchedule?: `${number}${"ms" | "s" | "m" | "h" | "d"}`;
   /** Allow manual analysis via architect.analyze(). Default: true */
   onDemand?: boolean;
   /** Minimum interval between analyses in ms. Default: 60000 (60s). */
@@ -606,22 +609,22 @@ export interface AIArchitect {
   getRollbackEntries(): RollbackEntry[];
 
   /** Get current budget usage. */
-  getBudgetUsage(): { tokens: number; dollars: number; percent: { tokens: number; dollars: number } };
+  getBudgetUsage(): BudgetUsage;
 
   /** Item 19: Start a discovery session to observe the system for patterns. */
   discover(options?: DiscoveryOptions): DiscoverySession;
 
-  /** Item 19: Run a what-if analysis for a proposed action. */
-  whatIf(action: ArchitectAction, options?: WhatIfOptions): Promise<WhatIfResult>;
+  /** Item 19: Run a what-if analysis for a proposed action. Accepts full ArchitectAction or simplified WhatIfInput. */
+  whatIf(action: ArchitectAction | WhatIfInput, options?: WhatIfOptions): Promise<WhatIfResult>;
 
   /** Item 19: Extract the system's constraint graph. */
-  graph(options?: Omit<import("./graph.js").ExtractGraphOptions, "dynamicIds">): SystemGraph;
+  graph(options?: Omit<ExtractGraphOptions, "dynamicIds">): SystemGraph;
 
   /** Item 19: Create a replay recorder for this system. */
-  record(): import("./replay.js").ReplayRecorder;
+  record(): ReplayRecorder;
 
   /** Item 19: Export an applied action as a shareable federation pattern. */
-  exportAction(actionId: string, options?: import("./federation.js").ExportPatternOptions): FederationExport | null;
+  exportAction(actionId: string, options?: ExportPatternOptions): FederationExport | null;
 
   /** Item 19: Import a federated pattern and register for approval. */
   importPattern(pattern: FederationPattern): Promise<FederationImportResult>;
@@ -633,14 +636,16 @@ export interface AIArchitect {
   destroy(): void;
 }
 
+/** E5: Unified budget usage shape used by both getBudgetUsage() and status().budget. */
+export interface BudgetUsage {
+  tokens: number;
+  dollars: number;
+  percent: { tokens: number; dollars: number };
+}
+
 /** Item 24: Status summary of the architect. */
 export interface ArchitectStatus {
-  budget: {
-    tokens: number;
-    dollars: number;
-    percentTokens: number;
-    percentDollars: number;
-  };
+  budget: BudgetUsage;
   circuitBreaker: CircuitBreakerState;
   activeDefinitions: number;
   pendingApprovals: number;
@@ -826,6 +831,14 @@ export interface DiscoveryTimelineEvent {
 // ============================================================================
 // What-If Types
 // ============================================================================
+
+/** E3: Simplified input for whatIf() — no reasoning/approval fields needed. */
+export interface WhatIfInput {
+  /** The tool the action calls. */
+  tool: string;
+  /** Arguments passed to the tool. */
+  arguments: Record<string, unknown>;
+}
 
 /** Options for what-if analysis. */
 export interface WhatIfOptions {
