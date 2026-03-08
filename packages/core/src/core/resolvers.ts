@@ -454,7 +454,7 @@ export function createResolversManager<S extends Schema>(
   async function handleRetryError(
     error: unknown,
     attempt: number,
-    retryPolicy: Required<RetryPolicy>,
+    retryPolicy: RetryPolicy & { attempts: number; backoff: string },
     controller: AbortController,
   ): Promise<{ action: "abort" | "break" | "continue"; error: Error }> {
     const normalizedError =
