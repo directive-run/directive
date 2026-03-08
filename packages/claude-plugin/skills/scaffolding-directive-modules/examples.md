@@ -950,23 +950,23 @@ export const cartModule = createModule("cart", {
       return facts.self.items.length === 0;
     },
 
-    discount: (facts, derive) => {
-      const sub = derive.subtotal;
+    discount: (facts, derived) => {
+      const sub = derived.subtotal;
 
       return sub * (facts.self.couponDiscount / 100);
     },
 
-    tax: (facts, derive) => {
-      const sub = derive.subtotal;
-      const disc = derive.discount;
+    tax: (facts, derived) => {
+      const sub = derived.subtotal;
+      const disc = derived.discount;
 
       return (sub - disc) * 0.08;
     },
 
-    total: (_facts, derive) => {
-      const sub = derive.subtotal;
-      const disc = derive.discount;
-      const tx = derive.tax;
+    total: (_facts, derived) => {
+      const sub = derived.subtotal;
+      const disc = derived.discount;
+      const tx = derived.tax;
 
       return sub - disc + tx;
     },
@@ -977,8 +977,8 @@ export const cartModule = createModule("cart", {
       );
     },
 
-    freeShipping: (_facts, derive) => {
-      const sub = derive.subtotal;
+    freeShipping: (_facts, derived) => {
+      const sub = derived.subtotal;
 
       return sub >= 75;
     },
@@ -1370,10 +1370,10 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       return resources.some((r) => r.status === "loading");
     },
 
-    combinedStatus: (facts, derive) => {
-      const loaded = derive.loadedCount;
-      const anyErr = derive.anyError;
-      const anyLoad = derive.anyLoading;
+    combinedStatus: (facts, derived) => {
+      const loaded = derived.loadedCount;
+      const anyErr = derived.anyError;
+      const anyLoad = derived.anyLoading;
       const allIdle = [
         facts.profile,
         facts.preferences,

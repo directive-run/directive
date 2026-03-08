@@ -173,7 +173,7 @@ const mod = createModule("moduleName", {
   },
   derive: {
     computed: (facts) => facts.key > 0,
-    composed: (facts, derive) => derive.computed && facts.data !== null,
+    composed: (facts, derived) => derived.computed && facts.data !== null,
   },
   constraints: {
     needsData: {

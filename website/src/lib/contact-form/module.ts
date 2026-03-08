@@ -131,8 +131,8 @@ export const contactForm = createModule("contact-form", {
       facts.subject !== "" &&
       facts.message.trim().length >= 10,
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {

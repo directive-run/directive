@@ -15,18 +15,15 @@ import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const orchestrator = createAgentOrchestrator({
   runner: createOpenAIRunner({ model: 'gpt-4o-mini' }),
-
   guardrails: {
     input: [createPIIGuardrail({ redact: true })],
   },
-
   constraints: {
     stuck: {
       when: (facts) => facts.agent.turnCount > 5,
       require: { type: 'ESCALATE' },
     },
   },
-
   resolvers: {
     escalate: {
       requirement: 'ESCALATE',
@@ -38,7 +35,6 @@ const orchestrator = createAgentOrchestrator({
       },
     },
   },
-
   maxTokenBudget: 10000,
 });
 
@@ -51,7 +47,6 @@ const multiAgentCode = `import { createMultiAgentOrchestrator, createToolGuardra
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-
   agents: {
     researcher: {
       agent: {
@@ -71,7 +66,6 @@ const orchestrator = createMultiAgentOrchestrator({
       },
     },
   },
-
   maxTokenBudget: 50000,
 });
 

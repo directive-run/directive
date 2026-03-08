@@ -10,26 +10,29 @@ import { HeroBackground } from "@/components/HeroBackground";
 import blurCyanImage from "@/images/blur-cyan.png";
 import blurIndigoImage from "@/images/blur-indigo.png";
 
-const moduleCode = `import { createModule, t } from '@directive-run/core';
+const schemaCode = `import { t } from '@directive-run/core';
+
+export const publishSchema = {
+  facts: {
+    draft:     t.string(),
+    validated: t.boolean(),
+    saved:     t.boolean(),
+  },
+  events: {
+    publish: { draft: t.string() },
+  },
+};`;
+
+const moduleCode = `import { createModule } from '@directive-run/core';
+import { publishSchema } from './publish.schema';
 
 export default createModule("publish", {
-  schema: {
-    facts: {
-      draft: t.string(),
-      validated: t.boolean(),
-      saved: t.boolean(),
-    },
-    events: {
-      publish: { draft: t.string() },
-    },
-  },
-
+  schema: publishSchema,
   events: {
     publish: (facts, { draft }) => {
       facts.draft = draft;
     },
   },
-
   constraints: {
     validate: {
       when: (facts) => facts.draft && !facts.validated,
@@ -40,7 +43,6 @@ export default createModule("publish", {
       require: { type: "SAVE" },
     },
   },
-
   resolvers: {
     validate: {
       requirement: "VALIDATE",
@@ -74,11 +76,12 @@ function PublishButton({ draft }) {
 // One click. Directive validates and saves — automatically.`;
 
 const tabs = [
+  { name: "publish.schema.ts", language: "typescript" },
   { name: "publish.module.ts", language: "typescript" },
   { name: "Editor.tsx", language: "tsx" },
 ];
 
-const codeBlocks = [moduleCode, reactCode];
+const codeBlocks = [schemaCode, moduleCode, reactCode];
 
 function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<"svg">) {
   return (

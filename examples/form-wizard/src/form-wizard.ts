@@ -123,23 +123,23 @@ export const wizardModule = createModule("wizard", {
       return facts.plan !== "";
     },
 
-    currentStepValid: (facts, derive) => {
+    currentStepValid: (facts, derived) => {
       if (facts.currentStep === 0) {
-        return derive.step0Valid;
+        return derived.step0Valid;
       }
       if (facts.currentStep === 1) {
-        return derive.step1Valid;
+        return derived.step1Valid;
       }
       if (facts.currentStep === 2) {
-        return derive.step2Valid;
+        return derived.step2Valid;
       }
 
       return false;
     },
 
-    canAdvance: (facts, derive) => {
+    canAdvance: (facts, derived) => {
       return (
-        derive.currentStepValid && facts.currentStep < facts.totalSteps - 1
+        derived.currentStepValid && facts.currentStep < facts.totalSteps - 1
       );
     },
 

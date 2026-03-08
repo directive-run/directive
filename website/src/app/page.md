@@ -84,7 +84,7 @@ No manual dependency arrays. Just access what you need - Directive tracks it aut
 ```typescript
 derive: {
   fullName: (facts) => `${facts.firstName} ${facts.lastName}`,
-  greeting: (facts, derive) => `Hello, ${derive.fullName}!` // Composition works too
+  greeting: (facts, derived) => `Hello, ${derived.fullName}!` // Composition works too
 }
 ```
 

@@ -204,7 +204,7 @@ unsub();
     Composed:          total
 ```
 
-Derivations can depend on other derivations via the second parameter (`derive`):
+Derivations can depend on other derivations via the second parameter (`derived`):
 
 ```typescript
 derive: {
@@ -213,12 +213,12 @@ derive: {
   lastName: (facts) => facts.user?.name.split(' ')[1] ?? "",
 
   // Composed – depends on firstName and lastName derivations
-  initials: (facts, derive) =>
-    `${derive.firstName[0] ?? ""}${derive.lastName[0] ?? ""}`.toUpperCase(),
+  initials: (facts, derived) =>
+    `${derived.firstName[0] ?? ""}${derived.lastName[0] ?? ""}`.toUpperCase(),
 
   // Composed – depends on firstName derivation
-  greeting: (facts, derive) =>
-    `Hello, ${derive.firstName}!`,
+  greeting: (facts, derived) =>
+    `Hello, ${derived.firstName}!`,
 }
 ```
 
@@ -338,11 +338,11 @@ derive: {
   activeUsers: (facts) => facts.users.filter(u => u.active),
 
   // Composed: filter admins from active users
-  activeAdmins: (facts, derive) =>
-    derive.activeUsers.filter(u => u.role === 'admin'),
+  activeAdmins: (facts, derived) =>
+    derived.activeUsers.filter(u => u.role === 'admin'),
 
   // Composed: count from activeAdmins
-  activeAdminCount: (facts, derive) => derive.activeAdmins.length,
+  activeAdminCount: (facts, derived) => derived.activeAdmins.length,
 }
 ```
 
@@ -394,7 +394,7 @@ Break complex derivations into smaller ones:
 derive: {
   // Good – composed, each piece is reusable
   activeUsers: (facts) => facts.users.filter(u => u.active),
-  activeAdmins: (facts, derive) => derive.activeUsers.filter(u => u.admin),
+  activeAdmins: (facts, derived) => derived.activeUsers.filter(u => u.admin),
 
   // Not as good – duplicated filter logic
   activeAdmins: (facts) => facts.users.filter(u => u.active && u.admin),

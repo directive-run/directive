@@ -317,10 +317,10 @@ const trafficLight = createModule("traffic-light", {
     isGreen: (facts) => facts.phase === "green",
     shouldTransition: (facts) => facts.phase === "red" && facts.elapsed > 30,
     // Compose derivations
-    status: (facts, derive) => ({
+    status: (facts, derived) => ({
       phase: facts.phase,
-      isRed: derive.isRed,
-      waiting: derive.shouldTransition,
+      isRed: derived.isRed,
+      waiting: derived.shouldTransition,
     }),
   },
 

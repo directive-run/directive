@@ -88,7 +88,7 @@ const cartModule = createModule("cart", {
       facts.items.reduce((sum, item) => sum + item.price * item.qty, 0),
 
     // Derivations can reference other derivations via the second argument
-    total: (facts, derive) =>
+    total: (facts, derived) =>
       derive.subtotal - facts.discount,
   },
 
