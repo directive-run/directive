@@ -76,12 +76,12 @@ function PublishButton({ draft }) {
 // One click. Directive validates and saves — automatically.`;
 
 const tabs = [
-  { name: "publish.schema.ts", language: "typescript" },
   { name: "publish.module.ts", language: "typescript" },
+  { name: "publish.schema.ts", language: "typescript" },
   { name: "Editor.tsx", language: "tsx" },
 ];
 
-const codeBlocks = [schemaCode, moduleCode, reactCode];
+const codeBlocks = [moduleCode, schemaCode, reactCode];
 
 function TrafficLightsIcon(props: React.ComponentPropsWithoutRef<"svg">) {
   return (

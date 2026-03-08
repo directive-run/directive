@@ -1498,6 +1498,9 @@ function createModuleFactsProxy(
     getPrototypeOf() {
       return null;
     },
+    setPrototypeOf() {
+      return false;
+    },
   });
 
   namespaceCache.set(namespace, proxy);
@@ -1562,6 +1565,9 @@ function createNamespacedFactsProxy(
     },
     getPrototypeOf() {
       return null;
+    },
+    setPrototypeOf() {
+      return false;
     },
   });
 
@@ -1664,6 +1670,9 @@ function createCrossModuleFactsProxy(
     getPrototypeOf() {
       return null;
     },
+    setPrototypeOf() {
+      return false;
+    },
   });
 
   namespaceCache.set(cacheKey, proxy);
@@ -1719,6 +1728,9 @@ function createModuleDeriveProxy(
     },
     getPrototypeOf() {
       return null;
+    },
+    setPrototypeOf() {
+      return false;
     },
   });
 
@@ -1787,6 +1799,9 @@ function createNamespacedDeriveProxy(
     },
     getPrototypeOf() {
       return null;
+    },
+    setPrototypeOf() {
+      return false;
     },
   });
 
@@ -1874,6 +1889,9 @@ function createNamespacedEventsProxy(
             getPrototypeOf() {
               return null;
             },
+            setPrototypeOf() {
+              return false;
+            },
           },
         );
 
@@ -1909,6 +1927,9 @@ function createNamespacedEventsProxy(
       },
       getPrototypeOf() {
         return null;
+      },
+      setPrototypeOf() {
+        return false;
       },
     },
   );
@@ -2064,6 +2085,18 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         return (payload?: Record<string, unknown>) => {
           engine.dispatch({ type: eventName, ...payload });
         };
+      },
+      set() {
+        return false;
+      },
+      defineProperty() {
+        return false;
+      },
+      getPrototypeOf() {
+        return null;
+      },
+      setPrototypeOf() {
+        return false;
       },
     },
   );

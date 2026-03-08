@@ -409,6 +409,9 @@ export function createResolversManager<S extends Schema>(
     const reqType = req.type;
     const cached = resolversByType.get(reqType);
     if (cached) {
+      // Move to end of Map iteration order (LRU: least recently used is first)
+      resolversByType.delete(reqType);
+      resolversByType.set(reqType, cached);
       // Try cached resolvers first
       for (const id of cached) {
         const def = definitions[id];
