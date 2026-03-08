@@ -152,7 +152,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
     expect(invalidatedIds).toContain("bottom");
     // bottom should appear exactly once (not twice from left + right)
     expect(
-      invalidatedIds.filter((id: string) => id === "bottom"),
+      invalidatedIds.filter((id) => id === "bottom"),
     ).toHaveLength(1);
   });
 });
@@ -176,7 +176,7 @@ describe("P0-2: FactsStore destroy", () => {
     expect(listener).toHaveBeenCalledTimes(1);
 
     // Destroy
-    (store as unknown as Record<string, () => void>).destroy();
+    (store as unknown as Record<string, () => void>).destroy!();
 
     // Fire after destroy — listener should not be called
     store.set("count", 2);
@@ -195,7 +195,7 @@ describe("P0-2: FactsStore destroy", () => {
     store.set("count", 1);
     expect(listener).toHaveBeenCalledTimes(1);
 
-    (store as unknown as Record<string, () => void>).destroy();
+    (store as unknown as Record<string, () => void>).destroy!();
 
     store.set("count", 2);
     expect(listener).toHaveBeenCalledTimes(1);
@@ -238,7 +238,7 @@ describe("P0-2: FactsStore destroy", () => {
       validate: false,
     });
 
-    (store as unknown as Record<string, () => void>).destroy();
+    (store as unknown as Record<string, () => void>).destroy!();
 
     // Should not throw — just no listeners to notify
     expect(() => {
@@ -527,7 +527,7 @@ describe("P1-3: resolver cache LRU", () => {
       manager.resolve({
         id: `req-${i}`,
         requirement: { type: "ACTION" },
-        constraintId: "test",
+        fromConstraint: "test",
       });
     }
 
