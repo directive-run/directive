@@ -452,7 +452,6 @@ describe("useSelector (NamespacedSystem)", () => {
     });
 
     expect(result.current).toBe(0);
-    const afterRender = renderCount;
 
     act(() => {
       system.facts.auth.token = "abc123";
