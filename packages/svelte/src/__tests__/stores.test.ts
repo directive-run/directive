@@ -1,6 +1,6 @@
 import { createModule, createSystem, t } from "@directive-run/core";
 import { createRequirementStatusPlugin } from "@directive-run/core";
-import type { SingleModuleSystem } from "@directive-run/core";
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // ============================================================================
@@ -105,8 +105,8 @@ const testSchema = {
     items: t.array<string>(),
   },
   derivations: {
-    doubled: { _type: 0 as number },
-    greeting: { _type: "" as string },
+    doubled: t.number(),
+    greeting: t.string(),
   },
   events: {
     increment: {},
@@ -124,12 +124,12 @@ function createTestSystem() {
       facts.items = [];
     },
     derive: {
-      doubled: (facts) => (facts.count as number) * 2,
+      doubled: (facts) => facts.count * 2,
       greeting: (facts) => `Hi, ${facts.name}!`,
     },
     events: {
       increment: (facts) => {
-        facts.count = (facts.count as number) + 1;
+        facts.count = facts.count + 1;
       },
       setName: (facts, { name }: { name: string }) => {
         facts.name = name;
@@ -1184,11 +1184,11 @@ describe("useDirective", () => {
         facts.items = [];
       },
       derive: {
-        doubled: (facts) => (facts.count as number) * 2,
+        doubled: (facts) => facts.count * 2,
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = (facts.count as number) + 1; },
+        increment: (facts) => { facts.count = facts.count + 1; },
         setName: (facts, { name }: { name: string }) => { facts.name = name; },
       },
     });
@@ -1211,11 +1211,11 @@ describe("useDirective", () => {
         facts.items = [];
       },
       derive: {
-        doubled: (facts) => (facts.count as number) * 2,
+        doubled: (facts) => facts.count * 2,
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = (facts.count as number) + 1; },
+        increment: (facts) => { facts.count = facts.count + 1; },
         setName: (facts, { name }: { name: string }) => { facts.name = name; },
       },
     });
@@ -1241,11 +1241,11 @@ describe("useDirective", () => {
         facts.items = [];
       },
       derive: {
-        doubled: (facts) => (facts.count as number) * 2,
+        doubled: (facts) => facts.count * 2,
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = (facts.count as number) + 1; },
+        increment: (facts) => { facts.count = facts.count + 1; },
         setName: (facts, { name }: { name: string }) => { facts.name = name; },
       },
     });
