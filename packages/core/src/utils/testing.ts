@@ -708,7 +708,7 @@ export function createTestSystem<Modules extends ModulesMap>(
       );
       if (!hasRequirement) {
         throw new Error(
-          `Expected requirement of type "${type}" but none found`,
+          `[Directive] Expected requirement of type "${type}" but none found`,
         );
       }
     },
@@ -718,12 +718,12 @@ export function createTestSystem<Modules extends ModulesMap>(
       if (times !== undefined) {
         if (calls.length !== times) {
           throw new Error(
-            `Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
+            `[Directive] Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
           );
         }
       } else if (calls.length === 0) {
         throw new Error(
-          `Expected resolver "${type}" to be called but it was not`,
+          `[Directive] Expected resolver "${type}" to be called but it was not`,
         );
       }
     },
@@ -731,7 +731,7 @@ export function createTestSystem<Modules extends ModulesMap>(
     assertFactSet(key: string, value?: unknown): void {
       const changes = factsHistory.filter((c) => c.key === key);
       if (changes.length === 0) {
-        throw new Error(`Expected fact "${key}" to be set but it was not`);
+        throw new Error(`[Directive] Expected fact "${key}" to be set but it was not`);
       }
       if (value !== undefined) {
         const hasValue = changes.some((c) => c.newValue === value);
@@ -740,7 +740,7 @@ export function createTestSystem<Modules extends ModulesMap>(
             .map((c) => JSON.stringify(c.newValue))
             .join(", ");
           throw new Error(
-            `Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+            `[Directive] Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
           );
         }
       }
@@ -750,7 +750,7 @@ export function createTestSystem<Modules extends ModulesMap>(
       const changes = factsHistory.filter((c) => c.key === key);
       if (changes.length !== times) {
         throw new Error(
-          `Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+          `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
         );
       }
     },
@@ -793,7 +793,7 @@ export function assertDynamic(
   const isDynamic = getDynamicCheck(system, type, id);
   if (!isDynamic) {
     throw new Error(
-      `Expected ${type} "${id}" to be dynamic, but it is not.`,
+      `[Directive] Expected ${type} "${id}" to be dynamic, but it is not.`,
     );
   }
 }
@@ -828,7 +828,7 @@ export function assertNotDynamic(
   const isDynamic = getDynamicCheck(system, type, id);
   if (isDynamic) {
     throw new Error(
-      `Expected ${type} "${id}" to NOT be dynamic, but it is.`,
+      `[Directive] Expected ${type} "${id}" to NOT be dynamic, but it is.`,
     );
   }
 }

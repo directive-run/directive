@@ -32,9 +32,7 @@ import { createFacts } from "./facts.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
-
-// Blocked properties for prototype pollution protection
-const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   ConstraintsDef,
   DerivationsDef,
@@ -127,6 +125,12 @@ export function createEngine<S extends Schema>(
           throw new Error(
             `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
               "This could indicate a prototype pollution attempt.",
+          );
+        }
+        if (section === "schema" && key.startsWith("$")) {
+          throw new Error(
+            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". ` +
+              "Keys starting with $ are reserved for internal accessors ($store, $snapshot).",
           );
         }
       }
@@ -1231,8 +1235,10 @@ export function createEngine<S extends Schema>(
       // Capture resolver starts for run history
       if (currentRun) {
         const inflightNow = resolversManager.getInflightInfo();
+        // Build Map for O(1) lookups instead of O(n) find per requirement
+        const inflightById = new Map(inflightNow.map((i) => [i.id, i]));
         for (const req of added) {
-          const info = inflightNow.find((i) => i.id === req.id);
+          const info = inflightById.get(req.id);
           currentRun.resolversStarted.push({
             resolver: info?.resolverId ?? "unknown",
             requirementId: req.id,
@@ -1376,6 +1382,15 @@ export function createEngine<S extends Schema>(
       }
       return undefined;
     },
+    set() {
+      return false;
+    },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
+    },
   });
 
   // Create typed events accessor using a Proxy
@@ -1428,6 +1443,15 @@ export function createEngine<S extends Schema>(
           return { configurable: true, enumerable: true };
         }
         return undefined;
+      },
+      set() {
+        return false;
+      },
+      defineProperty() {
+        return false;
+      },
+      getPrototypeOf() {
+        return null;
       },
     },
   );
@@ -1591,6 +1615,10 @@ export function createEngine<S extends Schema>(
     destroy(): void {
       this.stop();
       state.isDestroyed = true;
+      // Clean up resolvers (statuses, caches)
+      resolversManager.destroy();
+      // Clean up error boundary
+      errorBoundary.clearErrors();
       settlementListeners.clear();
       timeTravelListeners.clear();
       // Clean up deferred registrations (prevent closure retention)
@@ -1604,6 +1632,15 @@ export function createEngine<S extends Schema>(
       pendingFactChanges.length = 0;
       currentRun = null;
       runHistoryCache = null;
+      // Clean up dynamic definition state
+      dynamicIds.constraints.clear();
+      dynamicIds.resolvers.clear();
+      dynamicIds.derivations.clear();
+      dynamicIds.effects.clear();
+      originals.constraints.clear();
+      originals.resolvers.clear();
+      originals.derivations.clear();
+      originals.effects.clear();
       pluginManager.emitDestroy(system);
     },
 
@@ -2321,6 +2358,12 @@ export function createEngine<S extends Schema>(
         if (BLOCKED_PROPS.has(key)) {
           throw new Error(
             `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}.`,
+          );
+        }
+        if (section === "schema" && key.startsWith("$")) {
+          throw new Error(
+            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". ` +
+              "Keys starting with $ are reserved for internal accessors ($store, $snapshot).",
           );
         }
       }

@@ -33,6 +33,9 @@ import type {
  *
  * @public
  */
+/** Cache for default requirement IDs (no custom keyFn) to avoid repeated stableStringify */
+const reqIdCache = new WeakMap<Requirement, string>();
+
 export function generateRequirementId(
   req: Requirement,
   keyFn?: RequirementKeyFn,
@@ -42,26 +45,20 @@ export function generateRequirementId(
     return keyFn(req);
   }
 
+  // Check cache first
+  const cached = reqIdCache.get(req);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   // Default: type + stable JSON of other properties
   const { type, ...rest } = req;
   const sortedRest = stableStringify(rest);
-  return `${type}:${sortedRest}`;
-}
+  const id = `${type}:${sortedRest}`;
 
-/**
- * Check if two requirements are equal by comparing their computed IDs.
- *
- * @param a - First requirement to compare.
- * @param b - Second requirement to compare.
- * @returns `true` when both requirements share the same identity string.
- *
- * @public
- */
-export function requirementsEqual(
-  a: RequirementWithId,
-  b: RequirementWithId,
-): boolean {
-  return a.id === b.id;
+  reqIdCache.set(req, id);
+
+  return id;
 }
 
 /**
