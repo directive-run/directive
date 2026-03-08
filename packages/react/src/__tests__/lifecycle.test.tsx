@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
-import { createModule, createSystem, t } from "@directive-run/core";
+import { createModule, t } from "@directive-run/core";
 import type { ModuleDef } from "@directive-run/core";
 import { renderHook, act, render, screen } from "@testing-library/react";
-import React from "react";
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   useDirectiveRef,
   useDirective,

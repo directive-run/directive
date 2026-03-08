@@ -46,6 +46,7 @@ function createSystemWithStatus(
   const mod = createModule("test", {
     schema: {
       facts: { count: t.number(), ready: t.boolean() },
+      requirements: { LOAD_DATA: {} },
     },
     init: (facts) => {
       facts.count = 0;
@@ -94,6 +95,7 @@ function createMultiTypeSystem(
   const mod = createModule("multi", {
     schema: {
       facts: { a: t.boolean(), b: t.boolean() },
+      requirements: { LOAD_A: {}, LOAD_B: {} },
     },
     init: (facts) => {
       facts.a = false;
@@ -323,11 +325,14 @@ describe("useRequirementStatus", () => {
         useRequirementStatus(statusPlugin, ["LOAD_A", "LOAD_B"]),
       );
 
-      const statuses = result.current as Record<string, unknown>;
+      const statuses = result.current;
+      if (!statuses.LOAD_A || !statuses.LOAD_B) {
+        throw new Error("Missing statuses");
+      }
       expect(statuses).toHaveProperty("LOAD_A");
       expect(statuses).toHaveProperty("LOAD_B");
-      expect((statuses.LOAD_A as { isLoading: boolean }).isLoading).toBe(true);
-      expect((statuses.LOAD_B as { isLoading: boolean }).isLoading).toBe(true);
+      expect(statuses.LOAD_A.isLoading).toBe(true);
+      expect(statuses.LOAD_B.isLoading).toBe(true);
 
       await act(async () => {
         gateA.resolve();
@@ -358,10 +363,10 @@ describe("useRequirementStatus", () => {
         useRequirementStatus(statusPlugin, ["LOAD_A", "LOAD_B"]),
       );
 
-      const statuses = result.current as Record<
-        string,
-        { isLoading: boolean }
-      >;
+      const statuses = result.current;
+      if (!statuses.LOAD_A || !statuses.LOAD_B) {
+        throw new Error("Missing statuses");
+      }
       expect(statuses.LOAD_A.isLoading).toBe(true);
       expect(statuses.LOAD_B.isLoading).toBe(true);
 
@@ -371,10 +376,10 @@ describe("useRequirementStatus", () => {
         await new Promise((r) => setTimeout(r, 100));
       });
 
-      const updated = result.current as Record<
-        string,
-        { isLoading: boolean }
-      >;
+      const updated = result.current;
+      if (!updated.LOAD_A || !updated.LOAD_B) {
+        throw new Error("Missing statuses");
+      }
       expect(updated.LOAD_A.isLoading).toBe(false);
       // B is still loading
       expect(updated.LOAD_B.isLoading).toBe(true);
@@ -384,7 +389,10 @@ describe("useRequirementStatus", () => {
         await system.settle();
       });
 
-      const final = result.current as Record<string, { isLoading: boolean }>;
+      const final = result.current;
+      if (!final.LOAD_A || !final.LOAD_B) {
+        throw new Error("Missing statuses");
+      }
       expect(final.LOAD_A.isLoading).toBe(false);
       expect(final.LOAD_B.isLoading).toBe(false);
 
@@ -418,7 +426,7 @@ describe("useSuspenseRequirement", () => {
       return <div data-testid="status">{String(status.isLoading)}</div>;
     }
 
-    const { container } = render(
+    render(
       <Suspense fallback={<div data-testid="fallback">loading</div>}>
         <Inner />
       </Suspense>,
@@ -469,6 +477,7 @@ describe("useSuspenseRequirement", () => {
     const mod = createModule("err-test", {
       schema: {
         facts: { ready: t.boolean(), attempted: t.boolean() },
+        requirements: { LOAD_DATA: {} },
       },
       init: (facts) => {
         facts.ready = false;
@@ -563,7 +572,7 @@ describe("useSuspenseRequirement", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     function Inner() {
-      const statuses = useSuspenseRequirement(statusPlugin, [
+      useSuspenseRequirement(statusPlugin, [
         "LOAD_A",
         "LOAD_B",
       ]);
@@ -604,6 +613,7 @@ describe("useSuspenseRequirement", () => {
           b: t.boolean(),
           attemptedA: t.boolean(),
         },
+        requirements: { LOAD_A: {}, LOAD_B: {} },
       },
       init: (facts) => {
         facts.a = false;
