@@ -463,6 +463,13 @@ export function createFactsStore<S extends Schema>(
     },
   };
 
+  // Internal: clear all listeners on destroy to release resources immediately.
+  // Not part of the public FactsStore interface — called by engine.destroy().
+  (store as unknown as Record<string, unknown>).destroy = () => {
+    keyListeners.clear();
+    allListeners.clear();
+  };
+
   // Internal: register new schema keys for dynamic module registration.
   // Not part of the public FactsStore interface — used by engine.registerModule().
   (store as unknown as Record<string, unknown>).registerKeys = (

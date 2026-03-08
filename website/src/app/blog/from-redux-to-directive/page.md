@@ -419,12 +419,12 @@ test("isAuthenticated derives from user and token", () => {
   const { system } = createTestSystem({ module: auth });
   system.start();
 
-  expect(system.derived.isAuthenticated).toBe(false);
+  expect(system.derive.isAuthenticated).toBe(false);
 
   system.facts.user = { id: "1", email: "a@b.com", role: "user" };
   system.facts.token = "abc";
 
-  expect(system.derived.isAuthenticated).toBe(true);
+  expect(system.derive.isAuthenticated).toBe(true);
 });
 
 test("session constraint fires when unchecked", () => {
@@ -454,7 +454,7 @@ test("resolver updates facts on successful session", async () => {
   await resolveAll();
 
   expect(system.facts.sessionChecked).toBe(true);
-  expect(system.derived.isAuthenticated).toBe(true);
+  expect(system.derive.isAuthenticated).toBe(true);
 });
 ```
 

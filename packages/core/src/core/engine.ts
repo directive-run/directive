@@ -1366,6 +1366,11 @@ export function createEngine<S extends Schema>(
       if (prop in deriveMethods) {
         return deriveMethods[prop];
       }
+      // Return undefined for unknown derivation keys instead of throwing.
+      // React 19 dev-mode traverses objects accessing $$typeof, toJSON, then, etc.
+      if (!(prop in mergedDerive)) {
+        return undefined;
+      }
       return derivationsManager.get(prop as keyof DerivationsDef<S>);
     },
     has(_, prop: string | symbol) {
@@ -1402,6 +1407,9 @@ export function createEngine<S extends Schema>(
     },
     getPrototypeOf() {
       return null;
+    },
+    setPrototypeOf() {
+      return false;
     },
   });
 
@@ -1476,6 +1484,9 @@ export function createEngine<S extends Schema>(
       },
       getPrototypeOf() {
         return null;
+      },
+      setPrototypeOf() {
+        return false;
       },
     },
   );
@@ -1638,8 +1649,11 @@ export function createEngine<S extends Schema>(
     },
 
     destroy(): void {
+      if (state.isDestroyed) return;
       this.stop();
       state.isDestroyed = true;
+      // Clean up store listeners
+      (store as unknown as Record<string, () => void>).destroy?.();
       // Clean up resolvers (statuses, caches)
       resolversManager.destroy();
       // Clean up error boundary
