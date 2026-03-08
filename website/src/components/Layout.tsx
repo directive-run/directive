@@ -110,7 +110,7 @@ function Header() {
           <Search />
         </div>
       )}
-      <div className="relative flex basis-0 items-center justify-end gap-6 sm:gap-8 md:grow">
+      <div className="relative flex basis-0 items-center justify-end gap-4 sm:gap-6 md:gap-8 md:grow">
         <div className="hidden items-center gap-8 sm:gap-10 md:flex">
           <HeaderLink href="/docs/quick-start" activePrefix="/docs">
             Docs
@@ -132,10 +132,10 @@ function Header() {
           {canUseShareButton && <ShareButton />}
           <Link
             href="https://github.com/directive-run/directive"
-            className="group flex h-10 w-10 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary sm:h-6 sm:w-6"
+            className="group flex h-6 w-6 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             aria-label="GitHub"
           >
-            <GitHubIcon className="h-5 w-5 fill-slate-400 group-hover:fill-slate-500 sm:h-6 sm:w-6 dark:group-hover:fill-slate-300" />
+            <GitHubIcon className="h-6 w-6 fill-slate-400 group-hover:fill-slate-500 dark:group-hover:fill-slate-300" />
           </Link>
         </div>
       </div>
