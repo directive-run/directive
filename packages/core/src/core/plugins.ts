@@ -163,7 +163,9 @@ export function createPluginManager<
 
   /** Safe call - wraps plugin hook calls to prevent errors from breaking the system */
   function safeCall<T>(fn: (() => T) | undefined): T | undefined {
-    if (!fn) return undefined;
+    if (!fn) {
+      return undefined;
+    }
     try {
       return fn();
     } catch (error) {
@@ -176,7 +178,9 @@ export function createPluginManager<
   async function safeCallAsync<T>(
     fn: (() => Promise<T>) | undefined,
   ): Promise<T | undefined> {
-    if (!fn) return undefined;
+    if (!fn) {
+      return undefined;
+    }
     try {
       return await fn();
     } catch (error) {
