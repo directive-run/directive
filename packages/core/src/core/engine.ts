@@ -1485,7 +1485,8 @@ export function createEngine<S extends Schema>(
   const system: System<any> = {
     facts,
     debug: timeTravelManager.isEnabled ? timeTravelManager : null,
-    derive: deriveAccessor,
+    // biome-ignore lint/suspicious/noExplicitAny: Proxy provides both derivation values and control methods at runtime
+    derive: deriveAccessor as any,
     events: eventsAccessor,
     constraints: {
       disable: (id: string) => constraintsManager.disable(id),

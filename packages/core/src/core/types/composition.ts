@@ -34,6 +34,7 @@ import type {
 import type {
   ConstraintsControl,
   DebugConfig,
+  DerivationsControl,
   DistributableSnapshot,
   DistributableSnapshotOptions,
   EffectsControl,
@@ -263,7 +264,7 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   /** Time-travel debugging API (if enabled) */
   readonly debug: TimeTravelAPI | null;
   /** Namespaced derivations accessor: system.derive.auth.status */
-  readonly derive: NamespacedDerivations<Modules>;
+  readonly derive: NamespacedDerivations<Modules> & DerivationsControl;
   /** Events accessor (union of all module events) */
   readonly events: NamespacedEventsAccessor<Modules>;
   /** Runtime control for constraints (disable/enable/isDisabled + dynamic CRUD) */
@@ -625,7 +626,7 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   /** Time-travel debugging API (if enabled) */
   readonly debug: TimeTravelAPI | null;
   /** Direct derivations accessor: system.derive.doubled */
-  readonly derive: InferDerivations<S>;
+  readonly derive: InferDerivations<S> & DerivationsControl;
   /** Direct events accessor: system.events.increment() */
   readonly events: SingleModuleEvents<S>;
   /** Runtime control for constraints (disable/enable/isDisabled) */
