@@ -363,7 +363,7 @@ derive: {
 
 In the imperative version, the expression `user.role === "guest" && cart.total > 500` lives inside the `if` block. If another function needs the same check, it either duplicates the logic or calls a shared helper &ndash; but the helper still returns a boolean that feeds into another `if` chain.
 
-Derivations make these computed values first-class. They react to fact changes automatically (no manual dependency tracking), they're composable (derivations can reference other derivations), and they're readable from anywhere in the system. The constraint `guestSpendingCap` references `derive.guestOverLimit` directly. If the business definition of "over limit" changes, you update one derivation and every constraint that depends on it re-evaluates.
+Derivations make these computed values first-class. They react to fact changes automatically (no manual dependency tracking), they're composable (derivations can reference other derivations), and they're readable from anywhere in the system. The constraint `guestSpendingCap` references `derived.guestOverLimit` directly. If the business definition of "over limit" changes, you update one derivation and every constraint that depends on it re-evaluates.
 
 ---
 

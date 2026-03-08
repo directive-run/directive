@@ -243,16 +243,16 @@ The tracking uses two maps:
 // Example: dependency tracking in action
 derive: {
   isRed: (facts) => facts.phase === "red",        // depends on: ["phase"]
-  status: (facts, derive) => ({
+  status: (facts, derived) => ({
     phase: facts.phase,
-    isRed: derive.isRed,                           // depends on: ["phase", "isRed"]
+    isRed: derived.isRed,                           // depends on: ["phase", "isRed"]
   }),
 }
 ```
 
 When `isRed` recomputes, it calls `updateDependencies()` to reconcile its old dependency set with its new one. Old dependencies are removed from the tracking maps; new ones are added. This is necessary because derivation dependencies can change between computations – a derivation with a conditional branch might depend on different facts depending on the branch taken.
 
-The composition proxy (`derivedProxy`) does something subtle: when a derivation reads `derive.isRed`, the proxy calls `trackAccess("isRed")` so the consuming derivation records the dependency, and then it returns the (possibly recomputed) value. This is how derivation-to-derivation dependencies are established without explicit wiring.
+The composition proxy (`derivedProxy`) does something subtle: when a derivation reads `derived.isRed`, the proxy calls `trackAccess("isRed")` so the consuming derivation records the dependency, and then it returns the (possibly recomputed) value. This is how derivation-to-derivation dependencies are established without explicit wiring.
 
 One guard worth noting: the derivation proxy blocks access to `__proto__`, `constructor`, and `prototype`. Without this, code that enumerates proxy properties (common in serialization libraries and devtools) would create spurious dependency tracking entries and pollute the `factToDerivedDeps` Map with keys that aren't real facts. This is a small detail, but prototype pollution through proxy traps is a real attack vector in libraries that accept user-defined functions – which Directive does, in every constraint and derivation.
 

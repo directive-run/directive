@@ -134,7 +134,7 @@ export const permissionsModule = createModule("permissions", {
     canManageUsers: (facts) => facts.self.permissions.includes("users.manage"),
     canViewAnalytics: (facts) =>
       facts.self.permissions.includes("analytics.view"),
-    isAdmin: (_facts, derive) => derive.canManageUsers,
+    isAdmin: (_facts, derived) => derived.canManageUsers,
     permissionCount: (facts) => facts.self.permissions.length,
   },
 

@@ -180,10 +180,10 @@ export const dashboardLoaderModule = createModule("dashboard-loader", {
       return resources.some((r) => r.status === "loading");
     },
 
-    combinedStatus: (facts, derive) => {
-      const loaded = derive.loadedCount;
-      const anyErr = derive.anyError;
-      const anyLoad = derive.anyLoading;
+    combinedStatus: (facts, derived) => {
+      const loaded = derived.loadedCount;
+      const anyErr = derived.anyError;
+      const anyLoad = derived.anyLoading;
       const allIdle = [
         facts.profile,
         facts.preferences,

@@ -195,6 +195,10 @@
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ```
+- `ConstraintsControl` — Runtime control for constraints
+  ```ts
+  export interface ConstraintsControl {
+  ```
 - `ConstraintState` — Internal constraint state
   ```ts
   export interface ConstraintState {
@@ -219,6 +223,10 @@
   ```ts
   export interface DebugConfig {
   ```
+- `DerivationsControl` — Runtime control for derivations (dynamic registration + value access)
+  ```ts
+  export interface DerivationsControl {
+  ```
 - `DerivationState` — Internal derivation state
   ```ts
   export interface DerivationState<T> {
@@ -234,6 +242,10 @@
 - `DistributableSnapshotOptions` — Options for creating a distributable snapshot.
   ```ts
   export interface DistributableSnapshotOptions {
+  ```
+- `EffectsControl` — Runtime control for effects
+  ```ts
+  export interface EffectsControl {
   ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
@@ -318,6 +330,10 @@
 - `ResolverContext` — Resolver context passed to resolve function
   ```ts
   export interface ResolverContext<S extends Schema = Schema> {
+  ```
+- `ResolversControl` — Runtime control for resolvers
+  ```ts
+  export interface ResolversControl {
   ```
 - `RetryLaterConfig` — Configuration for retry-later strategy.
   ```ts

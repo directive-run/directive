@@ -108,8 +108,8 @@ export const debounceSearchModule = createModule("debounce-search", {
       return facts.query !== facts.debouncedQuery && facts.queryChangedAt > 0;
     },
 
-    debounceProgress: (facts, derive) => {
-      if (!derive.isDebouncing) {
+    debounceProgress: (facts, derived) => {
+      if (!derived.isDebouncing) {
         return 0;
       }
 

@@ -185,8 +185,8 @@ const newsletter = createModule("newsletter", {
 
     isValid: (facts) => EMAIL_REGEX.test(facts.email),
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {
@@ -369,7 +369,7 @@ Five facts replace four `useState` calls and a `useRef`. The imperative version 
 
 The imperative version computes `emailError`, `isValid`, `isRateLimited`, and `canSubmit` as local variables scattered across the function body. They re-run on every render whether their inputs changed or not.
 
-In the module, each is a named derivation with auto-tracked dependencies. `canSubmit` composes `derive.isValid` &ndash; if `isValid` hasn't changed, `canSubmit` doesn't recompute.
+In the module, each is a named derivation with auto-tracked dependencies. `canSubmit` composes `derived.isValid` &ndash; if `isValid` hasn't changed, `canSubmit` doesn't recompute.
 
 ### Events replace scattered setState
 
@@ -415,7 +415,7 @@ The `resetAfterDelay` resolver waits 8 seconds and clears the form. If status ch
 | Error state | `useState("")` | `errorMessage` fact |
 | Last submitted | `useRef(0)` | `lastSubmittedAt` fact |
 | Validation | Inline ternary chain | `emailError` + `isValid` derivations |
-| Submit guard | Local `canSubmit` variable | `canSubmit` derivation (composing `derive.isValid`) |
+| Submit guard | Local `canSubmit` variable | `canSubmit` derivation (composing `derived.isValid`) |
 | Rate limiting | `Date.now()` check in render | `lastSubmittedAt` fact + `canSubmit` derivation |
 | Auto-reset | `useEffect` + `setTimeout` + `clearTimeout` | `resetAfterSuccess` constraint + resolver |
 | Logging | `useEffect` + `useRef` for prev status | `logSubscription` effect with `deps: ["status"]` |

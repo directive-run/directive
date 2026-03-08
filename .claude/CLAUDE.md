@@ -122,7 +122,7 @@ const trafficLight = createModule("traffic-light", {
   derive: {
     isRed: (facts) => facts.phase === "red",
     // Composition
-    status: (facts, derive) => ({ phase: facts.phase, isRed: derive.isRed }),
+    status: (facts, derived) => ({ phase: facts.phase, isRed: derived.isRed }),
   },
 
   // Fire-and-forget

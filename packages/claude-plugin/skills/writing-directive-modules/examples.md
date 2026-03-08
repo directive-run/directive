@@ -584,8 +584,8 @@ const contactForm = createModule("contact-form", {
       facts.subject !== "" &&
       facts.message.trim().length >= 10,
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {
@@ -821,8 +821,8 @@ const newsletter = createModule("newsletter", {
 
     isValid: (facts) => EMAIL_REGEX.test(facts.email),
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {
@@ -1350,23 +1350,23 @@ export const cartModule = createModule("cart", {
       return facts.self.items.length === 0;
     },
 
-    discount: (facts, derive) => {
-      const sub = derive.subtotal;
+    discount: (facts, derived) => {
+      const sub = derived.subtotal;
 
       return sub * (facts.self.couponDiscount / 100);
     },
 
-    tax: (facts, derive) => {
-      const sub = derive.subtotal;
-      const disc = derive.discount;
+    tax: (facts, derived) => {
+      const sub = derived.subtotal;
+      const disc = derived.discount;
 
       return (sub - disc) * 0.08;
     },
 
-    total: (_facts, derive) => {
-      const sub = derive.subtotal;
-      const disc = derive.discount;
-      const tx = derive.tax;
+    total: (_facts, derived) => {
+      const sub = derived.subtotal;
+      const disc = derived.discount;
+      const tx = derived.tax;
 
       return sub - disc + tx;
     },
@@ -1377,8 +1377,8 @@ export const cartModule = createModule("cart", {
       );
     },
 
-    freeShipping: (_facts, derive) => {
-      const sub = derive.subtotal;
+    freeShipping: (_facts, derived) => {
+      const sub = derived.subtotal;
 
       return sub >= 75;
     },
@@ -1717,23 +1717,23 @@ export const wizardModule = createModule("wizard", {
       return facts.plan !== "";
     },
 
-    currentStepValid: (facts, derive) => {
+    currentStepValid: (facts, derived) => {
       if (facts.currentStep === 0) {
-        return derive.step0Valid;
+        return derived.step0Valid;
       }
       if (facts.currentStep === 1) {
-        return derive.step1Valid;
+        return derived.step1Valid;
       }
       if (facts.currentStep === 2) {
-        return derive.step2Valid;
+        return derived.step2Valid;
       }
 
       return false;
     },
 
-    canAdvance: (facts, derive) => {
+    canAdvance: (facts, derived) => {
       return (
-        derive.currentStepValid && facts.currentStep < facts.totalSteps - 1
+        derived.currentStepValid && facts.currentStep < facts.totalSteps - 1
       );
     },
 

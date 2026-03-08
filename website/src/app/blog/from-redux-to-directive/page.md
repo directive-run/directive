@@ -189,7 +189,7 @@ const auth = createModule("auth", {
     isAuthenticated: (facts) =>
       facts.user !== undefined && facts.token !== undefined,
     isAdmin: (facts) => facts.user?.role === "admin",
-    status: (facts, derive) => {
+    status: (facts, derived) => {
       if (facts.error) {
         return "failed" as const;
       }
@@ -198,7 +198,7 @@ const auth = createModule("auth", {
         return "loading" as const;
       }
 
-      if (derive.isAuthenticated) {
+      if (derived.isAuthenticated) {
         return "succeeded" as const;
       }
 

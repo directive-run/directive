@@ -303,10 +303,10 @@ derive: {
   isAdmin: (facts) => facts.user?.role === "admin",
 
   // Composed – builds on other derivations via the second argument
-  canEdit: (facts, derive) => derive.isLoggedIn && derive.isAdmin,
+  canEdit: (facts, derived) => derived.isLoggedIn && derived.isAdmin,
 
   // Deeper composition – mixes derivations with facts
-  canDelete: (facts, derive) => derive.canEdit && facts.user?.permissions.delete,
+  canDelete: (facts, derived) => derived.canEdit && facts.user?.permissions.delete,
 },
 ```
 

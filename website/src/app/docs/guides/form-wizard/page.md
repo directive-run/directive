@@ -62,12 +62,12 @@ const wizard = createModule('wizard', {
     step0Valid: (facts) => facts.email.includes('@') && facts.password.length >= 8,
     step1Valid: (facts) => facts.name.trim().length > 0,
     step2Valid: (facts) => facts.plan !== '',
-    currentStepValid: (facts, derive) => {
-      const validators = [derive.step0Valid, derive.step1Valid, derive.step2Valid];
+    currentStepValid: (facts, derived) => {
+      const validators = [derived.step0Valid, derived.step1Valid, derived.step2Valid];
 
       return validators[facts.currentStep] ?? false;
     },
-    canAdvance: (facts, derive) => derive.currentStepValid && facts.currentStep < facts.totalSteps - 1,
+    canAdvance: (facts, derived) => derived.currentStepValid && facts.currentStep < facts.totalSteps - 1,
     canGoBack: (facts) => facts.currentStep > 0,
     progress: (facts) => Math.round(((facts.currentStep + 1) / facts.totalSteps) * 100),
   },

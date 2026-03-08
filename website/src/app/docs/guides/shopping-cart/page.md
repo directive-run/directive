@@ -71,10 +71,10 @@ const cart = createModule('cart', {
     itemCount: (facts) => facts.self.items.reduce((sum, item) => sum + item.quantity, 0),
     isEmpty: (facts) => facts.self.items.length === 0,
     discount: (facts) => facts.self.couponDiscount,
-    tax: (facts, derive) => Math.round((derive.subtotal - derive.discount) * 0.08 * 100) / 100,
-    total: (facts, derive) => Math.max(0, derive.subtotal - derive.discount + derive.tax),
+    tax: (facts, derived) => Math.round((derived.subtotal - derived.discount) * 0.08 * 100) / 100,
+    total: (facts, derived) => Math.max(0, derived.subtotal - derived.discount + derived.tax),
     hasOverstockedItem: (facts) => facts.self.items.some((item) => item.quantity > item.maxStock),
-    freeShipping: (facts, derive) => derive.subtotal >= 50,
+    freeShipping: (facts, derived) => derived.subtotal >= 50,
   },
 
   constraints: {
@@ -250,7 +250,7 @@ function CartSummary({ system }) {
 
 4. **Module-level `crossModuleDeps`** – `crossModuleDeps: { auth: authSchema }` is declared on the cart module, giving all constraints and derivations access to `facts.auth.*`. Own-module facts are accessed via `facts.self.*` (e.g., `facts.self.items`, `facts.self.checkoutRequested`). The `authSchema` is defined above the cart module so it can be referenced. The `auth` module then reuses the same schema object: `schema: authSchema`.
 
-5. **Derivation composition** – `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection. Note that `derive` callbacks use `facts.self.*` for own-module facts, while the `derive` parameter (e.g., `derive.subtotal`) is always scoped to the current module.
+5. **Derivation composition** – `total` depends on `subtotal`, `discount`, and `tax`. Changing any item recalculates all three. The `freeShipping` derivation reads `subtotal` for threshold detection. Note that `derive` callbacks use `facts.self.*` for own-module facts, while the `derived` parameter (e.g., `derived.subtotal`) is always scoped to the current module.
 
 6. **`devtoolsPlugin({ panel: true })`** opens the DevTools panel, showing real-time constraint evaluation, resolver status, and fact changes – invaluable for debugging business rules.
 

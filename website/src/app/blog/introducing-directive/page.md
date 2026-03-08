@@ -144,8 +144,8 @@ derive: {
     facts.user?.name ?? 'Guest',
 
   // Composition: derivations can reference other derivations
-  profileReady: (facts, derive) =>
-    derive.isAuthenticated && facts.preferences !== undefined,
+  profileReady: (facts, derived) =>
+    derived.isAuthenticated && facts.preferences !== undefined,
 },
 ```
 
@@ -338,8 +338,8 @@ const userProfile = createModule("user-profile", {
       facts.sessionValid && facts.user !== undefined,
     displayName: (facts) =>
       facts.user?.name ?? 'Guest',
-    profileReady: (facts, derive) =>
-      derive.isAuthenticated && facts.preferences !== undefined,
+    profileReady: (facts, derived) =>
+      derived.isAuthenticated && facts.preferences !== undefined,
   },
 
   events: {

@@ -288,8 +288,8 @@ Derivations can be used in constraint conditions:
 ```typescript
 constraints: {
   fetchMoreWhenLow: {
-    when: (facts, derive) =>
-      derive.userCount < 10 && !facts.isLoading,
+    when: (facts, derived) =>
+      derived.userCount < 10 && !facts.isLoading,
     require: { type: "FETCH_MORE_USERS" },
   },
 }
