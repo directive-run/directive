@@ -4,7 +4,7 @@ import {
   createRequirementStatusPlugin,
   t,
 } from "@directive-run/core";
-import type { Plugin, SingleModuleSystem } from "@directive-run/core";
+import type { Plugin } from "@directive-run/core";
 import { effectScope, type EffectScope, type Ref, type ShallowRef } from "vue";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
@@ -24,7 +24,6 @@ import {
   useNamespacedSelector,
   createTypedHooks,
   shallowEqual,
-  type StatusPlugin,
 } from "../index";
 
 // ============================================================================
@@ -54,8 +53,8 @@ const testSchema = {
     items: t.array<string>(),
   },
   derivations: {
-    doubled: { _type: 0 as number },
-    greeting: { _type: "" as string },
+    doubled: t.number(),
+    greeting: t.string(),
   },
   events: {
     increment: {},
@@ -73,12 +72,12 @@ function createTestSystem() {
       facts.items = [];
     },
     derive: {
-      doubled: (facts) => (facts.count as number) * 2,
+      doubled: (facts) => facts.count * 2,
       greeting: (facts) => `Hi, ${facts.name}!`,
     },
     events: {
       increment: (facts) => {
-        facts.count = (facts.count as number) + 1;
+        facts.count = facts.count + 1;
       },
       setName: (facts, { name }: { name: string }) => {
         facts.name = name;
@@ -102,6 +101,9 @@ function createConstraintSystem() {
       derivations: {
         doubled: t.number(),
       },
+      requirements: {
+        MAKE_READY: {},
+      },
     },
     init: (facts) => {
       facts.count = 0;
@@ -119,7 +121,7 @@ function createConstraintSystem() {
     resolvers: {
       makeReady: {
         requirement: "MAKE_READY",
-        resolve: async (req, context) => {
+        resolve: async (_req, context) => {
           context.facts.ready = true;
         },
       },
@@ -178,6 +180,7 @@ function createSystemWithStatus(
   const mod = createModule("status-test", {
     schema: {
       facts: { count: t.number(), ready: t.boolean() },
+      requirements: { LOAD_DATA: {} },
     },
     init: (facts) => {
       facts.count = 0;
@@ -617,11 +620,7 @@ describe("useDispatch", () => {
   it("returns a dispatch function", () => {
     system = createTestSystem();
     scope = effectScope();
-    let dispatch!: ReturnType<typeof useDispatch>;
-
-    scope.run(() => {
-      dispatch = useDispatch(system);
-    });
+    const dispatch = scope.run(() => useDispatch(system))!;
 
     expect(typeof dispatch).toBe("function");
   });
@@ -629,13 +628,12 @@ describe("useDispatch", () => {
   it("dispatching events updates facts", () => {
     system = createTestSystem();
     scope = effectScope();
-    let dispatch!: ReturnType<typeof useDispatch>;
     let count!: Ref<number | undefined>;
-
-    scope.run(() => {
-      dispatch = useDispatch(system);
+    const dispatch = scope.run(() => {
       count = useFact(system, "count");
-    });
+
+      return useDispatch(system);
+    })!;
 
     expect(count.value).toBe(0);
 
@@ -651,11 +649,7 @@ describe("useDispatch", () => {
   it("dispatching increment multiple times", () => {
     system = createTestSystem();
     scope = effectScope();
-    let dispatch!: ReturnType<typeof useDispatch>;
-
-    scope.run(() => {
-      dispatch = useDispatch(system);
-    });
+    const dispatch = scope.run(() => useDispatch(system))!;
 
     dispatch({ type: "increment" });
     dispatch({ type: "increment" });
@@ -681,11 +675,7 @@ describe("useEvents", () => {
   it("returns events object with expected methods", () => {
     system = createTestSystem();
     scope = effectScope();
-    let events!: ReturnType<typeof useEvents>;
-
-    scope.run(() => {
-      events = useEvents(system);
-    });
+    const events = scope.run(() => useEvents(system))!;
 
     expect(events).toBeDefined();
     expect(typeof events.increment).toBe("function");
@@ -695,13 +685,12 @@ describe("useEvents", () => {
   it("calling event method updates system", () => {
     system = createTestSystem();
     scope = effectScope();
-    let events!: ReturnType<typeof useEvents>;
     let count!: Ref<number | undefined>;
-
-    scope.run(() => {
-      events = useEvents(system);
+    const events = scope.run(() => {
       count = useFact(system, "count");
-    });
+
+      return useEvents(system);
+    })!;
 
     expect(count.value).toBe(0);
 
@@ -921,6 +910,7 @@ describe("useRequirementStatus", () => {
     const mod = createModule("multi", {
       schema: {
         facts: { a: t.boolean(), b: t.boolean() },
+        requirements: { LOAD_A: {}, LOAD_B: {} },
       },
       init: (facts) => {
         facts.a = false;
@@ -1009,11 +999,7 @@ describe("useRequirementStatus", () => {
   it("status has correct shape", () => {
     const { system, statusPlugin } = createSystemWithStatus();
     scope = effectScope();
-    let status!: ShallowRef<Record<string, unknown>>;
-
-    scope.run(() => {
-      status = useRequirementStatus(statusPlugin, "LOAD_DATA");
-    });
+    const status = scope.run(() => useRequirementStatus(statusPlugin, "LOAD_DATA"))!;
 
     expect(status.value).toHaveProperty("pending");
     expect(status.value).toHaveProperty("inflight");
@@ -1043,6 +1029,9 @@ describe("useExplain", () => {
       schema: {
         facts: {
           status: t.string(),
+        },
+        requirements: {
+          LOAD_DATA: {},
         },
       },
       init: (facts) => {
@@ -1103,6 +1092,9 @@ describe("useExplain", () => {
         facts: {
           status: t.string(),
         },
+        requirements: {
+          LOAD_DATA: {},
+        },
       },
       init: (facts) => {
         facts.status = "pending";
@@ -1162,13 +1154,9 @@ describe("useConstraintStatus", () => {
     await system.settle();
 
     scope = effectScope();
-    let constraints!: ReturnType<typeof useConstraintStatus>;
+    const constraints = scope.run(() => useConstraintStatus(system))!;
 
-    scope.run(() => {
-      constraints = useConstraintStatus(system);
-    });
-
-    const list = constraints.value as Array<{ id: string }>;
+    const list = constraints.value;
     expect(Array.isArray(list)).toBe(true);
     expect(list.length).toBeGreaterThanOrEqual(1);
     expect(list.some((c) => c.id === "needsReady")).toBe(true);
@@ -1467,11 +1455,7 @@ describe("useDirective", () => {
     });
 
     scope = effectScope();
-    let result!: ReturnType<typeof useDirective>;
-
-    scope.run(() => {
-      result = useDirective(mod);
-    });
+    const result = scope.run(() => useDirective(mod))!;
 
     expect(result.system).toBeDefined();
     expect(result.facts.value).toHaveProperty("count");
@@ -1499,11 +1483,7 @@ describe("useDirective", () => {
     });
 
     scope = effectScope();
-    let result!: ReturnType<typeof useDirective>;
-
-    scope.run(() => {
-      result = useDirective(mod);
-    });
+    const result = scope.run(() => useDirective(mod))!;
 
     expect((result.facts.value as Record<string, unknown>).count).toBe(0);
 
@@ -1526,11 +1506,7 @@ describe("useDirective", () => {
     });
 
     scope = effectScope();
-    let result!: ReturnType<typeof useDirective>;
-
-    scope.run(() => {
-      result = useDirective(mod);
-    });
+    const result = scope.run(() => useDirective(mod))!;
 
     const destroySpy = vi.spyOn(result.system, "destroy");
 
@@ -1552,11 +1528,7 @@ describe("useDirective", () => {
     });
 
     scope = effectScope();
-    let result!: ReturnType<typeof useDirective>;
-
-    scope.run(() => {
-      result = useDirective(mod, { status: true });
-    });
+    const result = scope.run(() => useDirective(mod, { status: true }))!;
 
     expect(result.statusPlugin).toBeDefined();
     expect(typeof result.statusPlugin!.getStatus).toBe("function");
@@ -1632,7 +1604,7 @@ describe("useNamespacedSelector", () => {
       init: (facts) => {
         facts.count = 0;
       },
-      derive: { doubled: (facts) => (facts.count as number) * 2 },
+      derive: { doubled: (facts) => facts.count * 2 },
     });
     const system = createSystem({ modules: { auth, data } });
     system.start();
