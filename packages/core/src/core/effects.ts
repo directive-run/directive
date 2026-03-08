@@ -252,12 +252,16 @@ export function createEffectsManager<S extends Schema>(
   /** Check if an effect should run based on changed keys */
   function shouldRun(id: string, changedKeys: Set<string>): boolean {
     const state = getState(id);
-    if (!state.enabled) return false;
+    if (!state.enabled) {
+      return false;
+    }
 
     // If effect has tracked deps (explicit or auto-tracked), check if any changed
     if (state.dependencies) {
       for (const dep of state.dependencies) {
-        if (changedKeys.has(dep)) return true;
+        if (changedKeys.has(dep)) {
+          return true;
+        }
       }
       return false;
     }

@@ -311,8 +311,12 @@ export function createDerivationsManager<
   // Create the proxy for composition
   derivedProxy = new Proxy({} as DerivedValues<S, D>, {
     get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
 
       // Track this derivation access so the consuming derivation
       // records a dependency on it (enables composition invalidation)

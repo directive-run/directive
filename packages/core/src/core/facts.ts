@@ -628,7 +628,9 @@ export const t = {
     return createSchemaType<T | null>(
       [
         (v): v is T | null => {
-          if (v === null) return true;
+          if (v === null) {
+            return true;
+          }
           return innerType._validators.every((validator) => validator(v as T));
         },
       ],
@@ -654,7 +656,9 @@ export const t = {
     return createSchemaType<T | undefined>(
       [
         (v): v is T | undefined => {
-          if (v === undefined) return true;
+          if (v === undefined) {
+            return true;
+          }
           return innerType._validators.every((validator) => validator(v as T));
         },
       ],
@@ -753,7 +757,9 @@ export const t = {
     return createChainableType<TupleType>(
       [
         (v): v is TupleType => {
-          if (!Array.isArray(v) || v.length !== types.length) return false;
+          if (!Array.isArray(v) || v.length !== types.length) {
+            return false;
+          }
           return types.every((schemaType, i) =>
             schemaType._validators.every((validator) => validator(v[i])),
           );
@@ -824,7 +830,9 @@ export const t = {
     return createChainableType<string>(
       [
         (v): v is string => {
-          if (typeof v !== "string") return false;
+          if (typeof v !== "string") {
+            return false;
+          }
           try {
             new URL(v);
             return true;
@@ -971,7 +979,9 @@ export function createFactsStore<S extends Schema>(
   function getExpectedType(schemaType: unknown): string {
     // Check for our SchemaType with _typeName
     const st = schemaType as { _typeName?: string };
-    if (st._typeName) return st._typeName;
+    if (st._typeName) {
+      return st._typeName;
+    }
 
     // Check for Zod schema
     if (isZodSchema(schemaType)) {
@@ -987,7 +997,9 @@ export function createFactsStore<S extends Schema>(
 
   /** Format value for error message, respecting redactErrors option */
   function formatValueForError(value: unknown): string {
-    if (redactErrors) return "[redacted]";
+    if (redactErrors) {
+      return "[redacted]";
+    }
     return safeStringify(value);
   }
 
@@ -1344,24 +1356,38 @@ export function createFactsProxy<S extends Schema>(
 
   const proxy = new Proxy({} as Facts<S>, {
     get(_, prop: string | symbol) {
-      if (prop === "$store") return store;
-      if (prop === "$snapshot") return snapshot;
+      if (prop === "$store") {
+        return store;
+      }
+      if (prop === "$snapshot") {
+        return snapshot;
+      }
 
       // Special properties
-      if (typeof prop === "symbol") return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
 
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
 
       // Track and return the value
       return store.get(prop as keyof InferSchema<S>);
     },
 
     set(_, prop: string | symbol, value: unknown) {
-      if (typeof prop === "symbol") return false;
-      if (prop === "$store" || prop === "$snapshot") return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (prop === "$store" || prop === "$snapshot") {
+        return false;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
 
       // Validation is handled by store.set() when validate option is enabled
       store.set(
@@ -1372,20 +1398,32 @@ export function createFactsProxy<S extends Schema>(
     },
 
     deleteProperty(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return false;
-      if (prop === "$store" || prop === "$snapshot") return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (prop === "$store" || prop === "$snapshot") {
+        return false;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
 
       store.delete(prop as keyof InferSchema<S>);
       return true;
     },
 
     has(_, prop: string | symbol) {
-      if (prop === "$store" || prop === "$snapshot") return true;
-      if (typeof prop === "symbol") return false;
+      if (prop === "$store" || prop === "$snapshot") {
+        return true;
+      }
+      if (typeof prop === "symbol") {
+        return false;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
 
       return store.has(prop as keyof InferSchema<S>);
     },

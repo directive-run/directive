@@ -1355,9 +1355,13 @@ export function createEngine<S extends Schema>(
   // Create typed derive accessor using a Proxy
   const deriveAccessor = new Proxy({} as Record<string, unknown>, {
     get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       // Check for method properties first (register, assign, etc.)
       if (prop in deriveMethods) {
         return deriveMethods[prop];
@@ -1365,18 +1369,26 @@ export function createEngine<S extends Schema>(
       return derivationsManager.get(prop as keyof DerivationsDef<S>);
     },
     has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
       return prop in mergedDerive || prop in deriveMethods;
     },
     ownKeys() {
       return Object.keys(mergedDerive);
     },
     getOwnPropertyDescriptor(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
       // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       if (prop in mergedDerive || prop in deriveMethods) {
         return { configurable: true, enumerable: true };
       }
@@ -1399,9 +1411,13 @@ export function createEngine<S extends Schema>(
     {} as Record<string, (payload?: Record<string, unknown>) => void>,
     {
       get(_, prop: string | symbol) {
-        if (typeof prop === "symbol") return undefined;
+        if (typeof prop === "symbol") {
+          return undefined;
+        }
         // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) return undefined;
+        if (BLOCKED_PROPS.has(prop)) {
+          return undefined;
+        }
         // Return a function that dispatches the event
         return (payload?: Record<string, unknown>) => {
           const handler = mergedEvents[prop];
@@ -1427,18 +1443,26 @@ export function createEngine<S extends Schema>(
         };
       },
       has(_, prop: string | symbol) {
-        if (typeof prop === "symbol") return false;
+        if (typeof prop === "symbol") {
+          return false;
+        }
         // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) return false;
+        if (BLOCKED_PROPS.has(prop)) {
+          return false;
+        }
         return prop in mergedEvents;
       },
       ownKeys() {
         return Object.keys(mergedEvents);
       },
       getOwnPropertyDescriptor(_, prop: string | symbol) {
-        if (typeof prop === "symbol") return undefined;
+        if (typeof prop === "symbol") {
+          return undefined;
+        }
         // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) return undefined;
+        if (BLOCKED_PROPS.has(prop)) {
+          return undefined;
+        }
         if (prop in mergedEvents) {
           return { configurable: true, enumerable: true };
         }
