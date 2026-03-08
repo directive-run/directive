@@ -412,6 +412,20 @@ export function createConstraintsManager<S extends Schema>(
   function updateDependencies(id: string, newDeps: Set<string>): void {
     const oldDeps = constraintDeps.get(id) ?? new Set();
 
+    // Short-circuit: skip full remove/add cycle when deps haven't changed
+    if (oldDeps.size === newDeps.size && oldDeps.size > 0) {
+      let same = true;
+      for (const dep of newDeps) {
+        if (!oldDeps.has(dep)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        return;
+      }
+    }
+
     // Remove old dependencies
     for (const dep of oldDeps) {
       const constraints = factToConstraints.get(dep);

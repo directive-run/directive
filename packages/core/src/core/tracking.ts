@@ -78,8 +78,10 @@ export function withoutTracking<T>(fn: () => T): T {
   try {
     return fn();
   } finally {
-    // Restore the stack
-    trackingStack.push(...saved);
+    // Restore the stack (loop avoids spread overflow with deep stacks)
+    for (const ctx of saved) {
+      trackingStack.push(ctx);
+    }
   }
 }
 
@@ -90,3 +92,8 @@ export function withoutTracking<T>(fn: () => T): T {
 export function trackAccess(key: string): void {
   getCurrentTracker().track(key);
 }
+
+/** Prototype pollution guard — shared across all proxy handlers */
+export const BLOCKED_PROPS: ReadonlySet<string> = Object.freeze(
+  new Set(["__proto__", "constructor", "prototype"]),
+);

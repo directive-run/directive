@@ -151,8 +151,8 @@ export type {
   TypedResolver,
 } from "./helpers.js";
 export {
-  constraintFactory,
-  resolverFactory,
+  createConstraintFactory,
+  createResolverFactory,
   typedConstraint,
   typedResolver,
 } from "./helpers.js";

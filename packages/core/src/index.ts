@@ -243,26 +243,17 @@ export {
 export {
   constraint,
   when,
-  type ConstraintBuilderStart,
-  type ConstraintBuilderWithWhen,
-  type ConstraintBuilderComplete,
   type WhenConstraint,
-  type WhenBuilder,
 } from "./core/constraint-builders.js";
-export {
-  system,
-  type SystemBuilderStart,
-  type SingleModuleSystemBuilder,
-  type NamespacedSystemBuilder,
-} from "./core/system-builder.js";
+export { system } from "./core/system-builder.js";
 
 // Convenience helper for status plugin setup
 export { createSystemWithStatus } from "./utils/system-with-status.js";
 
 // Helper factory functions for external constraint/resolver definitions
 export {
-  constraintFactory,
-  resolverFactory,
+  createConstraintFactory,
+  createResolverFactory,
   typedConstraint,
   typedResolver,
 } from "./core/types.js";
@@ -385,18 +376,5 @@ export {
   type SignedSnapshot,
 } from "./utils/utils.js";
 
-// ============================================================================
-// Migration Utilities
-// ============================================================================
-
-export {
-  analyzeReduxSlice,
-  analyzeZustandStore,
-  analyzeXStateMachine,
-  generateModuleCode,
-  generateMigrationChecklist,
-  type ReduxSliceConfig,
-  type ZustandStoreConfig,
-  type XStateMachineConfig,
-  type DirectiveModuleStructure,
-} from "./utils/migration.js";
+// Migration utilities available via "@directive-run/core/migration" subpath export.
+// Not re-exported from main entrypoint to avoid bundle bloat for all consumers.

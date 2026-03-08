@@ -9,7 +9,7 @@
  * - Lazy evaluation
  */
 
-import { trackAccess, withTracking } from "./tracking.js";
+import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
   DerivationState,
   DerivationsDef,
@@ -111,9 +111,6 @@ export function createDerivationsManager<
   // Track which derivations depend on which other derivations
   const derivedToDerivedDeps = new Map<string, Set<string>>();
 
-  // Prototype pollution guard (same pattern as engine.ts, facts.ts, system.ts)
-  const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
-
   // Deferred notification: during invalidation, collect IDs to notify.
   // Listeners fire AFTER all invalidations complete so they see consistent state.
   let invalidationDepth = 0;
@@ -197,6 +194,20 @@ export function createDerivationsManager<
   function updateDependencies(id: string, newDeps: Set<string>): void {
     const state = getState(id);
     const oldDeps = state.dependencies;
+
+    // Short-circuit: skip full remove/add cycle when deps haven't changed
+    if (oldDeps.size === newDeps.size) {
+      let same = true;
+      for (const dep of newDeps) {
+        if (!oldDeps.has(dep)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        return;
+      }
+    }
 
     // Remove old fact dependencies
     for (const dep of oldDeps) {
@@ -315,6 +326,22 @@ export function createDerivationsManager<
       }
 
       return state.cachedValue;
+    },
+
+    set() {
+      return false;
+    },
+
+    deleteProperty() {
+      return false;
+    },
+
+    defineProperty() {
+      return false;
+    },
+
+    getPrototypeOf() {
+      return null;
     },
   });
 
