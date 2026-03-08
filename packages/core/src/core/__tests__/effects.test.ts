@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createFacts, t } from "../../index.js";
 import { createEffectsManager } from "../effects.js";
-import type { EffectsManager } from "../effects.js";
 
 // ============================================================================
 // Helpers
@@ -9,10 +8,9 @@ import type { EffectsManager } from "../effects.js";
 
 const schema = { count: t.number(), name: t.string() };
 
-type TestSchema = typeof schema;
-
 function setup(
-  definitions: Record<string, { run: (...args: unknown[]) => unknown; deps?: string[] }> = {},
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper — effect run signatures vary
+  definitions: Record<string, { run: (...args: any[]) => any; deps?: string[] }> = {},
   callbacks: {
     onRun?: (id: string, deps: string[]) => void;
     onError?: (id: string, error: unknown) => void;
@@ -476,7 +474,7 @@ describe("effects", () => {
 
       await manager.runEffects(new Set(["count"]));
 
-      expect(runFn.mock.calls[0][1]).toBeNull();
+      expect(runFn.mock.calls[0]![1]).toBeNull();
     });
 
     it("passes previous facts snapshot on subsequent runs", async () => {
@@ -486,16 +484,16 @@ describe("effects", () => {
       });
 
       await manager.runEffects(new Set(["count"]));
-      expect(runFn.mock.calls[0][1]).toBeNull();
+      expect(runFn.mock.calls[0]![1]).toBeNull();
 
       // Change count and re-run
       facts.count = 42;
       await manager.runEffects(new Set(["count"]));
 
       // prev should reflect the snapshot taken after the first run
-      const prev = runFn.mock.calls[1][1];
+      const prev = runFn.mock.calls[1]![1];
       expect(prev).not.toBeNull();
-      expect(prev.count).toBe(0);
+      expect(prev!.count).toBe(0);
     });
 
     it("prev reflects state at the time of last runEffects call", async () => {
