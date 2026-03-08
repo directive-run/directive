@@ -15,15 +15,18 @@ function setup(opts: {
   onSnapshot?: (s: unknown) => void;
   onTimeTravel?: (from: number, to: number) => void;
 } = {}) {
-  const schema = { count: { _type: 0 }, name: { _type: "" } };
-  const store = createFactsStore({ schema });
-  const facts = createFactsProxy(store, schema);
+  const schema = { count: { _type: 0 }, name: { _type: "" } } as const;
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper — schema types are checked at runtime
+  const store = createFactsStore({ schema } as any);
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper
+  const facts = createFactsProxy(store, schema as any) as any;
 
   // Initialise
   facts.count = 0;
   facts.name = "init";
 
-  const manager = createTimeTravelManager({
+  // biome-ignore lint/suspicious/noExplicitAny: Test helper
+  const manager = createTimeTravelManager<any>({
     config: {
       timeTravel: opts.timeTravel ?? true,
       maxSnapshots: opts.maxSnapshots,
@@ -87,7 +90,7 @@ describe("createTimeTravelManager", () => {
     manager.takeSnapshot("before");
 
     facts.count = 99;
-    expect(manager.snapshots[0].facts.count).toBe(1);
+    expect(manager.snapshots[0]!.facts.count).toBe(1);
   });
 
   it("takeSnapshot calls onSnapshot callback", () => {
@@ -95,7 +98,7 @@ describe("createTimeTravelManager", () => {
     const { manager } = setup({ onSnapshot });
     manager.takeSnapshot("cb");
     expect(onSnapshot).toHaveBeenCalledOnce();
-    expect(onSnapshot.mock.calls[0][0].trigger).toBe("cb");
+    expect(onSnapshot.mock.calls[0]![0].trigger).toBe("cb");
   });
 
   it("takeSnapshot returns noop when disabled", () => {
@@ -123,8 +126,8 @@ describe("createTimeTravelManager", () => {
     }
     expect(manager.snapshots).toHaveLength(3);
     // oldest two should be evicted
-    expect(manager.snapshots[0].trigger).toBe("snap-2");
-    expect(manager.snapshots[2].trigger).toBe("snap-4");
+    expect(manager.snapshots[0]!.trigger).toBe("snap-2");
+    expect(manager.snapshots[2]!.trigger).toBe("snap-4");
     expect(manager.currentIndex).toBe(2);
   });
 
@@ -146,7 +149,7 @@ describe("createTimeTravelManager", () => {
     facts.count = 10;
     manager.takeSnapshot("s4");
     expect(manager.snapshots).toHaveLength(2);
-    expect(manager.snapshots[1].trigger).toBe("s4");
+    expect(manager.snapshots[1]!.trigger).toBe("s4");
   });
 
   // ---- restore ------------------------------------------------------------
@@ -174,7 +177,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("restore rejects prototype pollution in snapshot data", () => {
-    const { manager, facts } = setup();
+    const { manager } = setup();
     const warnSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const poisoned = {
@@ -448,7 +451,7 @@ describe("createTimeTravelManager", () => {
   // ---- isRestoring --------------------------------------------------------
 
   it("isRestoring is true during restore, false otherwise", () => {
-    const { manager, facts, store } = setup();
+    const { manager, facts } = setup();
     facts.count = 5;
     const snap = manager.takeSnapshot("test");
 

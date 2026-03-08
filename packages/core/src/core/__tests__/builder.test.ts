@@ -65,8 +65,8 @@ describe("module() builder", () => {
     expect(mod.id).toBe("full");
     expect(mod.schema).toBe(counterSchema);
     expect(mod.init).toBe(initFn);
-    expect(mod.derive.doubled).toBe(deriveFn);
-    expect(mod.events.increment).toBe(incFn);
+    expect(mod.derive!.doubled).toBe(deriveFn);
+    expect(mod.events!.increment).toBe(incFn);
     expect(mod.effects).toBe(effectDef);
     expect(mod.constraints).toBe(constraintDef);
     expect(mod.resolvers).toBe(resolverDef);
