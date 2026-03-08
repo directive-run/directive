@@ -18,10 +18,18 @@ import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 import type {
   AdapterHooks,
   AgentRunner,
-  Message,
-  TokenUsage,
 } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import {
+  buildStreamingResult,
+  fireAfterCallHook,
+  fireBeforeCallHook,
+  fireErrorHook,
+  getSSEReader,
+  parseSSEStream,
+  throwStreamingHTTPError,
+  warnIfMissingApiKey,
+} from "./shared.js";
 
 // ============================================================================
 // Pricing Constants
@@ -103,16 +111,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   } = options;
 
   validateBaseURL(baseURL);
-
-  if (
-    typeof process !== "undefined" &&
-    process.env?.NODE_ENV !== "production" &&
-    !apiKey
-  ) {
-    console.warn(
-      "[Directive] createOpenAIRunner: apiKey is empty. API calls will fail.",
-    );
-  }
+  warnIfMissingApiKey(apiKey, "createOpenAIRunner");
 
   return createRunner({
     fetch: fetchFn,
@@ -193,16 +192,7 @@ export function createOpenAIEmbedder(
   } = options;
 
   validateBaseURL(baseURL);
-
-  if (
-    typeof process !== "undefined" &&
-    process.env?.NODE_ENV !== "production" &&
-    !apiKey
-  ) {
-    console.warn(
-      "[Directive] createOpenAIEmbedder: apiKey is empty. API calls will fail.",
-    );
-  }
+  warnIfMissingApiKey(apiKey, "createOpenAIEmbedder");
 
   return async (text: string): Promise<Embedding> => {
     const response = await fetchFn(`${baseURL}/embeddings`, {
@@ -281,20 +271,10 @@ export function createOpenAIStreamingRunner(
   } = options;
 
   validateBaseURL(baseURL);
-
-  if (
-    typeof process !== "undefined" &&
-    process.env?.NODE_ENV !== "production" &&
-    !apiKey
-  ) {
-    console.warn(
-      "[Directive] createOpenAIStreamingRunner: apiKey is empty. API calls will fail.",
-    );
-  }
+  warnIfMissingApiKey(apiKey, "createOpenAIStreamingRunner");
 
   return async (agent, input, callbacks) => {
-    const startTime = Date.now();
-    hooks?.onBeforeCall?.({ agent, input, timestamp: startTime });
+    const startTime = fireBeforeCallHook(hooks, agent, input);
 
     try {
       const response = await fetchFn(`${baseURL}/chat/completions`, {
@@ -319,116 +299,42 @@ export function createOpenAIStreamingRunner(
       });
 
       if (!response.ok) {
-        const errBody = await response.text().catch(() => "");
-
-        throw new Error(
-          `[Directive] OpenAI streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
-        );
+        await throwStreamingHTTPError(response, "OpenAI");
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("[Directive] No response body");
-      }
+      const reader = getSSEReader(response);
 
-      const decoder = new TextDecoder();
-      let buf = "";
-      let fullText = "";
-      let promptTokens = 0;
-      let completionTokens = 0;
+      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
+        reader,
+        callbacks.onToken,
+        (event) => {
+          const result: { text?: string; inputTokens?: number; outputTokens?: number } = {};
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
+          const delta = (event.choices as Array<Record<string, unknown>>)?.[0]
+            ?.delta as Record<string, unknown> | undefined;
+          if (delta?.content) {
+            result.text = delta.content as string;
           }
 
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) {
-              continue;
-            }
-            const data = line.slice(6).trim();
-            if (data === "[DONE]") {
-              continue;
-            }
-
-            try {
-              const event = JSON.parse(data);
-
-              // Extract token content from delta
-              const delta = event.choices?.[0]?.delta;
-              if (delta?.content) {
-                fullText += delta.content;
-                callbacks.onToken?.(delta.content);
-              }
-
-              // Extract usage from the final chunk (stream_options: include_usage)
-              if (event.usage) {
-                promptTokens = event.usage.prompt_tokens ?? 0;
-                completionTokens = event.usage.completion_tokens ?? 0;
-              }
-            } catch (parseErr) {
-              if (parseErr instanceof SyntaxError) {
-                if (
-                  typeof process !== "undefined" &&
-                  process.env?.NODE_ENV === "development"
-                ) {
-                  console.warn(
-                    "[Directive] Malformed SSE event from OpenAI:",
-                    data,
-                  );
-                }
-              } else {
-                throw parseErr;
-              }
-            }
+          if (event.usage) {
+            result.inputTokens = (event.usage as Record<string, unknown>).prompt_tokens as number ?? 0;
+            result.outputTokens = (event.usage as Record<string, unknown>).completion_tokens as number ?? 0;
           }
-        }
-      } finally {
-        reader.cancel().catch(() => {});
-      }
 
-      const assistantMsg: Message = { role: "assistant", content: fullText };
-      callbacks.onMessage?.(assistantMsg);
+          return result;
+        },
+        "OpenAI",
+      );
 
-      const tokenUsage: TokenUsage = {
-        inputTokens: promptTokens,
-        outputTokens: completionTokens,
-      };
-      const totalTokens = promptTokens + completionTokens;
+      const tokenUsage = { inputTokens, outputTokens };
+      const totalTokens = inputTokens + outputTokens;
 
-      hooks?.onAfterCall?.({
-        agent,
-        input,
-        output: fullText,
-        totalTokens,
-        tokenUsage,
-        durationMs: Date.now() - startTime,
-        timestamp: Date.now(),
-      });
+      callbacks.onMessage?.({ role: "assistant", content: fullText });
+      fireAfterCallHook(hooks, agent, input, fullText, totalTokens, tokenUsage, startTime);
 
-      return {
-        output: fullText,
-        messages: [{ role: "user" as const, content: input }, assistantMsg],
-        toolCalls: [],
-        totalTokens,
-        tokenUsage,
-      };
+      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
     } catch (err) {
-      if (err instanceof Error) {
-        hooks?.onError?.({
-          agent,
-          input,
-          error: err,
-          durationMs: Date.now() - startTime,
-          timestamp: Date.now(),
-        });
-      }
+      fireErrorHook(hooks, agent, input, err, startTime);
 
       throw err;
     }
