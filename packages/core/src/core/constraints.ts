@@ -1062,16 +1062,23 @@ export function createConstraintsManager<S extends Schema>(
     },
 
     registerDefinitions(newDefs: ConstraintsDef<Schema>): void {
+      let hasAfterDeps = false;
       for (const [key, def] of Object.entries(newDefs)) {
         (definitions as Record<string, unknown>)[key] = def;
         initState(key);
         dirtyConstraints.add(key);
+        if (def.after?.length) {
+          hasAfterDeps = true;
+        }
       }
       // Invalidate cached sort order
       sortedConstraintIds = null;
-      // Rebuild topological order and reverse dependency map
-      // so new `after` deps are validated for cycles and indexed
-      detectCyclesAndComputeTopoOrder();
+      // Only rebuild topo order when new constraints have `after` dependencies
+      if (hasAfterDeps) {
+        detectCyclesAndComputeTopoOrder();
+      }
+      // Always rebuild reverse deps — existing constraints may reference
+      // newly-added IDs in their `after` arrays (forward references)
       buildReverseDependencyMap();
     },
 

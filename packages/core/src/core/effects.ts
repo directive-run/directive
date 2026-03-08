@@ -128,6 +128,9 @@ export interface EffectsManager<_S extends Schema = Schema> {
   callOne(id: string): Promise<void>;
 }
 
+/** Number of consecutive identical dep sets before skipping re-tracking */
+const STABLE_THRESHOLD = 3;
+
 /** Internal effect state */
 interface EffectState {
   id: string;
@@ -135,6 +138,10 @@ interface EffectState {
   hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
   dependencies: Set<string> | null; // null = not yet tracked
   cleanup: (() => void) | null; // cleanup function returned by last run()
+  /** How many consecutive runs produced the same deps (auto-tracked only) */
+  stableRunCount: number;
+  /** Once true, skip withTracking() overhead until a tracked fact mutates */
+  depsStable: boolean;
 }
 
 /**
@@ -230,6 +237,8 @@ export function createEffectsManager<S extends Schema>(
       hasExplicitDeps: !!def.deps,
       dependencies: def.deps ? new Set(def.deps as string[]) : null,
       cleanup: null,
+      stableRunCount: 0,
+      depsStable: false,
     };
 
     states.set(id, state);
@@ -260,6 +269,13 @@ export function createEffectsManager<S extends Schema>(
     if (state.dependencies) {
       for (const dep of state.dependencies) {
         if (changedKeys.has(dep)) {
+          // Reset dep stability when a tracked fact changes so the next run
+          // re-tracks via withTracking() and can discover new conditional reads.
+          if (state.depsStable) {
+            state.depsStable = false;
+            state.stableRunCount = 0;
+          }
+
           return true;
         }
       }
@@ -320,30 +336,72 @@ export function createEffectsManager<S extends Schema>(
 
     try {
       if (!state.hasExplicitDeps) {
-        // Auto-tracked: re-track dependencies on EVERY run so conditional
-        // reads are picked up (fixes frozen deps after first run)
-        let trackedDeps: Set<string> | null = null;
-        let effectPromise: unknown;
-        const trackingResult = withTracking(() => {
+        if (state.depsStable && state.dependencies) {
+          // Deps have been stable for STABLE_THRESHOLD runs — skip withTracking()
+          // overhead and just run the effect directly.
+          let effectPromise: unknown;
           store.batch(() => {
             effectPromise = def.run(
               facts,
               previousSnapshot as InferSchema<S> | null,
             );
           });
-          return effectPromise;
-        });
-        trackedDeps = trackingResult.deps;
+          if (effectPromise instanceof Promise) {
+            const result = await effectPromise;
+            storeCleanup(state, result);
+          } else {
+            storeCleanup(state, effectPromise);
+          }
+        } else {
+          // Auto-tracked: re-track dependencies so conditional reads are picked up
+          let effectPromise: unknown;
+          const trackingResult = withTracking(() => {
+            store.batch(() => {
+              effectPromise = def.run(
+                facts,
+                previousSnapshot as InferSchema<S> | null,
+              );
+            });
+            return effectPromise;
+          });
+          const trackedDeps = trackingResult.deps;
 
-        // If the effect is async, wait for it and capture cleanup
-        let result = trackingResult.value;
-        if (result instanceof Promise) {
-          result = await result;
+          // If the effect is async, wait for it and capture cleanup
+          let result = trackingResult.value;
+          if (result instanceof Promise) {
+            result = await result;
+          }
+          storeCleanup(state, result);
+
+          // Check dep stability: if deps match previous run, increment counter
+          if (
+            state.dependencies &&
+            trackedDeps.size === state.dependencies.size
+          ) {
+            let same = true;
+            for (const dep of trackedDeps) {
+              if (!state.dependencies.has(dep)) {
+                same = false;
+                break;
+              }
+            }
+            if (same) {
+              state.stableRunCount++;
+              if (state.stableRunCount >= STABLE_THRESHOLD) {
+                state.depsStable = true;
+              }
+            } else {
+              state.stableRunCount = 0;
+              state.depsStable = false;
+            }
+          } else {
+            state.stableRunCount = 0;
+            state.depsStable = false;
+          }
+
+          // Update tracked dependencies
+          state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
         }
-        storeCleanup(state, result);
-
-        // Update tracked dependencies (always replace to catch new conditional reads)
-        state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
       } else {
         // Has explicit deps, batch synchronous mutations and run
         let effectPromise: unknown;
@@ -364,6 +422,11 @@ export function createEffectsManager<S extends Schema>(
       // Effects are fire-and-forget - errors are reported but don't propagate
       onError?.(id, error);
       console.error(`[Directive] Effect "${id}" threw an error:`, error);
+      // Reset dep stability — we don't know what the effect would have read
+      if (!state.hasExplicitDeps) {
+        state.stableRunCount = 0;
+        state.depsStable = false;
+      }
     }
   }
 
@@ -395,6 +458,11 @@ export function createEffectsManager<S extends Schema>(
         effectIds.map((id) => {
           const state = getState(id);
           if (state.enabled) {
+            // Reset stability so runEffect re-tracks deps
+            // (runAll bypasses shouldRun where the normal reset lives)
+            state.depsStable = false;
+            state.stableRunCount = 0;
+
             return runEffect(id);
           }
           return Promise.resolve();
