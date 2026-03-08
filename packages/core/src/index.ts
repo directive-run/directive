@@ -94,6 +94,11 @@ export type {
   // System
   System,
   SystemConfig,
+  // Runtime Controls
+  ConstraintsControl,
+  DerivationsControl,
+  EffectsControl,
+  ResolversControl,
   SystemInspection,
   SystemSnapshot,
   RunChangelogEntry,
