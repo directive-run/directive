@@ -97,8 +97,8 @@ const permissions = createModule('permissions', {
     canManageUsers: (facts) => facts.self.permissions.includes('users.manage'),
     canViewAnalytics: (facts) => facts.self.permissions.includes('analytics.view'),
     // Composition: admin inherits all permissions
-    isAdmin: (facts, derive) => {
-      return derive.canManageUsers;
+    isAdmin: (facts, derived) => {
+      return derived.canManageUsers;
     },
   },
 
@@ -202,8 +202,8 @@ const system = createSystem({
 ```tsx
 function ContentList({ system }) {
   const articles = useSelector(system, (facts) => facts.content.articles);
-  const canPublish = useSelector(system, (derive) => derive.permissions.canPublish);
-  const canEdit = useSelector(system, (derive) => derive.permissions.canEdit);
+  const canPublish = useSelector(system, (derived) => derived.permissions.canPublish);
+  const canEdit = useSelector(system, (derived) => derived.permissions.canEdit);
 
   return (
     <ul>
@@ -224,7 +224,7 @@ function ContentList({ system }) {
 }
 
 function AdminPanel({ system }) {
-  const canManageUsers = useSelector(system, (derive) => derive.permissions.canManageUsers);
+  const canManageUsers = useSelector(system, (derived) => derived.permissions.canManageUsers);
 
   if (!canManageUsers) {
     return null;

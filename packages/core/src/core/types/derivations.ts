@@ -26,7 +26,7 @@ export interface DerivationDef<
   T,
   D extends DerivationsDef<S>,
 > {
-  (facts: Facts<S>, derive: DerivedValues<S, D>): T;
+  (facts: Facts<S>, derived: DerivedValues<S, D>): T;
 }
 
 /** Map of derivation definitions. */

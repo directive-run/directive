@@ -79,7 +79,7 @@ export interface ModuleBuilder<M extends ModuleSchema = ModuleSchema> {
   derive<
     D extends Record<
       string,
-      (facts: Facts<M["facts"]>, derive: DeriveAccessor<M>) => unknown
+      (facts: Facts<M["facts"]>, derived: DeriveAccessor<M>) => unknown
     >,
   >(derivations: D): ModuleBuilder<M>;
 

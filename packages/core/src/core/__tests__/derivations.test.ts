@@ -153,7 +153,7 @@ describe("derivations", () => {
     it("derivation depending on another derivation via proxy", () => {
       const { manager } = setup({
         doubled: (facts) => (facts.count as number) * 2,
-        quadrupled: (_facts, derive) => (derive.doubled as number) * 2,
+        quadrupled: (_facts, derived) => (derived.doubled as number) * 2,
       });
 
       expect(manager.get("quadrupled")).toBe(0);
@@ -162,7 +162,7 @@ describe("derivations", () => {
     it("invalidating a fact invalidates transitive derivations", () => {
       const { facts, manager } = setup({
         doubled: (facts) => (facts.count as number) * 2,
-        quadrupled: (_facts, derive) => (derive.doubled as number) * 2,
+        quadrupled: (_facts, derived) => (derived.doubled as number) * 2,
       });
 
       manager.get("quadrupled");
@@ -176,7 +176,7 @@ describe("derivations", () => {
     it("composition proxy tracks access correctly", () => {
       const { manager } = setup({
         doubled: (facts) => (facts.count as number) * 2,
-        quadrupled: (_facts, derive) => (derive.doubled as number) * 2,
+        quadrupled: (_facts, derived) => (derived.doubled as number) * 2,
       });
 
       manager.get("quadrupled");
@@ -194,8 +194,8 @@ describe("derivations", () => {
   describe("circular dependency detection", () => {
     it("circular derivation (A depends on B, B depends on A) throws", () => {
       const { manager } = setup({
-        a: (_facts, derive) => (derive.b as number) + 1,
-        b: (_facts, derive) => (derive.a as number) + 1,
+        a: (_facts, derived) => (derived.b as number) + 1,
+        b: (_facts, derived) => (derived.a as number) + 1,
       });
 
       expect(() => manager.get("a")).toThrow("Circular dependency");

@@ -83,8 +83,8 @@ const app = createModule("app", {
 
   derive: {
     filtered: (facts) => facts.items.filter((i) => i.startsWith(facts.filter)),
-    count: (_facts, derive) => derive.filtered.length,
-    summary: (_facts, derive) => `${derive.count} items match`,
+    count: (_facts, derived) => derived.filtered.length,
+    summary: (_facts, derived) => `${derived.count} items match`,
   },
 });
 ```

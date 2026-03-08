@@ -186,8 +186,8 @@ const contactForm = createModule("contact-form", {
       facts.subject !== "" &&
       facts.message.trim().length >= 10,
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {
@@ -528,7 +528,7 @@ Nine facts replace six `useState` calls. The key difference: `lastSubmittedAt` a
 
 Each error derivation checks `facts.touched.name` before returning an error string &ndash; no error shows until the user blurs the field. This is the same pattern as the imperative version, but it's a derivation, not an inline expression buried in JSX.
 
-The key pattern is **derivation composition**: `canSubmit` reads `derive.isValid` instead of recomputing validity from raw facts. One chain, no duplication. And no dependency arrays &ndash; the runtime auto-tracks which facts each derivation reads. `nameError` recomputes when `facts.name` or `facts.touched` changes, nothing else.
+The key pattern is **derivation composition**: `canSubmit` reads `derived.isValid` instead of recomputing validity from raw facts. One chain, no duplication. And no dependency arrays &ndash; the runtime auto-tracks which facts each derivation reads. `nameError` recomputes when `facts.name` or `facts.touched` changes, nothing else.
 
 ### Events replace scattered setState
 
@@ -597,7 +597,7 @@ The derivation approach means the button is disabled whenever the constraint say
 - **Forms shared across frameworks.** The module works with React, Vue, Svelte, Solid, and Lit. Write validation once, use everywhere.
 
 **Not a good fit:**
-- **No validation.** If there's nothing to validate, there's nothing to derive.
+- **No validation.** If there's nothing to validate, there's nothing to derived.
 - **Static forms.** If the form doesn't need async behavior, rate limiting, or cross-field logic, the overhead isn't justified.
 
 Even a [single-field newsletter signup](/blog/declarative-newsletter-with-directive) benefits from Directive once you add validation, rate limiting, and auto-reset &ndash; behaviors that look simple but accumulate imperative complexity quickly.

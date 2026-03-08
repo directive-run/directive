@@ -318,23 +318,23 @@ export const elevenUpGame = createModule("eleven-up", {
     // Level 1 composition: depends only on facts
     isActiveGame: (facts) => !facts.gameOver && facts.table.length > 0,
 
-    // Level 2 composition: reads derive.isActiveGame
-    streakInfo: (facts, derive) => {
+    // Level 2 composition: reads derived.isActiveGame
+    streakInfo: (facts, derived) => {
       // Touch facts for dependency tracking
       facts.currentStreak;
       facts.maxStreak;
       return {
         current: facts.currentStreak,
         max: facts.maxStreak,
-        isHot: derive.isActiveGame && facts.currentStreak >= 3,
+        isHot: derived.isActiveGame && facts.currentStreak >= 3,
       };
     },
 
-    // Level 3 composition: reads derive.streakInfo
-    scoreLabel: (facts, derive) => {
+    // Level 3 composition: reads derived.streakInfo
+    scoreLabel: (facts, derived) => {
       facts.moveCount;
       facts.removed;
-      const streak = derive.streakInfo;
+      const streak = derived.streakInfo;
       const removed = facts.removed.length;
       if (streak.isHot) {
         return `${removed}/52 removed | ${streak.current} streak!`;
@@ -345,10 +345,10 @@ export const elevenUpGame = createModule("eleven-up", {
       return `${removed}/52 removed | ${facts.moveCount} moves`;
     },
 
-    // Level 2 composition: reads derive.streakInfo
-    comboMessage: (facts, derive) => {
+    // Level 2 composition: reads derived.streakInfo
+    comboMessage: (facts, derived) => {
       facts.comboCount;
-      const streak = derive.streakInfo;
+      const streak = derived.streakInfo;
       if (facts.comboCount > 0 && streak.isHot) {
         return `Auto-combo x${facts.comboCount} + ${streak.current} streak!`;
       }

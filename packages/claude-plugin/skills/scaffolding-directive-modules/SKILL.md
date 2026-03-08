@@ -55,7 +55,7 @@ export const {camelCaseName} = createModule("{kebab-case-name}", {
   derive: {
     // Computed values – pure functions, auto-tracked
     // {derivedName}: (facts) => {computation},
-    // Composition: {name}: (facts, derive) => derive.other && facts.x,
+    // Composition: {name}: (facts, derived) => derived.other && facts.x,
   },
 
   constraints: {
