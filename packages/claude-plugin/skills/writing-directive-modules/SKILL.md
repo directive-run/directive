@@ -178,9 +178,9 @@ Gives full TypeScript inference, skips runtime validation.
 ```typescript
 derive: {
   isRed: (facts) => facts.phase === "red",
-  status: (facts, derive) => ({   // Second param accesses other derivations
+  status: (facts, derived) => ({   // Second param accesses other derivations
     phase: facts.phase,
-    isRed: derive.isRed,
+    isRed: derived.isRed,
   }),
 },
 ```

@@ -98,8 +98,8 @@ const newsletter = createModule("newsletter", {
 
     isValid: (facts) => EMAIL_REGEX.test(facts.email),
 
-    canSubmit: (facts, derive) => {
-      if (!derive.isValid) {
+    canSubmit: (facts, derived) => {
+      if (!derived.isValid) {
         return false;
       }
       if (facts.status !== "idle") {

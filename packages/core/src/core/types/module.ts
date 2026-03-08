@@ -73,7 +73,7 @@ export type TypedDerivationFn<
   K extends keyof GetDerivationsSchema<M>,
 > = (
   facts: Facts<M["facts"]>,
-  derive: InferDerivations<M>,
+  derived: InferDerivations<M>,
 ) => InferSchemaType<GetDerivationsSchema<M>[K]>;
 
 /**
@@ -259,7 +259,7 @@ export type CrossModuleDerivationFn<
   K extends keyof GetDerivationsSchema<M>,
 > = (
   facts: CrossModuleFactsWithSelf<M, Deps>,
-  derive: InferDerivations<M>,
+  derived: InferDerivations<M>,
 ) => InferSchemaType<GetDerivationsSchema<M>[K]>;
 
 /**

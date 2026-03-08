@@ -147,10 +147,10 @@ export const sudokuGame = createModule("sudoku", {
       return findConflicts(facts.grid);
     },
 
-    conflictIndices: (facts, derive) => {
+    conflictIndices: (facts, derived) => {
       const indices = new Set<number>();
       const givens = facts.givens;
-      for (const c of derive.conflicts) {
+      for (const c of derived.conflicts) {
         // Only highlight player-placed cells, not givens
         if (!givens.has(c.index)) {
           indices.add(c.index);
@@ -160,8 +160,8 @@ export const sudokuGame = createModule("sudoku", {
       return indices;
     },
 
-    hasConflicts: (_facts, derive) => {
-      return derive.conflicts.length > 0;
+    hasConflicts: (_facts, derived) => {
+      return derived.conflicts.length > 0;
     },
 
     filledCount: (facts) => {
@@ -176,16 +176,16 @@ export const sudokuGame = createModule("sudoku", {
       return count;
     },
 
-    progress: (_facts, derive) => {
-      return Math.round((derive.filledCount / 81) * 100);
+    progress: (_facts, derived) => {
+      return Math.round((derived.filledCount / 81) * 100);
     },
 
     isComplete: (facts) => {
       return isBoardComplete(facts.grid);
     },
 
-    isSolved: (_facts, derive) => {
-      return derive.isComplete && !derive.hasConflicts;
+    isSolved: (_facts, derived) => {
+      return derived.isComplete && !derived.hasConflicts;
     },
 
     selectedPeers: (facts) => {
@@ -206,8 +206,8 @@ export const sudokuGame = createModule("sudoku", {
       return facts.grid[sel];
     },
 
-    sameValueIndices: (facts, derive) => {
-      const val = derive.highlightValue;
+    sameValueIndices: (facts, derived) => {
+      const val = derived.highlightValue;
       if (val === 0) {
         return new Set<number>();
       }

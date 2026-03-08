@@ -83,7 +83,7 @@ derive: {
 // GOOD: Meaningful computation
 derive: {
   isOverBudget: (facts) => facts.spent > facts.budget,
-  budgetStatus: (facts, derive) => derive.isOverBudget ? "over" : "under",
+  budgetStatus: (facts, derived) => derived.isOverBudget ? "over" : "under",
 }
 ```
 

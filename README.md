@@ -590,7 +590,7 @@ Computed values with automatic dependency tracking.
 derive: {
   total: (facts) => facts.price * facts.quantity,
   // Derivations can depend on other derivations
-  totalWithTax: (facts, derive) => derive.total * 1.1,
+  totalWithTax: (facts, derived) => derived.total * 1.1,
 },
 ```
 
@@ -599,8 +599,8 @@ derive: {
 ```typescript
 derive: {
   sum: (facts) => facts.a + facts.b,
-  // Touch facts.a to track dependencies, even though we use derive.sum
-  doubled: (facts, derive) => { facts.a; return derive.sum * 2; },
+  // Touch facts.a to track dependencies, even though we use derived.sum
+  doubled: (facts, derived) => { facts.a; return derived.sum * 2; },
 },
 ```
 

@@ -141,10 +141,10 @@ export const checkersGame = createModule("checkers", {
     redCount: (facts) => countPieces(facts.board).red,
     blackCount: (facts) => countPieces(facts.board).black,
 
-    score: (facts, derive) => {
+    score: (facts, derived) => {
       // Touch facts.board for dependency tracking (derive reads alone aren't tracked)
       facts.board;
-      return `Red ${derive.redCount} — Black ${derive.blackCount}`;
+      return `Red ${derived.redCount} — Black ${derived.blackCount}`;
     },
   },
 

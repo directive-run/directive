@@ -131,7 +131,7 @@ export interface ModuleConfigWithDeps<
  * Create a module definition with full type inference.
  *
  * The consolidated schema provides:
- * - Derivation composition (`derive.otherDerivation` is typed)
+ * - Derivation composition (`derived.otherDerivation` is typed)
  * - Event dispatch (`system.dispatch({ type: "..." })` has autocomplete)
  * - Resolver requirements (`req.payload` is typed based on requirement type)
  *
@@ -165,9 +165,9 @@ export interface ModuleConfigWithDeps<
  *   },
  *   derive: {
  *     isRed: (facts) => facts.phase === "red",
- *     timeRemaining: (facts, derive) => {
- *       // derive.isRed is typed as boolean!
- *       return derive.isRed ? 30 - facts.elapsed : 0;
+ *     timeRemaining: (facts, derived) => {
+ *       // derived.isRed is typed as boolean!
+ *       return derived.isRed ? 30 - facts.elapsed : 0;
  *     },
  *   },
  *   events: {

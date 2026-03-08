@@ -2348,7 +2348,7 @@ export function createEngine<S extends Schema>(
     schema: Record<string, unknown>;
     requirements?: Record<string, unknown>;
     init?: (facts: unknown) => void;
-    derive?: Record<string, (facts: unknown, derive: unknown) => unknown>;
+    derive?: Record<string, (facts: unknown, derived: unknown) => unknown>;
     events?: Record<string, (facts: unknown, event: unknown) => void>;
     effects?: Record<string, unknown>;
     constraints?: Record<string, unknown>;

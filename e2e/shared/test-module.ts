@@ -48,10 +48,10 @@ export const testModule = createModule("test", {
     doubled: (facts) => facts.count * 2,
     isPositive: (facts) => facts.count > 0,
     itemCount: (facts) => facts.items.length,
-    summary: (facts, derive) => ({
+    summary: (facts, derived) => ({
       phase: facts.status,
-      doubled: derive.doubled,
-      isPositive: derive.isPositive,
+      doubled: derived.doubled,
+      isPositive: derived.isPositive,
     }),
   },
 
