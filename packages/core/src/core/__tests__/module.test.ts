@@ -53,6 +53,7 @@ describe("createModule", () => {
     };
     const hooks = { onStart: vi.fn() };
 
+    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types are fine
     const mod = createModule("full", {
       schema: fullSchema,
       init: initFn,
@@ -62,11 +63,11 @@ describe("createModule", () => {
       constraints: constraintDef,
       resolvers: resolverDef,
       hooks,
-    });
+    } as any);
 
     expect(mod.init).toBe(initFn);
-    expect(mod.derive.doubled).toBe(deriveFn);
-    expect(mod.events.increment).toBe(eventFn);
+    expect(mod.derive!.doubled).toBe(deriveFn);
+    expect(mod.events!.increment).toBe(eventFn);
     expect(mod.effects).toBe(effectDef);
     expect(mod.constraints).toBe(constraintDef);
     expect(mod.resolvers).toBe(resolverDef);
@@ -80,6 +81,7 @@ describe("createModule", () => {
   });
 
   it("passes through snapshotEvents", () => {
+    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types
     const mod = createModule("snap", {
       schema: fullSchema,
       derive: { doubled: (f: any) => f.count * 2 },
@@ -88,7 +90,7 @@ describe("createModule", () => {
         setName: (f: any, p: any) => { f.name = p.name; },
       },
       snapshotEvents: ["increment"],
-    });
+    } as any);
     expect(mod.snapshotEvents).toEqual(["increment"]);
   });
 
@@ -277,6 +279,7 @@ describe("createModuleFactory", () => {
 
   it("factory passes through all config", () => {
     const initFn = vi.fn();
+    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types
     const factory = createModuleFactory({
       schema: fullSchema,
       init: initFn,
@@ -285,11 +288,11 @@ describe("createModuleFactory", () => {
         increment: (f: any) => { f.count += 1; },
         setName: (f: any, p: any) => { f.name = p.name; },
       },
-    });
+    } as any);
 
     const mod = factory("instance");
     expect(mod.init).toBe(initFn);
-    expect(mod.derive.doubled).toBeDefined();
+    expect(mod.derive!.doubled).toBeDefined();
   });
 
   it("each factory call produces independent module defs", () => {

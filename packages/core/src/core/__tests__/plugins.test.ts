@@ -32,7 +32,7 @@ describe("createPluginManager", () => {
       pm.unregister("alpha");
 
       expect(pm.getPlugins()).toHaveLength(1);
-      expect(pm.getPlugins()[0].name).toBe("beta");
+      expect(pm.getPlugins()[0]!.name).toBe("beta");
     });
 
     it("unregister is a no-op for unknown names", () => {
@@ -65,7 +65,7 @@ describe("createPluginManager", () => {
       pm.register(second);
 
       expect(warnSpy).toHaveBeenCalledOnce();
-      expect(warnSpy.mock.calls[0][0]).toContain("dup");
+      expect(warnSpy.mock.calls[0]![0]).toContain("dup");
       expect(pm.getPlugins()).toHaveLength(1);
       expect(pm.getPlugins()[0]).toBe(second);
 
@@ -109,7 +109,7 @@ describe("createPluginManager", () => {
 
       expect(afterHook).toHaveBeenCalledOnce();
       expect(errorSpy).toHaveBeenCalledOnce();
-      expect(errorSpy.mock.calls[0][0]).toContain("[Directive] Plugin error:");
+      expect(errorSpy.mock.calls[0]![0]).toContain("[Directive] Plugin error:");
 
       errorSpy.mockRestore();
     });
