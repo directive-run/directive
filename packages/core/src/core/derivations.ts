@@ -282,28 +282,42 @@ export function createDerivationsManager<
     }
   }
 
-  /** Invalidate a derivation and its dependents */
-  function invalidateDerivation(id: string, visited = new Set<string>()): void {
-    if (visited.has(id)) return;
-    visited.add(id);
+  /**
+   * Invalidate a derivation and its transitive dependents using iterative
+   * traversal (work queue) to avoid stack overflow on deep chains.
+   *
+   * Accepts an optional shared `visited` Set so that `invalidateMany` can
+   * coalesce multiple root invalidations into a single traversal.
+   */
+  function invalidateDerivation(
+    startId: string,
+    visited = new Set<string>(),
+  ): void {
+    const queue = [startId];
 
-    const state = states.get(id);
-    if (!state || state.isStale) return;
+    while (queue.length > 0) {
+      const id = queue.pop()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
 
-    state.isStale = true;
-    onInvalidate?.(id);
+      const state = states.get(id);
+      if (!state || state.isStale) continue;
 
-    // Defer listener notification until all invalidations complete.
-    // This prevents listeners from observing partially-stale state and
-    // avoids infinite loops from Set mutation during iteration (listeners
-    // recompute derivations → updateDependencies → modify dep Sets).
-    pendingNotifications.add(id);
+      state.isStale = true;
+      onInvalidate?.(id);
 
-    // Invalidate derivations that depend on this one
-    const dependents = derivedToDerivedDeps.get(id);
-    if (dependents) {
-      for (const dependent of dependents) {
-        invalidateDerivation(dependent, visited);
+      // Defer listener notification until all invalidations complete.
+      // This prevents listeners from observing partially-stale state and
+      // avoids infinite loops from Set mutation during iteration (listeners
+      // recompute derivations → updateDependencies → modify dep Sets).
+      pendingNotifications.add(id);
+
+      // Queue transitive dependents
+      const dependents = derivedToDerivedDeps.get(id);
+      if (dependents) {
+        for (const dependent of dependents) {
+          queue.push(dependent);
+        }
       }
     }
   }
@@ -315,6 +329,12 @@ export function createDerivationsManager<
         return undefined;
       }
       if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
+
+      // Return undefined for unknown derivation keys instead of throwing.
+      // React 19 dev-mode traverses objects accessing $$typeof, toJSON, then, etc.
+      if (!definitions[prop as keyof D]) {
         return undefined;
       }
 
@@ -347,6 +367,10 @@ export function createDerivationsManager<
     getPrototypeOf() {
       return null;
     },
+
+    setPrototypeOf() {
+      return false;
+    },
   });
 
   // Note: Fact change invalidation is handled by the engine calling invalidate()
@@ -372,9 +396,10 @@ export function createDerivationsManager<
       if (!dependents) return;
 
       invalidationDepth++;
+      const visited = new Set<string>();
       try {
         for (const id of dependents) {
-          invalidateDerivation(id);
+          invalidateDerivation(id, visited);
         }
       } finally {
         invalidationDepth--;
@@ -384,12 +409,15 @@ export function createDerivationsManager<
 
     invalidateMany(factKeys: Iterable<string>): void {
       invalidationDepth++;
+      // Share a single visited Set across all root invalidations so
+      // transitive dependents are only processed once.
+      const visited = new Set<string>();
       try {
         for (const factKey of factKeys) {
           const dependents = factToDerivedDeps.get(factKey);
           if (!dependents) continue;
           for (const id of dependents) {
-            invalidateDerivation(id);
+            invalidateDerivation(id, visited);
           }
         }
       } finally {
