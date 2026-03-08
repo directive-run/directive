@@ -223,7 +223,7 @@ export {
   type Branded,
   type ExtendedSchemaType,
   type ChainableSchemaType,
-} from "./core/facts.js";
+} from "./core/schema-builders.js";
 
 // ============================================================================
 // Module & System
