@@ -379,14 +379,14 @@ export async function graphCommand(args: string[]) {
 
   if (opts.open) {
     try {
-      const { exec } = await import("node:child_process");
+      const { execFile } = await import("node:child_process");
       const openCmd =
         process.platform === "darwin"
           ? "open"
           : process.platform === "win32"
             ? "start"
             : "xdg-open";
-      exec(`${openCmd} "${outputPath}"`);
+      execFile(openCmd, [outputPath]);
       console.log(pc.dim("Opened in browser."));
     } catch {
       console.log(
