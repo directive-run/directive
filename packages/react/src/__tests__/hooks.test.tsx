@@ -9,7 +9,6 @@ import {
   useEvents,
   useWatch,
 } from "../index";
-import type { SingleModuleSystem } from "@directive-run/core";
 
 // ============================================================================
 // Test Module Factory
@@ -22,8 +21,8 @@ const testSchema = {
     items: t.array<string>(),
   },
   derivations: {
-    doubled: { _type: 0 as number },
-    greeting: { _type: "" as string },
+    doubled: t.number(),
+    greeting: t.string(),
   },
   events: {
     increment: {},
@@ -41,12 +40,12 @@ function createTestSystem() {
       facts.items = [];
     },
     derive: {
-      doubled: (facts) => (facts.count as number) * 2,
+      doubled: (facts) => facts.count * 2,
       greeting: (facts) => `Hi, ${facts.name}!`,
     },
     events: {
       increment: (facts) => {
-        facts.count = (facts.count as number) + 1;
+        facts.count = facts.count + 1;
       },
       setName: (facts, { name }: { name: string }) => {
         facts.name = name;
@@ -627,8 +626,8 @@ describe("useWatch", () => {
       ({ cb }) => useWatch(system, "count", cb),
       {
         initialProps: {
-          cb: (newVal: number) => {
-            calls.push(newVal * 10);
+          cb: (newVal: number | undefined) => {
+            calls.push((newVal ?? 0) * 10);
           },
         },
       },
@@ -636,8 +635,8 @@ describe("useWatch", () => {
 
     // Re-render with a different callback
     rerender({
-      cb: (newVal: number) => {
-        calls.push(newVal * 100);
+      cb: (newVal: number | undefined) => {
+        calls.push((newVal ?? 0) * 100);
       },
     });
 
