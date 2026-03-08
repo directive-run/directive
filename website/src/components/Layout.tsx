@@ -121,8 +121,14 @@ function Header() {
           <HeaderLink href="/blog">Blog</HeaderLink>
         </div>
         <div className="flex items-center gap-4">
-          {canUseThemeSelector && <ThemeToggle />}
-          <BrandPresetSwitcher className="relative z-10" />
+          {canUseThemeSelector && (
+            <div className="hidden lg:block">
+              <ThemeToggle />
+            </div>
+          )}
+          <div className="hidden lg:block">
+            <BrandPresetSwitcher className="relative z-10" />
+          </div>
           {canUseShareButton && <ShareButton />}
           <Link
             href="https://github.com/directive-run/directive"
