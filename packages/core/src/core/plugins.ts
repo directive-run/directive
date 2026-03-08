@@ -189,6 +189,17 @@ export function createPluginManager<
     }
   }
 
+  /** Create a sync broadcast function for a given plugin hook name */
+  // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
+  function broadcast<K extends keyof Plugin<any>>(hook: K) {
+    return (...args: unknown[]) => {
+      for (const plugin of plugins) {
+        // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
+        safeCall(() => (plugin as any)[hook]?.(...args));
+      }
+    };
+  }
+
   const manager: PluginManager<S> = {
     // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
     register(plugin: Plugin<any>): void {
@@ -214,227 +225,67 @@ export function createPluginManager<
       return [...plugins];
     },
 
-    // Lifecycle hooks
+    // Lifecycle hooks (emitInit is async, handled separately)
     // biome-ignore lint/suspicious/noExplicitAny: System type varies
     async emitInit(system: System<any>): Promise<void> {
       for (const plugin of plugins) {
         await safeCallAsync(() => plugin.onInit?.(system) as Promise<void>);
       }
     },
-
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
-    emitStart(system: System<any>): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onStart?.(system));
-      }
-    },
-
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
-    emitStop(system: System<any>): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onStop?.(system));
-      }
-    },
-
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
-    emitDestroy(system: System<any>): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDestroy?.(system));
-      }
-    },
+    emitStart: broadcast("onStart"),
+    emitStop: broadcast("onStop"),
+    emitDestroy: broadcast("onDestroy"),
 
     // Fact hooks
-    emitFactSet(key: string, value: unknown, prev: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onFactSet?.(key, value, prev));
-      }
-    },
-
-    emitFactDelete(key: string, prev: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onFactDelete?.(key, prev));
-      }
-    },
-
-    emitFactsBatch(changes: FactChange[]): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onFactsBatch?.(changes));
-      }
-    },
+    emitFactSet: broadcast("onFactSet"),
+    emitFactDelete: broadcast("onFactDelete"),
+    emitFactsBatch: broadcast("onFactsBatch"),
 
     // Derivation hooks
-    emitDerivationCompute(id: string, value: unknown, deps: string[]): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDerivationCompute?.(id, value, deps));
-      }
-    },
-
-    emitDerivationInvalidate(id: string): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDerivationInvalidate?.(id));
-      }
-    },
+    emitDerivationCompute: broadcast("onDerivationCompute"),
+    emitDerivationInvalidate: broadcast("onDerivationInvalidate"),
 
     // Reconciliation hooks
-    // biome-ignore lint/suspicious/noExplicitAny: Schema type varies
-    emitReconcileStart(snapshot: FactsSnapshot<any>): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onReconcileStart?.(snapshot));
-      }
-    },
-
-    emitReconcileEnd(result: ReconcileResult): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onReconcileEnd?.(result));
-      }
-    },
+    emitReconcileStart: broadcast("onReconcileStart"),
+    emitReconcileEnd: broadcast("onReconcileEnd"),
 
     // Constraint hooks
-    emitConstraintEvaluate(id: string, active: boolean): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onConstraintEvaluate?.(id, active));
-      }
-    },
-
-    emitConstraintError(id: string, error: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onConstraintError?.(id, error));
-      }
-    },
+    emitConstraintEvaluate: broadcast("onConstraintEvaluate"),
+    emitConstraintError: broadcast("onConstraintError"),
 
     // Requirement hooks
-    emitRequirementCreated(req: RequirementWithId): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onRequirementCreated?.(req));
-      }
-    },
-
-    emitRequirementMet(req: RequirementWithId, byResolver: string): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onRequirementMet?.(req, byResolver));
-      }
-    },
-
-    emitRequirementCanceled(req: RequirementWithId): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onRequirementCanceled?.(req));
-      }
-    },
+    emitRequirementCreated: broadcast("onRequirementCreated"),
+    emitRequirementMet: broadcast("onRequirementMet"),
+    emitRequirementCanceled: broadcast("onRequirementCanceled"),
 
     // Resolver hooks
-    emitResolverStart(resolver: string, req: RequirementWithId): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onResolverStart?.(resolver, req));
-      }
-    },
-
-    emitResolverComplete(
-      resolver: string,
-      req: RequirementWithId,
-      duration: number,
-    ): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onResolverComplete?.(resolver, req, duration));
-      }
-    },
-
-    emitResolverError(
-      resolver: string,
-      req: RequirementWithId,
-      error: unknown,
-    ): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onResolverError?.(resolver, req, error));
-      }
-    },
-
-    emitResolverRetry(
-      resolver: string,
-      req: RequirementWithId,
-      attempt: number,
-    ): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onResolverRetry?.(resolver, req, attempt));
-      }
-    },
-
-    emitResolverCancel(resolver: string, req: RequirementWithId): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onResolverCancel?.(resolver, req));
-      }
-    },
+    emitResolverStart: broadcast("onResolverStart"),
+    emitResolverComplete: broadcast("onResolverComplete"),
+    emitResolverError: broadcast("onResolverError"),
+    emitResolverRetry: broadcast("onResolverRetry"),
+    emitResolverCancel: broadcast("onResolverCancel"),
 
     // Effect hooks
-    emitEffectRun(id: string): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onEffectRun?.(id));
-      }
-    },
-
-    emitEffectError(id: string, error: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onEffectError?.(id, error));
-      }
-    },
+    emitEffectRun: broadcast("onEffectRun"),
+    emitEffectError: broadcast("onEffectError"),
 
     // Time-travel hooks
-    emitSnapshot(snapshot: Snapshot): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onSnapshot?.(snapshot));
-      }
-    },
-
-    emitTimeTravel(from: number, to: number): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onTimeTravel?.(from, to));
-      }
-    },
+    emitSnapshot: broadcast("onSnapshot"),
+    emitTimeTravel: broadcast("onTimeTravel"),
 
     // Error boundary hooks
-    emitError(error: DirectiveError): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onError?.(error));
-      }
-    },
-
-    emitErrorRecovery(error: DirectiveError, strategy: RecoveryStrategy): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onErrorRecovery?.(error, strategy));
-      }
-    },
+    emitError: broadcast("onError"),
+    emitErrorRecovery: broadcast("onErrorRecovery"),
 
     // Dynamic definition hooks
-    emitDefinitionRegister(type: string, id: string, def: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDefinitionRegister?.(type, id, def));
-      }
-    },
-
-    emitDefinitionAssign(type: string, id: string, def: unknown, original: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDefinitionAssign?.(type, id, def, original));
-      }
-    },
-
-    emitDefinitionUnregister(type: string, id: string): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDefinitionUnregister?.(type, id));
-      }
-    },
-
-    emitDefinitionCall(type: string, id: string, props?: unknown): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onDefinitionCall?.(type, id, props));
-      }
-    },
+    emitDefinitionRegister: broadcast("onDefinitionRegister"),
+    emitDefinitionAssign: broadcast("onDefinitionAssign"),
+    emitDefinitionUnregister: broadcast("onDefinitionUnregister"),
+    emitDefinitionCall: broadcast("onDefinitionCall"),
 
     // Run history hooks
-    emitRunComplete(run: RunChangelogEntry): void {
-      for (const plugin of plugins) {
-        safeCall(() => plugin.onRunComplete?.(run));
-      }
-    },
-  };
+    emitRunComplete: broadcast("onRunComplete"),
+  } as PluginManager<S>;
 
   return manager;
 }
