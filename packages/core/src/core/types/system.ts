@@ -471,10 +471,9 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    */
   onTimeTravelChange(listener: () => void): () => void;
 
-  read<K extends DerivationKeys<M>>(
-    derivationId: K,
-  ): DerivationReturnType<M, K>;
-  read<T = unknown>(derivationId: string): T;
+  read<K extends DerivationKeys<M>>(id: K): DerivationReturnType<M, K>;
+  read<K extends FactKeys<M>>(id: K): FactReturnType<M, K>;
+  read<T = unknown>(id: string): T;
   /**
    * Subscribe to fact or derivation changes.
    * Keys are auto-detected -- pass any mix of fact keys and derivation keys.

@@ -133,7 +133,7 @@ export interface TypedResolver<
  * @example
  * ```typescript
  * const schema = { count: t.number(), threshold: t.number() };
- * const factory = constraintFactory<typeof schema>();
+ * const factory = createConstraintFactory<typeof schema>();
  *
  * const maxCountConstraint = factory.create({
  *   when: (facts) => facts.count > facts.threshold,
@@ -141,7 +141,7 @@ export interface TypedResolver<
  * });
  * ```
  */
-export function constraintFactory<S extends Schema>() {
+export function createConstraintFactory<S extends Schema>() {
   return {
     /**
      * Create a typed constraint
@@ -161,7 +161,7 @@ export function constraintFactory<S extends Schema>() {
  * @example
  * ```typescript
  * const schema = { user: t.object<User>() };
- * const factory = resolverFactory<typeof schema>();
+ * const factory = createResolverFactory<typeof schema>();
  *
  * const fetchUserResolver = factory.create<FetchUserReq>({
  *   requirement: (req): req is FetchUserReq => req.type === "FETCH_USER",
@@ -171,7 +171,7 @@ export function constraintFactory<S extends Schema>() {
  * });
  * ```
  */
-export function resolverFactory<S extends Schema>() {
+export function createResolverFactory<S extends Schema>() {
   return {
     /**
      * Create a typed resolver
@@ -190,7 +190,7 @@ export function resolverFactory<S extends Schema>() {
 
 /**
  * Type-safe constraint creator.
- * Simpler alternative to constraintFactory when you don't need a factory pattern.
+ * Simpler alternative to createConstraintFactory when you don't need a factory pattern.
  *
  * @example
  * ```typescript
@@ -209,7 +209,7 @@ export function typedConstraint<
 
 /**
  * Type-safe resolver creator.
- * Simpler alternative to resolverFactory when you don't need a factory pattern.
+ * Simpler alternative to createResolverFactory when you don't need a factory pattern.
  *
  * @example
  * ```typescript

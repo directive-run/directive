@@ -256,8 +256,9 @@ export function createErrorBoundaryManager(
   // Retry-later manager
   const retryLaterManager = createRetryLaterManager(config.retryLater);
 
-  // Track retry attempts per source ID
+  // Track retry attempts per source ID (capped to prevent unbounded growth)
   const retryAttempts = new Map<string, number>();
+  const MAX_RETRY_SOURCES = 1000;
 
   /** Convert unknown error to DirectiveError */
   function toDirectiveError(
@@ -360,6 +361,14 @@ export function createErrorBoundaryManager(
       if (strategy === "retry-later") {
         const attempt = (retryAttempts.get(sourceId) ?? 0) + 1;
         retryAttempts.set(sourceId, attempt);
+
+        // FIFO eviction to prevent unbounded growth
+        if (retryAttempts.size > MAX_RETRY_SOURCES) {
+          const oldest = retryAttempts.keys().next().value;
+          if (oldest !== undefined) {
+            retryAttempts.delete(oldest);
+          }
+        }
 
         const scheduled = retryLaterManager.scheduleRetry(
           source,
