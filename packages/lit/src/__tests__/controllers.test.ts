@@ -78,8 +78,8 @@ const testSchema = {
     items: t.array<string>(),
   },
   derivations: {
-    doubled: { _type: 0 as number },
-    greeting: { _type: "" as string },
+    doubled: t.number(),
+    greeting: t.string(),
   },
   events: {
     increment: {},
