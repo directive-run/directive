@@ -10,7 +10,12 @@ import pc from "picocolors";
  * 2. Named "system" export
  *
  * Returns the live System object for inspection/explain/graph commands.
+ *
+ * Note: Returns `any` intentionally — the loaded module is user code with
+ * unknown types. Duck-type validation via `isSystem()` ensures the returned
+ * object has the required shape (start, stop, inspect, facts).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function loadSystem(filePath: string): Promise<any> {
   const resolved = resolve(filePath);
 
