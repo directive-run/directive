@@ -128,7 +128,7 @@ export function ShareButton() {
         aria-expanded={isOpen}
         aria-haspopup="menu"
       >
-        <HandFist className="h-6 w-6 sm:h-5 sm:w-5" weight="duotone" />
+        <HandFist className="h-5 w-5" weight="duotone" />
       </IconButton>
 
       {isOpen && (
