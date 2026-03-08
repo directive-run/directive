@@ -322,11 +322,6 @@ function writeFile(filePath: string, content: string) {
 }
 
 function findModulesDir(dir: string): string {
-  // Look for existing src/ directory or modules directory
-  if (existsSync(join(dir, "src"))) {
-    return join(dir, "src");
-  }
-
   return join(dir, "src");
 }
 
