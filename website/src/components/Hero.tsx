@@ -10,44 +10,68 @@ import { HeroBackground } from "@/components/HeroBackground";
 import blurCyanImage from "@/images/blur-cyan.png";
 import blurIndigoImage from "@/images/blur-indigo.png";
 
-const moduleCode = `import { createModule } from '@directive-run/core';
+const moduleCode = `import { createModule, t } from '@directive-run/core';
 
 export default createModule("publish", {
+  schema: {
+    facts: {
+      draft: t.string(),
+      validated: t.boolean(),
+      saved: t.boolean(),
+    },
+    events: {
+      publish: { draft: t.string() },
+    },
+  },
+
+  events: {
+    publish: (facts, { draft }) => {
+      facts.draft = draft;
+    },
+  },
+
   constraints: {
     validate: {
-      when: (f) => f.action === "publish" && !f.validated,
+      when: (facts) => facts.draft && !facts.validated,
       require: { type: "VALIDATE" },
     },
-    upload: {
-      when: (f) => f.validated && f.images.length && !f.uploaded,
-      require: { type: "UPLOAD" },
-    },
     save: {
-      when: (f) => f.validated && f.uploaded && !f.saved,
+      when: (facts) => facts.validated && !facts.saved,
       require: { type: "SAVE" },
     },
   },
 
   resolvers: {
-    validate: { requirement: "VALIDATE", resolve: validateDraft },
-    upload:   { requirement: "UPLOAD",   resolve: uploadImages },
-    save:     { requirement: "SAVE",     resolve: createPost },
+    validate: {
+      requirement: "VALIDATE",
+      resolve: async (req, context) => {
+        context.facts.validated = await checkDraft(context.facts.draft);
+      },
+    },
+    save: {
+      requirement: "SAVE",
+      resolve: async (req, context) => {
+        await saveDraft(context.facts.draft);
+        context.facts.saved = true;
+      },
+    },
   },
 });`;
 
-const reactCode = `import { useFact } from '@directive-run/react';
+const reactCode = `import { useFact, useEvents } from '@directive-run/react';
 
-function PublishButton() {
+function PublishButton({ draft }) {
   const saved = useFact(system, "saved");
+  const events = useEvents(system);
 
   return (
-    <button onClick={() => system.facts.action = "publish"}>
-      {saved ? "Published \\u2713" : "Publish"}
+    <button onClick={() => events.publish({ draft })}>
+      {saved ? "Published ✓" : "Publish"}
     </button>
   );
 }
 
-// One assignment. Directive validates, uploads, and saves.`;
+// One click. Directive validates and saves — automatically.`;
 
 const tabs = [
   { name: "publish.module.ts", language: "typescript" },

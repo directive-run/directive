@@ -117,7 +117,11 @@
       "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint 2>&1 | tail -5)",
       "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && pnpm lint 2>&1 | grep \"Found\")",
       "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check packages/core/src/surface.ts packages/react/src/components.tsx packages/context/src/sanitize.ts packages/stories/src/adapter.ts 2>&1 | grep -E \"any|error|warning|Checked\")",
-      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check packages/core/src/surface.ts packages/react/src/components.tsx packages/context/src/sanitize.ts packages/stories/src/adapter.ts 2>&1 | grep \"━━\")"
+      "Bash(cd /Users/jasonwcomes/Desktop/Sizls/projects/morph && npx biome check packages/core/src/surface.ts packages/react/src/components.tsx packages/context/src/sanitize.ts packages/stories/src/adapter.ts 2>&1 | grep \"━━\")",
+      "Bash(for proj in directive morph architect)",
+      "Bash(do echo \"=== $proj ===\")",
+      "Read(//Users/jasonwcomes/Desktop/Sizls/projects/$proj/**)",
+      "Bash(pnpm lint:*)"
     ]
   }
 }
