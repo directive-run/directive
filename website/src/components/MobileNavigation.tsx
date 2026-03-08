@@ -9,7 +9,9 @@ import { List, X } from "@phosphor-icons/react";
 
 import { Logomark } from "@/components/Logo";
 import { Navigation } from "@/components/Navigation";
-import { aiNavigation, docsNavigation } from "@/lib/navigation";
+import { ThemeToggle } from "@/components/ThemeSelector";
+import { useCanUseThemeSelector } from "@/lib/feature-flags";
+import { aiNavigation, docsNavigation, getSiteSection } from "@/lib/navigation";
 
 function CloseOnNavigation({ close }: { close: () => void }) {
   const pathname = usePathname();
@@ -25,6 +27,10 @@ function CloseOnNavigation({ close }: { close: () => void }) {
 export function MobileNavigation() {
   const [isOpen, setIsOpen] = useState(false);
   const close = useCallback(() => setIsOpen(false), [setIsOpen]);
+  const canUseThemeSelector = useCanUseThemeSelector();
+  const pathname = usePathname();
+  const section = getSiteSection(pathname);
+  const isAIPage = section === "ai";
 
   function onLinkClick(event: React.MouseEvent<HTMLAnchorElement>) {
     const link = event.currentTarget;
@@ -68,6 +74,11 @@ export function MobileNavigation() {
             <Link href="/" className="ml-6" aria-label="Home page">
               <Logomark className="h-9 w-9" />
             </Link>
+            {canUseThemeSelector && (
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
+            )}
           </div>
           <div className="mt-5 flex flex-col gap-2 border-b border-slate-100 pb-4 dark:border-slate-800">
             <Link
@@ -98,23 +109,41 @@ export function MobileNavigation() {
             >
               About
             </Link>
+            <Link
+              href="/labs"
+              onClick={onLinkClick}
+              className="flex items-center text-base font-medium text-slate-900 hover:text-brand-primary dark:text-white dark:hover:text-brand-primary-400"
+            >
+              Labs
+            </Link>
           </div>
           <h3 className="mt-5 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Documentation
+            {isAIPage ? "AI" : "Documentation"}
           </h3>
           <Navigation
             className="px-1"
             onLinkClick={onLinkClick}
-            navigationOverride={docsNavigation}
+            navigationOverride={isAIPage ? aiNavigation : docsNavigation}
           />
-          <h3 className="mt-8 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            AI
-          </h3>
-          <Navigation
-            className="px-1"
-            onLinkClick={onLinkClick}
-            navigationOverride={aiNavigation}
-          />
+          <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
+            {isAIPage ? (
+              <Link
+                href="/docs/quick-start"
+                onClick={onLinkClick}
+                className="text-xs font-medium text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+              >
+                &larr; Core Docs
+              </Link>
+            ) : (
+              <Link
+                href="/ai/overview"
+                onClick={onLinkClick}
+                className="text-xs font-medium text-slate-500 hover:text-brand-primary dark:text-slate-400 dark:hover:text-brand-primary-400"
+              >
+                Explore AI Docs &rarr;
+              </Link>
+            )}
+          </div>
         </DialogPanel>
       </Dialog>
     </>
