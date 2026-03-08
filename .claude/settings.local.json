@@ -121,7 +121,8 @@
       "Bash(for proj in directive morph architect)",
       "Bash(do echo \"=== $proj ===\")",
       "Read(//Users/jasonwcomes/Desktop/Sizls/projects/$proj/**)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm:*)"
     ]
   }
 }
