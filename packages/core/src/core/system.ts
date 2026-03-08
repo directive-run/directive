@@ -1436,7 +1436,9 @@ function createModuleFactsProxy(
   let namespaceCache = moduleFactsProxyCache.get(facts);
   if (namespaceCache) {
     const cached = namespaceCache.get(namespace);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
   } else {
     namespaceCache = new Map();
     moduleFactsProxyCache.set(facts, namespaceCache);
@@ -1444,8 +1446,12 @@ function createModuleFactsProxy(
 
   const proxy = new Proxy({} as Record<string, unknown>, {
     get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       // Special properties pass through
       if (prop === "$store" || prop === "$snapshot") {
         return (facts as Record<string, unknown>)[prop];
@@ -1455,20 +1461,32 @@ function createModuleFactsProxy(
       ];
     },
     set(_, prop: string | symbol, value: unknown) {
-      if (typeof prop === "symbol") return false;
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
       (facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${prop}`] =
         value;
       return true;
     },
     has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return false;
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
       return `${namespace}${SEPARATOR}${prop}` in facts;
     },
     deleteProperty(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return false;
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
       delete (facts as Record<string, unknown>)[
         `${namespace}${SEPARATOR}${prop}`
       ];
@@ -1499,27 +1517,41 @@ function createNamespacedFactsProxy(
 ): Record<string, Record<string, unknown>> {
   // Check cache first
   const cached = namespacedFactsProxyCache.get(facts);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
   const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
     get(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(namespace)) return undefined;
-      if (!Object.hasOwn(modulesMap, namespace)) return undefined;
+      if (typeof namespace === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(namespace)) {
+        return undefined;
+      }
+      if (!Object.hasOwn(modulesMap, namespace)) {
+        return undefined;
+      }
 
       // Return a cached proxy for this module's facts
       return createModuleFactsProxy(facts, namespace);
     },
     has(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return false;
-      if (BLOCKED_PROPS.has(namespace)) return false;
+      if (typeof namespace === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(namespace)) {
+        return false;
+      }
       return Object.hasOwn(modulesMap, namespace);
     },
     ownKeys() {
       return getModuleNames();
     },
     getOwnPropertyDescriptor(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return undefined;
+      if (typeof namespace === "symbol") {
+        return undefined;
+      }
       if (Object.hasOwn(modulesMap, namespace)) {
         return { configurable: true, enumerable: true };
       }
@@ -1565,7 +1597,9 @@ function createCrossModuleFactsProxy(
   let namespaceCache = crossModuleFactsProxyCache.get(facts);
   if (namespaceCache) {
     const cached = namespaceCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
   } else {
     namespaceCache = new Map();
     crossModuleFactsProxyCache.set(facts, namespaceCache);
@@ -1576,8 +1610,12 @@ function createCrossModuleFactsProxy(
 
   const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
     get(_, key: string | symbol) {
-      if (typeof key === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(key)) return undefined;
+      if (typeof key === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(key)) {
+        return undefined;
+      }
 
       // "self" maps to own module's namespace
       if (key === "self") {
@@ -1600,15 +1638,21 @@ function createCrossModuleFactsProxy(
       return undefined;
     },
     has(_, key: string | symbol) {
-      if (typeof key === "symbol") return false;
-      if (BLOCKED_PROPS.has(key)) return false;
+      if (typeof key === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(key)) {
+        return false;
+      }
       return key === "self" || depNamesSet.has(key);
     },
     ownKeys() {
       return allKeys;
     },
     getOwnPropertyDescriptor(_, key: string | symbol) {
-      if (typeof key === "symbol") return undefined;
+      if (typeof key === "symbol") {
+        return undefined;
+      }
       if (key === "self" || depNamesSet.has(key)) {
         return { configurable: true, enumerable: true };
       }
@@ -1640,7 +1684,9 @@ function createModuleDeriveProxy(
   let namespaceCache = moduleDeriveProxyCache.get(derive);
   if (namespaceCache) {
     const cached = namespaceCache.get(namespace);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
   } else {
     namespaceCache = new Map();
     moduleDeriveProxyCache.set(derive, namespaceCache);
@@ -1648,13 +1694,21 @@ function createModuleDeriveProxy(
 
   const proxy = new Proxy({} as Record<string, unknown>, {
     get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(prop)) return undefined;
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       return derive[`${namespace}${SEPARATOR}${prop}`];
     },
     has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") return false;
-      if (BLOCKED_PROPS.has(prop)) return false;
+      if (typeof prop === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(prop)) {
+        return false;
+      }
       return `${namespace}${SEPARATOR}${prop}` in derive;
     },
     set() {
@@ -1685,27 +1739,41 @@ function createNamespacedDeriveProxy(
 ): Record<string, Record<string, unknown>> {
   // Check cache first
   const cached = namespacedDeriveProxyCache.get(derive);
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
   const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
     get(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return undefined;
-      if (BLOCKED_PROPS.has(namespace)) return undefined;
-      if (!Object.hasOwn(modulesMap, namespace)) return undefined;
+      if (typeof namespace === "symbol") {
+        return undefined;
+      }
+      if (BLOCKED_PROPS.has(namespace)) {
+        return undefined;
+      }
+      if (!Object.hasOwn(modulesMap, namespace)) {
+        return undefined;
+      }
 
       // Return a cached proxy for this module's derivations
       return createModuleDeriveProxy(derive, namespace);
     },
     has(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return false;
-      if (BLOCKED_PROPS.has(namespace)) return false;
+      if (typeof namespace === "symbol") {
+        return false;
+      }
+      if (BLOCKED_PROPS.has(namespace)) {
+        return false;
+      }
       return Object.hasOwn(modulesMap, namespace);
     },
     ownKeys() {
       return getModuleNames();
     },
     getOwnPropertyDescriptor(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") return undefined;
+      if (typeof namespace === "symbol") {
+        return undefined;
+      }
       if (Object.hasOwn(modulesMap, namespace)) {
         return { configurable: true, enumerable: true };
       }
@@ -1761,21 +1829,33 @@ function createNamespacedEventsProxy(
     >,
     {
       get(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") return undefined;
-        if (BLOCKED_PROPS.has(namespace)) return undefined;
-        if (!Object.hasOwn(modulesMap, namespace)) return undefined;
+        if (typeof namespace === "symbol") {
+          return undefined;
+        }
+        if (BLOCKED_PROPS.has(namespace)) {
+          return undefined;
+        }
+        if (!Object.hasOwn(modulesMap, namespace)) {
+          return undefined;
+        }
 
         // Check cache for this namespace's event proxy
         const cached = namespaceCache!.get(namespace);
-        if (cached) return cached;
+        if (cached) {
+          return cached;
+        }
 
         // Create and cache the module events proxy
         const moduleEventsProxy = new Proxy(
           {} as Record<string, (payload?: Record<string, unknown>) => void>,
           {
             get(_, eventName: string | symbol) {
-              if (typeof eventName === "symbol") return undefined;
-              if (BLOCKED_PROPS.has(eventName)) return undefined;
+              if (typeof eventName === "symbol") {
+                return undefined;
+              }
+              if (BLOCKED_PROPS.has(eventName)) {
+                return undefined;
+              }
 
               // Return a function that dispatches the prefixed event
               return (payload?: Record<string, unknown>) => {
@@ -1801,15 +1881,21 @@ function createNamespacedEventsProxy(
         return moduleEventsProxy;
       },
       has(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") return false;
-        if (BLOCKED_PROPS.has(namespace)) return false;
+        if (typeof namespace === "symbol") {
+          return false;
+        }
+        if (BLOCKED_PROPS.has(namespace)) {
+          return false;
+        }
         return Object.hasOwn(modulesMap, namespace);
       },
       ownKeys() {
         return getModuleNames();
       },
       getOwnPropertyDescriptor(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") return undefined;
+        if (typeof namespace === "symbol") {
+          return undefined;
+        }
         if (Object.hasOwn(modulesMap, namespace)) {
           return { configurable: true, enumerable: true };
         }
@@ -1968,8 +2054,12 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     {} as Record<string, (payload?: Record<string, unknown>) => void>,
     {
       get(_, eventName: string | symbol) {
-        if (typeof eventName === "symbol") return undefined;
-        if (BLOCKED_PROPS.has(eventName)) return undefined;
+        if (typeof eventName === "symbol") {
+          return undefined;
+        }
+        if (BLOCKED_PROPS.has(eventName)) {
+          return undefined;
+        }
 
         return (payload?: Record<string, unknown>) => {
           engine.dispatch({ type: eventName, ...payload });

@@ -449,7 +449,9 @@ export function createConstraintsManager<S extends Schema>(
   /** Evaluate a single sync constraint */
   function evaluateSync(id: string): boolean | Promise<boolean> {
     const def = definitions[id];
-    if (!def) return false;
+    if (!def) {
+      return false;
+    }
 
     const state = getState(id);
 
@@ -525,7 +527,9 @@ export function createConstraintsManager<S extends Schema>(
   /** Evaluate a single async constraint with timeout */
   async function evaluateAsync(id: string): Promise<boolean> {
     const def = definitions[id];
-    if (!def) return false;
+    if (!def) {
+      return false;
+    }
 
     const state = getState(id);
     const timeout = def.timeout ?? defaultTimeout;
@@ -612,7 +616,9 @@ export function createConstraintsManager<S extends Schema>(
     deps: Set<string>;
   } {
     const def = definitions[id];
-    if (!def) return { requirements: [], deps: new Set() };
+    if (!def) {
+      return { requirements: [], deps: new Set() };
+    }
 
     const requireDef = def.require;
     if (typeof requireDef === "function") {
@@ -667,7 +673,9 @@ export function createConstraintsManager<S extends Schema>(
 
         // Primary sort: priority (higher first)
         const priorityDiff = stateB.priority - stateA.priority;
-        if (priorityDiff !== 0) return priorityDiff;
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
 
         // Secondary sort: topological order (dependencies first)
         // Uses cached topologicalIndex for O(1) lookups
@@ -706,7 +714,9 @@ export function createConstraintsManager<S extends Schema>(
    */
   function areAfterDependenciesSatisfied(id: string): boolean {
     const state = states.get(id);
-    if (!state || state.after.length === 0) return true;
+    if (!state || state.after.length === 0) {
+      return true;
+    }
 
     for (const depId of state.after) {
       // Skip deps that don't exist (cross-module, handled externally)
