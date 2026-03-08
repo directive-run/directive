@@ -7,23 +7,11 @@
 
 ### Functions
 
-- `analyzeReduxSlice` — Analyze a Redux slice and generate a Directive module structure.
-  ```ts
-  function analyzeReduxSlice(config: ReduxSliceConfig): DirectiveModuleStructure
-  ```
-- `analyzeXStateMachine` — Analyze an XState machine and generate a Directive module structure.
-  ```ts
-  function analyzeXStateMachine(config: XStateMachineConfig): DirectiveModuleStructure
-  ```
-- `analyzeZustandStore` — Analyze a Zustand store and generate a Directive module structure.
-  ```ts
-  function analyzeZustandStore(config: ZustandStoreConfig): DirectiveModuleStructure
-  ```
 - `constraint` — Create a constraint using the full builder pattern.
   ```ts
   function constraint(): ConstraintBuilderStart<M>
   ```
-- `constraintFactory` — Create a typed constraint factory for a specific schema.
+- `createConstraintFactory` — Create a typed constraint factory for a specific schema.
 - `createConstraintsManager` — Create a manager that evaluates constraint rules and produces unmet
   ```ts
   function createConstraintsManager(options: CreateConstraintsOptions<S>): ConstraintsManager<S>
@@ -73,6 +61,7 @@
   function createPluginManager(): PluginManager<S>
   ```
 - `createRequirementStatusPlugin` — Create a plugin that tracks requirement status for reactive UI updates.
+- `createResolverFactory` — Create a typed resolver factory for a specific schema.
 - `createResolversManager` — Create a manager that fulfills requirements by matching them to resolver
   ```ts
   function createResolversManager(options: CreateResolversOptions<S>): ResolversManager<S>
@@ -95,18 +84,6 @@
 - `forType` — Create a type-guard function suitable for a resolver's `requirement`
   ```ts
   export function forType<R extends Requirement>(
-  ```
-- `generateMigrationChecklist` — Generate a migration checklist for a given state management pattern.
-  ```ts
-  function generateMigrationChecklist(source: "redux" | "zustand" | "xstate"): string[]
-  ```
-- `generateModuleCode` — Generate Directive module code from a structure.
-  ```ts
-  function generateModuleCode(structure: DirectiveModuleStructure): string
-  ```
-- `generateRequirementId` — Generate a stable identity string for a requirement.
-  ```ts
-  function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
   ```
 - `getCurrentTracker` — Get the current tracking context.
   ```ts
@@ -144,7 +121,6 @@
   ```ts
   function req(type: T): <P extends Record<string, unknown>>(props: P) => Requirement & { type: T; } & P
   ```
-- `resolverFactory` — Create a typed resolver factory for a specific schema.
 - `shallowEqual` — Shallow equality comparison for objects.
   ```ts
   function shallowEqual(a: T, b: T): boolean
@@ -219,18 +195,6 @@
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ```
-- `ConstraintBuilderComplete` — Builder after .require() — optional chaining + .build()
-  ```ts
-  export interface ConstraintBuilderComplete<M extends ModuleSchema> {
-  ```
-- `ConstraintBuilderStart` — Builder after constraint() — must call .when() first
-  ```ts
-  export interface ConstraintBuilderStart<M extends ModuleSchema> {
-  ```
-- `ConstraintBuilderWithWhen` — Builder after .when() — must call .require() next
-  ```ts
-  export interface ConstraintBuilderWithWhen<M extends ModuleSchema> {
-  ```
 - `ConstraintState` — Internal constraint state
   ```ts
   export interface ConstraintState {
@@ -258,10 +222,6 @@
 - `DerivationState` — Internal derivation state
   ```ts
   export interface DerivationState<T> {
-  ```
-- `DirectiveModuleStructure` — Generated Directive module structure
-  ```ts
-  export interface DirectiveModuleStructure {
   ```
 - `DistributableSnapshot` — A distributable snapshot containing computed state.
   ```ts
@@ -327,10 +287,6 @@
   ```ts
   export interface NamespacedSystem<Modules extends ModulesMap> {
   ```
-- `NamespacedSystemBuilder` — Builder for a namespaced multi-module system.
-  ```ts
-  export interface NamespacedSystemBuilder<Modules extends ModulesMap> {
-  ```
 - `PendingRetry` — A queued retry entry tracking its source, attempt count, and scheduled time.
   ```ts
   export interface PendingRetry {
@@ -342,10 +298,6 @@
 - `ReconcileResult` — Reconcile result
   ```ts
   export interface ReconcileResult {
-  ```
-- `ReduxSliceConfig` — Redux slice configuration (simplified)
-  ```ts
-  export interface ReduxSliceConfig {
   ```
 - `Requirement` — Base requirement structure
   ```ts
@@ -391,10 +343,6 @@
   ```ts
   export interface SingleModuleSystem<S extends ModuleSchema> {
   ```
-- `SingleModuleSystemBuilder` — Builder for a single-module system with direct access to facts, derivations, and events.
-  ```ts
-  export interface SingleModuleSystemBuilder<S extends ModuleSchema> {
-  ```
 - `Snapshot` — Snapshot for time-travel
   ```ts
   export interface Snapshot {
@@ -410,10 +358,6 @@
 - `SnapshotMeta` — Lightweight snapshot metadata (no facts data — keeps re-renders cheap)
   ```ts
   export interface SnapshotMeta {
-  ```
-- `SystemBuilderStart` — Entry point of the system builder, returned by {@link system}.
-  ```ts
-  export interface SystemBuilderStart {
   ```
 - `SystemConfig` — System configuration
   ```ts
@@ -458,18 +402,6 @@
 - `TypedResolverDef` — Typed resolver definition for a specific requirement type.
   ```ts
   export interface TypedResolverDef<
-  ```
-- `WhenBuilder` — Result from when() — must call .require()
-  ```ts
-  export interface WhenBuilder<M extends ModuleSchema> {
-  ```
-- `XStateMachineConfig` — XState machine configuration (simplified)
-  ```ts
-  export interface XStateMachineConfig {
-  ```
-- `ZustandStoreConfig` — Zustand store configuration (simplified)
-  ```ts
-  export interface ZustandStoreConfig {
   ```
 
 ### Types
