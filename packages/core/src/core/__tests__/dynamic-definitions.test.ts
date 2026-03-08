@@ -45,7 +45,7 @@ function createTestModule() {
     resolvers: {
       increment: {
         requirement: "INCREMENT",
-        resolve: async (req, context) => {
+        resolve: async (_req, context) => {
           context.facts.count = 1;
         },
       },
@@ -113,7 +113,7 @@ describe("Constraints dynamic definitions", () => {
 
     const result = await system.constraints.call("autoIncrement");
     expect(result.length).toBeGreaterThan(0);
-    expect(result[0].requirement).toHaveProperty("type", "INCREMENT");
+    expect(result[0]!.requirement).toHaveProperty("type", "INCREMENT");
 
     system.destroy();
   });
@@ -187,7 +187,7 @@ describe("Constraints dynamic definitions", () => {
 
     const result = await system.constraints.call("alwaysFires");
     expect(result.length).toBe(1);
-    expect(result[0].requirement).toHaveProperty("type", "LOAD_DATA");
+    expect(result[0]!.requirement).toHaveProperty("type", "LOAD_DATA");
 
     system.destroy();
   });
@@ -235,7 +235,7 @@ describe("Resolvers dynamic definitions", () => {
 
     system.resolvers.assign("increment", {
       requirement: "INCREMENT",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
         context.facts.count = 42;
       },
     });
@@ -295,7 +295,7 @@ describe("Derivations dynamic definitions", () => {
 
     expect(system.derive.isDynamic("tripled")).toBe(true);
     expect(system.derive.listDynamic()).toContain("tripled");
-    expect((system.derive as Record<string, unknown>).tripled).toBe(0);
+    expect((system.derive as unknown as Record<string, unknown>).tripled).toBe(0);
 
     system.destroy();
   });
@@ -341,7 +341,7 @@ describe("Derivations dynamic definitions", () => {
       return (facts.count as number) + 100;
     });
 
-    expect((system.derive as Record<string, unknown>).custom).toBe(100);
+    expect((system.derive as unknown as Record<string, unknown>).custom).toBe(100);
     expect(system.derive.isDynamic("custom")).toBe(true);
 
     system.derive.unregister("custom");
@@ -732,7 +732,8 @@ describe("isDynamic / listDynamic", () => {
 
 describe("Deferred operations during reconciliation", () => {
   it("register from within an effect is deferred and applied after reconciliation", async () => {
-    let systemRef: ReturnType<typeof createSystem> | null = null;
+    // biome-ignore lint/suspicious/noExplicitAny: Test — system type varies by overload
+    let systemRef: any = null;
 
     const module = createModule("deferred", {
       schema: {
@@ -771,7 +772,7 @@ describe("Deferred operations during reconciliation", () => {
 
     // The deferred registration should have been applied after reconciliation
     expect(system.derive.isDynamic("dynamicDerived")).toBe(true);
-    expect((system.derive as Record<string, unknown>).dynamicDerived).toBe("derived-true");
+    expect((system.derive as unknown as Record<string, unknown>).dynamicDerived).toBe("derived-true");
 
     system.destroy();
   });
@@ -873,7 +874,7 @@ describe("Lifecycle: assign → unregister", () => {
 
     system.resolvers.register("dynRes", {
       requirement: "LOAD_DATA",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
         context.facts.label = "v1";
       },
     });
@@ -883,7 +884,7 @@ describe("Lifecycle: assign → unregister", () => {
     // Assign override
     system.resolvers.assign("dynRes", {
       requirement: "LOAD_DATA",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
         context.facts.label = "v2";
       },
     });
@@ -1018,7 +1019,7 @@ describe("Namespaced system dynamic registration", () => {
     // Register a dynamic resolver
     system.resolvers.register("dynamicFetch", {
       requirement: "FETCH",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
         context.facts["data::loaded"] = true;
       },
     });
@@ -1046,13 +1047,17 @@ describe("Namespaced system dynamic registration", () => {
 
 describe("Concurrent deferred operations", () => {
   it("multiple effects defer different operations in a single reconciliation", async () => {
-    let systemRef: ReturnType<typeof createSystem> | null = null;
+    // biome-ignore lint/suspicious/noExplicitAny: Test — system type varies by overload
+    let systemRef: any = null;
 
     const module = createModule("concurrent-defer", {
       schema: {
         facts: {
           trigger: t.boolean(),
           value: t.number(),
+        },
+        requirements: {
+          INCREMENT: {},
         },
       },
       init: (facts) => {
@@ -1091,7 +1096,7 @@ describe("Concurrent deferred operations", () => {
       resolvers: {
         increment: {
           requirement: "INCREMENT",
-          resolve: async (req, context) => {
+          resolve: async (_req, context) => {
             context.facts.value = 1;
           },
         },
@@ -1133,7 +1138,7 @@ describe("Resolver assign triggers reconciliation", () => {
     // Assign a new resolver — should trigger scheduleReconcile
     system.resolvers.assign("increment", {
       requirement: "INCREMENT",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
         context.facts.count = 99;
       },
     });

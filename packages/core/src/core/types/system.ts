@@ -393,6 +393,37 @@ export interface EffectsControl {
   listDynamic(): string[];
 }
 
+/** Runtime control for derivations (dynamic registration + value access) */
+export interface DerivationsControl {
+  /**
+   * Register a new derivation at runtime.
+   * @throws If a derivation with this ID already exists (use `assign` to override)
+   * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
+   */
+  register(id: string, fn: (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown): void;
+  /**
+   * Override an existing derivation (static or dynamic).
+   * @throws If no derivation with this ID exists (use `register` to create)
+   * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
+   */
+  assign(id: string, fn: (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown): void;
+  /**
+   * Remove a dynamically registered derivation.
+   * Static (module-defined) derivations cannot be unregistered — logs a dev warning and no-ops.
+   * @remarks During reconciliation, the unregistration is deferred and applied after the current cycle completes.
+   */
+  unregister(id: string): void;
+  /**
+   * Recompute and return a derivation's current value.
+   * @throws If no derivation with this ID exists
+   */
+  call(id: string): unknown;
+  /** Check if a derivation was dynamically registered (not from a module definition) */
+  isDynamic(id: string): boolean;
+  /** List all dynamically registered derivation IDs */
+  listDynamic(): string[];
+}
+
 /** Runtime control for resolvers */
 export interface ResolversControl {
   /**
@@ -428,7 +459,7 @@ export interface ResolversControl {
 export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly facts: Facts<M["facts"]>;
   readonly debug: TimeTravelAPI | null;
-  readonly derive: InferDerivations<M>;
+  readonly derive: InferDerivations<M> & DerivationsControl;
   readonly events: EventsAccessorFromSchema<M>;
   readonly constraints: ConstraintsControl;
   readonly effects: EffectsControl;

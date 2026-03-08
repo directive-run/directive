@@ -140,6 +140,11 @@ export type {
   DistributableSnapshot,
   // Run changelog
   RunChangelogEntry,
+  // Runtime controls
+  ConstraintsControl,
+  DerivationsControl,
+  EffectsControl,
+  ResolversControl,
   // System interfaces
   System,
   SystemConfig,
