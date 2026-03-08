@@ -72,7 +72,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/ai/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
