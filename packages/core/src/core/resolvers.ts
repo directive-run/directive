@@ -446,6 +446,57 @@ export function createResolversManager<S extends Schema>(
     };
   }
 
+  /**
+   * Shared retry catch-block logic: normalize error, check abort, check shouldRetry,
+   * sleep with abort awareness. Returns "abort" if canceled, "break" if shouldRetry
+   * returned false, or "continue" if the next attempt should proceed.
+   */
+  async function handleRetryError(
+    error: unknown,
+    attempt: number,
+    retryPolicy: Required<RetryPolicy>,
+    controller: AbortController,
+  ): Promise<{ action: "abort" | "break" | "continue"; error: Error }> {
+    const normalizedError =
+      error instanceof Error ? error : new Error(String(error));
+
+    if (controller.signal.aborted) {
+      return { action: "abort", error: normalizedError };
+    }
+
+    if (
+      retryPolicy.shouldRetry &&
+      !retryPolicy.shouldRetry(normalizedError, attempt)
+    ) {
+      return { action: "break", error: normalizedError };
+    }
+
+    if (attempt < retryPolicy.attempts) {
+      if (controller.signal.aborted) {
+        return { action: "abort", error: normalizedError };
+      }
+
+      const delay = calculateDelay(retryPolicy, attempt);
+
+      await new Promise<void>((resolve) => {
+        const timeoutId = setTimeout(resolve, delay);
+        const abortHandler = () => {
+          clearTimeout(timeoutId);
+          resolve();
+        };
+        controller.signal.addEventListener("abort", abortHandler, {
+          once: true,
+        });
+      });
+
+      if (controller.signal.aborted) {
+        return { action: "abort", error: normalizedError };
+      }
+    }
+
+    return { action: "continue", error: normalizedError };
+  }
+
   /** Execute a single requirement resolution with retry */
   async function executeResolve(
     resolverId: string,
@@ -514,48 +565,24 @@ export function createResolversManager<S extends Schema>(
         onComplete?.(resolverId, req, duration);
         return;
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+        const result = await handleRetryError(
+          error,
+          attempt,
+          retryPolicy,
+          controller,
+        );
+        lastError = result.error;
 
-        // Check if it was an abort
-        if (controller.signal.aborted) {
+        if (result.action === "abort") {
           return;
         }
-
-        // Check shouldRetry predicate — if it returns false, stop immediately
-        if (
-          retryPolicy.shouldRetry &&
-          !retryPolicy.shouldRetry(lastError, attempt)
-        ) {
+        if (result.action === "break") {
           break;
         }
 
-        // If we have more attempts, wait and retry
+        // "continue" — notify retry and loop
         if (attempt < retryPolicy.attempts) {
-          // Check abort before starting delay (avoids unnecessary waiting)
-          if (controller.signal.aborted) {
-            return;
-          }
-
-          const delay = calculateDelay(retryPolicy, attempt);
           onRetry?.(resolverId, req, attempt + 1);
-
-          // Use AbortSignal-aware sleep to respond to cancellation immediately
-          await new Promise<void>((resolve) => {
-            const timeoutId = setTimeout(resolve, delay);
-            // Listen for abort during sleep
-            const abortHandler = () => {
-              clearTimeout(timeoutId);
-              resolve();
-            };
-            controller.signal.addEventListener("abort", abortHandler, {
-              once: true,
-            });
-          });
-
-          // Check abort after sleep
-          if (controller.signal.aborted) {
-            return;
-          }
         }
       }
     }
@@ -715,44 +742,25 @@ export function createResolversManager<S extends Schema>(
           return;
         }
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
+        const result = await handleRetryError(
+          error,
+          attempt,
+          retryPolicy,
+          controller,
+        );
+        lastError = result.error;
 
-        // Check if it was an abort
-        if (controller.signal.aborted) {
+        if (result.action === "abort") {
           return;
         }
-
-        // Check shouldRetry predicate — if it returns false, stop immediately
-        if (
-          retryPolicy.shouldRetry &&
-          !retryPolicy.shouldRetry(lastError, attempt)
-        ) {
+        if (result.action === "break") {
           break;
         }
 
-        // If we have more attempts, wait and retry
+        // "continue" — notify retry for all requirements and loop
         if (attempt < retryPolicy.attempts) {
-          const delay = calculateDelay(retryPolicy, attempt);
-          // Notify retry for all requirements
           for (const req of requirements) {
             onRetry?.(resolverId, req, attempt + 1);
-          }
-
-          // Use AbortSignal-aware sleep
-          await new Promise<void>((resolve) => {
-            const timeoutId = setTimeout(resolve, delay);
-            const abortHandler = () => {
-              clearTimeout(timeoutId);
-              resolve();
-            };
-            controller.signal.addEventListener("abort", abortHandler, {
-              once: true,
-            });
-          });
-
-          // Check abort after sleep
-          if (controller.signal.aborted) {
-            return;
           }
         }
       }
