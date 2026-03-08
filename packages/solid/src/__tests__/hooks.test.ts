@@ -1,4 +1,4 @@
-import { createRoot, createEffect, createSignal } from "solid-js";
+import { createRoot } from "solid-js";
 import {
   createModule,
   createSystem,
@@ -37,8 +37,8 @@ const testSchema = {
     items: t.array<string>(),
   },
   derivations: {
-    doubled: { _type: 0 as number },
-    greeting: { _type: "" as string },
+    doubled: t.number(),
+    greeting: t.string(),
   },
   events: {
     increment: {},
@@ -452,11 +452,11 @@ describe("useEvents", () => {
 
   it("calling events updates the system", () => {
     let dispose: () => void;
-    let events: ReturnType<typeof useEvents>;
+    let events: { increment: () => void; setName: (payload: { name: string }) => void };
     let count: () => number | undefined;
     createRoot((_dispose) => {
       dispose = _dispose;
-      events = useEvents(system);
+      events = useEvents(system) as typeof events;
       count = useFact(system, "count");
     });
 
@@ -591,7 +591,7 @@ describe("useInspect", () => {
       state = useInspect(system);
     });
 
-    const before = state!();
+    state!();
     system.facts.count = 10;
     const after = state!();
 
@@ -753,7 +753,7 @@ describe("useSuspenseRequirement", () => {
     let isLoading = true;
 
     const mockStatusPlugin = {
-      getStatus: (type: string) => ({
+      getStatus: (_type: string) => ({
         pending: isLoading ? 1 : 0,
         inflight: 0,
         failed: 0,
@@ -1175,7 +1175,8 @@ describe("useDirective", () => {
     });
 
     let dispose: () => void;
-    let result: ReturnType<typeof useDirective>;
+    // biome-ignore lint/suspicious/noExplicitAny: test convenience
+    let result: any;
     createRoot((_dispose) => {
       dispose = _dispose;
       result = useDirective(mod);
@@ -1213,7 +1214,8 @@ describe("useDirective", () => {
     });
 
     let dispose: () => void;
-    let result: ReturnType<typeof useDirective>;
+    // biome-ignore lint/suspicious/noExplicitAny: test convenience
+    let result: any;
     createRoot((_dispose) => {
       dispose = _dispose;
       result = useDirective(mod);
