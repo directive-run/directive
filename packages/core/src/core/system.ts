@@ -18,6 +18,7 @@
 
 import { isPrototypeSafe } from "../utils/utils.js";
 import { createEngine } from "./engine.js";
+import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   CreateSystemOptionsNamed,
   CreateSystemOptionsSingle,
@@ -27,14 +28,6 @@ import type {
   NamespacedSystem,
   SingleModuleSystem,
 } from "./types.js";
-
-// ============================================================================
-// Blocked Properties (Security)
-// ============================================================================
-
-const BLOCKED_PROPS = Object.freeze(
-  new Set(["__proto__", "constructor", "prototype"]),
-);
 
 /** Namespace separator for internal key prefixing (e.g., "auth::token") */
 const SEPARATOR = "::";
@@ -211,6 +204,18 @@ export function createSystem<
         "  createSystem({ modules: { auth: authModule, data: dataModule } })\n\n" +
         "Or for a single module:\n" +
         "  createSystem({ module: counterModule })",
+    );
+  }
+
+  // Detect single ModuleDef accidentally passed to `modules:` instead of `module:`
+  const mods = namedOptions.modules as Record<string, unknown>;
+  if (mods && typeof mods === "object" && "id" in mods && "schema" in mods) {
+    throw new Error(
+      "[Directive] A single module was passed to `modules:`. " +
+        "For a single module, use `module:` instead:\n\n" +
+        "  createSystem({ module: myModule })\n\n" +
+        "For multiple modules, wrap in an object:\n" +
+        "  createSystem({ modules: { myName: myModule } })",
     );
   }
 
@@ -1375,6 +1380,18 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
   } as any;
 
+  // Dev-mode warning if system.start() is never called
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+    setTimeout(() => {
+      if (!system.isRunning && !system.isInitialized) {
+        console.warn(
+          "[Directive] System created but start() was never called. " +
+            "Constraints, resolvers, and effects will not run until you call system.start().",
+        );
+      }
+    }, 0);
+  }
+
   return system;
 }
 
@@ -1457,6 +1474,12 @@ function createModuleFactsProxy(
       ];
       return true;
     },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
+    },
   });
 
   namespaceCache.set(namespace, proxy);
@@ -1501,6 +1524,12 @@ function createNamespacedFactsProxy(
         return { configurable: true, enumerable: true };
       }
       return undefined;
+    },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
     },
   });
 
@@ -1585,6 +1614,12 @@ function createCrossModuleFactsProxy(
       }
       return undefined;
     },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
+    },
   });
 
   namespaceCache.set(cacheKey, proxy);
@@ -1621,6 +1656,15 @@ function createModuleDeriveProxy(
       if (typeof prop === "symbol") return false;
       if (BLOCKED_PROPS.has(prop)) return false;
       return `${namespace}${SEPARATOR}${prop}` in derive;
+    },
+    set() {
+      return false;
+    },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
     },
   });
 
@@ -1666,6 +1710,15 @@ function createNamespacedDeriveProxy(
         return { configurable: true, enumerable: true };
       }
       return undefined;
+    },
+    set() {
+      return false;
+    },
+    defineProperty() {
+      return false;
+    },
+    getPrototypeOf() {
+      return null;
     },
   });
 
@@ -1732,6 +1785,15 @@ function createNamespacedEventsProxy(
                 });
               };
             },
+            set() {
+              return false;
+            },
+            defineProperty() {
+              return false;
+            },
+            getPrototypeOf() {
+              return null;
+            },
           },
         );
 
@@ -1752,6 +1814,15 @@ function createNamespacedEventsProxy(
           return { configurable: true, enumerable: true };
         }
         return undefined;
+      },
+      set() {
+        return false;
+      },
+      defineProperty() {
+        return false;
+      },
+      getPrototypeOf() {
+        return null;
       },
     },
   );
@@ -2046,6 +2117,18 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     },
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing
   } as any;
+
+  // Dev-mode warning if system.start() is never called
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+    setTimeout(() => {
+      if (!system.isRunning && !system.isInitialized) {
+        console.warn(
+          "[Directive] System created but start() was never called. " +
+            "Constraints, resolvers, and effects will not run until you call system.start().",
+        );
+      }
+    }, 0);
+  }
 
   return system;
 }

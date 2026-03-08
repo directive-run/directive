@@ -144,6 +144,10 @@ export interface ResolversManager<_S extends Schema> {
    * @param requirement - The requirement to resolve.
    */
   callOne(id: string, requirement: Requirement): Promise<void>;
+  /**
+   * Clean up all internal state. Called on system destroy.
+   */
+  destroy(): void;
 }
 
 /** Internal resolver state */
@@ -338,7 +342,7 @@ export function createResolversManager<S extends Schema>(
 
   // Resolver index by requirement type for O(1) lookup (populated lazily)
   // Capped to prevent unbounded growth with dynamic requirement types (e.g., FETCH_USER_${id})
-  const resolversByType = new Map<string, string[]>();
+  const resolversByType = new Map<string, Set<string>>();
   const MAX_RESOLVER_CACHE = 1000;
 
   /** Cleanup old statuses to prevent memory leak */
@@ -424,12 +428,9 @@ export function createResolversManager<S extends Schema>(
             const oldest = resolversByType.keys().next().value;
             if (oldest !== undefined) resolversByType.delete(oldest);
           }
-          resolversByType.set(reqType, []);
+          resolversByType.set(reqType, new Set());
         }
-        const typeResolvers = resolversByType.get(reqType)!;
-        if (!typeResolvers.includes(id)) {
-          typeResolvers.push(id);
-        }
+        resolversByType.get(reqType)!.add(id);
         return id;
       }
     }
@@ -1082,6 +1083,12 @@ export function createResolversManager<S extends Schema>(
 
         await resolvePromise;
       }
+    },
+
+    destroy(): void {
+      this.cancelAll();
+      statuses.clear();
+      resolversByType.clear();
     },
   };
 

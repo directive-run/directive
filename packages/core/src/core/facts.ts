@@ -9,7 +9,7 @@
  * - Schema validation in development mode
  */
 
-import { trackAccess, withoutTracking } from "./tracking.js";
+import { BLOCKED_PROPS, trackAccess, withoutTracking } from "./tracking.js";
 import type {
   Facts,
   FactsSnapshot,
@@ -1306,10 +1306,6 @@ export function createFactsStore<S extends Schema>(
 // Proxy-based Facts Accessor
 // ============================================================================
 
-/** Prototype pollution guard - prevent access to dangerous properties */
-const BLOCKED_PROPS = Object.freeze(
-  new Set(["__proto__", "constructor", "prototype"]),
-);
 
 /**
  * Create a Proxy wrapper around a {@link FactsStore} for clean property-style
@@ -1405,6 +1401,18 @@ export function createFactsProxy<S extends Schema>(
         return { configurable: true, enumerable: false, writable: false };
       }
       return { configurable: true, enumerable: true, writable: true };
+    },
+
+    defineProperty() {
+      return false;
+    },
+
+    getPrototypeOf() {
+      return null;
+    },
+
+    setPrototypeOf() {
+      return false;
     },
   });
 
