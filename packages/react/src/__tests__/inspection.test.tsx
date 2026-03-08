@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { createModule, createSystem, t } from "@directive-run/core";
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   useInspect,
   useTimeTravel,
@@ -23,6 +23,9 @@ function createTestSystem() {
       derivations: {
         doubled: t.number(),
       },
+      requirements: {
+        MAKE_READY: {},
+      },
     },
     init: (facts) => {
       facts.count = 0;
@@ -40,7 +43,7 @@ function createTestSystem() {
     resolvers: {
       makeReady: {
         requirement: "MAKE_READY",
-        resolve: async (req, context) => {
+        resolve: async (_req, context) => {
           context.facts.ready = true;
         },
       },
@@ -141,6 +144,9 @@ describe("useInspect", () => {
       schema: {
         facts: {
           status: t.string(),
+        },
+        requirements: {
+          LOAD_DATA: {},
         },
       },
       init: (facts) => {
@@ -296,6 +302,9 @@ describe("useInspect", () => {
         facts: {
           done: t.boolean(),
         },
+        requirements: {
+          DO_WORK: {},
+        },
       },
       init: (facts) => {
         facts.done = false;
@@ -309,7 +318,7 @@ describe("useInspect", () => {
       resolvers: {
         doWork: {
           requirement: "DO_WORK",
-          resolve: async (req, context) => {
+          resolve: async (_req, context) => {
             await resolverPromise;
             context.facts.done = true;
           },
@@ -572,6 +581,9 @@ describe("useExplain", () => {
         facts: {
           status: t.string(),
         },
+        requirements: {
+          LOAD_DATA: {},
+        },
       },
       init: (facts) => {
         facts.status = "pending";
@@ -629,6 +641,9 @@ describe("useExplain", () => {
         facts: {
           status: t.string(),
         },
+        requirements: {
+          LOAD_DATA: {},
+        },
       },
       init: (facts) => {
         facts.status = "pending";
@@ -677,6 +692,9 @@ describe("useExplain", () => {
       schema: {
         facts: {
           value: t.number(),
+        },
+        requirements: {
+          SET_VALUE: {},
         },
       },
       init: (facts) => {
