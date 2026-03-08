@@ -538,6 +538,103 @@ The primitive family uses simple nouns: **facts**, **constraints**, **resolvers*
 
 If pronunciation becomes a real adoption blocker (conference talks, video tutorials), "computed" is the strongest alternative &ndash; but that's a v2 conversation.
 
+## Security: Prototype Pollution Defense
+
+Directive uses a consistent defense-in-depth strategy against prototype pollution across both `@directive-run/core` and `@directive-run/ai`.
+
+### The Threat
+
+Prototype pollution occurs when an attacker injects properties into `Object.prototype`, causing them to appear on every object in the runtime. In a constraint-driven system where objects are merged, iterated, and used as lookup tables, this is especially dangerous:
+
+```typescript
+// Attacker pollutes prototype
+(Object.prototype as any).__proto__ = maliciousPayload;
+(Object.prototype as any).constructor = evilFunction;
+
+// Now every {} has these properties
+const merged = {};
+merged.constructor; // evilFunction (!)
+```
+
+### Defense: `Object.create(null)`
+
+All merged objects, lookup tables, caches, and dynamically-keyed maps use `Object.create(null)` instead of `{}`:
+
+```typescript
+// ❌ Vulnerable to prototype pollution
+const cache = {};
+cache[userInput] = value;        // attacker could set "__proto__"
+
+// ✅ Null-prototype object — no inherited properties
+const cache = Object.create(null);
+cache[userInput] = value;        // "__proto__" is just a regular key
+cache.constructor;               // undefined (no prototype chain)
+```
+
+**Where this is applied (53 uses across both packages):**
+
+| Package | File | Count | Purpose |
+|---------|------|-------|---------|
+| core | `engine.ts` | 7 | Merged schemas, definitions, constraint/resolver maps |
+| core | `devtools-ai-bridge.ts` | 1 | Bridge state objects |
+| ai | `multi-agent-orchestrator.ts` | 30 | Agent state, DAG contexts, constraint results, internal maps |
+| ai | `pattern-serialization.ts` | 3 | Deserialized pattern nodes |
+| ai | `pattern-composition.ts` | 5 | DAG execution contexts, upstream outputs |
+| ai | `orchestrator-bridge.ts` | 2 | Bridge accessor maps |
+| ai | `health-monitor.ts` | 1 | Health state tracking |
+| ai | `otel.ts` | 1 | Span attribute maps |
+| ai | `provider-routing.ts` | 1 | Provider lookup tables |
+
+### Defense: `BLOCKED_PROPS` Guard
+
+All Proxy `get` handlers check against a `BLOCKED_PROPS` set to prevent prototype-related keys from leaking through:
+
+```typescript
+import { BLOCKED_PROPS } from "./tracking.js";
+// BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"])
+
+const proxy = new Proxy(target, {
+  get(t, prop) {
+    if (typeof prop === "string" && BLOCKED_PROPS.has(prop)) {
+      return undefined;
+    }
+    // ... normal handler
+  },
+});
+```
+
+This is applied to all 11 Proxy instances across core (facts, derivations, engine, system).
+
+### Defense: Proxy Trap Hardening
+
+Read-only proxies also define `set`, `deleteProperty`, `defineProperty`, `setPrototypeOf`, and `getPrototypeOf` traps that return safe values:
+
+```typescript
+const readOnlyProxy = new Proxy(target, {
+  set: () => false,
+  deleteProperty: () => false,
+  defineProperty: () => false,
+  setPrototypeOf: () => false,
+  getPrototypeOf: () => null,
+});
+```
+
+### Defense: Key Validation
+
+- `engine.ts` validates all schema keys against `BLOCKED_PROPS` unconditionally (not gated behind dev mode)
+- Schema keys starting with `$` are rejected to prevent collision with internal `$store`/`$snapshot` keys
+- The `::` namespace separator cannot appear in JS identifiers, preventing collision with module-namespaced keys
+- `patternFromJSON()` filters out `__proto__`, `constructor`, and `prototype` keys when deserializing patterns
+
+### Contributing: Maintaining This Defense
+
+When writing new code that creates objects used as lookup tables or merge targets:
+
+1. **Always** use `Object.create(null)` instead of `{}`
+2. **Never** use `Object.assign({}, ...)` — use `Object.assign(Object.create(null), ...)`
+3. **Always** add `BLOCKED_PROPS` checks to new Proxy `get` handlers
+4. **Always** validate user-provided keys against `BLOCKED_PROPS` before using them as object keys
+
 ## Design Rationale Summary
 
 | Decision | Rationale |
@@ -548,5 +645,7 @@ If pronunciation becomes a real adoption blocker (conference talks, video tutori
 | Namespace convention | Scales flat merge to larger applications |
 | Collision detection | Catches errors early in development |
 | "Derivations" naming | Precise, unique, clean in code (`derive:`); alternatives are generic or overloaded |
+| `Object.create(null)` everywhere | Defense-in-depth against prototype pollution (53 uses) |
+| `BLOCKED_PROPS` on all Proxies | Prevents `__proto__`/`constructor` from leaking through reactive layer |
 
 The flat merge isn't a limitation - it's what makes Directive's constraint-driven model work. When you need modules to coordinate based on shared state, the flat merge gives you that capability with zero boilerplate.
