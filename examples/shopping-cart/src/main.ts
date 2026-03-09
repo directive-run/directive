@@ -5,6 +5,7 @@
  * and renders the cart items, order summary, coupon, and checkout.
  */
 
+import { el } from "@directive-run/el";
 import { authSchema, cartSchema, system } from "./shopping-cart.js";
 
 // ============================================================================
@@ -51,13 +52,6 @@ const authStatusEl = document.getElementById("sc-auth-status")!;
 // Helpers
 // ============================================================================
 
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
 function formatPrice(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
@@ -100,37 +94,35 @@ function render(): void {
 
   // ---- Cart Items ----
   if (isEmpty) {
-    itemListEl.innerHTML = `
-      <div class="sc-empty-cart">
-        <div class="sc-empty-icon">&#128722;</div>
-        <p>Your cart is empty</p>
-      </div>
-    `;
+    itemListEl.replaceChildren(
+      el("div", { className: "sc-empty-cart" },
+        el("div", { className: "sc-empty-icon" }, "\u{1F6D2}"),
+        el("p", "Your cart is empty"),
+      ),
+    );
   } else {
-    itemListEl.innerHTML = items
-      .map((item) => {
+    itemListEl.replaceChildren(
+      ...items.map((item) => {
         const overstock = item.quantity > item.maxStock;
         const itemTotal = item.price * item.quantity;
 
-        return `
-          <div class="sc-item${overstock ? " sc-item-overstock" : ""}" data-item-id="${escapeHtml(item.id)}">
-            <div class="sc-item-icon sc-icon-${escapeHtml(item.image)}"></div>
-            <div class="sc-item-details">
-              <div class="sc-item-name">${escapeHtml(item.name)}</div>
-              <div class="sc-item-price">${formatPrice(item.price)} each</div>
-              ${overstock ? `<div class="sc-stock-warning">Only ${item.maxStock} in stock</div>` : ""}
-            </div>
-            <div class="sc-item-controls">
-              <button class="sc-qty-btn" data-action="decrease" data-id="${escapeHtml(item.id)}" ${item.quantity <= 1 ? "disabled" : ""}>-</button>
-              <span class="sc-qty-value">${item.quantity}</span>
-              <button class="sc-qty-btn" data-action="increase" data-id="${escapeHtml(item.id)}" ${item.quantity >= item.maxStock ? "disabled" : ""}>+</button>
-            </div>
-            <div class="sc-item-total">${formatPrice(itemTotal)}</div>
-            <button class="sc-remove-btn" data-action="remove" data-id="${escapeHtml(item.id)}" title="Remove item">&times;</button>
-          </div>
-        `;
-      })
-      .join("");
+        return el("div", { className: `sc-item${overstock ? " sc-item-overstock" : ""}`, dataset: { itemId: item.id } } as any,
+          el("div", { className: `sc-item-icon sc-icon-${item.image}` }),
+          el("div", { className: "sc-item-details" },
+            el("div", { className: "sc-item-name" }, item.name),
+            el("div", { className: "sc-item-price" }, `${formatPrice(item.price)} each`),
+            overstock ? el("div", { className: "sc-stock-warning" }, `Only ${item.maxStock} in stock`) : null,
+          ),
+          el("div", { className: "sc-item-controls" },
+            el("button", { className: "sc-qty-btn", dataset: { action: "decrease", id: item.id }, disabled: item.quantity <= 1 } as any, "-"),
+            el("span", { className: "sc-qty-value" }, `${item.quantity}`),
+            el("button", { className: "sc-qty-btn", dataset: { action: "increase", id: item.id }, disabled: item.quantity >= item.maxStock } as any, "+"),
+          ),
+          el("div", { className: "sc-item-total" }, formatPrice(itemTotal)),
+          el("button", { className: "sc-remove-btn", dataset: { action: "remove", id: item.id }, title: "Remove item" } as any, "\u00D7"),
+        );
+      }),
+    );
   }
 
   // ---- Order Summary ----
@@ -179,32 +171,32 @@ function render(): void {
   checkoutBtn.disabled = isEmpty || !isAuthenticated || isProcessing;
 
   if (checkoutStatus === "processing") {
-    checkoutBtn.innerHTML = '<span class="sc-spinner"></span> Processing...';
+    checkoutBtn.replaceChildren(el("span", { className: "sc-spinner" }), " Processing...");
   } else {
     checkoutBtn.textContent = "Checkout";
   }
 
   // Checkout status overlay
   if (checkoutStatus === "complete") {
-    checkoutStatusEl.innerHTML = `
-      <div class="sc-overlay sc-overlay-success">
-        <div class="sc-overlay-icon">&#10003;</div>
-        <div class="sc-overlay-title">Order Complete!</div>
-        <div class="sc-overlay-detail">Thank you for your purchase.</div>
-        <button class="sc-overlay-btn" id="sc-reset-btn">Continue Shopping</button>
-      </div>
-    `;
+    checkoutStatusEl.replaceChildren(
+      el("div", { className: "sc-overlay sc-overlay-success" },
+        el("div", { className: "sc-overlay-icon" }, "\u2713"),
+        el("div", { className: "sc-overlay-title" }, "Order Complete!"),
+        el("div", { className: "sc-overlay-detail" }, "Thank you for your purchase."),
+        el("button", { className: "sc-overlay-btn", id: "sc-reset-btn" }, "Continue Shopping"),
+      ),
+    );
     checkoutStatusEl.style.display = "flex";
   } else if (checkoutStatus === "failed") {
-    checkoutStatusEl.innerHTML = `
-      <div class="sc-overlay sc-overlay-error">
-        <div class="sc-overlay-icon">&#10007;</div>
-        <div class="sc-overlay-title">Checkout Failed</div>
-        <div class="sc-overlay-detail">${escapeHtml(checkoutError)}</div>
-        <button class="sc-overlay-btn" id="sc-retry-checkout-btn">Try Again</button>
-        <button class="sc-overlay-btn sc-overlay-btn-secondary" id="sc-dismiss-btn">Dismiss</button>
-      </div>
-    `;
+    checkoutStatusEl.replaceChildren(
+      el("div", { className: "sc-overlay sc-overlay-error" },
+        el("div", { className: "sc-overlay-icon" }, "\u2717"),
+        el("div", { className: "sc-overlay-title" }, "Checkout Failed"),
+        el("div", { className: "sc-overlay-detail" }, checkoutError),
+        el("button", { className: "sc-overlay-btn", id: "sc-retry-checkout-btn" }, "Try Again"),
+        el("button", { className: "sc-overlay-btn sc-overlay-btn-secondary", id: "sc-dismiss-btn" }, "Dismiss"),
+      ),
+    );
     checkoutStatusEl.style.display = "flex";
   } else {
     checkoutStatusEl.style.display = "none";
@@ -213,11 +205,14 @@ function render(): void {
   // ---- Auth ----
   if (isAuthenticated) {
     authToggleBtn.textContent = "Sign Out";
-    authStatusEl.innerHTML = `<span class="sc-auth-badge sc-auth-in">Signed in as ${escapeHtml(userName)}</span>`;
+    authStatusEl.replaceChildren(
+      el("span", { className: "sc-auth-badge sc-auth-in" }, `Signed in as ${userName}`),
+    );
   } else {
     authToggleBtn.textContent = "Sign In";
-    authStatusEl.innerHTML =
-      '<span class="sc-auth-badge sc-auth-out">Not signed in</span>';
+    authStatusEl.replaceChildren(
+      el("span", { className: "sc-auth-badge sc-auth-out" }, "Not signed in"),
+    );
   }
 }
 

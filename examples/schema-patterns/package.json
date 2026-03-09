@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@directive-run/core": "workspace:*",
+    "@directive-run/el": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

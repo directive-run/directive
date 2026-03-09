@@ -5,6 +5,7 @@
  * renders the mission board, sidebar, and event log.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { AGENTS, AGENT_ORDER, getApiKey } from "./agents.js";
@@ -101,7 +102,7 @@ btnStep.addEventListener("click", () => {
 btnReset.addEventListener("click", () => {
   system.dispatch({ type: "reset" });
   lastRenderedLogCount = 0;
-  logEntries.innerHTML = "";
+  logEntries.replaceChildren();
 });
 
 strategySelect.addEventListener("change", () => {
@@ -299,45 +300,35 @@ function render() {
   mobileSatisfaction.textContent = `${progressPercent}%`;
   mobileStep.textContent = `Step ${facts.currentStep}`;
 
-  // ── Sidebar: facts (createElement, no innerHTML) ──
-  factsList.textContent = "";
+  // ── Sidebar: facts ──
+  factsList.replaceChildren(
+    ...FACT_KEYS.map((key) => {
+      const hasValue = goalFacts[key] != null;
 
-  for (const key of FACT_KEYS) {
-    const hasValue = goalFacts[key] != null;
-    const li = document.createElement("li");
-    const dot = document.createElement("span");
-    dot.className = hasValue ? "fact-check" : "fact-empty";
-    dot.textContent = hasValue ? "\u25CF" : "\u25CB";
-    const label = document.createElement("span");
-    label.className = "fact-key";
-    label.textContent = key;
-    li.append(dot, label);
-    factsList.appendChild(li);
-  }
+      return el("li",
+        el("span", { className: hasValue ? "fact-check" : "fact-empty" }, hasValue ? "\u25CF" : "\u25CB"),
+        el("span", { className: "fact-key" }, key),
+      );
+    }),
+  );
 
   // ── Sidebar: strategy ──
   strategyBadge.textContent = selectedStrategy;
 
-  // ── Sidebar: crew (createElement, no innerHTML) ──
-  crewList.textContent = "";
+  // ── Sidebar: crew ──
+  crewList.replaceChildren(
+    ...AGENT_ORDER.map((id) => {
+      const agent = AGENTS[id];
+      const nodeStatus = nodeStatuses[id] ?? "pending";
+      const tokens = facts.nodeTokens[id] ?? 0;
 
-  for (const id of AGENT_ORDER) {
-    const agent = AGENTS[id];
-    const nodeStatus = nodeStatuses[id] ?? "pending";
-    const tokens = facts.nodeTokens[id] ?? 0;
-    const row = document.createElement("div");
-    row.className = "agent-row";
-    const dot = document.createElement("span");
-    dot.className = `agent-dot ${nodeStatus}`;
-    const name = document.createElement("span");
-    name.className = "agent-name";
-    name.textContent = `${agent.emoji} ${agent.name}`;
-    const tok = document.createElement("span");
-    tok.className = "agent-tokens";
-    tok.textContent = tokens > 0 ? `${tokens}t` : "";
-    row.append(dot, name, tok);
-    crewList.appendChild(row);
-  }
+      return el("div", { className: "agent-row" },
+        el("span", { className: `agent-dot ${nodeStatus}` }),
+        el("span", { className: "agent-name" }, `${agent.emoji} ${agent.name}`),
+        el("span", { className: "agent-tokens" }, tokens > 0 ? `${tokens}t` : ""),
+      );
+    }),
+  );
 
   // ── Sidebar: stats ──
   statStep.textContent = String(facts.currentStep);
@@ -360,16 +351,15 @@ function render() {
       const deltaClass = entry.satisfactionDelta > 0 ? "" : "zero";
       const deltaSign = entry.satisfactionDelta > 0 ? "+" : "";
 
-      const div = document.createElement("div");
-      div.className = "log-entry";
-      const stepSpan = document.createElement("span");
-      stepSpan.className = "log-step";
-      stepSpan.textContent = `Step ${entry.step}:`;
-      const deltaSpan = document.createElement("span");
-      deltaSpan.className = `log-delta ${deltaClass}`;
-      deltaSpan.textContent = `${deltaSign}${(entry.satisfactionDelta * 100).toFixed(0)}%`;
-      div.append(stepSpan, ` ${names} `, deltaSpan);
-      logEntries.appendChild(div);
+      logEntries.appendChild(
+        el("div", { className: "log-entry" },
+          el("span", { className: "log-step" }, `Step ${entry.step}:`),
+          ` ${names} `,
+          el("span", { className: `log-delta ${deltaClass}` },
+            `${deltaSign}${(entry.satisfactionDelta * 100).toFixed(0)}%`,
+          ),
+        ),
+      );
     }
 
     // Render relaxation entries
@@ -379,31 +369,29 @@ function render() {
       );
 
       if (!existing) {
-        const div = document.createElement("div");
-        div.className = "log-entry relaxation";
-        div.setAttribute("data-rel-step", `${rel.step}-${rel.strategy}`);
-        const relStep = document.createElement("span");
-        relStep.className = "log-step";
-        relStep.textContent = `\u26A0 Step ${rel.step}:`;
-        div.append(relStep, ` ${rel.label} [${rel.strategy}]`);
-        logEntries.appendChild(div);
+        const relDiv = el("div", { className: "log-entry relaxation" },
+          el("span", { className: "log-step" }, `\u26A0 Step ${rel.step}:`),
+          ` ${rel.label} [${rel.strategy}]`,
+        );
+        relDiv.setAttribute("data-rel-step", `${rel.step}-${rel.strategy}`);
+        logEntries.appendChild(relDiv);
       }
     }
 
     // Completion
     if (achieved && !logEntries.querySelector(".completion")) {
-      const div = document.createElement("div");
-      div.className = "log-entry completion";
-      div.textContent = `\u2705 Mission complete! ${stepHistory.length} steps, ${facts.totalTokens} tokens.`;
-      logEntries.appendChild(div);
+      logEntries.appendChild(
+        el("div", { className: "log-entry completion" },
+          `\u2705 Mission complete! ${stepHistory.length} steps, ${facts.totalTokens} tokens.`,
+        ),
+      );
     }
 
     // Error
     if (status === "error" && !logEntries.querySelector(".error")) {
-      const div = document.createElement("div");
-      div.className = "log-entry error";
-      div.textContent = `\u274C ${facts.error}`;
-      logEntries.appendChild(div);
+      logEntries.appendChild(
+        el("div", { className: "log-entry error" }, `\u274C ${facts.error}`),
+      );
     }
 
     lastRenderedLogCount = stepHistory.length;

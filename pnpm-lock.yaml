@@ -169,6 +169,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -185,6 +188,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -201,6 +207,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -214,6 +223,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -227,6 +239,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -240,6 +255,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -256,6 +274,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       '@directive-run/vite-plugin-api-proxy':
         specifier: workspace:*
@@ -272,6 +293,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -285,6 +309,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -298,6 +325,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -311,6 +341,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -324,6 +357,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -337,6 +373,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
       '@directive-run/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -368,6 +407,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -381,6 +423,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
       '@directive-run/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -412,6 +457,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -425,6 +473,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -441,6 +492,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       '@directive-run/vite-plugin-api-proxy':
         specifier: workspace:*
@@ -457,6 +511,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -470,6 +527,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -483,6 +543,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -496,6 +559,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -509,6 +575,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -522,6 +591,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -535,6 +607,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -548,6 +623,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
       zod:
         specifier: ^3.23.0
         version: 3.25.76
@@ -567,6 +645,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
       express:
         specifier: ^4.21.0
         version: 4.22.1
@@ -586,6 +667,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -599,6 +683,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -612,6 +699,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -625,6 +715,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -638,6 +731,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -651,6 +747,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0
@@ -664,6 +763,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@directive-run/el':
+        specifier: workspace:*
+        version: link:../../packages/el
     devDependencies:
       typescript:
         specifier: ^5.3.0

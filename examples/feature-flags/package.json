@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@directive-run/core": "workspace:*",
+    "@directive-run/el": "workspace:*",
     "@directive-run/react": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

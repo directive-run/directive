@@ -6,6 +6,7 @@
  * and event timeline. A 500ms timer drives reactive reconnect countdown.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
@@ -138,34 +139,36 @@ function render(): void {
 
   // --- Message feed ---
   if (messages.length === 0) {
-    messageFeed.innerHTML =
-      '<div class="ws-message-empty">Messages will appear here after connecting</div>';
+    messageFeed.replaceChildren(
+      el("div", { className: "ws-message-empty" }, "Messages will appear here after connecting"),
+    );
   } else {
-    messageFeed.innerHTML = "";
-    for (const msg of messages) {
-      const el = document.createElement("div");
-      const isEcho = msg.from === "You";
-      el.className = `ws-message-item ${isEcho ? "" : msg.type}`;
-      if (isEcho) {
-        el.style.borderLeft = "3px solid var(--brand-text-dim)";
-      }
+    messageFeed.replaceChildren(
+      ...messages.map((msg) => {
+        const isEcho = msg.from === "You";
+        const time = new Date(msg.timestamp);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(msg.timestamp);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+        const row = el("div", {
+          className: `ws-message-item ${isEcho ? "" : msg.type}`,
+        },
+          el("span", { className: `ws-msg-type ${msg.type}` }, isEcho ? "echo" : msg.type),
+          el("span", { className: "ws-msg-from" }, msg.from),
+          el("span", { className: "ws-msg-text" }, msg.text),
+          el("span", { className: "ws-msg-time" }, timeStr),
+        );
 
-      el.innerHTML = `
-        <span class="ws-msg-type ${msg.type}">${escapeHtml(isEcho ? "echo" : msg.type)}</span>
-        <span class="ws-msg-from">${escapeHtml(msg.from)}</span>
-        <span class="ws-msg-text">${escapeHtml(msg.text)}</span>
-        <span class="ws-msg-time">${timeStr}</span>
-      `;
+        if (isEcho) {
+          row.style.borderLeft = "3px solid var(--brand-text-dim)";
+        }
 
-      messageFeed.appendChild(el);
-    }
+        return row;
+      }),
+    );
 
     // Auto-scroll when new messages arrive
     if (messages.length > lastMessageCount) {
@@ -184,15 +187,13 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="ws-timeline-empty">Events will appear here after connecting</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "ws-timeline-empty" }, "Events will appear here after connecting"),
+    );
   } else {
-    timelineEl.innerHTML = "";
+    const entries: HTMLElement[] = [];
     for (let i = eventLog.length - 1; i >= 0; i--) {
       const entry = eventLog[i];
-      const el = document.createElement("div");
-      el.className = `ws-timeline-entry ${entry.event}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -200,14 +201,15 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="ws-timeline-time">${timeStr}</span>
-        <span class="ws-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="ws-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
+      entries.push(
+        el("div", { className: `ws-timeline-entry ${entry.event}` },
+          el("span", { className: "ws-timeline-time" }, timeStr),
+          el("span", { className: "ws-timeline-event" }, entry.event),
+          el("span", { className: "ws-timeline-detail" }, entry.detail),
+        ),
+      );
     }
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -301,17 +303,6 @@ reconnectFailSlider.addEventListener("input", () => {
 maxRetriesSlider.addEventListener("input", () => {
   system.events.setMaxRetries({ value: Number(maxRetriesSlider.value) });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

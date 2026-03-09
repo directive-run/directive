@@ -4,6 +4,8 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
+import { el } from "@directive-run/el";
+
 import { addTimelineEntry, log, schema, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -32,17 +34,6 @@ const charCountEl = document.getElementById("char-count")!;
 
 // Timeline
 const timelineEl = document.getElementById("cf-timeline")!;
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Render
@@ -93,29 +84,26 @@ function render() {
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="cf-timeline-empty">Events appear after interactions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "cf-timeline-empty" }, "Events appear after interactions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `cf-timeline-entry ${entry.type}`;
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      el.innerHTML = `
-        <span class="cf-timeline-time">${timeStr}</span>
-        <span class="cf-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="cf-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
-    }
+        return el("div", { className: `cf-timeline-entry ${entry.type}` },
+          el("span", { className: "cf-timeline-time" }, timeStr),
+          el("span", { className: "cf-timeline-event" }, entry.event),
+          el("span", { className: "cf-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 
@@ -132,17 +120,17 @@ system.subscribe(
 // Controls
 // ============================================================================
 
-for (const [el, field] of [
+for (const [inputEl, field] of [
   [nameInput, "name"],
   [emailInput, "email"],
   [subjectInput, "subject"],
   [messageInput, "message"],
 ] as const) {
-  el.addEventListener("input", () => {
-    system.events.updateField({ field, value: el.value });
+  inputEl.addEventListener("input", () => {
+    system.events.updateField({ field, value: inputEl.value });
     addTimelineEntry("field", `${field} updated`, "field");
   });
-  el.addEventListener("blur", () => {
+  inputEl.addEventListener("blur", () => {
     system.events.touchField({ field });
   });
 }

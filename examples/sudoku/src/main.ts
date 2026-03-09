@@ -7,6 +7,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import { MAX_HINTS } from "./rules.js";
 import { sudokuGame, sudokuSchema } from "./sudoku.js";
 
@@ -147,9 +148,8 @@ function render(): void {
   modeHard.classList.toggle("active", difficulty === "hard");
 
   // Grid
-  gridEl.innerHTML = "";
+  const cells: HTMLElement[] = [];
   for (let i = 0; i < 81; i++) {
-    const cell = document.createElement("div");
     const value = grid[i];
     const isGiven = givens.has(i);
     const isSelected = i === selectedIndex;
@@ -160,60 +160,58 @@ function render(): void {
     const row = Math.floor(i / 9);
     const col = i % 9;
 
-    cell.className = "sudoku-cell";
+    const classes = ["sudoku-cell"];
+    if (isGiven) {
+      classes.push("given");
+    }
+    if (isSelected) {
+      classes.push("selected");
+    }
+    if (isConflict) {
+      classes.push("conflict");
+    }
+    if (isPeer && !isSelected) {
+      classes.push("peer");
+    }
+    if (isSameValue && !isSelected) {
+      classes.push("same-value");
+    }
+    if (col % 3 === 0 && col !== 0) {
+      classes.push("box-left");
+    }
+    if (row % 3 === 0 && row !== 0) {
+      classes.push("box-top");
+    }
+
+    let children: (string | HTMLElement)[] = [];
+    if (value !== 0) {
+      children = [String(value)];
+    } else if (notes[i] && notes[i].size > 0) {
+      const noteDigits: HTMLElement[] = [];
+      for (let d = 1; d <= 9; d++) {
+        noteDigits.push(
+          el("span", { className: "note-digit" }, notes[i].has(d) ? String(d) : ""),
+        );
+      }
+      children = [el("div", { className: "notes-grid" }, ...noteDigits)];
+    }
+
+    const cell = el("div", {
+      className: classes.join(" "),
+      tabIndex: 0,
+    }, ...children);
     cell.dataset.testid = `sudoku-cell-${i}`;
     cell.setAttribute(
       "aria-label",
       `Row ${row + 1}, Column ${col + 1}${value ? `, value ${value}` : ", empty"}`,
     );
-    if (isGiven) {
-      cell.classList.add("given");
-    }
-    if (isSelected) {
-      cell.classList.add("selected");
-    }
-    if (isConflict) {
-      cell.classList.add("conflict");
-    }
-    if (isPeer && !isSelected) {
-      cell.classList.add("peer");
-    }
-    if (isSameValue && !isSelected) {
-      cell.classList.add("same-value");
-    }
-
-    // Box borders
-    if (col % 3 === 0 && col !== 0) {
-      cell.classList.add("box-left");
-    }
-    if (row % 3 === 0 && row !== 0) {
-      cell.classList.add("box-top");
-    }
-
-    if (value !== 0) {
-      cell.textContent = String(value);
-    } else if (notes[i] && notes[i].size > 0) {
-      // Show pencil marks
-      const notesGrid = document.createElement("div");
-      notesGrid.className = "notes-grid";
-      for (let d = 1; d <= 9; d++) {
-        const noteCell = document.createElement("span");
-        noteCell.className = "note-digit";
-        if (notes[i].has(d)) {
-          noteCell.textContent = String(d);
-        }
-        notesGrid.appendChild(noteCell);
-      }
-      cell.appendChild(notesGrid);
-    }
-
-    cell.tabIndex = 0;
     cell.addEventListener("click", () => {
       system.events.selectCell({ index: i });
     });
 
-    gridEl.appendChild(cell);
+    cells.push(cell);
   }
+  gridEl.replaceChildren(...cells);
 
   // Number pad
   for (let d = 1; d <= 9; d++) {

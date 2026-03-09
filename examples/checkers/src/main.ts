@@ -12,6 +12,7 @@
 import type { DashboardData } from "@directive-run/ai";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import { createCheckersAI } from "./ai-orchestrator.js";
 import { checkersChat } from "./chat.js";
 import { getApiKey, setApiKey } from "./claude-adapter.js";
@@ -36,7 +37,7 @@ system.start();
 
 const checkersAI = createCheckersAI();
 
-/** Sync AI adapter state → directive system */
+/** Sync AI adapter state -> directive system */
 function syncAI(): void {
   const state = checkersAI.getState();
   system.events.chat.updateAIState({
@@ -103,7 +104,8 @@ let dashboardOpen = false;
 function renderDashboard(container: HTMLElement): void {
   const obs = checkersAI.observability;
   if (!obs) {
-    container.innerHTML = "<div>Observability not available</div>";
+    container.replaceChildren(el("div", "Observability not available"));
+
     return;
   }
 
@@ -116,75 +118,57 @@ function renderDashboard(container: HTMLElement): void {
   const cost = s.totalCost.toFixed(4);
   const uptime = Math.floor(data.service.uptime / 1000);
 
-  container.innerHTML = `
-    <div class="dashboard-header">
-      <span>AI Dashboard</span>
-      <span class="health-badge ${health.healthy ? "healthy" : "unhealthy"}">${health.healthy ? "Healthy" : "Degraded"}</span>
-    </div>
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-value">${s.totalRequests}</div>
-        <div class="metric-label">Requests</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${s.totalErrors}</div>
-        <div class="metric-label">Errors (${errorRatePct}%)</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${avgLatency}ms</div>
-        <div class="metric-label">Avg Latency</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${s.totalTokens}</div>
-        <div class="metric-label">Tokens</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">$${cost}</div>
-        <div class="metric-label">Cost</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-value">${uptime}s</div>
-        <div class="metric-label">Uptime</div>
-      </div>
-    </div>
-    ${
-      data.traces.length > 0
-        ? `
-    <div class="traces-section">
-      <div class="traces-title">Recent Traces</div>
-      ${data.traces
-        .slice(-5)
-        .reverse()
-        .map(
-          (t) => `
-        <div class="trace-item">
-          <span class="trace-op">${t.operationName}</span>
-          <span class="trace-duration">${t.duration ?? "..."}ms</span>
-          <span class="trace-status ${t.status}">${t.status}</span>
-        </div>
-      `,
-        )
-        .join("")}
-    </div>`
-        : ""
-    }
-    ${
-      data.alerts.length > 0
-        ? `
-    <div class="alerts-section">
-      <div class="traces-title">Alerts</div>
-      ${data.alerts
-        .slice(-3)
-        .map(
-          (a) => `
-        <div class="alert-item">${a.message}</div>
-      `,
-        )
-        .join("")}
-    </div>`
-        : ""
-    }
-  `;
+  const metricCards = [
+    { value: String(s.totalRequests), label: "Requests" },
+    { value: String(s.totalErrors), label: `Errors (${errorRatePct}%)` },
+    { value: `${avgLatency}ms`, label: "Avg Latency" },
+    { value: String(s.totalTokens), label: "Tokens" },
+    { value: `$${cost}`, label: "Cost" },
+    { value: `${uptime}s`, label: "Uptime" },
+  ];
+
+  const tracesSection = data.traces.length > 0
+    ? el("div", { className: "traces-section" },
+        el("div", { className: "traces-title" }, "Recent Traces"),
+        ...data.traces.slice(-5).reverse().map((t) =>
+          el("div", { className: "trace-item" },
+            el("span", { className: "trace-op" }, t.operationName),
+            el("span", { className: "trace-duration" }, `${t.duration ?? "..."}ms`),
+            el("span", { className: `trace-status ${t.status}` }, t.status),
+          ),
+        ),
+      )
+    : null;
+
+  const alertsSection = data.alerts.length > 0
+    ? el("div", { className: "alerts-section" },
+        el("div", { className: "traces-title" }, "Alerts"),
+        ...data.alerts.slice(-3).map((a) =>
+          el("div", { className: "alert-item" }, a.message),
+        ),
+      )
+    : null;
+
+  const children: (HTMLElement | null)[] = [
+    el("div", { className: "dashboard-header" },
+      el("span", "AI Dashboard"),
+      el("span", { className: `health-badge ${health.healthy ? "healthy" : "unhealthy"}` },
+        health.healthy ? "Healthy" : "Degraded",
+      ),
+    ),
+    el("div", { className: "metrics-grid" },
+      ...metricCards.map((m) =>
+        el("div", { className: "metric-card" },
+          el("div", { className: "metric-value" }, m.value),
+          el("div", { className: "metric-label" }, m.label),
+        ),
+      ),
+    ),
+    tracesSection,
+    alertsSection,
+  ];
+
+  container.replaceChildren(...children.filter((c): c is HTMLElement => c !== null));
 }
 
 // ============================================================================
@@ -272,7 +256,7 @@ async function handleAITurn() {
     system.events.game.claudeMove({ from: result.from, to: result.to });
   }
 
-  // Sync AI state → directive system
+  // Sync AI state -> directive system
   syncAI();
 
   aiTurnPending = false;
@@ -372,7 +356,7 @@ function render() {
   }
 
   // Board
-  boardEl.innerHTML = "";
+  const squares: HTMLElement[] = [];
   const highlightSet = new Set(highlightSquares);
   const selectableSet = new Set(selectableSquares);
 
@@ -382,30 +366,34 @@ function render() {
       const isDark = (row + col) % 2 === 1;
       const piece = board[index];
 
-      const square = document.createElement("div");
-      square.className = `square ${isDark ? "dark" : "light"}`;
+      const classes = ["square", isDark ? "dark" : "light"];
+
+      if (isDark) {
+        if (index === selectedIndex) classes.push("selected");
+        if (highlightSet.has(index)) classes.push("highlight");
+        if (selectableSet.has(index) && !gameOver) classes.push("selectable");
+      }
+
+      const children: HTMLElement[] = [];
+      if (piece) {
+        children.push(
+          el("div", { className: `piece ${piece.player}${piece.king ? " king" : ""}` }),
+        );
+      }
+
+      const square = el("div", { className: classes.join(" ") }, ...children);
       square.dataset.testid = `checkers-square-${index}`;
 
       if (isDark) {
-        if (index === selectedIndex) square.classList.add("selected");
-        if (highlightSet.has(index)) square.classList.add("highlight");
-        if (selectableSet.has(index) && !gameOver)
-          square.classList.add("selectable");
-
         square.addEventListener("click", () => {
           system.events.game.clickSquare({ index });
         });
       }
 
-      if (piece) {
-        const pieceEl = document.createElement("div");
-        pieceEl.className = `piece ${piece.player}${piece.king ? " king" : ""}`;
-        square.appendChild(pieceEl);
-      }
-
-      boardEl.appendChild(square);
+      squares.push(square);
     }
   }
+  boardEl.replaceChildren(...squares);
 
   // Game over modal
   if (gameOver && winner) {
@@ -472,69 +460,57 @@ function renderChat() {
   const isStreaming = system.facts.chat.isStreaming;
   const streamingText = system.facts.chat.streamingText;
 
-  chatMessages.innerHTML = "";
+  const bubbles: HTMLElement[] = [];
 
   for (const msg of messages) {
-    const bubble = document.createElement("div");
-    bubble.className = `chat-bubble ${msg.sender}`;
-
-    const text = document.createElement("div");
-    text.className = "chat-text";
-    text.textContent = msg.text;
-    bubble.appendChild(text);
+    const children: HTMLElement[] = [
+      el("div", { className: "chat-text" }, msg.text),
+    ];
 
     if (msg.reasoning) {
-      const reasoning = document.createElement("div");
-      reasoning.className = "chat-reasoning";
-      reasoning.textContent = msg.reasoning;
-      bubble.appendChild(reasoning);
+      children.push(
+        el("div", { className: "chat-reasoning" }, msg.reasoning),
+      );
     }
 
     if (msg.analysis) {
-      const section = document.createElement("div");
-      section.className = "analysis-section";
-
-      const toggle = document.createElement("div");
-      toggle.className = "analysis-toggle";
-      toggle.innerHTML = '<span class="arrow">▶</span> Strategic Analysis';
-
-      const content = document.createElement("div");
-      content.className = "analysis-content";
-      content.textContent = msg.analysis;
+      const arrow = el("span", { className: "arrow" }, "\u25B6");
+      const content = el("div", { className: "analysis-content" }, msg.analysis);
+      const toggle = el("div", { className: "analysis-toggle" }, arrow, " Strategic Analysis");
 
       toggle.addEventListener("click", () => {
-        const arrow = toggle.querySelector(".arrow")!;
         const isOpen = content.classList.toggle("open");
         arrow.classList.toggle("open", isOpen);
       });
 
-      section.appendChild(toggle);
-      section.appendChild(content);
-      bubble.appendChild(section);
+      children.push(
+        el("div", { className: "analysis-section" }, toggle, content),
+      );
     }
 
-    chatMessages.appendChild(bubble);
+    bubbles.push(el("div", { className: `chat-bubble ${msg.sender}` }, ...children));
   }
 
   // Streaming: show in-progress text with blinking cursor
   if (isStreaming && streamingText) {
-    const bubble = document.createElement("div");
-    bubble.className = "chat-bubble claude";
-
-    const text = document.createElement("div");
-    text.className = "chat-text streaming-cursor";
-    text.textContent = streamingText;
-    bubble.appendChild(text);
-
-    chatMessages.appendChild(bubble);
+    bubbles.push(
+      el("div", { className: "chat-bubble claude" },
+        el("div", { className: "chat-text streaming-cursor" }, streamingText),
+      ),
+    );
   } else if (thinking) {
-    const dots = document.createElement("div");
-    dots.className = "chat-bubble claude thinking-bubble";
-    dots.innerHTML =
-      '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>';
-    chatMessages.appendChild(dots);
+    bubbles.push(
+      el("div", { className: "chat-bubble claude thinking-bubble" },
+        el("span", { className: "thinking-dots" },
+          el("span", "."),
+          el("span", "."),
+          el("span", "."),
+        ),
+      ),
+    );
   }
 
+  chatMessages.replaceChildren(...bubbles);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
@@ -637,7 +613,7 @@ function sendChat() {
         });
       }
 
-      // Sync AI state → directive system
+      // Sync AI state -> directive system
       syncAI();
     })
     .catch((err) => {
