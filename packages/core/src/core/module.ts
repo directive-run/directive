@@ -243,7 +243,7 @@ export function createModule<const M extends ModuleSchema>(
   if (process.env.NODE_ENV !== "production") {
     if (!id || typeof id !== "string") {
       console.warn("[Directive] Module ID must be a non-empty string");
-    } else if (!/^[a-z][a-z0-9-]*$/i.test(id)) {
+    } else if (!/^(__[a-z][a-z0-9_-]*|[a-z][a-z0-9-]*)$/i.test(id)) {
       console.warn(
         `[Directive] Module ID "${id}" should follow kebab-case convention (e.g., "my-module")`,
       );
