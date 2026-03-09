@@ -8,6 +8,7 @@
  * controls, and event timeline.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin, loggingPlugin } from "@directive-run/core/plugins";
 import {
@@ -326,20 +327,17 @@ function render(): void {
 
 function renderTimeline(): void {
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="ac-timeline-empty">Events will appear here after starting the chain</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "ac-timeline-empty" }, "Events will appear here after starting the chain"),
+    );
 
     return;
   }
 
-  timelineEl.innerHTML = "";
-
   // Newest first
+  const entries: HTMLElement[] = [];
   for (let i = timeline.length - 1; i >= 0; i--) {
     const entry = timeline[i]!;
-    const el = document.createElement("div");
-    el.className = `ac-timeline-entry ${entry.module}`;
-
     const time = new Date(entry.timestamp);
     const timeStr = time.toLocaleTimeString([], {
       hour: "2-digit",
@@ -347,15 +345,16 @@ function renderTimeline(): void {
       second: "2-digit",
     });
 
-    el.innerHTML = `
-      <span class="ac-timeline-time">${timeStr}</span>
-      <span class="ac-timeline-module">${escapeHtml(entry.module)}</span>
-      <span class="ac-timeline-event">${escapeHtml(entry.event)}</span>
-      <span class="ac-timeline-detail">${escapeHtml(entry.detail)}</span>
-    `;
-
-    timelineEl.appendChild(el);
+    entries.push(
+      el("div", { className: `ac-timeline-entry ${entry.module}` },
+        el("span", { className: "ac-timeline-time" }, timeStr),
+        el("span", { className: "ac-timeline-module" }, entry.module),
+        el("span", { className: "ac-timeline-event" }, entry.event),
+        el("span", { className: "ac-timeline-detail" }, entry.detail),
+      ),
+    );
   }
+  timelineEl.replaceChildren(...entries);
 }
 
 // ============================================================================
@@ -403,17 +402,6 @@ permsFailSlider.addEventListener("input", () => {
 dashFailSlider.addEventListener("input", () => {
   system.events.dashboard.setFailRate({ value: Number(dashFailSlider.value) });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

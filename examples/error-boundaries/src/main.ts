@@ -6,6 +6,8 @@
 
 import type { RecoveryStrategy } from "@directive-run/core";
 
+import { el } from "@directive-run/el";
+
 import { type ServiceState, perf, schema, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -54,13 +56,6 @@ const timelineEl = document.getElementById("eb-timeline")!;
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 function renderServiceCard(
   statusEl: HTMLElement,
@@ -113,29 +108,26 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="eb-timeline-empty">Events appear after interactions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "eb-timeline-empty" }, "Events appear after interactions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `eb-timeline-entry ${entry.type}`;
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      el.innerHTML = `
-        <span class="eb-timeline-time">${timeStr}</span>
-        <span class="eb-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="eb-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
-    }
+        return el("div", { className: `eb-timeline-entry ${entry.type}` },
+          el("span", { className: "eb-timeline-time" }, timeStr),
+          el("span", { className: "eb-timeline-event" }, entry.event),
+          el("span", { className: "eb-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 

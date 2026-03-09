@@ -4,6 +4,7 @@
  * Imports from module, starts system, renders the game grid and event timeline.
  */
 
+import { el } from "@directive-run/el";
 import { type Tile, addLog, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -27,17 +28,6 @@ const gridEl = document.getElementById("grid")!;
 const timelineEl = document.getElementById("nm-timeline")!;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-// ============================================================================
 // Render
 // ============================================================================
 
@@ -55,53 +45,47 @@ function render() {
   messageEl.textContent = msg;
 
   // --- Grid ---
-  gridEl.innerHTML = "";
-  for (const tile of table) {
-    const div = document.createElement("div");
-    div.className = `tile${selected.includes(tile.id) ? " selected" : ""}`;
-    div.textContent = String(tile.value);
-    div.addEventListener("click", () => {
-      if (selected.includes(tile.id)) {
-        system.events.deselectTile({ tileId: tile.id });
-      } else {
-        system.events.selectTile({ tileId: tile.id });
-      }
-    });
-    gridEl.appendChild(div);
-  }
-
-  // Empty slots
-  for (let i = table.length; i < 9; i++) {
-    const div = document.createElement("div");
-    div.className = "tile empty";
-    gridEl.appendChild(div);
-  }
+  gridEl.replaceChildren(
+    ...table.map((tile) =>
+      el("div", {
+        className: `tile${selected.includes(tile.id) ? " selected" : ""}`,
+        textContent: String(tile.value),
+        onclick: () => {
+          if (selected.includes(tile.id)) {
+            system.events.deselectTile({ tileId: tile.id });
+          } else {
+            system.events.selectTile({ tileId: tile.id });
+          }
+        },
+      }),
+    ),
+    ...Array.from({ length: Math.max(0, 9 - table.length) }, () =>
+      el("div", { className: "tile empty" }),
+    ),
+  );
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="nm-timeline-empty">Events appear after interactions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "nm-timeline-empty" }, "Events appear after interactions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `nm-timeline-entry ${entry.type}`;
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      el.innerHTML = `
-        <span class="nm-timeline-time">${timeStr}</span>
-        <span class="nm-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="nm-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
-    }
+        return el("div", { className: `nm-timeline-entry ${entry.type}` },
+          el("span", { className: "nm-timeline-time" }, timeStr),
+          el("span", { className: "nm-timeline-event" }, entry.event),
+          el("span", { className: "nm-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 

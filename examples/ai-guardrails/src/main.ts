@@ -4,6 +4,7 @@
  * Imports from module, starts system, renders chat log and event timeline.
  */
 
+import { el } from "@directive-run/el";
 import {
   type ChatMessage,
   analyzeMessage,
@@ -42,84 +43,70 @@ const testSsn = document.getElementById("gs-test-ssn")!;
 const testGdpr = document.getElementById("gs-test-gdpr")!;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-// ============================================================================
 // Render
 // ============================================================================
 
 function render(): void {
-  const messages = system.facts.messages as ChatMessage[];
+  const messages = system.facts.messages;
 
   // Chat log
   if (messages.length === 0) {
-    chatLog.innerHTML =
-      '<div class="gs-empty">Send a message to test guardrails</div>';
+    chatLog.replaceChildren(
+      el("div", { className: "gs-empty" }, "Send a message to test guardrails"),
+    );
   } else {
-    chatLog.innerHTML = "";
-    for (const msg of messages) {
-      const el = document.createElement("div");
-      el.className = `gs-message ${msg.blocked ? "blocked" : "passed"}`;
-      el.setAttribute("data-testid", `gs-msg-${msg.id}`);
+    chatLog.replaceChildren(
+      ...messages.map((msg) => {
+        const displayText = system.facts.redactionEnabled
+          ? msg.redactedText
+          : msg.text;
 
-      const displayText = (system.facts.redactionEnabled as boolean)
-        ? msg.redactedText
-        : msg.text;
+        const flags: HTMLElement[] = [];
+        if (msg.injectionResult) {
+          flags.push(el("span", { className: "gs-flag injection" }, "injection"));
+        }
+        if (msg.piiResult) {
+          const types = msg.piiResult.items.map((i) => i.type).join(", ");
+          flags.push(el("span", { className: "gs-flag pii" }, `PII: ${types}`));
+        }
+        if (msg.blocked) {
+          flags.push(el("span", { className: "gs-flag blocked" }, "BLOCKED"));
+        }
 
-      let flags = "";
-      if (msg.injectionResult) {
-        flags += `<span class="gs-flag injection">injection</span>`;
-      }
-      if (msg.piiResult) {
-        const types = msg.piiResult.items.map((i) => i.type).join(", ");
-        flags += `<span class="gs-flag pii">PII: ${escapeHtml(types)}</span>`;
-      }
-      if (msg.blocked) {
-        flags += `<span class="gs-flag blocked">BLOCKED</span>`;
-      }
+        const msgEl = el("div", { className: `gs-message ${msg.blocked ? "blocked" : "passed"}` },
+          el("div", { className: "gs-message-text" }, displayText),
+          ...(flags.length > 0 ? [el("div", { className: "gs-message-flags" }, ...flags)] : []),
+        );
+        msgEl.setAttribute("data-testid", `gs-msg-${msg.id}`);
 
-      el.innerHTML = `
-        <div class="gs-message-text">${escapeHtml(displayText)}</div>
-        ${flags ? `<div class="gs-message-flags">${flags}</div>` : ""}
-      `;
-      chatLog.appendChild(el);
-    }
+        return msgEl;
+      }),
+    );
     chatLog.scrollTop = chatLog.scrollHeight;
   }
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="gs-timeline-empty">Events appear after sending messages</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "gs-timeline-empty" }, "Events appear after sending messages"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `gs-timeline-entry ${entry.type}`;
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      el.innerHTML = `
-        <span class="gs-timeline-time">${timeStr}</span>
-        <span class="gs-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="gs-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
-    }
+        return el("div", { className: `gs-timeline-entry ${entry.type}` },
+          el("span", { className: "gs-timeline-time" }, timeStr),
+          el("span", { className: "gs-timeline-event" }, entry.event),
+          el("span", { className: "gs-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 
@@ -143,7 +130,7 @@ function sendMessage(text: string) {
   }
 
   const msg = analyzeMessage(text);
-  const messages = [...(system.facts.messages as ChatMessage[]), msg];
+  const messages = [...system.facts.messages, msg];
   system.facts.messages = messages;
 }
 

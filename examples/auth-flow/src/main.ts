@@ -6,6 +6,7 @@
  * and event timeline. A 1s timer drives reactive token countdown.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { authFlowModule, authFlowSchema } from "./auth-flow.js";
@@ -91,7 +92,7 @@ function render(): void {
   if (user) {
     userDisplay.textContent = `${user.name} (${user.role})`;
   } else {
-    userDisplay.innerHTML = "&mdash;";
+    userDisplay.textContent = "\u2014";
   }
 
   // Countdown
@@ -109,7 +110,7 @@ function render(): void {
   } else {
     countdownFill.style.width = "0%";
     countdownFill.className = "af-countdown-fill";
-    countdownText.innerHTML = "&mdash;";
+    countdownText.textContent = "\u2014";
   }
 
   // --- Login form state ---
@@ -137,15 +138,13 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="af-timeline-empty">Events will appear here after login</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "af-timeline-empty" }, "Events will appear here after login"),
+    );
   } else {
-    timelineEl.innerHTML = "";
+    const entries: HTMLElement[] = [];
     for (let i = eventLog.length - 1; i >= 0; i--) {
       const entry = eventLog[i];
-      const el = document.createElement("div");
-      el.className = `af-timeline-entry ${entry.event}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -153,14 +152,15 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="af-timeline-time">${timeStr}</span>
-        <span class="af-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="af-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
+      entries.push(
+        el("div", { className: `af-timeline-entry ${entry.event}` },
+          el("span", { className: "af-timeline-time" }, timeStr),
+          el("span", { className: "af-timeline-event" }, entry.event),
+          el("span", { className: "af-timeline-detail" }, entry.detail),
+        ),
+      );
     }
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -249,17 +249,6 @@ loginFailSlider.addEventListener("input", () => {
 refreshFailSlider.addEventListener("input", () => {
   system.events.setRefreshFailRate({ value: Number(refreshFailSlider.value) });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

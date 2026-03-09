@@ -4,6 +4,7 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
+import { el } from "@directive-run/el";
 import {
   type PipelineStage,
   STAGES,
@@ -36,23 +37,12 @@ const checkpointList = document.getElementById("cp-checkpoint-list")!;
 const timelineEl = document.getElementById("cp-timeline")!;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-// ============================================================================
 // Render
 // ============================================================================
 
 function render(): void {
   const stage = system.facts.currentStage;
-  const completion = system.read("completionPercentage") as number;
+  const completion = system.read("completionPercentage");
   const results = system.facts.stageResults;
 
   // Progress bar
@@ -84,11 +74,12 @@ function render(): void {
   // Checkpoints
   const checkpoints = system.facts.checkpoints;
   if (checkpoints.length === 0) {
-    checkpointList.innerHTML =
-      '<div style="color:var(--brand-text-faint);font-size:0.65rem;font-style:italic">No checkpoints saved</div>';
+    const emptyMsg = el("div", "No checkpoints saved");
+    emptyMsg.style.cssText = "color:var(--brand-text-faint);font-size:0.65rem;font-style:italic";
+    checkpointList.replaceChildren(emptyMsg);
   } else {
-    checkpointList.innerHTML = checkpoints
-      .map((cp) => {
+    checkpointList.replaceChildren(
+      ...checkpoints.map((cp) => {
         const time = new Date(cp.createdAt);
         const timeStr = time.toLocaleTimeString([], {
           hour: "2-digit",
@@ -96,42 +87,51 @@ function render(): void {
           second: "2-digit",
         });
 
-        return `<div class="cp-checkpoint-entry" data-testid="cp-ckpt-${cp.id}">
-        <div class="cp-checkpoint-info">
-          <span class="cp-checkpoint-label">${escapeHtml(cp.label)}</span>
-          <span class="cp-checkpoint-time">${timeStr}</span>
-        </div>
-        <div class="cp-checkpoint-actions">
-          <button class="cp-btn-sm" data-restore="${cp.id}">Restore</button>
-          <button class="cp-btn-sm danger" data-delete="${cp.id}">Del</button>
-        </div>
-      </div>`;
-      })
-      .join("");
+        const restoreBtn = el("button", { className: "cp-btn-sm" }, "Restore");
+        restoreBtn.setAttribute("data-restore", cp.id);
+
+        const deleteBtn = el("button", { className: "cp-btn-sm danger" }, "Del");
+        deleteBtn.setAttribute("data-delete", cp.id);
+
+        const entry = el("div", { className: "cp-checkpoint-entry" },
+          el("div", { className: "cp-checkpoint-info" },
+            el("span", { className: "cp-checkpoint-label" }, cp.label),
+            el("span", { className: "cp-checkpoint-time" }, timeStr),
+          ),
+          el("div", { className: "cp-checkpoint-actions" },
+            restoreBtn,
+            deleteBtn,
+          ),
+        );
+        entry.setAttribute("data-testid", `cp-ckpt-${cp.id}`);
+
+        return entry;
+      }),
+    );
   }
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="cp-timeline-empty">Events appear after running the pipeline</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "cp-timeline-empty" }, "Events appear after running the pipeline"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `cp-timeline-entry ${entry.type}`;
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      el.innerHTML = `
-        <span class="cp-timeline-time">${timeStr}</span>
-        <span class="cp-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="cp-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-      timelineEl.appendChild(el);
-    }
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        return el("div", { className: `cp-timeline-entry ${entry.type}` },
+          el("span", { className: "cp-timeline-time" }, timeStr),
+          el("span", { className: "cp-timeline-event" }, entry.event),
+          el("span", { className: "cp-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 

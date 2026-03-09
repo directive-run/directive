@@ -6,6 +6,7 @@
  * and config panel.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
@@ -119,14 +120,14 @@ function render(): void {
 
   // Mark toasts that are leaving
   const existingToasts = toastStack.querySelectorAll<HTMLElement>(".nt-toast");
-  for (const el of existingToasts) {
-    const id = el.dataset.id;
+  for (const toastEl of existingToasts) {
+    const id = toastEl.dataset.id;
     if (id && !currentIds.has(id)) {
-      el.classList.add("nt-toast-exit");
-      el.addEventListener(
+      toastEl.classList.add("nt-toast-exit");
+      toastEl.addEventListener(
         "animationend",
         () => {
-          el.remove();
+          toastEl.remove();
         },
         { once: true },
       );
@@ -135,28 +136,28 @@ function render(): void {
 
   // Add or update toasts
   for (const notification of visible) {
-    let el = toastStack.querySelector<HTMLElement>(
+    const existing = toastStack.querySelector<HTMLElement>(
       `[data-id="${notification.id}"]`,
     );
 
-    if (!el) {
-      el = document.createElement("div");
-      el.className = `nt-toast nt-toast-${notification.level}`;
-      el.dataset.id = notification.id;
-
-      if (!renderedIds.has(notification.id)) {
-        el.classList.add("nt-toast-enter");
-      }
-
+    if (!existing) {
+      const enterClass = !renderedIds.has(notification.id) ? " nt-toast-enter" : "";
       const levelIcon = getLevelIcon(notification.level);
 
-      el.innerHTML = `
-        <span class="nt-toast-icon">${levelIcon}</span>
-        <span class="nt-toast-message">${escapeHtml(notification.message)}</span>
-        <button class="nt-toast-close" data-dismiss="${notification.id}" aria-label="Dismiss">&times;</button>
-      `;
+      const toast = el("div", {
+        className: `nt-toast nt-toast-${notification.level}${enterClass}`,
+      },
+        el("span", { className: "nt-toast-icon" }, levelIcon),
+        el("span", { className: "nt-toast-message" }, notification.message),
+        el("button", {
+          className: "nt-toast-close",
+          ariaLabel: "Dismiss",
+        }, "\u00D7"),
+      );
+      toast.dataset.id = notification.id;
+      toast.querySelector(".nt-toast-close")!.setAttribute("data-dismiss", notification.id);
 
-      toastStack.appendChild(el);
+      toastStack.appendChild(toast);
     }
   }
 
@@ -167,30 +168,28 @@ function render(): void {
 
   // --- Action log ---
   if (actionLog.length === 0) {
-    actionLogEl.innerHTML =
-      '<div class="nt-log-empty">Actions will appear here</div>';
+    actionLogEl.replaceChildren(
+      el("div", { className: "nt-log-empty" }, "Actions will appear here"),
+    );
   } else {
-    actionLogEl.innerHTML = "";
+    const entries: HTMLElement[] = [];
     for (let i = actionLog.length - 1; i >= 0; i--) {
-      const el = document.createElement("div");
-      el.className = "nt-log-entry";
-      el.textContent = actionLog[i];
-
-      actionLogEl.appendChild(el);
+      entries.push(el("div", { className: "nt-log-entry" }, actionLog[i]));
     }
+    actionLogEl.replaceChildren(...entries);
   }
 }
 
 function getLevelIcon(level: Notification["level"]): string {
   switch (level) {
     case "info":
-      return "&#8505;";
+      return "\u2139";
     case "success":
-      return "&#10003;";
+      return "\u2713";
     case "warning":
-      return "&#9888;";
+      return "\u26A0";
     case "error":
-      return "&#10007;";
+      return "\u2717";
   }
 }
 
@@ -269,17 +268,6 @@ maxVisibleSlider.addEventListener("input", () => {
     value: Number(maxVisibleSlider.value),
   });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

@@ -6,6 +6,7 @@
  * sidebar toggle, and translated preview area.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin, persistencePlugin } from "@directive-run/core/plugins";
 import {
@@ -147,29 +148,30 @@ function render(): void {
   previewEl.style.color = themeColors.text;
   previewEl.setAttribute("dir", isRTL ? "rtl" : "ltr");
 
-  previewEl.innerHTML = `
-    <div class="tl-preview-header" style="color: ${themeColors.accent}; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;">
-      ${escapeHtml(translations.greeting)}!
-    </div>
-    <div class="tl-preview-grid">
-      <div class="tl-preview-item">
-        <span class="tl-preview-label" style="color: ${themeColors.muted};">${escapeHtml(translations.settings)}</span>
-        <span class="tl-preview-icon">&#9881;</span>
-      </div>
-      <div class="tl-preview-item">
-        <span class="tl-preview-label" style="color: ${themeColors.muted};">${escapeHtml(translations.theme)}</span>
-        <span class="tl-preview-icon">${effectiveTheme === "dark" ? "&#9790;" : "&#9728;"}</span>
-      </div>
-      <div class="tl-preview-item">
-        <span class="tl-preview-label" style="color: ${themeColors.muted};">${escapeHtml(translations.language)}</span>
-        <span class="tl-preview-icon">${escapeHtml(locale.toUpperCase())}</span>
-      </div>
-      <div class="tl-preview-item">
-        <span class="tl-preview-label" style="color: ${themeColors.muted};">${escapeHtml(translations.sidebar)}</span>
-        <span class="tl-preview-icon">${sidebarOpen ? "&#9776;" : "&#10005;"}</span>
-      </div>
-    </div>
-  `;
+  previewEl.replaceChildren(
+    el("div", {
+      className: "tl-preview-header",
+      style: `color: ${themeColors.accent}; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem;`,
+    }, `${translations.greeting}!`),
+    el("div", { className: "tl-preview-grid" },
+      el("div", { className: "tl-preview-item" },
+        el("span", { className: "tl-preview-label", style: `color: ${themeColors.muted};` }, translations.settings),
+        el("span", { className: "tl-preview-icon" }, "\u2699"),
+      ),
+      el("div", { className: "tl-preview-item" },
+        el("span", { className: "tl-preview-label", style: `color: ${themeColors.muted};` }, translations.theme),
+        el("span", { className: "tl-preview-icon" }, effectiveTheme === "dark" ? "\u263E" : "\u2600"),
+      ),
+      el("div", { className: "tl-preview-item" },
+        el("span", { className: "tl-preview-label", style: `color: ${themeColors.muted};` }, translations.language),
+        el("span", { className: "tl-preview-icon" }, locale.toUpperCase()),
+      ),
+      el("div", { className: "tl-preview-item" },
+        el("span", { className: "tl-preview-label", style: `color: ${themeColors.muted};` }, translations.sidebar),
+        el("span", { className: "tl-preview-icon" }, sidebarOpen ? "\u2630" : "\u2715"),
+      ),
+    ),
+  );
 }
 
 // ============================================================================
@@ -201,17 +203,6 @@ localeSelect.addEventListener("change", () => {
 sidebarToggle.addEventListener("click", () => {
   system.events.preferences.toggleSidebar();
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

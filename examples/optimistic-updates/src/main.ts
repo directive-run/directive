@@ -8,6 +8,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   type TodoItem,
   optimisticUpdatesModule,
@@ -146,47 +147,49 @@ function render(): void {
     }
   }
 
-  todoList.innerHTML = "";
-  for (const item of items) {
+  const todoElements = items.map((item) => {
     const isPending = pendingItemIds.has(item.id);
-    const el = document.createElement("div");
-    el.className = "ou-todo-item";
-    el.setAttribute("data-testid", `ou-item-${item.id}`);
 
+    const classNames = ["ou-todo-item"];
     if (isPending) {
-      el.classList.add("pending");
-      el.setAttribute("data-pending", "true");
+      classNames.push("pending");
     }
     if (item.done) {
-      el.classList.add("done");
+      classNames.push("done");
     }
     if (rollbackIds.has(item.id)) {
-      el.classList.add("ou-item-rollback");
-      setTimeout(() => el.classList.remove("ou-item-rollback"), 600);
+      classNames.push("ou-item-rollback");
     }
 
-    el.innerHTML = `
-      <input
-        type="checkbox"
-        class="ou-todo-checkbox"
-        data-testid="ou-toggle-${item.id}"
-        data-action="toggle"
-        data-id="${item.id}"
-        ${item.done ? "checked" : ""}
-        ${isPending ? "disabled" : ""}
-      />
-      <span class="ou-todo-text">${escapeHtml(item.text)}</span>
-      <button
-        class="ou-todo-delete"
-        data-testid="ou-delete-${item.id}"
-        data-action="delete"
-        data-id="${item.id}"
-        ${isPending ? "disabled" : ""}
-      >\u{1F5D1}</button>
-    `;
+    const itemEl = el("div", { className: classNames.join(" ") } as any,
+      el("input", {
+        type: "checkbox",
+        className: "ou-todo-checkbox",
+        checked: item.done,
+        disabled: isPending,
+        dataset: { testid: `ou-toggle-${item.id}`, action: "toggle", id: item.id },
+      } as any),
+      el("span", { className: "ou-todo-text" }, item.text),
+      el("button", {
+        className: "ou-todo-delete",
+        disabled: isPending,
+        dataset: { testid: `ou-delete-${item.id}`, action: "delete", id: item.id },
+      } as any, "\u{1F5D1}"),
+    );
 
-    todoList.appendChild(el);
-  }
+    itemEl.setAttribute("data-testid", `ou-item-${item.id}`);
+    if (isPending) {
+      itemEl.setAttribute("data-pending", "true");
+    }
+
+    if (rollbackIds.has(item.id)) {
+      setTimeout(() => itemEl.classList.remove("ou-item-rollback"), 600);
+    }
+
+    return itemEl;
+  });
+
+  todoList.replaceChildren(...todoElements);
 
   prevItems = items.map((i) => ({ ...i }));
 
@@ -215,15 +218,13 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="ou-timeline-empty">Events will appear here after actions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "ou-timeline-empty" }, "Events will appear here after actions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
+    const entries = [];
     for (let i = eventLog.length - 1; i >= 0; i--) {
       const entry = eventLog[i];
-      const el = document.createElement("div");
-      el.className = `ou-timeline-entry ${entry.event}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -231,14 +232,16 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="ou-timeline-time">${timeStr}</span>
-        <span class="ou-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="ou-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
+      entries.push(
+        el("div", { className: `ou-timeline-entry ${entry.event}` },
+          el("span", { className: "ou-timeline-time" }, timeStr),
+          el("span", { className: "ou-timeline-event" }, entry.event),
+          el("span", { className: "ou-timeline-detail" }, entry.detail),
+        ),
+      );
     }
+
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -307,17 +310,6 @@ serverDelaySlider.addEventListener("input", () => {
 failRateSlider.addEventListener("input", () => {
   system.events.setFailRate({ value: Number(failRateSlider.value) });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

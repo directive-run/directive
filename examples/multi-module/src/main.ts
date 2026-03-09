@@ -11,6 +11,7 @@
  * - No asCombined() helper needed
  */
 
+import { el } from "@directive-run/el";
 import { getFacts, system } from "./system";
 
 // DOM Elements
@@ -36,10 +37,13 @@ function updateUI() {
       ? "authenticated"
       : "unauthenticated";
 
-  authStatusEl.innerHTML = `
-    <span class="status ${authStatus}">${authStatus}</span>
-    ${facts.auth.user ? `<span style="margin-left: 0.5rem">Welcome, ${facts.auth.user.name}!</span>` : ""}
-  `;
+  const welcomeSpan = facts.auth.user
+    ? (() => { const s = el("span", `Welcome, ${facts.auth.user.name}!`); s.style.marginLeft = "0.5rem"; return s; })()
+    : null;
+  authStatusEl.replaceChildren(
+    el("span", { className: `status ${authStatus}` }, authStatus),
+    ...(welcomeSpan ? [welcomeSpan] : []),
+  );
 
   // Button states
   loginBtn.disabled = facts.auth.isAuthenticated || facts.auth.isValidating;
@@ -54,43 +58,56 @@ function updateUI() {
         ? "success"
         : "idle";
 
-  dataStatusEl.innerHTML = `
-    <span class="status ${dataStatus === "success" ? "authenticated" : dataStatus === "error" ? "unauthenticated" : "loading"}">
-      ${dataStatus}
-    </span>
-    ${facts.data.users.length > 0 ? `<span style="margin-left: 0.5rem">${facts.data.users.length} users loaded</span>` : ""}
-    ${facts.data.error ? `<div class="error">${facts.data.error}</div>` : ""}
-  `;
+  const statusClass = dataStatus === "success" ? "authenticated" : dataStatus === "error" ? "unauthenticated" : "loading";
+  const usersSpan = facts.data.users.length > 0
+    ? (() => { const s = el("span", `${facts.data.users.length} users loaded`); s.style.marginLeft = "0.5rem"; return s; })()
+    : null;
+  dataStatusEl.replaceChildren(
+    el("span", { className: `status ${statusClass}` }, dataStatus),
+    ...(usersSpan ? [usersSpan] : []),
+    ...(facts.data.error ? [el("div", { className: "error" }, facts.data.error)] : []),
+  );
 
   // User list
   if (facts.data.users.length > 0) {
-    userListEl.innerHTML = `
-      <ul class="user-list">
-        ${facts.data.users.map((u) => `<li><strong>${u.name}</strong> - ${u.department}</li>`).join("")}
-      </ul>
-    `;
+    userListEl.replaceChildren(
+      el("ul", { className: "user-list" },
+        facts.data.users.map((u) =>
+          el("li", el("strong", u.name), ` - ${u.department}`),
+        ),
+      ),
+    );
   } else if (!facts.auth.isAuthenticated) {
-    userListEl.innerHTML = `<p style="color: #666">Login to see users</p>`;
+    const p = el("p", "Login to see users");
+    p.style.color = "#666";
+    userListEl.replaceChildren(p);
   } else if (facts.data.isLoading) {
-    userListEl.innerHTML = `<p style="color: #666">Loading...</p>`;
+    const p = el("p", "Loading...");
+    p.style.color = "#666";
+    userListEl.replaceChildren(p);
   } else {
-    userListEl.innerHTML = `<p style="color: #666">No users</p>`;
+    const p = el("p", "No users");
+    p.style.color = "#666";
+    userListEl.replaceChildren(p);
   }
 
   // UI notifications - namespaced access: facts.ui.notifications
   const notifications = facts.ui.notifications;
   if (notifications.length > 0) {
-    uiNotificationEl.innerHTML = notifications
-      .map(
-        (n) => `
-        <div class="status ${n.type === "success" ? "authenticated" : n.type === "error" ? "unauthenticated" : "loading"}" style="margin-bottom: 0.5rem; display: block">
-          ${n.message}
-        </div>
-      `,
-      )
-      .join("");
+    uiNotificationEl.replaceChildren(
+      ...notifications.map((n) => {
+        const notifClass = n.type === "success" ? "authenticated" : n.type === "error" ? "unauthenticated" : "loading";
+        const notifEl = el("div", { className: `status ${notifClass}` }, n.message);
+        notifEl.style.marginBottom = "0.5rem";
+        notifEl.style.display = "block";
+
+        return notifEl;
+      }),
+    );
   } else {
-    uiNotificationEl.innerHTML = `<p style="color: #666">No notifications</p>`;
+    const p = el("p", "No notifications");
+    p.style.color = "#666";
+    uiNotificationEl.replaceChildren(p);
   }
 
   // State display - show the namespaced structure
