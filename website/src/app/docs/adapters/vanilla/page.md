@@ -9,8 +9,14 @@ Directive's vanilla adapter gives you three ways to build reactive UIs with zero
 
 ## Installation
 
+`@directive-run/el` versions independently from the rest of the Directive ecosystem. Its core (`el()`, JSX, htm) has zero dependency on `@directive-run/core`.
+
 ```bash
-npm install @directive-run/core @directive-run/el
+# Standalone — no Directive dependency
+npm install @directive-run/el
+
+# With reactive bindings (bind, bindText, mount)
+npm install @directive-run/el @directive-run/core
 
 # For htm tagged templates (optional)
 npm install htm
@@ -209,7 +215,7 @@ const badge = el("span", { className: "badge" });
 
 const cleanup = bind(system, badge, (el, facts, derived) => {
   el.textContent = `${facts.count}`;
-  el.className = (facts.count as number) > 10 ? "badge high" : "badge low";
+  el.className = facts.count > 10 ? "badge high" : "badge low";
 });
 
 // Later: unsubscribe
@@ -240,8 +246,7 @@ import { el, mount } from "@directive-run/el";
 const listEl = el("ul");
 
 const cleanup = mount(system, listEl, (facts) => {
-  const items = facts.items as string[];
-  return items.map(item => el("li", item));
+  return facts.items.map(item => el("li", item));
 });
 ```
 
@@ -308,8 +313,7 @@ const listEl = el("ul");
 bindText(system, countSpan, (facts) => `${facts.count}`);
 
 mount(system, listEl, (facts) => {
-  const items = facts.items as string[];
-  return items.map(item => el("li", item));
+  return facts.items.map(item => el("li", item));
 });
 
 const app = el("div", { className: "app" },

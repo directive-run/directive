@@ -72,8 +72,10 @@ Changesets uses **fixed groups** so packages in the same group always share the 
 
 | Group | Packages | Current Version |
 |-------|----------|-----------------|
-| Core + Frameworks | `core`, `react`, `vue`, `svelte`, `solid`, `lit` | 0.2.0 |
-| AI | `ai` | 0.2.0 (independent) |
+| Fixed | `core`, `react`, `vue`, `svelte`, `solid`, `lit`, `ai`, `cli`, `knowledge`, `devtools`, `claude-plugin` | 0.5.0 |
+| Independent | `el` | 0.4.2 |
+
+`el` versions independently because its core (`el()`, JSX, htm) has no dependency on `@directive-run/core`. Only the reactive bindings (`bind`, `bindText`, `mount`) require core.
 
 `vite-plugin-api-proxy` is excluded from changesets.
 

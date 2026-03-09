@@ -52,7 +52,7 @@ All adapters share the same core hook names and signatures (adapted to each fram
 - **Svelte** – Returns Svelte `Readable` stores. Use `$` prefix for auto-subscription.
 - **Solid** – Signal-based reactivity. Fine-grained updates without VDOM overhead.
 - **Lit** – Controller-based pattern for Web Components. Works with any Lit element.
-- **Vanilla** – No framework. Three authoring modes: `el()` function calls, JSX (with build), or htm tagged templates (no build). The lightest adapter.
+- **Vanilla** – No framework. Three authoring modes: `el()` function calls, JSX (with build), or htm tagged templates (no build). The lightest adapter. Versions independently — `el()`, JSX, and htm work without `@directive-run/core`.
 
 ---
 
