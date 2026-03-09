@@ -1,0 +1,88 @@
+{
+  "name": "@directive-run/el",
+  "version": "0.4.2",
+  "description": "Vanilla DOM adapter for Directive. Typed element creation + reactive bindings + JSX runtime.",
+  "license": "MIT",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/el"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "vanilla",
+    "dom",
+    "elements",
+    "jsx",
+    "htm",
+    "state-management",
+    "reactive",
+    "constraint-driven"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./jsx-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "require": "./dist/jsx-runtime.cjs",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./jsx-dev-runtime": {
+      "types": "./dist/jsx-runtime.d.ts",
+      "require": "./dist/jsx-runtime.cjs",
+      "import": "./dist/jsx-runtime.js"
+    },
+    "./htm": {
+      "types": "./dist/htm.d.ts",
+      "require": "./dist/htm.cjs",
+      "import": "./dist/htm.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "*",
+    "htm": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "htm": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@types/node": "^25.2.0",
+    "happy-dom": "^17.4.4",
+    "htm": "^3.1.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  }
+}
