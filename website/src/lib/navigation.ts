@@ -57,6 +57,8 @@ export const docsNavigation: NavigationSection[] = [
       { title: "Solid API", href: "/docs/api/solid" },
       { title: "Lit", href: "/docs/adapters/lit" },
       { title: "Lit API", href: "/docs/api/lit" },
+      { title: "Vanilla", href: "/docs/adapters/vanilla" },
+      { title: "Vanilla API", href: "/docs/api/vanilla" },
     ],
   },
   {

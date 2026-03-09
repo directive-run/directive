@@ -1,9 +1,9 @@
 ---
 title: Framework Adapters
-description: Use Directive with React, Vue, Svelte, Solid, or Lit – reactive hooks and bindings for every major framework.
+description: Use Directive with React, Vue, Svelte, Solid, Lit, or vanilla JS/TS – reactive hooks and bindings for every major framework.
 ---
 
-Directive provides first-class adapters for five UI frameworks. Each adapter gives you reactive hooks (or stores/controllers) that subscribe to facts, derivations, and system state with zero boilerplate. {% .lead %}
+Directive provides first-class adapters for five UI frameworks plus a vanilla adapter for framework-free projects. Each adapter gives you reactive hooks (or stores/controllers/bindings) that subscribe to facts, derivations, and system state with zero boilerplate. {% .lead %}
 
 ---
 
@@ -16,6 +16,7 @@ Directive provides first-class adapters for five UI frameworks. Each adapter giv
 | [Svelte](/docs/adapters/svelte) | `@directive-run/svelte` | Stores (`useFact`, `useDerived`, ...) | Svelte `Readable` stores |
 | [Solid](/docs/adapters/solid) | `@directive-run/solid` | Signals (`useFact`, `useDerived`, ...) | `createSignal` / `createMemo` |
 | [Lit](/docs/adapters/lit) | `@directive-run/lit` | Controllers (`FactController`, ...) | `ReactiveController` |
+| [Vanilla](/docs/adapters/vanilla) | `@directive-run/el` | `el()`, `bind()`, JSX, htm | Direct DOM |
 
 ---
 
@@ -51,6 +52,7 @@ All adapters share the same core hook names and signatures (adapted to each fram
 - **Svelte** – Returns Svelte `Readable` stores. Use `$` prefix for auto-subscription.
 - **Solid** – Signal-based reactivity. Fine-grained updates without VDOM overhead.
 - **Lit** – Controller-based pattern for Web Components. Works with any Lit element.
+- **Vanilla** – No framework. Three authoring modes: `el()` function calls, JSX (with build), or htm tagged templates (no build). The lightest adapter.
 
 ---
 
