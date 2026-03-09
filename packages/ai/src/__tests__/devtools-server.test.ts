@@ -865,6 +865,8 @@ describe("DevTools Server", () => {
     });
 
     it("throwing listener does not break other listeners", () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       const good = vi.fn();
       const bad = vi.fn(() => {
         throw new Error("boom");
@@ -883,6 +885,8 @@ describe("DevTools Server", () => {
 
       expect(bad).toHaveBeenCalledTimes(1);
       expect(good).toHaveBeenCalledTimes(1);
+
+      errorSpy.mockRestore();
     });
   });
 
