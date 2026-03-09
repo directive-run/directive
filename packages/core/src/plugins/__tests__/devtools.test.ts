@@ -1298,6 +1298,7 @@ describe("devtoolsPlugin", () => {
 
   describe("maxEvents validation", () => {
     it("treats zero maxEvents as default 1000", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mod = createTestModule();
       const system = createSystem({
         module: mod,
@@ -1316,9 +1317,11 @@ describe("devtoolsPlugin", () => {
       expect(events.length).toBeGreaterThan(0);
 
       system.destroy();
+      warnSpy.mockRestore();
     });
 
     it("treats negative maxEvents as default 1000", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const mod = createTestModule();
       const system = createSystem({
         module: mod,
@@ -1334,6 +1337,7 @@ describe("devtoolsPlugin", () => {
       expect(events.length).toBeGreaterThan(0);
 
       system.destroy();
+      warnSpy.mockRestore();
     });
   });
 

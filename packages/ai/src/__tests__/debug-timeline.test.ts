@@ -997,6 +997,7 @@ describe("createDebugTimelinePlugin bridges core events", () => {
 
 describe("listener error handling (A6)", () => {
   it("does not throw when a listener throws", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const timeline = createDebugTimeline();
 
     timeline.subscribe(() => {
@@ -1009,6 +1010,7 @@ describe("listener error handling (A6)", () => {
     ).not.toThrow();
 
     expect(timeline.length).toBe(1);
+    errorSpy.mockRestore();
   });
 
   it("logs error to console.error in dev mode", () => {

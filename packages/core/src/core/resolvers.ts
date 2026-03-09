@@ -849,9 +849,11 @@ export function createResolversManager<S extends Schema>(
       // Find resolver
       const resolverId = findResolver(req.requirement);
       if (!resolverId) {
-        console.warn(
-          `[Directive] No resolver found for requirement type "${req.requirement.type}" (id: ${req.id})`,
-        );
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `[Directive] No resolver found for requirement type "${req.requirement.type}" (id: ${req.id})`,
+          );
+        }
         return;
       }
 
