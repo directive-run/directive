@@ -1,5 +1,12 @@
 # @directive-run/example-dashboard-loader
 
+## 0.0.7
+
+### Patch Changes
+
+- Updated dependencies [[`8f20339`](https://github.com/directive-run/directive/commit/8f203394a0320d108d1e06b89dac9e675094154a), [`f15a4bf`](https://github.com/directive-run/directive/commit/f15a4bf653c0d8616227b7de678efb36563c57b0)]:
+  - @directive-run/el@0.5.0
+
 ## 0.0.6
 
 ### Patch Changes
