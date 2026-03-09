@@ -6,6 +6,8 @@
  * and scroll sentinel.
  */
 
+import { el } from "@directive-run/el";
+
 import type { ListItem } from "./mock-api.js";
 import { filtersSchema, listSchema, system } from "./pagination.js";
 
@@ -51,25 +53,22 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function renderItems(items: ListItem[]): void {
   if (items.length === 0) {
-    itemListEl.innerHTML = "";
+    itemListEl.replaceChildren();
 
     return;
   }
 
-  // Build all items as HTML string for performance
-  let html = "";
-  for (const item of items) {
-    const color = CATEGORY_COLORS[item.category] ?? "var(--brand-text-dim)";
-    html += `
-      <div class="pg-item">
-        <span class="pg-item-category" style="background: ${color}">${escapeHtml(item.category)}</span>
-        <span class="pg-item-title">${escapeHtml(item.title)}</span>
-        <span class="pg-item-id">${escapeHtml(item.id)}</span>
-      </div>
-    `;
-  }
+  itemListEl.replaceChildren(
+    ...items.map((item) => {
+      const color = CATEGORY_COLORS[item.category] ?? "var(--brand-text-dim)";
 
-  itemListEl.innerHTML = html;
+      return el("div", { className: "pg-item" },
+        el("span", { className: "pg-item-category", style: `background: ${color}` }, item.category),
+        el("span", { className: "pg-item-title" }, item.title),
+        el("span", { className: "pg-item-id" }, item.id),
+      );
+    }),
+  );
 }
 
 function render(): void {
@@ -149,17 +148,6 @@ for (const btn of categoryBtns) {
 sortSelect.addEventListener("change", () => {
   system.events.filters.setSortBy({ value: sortSelect.value });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

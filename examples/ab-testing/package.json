@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@directive-run/core": "workspace:*"
+    "@directive-run/core": "workspace:*",
+    "@directive-run/el": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

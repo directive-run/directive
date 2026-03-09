@@ -4,6 +4,7 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
+import { el } from "@directive-run/el";
 import { addLog, logs, schema, system } from "./module.js";
 
 // ============================================================================
@@ -57,12 +58,7 @@ function render() {
   }
 
   // Render logs
-  logEl.innerHTML = "";
-  for (const entry of logs) {
-    const line = document.createElement("div");
-    line.textContent = entry;
-    logEl.appendChild(line);
-  }
+  logEl.replaceChildren(...logs.map((entry) => el("div", entry)));
   logEl.scrollTop = logEl.scrollHeight;
 }
 

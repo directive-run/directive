@@ -4,6 +4,8 @@
  * Imports from module, starts system, renders user list and event timeline.
  */
 
+import { el } from "@directive-run/el";
+
 import { type UserProfile, schema, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -25,17 +27,6 @@ const failItemSelect = document.getElementById(
 const timelineEl = document.getElementById("bl-timeline")!;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-// ============================================================================
 // Render
 // ============================================================================
 
@@ -46,31 +37,30 @@ function render(): void {
 
   // User list
   if (users.length === 0 && loadingIds.length === 0) {
-    userListEl.innerHTML =
-      '<div class="bl-empty">No users loaded. Click a button to start.</div>';
+    userListEl.replaceChildren(
+      el("div", { className: "bl-empty" }, "No users loaded. Click a button to start."),
+    );
   } else {
-    userListEl.innerHTML = "";
+    userListEl.replaceChildren(
+      // Loading indicators
+      ...loadingIds.map((id) =>
+        el("div", { className: "bl-user-item loading" },
+          el("span", { className: "bl-user-id" }, `#${id}`),
+          " Loading...",
+        ),
+      ),
+      // Loaded users
+      ...users.map((user) => {
+        const row = el("div", { className: "bl-user-item" },
+          el("span", { className: "bl-user-id" }, `#${user.id}`),
+          el("span", { className: "bl-user-name" }, user.name),
+          el("span", { className: "bl-user-role" }, user.role),
+        );
+        row.setAttribute("data-testid", `bl-user-${user.id}`);
 
-    // Loading indicators
-    for (const id of loadingIds) {
-      const el = document.createElement("div");
-      el.className = "bl-user-item loading";
-      el.innerHTML = `<span class="bl-user-id">#${id}</span> Loading...`;
-      userListEl.appendChild(el);
-    }
-
-    // Loaded users
-    for (const user of users) {
-      const el = document.createElement("div");
-      el.className = "bl-user-item";
-      el.setAttribute("data-testid", `bl-user-${user.id}`);
-      el.innerHTML = `
-        <span class="bl-user-id">#${user.id}</span>
-        <span class="bl-user-name">${escapeHtml(user.name)}</span>
-        <span class="bl-user-role">${escapeHtml(user.role)}</span>
-      `;
-      userListEl.appendChild(el);
-    }
+        return row;
+      }),
+    );
   }
 
   // User count in header
@@ -81,29 +71,26 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="bl-timeline-empty">Events appear after interactions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "bl-timeline-empty" }, "Events appear after interactions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `bl-timeline-entry ${entry.type}`;
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
 
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      el.innerHTML = `
-        <span class="bl-timeline-time">${timeStr}</span>
-        <span class="bl-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="bl-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
-    }
+        return el("div", { className: `bl-timeline-entry ${entry.type}` },
+          el("span", { className: "bl-timeline-time" }, timeStr),
+          el("span", { className: "bl-timeline-event" }, entry.event),
+          el("span", { className: "bl-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 

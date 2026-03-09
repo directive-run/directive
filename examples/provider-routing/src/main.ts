@@ -4,6 +4,7 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
+import { el } from "@directive-run/el";
 import type { CircuitState } from "@directive-run/core/plugins";
 
 import {
@@ -35,29 +36,24 @@ const timelineEl = document.getElementById("pr-timeline")!;
 // Helpers
 // ============================================================================
 
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-function circuitBadge(state: CircuitState): string {
+function circuitBadge(state: CircuitState): HTMLSpanElement {
   const cls =
     state === "CLOSED" ? "closed" : state === "OPEN" ? "open" : "half-open";
 
-  return `<span class="pr-circuit-badge ${cls}">${state}</span>`;
+  return el("span", { className: `pr-circuit-badge ${cls}` }, state);
 }
 
 function renderProvider(
-  el: HTMLElement,
+  container: HTMLElement,
   stats: ProviderStats,
   state: CircuitState,
 ): void {
-  el.innerHTML = `
-    ${circuitBadge(state)}
-    <span style="font-size:0.55rem;color:var(--brand-text-dim)">${stats.callCount} calls, ${stats.errorCount} err, $${stats.totalCost}</span>
-  `;
+  container.replaceChildren(
+    circuitBadge(state),
+    el("span", { style: "font-size:0.55rem;color:var(--brand-text-dim)" },
+      `${stats.callCount} calls, ${stats.errorCount} err, $${stats.totalCost}`,
+    ),
+  );
 }
 
 // ============================================================================
@@ -91,26 +87,26 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="pr-timeline-empty">Events appear after sending requests</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "pr-timeline-empty" }, "Events appear after sending requests"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `pr-timeline-entry ${entry.type}`;
-      const time = new Date(entry.time);
-      const timeStr = time.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      el.innerHTML = `
-        <span class="pr-timeline-time">${timeStr}</span>
-        <span class="pr-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="pr-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-      timelineEl.appendChild(el);
-    }
+    timelineEl.replaceChildren(
+      ...timeline.map((entry) => {
+        const time = new Date(entry.time);
+        const timeStr = time.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+
+        return el("div", { className: `pr-timeline-entry ${entry.type}` },
+          el("span", { className: "pr-timeline-time" }, timeStr),
+          el("span", { className: "pr-timeline-event" }, entry.event),
+          el("span", { className: "pr-timeline-detail" }, entry.detail),
+        );
+      }),
+    );
   }
 }
 

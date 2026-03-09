@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@directive-run/core": "workspace:*",
-    "@directive-run/ai": "workspace:*"
+    "@directive-run/ai": "workspace:*",
+    "@directive-run/el": "workspace:*"
   },
   "devDependencies": {
     "@directive-run/vite-plugin-api-proxy": "workspace:*",

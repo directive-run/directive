@@ -11,6 +11,7 @@
   "dependencies": {
     "@directive-run/core": "workspace:*",
     "@directive-run/ai": "workspace:*",
+    "@directive-run/el": "workspace:*",
     "express": "^4.21.0"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@
  * Imports from module, starts system, renders experiment cards and event timeline.
  */
 
+import { el } from "@directive-run/el";
 import { type Experiment, addLog, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -29,17 +30,6 @@ const resetBtn = document.getElementById("btn-reset")!;
 const timelineEl = document.getElementById("ab-timeline")!;
 
 // ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
-
-// ============================================================================
 // Render
 // ============================================================================
 
@@ -60,53 +50,48 @@ function render() {
   pauseBtn.className = system.facts.paused ? "ab-btn" : "ab-btn primary";
 
   // --- Experiment cards ---
-  experimentsEl.innerHTML = "";
+  const cards: HTMLElement[] = [];
   for (const exp of experiments) {
-    const div = document.createElement("div");
-    div.className = "experiment";
-
     const assigned = assignments[exp.id];
     const exposed = exposures[exp.id];
 
-    div.innerHTML = `
-      <div class="experiment-name">${escapeHtml(exp.name)}</div>
-      <div class="experiment-meta">
-        ID: ${escapeHtml(exp.id)} &nbsp;|&nbsp;
-        Status: ${exp.active ? (system.facts.paused ? "Paused" : "Active") : "Inactive"} &nbsp;|&nbsp;
-        Assigned: ${assigned ?? "\u2013"} &nbsp;|&nbsp;
-        Exposed: ${exposed ? new Date(exposed).toLocaleTimeString() : "\u2013"}
-      </div>
-      <div class="experiment-variants"></div>
-    `;
+    const variantBtns = exp.variants.map((variant) => {
+      const btn = el("button", {
+        className: `variant-btn${assigned === variant.id ? " active" : ""}`,
+      }, `${variant.label} (${variant.weight}%)`);
 
-    const variantsEl = div.querySelector(".experiment-variants")!;
-    for (const variant of exp.variants) {
-      const btn = document.createElement("button");
-      btn.className = `variant-btn${assigned === variant.id ? " active" : ""}`;
-      btn.textContent = `${variant.label} (${variant.weight}%)`;
       btn.addEventListener("click", () => {
         system.events.assignVariant({
           experimentId: exp.id,
           variantId: variant.id,
         });
-        addLog("event", `Manual assignment: ${exp.id} → ${variant.id}`);
+        addLog("event", `Manual assignment: ${exp.id} -> ${variant.id}`);
       });
-      variantsEl.appendChild(btn);
-    }
 
-    experimentsEl.appendChild(div);
+      return btn;
+    });
+
+    const statusText = exp.active ? (system.facts.paused ? "Paused" : "Active") : "Inactive";
+
+    cards.push(
+      el("div", { className: "experiment" },
+        el("div", { className: "experiment-name" }, exp.name),
+        el("div", { className: "experiment-meta" },
+          `ID: ${exp.id} \u00a0|\u00a0 Status: ${statusText} \u00a0|\u00a0 Assigned: ${assigned ?? "\u2013"} \u00a0|\u00a0 Exposed: ${exposed ? new Date(exposed).toLocaleTimeString() : "\u2013"}`,
+        ),
+        el("div", { className: "experiment-variants" }, ...variantBtns),
+      ),
+    );
   }
+  experimentsEl.replaceChildren(...cards);
 
   // --- Timeline ---
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="ab-timeline-empty">Events appear after interactions</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "ab-timeline-empty" }, "Events appear after interactions"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `ab-timeline-entry ${entry.type}`;
-
+    const entries = timeline.map((entry) => {
       const time = new Date(entry.time);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -114,14 +99,14 @@ function render() {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="ab-timeline-time">${timeStr}</span>
-        <span class="ab-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="ab-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
+      return el("div", { className: `ab-timeline-entry ${entry.type}` },
+        el("span", { className: "ab-timeline-time" }, timeStr),
+        el("span", { className: "ab-timeline-event" }, entry.event),
+        el("span", { className: "ab-timeline-detail" }, entry.detail),
+      );
+    });
 
-      timelineEl.appendChild(el);
-    }
+    timelineEl.replaceChildren(...entries);
   }
 }
 

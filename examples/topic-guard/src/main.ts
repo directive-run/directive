@@ -5,6 +5,7 @@
  * and renders the chat UI + guardrail log + stats to the DOM.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import { topicGuardModule, topicGuardSchema } from "./topic-guard.js";
@@ -70,26 +71,24 @@ function render(): void {
 
   // Messages
   if (messages.length === 0) {
-    messagesEl.innerHTML =
-      '<div class="tg-empty-state">Send a message to see guardrails in action</div>';
+    messagesEl.replaceChildren(
+      el("div", { className: "tg-empty-state" }, "Send a message to see guardrails in action"),
+    );
   } else {
-    messagesEl.innerHTML = "";
-    messages.forEach((msg, i) => {
-      const el = document.createElement("div");
-      el.className = `tg-message ${msg.role}`;
-      if (msg.blocked) {
-        el.classList.add("blocked");
-      }
-      el.dataset.testid = `topic-guard-message-${i}`;
+    messagesEl.replaceChildren(
+      ...messages.map((msg, i) => {
+        const className = `tg-message ${msg.role}${msg.blocked ? " blocked" : ""}`;
+        const msgEl = el("div", { className },
+          msg.text,
+          msg.blocked && msg.guardrail
+            ? el("div", { className: "tg-guardrail-badge" }, `${msg.guardrail} guardrail`)
+            : null,
+        );
+        msgEl.dataset.testid = `topic-guard-message-${i}`;
 
-      let html = escapeHtml(msg.text);
-      if (msg.blocked && msg.guardrail) {
-        html += `<div class="tg-guardrail-badge">${escapeHtml(msg.guardrail)} guardrail</div>`;
-      }
-      el.innerHTML = html;
-
-      messagesEl.appendChild(el);
-    });
+        return msgEl;
+      }),
+    );
 
     // Auto-scroll to bottom
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -97,34 +96,36 @@ function render(): void {
 
   // Guardrail log
   if (guardrailLog.length === 0) {
-    logEl.innerHTML =
-      '<div class="tg-log-empty">No guardrail evaluations yet</div>';
+    logEl.replaceChildren(
+      el("div", { className: "tg-log-empty" }, "No guardrail evaluations yet"),
+    );
   } else {
-    logEl.innerHTML = "";
+    const entries: HTMLDivElement[] = [];
     // Show newest first
     for (let i = guardrailLog.length - 1; i >= 0; i--) {
       const entry = guardrailLog[i];
-      const el = document.createElement("div");
-      el.className = `tg-log-entry ${entry.result.blocked ? "blocked" : "allowed"}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
       });
+      const resultClass = entry.result.blocked ? "blocked" : "allowed";
 
-      el.innerHTML = `
-        <div class="tg-log-time">${timeStr}</div>
-        <span class="tg-log-input">${escapeHtml(truncate(entry.input, 40))}</span>
-        <span class="tg-log-result ${entry.result.blocked ? "blocked" : "allowed"}">
-          ${entry.result.blocked ? "\u2715 Blocked" : "\u2713 Allowed"}
-        </span>
-        <span class="tg-log-guardrail">${escapeHtml(entry.result.guardrailName)} &mdash; ${escapeHtml(entry.result.reason)}</span>
-      `;
-
-      logEl.appendChild(el);
+      entries.push(
+        el("div", { className: `tg-log-entry ${resultClass}` },
+          el("div", { className: "tg-log-time" }, timeStr),
+          el("span", { className: "tg-log-input" }, truncate(entry.input, 40)),
+          el("span", { className: `tg-log-result ${resultClass}` },
+            entry.result.blocked ? "\u2715 Blocked" : "\u2713 Allowed",
+          ),
+          el("span", { className: "tg-log-guardrail" },
+            `${entry.result.guardrailName} \u2014 ${entry.result.reason}`,
+          ),
+        ),
+      );
     }
+    logEl.replaceChildren(...entries);
   }
 
   // Sync topic checkboxes with state
@@ -195,13 +196,6 @@ topicsEl.addEventListener("change", (e) => {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) {

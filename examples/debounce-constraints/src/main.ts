@@ -9,6 +9,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   debounceSearchModule,
   debounceSearchSchema,
@@ -125,32 +126,31 @@ function render(): void {
 
   // --- Results list ---
   if (query === "" && results.length === 0) {
-    resultsList.innerHTML =
-      '<div class="dc-results-empty">Type to search 30 tech items...</div>';
+    resultsList.replaceChildren(
+      el("div", { className: "dc-results-empty" }, "Type to search 30 tech items..."),
+    );
   } else if (
     results.length === 0 &&
     debouncedQuery.length > 0 &&
     !isSearching &&
     !isDebouncing
   ) {
-    resultsList.innerHTML = `<div class="dc-results-empty">No results for "${escapeHtml(debouncedQuery)}"</div>`;
+    resultsList.replaceChildren(
+      el("div", { className: "dc-results-empty" }, `No results for "${debouncedQuery}"`),
+    );
   } else if (results.length === 0 && (isSearching || isDebouncing)) {
-    resultsList.innerHTML = '<div class="dc-results-empty">Searching...</div>';
+    resultsList.replaceChildren(
+      el("div", { className: "dc-results-empty" }, "Searching..."),
+    );
   } else {
-    resultsList.innerHTML = "";
-    for (const item of results) {
-      const el = document.createElement("div");
-      el.className = "dc-result-item";
-
-      const badgeClass = item.category.toLowerCase();
-
-      el.innerHTML = `
-        <span class="dc-result-title">${escapeHtml(item.title)}</span>
-        <span class="dc-result-badge ${badgeClass}">${escapeHtml(item.category)}</span>
-      `;
-
-      resultsList.appendChild(el);
-    }
+    resultsList.replaceChildren(
+      ...results.map((item) =>
+        el("div", { className: "dc-result-item" },
+          el("span", { className: "dc-result-title" }, item.title),
+          el("span", { className: `dc-result-badge ${item.category.toLowerCase()}` }, item.category),
+        ),
+      ),
+    );
   }
 
   // --- Footer ---
@@ -170,15 +170,13 @@ function render(): void {
 
   // --- Timeline ---
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="dc-timeline-empty">Events will appear here after typing</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "dc-timeline-empty" }, "Events will appear here after typing"),
+    );
   } else {
-    timelineEl.innerHTML = "";
+    const entries: HTMLElement[] = [];
     for (let i = eventLog.length - 1; i >= 0; i--) {
       const entry = eventLog[i];
-      const el = document.createElement("div");
-      el.className = `dc-timeline-entry ${entry.event}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -186,14 +184,16 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="dc-timeline-time">${timeStr}</span>
-        <span class="dc-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="dc-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
+      entries.push(
+        el("div", { className: `dc-timeline-entry ${entry.event}` },
+          el("span", { className: "dc-timeline-time" }, timeStr),
+          el("span", { className: "dc-timeline-event" }, entry.event),
+          el("span", { className: "dc-timeline-detail" }, entry.detail),
+        ),
+      );
     }
+
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -235,17 +235,6 @@ apiDelaySlider.addEventListener("input", () => {
 minCharsSlider.addEventListener("input", () => {
   system.events.setMinChars({ value: Number(minCharsSlider.value) });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render
