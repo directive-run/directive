@@ -1,5 +1,13 @@
 # @directive-run/example-ai-guardrails
 
+## 0.0.6
+
+### Patch Changes
+
+- Updated dependencies [[`7229881`](https://github.com/directive-run/directive/commit/72298811032bbaf988bf8c200cc8ba481f0132f7), [`02ee740`](https://github.com/directive-run/directive/commit/02ee7409536a59dd6492576252070127184dcca5)]:
+  - @directive-run/core@0.5.0
+  - @directive-run/ai@0.5.0
+
 ## 0.0.5
 
 ### Patch Changes
