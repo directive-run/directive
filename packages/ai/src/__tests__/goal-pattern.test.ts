@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InMemoryCheckpointStore } from "../checkpoint.js";
 import {
   allReadyStrategy,
@@ -1077,6 +1077,7 @@ describe("goal pattern", () => {
   // ---- C1: User callback safety ----
 
   it("C1: throwing when() does not crash the loop", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     let whenCalls = 0;
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -1114,9 +1115,11 @@ describe("goal pattern", () => {
     // Should still achieve goal after the first when() throw is caught
     expect(result.achieved).toBe(true);
     expect(whenCalls).toBeGreaterThanOrEqual(2);
+    errorSpy.mockRestore();
   });
 
   it("C1: throwing extractOutput does not crash the loop", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     let extractCalls = 0;
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -1159,9 +1162,11 @@ describe("goal pattern", () => {
 
     expect(result.achieved).toBe(true);
     expect(extractCalls).toBeGreaterThanOrEqual(1);
+    errorSpy.mockRestore();
   });
 
   it("C1: throwing satisfaction does not crash the loop", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         worker: { agent: { name: "worker" } },
@@ -1193,6 +1198,7 @@ describe("goal pattern", () => {
     );
 
     expect(result.achieved).toBe(true);
+    errorSpy.mockRestore();
   });
 
   // ---- C2: Cycle detection ----
