@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   composePatterns,
   debate,
@@ -192,6 +192,8 @@ describe("spawnOnCondition", () => {
   });
 
   it("require() returns RUN_AGENT requirement", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const constraint = spawnOnCondition({
       when: () => true,
       agent: "worker",
@@ -211,6 +213,8 @@ describe("spawnOnCondition", () => {
       context: { urgent: true },
     });
     expect(constraint.priority).toBe(10);
+
+    warnSpy.mockRestore();
   });
 });
 

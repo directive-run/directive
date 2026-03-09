@@ -172,6 +172,8 @@ describe("Constraints dynamic definitions", () => {
   });
 
   it("call evaluates constraint and returns requirements array", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const system = createStartedSystem();
     await flushMicrotasks();
 
@@ -189,7 +191,9 @@ describe("Constraints dynamic definitions", () => {
     expect(result.length).toBe(1);
     expect(result[0]!.requirement).toHaveProperty("type", "LOAD_DATA");
 
+    await flushMicrotasks();
     system.destroy();
+    warnSpy.mockRestore();
   });
 });
 

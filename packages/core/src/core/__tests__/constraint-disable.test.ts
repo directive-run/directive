@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 
 // ============================================================================
@@ -90,21 +90,27 @@ describe("constraints.disable / constraints.enable / constraints.isDisabled", ()
   });
 
   it("disable() on unknown constraint does not throw", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const system = createSystem({ module: createTestModule() });
     system.start();
 
     expect(() => system.constraints.disable("nonexistent")).not.toThrow();
 
     system.destroy();
+    warnSpy.mockRestore();
   });
 
   it("enable() on unknown constraint does not throw", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const system = createSystem({ module: createTestModule() });
     system.start();
 
     expect(() => system.constraints.enable("nonexistent")).not.toThrow();
 
     system.destroy();
+    warnSpy.mockRestore();
   });
 });
 

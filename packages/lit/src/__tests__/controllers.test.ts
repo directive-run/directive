@@ -148,6 +148,19 @@ function createTimeTravelSystem() {
 }
 
 // ============================================================================
+// Suppress expected console.warn from createTestSystem/createTimeTravelSystem
+// (schema.events["increment"]/["setName"] has no matching handler warnings)
+// ============================================================================
+
+beforeEach(() => {
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.mocked(console.warn).mockRestore();
+});
+
+// ============================================================================
 // FactController
 // ============================================================================
 
