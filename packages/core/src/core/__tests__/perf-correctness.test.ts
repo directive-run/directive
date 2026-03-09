@@ -452,6 +452,8 @@ describe("P1-2: effects deps stability", () => {
   });
 
   it("resets depsStable when effect throws", async () => {
+    const warnSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     const { store, facts } = createFacts({
       schema: { count: t.number() },
     });
@@ -495,6 +497,8 @@ describe("P1-2: effects deps stability", () => {
     await manager.runEffects(new Set(["count"]));
     await manager.runEffects(new Set(["count"]));
     expect(runCount).toBe(6);
+
+    warnSpy.mockRestore();
   });
 });
 

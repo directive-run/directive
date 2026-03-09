@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CircularBuffer,
   FLOW,
@@ -190,19 +190,27 @@ describe("validateMaxEvents", () => {
   });
 
   it("returns 1000 for zero", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(validateMaxEvents(0)).toBe(1000);
+    warnSpy.mockRestore();
   });
 
   it("returns 1000 for negative numbers", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(validateMaxEvents(-5)).toBe(1000);
+    warnSpy.mockRestore();
   });
 
   it("returns 1000 for NaN", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(validateMaxEvents(Number.NaN)).toBe(1000);
+    warnSpy.mockRestore();
   });
 
   it("returns 1000 for Infinity", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(validateMaxEvents(Number.POSITIVE_INFINITY)).toBe(1000);
+    warnSpy.mockRestore();
   });
 });
 

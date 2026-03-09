@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InMemoryCheckpointStore } from "../checkpoint.js";
 import {
   dag,
@@ -1089,6 +1089,8 @@ describe("Replay", () => {
 
 describe("forkFromCheckpoint", () => {
   it("creates an independent orchestrator from a checkpoint", async () => {
+    const warnSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
     const store = new InMemoryCheckpointStore();
 
     // Save a sequential checkpoint
@@ -1146,6 +1148,8 @@ describe("forkFromCheckpoint", () => {
 
     expect(forked).toBeDefined();
     expect(forked.system).toBeDefined();
+
+    warnSpy.mockRestore();
   });
 
   it("throws when checkpoint not found", async () => {
