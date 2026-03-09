@@ -17,8 +17,7 @@
       "@directive-run/cli",
       "@directive-run/knowledge",
       "@directive-run/devtools",
-      "@directive-run/claude-plugin",
-      "@directive-run/el"
+      "@directive-run/claude-plugin"
     ]
   ],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {

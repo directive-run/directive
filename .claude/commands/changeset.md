@@ -66,11 +66,14 @@ The highest classification wins per group:
 
 Show the user a summary of detected **source code** changes per package:
 
-**All packages** (single fixed group – all bump together):
+**Fixed group** (all bump together):
 - `@directive-run/core`: [list actual src/ changes found]
 - `@directive-run/ai`: [list actual src/ changes found]
 - `@directive-run/cli`: [list actual src/ changes found]
 - (etc. – only list packages that actually changed)
+
+**Independent packages** (version separately):
+- `@directive-run/el`: [list actual src/ changes found, if any]
 
 **Recommended bump:** [patch/minor/major] because [reason]
 
@@ -99,9 +102,10 @@ Add tasks system and harden resolver lifecycle.
 ```
 
 **How the fixed group works:**
-- All `@directive-run/*` packages share one version (core, react, vue, svelte, solid, lit, ai, cli, knowledge)
-- List only ONE package (e.g., `@directive-run/core`) &ndash; changesets bumps all packages in the group automatically
-- Do NOT list every package just for the version bump &ndash; that's redundant
+- Most `@directive-run/*` packages share one version (core, react, vue, svelte, solid, lit, ai, cli, knowledge, devtools, claude-plugin)
+- `@directive-run/el` versions independently (its core has no dependency on `@directive-run/core`)
+- For the fixed group: list only ONE package (e.g., `@directive-run/core`) &ndash; changesets bumps all group members automatically
+- For `@directive-run/el`: list it explicitly in the changeset &ndash; it won't bump with the group
 
 **Per-package changelogs:** All packages share a version number, but changelog entries only appear for packages explicitly listed in the changeset file. If a package has its own meaningful changes, list it explicitly so it gets its own changelog entry. Example: if `core` adds a new API and `react` adds a new hook, list both. Packages with no changes of their own don't need listing &ndash; they still get the version bump.
 
@@ -123,5 +127,6 @@ Show the created changeset and remind the user:
 ## Fixed Group Reference
 
 From `.changeset/config.json`:
-- **All packages** (single fixed group, one version): core, react, vue, svelte, solid, lit, ai, cli, knowledge
-- **Not managed by changesets:** claude-plugin (private), vite-plugin-api-proxy
+- **Fixed group** (one version): core, react, vue, svelte, solid, lit, ai, cli, knowledge, devtools, claude-plugin
+- **Independent:** el (versions separately — core `el()` has no dependency on `@directive-run/core`)
+- **Not managed by changesets:** vite-plugin-api-proxy

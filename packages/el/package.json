@@ -73,6 +73,9 @@
     "htm": ">=3"
   },
   "peerDependenciesMeta": {
+    "@directive-run/core": {
+      "optional": true
+    },
     "htm": {
       "optional": true
     }
