@@ -4,7 +4,9 @@
 [![downloads](https://img.shields.io/npm/dm/@directive-run/el)](https://www.npmjs.com/package/@directive-run/el)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@directive-run/el)](https://bundlephobia.com/package/@directive-run/el)
 
-Vanilla DOM adapter for [Directive](https://www.npmjs.com/package/@directive-run/core). Typed element creation, reactive bindings, JSX runtime, and htm support — no framework required.
+Typed element creation, JSX runtime, and htm support — no framework required. Versions independently from the rest of the [Directive](https://www.npmjs.com/package/@directive-run/core) ecosystem.
+
+Use `el()` standalone for any vanilla DOM project. Add `@directive-run/core` for reactive bindings (`bind`, `bindText`, `mount`).
 
 ## Three Ways to Write
 
@@ -24,15 +26,35 @@ All three produce real DOM nodes. Pick what fits your project.
 ## Install
 
 ```bash
-npm install @directive-run/core @directive-run/el
+# Standalone — no Directive dependency
+npm install @directive-run/el
+
+# With reactive bindings (requires Directive)
+npm install @directive-run/el @directive-run/core
 
 # For htm (optional)
 npm install htm
 ```
 
-## Quick Start
+## Standalone Usage
 
-Define a module, then build your UI:
+`el()` works without Directive — just typed DOM creation:
+
+```typescript
+import { el } from "@directive-run/el";
+
+const app = el("div", { className: "card" },
+  el("h2", "Hello"),
+  el("p", "No framework needed."),
+  el("button", { onclick: () => alert("clicked") }, "Click me"),
+);
+
+document.body.appendChild(app);
+```
+
+## With Directive
+
+Add reactive bindings to a Directive system:
 
 ```typescript
 // system.ts
@@ -223,7 +245,7 @@ const badge = el("span", { className: "badge" });
 
 const cleanup = bind(system, badge, (el, facts, derived) => {
   el.textContent = `${facts.count}`;
-  el.className = (facts.count as number) > 10 ? "badge high" : "badge low";
+  el.className = facts.count > 10 ? "badge high" : "badge low";
 });
 
 cleanup(); // unsubscribe
@@ -252,8 +274,7 @@ import { mount } from "@directive-run/el";
 const listEl = el("ul");
 
 const cleanup = mount(system, listEl, (facts) => {
-  const items = facts.items as string[];
-  return items.map(item => el("li", item));
+  return facts.items.map(item => el("li", item));
 });
 ```
 
@@ -321,7 +342,7 @@ system.subscribe(["ship.*"], () => {
 
 ## Peer Dependencies
 
-- `@directive-run/core`
+- `@directive-run/core` (optional — only needed for `bind`, `bindText`, `mount`)
 - `htm` >= 3 (optional — only needed for `@directive-run/el/htm`)
 
 ## Documentation
