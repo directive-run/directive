@@ -346,6 +346,8 @@ describe("createOtelPlugin", () => {
   });
 
   it("supports custom tracer", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const mockSpan = {
       setAttribute: vi.fn(),
       addEvent: vi.fn(),
@@ -374,6 +376,8 @@ describe("createOtelPlugin", () => {
 
     // External tracer — getSpans returns empty (no built-in collector)
     expect(otel.getSpans()).toEqual([]);
+
+    warnSpy.mockRestore();
   });
 
   it("attach returns unsubscribe function", () => {

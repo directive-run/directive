@@ -314,6 +314,8 @@ describe("snapshotEvents", () => {
   });
 
   it("snapshotEvents: [] disables all event snapshots", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const mod = createTestModule({ snapshotEvents: [] });
     const system = createSystem({
       module: mod,
@@ -339,6 +341,7 @@ describe("snapshotEvents", () => {
     expect(system.debug!.currentIndex).toBe(initialIndex + 1);
 
     system.destroy();
+    warnSpy.mockRestore();
   });
 
   it("dispatch() path respects snapshotEvents filtering", async () => {

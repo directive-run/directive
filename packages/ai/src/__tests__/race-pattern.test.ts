@@ -337,7 +337,7 @@ describe("race pattern", () => {
     expect(agentIds).toEqual(["a", "b"]);
   });
 
-  it("minSuccess > agents.length throws validation error", () => {
+  it("minSuccess > agents.length throws validation error", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         a: { agent: { name: "a" } },
@@ -349,7 +349,7 @@ describe("race pattern", () => {
       },
     });
 
-    expect(
+    await expect(
       orchestrator.runRace(["a", "b"], "go", { minSuccess: 5 }),
     ).rejects.toThrow("minSuccess (5) exceeds agent count (2)");
   });

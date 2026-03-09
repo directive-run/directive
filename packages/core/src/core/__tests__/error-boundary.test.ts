@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { createErrorBoundaryManager } from "../errors.js";
 import type { RecoveryStrategy } from "../types.js";
@@ -111,6 +111,20 @@ function createFailingModule(opts?: {
     },
   };
 }
+
+// ============================================================================
+// Suppress expected console.warn/error from error boundary tests
+// ============================================================================
+
+beforeEach(() => {
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.mocked(console.warn).mockRestore();
+  vi.mocked(console.error).mockRestore();
+});
 
 // ============================================================================
 // Tests: Skip Strategy

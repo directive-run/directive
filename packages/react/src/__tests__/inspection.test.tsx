@@ -139,6 +139,8 @@ describe("useInspect", () => {
   });
 
   it("hasUnmet is true when constraints produce unmet requirements", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     // Create a system where the constraint fires but no resolver is registered
     const mod = createModule("unmet", {
       schema: {
@@ -173,6 +175,7 @@ describe("useInspect", () => {
 
     unmount();
     system.destroy();
+    warnSpy.mockRestore();
   });
 
   it("updates reactively when system state changes", async () => {
@@ -575,6 +578,8 @@ describe("useTimeTravel", () => {
 
 describe("useExplain", () => {
   it("returns explanation string for a requirement", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     // Create a system with an unmet requirement (no resolver)
     const mod = createModule("explaintest", {
       schema: {
@@ -618,6 +623,7 @@ describe("useExplain", () => {
 
     unmount();
     system.destroy();
+    warnSpy.mockRestore();
   });
 
   it("returns null for non-existent requirement", async () => {
@@ -635,6 +641,8 @@ describe("useExplain", () => {
   });
 
   it("updates when system state changes", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     // Create a system with an unmet requirement
     const mod = createModule("explainupdate", {
       schema: {
@@ -684,9 +692,12 @@ describe("useExplain", () => {
 
     unmount();
     system.destroy();
+    warnSpy.mockRestore();
   });
 
   it("subscribes to both facts and settled state", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     // Verify the hook re-renders when facts change or settlement state changes
     const mod = createModule("explainsub", {
       schema: {
@@ -739,6 +750,7 @@ describe("useExplain", () => {
 
     unmount();
     system.destroy();
+    warnSpy.mockRestore();
   });
 });
 
