@@ -6,6 +6,7 @@
  * and admin panel.
  */
 
+import { el } from "@directive-run/el";
 import { system } from "./permissions.js";
 
 // ============================================================================
@@ -69,9 +70,9 @@ function showToast(
 // Render
 // ============================================================================
 
-function renderPermBadge(el: HTMLElement, granted: boolean): void {
-  el.classList.toggle("granted", granted);
-  el.classList.toggle("denied", !granted);
+function renderPermBadge(badgeEl: HTMLElement, granted: boolean): void {
+  badgeEl.classList.toggle("granted", granted);
+  badgeEl.classList.toggle("denied", !granted);
 }
 
 function render(): void {
@@ -110,42 +111,54 @@ function render(): void {
 
   // --- Article list ---
   if (!isAuthenticated) {
-    articleListEl.innerHTML =
-      '<div class="pm-empty">Sign in to view articles</div>';
+    articleListEl.replaceChildren(
+      el("div", { className: "pm-empty" }, "Sign in to view articles"),
+    );
   } else if (!contentLoaded) {
-    articleListEl.innerHTML = '<div class="pm-empty">Loading articles...</div>';
+    articleListEl.replaceChildren(
+      el("div", { className: "pm-empty" }, "Loading articles..."),
+    );
   } else if (articles.length === 0) {
-    articleListEl.innerHTML = '<div class="pm-empty">No articles</div>';
+    articleListEl.replaceChildren(
+      el("div", { className: "pm-empty" }, "No articles"),
+    );
   } else {
-    articleListEl.innerHTML = articles
-      .map((article) => {
-        const statusClass = article.status;
-        let actions = "";
+    articleListEl.replaceChildren(
+      ...articles.map((article) => {
+        const actionButtons: (HTMLElement | null)[] = [];
 
         if (canEdit) {
-          actions += `<button class="pm-article-action edit" data-article-id="${article.id}" data-action="edit">Edit</button>`;
+          actionButtons.push(
+            el("button", { className: "pm-article-action edit", dataset: { articleId: article.id, action: "edit" } } as any, "Edit"),
+          );
         }
 
         if (canPublish && article.status === "draft") {
-          actions += `<button class="pm-article-action publish" data-article-id="${article.id}" data-action="publish">Publish</button>`;
+          actionButtons.push(
+            el("button", { className: "pm-article-action publish", dataset: { articleId: article.id, action: "publish" } } as any, "Publish"),
+          );
         }
 
         if (canDelete) {
-          actions += `<button class="pm-article-action delete" data-article-id="${article.id}" data-action="delete">Delete</button>`;
+          actionButtons.push(
+            el("button", { className: "pm-article-action delete", dataset: { articleId: article.id, action: "delete" } } as any, "Delete"),
+          );
         }
 
-        return `
-          <div class="pm-article-card">
-            <div class="pm-article-header">
-              <span class="pm-article-title">${escapeHtml(article.title)}</span>
-              <span class="pm-article-status ${statusClass}">${article.status}</span>
-            </div>
-            <div class="pm-article-meta">by ${escapeHtml(article.author)}</div>
-            <div class="pm-article-actions">${actions || '<span class="pm-no-actions">No actions available</span>'}</div>
-          </div>
-        `;
-      })
-      .join("");
+        const actionsContent = actionButtons.length > 0
+          ? actionButtons
+          : [el("span", { className: "pm-no-actions" }, "No actions available")];
+
+        return el("div", { className: "pm-article-card" },
+          el("div", { className: "pm-article-header" },
+            el("span", { className: "pm-article-title" }, article.title),
+            el("span", { className: `pm-article-status ${article.status}` }, article.status),
+          ),
+          el("div", { className: "pm-article-meta" }, `by ${article.author}`),
+          el("div", { className: "pm-article-actions" }, ...actionsContent),
+        );
+      }),
+    );
   }
 
   // --- Action status ---
@@ -166,25 +179,25 @@ function render(): void {
   // --- Admin panel ---
   if (canManageUsers) {
     adminPanelEl.classList.add("visible");
-    adminPanelEl.innerHTML = `
-      <div class="pm-panel-header">Admin Panel</div>
-      <div class="pm-panel-body">
-        <div class="pm-admin-info">
-          <div class="pm-admin-icon">&#x1f6e1;</div>
-          <div class="pm-admin-label">User Management</div>
-          <div class="pm-admin-detail">Logged in as ${escapeHtml(userName)} (${escapeHtml(role)})</div>
-          <div class="pm-admin-detail">${permissions.length} permissions granted</div>
-        </div>
-        <div class="pm-admin-placeholder">
-          <div class="pm-admin-row">Users online: 12</div>
-          <div class="pm-admin-row">Pending invites: 3</div>
-          <div class="pm-admin-row">System health: OK</div>
-        </div>
-      </div>
-    `;
+    adminPanelEl.replaceChildren(
+      el("div", { className: "pm-panel-header" }, "Admin Panel"),
+      el("div", { className: "pm-panel-body" },
+        el("div", { className: "pm-admin-info" },
+          el("div", { className: "pm-admin-icon" }, "\u{1F6E1}"),
+          el("div", { className: "pm-admin-label" }, "User Management"),
+          el("div", { className: "pm-admin-detail" }, `Logged in as ${userName} (${role})`),
+          el("div", { className: "pm-admin-detail" }, `${permissions.length} permissions granted`),
+        ),
+        el("div", { className: "pm-admin-placeholder" },
+          el("div", { className: "pm-admin-row" }, "Users online: 12"),
+          el("div", { className: "pm-admin-row" }, "Pending invites: 3"),
+          el("div", { className: "pm-admin-row" }, "System health: OK"),
+        ),
+      ),
+    );
   } else {
     adminPanelEl.classList.remove("visible");
-    adminPanelEl.innerHTML = "";
+    adminPanelEl.replaceChildren();
   }
 }
 
@@ -291,17 +304,6 @@ articleListEl.addEventListener("click", (e) => {
     return;
   }
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

@@ -5,6 +5,7 @@
  * and renders the product grid, filters, and pagination.
  */
 
+import { el } from "@directive-run/el";
 import { productsSchema, system, urlSchema } from "./url-sync.js";
 
 // ============================================================================
@@ -41,13 +42,6 @@ const loadingIndicator = document.getElementById("us-loading")!;
 // ============================================================================
 // Render
 // ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 function formatPrice(price: number): string {
   return `$${price.toFixed(2)}`;
@@ -97,20 +91,19 @@ function render(): void {
   // Product list
   const items = productFacts.items;
   if (items.length === 0 && !productFacts.isLoading) {
-    productList.innerHTML =
-      '<div class="us-empty">No products found. Try adjusting your filters.</div>';
+    productList.replaceChildren(
+      el("div", { className: "us-empty" }, "No products found. Try adjusting your filters."),
+    );
   } else {
-    productList.innerHTML = "";
-    for (const product of items) {
-      const card = document.createElement("div");
-      card.className = "us-product-card";
-      card.innerHTML = `
-        <div class="us-product-category">${escapeHtml(categoryLabel(product.category))}</div>
-        <div class="us-product-name">${escapeHtml(product.name)}</div>
-        <div class="us-product-price">${formatPrice(product.price)}</div>
-      `;
-      productList.appendChild(card);
-    }
+    productList.replaceChildren(
+      ...items.map((product) =>
+        el("div", { className: "us-product-card" },
+          el("div", { className: "us-product-category" }, categoryLabel(product.category)),
+          el("div", { className: "us-product-name" }, product.name),
+          el("div", { className: "us-product-price" }, formatPrice(product.price)),
+        ),
+      ),
+    );
   }
 
   // Total items
@@ -126,35 +119,30 @@ function render(): void {
   prevBtn.disabled = currentPg <= 1;
   nextBtn.disabled = currentPg >= totalPg;
 
-  pageNumbers.innerHTML = "";
+  const pageItems: HTMLElement[] = [];
   if (totalPg > 0) {
     const startPage = Math.max(1, currentPg - 2);
     const endPage = Math.min(totalPg, currentPg + 2);
 
     if (startPage > 1) {
-      pageNumbers.appendChild(makePageBtn(1, currentPg));
+      pageItems.push(makePageBtn(1, currentPg));
       if (startPage > 2) {
-        const ellipsis = document.createElement("span");
-        ellipsis.className = "us-page-ellipsis";
-        ellipsis.textContent = "\u2026";
-        pageNumbers.appendChild(ellipsis);
+        pageItems.push(el("span", { className: "us-page-ellipsis" }, "\u2026"));
       }
     }
 
     for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.appendChild(makePageBtn(i, currentPg));
+      pageItems.push(makePageBtn(i, currentPg));
     }
 
     if (endPage < totalPg) {
       if (endPage < totalPg - 1) {
-        const ellipsis = document.createElement("span");
-        ellipsis.className = "us-page-ellipsis";
-        ellipsis.textContent = "\u2026";
-        pageNumbers.appendChild(ellipsis);
+        pageItems.push(el("span", { className: "us-page-ellipsis" }, "\u2026"));
       }
-      pageNumbers.appendChild(makePageBtn(totalPg, currentPg));
+      pageItems.push(makePageBtn(totalPg, currentPg));
     }
   }
+  pageNumbers.replaceChildren(...pageItems);
 
   // URL display
   const search = window.location.search || "(no params)";
@@ -162,12 +150,9 @@ function render(): void {
 }
 
 function makePageBtn(page: number, currentPage: number): HTMLButtonElement {
-  const btn = document.createElement("button");
-  btn.className = "us-btn us-page-btn";
-  btn.textContent = String(page);
-  if (page === currentPage) {
-    btn.classList.add("active");
-  }
+  const btn = el("button", {
+    className: `us-btn us-page-btn${page === currentPage ? " active" : ""}`,
+  }, String(page));
   btn.addEventListener("click", () => {
     system.events.url.setPage({ value: page });
   });

@@ -6,6 +6,7 @@
  * Uses subscribeModule for per-namespace reactivity.
  */
 
+import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
 import {
@@ -91,10 +92,11 @@ function render(): void {
 
   // --- Widgets area ---
   if (loaded.length === 0) {
-    widgetsArea.innerHTML =
-      '<div class="dm-widgets-empty">Load a module to get started</div>';
+    widgetsArea.replaceChildren(
+      el("div", { className: "dm-widgets-empty" }, "Load a module to get started"),
+    );
   } else {
-    widgetsArea.innerHTML = "";
+    widgetsArea.replaceChildren();
     for (const ns of loaded) {
       if (ns === "counter") {
         renderCounterWidget();
@@ -117,46 +119,51 @@ function renderCounterWidget(): void {
   const step = facts.step;
   const isNearMax = derive.isNearMax;
 
-  const card = document.createElement("div");
-  card.className = "dm-widget-card counter";
-  card.setAttribute("data-testid", "dm-widget-counter");
+  const decrementBtn = el("button", { className: "dm-btn dm-btn-sm" }, "\u2212");
+  decrementBtn.dataset.testid = "dm-counter-decrement";
 
-  card.innerHTML = `
-    <div class="dm-widget-header">Counter</div>
-    <div class="dm-widget-body">
-      <div class="dm-counter-display" data-testid="dm-counter-value">${count}</div>
-      ${isNearMax ? '<div class="dm-counter-near-max">Near max (100)</div>' : ""}
-      <div class="dm-counter-controls">
-        <button class="dm-btn dm-btn-sm" data-testid="dm-counter-decrement">&minus;</button>
-        <button class="dm-btn dm-btn-sm" data-testid="dm-counter-increment">+</button>
-      </div>
-      <div class="dm-step-row">
-        <span>Step</span>
-        <input type="range" min="1" max="10" value="${step}" data-testid="dm-counter-step" />
-        <span class="dm-step-val">${step}</span>
-      </div>
-    </div>
-  `;
+  const incrementBtn = el("button", { className: "dm-btn dm-btn-sm" }, "+");
+  incrementBtn.dataset.testid = "dm-counter-increment";
+
+  const stepInput = el("input", {
+    type: "range",
+    min: "1",
+    max: "10",
+    value: String(step),
+  }) as HTMLInputElement;
+  stepInput.dataset.testid = "dm-counter-step";
+
+  const counterDisplay = el("div", { className: "dm-counter-display" }, String(count));
+  counterDisplay.dataset.testid = "dm-counter-value";
+
+  const card = el("div", { className: "dm-widget-card counter" },
+    el("div", { className: "dm-widget-header" }, "Counter"),
+    el("div", { className: "dm-widget-body" },
+      counterDisplay,
+      isNearMax ? el("div", { className: "dm-counter-near-max" }, "Near max (100)") : null,
+      el("div", { className: "dm-counter-controls" }, decrementBtn, incrementBtn),
+      el("div", { className: "dm-step-row" },
+        el("span", "Step"),
+        stepInput,
+        el("span", { className: "dm-step-val" }, String(step)),
+      ),
+    ),
+  );
+  card.dataset.testid = "dm-widget-counter";
 
   widgetsArea.appendChild(card);
 
   // Wire up controls after appending
-  card
-    .querySelector('[data-testid="dm-counter-increment"]')!
-    .addEventListener("click", () => {
-      system.events.counter.increment();
-    });
-  card
-    .querySelector('[data-testid="dm-counter-decrement"]')!
-    .addEventListener("click", () => {
-      system.events.counter.decrement();
-    });
-  card
-    .querySelector('[data-testid="dm-counter-step"]')!
-    .addEventListener("input", (e) => {
-      const value = Number((e.target as HTMLInputElement).value);
-      system.events.counter.setStep({ value });
-    });
+  incrementBtn.addEventListener("click", () => {
+    system.events.counter.increment();
+  });
+  decrementBtn.addEventListener("click", () => {
+    system.events.counter.decrement();
+  });
+  stepInput.addEventListener("input", (e) => {
+    const value = Number((e.target as HTMLInputElement).value);
+    system.events.counter.setStep({ value });
+  });
 }
 
 function renderWeatherWidget(): void {
@@ -168,22 +175,18 @@ function renderWeatherWidget(): void {
   const summary = derive.summary;
   const humidity = facts.humidity;
 
-  const card = document.createElement("div");
-  card.className = "dm-widget-card weather";
-  card.setAttribute("data-testid", "dm-widget-weather");
-
-  let weatherBody: string;
+  let weatherBody: HTMLElement;
   if (isLoading) {
-    weatherBody = '<div class="dm-weather-loading">Fetching weather...</div>';
+    weatherBody = el("div", { className: "dm-weather-loading" }, "Fetching weather...");
   } else if (!hasFetched) {
-    weatherBody = '<div class="dm-weather-empty">Enter a city</div>';
+    weatherBody = el("div", { className: "dm-weather-empty" }, "Enter a city");
   } else {
-    weatherBody = `
-      <div class="dm-weather-data">
-        <div class="dm-weather-temp" data-testid="dm-weather-summary">${escapeHtml(summary)}</div>
-        <div class="dm-weather-humidity">Humidity: ${humidity}%</div>
-      </div>
-    `;
+    const summaryEl = el("div", { className: "dm-weather-temp" }, summary);
+    summaryEl.dataset.testid = "dm-weather-summary";
+    weatherBody = el("div", { className: "dm-weather-data" },
+      summaryEl,
+      el("div", { className: "dm-weather-humidity" }, `Humidity: ${humidity}%`),
+    );
   }
 
   // Preserve city input value during re-render
@@ -192,38 +195,39 @@ function renderWeatherWidget(): void {
   ) as HTMLInputElement | null;
   const currentCityValue = existingInput ? existingInput.value : city;
 
-  card.innerHTML = `
-    <div class="dm-widget-header">Weather</div>
-    <div class="dm-widget-body">
-      <div class="dm-weather-input-row">
-        <input
-          class="dm-input"
-          type="text"
-          placeholder="Enter city..."
-          value="${escapeHtml(currentCityValue)}"
-          autocomplete="off"
-          data-testid="dm-weather-city"
-        />
-        <button class="dm-btn dm-btn-sm dm-btn-secondary" data-testid="dm-weather-refresh" ${!hasFetched ? "disabled" : ""}>Refresh</button>
-      </div>
-      ${weatherBody}
-    </div>
-  `;
+  const cityInput = el("input", {
+    className: "dm-input",
+    type: "text",
+    placeholder: "Enter city...",
+    value: currentCityValue,
+    autocomplete: "off",
+  }) as HTMLInputElement;
+  cityInput.dataset.testid = "dm-weather-city";
+
+  const refreshBtn = el("button", {
+    className: "dm-btn dm-btn-sm dm-btn-secondary",
+    disabled: !hasFetched,
+  }, "Refresh");
+  refreshBtn.dataset.testid = "dm-weather-refresh";
+
+  const card = el("div", { className: "dm-widget-card weather" },
+    el("div", { className: "dm-widget-header" }, "Weather"),
+    el("div", { className: "dm-widget-body" },
+      el("div", { className: "dm-weather-input-row" }, cityInput, refreshBtn),
+      weatherBody,
+    ),
+  );
+  card.dataset.testid = "dm-widget-weather";
 
   widgetsArea.appendChild(card);
 
   // Wire up controls
-  const cityInput = card.querySelector(
-    '[data-testid="dm-weather-city"]',
-  ) as HTMLInputElement;
   cityInput.addEventListener("input", () => {
     system.events.weather.setCity({ value: cityInput.value });
   });
-  card
-    .querySelector('[data-testid="dm-weather-refresh"]')!
-    .addEventListener("click", () => {
-      system.events.weather.refresh();
-    });
+  refreshBtn.addEventListener("click", () => {
+    system.events.weather.refresh();
+  });
 
   // Focus management: re-focus if user was typing
   if (existingInput && document.activeElement === existingInput) {
@@ -242,47 +246,57 @@ function renderDiceWidget(): void {
   const isDoubles = derive.isDoubles;
   const rollCount = facts.rollCount;
 
-  const card = document.createElement("div");
-  card.className = "dm-widget-card dice";
-  card.setAttribute("data-testid", "dm-widget-dice");
+  const die1Span = el("span", DICE_FACES[die1 - 1]);
+  die1Span.dataset.testid = "dm-dice-die1";
 
-  card.innerHTML = `
-    <div class="dm-widget-header">Dice</div>
-    <div class="dm-widget-body">
-      <div class="dm-dice-faces">
-        <span data-testid="dm-dice-die1">${DICE_FACES[die1 - 1]}</span>
-        <span data-testid="dm-dice-die2">${DICE_FACES[die2 - 1]}</span>
-      </div>
-      <div class="dm-dice-info">
-        <span data-testid="dm-dice-total">Total: ${total}</span>
-        ${isDoubles ? '<span class="dm-doubles-badge" data-testid="dm-dice-doubles">Doubles!</span>' : ""}
-      </div>
-      <div class="dm-dice-roll-count">Rolls: ${rollCount}</div>
-      <button class="dm-btn dm-btn-sm" data-testid="dm-dice-roll">Roll</button>
-    </div>
-  `;
+  const die2Span = el("span", DICE_FACES[die2 - 1]);
+  die2Span.dataset.testid = "dm-dice-die2";
+
+  const totalSpan = el("span", `Total: ${total}`);
+  totalSpan.dataset.testid = "dm-dice-total";
+
+  const doublesEl = isDoubles
+    ? (() => {
+        const badge = el("span", { className: "dm-doubles-badge" }, "Doubles!");
+        badge.dataset.testid = "dm-dice-doubles";
+
+        return badge;
+      })()
+    : null;
+
+  const rollBtn = el("button", { className: "dm-btn dm-btn-sm" }, "Roll");
+  rollBtn.dataset.testid = "dm-dice-roll";
+
+  const card = el("div", { className: "dm-widget-card dice" },
+    el("div", { className: "dm-widget-header" }, "Dice"),
+    el("div", { className: "dm-widget-body" },
+      el("div", { className: "dm-dice-faces" }, die1Span, die2Span),
+      el("div", { className: "dm-dice-info" }, totalSpan, doublesEl),
+      el("div", { className: "dm-dice-roll-count" }, `Rolls: ${rollCount}`),
+      rollBtn,
+    ),
+  );
+  card.dataset.testid = "dm-widget-dice";
 
   widgetsArea.appendChild(card);
 
-  card
-    .querySelector('[data-testid="dm-dice-roll"]')!
-    .addEventListener("click", () => {
-      system.events.dice.roll();
-    });
+  rollBtn.addEventListener("click", () => {
+    system.events.dice.roll();
+  });
 }
 
 function renderTimeline(eventLog: EventLogEntry[]): void {
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="dm-timeline-empty">Events will appear here</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "dm-timeline-empty" }, "Events will appear here"),
+    );
 
     return;
   }
 
-  timelineEl.innerHTML = "";
+  const entries: HTMLDivElement[] = [];
   for (let i = eventLog.length - 1; i >= 0; i--) {
     const entry = eventLog[i];
-    const el = document.createElement("div");
 
     // Determine timeline entry class for color coding
     let entryClass = "loaded";
@@ -302,8 +316,6 @@ function renderTimeline(eventLog: EventLogEntry[]): void {
       entryClass = "dice";
     }
 
-    el.className = `dm-timeline-entry ${entryClass}`;
-
     const time = new Date(entry.timestamp);
     const timeStr = time.toLocaleTimeString([], {
       hour: "2-digit",
@@ -311,14 +323,15 @@ function renderTimeline(eventLog: EventLogEntry[]): void {
       second: "2-digit",
     });
 
-    el.innerHTML = `
-      <span class="dm-timeline-time">${timeStr}</span>
-      <span class="dm-timeline-event">${escapeHtml(entry.event)}</span>
-      <span class="dm-timeline-detail">${escapeHtml(entry.detail)}</span>
-    `;
-
-    timelineEl.appendChild(el);
+    entries.push(
+      el("div", { className: `dm-timeline-entry ${entryClass}` },
+        el("span", { className: "dm-timeline-time" }, timeStr),
+        el("span", { className: "dm-timeline-event" }, entry.event),
+        el("span", { className: "dm-timeline-detail" }, entry.detail),
+      ),
+    );
   }
+  timelineEl.replaceChildren(...entries);
 }
 
 // ============================================================================
@@ -393,17 +406,6 @@ resetBtn.addEventListener("click", () => resetDemo());
 // ============================================================================
 
 setupSubscriptions();
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

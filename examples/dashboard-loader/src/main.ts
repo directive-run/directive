@@ -7,6 +7,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   type ResourceState,
   dashboardLoaderModule,
@@ -126,24 +127,35 @@ function renderCard(
 
   // Body
   if (res.status === "idle") {
-    bodyEl.innerHTML =
-      '<span class="dl-loading-msg" style="color: var(--brand-text-faint); font-style: italic;">Waiting to start</span>';
+    bodyEl.replaceChildren(
+      el("span", { className: "dl-loading-msg", style: "color: var(--brand-text-faint); font-style: italic;" } as any, "Waiting to start"),
+    );
   } else if (res.status === "loading") {
-    bodyEl.innerHTML =
-      '<span class="dl-loading-msg"><span class="dl-spinner"></span> Fetching data...</span>';
+    bodyEl.replaceChildren(
+      el("span", { className: "dl-loading-msg" },
+        el("span", { className: "dl-spinner" }),
+        " Fetching data...",
+      ),
+    );
   } else if (res.status === "success" && res.data) {
     const data = res.data as Record<string, unknown>;
-    let preview = "";
-    for (const [key, val] of Object.entries(data)) {
-      const displayVal = Array.isArray(val) ? val.join(", ") : String(val);
-      preview += `<div><span class="dl-data-label">${escapeHtml(key)}</span> ${escapeHtml(displayVal)}</div>`;
-    }
-    bodyEl.innerHTML = `<div class="dl-data-preview">${preview}</div>`;
+    bodyEl.replaceChildren(
+      el("div", { className: "dl-data-preview" },
+        ...Object.entries(data).map(([key, val]) => {
+          const displayVal = Array.isArray(val) ? val.join(", ") : String(val);
+
+          return el("div",
+            el("span", { className: "dl-data-label" }, key),
+            ` ${displayVal}`,
+          );
+        }),
+      ),
+    );
   } else if (res.status === "error") {
-    bodyEl.innerHTML = `
-      <span class="dl-error-msg">${escapeHtml(res.error ?? "Unknown error")}</span>
-      <button class="dl-btn retry-btn" data-testid="${retryTestId}" data-resource="${resourceKey}">Retry</button>
-    `;
+    bodyEl.replaceChildren(
+      el("span", { className: "dl-error-msg" }, res.error ?? "Unknown error"),
+      el("button", { className: "dl-btn retry-btn", dataset: { testid: retryTestId, resource: resourceKey } } as any, "Retry"),
+    );
   }
 }
 
@@ -220,16 +232,14 @@ function render(): void {
 
   // Timeline
   if (eventLog.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="dl-timeline-empty">Events will appear here when loading starts</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "dl-timeline-empty" }, "Events will appear here when loading starts"),
+    );
   } else {
-    timelineEl.innerHTML = "";
+    const entries = [];
     // Show newest first
     for (let i = eventLog.length - 1; i >= 0; i--) {
       const entry = eventLog[i];
-      const el = document.createElement("div");
-      el.className = `dl-timeline-entry ${entry.event}`;
-
       const time = new Date(entry.timestamp);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -237,14 +247,16 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="dl-timeline-time">${timeStr}</span>
-        <span class="dl-timeline-resource">${escapeHtml(entry.resource)}</span>
-        <span class="dl-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
-
-      timelineEl.appendChild(el);
+      entries.push(
+        el("div", { className: `dl-timeline-entry ${entry.event}` },
+          el("span", { className: "dl-timeline-time" }, timeStr),
+          el("span", { className: "dl-timeline-resource" }, entry.resource),
+          el("span", { className: "dl-timeline-detail" }, entry.detail),
+        ),
+      );
     }
+
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -339,17 +351,6 @@ permsFailrateSlider.addEventListener("input", () => {
     value: Number(permsFailrateSlider.value),
   });
 });
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

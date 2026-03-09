@@ -1,9 +1,10 @@
 /**
  * Time Machine — DOM Rendering & System Wiring
  *
- * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
+ * Six-section pattern: System -> DOM Refs -> Render -> Subscribe -> Controls -> Initial Render
  */
 
+import { el } from "@directive-run/el";
 import { addTimeline, schema, system, timeline } from "./module.js";
 
 // ============================================================================
@@ -48,17 +49,6 @@ const changesetStatus = document.getElementById("tm-changeset-status")!;
 
 // Timeline
 const timelineEl = document.getElementById("tm-timeline")!;
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Canvas Rendering
@@ -108,14 +98,11 @@ function render(): void {
 
   // Timeline
   if (timeline.length === 0) {
-    timelineEl.innerHTML =
-      '<div class="tm-timeline-empty">Events appear after drawing</div>';
+    timelineEl.replaceChildren(
+      el("div", { className: "tm-timeline-empty" }, "Events appear after drawing"),
+    );
   } else {
-    timelineEl.innerHTML = "";
-    for (const entry of timeline) {
-      const el = document.createElement("div");
-      el.className = `tm-timeline-entry ${entry.type}`;
-
+    const entries = timeline.map((entry) => {
       const time = new Date(entry.time);
       const timeStr = time.toLocaleTimeString([], {
         hour: "2-digit",
@@ -123,14 +110,14 @@ function render(): void {
         second: "2-digit",
       });
 
-      el.innerHTML = `
-        <span class="tm-timeline-time">${timeStr}</span>
-        <span class="tm-timeline-event">${escapeHtml(entry.event)}</span>
-        <span class="tm-timeline-detail">${escapeHtml(entry.detail)}</span>
-      `;
+      return el("div", { className: `tm-timeline-entry ${entry.type}` },
+        el("span", { className: "tm-timeline-time" }, timeStr),
+        el("span", { className: "tm-timeline-event" }, entry.event),
+        el("span", { className: "tm-timeline-detail" }, entry.detail),
+      );
+    });
 
-      timelineEl.appendChild(el);
-    }
+    timelineEl.replaceChildren(...entries);
   }
 }
 
@@ -197,13 +184,13 @@ brushSlider.addEventListener("input", () => {
 
 undoBtn.addEventListener("click", () => {
   tt.goBack();
-  addTimeline("undo", `→ snapshot #${tt.currentIndex}`, "undo");
+  addTimeline("undo", `-> snapshot #${tt.currentIndex}`, "undo");
   render();
 });
 
 redoBtn.addEventListener("click", () => {
   tt.goForward();
-  addTimeline("redo", `→ snapshot #${tt.currentIndex}`, "redo");
+  addTimeline("redo", `-> snapshot #${tt.currentIndex}`, "redo");
   render();
 });
 
@@ -222,7 +209,7 @@ snapshotSlider.addEventListener("input", () => {
   const idx = Number(snapshotSlider.value);
   if (idx >= 0 && idx < tt.snapshots.length) {
     tt.goTo(tt.snapshots[idx]!.id);
-    addTimeline("goto", `→ snapshot #${idx}`, "goto");
+    addTimeline("goto", `-> snapshot #${idx}`, "goto");
     render();
   }
 });
