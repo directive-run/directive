@@ -1019,12 +1019,15 @@ describe("useRequirementStatus", () => {
 
 describe("useExplain", () => {
   let scope: EffectScope;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   afterEach(() => {
     scope?.stop();
+    warnSpy?.mockRestore();
   });
 
   it("returns explanation string for a requirement", async () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mod = createModule("explaintest", {
       schema: {
         facts: {
@@ -1087,6 +1090,7 @@ describe("useExplain", () => {
   });
 
   it("updates when system state changes", async () => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const mod = createModule("explainupdate", {
       schema: {
         facts: {

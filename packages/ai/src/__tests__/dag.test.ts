@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { composePatterns, dag } from "../multi-agent-orchestrator.js";
 import {
   assertDagExecution,
@@ -1105,6 +1105,7 @@ describe("DAG: single-node (degenerate)", () => {
 
 describe("DAG: composePatterns integration", () => {
   it("composes a DAG with a sequential pattern", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: {
         researcher: { agent: { name: "researcher" } },
@@ -1139,9 +1140,11 @@ describe("DAG: composePatterns integration", () => {
     // All agents should have been called
     const calls = orchestrator.getCalls();
     expect(calls.length).toBeGreaterThanOrEqual(3);
+    debugSpy.mockRestore();
   });
 
   it("DAG output feeds as input to next pattern", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
     let writerInput = "";
 
     const orchestrator = createTestMultiAgentOrchestrator({
@@ -1177,6 +1180,7 @@ describe("DAG: composePatterns integration", () => {
 
     // Writer should receive the stringified DAG output
     expect(writerInput).toContain("dag-output");
+    debugSpy.mockRestore();
   });
 });
 
