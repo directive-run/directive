@@ -15,6 +15,7 @@
  * - No asCombined() helper needed
  */
 
+import { el } from "@directive-run/el";
 import { getFacts, system } from "./system";
 
 // DOM Elements

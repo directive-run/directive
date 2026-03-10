@@ -670,6 +670,7 @@ export function createEngine<S extends Schema>(
 
   // Reconcile depth guard — prevents runaway reconcile → scheduleReconcile chains
   const MAX_RECONCILE_DEPTH = 50;
+  const MAX_DEFERRED_REGISTRATIONS = 100;
   let reconcileDepth = 0;
 
   // Engine state
@@ -758,6 +759,11 @@ export function createEngine<S extends Schema>(
 
     // If reconciling, defer
     if (state.isReconciling) {
+      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
+        throw new Error(
+          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
+        );
+      }
       deferredRegistrations.push({ op: "register", type, id, def });
 
       return;
@@ -777,6 +783,11 @@ export function createEngine<S extends Schema>(
     validateDefId(id);
 
     if (state.isReconciling) {
+      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
+        throw new Error(
+          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
+        );
+      }
       deferredRegistrations.push({ op: "assign", type, id, def });
 
       return;
@@ -796,6 +807,11 @@ export function createEngine<S extends Schema>(
     validateDefId(id);
 
     if (state.isReconciling) {
+      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
+        throw new Error(
+          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
+        );
+      }
       deferredRegistrations.push({ op: "unregister", type, id });
 
       return;

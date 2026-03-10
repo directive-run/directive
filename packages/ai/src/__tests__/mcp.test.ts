@@ -429,6 +429,7 @@ describe("callToolDirect", () => {
     const adapter = createMCPAdapter({
       servers: [serverConfig("fs")],
       clientFactory: () => client,
+      allowDirectCalls: true,
       toolConstraints: {
         "fs.write_file": { when: () => false },
       },

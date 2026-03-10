@@ -23,6 +23,7 @@
  * ```
  */
 
+import path from "node:path";
 import { cosineSimilarity } from "./guardrails/semantic-cache.js";
 import type { EmbedderFn, Embedding } from "./guardrails/semantic-cache.js";
 
@@ -228,6 +229,36 @@ export interface JSONFileStoreOptions {
   mapEntry?: (entry: Record<string, unknown>) => RAGChunk;
   /** Cache TTL in ms. 0 = cache forever (default) */
   ttlMs?: number;
+  /** Base directory to confine file access. Resolved paths must start with this. */
+  baseDir?: string;
+}
+
+/**
+ * Validate that a file path does not escape the allowed directory.
+ * Resolves the path, rejects `..` segments, and (if baseDir is provided)
+ * ensures the resolved path is inside the base directory.
+ */
+function validateFilePath(filePath: string, baseDir?: string): string {
+  const resolved = path.resolve(filePath);
+
+  // Defense in depth: reject paths that still contain ".." after resolution
+  const segments = resolved.split(path.sep);
+  if (segments.includes("..")) {
+    throw new Error(
+      `[Directive] File path escapes allowed directory: ${filePath}`,
+    );
+  }
+
+  if (baseDir) {
+    const resolvedBase = path.resolve(baseDir) + path.sep;
+    if (!resolved.startsWith(resolvedBase) && resolved !== resolvedBase.slice(0, -1)) {
+      throw new Error(
+        `[Directive] File path escapes allowed directory: ${filePath}`,
+      );
+    }
+  }
+
+  return resolved;
 }
 
 /**
@@ -235,7 +266,8 @@ export interface JSONFileStoreOptions {
  * Uses dynamic `import('node:fs')` for isomorphic safety.
  */
 export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
-  const { filePath, mapEntry, ttlMs = 0 } = options;
+  const { filePath, mapEntry, ttlMs = 0, baseDir } = options;
+  const resolvedPath = validateFilePath(filePath, baseDir);
   let cached: RAGChunk[] | null = null;
   let cachedAt = 0;
 
@@ -246,7 +278,7 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
 
     try {
       const fs = await import("node:fs");
-      const data = await fs.promises.readFile(filePath, "utf-8");
+      const data = await fs.promises.readFile(resolvedPath, "utf-8");
       const raw = JSON.parse(data) as Record<string, unknown>[];
 
       cached = mapEntry ? raw.map(mapEntry) : (raw as unknown as RAGChunk[]);
@@ -259,7 +291,7 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
         process.env?.NODE_ENV === "development"
       ) {
         console.warn(
-          `[Directive] JSONFileStore: failed to load ${filePath}:`,
+          `[Directive] JSONFileStore: failed to load ${resolvedPath}:`,
           err,
         );
       }
