@@ -78,17 +78,18 @@ If you're using Node.js module resolution, you may need to set `"moduleResolutio
 
 ## Bundle Size
 
-Directive is designed to be lightweight:
+Directive ships tree-shakeable ESM and CJS builds:
 
 | Export | Minified | Gzipped |
 |--------|----------|---------|
-| `@directive-run/core` | ~8 KB | ~3 KB |
-| `@directive-run/react` | ~2 KB | ~1 KB |
-| `@directive-run/vue` | ~2 KB | ~1 KB |
-| `@directive-run/svelte` | ~2 KB | ~1 KB |
-| `@directive-run/solid` | ~2 KB | ~1 KB |
-| `@directive-run/lit` | ~2 KB | ~1 KB |
-| `@directive-run/core/plugins` | ~4 KB | ~1.5 KB |
+| `@directive-run/core` | ~97 KB | ~28 KB |
+| `@directive-run/react` | ~12 KB | ~4 KB |
+| `@directive-run/vue` | ~6 KB | ~2 KB |
+| `@directive-run/svelte` | ~6 KB | ~2 KB |
+| `@directive-run/solid` | ~6 KB | ~2 KB |
+| `@directive-run/lit` | ~11 KB | ~3 KB |
+| `@directive-run/el` | ~1.3 KB | ~0.6 KB |
+| `@directive-run/core/plugins` | ~55 KB | ~17 KB |
 
 All exports are tree-shakeable. Import only what you use.
 

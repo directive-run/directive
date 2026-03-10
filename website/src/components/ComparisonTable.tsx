@@ -229,7 +229,7 @@ const sections: Section[] = [
 
           XState: "~14KB",
           "React Query": "~13KB",
-          Directive: "~3KB",
+          Directive: "~28KB*",
         },
       },
       {
@@ -451,6 +451,10 @@ export function ComparisonTable() {
           </tbody>
         </table>
       </div>
+      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        * Core includes constraint engine, time-travel debugging, and plugin
+        system. Tree-shakeable – typical usage is smaller.
+      </p>
     </div>
   );
 }

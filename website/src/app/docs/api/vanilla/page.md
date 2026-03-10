@@ -1,9 +1,9 @@
 ---
 title: Vanilla API
-description: Complete API reference for @directive-run/el — el(), bind(), bindText(), mount(), JSX runtime, and htm tagged templates.
+description: Complete API reference for @directive-run/el – el(), bind(), bindText(), mount(), JSX runtime, and htm tagged templates.
 ---
 
-Vanilla adapter API reference. Three entry points — main package, JSX runtime, and htm binding. {% .lead %}
+Vanilla adapter API reference. Three entry points – main package, JSX runtime, and htm binding. {% .lead %}
 
 ---
 
@@ -57,7 +57,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 | `propsOrChild` | `Partial<HTMLElementTagNameMap[K]> \| ElChild` | Props object or first child (auto-detected) |
 | `children` | `ElChild[]` | Additional children |
 
-**Returns:** `HTMLElementTagNameMap[K]` — the typed DOM element.
+**Returns:** `HTMLElementTagNameMap[K]` – the typed DOM element.
 
 **Props auto-detection:** If the second argument is a string, number, boolean, `null`, `undefined`, `Node`, or array, it is treated as a child. Plain objects are treated as props.
 
@@ -118,7 +118,7 @@ function bind<E extends HTMLElement>(
 | `element` | `E extends HTMLElement` | The element to bind |
 | `updater` | `(el, facts, derived) => void` | Called on every state change |
 
-**Returns:** `() => void` — cleanup function that unsubscribes.
+**Returns:** `() => void` – cleanup function that unsubscribes.
 
 ```typescript
 const span = el("span");
@@ -157,7 +157,7 @@ function bindText(
 | `element` | `HTMLElement` | The element to bind |
 | `selector` | `(facts, derived) => string` | Returns the text to display |
 
-**Returns:** `() => void` — cleanup function that unsubscribes.
+**Returns:** `() => void` – cleanup function that unsubscribes.
 
 ```typescript
 const label = el("span");
@@ -192,7 +192,7 @@ function mount(
 | `container` | `HTMLElement` | The container whose children are replaced |
 | `renderer` | `(facts, derived) => Node \| Node[]` | Returns the new children |
 
-**Returns:** `() => void` — cleanup function that unsubscribes.
+**Returns:** `() => void` – cleanup function that unsubscribes.
 
 The renderer can return a single `Node` or an array of `Node`s:
 
@@ -231,7 +231,7 @@ The JSX runtime allows writing JSX that compiles to `el()` calls without React.
 function jsx(type: string, props: Record<string, unknown>): HTMLElement
 ```
 
-These are called by the JSX compiler — you don't call them directly. They extract `children` from props and pass everything else to `el()`.
+These are called by the JSX compiler – you don't call them directly. They extract `children` from props and pass everything else to `el()`.
 
 ### Fragment
 
@@ -280,7 +280,7 @@ import { html } from "@directive-run/el/htm";
 const element = html`<div className="card">Hello</div>`;
 ```
 
-`html` is `htm.bind(el)` — it parses the tagged template and calls `el()` for each element. Supports interpolation, nested elements, event handlers, and array children.
+`html` is `htm.bind(el)` – it parses the tagged template and calls `el()` for each element. Supports interpolation, nested elements, event handlers, and array children.
 
 ---
 
@@ -297,7 +297,7 @@ const element = html`<div className="card">Hello</div>`;
 
 | Entry | ESM | CJS |
 |-------|-----|-----|
-| `@directive-run/el` | 1.2 KB | 1.3 KB |
+| `@directive-run/el` | 1.3 KB | 1.4 KB |
 | `@directive-run/el/jsx-runtime` | 0.7 KB | 0.8 KB |
 | `@directive-run/el/htm` | 0.6 KB | 0.7 KB |
 
