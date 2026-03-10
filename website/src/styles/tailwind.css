@@ -135,8 +135,8 @@
     display: none;
   }
 
-  .devtools-panel button,
-  .devtools-panel a {
+  button,
+  [role="button"] {
     cursor: pointer;
   }
 }
