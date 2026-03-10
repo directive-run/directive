@@ -16,7 +16,7 @@ import {
 import Link from "next/link";
 
 export const metadata = buildPageMetadata({
-  title: "About — Directive",
+  title: "About – Directive",
   description:
     "Learn about the Directive project, its constraint-driven philosophy, and the team behind it.",
   path: "/about",
@@ -30,7 +30,7 @@ const projectStats = [
   },
   {
     label: "Zero Dependencies",
-    description: "Tree-shakeable, ~27KB gzipped",
+    description: "Tree-shakeable, ~28KB gzipped",
     icon: Package,
   },
   {
