@@ -298,6 +298,8 @@ export interface MCPAdapterConfig {
   debug?: boolean;
   /** Approval timeout in milliseconds (default: 300000 = 5 minutes) */
   approvalTimeoutMs?: number;
+  /** Allow callToolDirect() which bypasses all constraints (default: false) */
+  allowDirectCalls?: boolean;
 }
 
 // ============================================================================

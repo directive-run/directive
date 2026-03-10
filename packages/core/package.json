@@ -75,8 +75,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "postinstall": "echo \"Tip: Run 'npx directive ai-rules init' for AI coding rules, or install the Claude Code plugin: /plugin install directive@directive-plugins\""
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@types/node": "^25.2.0",

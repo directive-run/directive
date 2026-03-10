@@ -13,6 +13,7 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   debounceSearchModule,
   debounceSearchSchema,
@@ -84,15 +85,6 @@ const tickInterval = setInterval(() => {
 
 // Sliders
 
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function escapeHtml(text: string): string {
-
-  return div.innerHTML;
-}
 
 // ============================================================================
 // Initial Render

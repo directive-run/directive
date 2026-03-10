@@ -16,7 +16,7 @@ export type ElChild =
   | ElChild[];
 
 /** Props that must never be set via Object.assign (XSS vectors). */
-const BLOCKED_PROPS = new Set(["innerHTML", "outerHTML"]);
+const BLOCKED_PROPS = new Set(["innerHTML", "outerHTML", "srcdoc"]);
 
 function isProps(value: unknown): value is Record<string, unknown> {
   return (

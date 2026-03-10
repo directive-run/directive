@@ -15,6 +15,7 @@ import {
   getResetMinutes,
   isRateLimited,
 } from "@/lib/rate-limit";
+import { createPromptInjectionGuardrail } from "@directive-run/ai";
 import { createAnthropicRunner } from "@directive-run/ai/anthropic";
 import { createOpenAIRunner } from "@directive-run/ai/openai";
 import {
@@ -109,6 +110,28 @@ export async function POST(request: Request) {
   // -------------------------------------------------------------------------
 
   if (isByok) {
+    // M16: Run prompt-injection guardrail on BYOK path
+    const injectionGuardrail = createPromptInjectionGuardrail({
+      strictMode: false,
+    });
+    const guardResult = injectionGuardrail(
+      { input: message, agentName: "data-pipeline" },
+      { agentName: "data-pipeline", input: message, facts: {} },
+    );
+    const resolved =
+      guardResult instanceof Promise ? await guardResult : guardResult;
+    if (resolved && typeof resolved === "object" && "passed" in resolved) {
+      if (!resolved.passed) {
+        return Response.json(
+          {
+            error:
+              "Your message was flagged by our safety filter. Please rephrase your question.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const runner =
       clientProvider === "openai"
         ? createOpenAIRunner({ apiKey: clientApiKey!, model: "gpt-4o-mini" })
@@ -147,10 +170,12 @@ export async function POST(request: Request) {
 
           send({ type: "text", text: String(result.output) });
           send({ type: "done" });
-        } catch (err) {
+        } catch (_err) {
+          // M15: Sanitize error messages — never leak raw API errors to client
           send({
             type: "error",
-            message: err instanceof Error ? err.message : "Pipeline failed",
+            message:
+              "An error occurred processing your request. Please check your API key and try again.",
           });
         } finally {
           try {
@@ -162,15 +187,20 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
+    // M14: Replace CORS wildcard with validated origin
+    const origin = request.headers.get("origin");
+    const sseHeaders: Record<string, string> = {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    };
+
+    if (origin) {
+      sseHeaders["Access-Control-Allow-Origin"] = origin;
+    }
+
+    return new Response(stream, { headers: sseHeaders });
   }
 
   // Server key path — 503 if not configured
