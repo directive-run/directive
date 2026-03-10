@@ -291,6 +291,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
     autoConnect = false,
     autoReconnect = true,
     debug = false,
+    allowDirectCalls = false,
   } = config;
 
   // Warn if using stub client in production
@@ -461,6 +462,31 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
     });
   }
 
+  // Validate stdio command to prevent shell injection
+  function validateStdioCommand(serverConfig: MCPServerConfig): void {
+    const shellMetachars = /[;|&$`><]/;
+
+    if (serverConfig.command) {
+      if (shellMetachars.test(serverConfig.command)) {
+        throw new Error(
+          `[Directive MCP] Stdio command for server '${serverConfig.name}' contains shell metacharacters: '${serverConfig.command}'. ` +
+            `This may indicate a command injection vulnerability. Use 'args' for command arguments instead.`,
+        );
+      }
+    }
+
+    if (serverConfig.args) {
+      for (const arg of serverConfig.args) {
+        if (shellMetachars.test(arg)) {
+          throw new Error(
+            `[Directive MCP] Stdio argument for server '${serverConfig.name}' contains shell metacharacters: '${arg}'. ` +
+              `This may indicate a command injection vulnerability.`,
+          );
+        }
+      }
+    }
+  }
+
   // Connect to a server
   async function connectServer(name: string): Promise<void> {
     const serverState = state.servers.get(name);
@@ -470,6 +496,11 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
 
     if (serverState.status === "connected") {
       return;
+    }
+
+    // Validate stdio commands before connecting
+    if (serverState.config.transport === "stdio") {
+      validateStdioCommand(serverState.config);
     }
 
     serverState.status = "connecting";
@@ -775,6 +806,16 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
     },
 
     async callToolDirect(server, tool, args) {
+      if (!allowDirectCalls) {
+        throw new Error(
+          "[Directive] callToolDirect is disabled by default. Pass { allowDirectCalls: true } to enable unconstrained tool calls.",
+        );
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[Directive] callToolDirect bypasses all constraints (rate limits, approvals, timeouts).",
+        );
+      }
       const serverState = state.servers.get(server);
       if (!serverState) {
         throw new Error(

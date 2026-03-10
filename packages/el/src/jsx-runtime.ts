@@ -32,7 +32,7 @@ export namespace JSX {
 }
 
 /** Props that must never be set via Object.assign (XSS vectors). */
-const BLOCKED_PROPS = new Set(["innerHTML", "outerHTML"]);
+const BLOCKED_PROPS = new Set(["innerHTML", "outerHTML", "srcdoc"]);
 
 export function jsx(
   type: string | ((props: Record<string, unknown>) => Node),
