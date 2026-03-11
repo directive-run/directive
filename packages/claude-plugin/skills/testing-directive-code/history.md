@@ -213,28 +213,31 @@ history.goForward();
 console.log(system.facts.text); // "Hello, world"
 ```
 
-## Changesets: Grouping Related Changes
+## How Snapshots Work
 
-Multiple fact mutations can be grouped into a single undoable unit.
+Snapshots are taken **once per reconciliation cycle**, not per individual fact change. All synchronous fact mutations within the same event handler batch into a single snapshot. One `goBack()` reverts all changes from that event.
+
+## Changesets: Grouping Multiple Events
+
+Changesets group snapshots from **multiple separate events** into one undo/redo unit. Useful when a single user action triggers a sequence of events.
 
 ```typescript
 const history = system.history!;
 
-// Without changeset — each mutation is a separate snapshot
-system.facts.firstName = "Alice";
-system.facts.lastName = "Smith";
-// Two snapshots, two goBack() calls needed
+// Two separate events = two snapshots
+system.events.pickUp({ index: 0 });      // → snapshot 1
+system.events.place({ from: 0, to: 1 }); // → snapshot 2
+// goBack() only reverts the place — need two goBack() calls
 
 // With changeset — grouped into one undo unit
-history.beginChangeset("Update user name");
-system.facts.firstName = "Alice";
-system.facts.lastName = "Smith";
+history.beginChangeset("Move piece");
+system.events.pickUp({ index: 0 });      // → snapshot 1 ─┐
+system.events.place({ from: 0, to: 1 }); // → snapshot 2 ─┘ grouped
 history.endChangeset();
-// One goBack() restores both
-
-history.goBack();
-// Both firstName and lastName are restored
+// One goBack() reverts both events
 ```
+
+Always close your changesets. If you forget `endChangeset()`, all subsequent mutations get grouped into the same changeset.
 
 ## Exporting and Importing History
 
