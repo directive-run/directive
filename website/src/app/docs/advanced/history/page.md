@@ -201,25 +201,103 @@ if (history) {
 
 ---
 
-## Undo Groups (Changesets)
+## How Snapshots Work
 
-A single user action often produces multiple snapshots (e.g., moving a piece changes the board, clears selection, and switches turns). Without grouping, undo goes back one snapshot – not one logical action.
-
-Use `beginChangeset` / `endChangeset` to group snapshots into a single undo/redo unit:
+Snapshots are taken **once per reconciliation cycle**, not per individual fact change. All synchronous fact mutations within the same event handler batch into a single snapshot:
 
 ```typescript
-const history = system.history;
+events: {
+  movePiece: (facts, { from, to }) => {
+    facts.cells[to] = facts.cells[from];  // ─┐
+    facts.cells[from] = "";                //  ├─ One reconcile cycle = one snapshot
+    facts.selected = -1;                   //  │
+    facts.turn = facts.turn === "white"    //  │
+      ? "black" : "white";                 // ─┘
+  },
+},
+```
 
-if (history) {
-  // Group multiple snapshots into one logical "undo" unit
-  history.beginChangeset("Move piece from A to B");
-  // ... multiple fact mutations happen here ...
-  history.endChangeset();
+One `goBack()` reverts all four changes — no changeset needed for a single event.
 
-  // Undo reverts the entire changeset, not individual snapshots
-  history.goBack();
+---
+
+## Undo Groups (Changesets)
+
+Changesets group snapshots from **multiple separate events** into one undo/redo unit. This is useful when a single user action triggers a sequence of events.
+
+For example, a drag-and-drop move might require two separate events — one to pick up, one to place:
+
+```typescript
+const board = createModule("board", {
+  schema: {
+    cells: t.array<string>(),
+    selected: t.number(),
+    turn: t.string<"white" | "black">(),
+  },
+
+  events: {
+    pickUp: (facts, { index }: { index: number }) => {
+      facts.selected = index;
+      // → snapshot 1
+    },
+    place: (facts, { from, to }: { from: number; to: number }) => {
+      facts.cells[to] = facts.cells[from];
+      facts.cells[from] = "";
+      facts.selected = -1;
+      facts.turn = facts.turn === "white" ? "black" : "white";
+      // → snapshot 2
+    },
+  },
+});
+```
+
+### Without a changeset
+
+```typescript
+system.events.pickUp({ index: 0 });   // Snapshot 1
+system.events.place({ from: 0, to: 1 }); // Snapshot 2
+
+system.history!.goBack(); // Only reverts the place — piece is selected but not moved
+system.history!.goBack(); // Now reverts the pickup
+```
+
+Two `goBack()` calls for what the user sees as one action.
+
+### With a changeset
+
+```typescript
+const history = system.history!;
+
+history.beginChangeset("Move piece 0 → 1");
+system.events.pickUp({ index: 0 });
+system.events.place({ from: 0, to: 1 });
+history.endChangeset();
+// Two snapshots, but grouped as one changeset
+
+history.goBack(); // Reverts both — one undo for one user action
+```
+
+### In a React component
+
+```tsx
+function Board() {
+  const { facts, events } = useDirective(boardModule);
+  const history = useHistory(system);
+
+  function handleDrop(from: number, to: number) {
+    history?.beginChangeset(`Move ${from} → ${to}`);
+    events.pickUp({ index: from });
+    events.place({ from, to });
+    history?.endChangeset();
+  }
+
+  return <BoardGrid cells={facts.cells} onDrop={handleDrop} />;
 }
 ```
+
+{{ note }}
+Always close your changesets. If you forget `endChangeset()`, all subsequent mutations get grouped into the same changeset — causing undo to revert far more than intended.
+{{ /note }}
 
 ---
 
