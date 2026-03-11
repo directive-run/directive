@@ -65,6 +65,7 @@ export const docsNavigation: NavigationSection[] = [
     links: [
       { title: "Overview", href: "/docs/advanced/overview" },
       { title: "Multi-Module", href: "/docs/advanced/multi-module" },
+      { title: "Runtime Dynamics", href: "/docs/advanced/runtime" },
       { title: "History & Snapshots", href: "/docs/advanced/history" },
       { title: "SSR & Hydration", href: "/docs/advanced/ssr" },
       { title: "Error Boundaries", href: "/docs/advanced/errors" },

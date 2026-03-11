@@ -1519,8 +1519,10 @@ export function createEngine<S extends Schema>(
       disable: (id: string) => constraintsManager.disable(id),
       enable: (id: string) => constraintsManager.enable(id),
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
-      register: (id: string, def: Record<string, unknown>) => registerDefinition("constraint", id, def),
-      assign: (id: string, def: Record<string, unknown>) => assignDefinition("constraint", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
+      register: (id: string, def: any) => registerDefinition("constraint", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
+      assign: (id: string, def: any) => assignDefinition("constraint", id, def),
       unregister: (id: string) => unregisterDefinition("constraint", id),
       call: (id: string, props?: Record<string, unknown>) => callDefinition("constraint", id, props) as Promise<Record<string, unknown>[]>,
       isDynamic: (id: string) => dynamicIds.constraints.has(id),
@@ -1530,16 +1532,20 @@ export function createEngine<S extends Schema>(
       disable: (id: string) => effectsManager.disable(id),
       enable: (id: string) => effectsManager.enable(id),
       isEnabled: (id: string) => effectsManager.isEnabled(id),
-      register: (id: string, def: Record<string, unknown>) => registerDefinition("effect", id, def),
-      assign: (id: string, def: Record<string, unknown>) => assignDefinition("effect", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
+      register: (id: string, def: any) => registerDefinition("effect", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
+      assign: (id: string, def: any) => assignDefinition("effect", id, def),
       unregister: (id: string) => unregisterDefinition("effect", id),
       call: (id: string) => callDefinition("effect", id) as Promise<void>,
       isDynamic: (id: string) => dynamicIds.effects.has(id),
       listDynamic: () => [...dynamicIds.effects],
     },
     resolvers: {
-      register: (id: string, def: Record<string, unknown>) => registerDefinition("resolver", id, def),
-      assign: (id: string, def: Record<string, unknown>) => assignDefinition("resolver", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
+      register: (id: string, def: any) => registerDefinition("resolver", id, def),
+      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
+      assign: (id: string, def: any) => assignDefinition("resolver", id, def),
       unregister: (id: string) => unregisterDefinition("resolver", id),
       call: (id: string, requirement: { type: string; [key: string]: unknown }) => callDefinition("resolver", id, requirement) as Promise<void>,
       isDynamic: (id: string) => dynamicIds.resolvers.has(id),

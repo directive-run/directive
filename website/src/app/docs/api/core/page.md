@@ -261,6 +261,44 @@ system.registerModule(name: string, module: ModuleDef): void
 
 The module is immediately wired into the constraint, resolver, effect, and derivation graphs. Throws if called during reconciliation or on a destroyed system.
 
+### getOriginal
+
+Get the original definition that was overridden by `assign()`.
+
+```typescript
+system.getOriginal(
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string
+): unknown | undefined
+```
+
+Returns the original module-defined definition, or `undefined` if no original exists for this type/id.
+
+```typescript
+// After overriding a constraint with assign()
+const original = system.getOriginal("constraint", "transition");
+```
+
+### restoreOriginal
+
+Restore the original definition that was overridden by `assign()`.
+
+```typescript
+system.restoreOriginal(
+  type: "constraint" | "resolver" | "derivation" | "effect",
+  id: string
+): boolean
+```
+
+Re-assigns the original definition and removes the override tracking. Returns `true` if restoration succeeded, `false` if no original exists.
+
+```typescript
+// Restore a previously overridden constraint
+system.restoreOriginal("constraint", "transition"); // true
+```
+
+See [Runtime Dynamics](/docs/advanced/runtime) for the full override lifecycle.
+
 ### dispatch
 
 Dispatch an event.
@@ -440,7 +478,7 @@ interface DistributableSnapshotOptions {
 ```
 
 ```typescript
-// Export selected derivations (default behavior — safe to distribute)
+// Export selected derivations (default behavior – safe to distribute)
 const snapshot = system.getDistributableSnapshot({
   includeDerivations: ["effectivePlan", "canUseFeature"],
   ttlSeconds: 3600,

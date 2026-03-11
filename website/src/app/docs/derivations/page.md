@@ -409,49 +409,16 @@ Derivations recompute whenever their dependencies change. For expensive operatio
 
 ## Runtime Registration
 
-Register, override, or remove derivations at runtime — useful for plugin-provided computed values or dynamic business rules:
+Derivations support dynamic registration and overrides:
 
 ```typescript
-// Register a new derivation at runtime
 system.derive.register("tripled", (facts) => facts.count * 3);
-
-// Access it like any other derivation
-system.derive.tripled; // => 15
-
-// Override an existing derivation's logic
 system.derive.assign("doubled", (facts) => facts.count * 20);
-
-// Remove a dynamically registered derivation
 system.derive.unregister("tripled");
-
-// Recompute a derivation (ignores cache)
-const value = system.derive.call("doubled");
+system.derive.call("doubled"); // recompute, ignoring cache
 ```
 
-### Introspection
-
-```typescript
-system.derive.isDynamic("tripled");   // true
-system.derive.isDynamic("doubled");   // false (module-defined)
-system.derive.listDynamic();          // ["tripled"]
-```
-
-{% callout type="warning" title="Reserved names" %}
-Derivation IDs cannot be `register`, `assign`, `unregister`, `call`, `isDynamic`, or `listDynamic` — these names are reserved for the runtime registration methods on the `derive` proxy.
-{% /callout %}
-
-### Semantics
-
-| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
-|--------|-------------------|---------------------|--------------------|
-| `register` | throws | throws | creates |
-| `assign` | overrides | overrides | throws |
-| `unregister` | dev warning, no-op | removes | dev warning, no-op |
-| `call` | recomputes | recomputes | throws |
-
-{% callout type="note" title="Deferred during reconciliation" %}
-If you call `register`, `assign`, or `unregister` during a reconciliation cycle, the operation is automatically deferred and applied after the current cycle completes.
-{% /callout %}
+All four subsystems (constraints, effects, resolvers, derivations) share the same registration interface. See [Runtime Dynamics](/docs/advanced/runtime) for the full semantics table, introspection methods, and use cases.
 
 ---
 

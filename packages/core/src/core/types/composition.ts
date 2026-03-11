@@ -631,15 +631,15 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   /** History API for undo/redo, rollback, audit trails (if enabled) */
   readonly history: HistoryAPI | null;
   /** Direct derivations accessor: system.derive.doubled */
-  readonly derive: InferDerivations<S> & DerivationsControl;
+  readonly derive: InferDerivations<S> & DerivationsControl<S>;
   /** Direct events accessor: system.events.increment() */
   readonly events: SingleModuleEvents<S>;
   /** Runtime control for constraints (disable/enable/isDisabled) */
-  readonly constraints: ConstraintsControl;
+  readonly constraints: ConstraintsControl<S>;
   /** Runtime control for effects (disable/enable/isEnabled) */
-  readonly effects: EffectsControl;
+  readonly effects: EffectsControl<S>;
   /** Runtime control for resolvers (register/assign/unregister/call) */
-  readonly resolvers: ResolversControl;
+  readonly resolvers: ResolversControl<S>;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 

@@ -400,68 +400,19 @@ constraints: {
 
 ---
 
-## Runtime Control
+## Runtime Control & Registration
 
-Disable or enable constraints at runtime without removing them from the module definition:
+Constraints support enable/disable toggling and dynamic registration:
 
 ```typescript
-// Disable a constraint – its when() function won't be called
 system.constraints.disable("expensiveCheck");
-
-// Re-enable it for future reconciliation cycles
 system.constraints.enable("expensiveCheck");
+system.constraints.register("override", { when: ..., require: ... });
+system.constraints.assign("existing", { when: ..., require: ... });
+system.constraints.unregister("override");
 ```
 
-This is useful for feature flags, A/B testing, or temporarily suppressing constraints during maintenance windows. Disabled constraints are skipped entirely – their `when()` function is never called.
-
----
-
-## Runtime Registration
-
-Register, override, or remove constraints at runtime — useful for A/B testing, plugin-provided rules, or admin overrides:
-
-```typescript
-// Register a new constraint at runtime
-system.constraints.register("emergencyOverride", {
-  when: (facts) => facts.emergencyVehicle === true,
-  require: { type: "TRANSITION", to: "green" },
-  priority: 100,
-});
-
-// Override an existing constraint's logic
-system.constraints.assign("transition", {
-  when: (facts) => facts.phase === "red" && facts.elapsed > 10,
-  require: { type: "TRANSITION", to: "green" },
-  priority: 200,
-});
-
-// Remove a dynamically registered constraint
-system.constraints.unregister("emergencyOverride");
-
-// Invoke a constraint manually (returns its requirements)
-const reqs = await system.constraints.call("transition");
-```
-
-### Introspection
-
-```typescript
-system.constraints.isDynamic("emergencyOverride"); // true
-system.constraints.isDynamic("transition");         // false (module-defined)
-system.constraints.listDynamic();                   // ["emergencyOverride"]
-```
-
-### Semantics
-
-| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
-|--------|-------------------|---------------------|-----------------|
-| `register` | throws | throws | creates |
-| `assign` | overrides | overrides | throws |
-| `unregister` | dev warning, no-op | removes | dev warning, no-op |
-| `call` | evaluates | evaluates | throws |
-
-{% callout type="note" title="Deferred during reconciliation" %}
-If you call `register`, `assign`, or `unregister` during a reconciliation cycle (e.g., inside a resolver), the operation is automatically deferred and applied after the current cycle completes.
-{% /callout %}
+All four subsystems (constraints, effects, resolvers, derivations) share the same registration interface. See [Runtime Dynamics](/docs/advanced/runtime) for the full semantics table, introspection methods, and use cases.
 
 ---
 
