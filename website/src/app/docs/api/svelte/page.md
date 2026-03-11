@@ -578,12 +578,12 @@ function useHistory(system: System): Readable<HistoryState | null>
 
 ```typescript
 interface HistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
   currentIndex: number;
   totalSnapshots: number;
+  goBack: (steps?: number) => void;
+  goForward: (steps?: number) => void;
 }
 ```
 
@@ -599,8 +599,8 @@ interface HistoryState {
 </script>
 
 {#if $tt}
-  <button on:click={$tt.undo} disabled={!$tt.canUndo}>Undo</button>
-  <button on:click={$tt.redo} disabled={!$tt.canRedo}>Redo</button>
+  <button on:click={() => $tt.goBack()} disabled={!$tt.canGoBack}>Undo</button>
+  <button on:click={() => $tt.goForward()} disabled={!$tt.canGoForward}>Redo</button>
   <span>{$tt.currentIndex + 1} / {$tt.totalSnapshots}</span>
 {/if}
 ```

@@ -731,9 +731,9 @@ Re-exported utility for use with `useSelector`:
 </script>
 
 {#if $history}
-  {@const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = $history}
-  <button on:click={undo} disabled={!canUndo}>Undo</button>
-  <button on:click={redo} disabled={!canRedo}>Redo</button>
+  {@const { canGoBack, canGoForward, goBack, goForward, currentIndex, totalSnapshots } = $history}
+  <button on:click={() => goBack()} disabled={!canGoBack}>Undo</button>
+  <button on:click={() => goForward()} disabled={!canGoForward}>Redo</button>
   <span>{currentIndex + 1} / {totalSnapshots}</span>
 {/if}
 ```

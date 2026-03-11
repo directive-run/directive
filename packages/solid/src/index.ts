@@ -671,8 +671,8 @@ export function useSuspenseRequirement(
  *
  * @example
  * ```tsx
- * const tt = useHistory(system);
- * <button disabled={!tt()?.canUndo} onClick={() => tt()?.undo()}>Undo</button>
+ * const history = useHistory(system);
+ * <button disabled={!history()?.canGoBack} onClick={() => history()?.goBack()}>Undo</button>
  * ```
  */
 export function useHistory(

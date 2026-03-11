@@ -48,8 +48,8 @@ export const TestIds = {
   reqStatusLoading: "req-status-loading",
 
   // useHistory
-  historyCanUndo: "history-can-undo",
-  historyCanRedo: "history-can-redo",
+  historyCanGoBack: "history-can-go-back",
+  historyCanGoForward: "history-can-go-forward",
   historyIndex: "history-index",
   historyTotal: "history-total",
   historyEnabled: "history-enabled",
@@ -66,8 +66,8 @@ export const TestIds = {
   btnAddItem: "btn-add-item",
   btnReset: "btn-reset",
   btnTriggerLoad: "btn-trigger-load",
-  btnUndo: "btn-undo",
-  btnRedo: "btn-redo",
+  btnGoBack: "btn-go-back",
+  btnGoForward: "btn-go-forward",
   btnMutate: "btn-mutate",
   btnRollback: "btn-rollback",
   btnDispatchIncrement: "btn-dispatch-increment",

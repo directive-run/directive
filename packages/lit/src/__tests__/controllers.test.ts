@@ -826,10 +826,10 @@ describe("HistoryController", () => {
     expect(controller.value).not.toBeNull();
     expect(controller.value).toEqual(
       expect.objectContaining({
-        canUndo: expect.any(Boolean),
-        canRedo: expect.any(Boolean),
-        undo: expect.any(Function),
-        redo: expect.any(Function),
+        canGoBack: expect.any(Boolean),
+        canGoForward: expect.any(Boolean),
+        goBack: expect.any(Function),
+        goForward: expect.any(Function),
         currentIndex: expect.any(Number),
         totalSnapshots: expect.any(Number),
       }),
@@ -850,7 +850,7 @@ describe("HistoryController", () => {
     await flush();
 
     // Initial — can't undo
-    expect(controller.value!.canUndo).toBe(false);
+    expect(controller.value!.canGoBack).toBe(false);
 
     system.facts.count = 10;
     await flush();
@@ -858,13 +858,13 @@ describe("HistoryController", () => {
     system.facts.count = 20;
     await flush();
 
-    // After changes and reconcile, we should be able to undo
-    expect(controller.value!.canUndo).toBe(true);
+    // After changes and reconcile, we should be able to go back
+    expect(controller.value!.canGoBack).toBe(true);
 
-    controller.value!.undo();
+    controller.value!.goBack();
 
     expect(system.facts.count).toBe(10);
-    expect(controller.value!.canRedo).toBe(true);
+    expect(controller.value!.canGoForward).toBe(true);
 
     controller.hostDisconnected();
     system.destroy();

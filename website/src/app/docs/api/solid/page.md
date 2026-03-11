@@ -546,12 +546,12 @@ useHistory(system: System): Accessor<HistoryState | null>
 
 ```typescript
 interface HistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
   currentIndex: number;
   totalSnapshots: number;
+  goBack: (steps?: number) => void;
+  goForward: (steps?: number) => void;
 }
 ```
 
@@ -566,8 +566,8 @@ function UndoControls() {
     <Show when={tt()}>
       {(state) => (
         <div>
-          <button onClick={() => state().undo()} disabled={!state().canUndo}>Undo</button>
-          <button onClick={() => state().redo()} disabled={!state().canRedo}>Redo</button>
+          <button onClick={() => state().goBack()} disabled={!state().canGoBack}>Undo</button>
+          <button onClick={() => state().goForward()} disabled={!state().canGoForward}>Redo</button>
           <span>{state().currentIndex + 1} / {state().totalSnapshots}</span>
         </div>
       )}

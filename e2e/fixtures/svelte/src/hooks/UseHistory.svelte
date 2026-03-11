@@ -9,17 +9,17 @@ const history = useHistory(system);
 <div>
   <span data-testid={TestIds.factSingle}>{$count}</span>
   <span data-testid={TestIds.historyEnabled}>{String($history !== null)}</span>
-  <span data-testid={TestIds.historyCanUndo}>{String($history?.canUndo ?? false)}</span>
-  <span data-testid={TestIds.historyCanRedo}>{String($history?.canRedo ?? false)}</span>
+  <span data-testid={TestIds.historyCanGoBack}>{String($history?.canGoBack ?? false)}</span>
+  <span data-testid={TestIds.historyCanGoForward}>{String($history?.canGoForward ?? false)}</span>
   <span data-testid={TestIds.historyIndex}>{$history?.currentIndex ?? -1}</span>
   <span data-testid={TestIds.historyTotal}>{$history?.totalSnapshots ?? 0}</span>
   <button data-testid={TestIds.btnIncrement} on:click={() => system.events.increment()}>
     inc
   </button>
-  <button data-testid={TestIds.btnUndo} on:click={() => $history?.undo()}>
-    undo
+  <button data-testid={TestIds.btnGoBack} on:click={() => $history?.goBack()}>
+    goBack
   </button>
-  <button data-testid={TestIds.btnRedo} on:click={() => $history?.redo()}>
-    redo
+  <button data-testid={TestIds.btnGoForward} on:click={() => $history?.goForward()}>
+    goForward
   </button>
 </div>

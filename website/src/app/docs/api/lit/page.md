@@ -562,8 +562,8 @@ class HistoryElement extends LitElement {
     }
 
     return html`
-      <button ?disabled=${!state.canUndo} @click=${state.undo}>Undo</button>
-      <button ?disabled=${!state.canRedo} @click=${state.redo}>Redo</button>
+      <button ?disabled=${!state.canGoBack} @click=${() => state.goBack()}>Undo</button>
+      <button ?disabled=${!state.canGoForward} @click=${() => state.goForward()}>Redo</button>
     `;
   }
 }
@@ -688,7 +688,7 @@ useHistory(system: System): HistoryState | null
 const tt = useHistory(system);
 
 // Undo the last action if possible
-if (tt?.canUndo) tt.undo();
+if (tt?.canGoBack) tt.goBack();
 ```
 
 ### getDerived

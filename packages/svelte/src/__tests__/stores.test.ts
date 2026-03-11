@@ -1124,10 +1124,10 @@ describe("useHistory", () => {
     const tt = getValue();
 
     expect(tt).not.toBeNull();
-    expect(tt).toHaveProperty("canUndo");
-    expect(tt).toHaveProperty("canRedo");
-    expect(tt).toHaveProperty("undo");
-    expect(tt).toHaveProperty("redo");
+    expect(tt).toHaveProperty("canGoBack");
+    expect(tt).toHaveProperty("canGoForward");
+    expect(tt).toHaveProperty("goBack");
+    expect(tt).toHaveProperty("goForward");
     expect(tt).toHaveProperty("currentIndex");
     expect(tt).toHaveProperty("totalSnapshots");
 
@@ -1151,8 +1151,6 @@ describe("useHistory", () => {
 
     const tt = getValue();
     expect(tt).not.toBeNull();
-    expect(typeof tt?.undo).toBe("function");
-    expect(typeof tt?.redo).toBe("function");
     expect(typeof tt?.goTo).toBe("function");
     expect(typeof tt?.goBack).toBe("function");
     expect(typeof tt?.goForward).toBe("function");
