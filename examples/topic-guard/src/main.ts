@@ -16,7 +16,7 @@ import { topicGuardModule, topicGuardSchema } from "./topic-guard.js";
 
 const system = createSystem({
   module: topicGuardModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "topic-guard" })],
 });
 system.start();

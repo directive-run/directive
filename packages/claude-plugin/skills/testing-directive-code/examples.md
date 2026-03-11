@@ -149,7 +149,8 @@ const canvasModule = createModule("canvas", {
 
 export const system = createSystem({
   module: canvasModule,
-  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
+  history: { maxSnapshots: 200 },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "time-machine" })],
 });
 ```

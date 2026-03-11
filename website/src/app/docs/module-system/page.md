@@ -57,11 +57,11 @@ import { createSystem } from '@directive-run/core';
 // Single module – facts and derivations are accessed directly
 // const system = createSystem({ module: counterModule });
 
-// With plugins and debug options
+// With plugins and time-travel
 const system = createSystem({
   module: counterModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
-  debug: { timeTravel: true },
+  history: true,
 });
 ```
 
@@ -72,7 +72,7 @@ const system = createSystem({
 | `module` | Single module to run (direct access) |
 | `modules` | Multiple modules as `{ name: module }` (namespaced access) |
 | `plugins` | Array of plugins |
-| `debug` | Debug options (`{ timeTravel, maxSnapshots }`) |
+| `history` | Enable time-travel debugging (snapshots, undo/redo) |
 | `errorBoundary` | Error handling strategies per subsystem |
 | `initialFacts` | Override initial fact values |
 | `tickMs` | Interval in ms for automatic `tick` event dispatch |
@@ -310,7 +310,7 @@ const value = system.read("displayName");
 
 // Get detailed system state
 const info = system.inspect();
-// { unmet, inflight, constraints, resolvers, runHistory? }
+// { unmet, inflight, constraints, resolvers, trace? }
 
 // Explain why a requirement exists
 const reason = system.explain(requirementId);
@@ -333,42 +333,42 @@ const unsub = system.watchDistributableSnapshot(
 );
 ```
 
-See [Time-Travel & Snapshots](/docs/advanced/time-travel) for full options.
+See [Time-Travel & Snapshots](/docs/advanced/history) for full options.
 
-### Run History
+### Trace
 
-When `debug.runHistory` is enabled, the system tracks per-run changelogs:
+When `trace` is enabled, the system tracks per-run changelogs:
 
 ```typescript
 const system = createSystem({
   module: myModule,
-  debug: { runHistory: true },
+  trace: true,
 });
 
 // Access the run changelog
-system.runHistory; // RunChangelogEntry[] | null
+system.trace; // TraceEntry[] | null
 ```
 
 ### Time-Travel
 
-When `debug.timeTravel` is enabled, `system.debug` exposes the full time-travel API:
+When `history` is enabled, `system.history` exposes the full time-travel API:
 
 ```typescript
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true },
+  history: true,
 });
 
-system.debug?.goBack();
-system.debug?.goForward();
+system.history?.goBack();
+system.history?.goForward();
 
 // Subscribe to time-travel changes
-const unsub = system.onTimeTravelChange(() => {
-  console.log('Snapshot index:', system.debug?.currentIndex);
+const unsub = system.onHistoryChange(() => {
+  console.log('Snapshot index:', system.history?.currentIndex);
 });
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full API.
+See [Time-Travel](/docs/advanced/history) for the full API.
 
 ---
 

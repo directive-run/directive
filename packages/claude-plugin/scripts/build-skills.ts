@@ -57,7 +57,7 @@ const SKILL_MAP: SkillConfig[] = [
   },
   {
     name: "testing-directive-code",
-    knowledgeFiles: ["api-skeleton", "testing", "time-travel"],
+    knowledgeFiles: ["api-skeleton", "testing", "history"],
     examples: ["time-machine"],
   },
   {

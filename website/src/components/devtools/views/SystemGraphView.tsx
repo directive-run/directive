@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
-import type { RunChangelogEntry } from "@directive-run/core";
+import type { TraceEntry } from "@directive-run/core";
 import { useDirectiveRef, useEvents, useSelector } from "@directive-run/react";
 import getStroke from "perfect-freehand";
 import { useDevToolsSystem } from "../DevToolsSystemContext";
@@ -445,16 +445,16 @@ function buildPipelineGraph(
 }
 
 // ---------------------------------------------------------------------------
-// Build pipeline graph from a single RunChangelogEntry
+// Build pipeline graph from a single TraceEntry
 // Uses real dependency edges (E12) instead of heuristic name matching
 // ---------------------------------------------------------------------------
 
-function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
+function buildTraceGraph(entry: TraceEntry): PipelineGraphResult {
   const nodes = new Map<string, PipelineGraphNode>();
   const edges: PipelineGraphEdge[] = [];
 
-  // Fact nodes — only keys from this run's factChanges
-  for (const fc of run.factChanges) {
+  // Fact nodes — only keys from this entry's factChanges
+  for (const fc of entry.factChanges) {
     nodes.set(`fact-${fc.key}`, {
       id: `fact-${fc.key}`,
       label: fc.key,
@@ -467,19 +467,19 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
   }
 
   // Derivation nodes — use real deps from E12, show old → new values
-  for (const d of run.derivationsRecomputed) {
+  for (const d of entry.derivationsRecomputed) {
     const dId = typeof d === "string" ? d : d.id;
     const realDeps = typeof d === "string" ? [] : d.deps;
     const oldValue = typeof d === "string" ? undefined : d.oldValue;
     const newValue = typeof d === "string" ? undefined : d.newValue;
 
-    // Link to fact nodes that exist in this run; fallback to all facts if deps empty
+    // Link to fact nodes that exist in this trace; fallback to all facts if deps empty
     let factDeps = realDeps
       .filter((dep) => nodes.has(`fact-${dep}`))
       .map((dep) => `fact-${dep}`);
 
-    if (factDeps.length === 0 && run.factChanges.length > 0) {
-      factDeps = run.factChanges.map((fc) => `fact-${fc.key}`);
+    if (factDeps.length === 0 && entry.factChanges.length > 0) {
+      factDeps = entry.factChanges.map((fc) => `fact-${fc.key}`);
     }
 
     // Build subtitle with old → new values like facts
@@ -504,7 +504,7 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
   }
 
   // Constraint nodes — use real deps from E12
-  for (const c of run.constraintsHit) {
+  for (const c of entry.constraintsHit) {
     const realDeps = c.deps ?? [];
     // Link to derivations or facts that exist
     const constraintDeps: string[] = [];
@@ -533,19 +533,19 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
 
   // Requirement nodes — derive status from resolver outcome
   const resolvedReqIds = new Set(
-    run.resolversCompleted.map((r) => r.requirementId),
+    entry.resolversCompleted.map((r) => r.requirementId),
   );
   const erroredReqIds = new Set(
-    run.resolversErrored.map((r) => r.requirementId),
+    entry.resolversErrored.map((r) => r.requirementId),
   );
 
-  for (const req of run.requirementsAdded) {
+  for (const req of entry.requirementsAdded) {
     let reqStatus = "pending";
     if (resolvedReqIds.has(req.id)) {
       reqStatus = "completed";
     } else if (erroredReqIds.has(req.id)) {
       reqStatus = "error";
-    } else if (run.resolversStarted.some((rs) => rs.requirementId === req.id)) {
+    } else if (entry.resolversStarted.some((rs) => rs.requirementId === req.id)) {
       reqStatus = "running";
     }
 
@@ -571,13 +571,13 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
 
   // Resolver nodes — unique key per requirement (M9)
   const completedMap = new Map(
-    run.resolversCompleted.map((r) => [r.requirementId, r]),
+    entry.resolversCompleted.map((r) => [r.requirementId, r]),
   );
   const erroredMap = new Map(
-    run.resolversErrored.map((r) => [r.requirementId, r]),
+    entry.resolversErrored.map((r) => [r.requirementId, r]),
   );
 
-  for (const rs of run.resolversStarted) {
+  for (const rs of entry.resolversStarted) {
     const completed = completedMap.get(rs.requirementId);
     const errored = erroredMap.get(rs.requirementId);
 
@@ -619,10 +619,10 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
   }
 
   // Effect nodes — fan out to ALL fact changes (M2), use real triggeredBy deps
-  for (const e of run.effectsRun) {
+  for (const e of entry.effectsRun) {
     const effectId = typeof e === "string" ? e : e.id;
     const triggeredBy = typeof e === "string" ? [] : e.triggeredBy;
-    const hasError = run.effectErrors.some((err) => err.id === effectId);
+    const hasError = entry.effectErrors.some((err) => err.id === effectId);
 
     // Use real triggeredBy deps, falling back to all fact changes
     const effectDeps =
@@ -630,7 +630,7 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
         ? triggeredBy
             .filter((dep) => nodes.has(`fact-${dep}`))
             .map((dep) => `fact-${dep}`)
-        : run.factChanges.map((fc) => `fact-${fc.key}`);
+        : entry.factChanges.map((fc) => `fact-${fc.key}`);
 
     nodes.set(`effect-${effectId}`, {
       id: `effect-${effectId}`,
@@ -642,7 +642,7 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
       detail: {
         id: effectId,
         triggeredBy,
-        error: run.effectErrors.find((err) => err.id === effectId)?.error,
+        error: entry.effectErrors.find((err) => err.id === effectId)?.error,
       },
     });
 
@@ -659,14 +659,14 @@ function buildRunGraph(run: RunChangelogEntry): PipelineGraphResult {
   return {
     nodes,
     edges,
-    totalFacts: run.factChanges.length,
-    totalDerivations: run.derivationsRecomputed.length,
-    shownFacts: run.factChanges.length,
-    shownDerivations: run.derivationsRecomputed.length,
-    totalConstraints: run.constraintsHit.length,
-    shownConstraints: run.constraintsHit.length,
-    totalResolvers: run.resolversStarted.length,
-    shownResolvers: run.resolversStarted.length,
+    totalFacts: entry.factChanges.length,
+    totalDerivations: entry.derivationsRecomputed.length,
+    shownFacts: entry.factChanges.length,
+    shownDerivations: entry.derivationsRecomputed.length,
+    totalConstraints: entry.constraintsHit.length,
+    shownConstraints: entry.constraintsHit.length,
+    totalResolvers: entry.resolversStarted.length,
+    shownResolvers: entry.resolversStarted.length,
   };
 }
 
@@ -926,39 +926,39 @@ function DetailRow({
 }
 
 // ---------------------------------------------------------------------------
-// Run summary badge text
+// Trace summary badge text
 // ---------------------------------------------------------------------------
 
-function runSummaryText(run: RunChangelogEntry): string {
+function traceSummaryText(entry: TraceEntry): string {
   const parts: string[] = [];
-  if (run.factChanges.length > 0) {
+  if (entry.factChanges.length > 0) {
     parts.push(
-      `${run.factChanges.length} fact${run.factChanges.length !== 1 ? "s" : ""}`,
+      `${entry.factChanges.length} fact${entry.factChanges.length !== 1 ? "s" : ""}`,
     );
   }
-  if (run.derivationsRecomputed.length > 0) {
+  if (entry.derivationsRecomputed.length > 0) {
     parts.push(
-      `${run.derivationsRecomputed.length} derivation${run.derivationsRecomputed.length !== 1 ? "s" : ""}`,
+      `${entry.derivationsRecomputed.length} derivation${entry.derivationsRecomputed.length !== 1 ? "s" : ""}`,
     );
   }
-  if (run.constraintsHit.length > 0) {
+  if (entry.constraintsHit.length > 0) {
     parts.push(
-      `${run.constraintsHit.length} constraint${run.constraintsHit.length !== 1 ? "s" : ""}`,
+      `${entry.constraintsHit.length} constraint${entry.constraintsHit.length !== 1 ? "s" : ""}`,
     );
   }
-  if (run.requirementsAdded.length > 0) {
+  if (entry.requirementsAdded.length > 0) {
     parts.push(
-      `${run.requirementsAdded.length} requirement${run.requirementsAdded.length !== 1 ? "s" : ""}`,
+      `${entry.requirementsAdded.length} requirement${entry.requirementsAdded.length !== 1 ? "s" : ""}`,
     );
   }
-  if (run.resolversStarted.length > 0) {
+  if (entry.resolversStarted.length > 0) {
     parts.push(
-      `${run.resolversStarted.length} resolver${run.resolversStarted.length !== 1 ? "s" : ""}`,
+      `${entry.resolversStarted.length} resolver${entry.resolversStarted.length !== 1 ? "s" : ""}`,
     );
   }
-  if (run.effectsRun.length > 0) {
+  if (entry.effectsRun.length > 0) {
     parts.push(
-      `${run.effectsRun.length} effect${run.effectsRun.length !== 1 ? "s" : ""}`,
+      `${entry.effectsRun.length} effect${entry.effectsRun.length !== 1 ? "s" : ""}`,
     );
   }
 
@@ -966,14 +966,14 @@ function runSummaryText(run: RunChangelogEntry): string {
 }
 
 // ---------------------------------------------------------------------------
-// Run History Export/Import types (Part 7)
+// Trace Export/Import types
 // ---------------------------------------------------------------------------
 
-interface RunHistoryExport {
+interface TraceHistoryExport {
   version: 1;
   systemName: string;
   exportedAt: string;
-  runs: RunChangelogEntry[];
+  traces: TraceEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1229,24 +1229,24 @@ export function SystemGraphView() {
     system,
     (s) => s.facts.runtime.resolverStats,
   );
-  const runHistory = useSelector(
+  const traceLog = useSelector(
     system,
-    (s) => s.facts.runtime.runHistory,
-  ) as RunChangelogEntry[];
+    (s) => s.facts.runtime.trace,
+  ) as TraceEntry[];
   const systemName = useSelector(
     system,
     (s) => s.facts.runtime.systemName,
   ) as string;
-  const runHistoryEnabled = useSelector(
+  const traceEnabled = useSelector(
     system,
-    (s) => s.facts.runtime.runHistoryEnabled,
+    (s) => s.facts.runtime.traceEnabled,
   );
 
-  // Run pager: null = live (cumulative), number = specific run ID (M7)
-  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  // Trace pager: null = live (cumulative), number = specific trace ID (M7)
+  const [selectedTraceId, setSelectedTraceId] = useState<number | null>(null);
 
-  // Imported run history (Part 7)
-  const [importedRuns, setImportedRuns] = useState<RunChangelogEntry[] | null>(
+  // Imported trace (Part 7)
+  const [importedTraces, setImportedTraces] = useState<TraceEntry[] | null>(
     null,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1254,27 +1254,27 @@ export function SystemGraphView() {
   // Playback (shared hook)
   const playback = usePlayback({ totalSteps: STAGE_ORDER.length });
 
-  const activeRunHistory = importedRuns ?? runHistory;
+  const activeTrace = importedTraces ?? traceLog;
 
-  // Compute derived state from run ID (M7)
-  const isLive = selectedRunId === null;
-  const currentRunEntry =
-    selectedRunId !== null
-      ? (activeRunHistory.find((r) => r.id === selectedRunId) ?? null)
+  // Compute derived state from trace ID (M7)
+  const isLive = selectedTraceId === null;
+  const currentTraceEntry =
+    selectedTraceId !== null
+      ? (activeTrace.find((r) => r.id === selectedTraceId) ?? null)
       : null;
-  const selectedRunIndex = currentRunEntry
-    ? activeRunHistory.indexOf(currentRunEntry)
+  const selectedTraceIndex = currentTraceEntry
+    ? activeTrace.indexOf(currentTraceEntry)
     : -1;
 
-  // Reset selection if the run disappears (evicted or disconnected)
+  // Reset selection if the trace disappears (evicted or disconnected)
   useEffect(() => {
     if (
-      selectedRunId !== null &&
-      !activeRunHistory.find((r) => r.id === selectedRunId)
+      selectedTraceId !== null &&
+      !activeTrace.find((r) => r.id === selectedTraceId)
     ) {
-      setSelectedRunId(null);
+      setSelectedTraceId(null);
     }
-  }, [selectedRunId, activeRunHistory]);
+  }, [selectedTraceId, activeTrace]);
 
   // Keyboard navigation (M1) — defers to playback when active
   useEffect(() => {
@@ -1293,35 +1293,35 @@ export function SystemGraphView() {
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        if (isLive && activeRunHistory.length > 0) {
-          setSelectedRunId(activeRunHistory[activeRunHistory.length - 1].id);
-        } else if (selectedRunIndex > 0) {
-          setSelectedRunId(activeRunHistory[selectedRunIndex - 1].id);
+        if (isLive && activeTrace.length > 0) {
+          setSelectedTraceId(activeTrace[activeTrace.length - 1].id);
+        } else if (selectedTraceIndex > 0) {
+          setSelectedTraceId(activeTrace[selectedTraceIndex - 1].id);
         }
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        if (!isLive && selectedRunIndex < activeRunHistory.length - 1) {
-          setSelectedRunId(activeRunHistory[selectedRunIndex + 1].id);
+        if (!isLive && selectedTraceIndex < activeTrace.length - 1) {
+          setSelectedTraceId(activeTrace[selectedTraceIndex + 1].id);
         } else if (!isLive) {
-          setSelectedRunId(null);
+          setSelectedTraceId(null);
         }
       } else if (e.key === "Escape" && !isLive) {
         e.preventDefault();
-        setSelectedRunId(null);
+        setSelectedTraceId(null);
       }
     };
     window.addEventListener("keydown", handler);
 
     return () => window.removeEventListener("keydown", handler);
-  }, [isLive, selectedRunIndex, activeRunHistory, playback.step]);
+  }, [isLive, selectedTraceIndex, activeTrace, playback.step]);
 
   // Export handler (Part 7)
   const handleExport = useCallback(() => {
-    const exportData: RunHistoryExport = {
+    const exportData: TraceHistoryExport = {
       version: 1,
       systemName: systemName || "unknown",
       exportedAt: new Date().toISOString(),
-      runs: activeRunHistory,
+      traces: activeTrace,
     };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
       type: "application/json",
@@ -1329,10 +1329,10 @@ export function SystemGraphView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${systemName || "directive"}-runs.json`;
+    a.download = `${systemName || "directive"}-traces.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [activeRunHistory, systemName]);
+  }, [activeTrace, systemName]);
 
   // Import handler (Part 7)
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1344,10 +1344,10 @@ export function SystemGraphView() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result as string) as RunHistoryExport;
-        if (data.version === 1 && Array.isArray(data.runs)) {
-          setImportedRuns(data.runs);
-          setSelectedRunId(null);
+        const data = JSON.parse(reader.result as string) as TraceHistoryExport;
+        if (data.version === 1 && Array.isArray(data.traces)) {
+          setImportedTraces(data.traces);
+          setSelectedTraceId(null);
         }
       } catch {
         // Invalid file — ignore
@@ -1358,10 +1358,10 @@ export function SystemGraphView() {
     e.target.value = "";
   }, []);
 
-  // Build graph from either a specific run or the live cumulative data
+  // Build graph from either a specific trace or the live cumulative data
   const graphData = useMemo(() => {
-    if (currentRunEntry) {
-      return buildRunGraph(currentRunEntry);
+    if (currentTraceEntry) {
+      return buildTraceGraph(currentTraceEntry);
     }
 
     return buildPipelineGraph(
@@ -1373,7 +1373,7 @@ export function SystemGraphView() {
       resolverStats,
     );
   }, [
-    currentRunEntry,
+    currentTraceEntry,
     facts,
     derivations,
     constraints,
@@ -1455,8 +1455,8 @@ export function SystemGraphView() {
     return <EmptyState message="No graph data available" />;
   }
 
-  // If we have runHistory entries and we're in live mode, check for no activity
-  const hasRunHistory = activeRunHistory.length > 0;
+  // If we have trace entries and we're in live mode, check for no activity
+  const hasTrace = activeTrace.length > 0;
 
   const selected = selectedNode ? graphData.nodes.get(selectedNode) : null;
   const hiddenFacts = graphData.totalFacts - graphData.shownFacts;
@@ -1472,10 +1472,10 @@ export function SystemGraphView() {
       hiddenConstraints > 0 ||
       hiddenResolvers > 0);
 
-  // Show empty state if no runs yet and no active pipeline (live mode with no constraints hit)
-  if (isLive && !hasRunHistory) {
-    if (!runHistoryEnabled) {
-      // Don't fall through to "No runs yet" — the real issue is runHistory isn't enabled
+  // Show empty state if no traces yet and no active pipeline (live mode with no constraints hit)
+  if (isLive && !hasTrace) {
+    if (!traceEnabled) {
+      // Don't fall through to "No traces yet" — the real issue is trace isn't enabled
     } else {
       const noActivityYet =
         graphData.totalConstraints > 0 &&
@@ -1484,7 +1484,7 @@ export function SystemGraphView() {
         unmet.length === 0;
       if (noActivityYet) {
         return (
-          <EmptyState message="No runs yet. Interact with the system to see the pipeline." />
+          <EmptyState message="No traces yet. Interact with the system to see the pipeline." />
         );
       }
     }
@@ -1517,52 +1517,52 @@ export function SystemGraphView() {
           <AutoFit nodeCount={nodes.length} />
           <DrawingOverlay />
 
-          {/* Run history enable message */}
-          {!runHistoryEnabled && (
+          {/* Trace enable message */}
+          {!traceEnabled && (
             <Panel position="top-right" className="!m-2">
               <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
                 Enable{" "}
                 <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-                  runHistory: true
+                  trace: true
                 </code>{" "}
-                in debug config for run history timeline
+                in debug config for trace timeline
               </div>
             </Panel>
           )}
 
-          {/* Run pager + playback controls (stacked in single panel) */}
-          {runHistoryEnabled && (hasRunHistory || !isLive) && (
+          {/* Trace pager + playback controls (stacked in single panel) */}
+          {traceEnabled && (hasTrace || !isLive) && (
             <Panel position="top-right" className="!m-2">
-              <nav aria-label="Run history navigation">
+              <nav aria-label="Trace history navigation">
                 <div className="flex flex-col gap-1 rounded-lg border border-zinc-700 bg-zinc-900/95 px-2 py-1.5 shadow-lg backdrop-blur-sm">
-                  {/* Row 1: Run pager */}
+                  {/* Row 1: Trace pager */}
                   <div className="flex items-center gap-1.5">
                     <button
-                      aria-label="First run"
+                      aria-label="First trace"
                       onClick={() => {
-                        if (activeRunHistory.length > 0) {
-                          setSelectedRunId(activeRunHistory[0].id);
+                        if (activeTrace.length > 0) {
+                          setSelectedTraceId(activeTrace[0].id);
                         }
                       }}
-                      disabled={!isLive && selectedRunIndex === 0}
+                      disabled={!isLive && selectedTraceIndex === 0}
                       className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       First
                     </button>
                     <button
-                      aria-label="Previous run"
+                      aria-label="Previous trace"
                       onClick={() => {
-                        if (isLive && activeRunHistory.length > 0) {
-                          setSelectedRunId(
-                            activeRunHistory[activeRunHistory.length - 1].id,
+                        if (isLive && activeTrace.length > 0) {
+                          setSelectedTraceId(
+                            activeTrace[activeTrace.length - 1].id,
                           );
-                        } else if (selectedRunIndex > 0) {
-                          setSelectedRunId(
-                            activeRunHistory[selectedRunIndex - 1].id,
+                        } else if (selectedTraceIndex > 0) {
+                          setSelectedTraceId(
+                            activeTrace[selectedTraceIndex - 1].id,
                           );
                         }
                       }}
-                      disabled={!isLive && selectedRunIndex === 0}
+                      disabled={!isLive && selectedTraceIndex === 0}
                       className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       Prev
@@ -1575,15 +1575,15 @@ export function SystemGraphView() {
                         </>
                       ) : (
                         <>
-                          Run {selectedRunIndex + 1} / {activeRunHistory.length}
-                          {currentRunEntry?.status === "pending" && (
+                          Trace {selectedTraceIndex + 1} / {activeTrace.length}
+                          {currentTraceEntry?.status === "pending" && (
                             <span className="ml-1 text-amber-400">◉</span>
                           )}
-                          {currentRunEntry?.anomalies &&
-                            currentRunEntry.anomalies.length > 0 && (
+                          {currentTraceEntry?.anomalies &&
+                            currentTraceEntry.anomalies.length > 0 && (
                               <span
                                 className="ml-1 text-red-400"
-                                title={currentRunEntry.anomalies.join(", ")}
+                                title={currentTraceEntry.anomalies.join(", ")}
                               >
                                 !
                               </span>
@@ -1592,17 +1592,17 @@ export function SystemGraphView() {
                       )}
                     </span>
                     <button
-                      aria-label="Next run"
+                      aria-label="Next trace"
                       onClick={() => {
                         if (
                           !isLive &&
-                          selectedRunIndex < activeRunHistory.length - 1
+                          selectedTraceIndex < activeTrace.length - 1
                         ) {
-                          setSelectedRunId(
-                            activeRunHistory[selectedRunIndex + 1].id,
+                          setSelectedTraceId(
+                            activeTrace[selectedTraceIndex + 1].id,
                           );
                         } else {
-                          setSelectedRunId(null);
+                          setSelectedTraceId(null);
                         }
                       }}
                       disabled={isLive}
@@ -1613,7 +1613,7 @@ export function SystemGraphView() {
                     {!isLive && (
                       <button
                         aria-label="Return to live view"
-                        onClick={() => setSelectedRunId(null)}
+                        onClick={() => setSelectedTraceId(null)}
                         className="rounded px-1.5 py-0.5 text-[10px] text-emerald-400 transition-colors hover:bg-zinc-800"
                       >
                         Live
@@ -1622,28 +1622,28 @@ export function SystemGraphView() {
                     {/* Export/Import buttons (Part 7) */}
                     <span className="mx-0.5 h-3 w-px bg-zinc-700" />
                     <button
-                      aria-label="Export run history"
+                      aria-label="Export trace"
                       onClick={handleExport}
-                      disabled={activeRunHistory.length === 0}
+                      disabled={activeTrace.length === 0}
                       className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      title="Export run history as JSON"
+                      title="Export trace as JSON"
                     >
                       Export
                     </button>
                     <button
-                      aria-label="Import run history"
+                      aria-label="Import trace"
                       onClick={() => fileInputRef.current?.click()}
                       className="rounded px-1.5 py-0.5 text-[10px] text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
-                      title="Import run history from JSON"
+                      title="Import trace from JSON"
                     >
                       Import
                     </button>
-                    {importedRuns && (
+                    {importedTraces && (
                       <button
                         aria-label="Clear imported data"
                         onClick={() => {
-                          setImportedRuns(null);
-                          setSelectedRunId(null);
+                          setImportedTraces(null);
+                          setSelectedTraceId(null);
                         }}
                         className="rounded px-1.5 py-0.5 text-[10px] text-red-400 transition-colors hover:bg-zinc-800"
                       >
@@ -1658,8 +1658,8 @@ export function SystemGraphView() {
                       onChange={handleImport}
                     />
                   </div>
-                  {/* Row 2+3: Playback controls (when run selected) */}
-                  {currentRunEntry && (
+                  {/* Row 2+3: Playback controls (when trace selected) */}
+                  {currentTraceEntry && (
                     <PlaybackControls
                       playback={playback}
                       stepLabel={
@@ -1674,34 +1674,34 @@ export function SystemGraphView() {
             </Panel>
           )}
 
-          {/* Run summary badge with causal chain (Part 6) */}
-          {currentRunEntry && (
+          {/* Trace summary badge with causal chain (Part 6) */}
+          {currentTraceEntry && (
             <Panel position="bottom-right" className="!m-2">
               <div className="max-w-md rounded-lg border border-zinc-700 bg-zinc-900/95 px-2.5 py-1.5 font-mono text-[10px] text-zinc-400 shadow-lg backdrop-blur-sm">
                 <div>
-                  Run {currentRunEntry.id}
-                  {currentRunEntry.status === "pending" && (
+                  Trace {currentTraceEntry.id}
+                  {currentTraceEntry.status === "pending" && (
                     <span className="ml-1 text-amber-400">(pending)</span>
                   )}
-                  {currentRunEntry.anomalies &&
-                    currentRunEntry.anomalies.length > 0 && (
+                  {currentTraceEntry.anomalies &&
+                    currentTraceEntry.anomalies.length > 0 && (
                       <span className="ml-1 text-red-400">(anomaly)</span>
                     )}
                   {" — "}
-                  {runSummaryText(currentRunEntry)}
+                  {traceSummaryText(currentTraceEntry)}
                 </div>
-                {currentRunEntry.causalChain && (
+                {currentTraceEntry.causalChain && (
                   <div
                     className="mt-1 truncate text-[9px] text-zinc-500"
-                    title={currentRunEntry.causalChain}
+                    title={currentTraceEntry.causalChain}
                   >
-                    {currentRunEntry.causalChain}
+                    {currentTraceEntry.causalChain}
                   </div>
                 )}
-                {currentRunEntry.anomalies &&
-                  currentRunEntry.anomalies.length > 0 && (
+                {currentTraceEntry.anomalies &&
+                  currentTraceEntry.anomalies.length > 0 && (
                     <div className="mt-1 text-[9px] text-red-400">
-                      {currentRunEntry.anomalies.map((a, i) => (
+                      {currentTraceEntry.anomalies.map((a, i) => (
                         <div key={i}>{a}</div>
                       ))}
                     </div>
@@ -1711,15 +1711,15 @@ export function SystemGraphView() {
           )}
 
           {/* Imported data badge */}
-          {importedRuns && (
+          {importedTraces && (
             <Panel position="top-left" className="!m-2">
               <div className="rounded-lg border border-amber-700/50 bg-amber-900/30 px-2.5 py-1.5 text-[10px] text-amber-300 shadow-lg backdrop-blur-sm">
-                Viewing imported data ({importedRuns.length} runs)
+                Viewing imported data ({importedTraces.length} traces)
               </div>
             </Panel>
           )}
 
-          {/* Hidden nodes badge — bottom-left to avoid overlap with run summary */}
+          {/* Hidden nodes badge — bottom-left to avoid overlap with trace summary */}
           {hasHiddenNodes && isLive && (
             <Panel position="bottom-left" className="!m-2">
               <div className="rounded-lg border border-zinc-700 bg-zinc-900/95 px-2.5 py-1.5 font-mono text-[10px] text-zinc-400 shadow-lg backdrop-blur-sm">

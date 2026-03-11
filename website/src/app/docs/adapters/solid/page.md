@@ -520,19 +520,19 @@ function Profile() {
 
 ## Time Travel
 
-`useTimeTravel` returns an `Accessor<TimeTravelState | null>` – `null` when disabled, otherwise the full reactive API. Call `timeTravel()` to read, and destructure inside `<Show>` to access properties:
+`useHistory` returns an `Accessor<HistoryState | null>` – `null` when disabled, otherwise the full reactive API. Call `history()` to read, and destructure inside `<Show>` to access properties:
 
 ### Undo / Redo Controls
 
 ```tsx
-import { useTimeTravel } from '@directive-run/solid';
+import { useHistory } from '@directive-run/solid';
 import { Show } from 'solid-js';
 
 function UndoRedo() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => {
         const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = state();
 
@@ -557,10 +557,10 @@ function UndoRedo() {
 import { Show, For } from 'solid-js';
 
 function SnapshotTimeline() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => (
         <ul>
           <For each={state().snapshots}>
@@ -586,10 +586,10 @@ function SnapshotTimeline() {
 
 ```tsx
 function NavigationControls() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => {
         const { goBack, goForward, goTo, replay } = state();
 
@@ -611,10 +611,10 @@ function NavigationControls() {
 
 ```tsx
 function SessionControls() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => {
         const { exportSession, importSession } = state();
 
@@ -645,12 +645,12 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```tsx
 function BatchedAction() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   function handleComplexAction() {
-    timeTravel()?.beginChangeset('Move piece A→B');
+    history()?.beginChangeset('Move piece A→B');
     // ... multiple fact mutations ...
-    timeTravel()?.endChangeset();
+    history()?.endChangeset();
     // Now undo/redo treats all mutations as one step
   }
 
@@ -662,10 +662,10 @@ function BatchedAction() {
 
 ```tsx
 function RecordingToggle() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => {
         const { isPaused, pause, resume } = state();
 
@@ -680,7 +680,7 @@ function RecordingToggle() {
 }
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/history) for the full `HistoryState` interface and keyboard shortcuts.
 
 ---
 
@@ -784,7 +784,7 @@ test('displays user name', async () => {
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createDerivedSignal` | Factory | Create a derivation signal outside components |
 | `createFactSignal` | Factory | Create a fact signal outside components |
-| `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---

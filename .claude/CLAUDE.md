@@ -88,7 +88,7 @@ src/
 ├── resolvers.ts     # Execution + retry + batch
 ├── engine.ts        # Reconciliation loop
 ├── plugins.ts       # Plugin architecture
-├── time-travel.ts   # Debugging support
+├── history.ts       # Time-travel debugging
 ├── errors.ts        # Error boundaries
 ├── module.ts        # createModule API
 ├── system.ts        # createSystem API
@@ -160,7 +160,7 @@ const trafficLight = createModule("traffic-light", {
 const system = createSystem({
   module: trafficLight,  // Single module: direct access
   plugins: [loggingPlugin(), devtoolsPlugin()],
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: { maxSnapshots: 100 },
 });
 ```
 

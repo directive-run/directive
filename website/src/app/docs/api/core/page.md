@@ -94,7 +94,7 @@ function createSystem<M extends ModuleSchema>(
 |----------|------|-------------|
 | `module` | `Module` | Module definition |
 | `plugins` | `Plugin[]` | Optional plugins |
-| `debug` | `DebugConfig` | Debug options |
+| `trace` | `TraceOption` | Trace options |
 | `errorBoundary` | `ErrorBoundaryConfig` | Error handling configuration |
 | `initialFacts` | `Record<string, unknown>` | Initial fact values for hydration |
 
@@ -199,16 +199,16 @@ system.resolvers.register("loadData", { requirement: "LOAD", resolve: ... });
 await system.resolvers.call("loadData", { type: "LOAD", id: "123" });
 ```
 
-### debug
+### history
 
 Access the time-travel API (or `null` if not enabled).
 
 ```typescript
-// Time-travel is only available when debug.timeTravel is enabled
-if (system.debug) {
-  system.debug.goBack();               // undo last state change
-  system.debug.goForward();            // redo
-  console.log(system.debug.snapshots); // all captured snapshots
+// Time-travel is only available when history is enabled
+if (system.history) {
+  system.history.goBack();               // undo last state change
+  system.history.goForward();            // redo
+  console.log(system.history.snapshots); // all captured snapshots
 }
 ```
 

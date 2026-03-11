@@ -4,7 +4,7 @@ import { useSelector } from "@directive-run/react";
 import { useEffect, useRef, useState } from "react";
 import { useDevToolsSystem } from "../DevToolsSystemContext";
 import { EmptyState } from "../EmptyState";
-import { useTimeTravel } from "../hooks/useTimeTravel";
+import { useHistory } from "../hooks/useHistory";
 
 interface DiffEntry {
   key: string;
@@ -79,26 +79,26 @@ function DiffValue({ value }: { value: unknown }) {
   );
 }
 
-export function TimeTravelView() {
+export function HistoryView() {
   const system = useDevToolsSystem();
   const connected = useSelector(system, (s) => s.facts.runtime.connected);
   const facts = useSelector(system, (s) => s.facts.runtime.facts);
   const {
-    timeTravelEnabled,
+    historyEnabled,
     snapshotIndex,
     snapshotCount,
     canUndo,
     canRedo,
     handleUndo,
     handleRedo,
-  } = useTimeTravel();
+  } = useHistory();
 
   const [diff, setDiff] = useState<DiffEntry[]>([]);
   const prevFactsRef = useRef<Record<string, unknown>>({});
 
   // Compute diff when facts change after a time-travel operation
   useEffect(() => {
-    if (!timeTravelEnabled) {
+    if (!historyEnabled) {
       return;
     }
 
@@ -120,7 +120,7 @@ export function TimeTravelView() {
     }
 
     prevFactsRef.current = { ...facts };
-  }, [facts, timeTravelEnabled]);
+  }, [facts, historyEnabled]);
 
   // Wrap shared hook callbacks with local diff tracking
   const onUndo = () => {
@@ -142,15 +142,15 @@ export function TimeTravelView() {
     );
   }
 
-  if (!timeTravelEnabled) {
+  if (!historyEnabled) {
     return (
       <div className="flex h-48 flex-col items-center justify-center">
         <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
           Enable{" "}
           <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-            timeTravel: true
+            history: true
           </code>{" "}
-          in debug config for time-travel debugging
+          in system config for time-travel debugging
         </div>
       </div>
     );

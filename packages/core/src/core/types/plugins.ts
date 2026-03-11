@@ -6,7 +6,7 @@ import type { DirectiveError, RecoveryStrategy } from "./errors.js";
 import type { FactChange, FactsSnapshot } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ModuleSchema } from "./schema.js";
-import type { RunChangelogEntry, System } from "./system.js";
+import type { TraceEntry, System } from "./system.js";
 
 // ============================================================================
 // Plugin Hook Types
@@ -249,21 +249,21 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onEffectError?: (id: string, error: unknown) => void;
 
   // ============================================================================
-  // Time-Travel Hooks
+  // History Hooks
   // ============================================================================
 
   /**
-   * Called when a time-travel snapshot is taken.
+   * Called when a history snapshot is taken.
    * @param snapshot - The snapshot that was captured
    */
   onSnapshot?: (snapshot: Snapshot) => void;
 
   /**
-   * Called when time-travel navigation occurs.
+   * Called when history navigation occurs (undo/redo/goTo).
    * @param from - The index we navigated from
    * @param to - The index we navigated to
    */
-  onTimeTravel?: (from: number, to: number) => void;
+  onHistoryNavigate?: (from: number, to: number) => void;
 
   // ============================================================================
   // Error Boundary Hooks
@@ -319,13 +319,13 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onDefinitionCall?: (type: string, id: string, props?: unknown) => void;
 
   // ============================================================================
-  // Run History Hooks
+  // Trace Hooks
   // ============================================================================
 
   /**
-   * Called when a run finalizes (all resolvers settled or no resolvers started).
-   * Only fires when debug.runHistory is enabled.
-   * @param run - The complete run changelog entry
+   * Called when a trace entry finalizes (all resolvers settled or no resolvers started).
+   * Only fires when trace is enabled.
+   * @param entry - The complete trace entry
    */
-  onRunComplete?: (run: RunChangelogEntry) => void;
+  onTraceComplete?: (entry: TraceEntry) => void;
 }

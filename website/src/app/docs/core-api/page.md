@@ -121,7 +121,7 @@ For advanced use cases (custom tooling, framework adapters, testing infrastructu
 | `createResolversManager` | Requirement resolution with retry and batching |
 | `createPluginManager` | Plugin lifecycle management |
 | `createErrorBoundaryManager` / `createRetryLaterManager` | Error handling and retry-later scheduling |
-| `createTimeTravelManager` / `createDisabledTimeTravel` | Time-travel snapshot management |
+| `createHistoryManager` / `createDisabledHistory` | Time-travel snapshot management |
 | `createEngine` | The reconciliation loop that ties everything together |
 
 Most applications should use `createModule` + `createSystem` instead. These lower-level APIs are useful when you need to compose your own system-like abstraction, build framework adapters, or write advanced test harnesses.

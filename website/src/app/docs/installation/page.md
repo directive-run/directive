@@ -245,8 +245,7 @@ const system = createSystem({
   ],
 
   // Enable time-travel to step through state history
-  debug: {
-    timeTravel: true,
+  history: {
     maxSnapshots: 100,
   },
 });

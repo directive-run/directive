@@ -21,7 +21,7 @@ import {
 
 const system = createSystem({
   module: websocketModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "websocket" })],
 });
 system.start();

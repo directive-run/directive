@@ -11,7 +11,7 @@ import { UseOptimisticUpdatePage } from "./hooks/UseOptimisticUpdate";
 import { UseRequirementStatusPage } from "./hooks/UseRequirementStatus";
 import { UseSelectorPage } from "./hooks/UseSelector";
 import { UseSelectorDefaultPage } from "./hooks/UseSelectorDefault";
-import { UseTimeTravelPage } from "./hooks/UseTimeTravel";
+import { UseHistoryPage } from "./hooks/UseHistory";
 import { UseWatchPage } from "./hooks/UseWatch";
 
 const routes: Record<string, () => JSX.Element> = {
@@ -27,7 +27,7 @@ const routes: Record<string, () => JSX.Element> = {
   useConstraintStatus: UseConstraintStatusPage,
   useOptimisticUpdate: UseOptimisticUpdatePage,
   useRequirementStatus: UseRequirementStatusPage,
-  useTimeTravel: UseTimeTravelPage,
+  useHistory: UseHistoryPage,
   useDirective: UseDirectivePage,
 };
 

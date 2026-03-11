@@ -9,9 +9,9 @@ Prioritized list of documentation gaps affecting chatbot accuracy and developer 
 | Gap | Impact | Affected Page | Status |
 |-----|--------|---------------|--------|
 | `System.onSettledChange()` &ndash; listener method, zero docs | Users can't discover reactive settlement binding | `/docs/api/core` | **Resolved** &ndash; TSDoc added to engine.ts |
-| `System.onTimeTravelChange()` &ndash; listener method, zero docs | Same | `/docs/api/core` | **Resolved** &ndash; TSDoc added to engine.ts |
-| `TimeTravelAPI.beginChangeset()` / `endChangeset()` &ndash; zero docs | Grouped undo/redo unusable | `/docs/advanced/time-travel` | **Resolved** &ndash; TSDoc added to time-travel.ts |
-| `TimeTravelAPI.pause()` / `resume()` &ndash; zero docs | Can't suppress snapshots during batch ops | `/docs/advanced/time-travel` | **Resolved** &ndash; TSDoc added to time-travel.ts |
+| `System.onHistoryChange()` &ndash; listener method, zero docs | Same | `/docs/api/core` | **Resolved** &ndash; TSDoc added to engine.ts |
+| `HistoryAPI.beginChangeset()` / `endChangeset()` &ndash; zero docs | Grouped undo/redo unusable | `/docs/advanced/history` | **Resolved** &ndash; TSDoc added to history.ts |
+| `HistoryAPI.pause()` / `resume()` &ndash; zero docs | Can't suppress snapshots during batch ops | `/docs/advanced/history` | **Resolved** &ndash; TSDoc added to history.ts |
 | `System.inspect()` return shape &ndash; one-liner, no field docs | Users ask "what does inspect return?" and chatbot guesses | `/docs/api/core` | **Resolved** &ndash; TSDoc added to engine.ts + SystemInspection type |
 | `System.explain()` return shape &ndash; one-liner | Same problem | `/docs/api/core` | **Resolved** &ndash; TSDoc added to engine.ts |
 | Requirement helpers: `req()`, `forType()`, `isRequirementType()`, `RequirementSet` &ndash; zero docs | Advanced requirement composition undiscoverable | New page needed | **Resolved** &ndash; TSDoc added to requirements.ts |
@@ -34,6 +34,6 @@ Prioritized list of documentation gaps affecting chatbot accuracy and developer 
 |-----|--------|---------------|--------|
 | Low-level managers (`createFacts`, `createDerivationsManager`, etc.) &ndash; zero docs | Plugin authors can't use them | Mark `@internal` or document | **Resolved** &ndash; All marked `@internal` with TSDoc |
 | Tracking APIs (`withTracking`, `withoutTracking`, `trackAccess`) &ndash; scattered mentions | Custom derivation authors blocked | `/docs/advanced/overview` | Open |
-| Type interfaces (`ConstraintsControl`, `EffectsControl`, `TimeTravelState`) &ndash; no examples | TypeScript users can't find types | `/docs/api/types` | Open |
+| Type interfaces (`ConstraintsControl`, `EffectsControl`, `HistoryState`) &ndash; no examples | TypeScript users can't find types | `/docs/api/types` | Open |
 | `createSystemWithStatus` / `createStatusHook` &ndash; zero docs | Status plugin composition unclear | `/docs/plugins/overview` | Open |
 | Resolver param naming: docs use `req, ctx` but convention is `request, context` | Style inconsistency, not accuracy | All resolver examples | Open &ndash; Convention is `req, context` per project memory |

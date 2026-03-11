@@ -378,7 +378,8 @@ const numberMatch = createModule("number-match", {
 export const system = createSystem({
   module: numberMatch,
   plugins: [devtoolsPlugin({ name: "number-match" })],
-  debug: { timeTravel: true, runHistory: true },
+  history: true,
+  trace: true,
 });
 ```
 
@@ -709,7 +710,7 @@ const contactForm = createModule("contact-form", {
 
 export const system = createSystem({
   module: contactForm,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "contact-form" })],
 });
 ```
@@ -928,7 +929,7 @@ const newsletter = createModule("newsletter", {
 
 export const system = createSystem({
   module: newsletter,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "newsletter" })],
 });
 ```
@@ -1577,11 +1578,8 @@ export const system = createSystem({
     auth: authModule,
   },
   plugins: [devtoolsPlugin({ name: "shopping-cart", panel: true })],
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 50,
-    runHistory: true,
-  },
+  history: { maxSnapshots: 50 },
+  trace: true,
 });
 ```
 
@@ -1919,7 +1917,7 @@ export const system = createSystem({
     wizard: wizardModule,
     validation: validationModule,
   },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [
     devtoolsPlugin({ name: "form-wizard" }),
     persistencePlugin({

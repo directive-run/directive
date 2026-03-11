@@ -24,7 +24,7 @@ import {
 const system = createSystem({
   modules: { notifications: notificationsModule, app: appModule },
   tickMs: 1000,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "notifications" })],
 });
 system.start();

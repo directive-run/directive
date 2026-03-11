@@ -337,7 +337,7 @@ export function createDebugTimeline(
  * @example
  * ```typescript
  * const timeline = createDebugTimeline();
- * const plugin = createDebugTimelinePlugin(timeline, () => system.debug?.currentIndex ?? null);
+ * const plugin = createDebugTimelinePlugin(timeline, () => system.history?.currentIndex ?? null);
  * ```
  */
 export function createDebugTimelinePlugin(

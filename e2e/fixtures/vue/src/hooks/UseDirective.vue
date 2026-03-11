@@ -5,7 +5,7 @@ import { testModule } from "../../../../shared/test-module";
 const { system, facts, derived, events, dispatch } = useDirective(testModule, {
   facts: ["count", "name"],
   derived: ["doubled"],
-  debug: { timeTravel: true, maxSnapshots: 50 },
+  history: { maxSnapshots: 50 },
 });
 </script>
 

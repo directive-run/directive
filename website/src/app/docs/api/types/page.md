@@ -34,7 +34,7 @@ interface System<M extends ModuleSchema> {
   readonly events: EventsAccessor<M>;          // typed event definitions
   readonly constraints: ConstraintsControl;    // enable/disable constraints
   readonly effects: EffectsControl;            // enable/disable effects
-  readonly debug: TimeTravelAPI | null;        // time-travel (null if disabled)
+  readonly history: HistoryAPI | null;          // time-travel (null if disabled)
 
   // Lifecycle
   start(): void;
@@ -88,10 +88,10 @@ interface EffectsControl {
 }
 ```
 
-### TimeTravelAPI
+### HistoryAPI
 
 ```typescript
-interface TimeTravelAPI {
+interface HistoryAPI {
   readonly snapshots: Snapshot[];    // all captured state snapshots
   readonly currentIndex: number;     // position in the snapshot timeline
 

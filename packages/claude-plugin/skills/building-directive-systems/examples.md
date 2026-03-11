@@ -893,7 +893,7 @@ export const system = createSystem({
     permissions: permissionsModule,
     content: contentModule,
   },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "permissions" })],
 });
 ```
@@ -1873,7 +1873,7 @@ export const listModule = createModule("list", {
 
 export const system = createSystem({
   modules: { filters: filtersModule, list: listModule },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [loggingPlugin(), devtoolsPlugin({ name: "pagination" })],
 });
 ```
@@ -2211,7 +2211,7 @@ export const system = createSystem({
     url: urlModule,
     products: productsModule,
   },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "url-sync" })],
 });
 ```
@@ -3576,7 +3576,7 @@ const abTesting = createModule("ab-testing", {
 
 export const system = createSystem({
   module: abTesting,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "ab-testing" })],
 });
 ```

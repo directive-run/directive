@@ -405,8 +405,8 @@ export interface PanelRefs {
   unmetCount: HTMLSpanElement;
   perfSection: HTMLDetailsElement;
   perfBody: HTMLDivElement;
-  timeTravelSection: HTMLDivElement;
-  timeTravelLabel: HTMLSpanElement;
+  historySection: HTMLDivElement;
+  historyLabel: HTMLSpanElement;
   undoBtn: HTMLButtonElement;
   redoBtn: HTMLButtonElement;
   flowSection: HTMLDetailsElement;

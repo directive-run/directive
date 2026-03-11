@@ -14,7 +14,7 @@ import type {
   ReconcileResult,
   RecoveryStrategy,
   RequirementWithId,
-  RunChangelogEntry,
+  TraceEntry,
   Schema,
   Snapshot,
   System,
@@ -46,9 +46,9 @@ import type { DirectiveError } from "./types.js";
  * - **Requirements:** `emitRequirementCreated`, `emitRequirementMet`, `emitRequirementCanceled`
  * - **Resolvers:** `emitResolverStart`, `emitResolverComplete`, `emitResolverError`, `emitResolverRetry`, `emitResolverCancel`
  * - **Effects:** `emitEffectRun`, `emitEffectError`
- * - **Time-travel:** `emitSnapshot`, `emitTimeTravel`
+ * - **History:** `emitSnapshot`, `emitHistoryNavigate`
  * - **Errors:** `emitError`, `emitErrorRecovery`
- * - **Run history:** `emitRunComplete`
+ * - **Trace:** `emitTraceComplete`
  *
  * @typeParam _S - The flat schema type (unused at runtime).
  *
@@ -123,9 +123,9 @@ export interface PluginManager<_S extends Schema = any> {
   emitEffectRun(id: string): void;
   emitEffectError(id: string, error: unknown): void;
 
-  // Time-travel hooks
+  // History hooks
   emitSnapshot(snapshot: Snapshot): void;
-  emitTimeTravel(from: number, to: number): void;
+  emitHistoryNavigate(from: number, to: number): void;
 
   // Error boundary hooks
   emitError(error: DirectiveError): void;
@@ -137,8 +137,8 @@ export interface PluginManager<_S extends Schema = any> {
   emitDefinitionUnregister(type: string, id: string): void;
   emitDefinitionCall(type: string, id: string, props?: unknown): void;
 
-  // Run history hooks
-  emitRunComplete(run: RunChangelogEntry): void;
+  // Trace hooks
+  emitTraceComplete(run: TraceEntry): void;
 }
 
 /**
@@ -269,9 +269,9 @@ export function createPluginManager<
     emitEffectRun: broadcast("onEffectRun"),
     emitEffectError: broadcast("onEffectError"),
 
-    // Time-travel hooks
+    // History hooks
     emitSnapshot: broadcast("onSnapshot"),
-    emitTimeTravel: broadcast("onTimeTravel"),
+    emitHistoryNavigate: broadcast("onHistoryNavigate"),
 
     // Error boundary hooks
     emitError: broadcast("onError"),
@@ -283,8 +283,8 @@ export function createPluginManager<
     emitDefinitionUnregister: broadcast("onDefinitionUnregister"),
     emitDefinitionCall: broadcast("onDefinitionCall"),
 
-    // Run history hooks
-    emitRunComplete: broadcast("onRunComplete"),
+    // Trace hooks
+    emitTraceComplete: broadcast("onTraceComplete"),
   } as PluginManager<S>;
 
   return manager;

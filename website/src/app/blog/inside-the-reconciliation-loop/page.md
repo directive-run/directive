@@ -373,7 +373,7 @@ The reconciliation loop is Directive's core contribution – the mechanism that 
 This article covered the reconciliation loop at a conceptual level. For the full picture:
 
 - **[Advanced Overview](/docs/advanced/overview)** covers error boundaries, snapshot management, and performance tuning.
-- **[Time-Travel Debugging](/docs/advanced/time-travel)** explains how snapshots capture the loop's state at each cycle.
+- **[Time-Travel Debugging](/docs/advanced/history)** explains how snapshots capture the loop's state at each cycle.
 - **[Testing Overview](/docs/testing/overview)** shows how to use `settle()`, mock resolvers, and fake timers to test reconciliation behavior.
 - **[Constraint-Driven Architecture](/blog/constraint-driven-architecture)** introduces the paradigm from scratch, if you haven't read it yet.
 

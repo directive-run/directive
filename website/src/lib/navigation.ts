@@ -37,7 +37,6 @@ export const docsNavigation: NavigationSection[] = [
       { title: "Resolvers", href: "/docs/resolvers" },
       { title: "Effects", href: "/docs/effects" },
       { title: "Events", href: "/docs/events" },
-      { title: "Builders", href: "/docs/builders" },
       { title: "Schema & Types", href: "/docs/schema-overview" },
       { title: "API Reference", href: "/docs/api/core" },
       { title: "Type Reference", href: "/docs/api/types" },
@@ -66,7 +65,7 @@ export const docsNavigation: NavigationSection[] = [
     links: [
       { title: "Overview", href: "/docs/advanced/overview" },
       { title: "Multi-Module", href: "/docs/advanced/multi-module" },
-      { title: "Time-Travel & Snapshots", href: "/docs/advanced/time-travel" },
+      { title: "History & Snapshots", href: "/docs/advanced/history" },
       { title: "SSR & Hydration", href: "/docs/advanced/ssr" },
       { title: "Error Boundaries", href: "/docs/advanced/errors" },
     ],
@@ -130,8 +129,8 @@ export const docsNavigation: NavigationSection[] = [
         href: "/docs/guides/debounce-constraints",
       },
       {
-        title: "Debug with Time-Travel",
-        href: "/docs/guides/debug-time-travel",
+        title: "Debug with History",
+        href: "/docs/guides/debug-history",
       },
     ],
   },

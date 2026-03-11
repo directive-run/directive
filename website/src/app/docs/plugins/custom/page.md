@@ -170,13 +170,13 @@ Every hook is optional. Only lifecycle hooks (`onInit`, `onStart`, `onStop`, `on
 | Hook | Parameters | When it fires |
 |------|------------|---------------|
 | `onSnapshot` | `(snapshot: { id, timestamp, facts, trigger })` | A time-travel snapshot is captured |
-| `onTimeTravel` | `(from, to)` | Time-travel navigation occurs |
+| `onHistoryNavigate` | `(from, to)` | Time-travel navigation occurs |
 
-### Run History
+### Trace
 
 | Hook | Parameters | When it fires |
 |------|------------|---------------|
-| `onRunComplete` | `(run: RunChangelogEntry)` | A run finalizes (all resolvers settled). Requires `debug.runHistory` to be enabled. |
+| `onTraceComplete` | `(entry: TraceEntry)` | A trace entry finalizes (all resolvers settled). Requires `trace` to be enabled. |
 
 ### Error Boundary
 

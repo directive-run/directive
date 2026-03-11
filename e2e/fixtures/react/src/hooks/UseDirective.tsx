@@ -8,7 +8,7 @@ export function UseDirectivePage() {
     {
       facts: ["count", "name"],
       derived: ["doubled"],
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     },
   );
 

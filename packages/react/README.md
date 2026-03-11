@@ -104,7 +104,7 @@ function Summary() {
 | `useExplain(system, reqId)` | `string \| null` | Human-readable requirement explanation |
 | `useConstraintStatus(system)` | `ConstraintInfo[]` | All constraint states |
 | `useOptimisticUpdate(system)` | `{ mutate, isPending, error, rollback }` | Optimistic mutation with auto-rollback |
-| `useTimeTravel(system)` | `TimeTravelState \| null` | Undo/redo navigation |
+| `useHistory(system)` | `HistoryState \| null` | Undo/redo navigation |
 
 ### React-Specific
 

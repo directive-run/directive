@@ -102,7 +102,7 @@ class MySummary extends LitElement {
 | `ExplainController(host, system, reqId)` | `string \| null` | Requirement explanation |
 | `ConstraintStatusController(host, system)` | `ConstraintInfo[]` | All constraint states |
 | `OptimisticUpdateController(host, system)` | `{ isPending, error }` | Optimistic mutation with `.mutate()` and `.rollback()` |
-| `TimeTravelController(host, system)` | `TimeTravelState \| null` | Undo/redo navigation |
+| `HistoryController(host, system)` | `HistoryState \| null` | Undo/redo navigation |
 | `SystemController(host, module)` | &ndash; | Manages system lifecycle (`.system` accessor) |
 | `ModuleController(host, module)` | &ndash; | All-in-one: creates system, subscribes to all facts/derivations |
 
@@ -129,7 +129,7 @@ Shorthand for creating controllers:
 |--------|------------|-------------|
 | `useDispatch(system)` | `(event) => void` | Dispatch function (non-reactive) |
 | `useEvents(system)` | `Events` | Events dispatcher (non-reactive) |
-| `useTimeTravel(system)` | `TimeTravelState \| null` | Snapshot time-travel state (non-reactive) |
+| `useHistory(system)` | `HistoryState \| null` | Snapshot time-travel state (non-reactive) |
 | `getDerived(system, key)` | `() => T` | Getter function for a derivation |
 | `getFact(system, key)` | `() => T` | Getter function for a fact |
 | `createTypedHooks()` | `{ createDerived, createFact, ... }` | Factory for pre-typed controllers |

@@ -71,23 +71,31 @@ export type EventsAccessor<M extends ModuleSchema> =
   EventsAccessorFromSchema<M>;
 
 // ============================================================================
-// Debug & Time-Travel Types
+// History & Debug Types
 // ============================================================================
 
-/** Debug configuration */
-export interface DebugConfig {
-  timeTravel?: boolean;
+/** History configuration for snapshot-based state history (undo/redo, rollback, audit trails) */
+export interface HistoryConfig {
+  /** Maximum number of snapshots in the ring buffer (default 100) */
   maxSnapshots?: number;
   /** Only snapshot events from these modules. Omit to snapshot all modules. Multi-module only. */
   snapshotModules?: string[];
-  /** Enable per-run changelog (default false) */
-  runHistory?: boolean;
-  /** Ring buffer cap for run history (default 100) */
+}
+
+/** History option: boolean shorthand or full config (presence implies enabled) */
+export type HistoryOption = boolean | HistoryConfig;
+
+/** Trace configuration for per-run reconciliation changelogs */
+export interface TraceConfig {
+  /** Ring buffer cap for trace entries (default 100) */
   maxRuns?: number;
 }
 
-/** Time-travel API */
-export interface TimeTravelAPI {
+/** Trace option: boolean shorthand or full config (presence implies enabled) */
+export type TraceOption = boolean | TraceConfig;
+
+/** History API for snapshot navigation, changesets, and export/import */
+export interface HistoryAPI {
   readonly snapshots: Snapshot[];
   readonly currentIndex: number;
   readonly isPaused: boolean;
@@ -110,8 +118,8 @@ export interface SnapshotMeta {
   trigger: string;
 }
 
-/** Reactive time-travel state for framework hooks */
-export interface TimeTravelState {
+/** Reactive history state for framework hooks */
+export interface HistoryState {
   // Existing (unchanged)
   canUndo: boolean;
   canRedo: boolean;
@@ -145,11 +153,11 @@ export interface TimeTravelState {
 }
 
 // ============================================================================
-// Run Changelog Types
+// Trace Types (per-run reconciliation changelogs)
 // ============================================================================
 
-/** A structured record of one reconciliation run — from facts through resolvers and effects. */
-export interface RunChangelogEntry {
+/** A structured record of one reconciliation run — fact changes, derivation recomputes, constraints hit, resolvers, effects. */
+export interface TraceEntry {
   /** Monotonic run ID */
   id: number;
   /** When the reconcile started */
@@ -226,10 +234,10 @@ export interface SystemInspection {
   resolvers: Record<string, ResolverStatus>;
   /** All defined resolver names and their requirement types */
   resolverDefs: Array<{ id: string; requirement: string }>;
-  /** Whether debug.runHistory is enabled on this system */
-  runHistoryEnabled: boolean;
-  /** Per-run changelog entries (only present if debug.runHistory is enabled) */
-  runHistory?: RunChangelogEntry[];
+  /** Whether trace is enabled on this system */
+  traceEnabled: boolean;
+  /** Per-run trace entries (only present if trace is enabled) */
+  trace?: TraceEntry[];
 }
 
 /** Explanation of why a requirement exists */
@@ -458,14 +466,14 @@ export interface ResolversControl {
 
 export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly facts: Facts<M["facts"]>;
-  readonly debug: TimeTravelAPI | null;
+  readonly history: HistoryAPI | null;
   readonly derive: InferDerivations<M> & DerivationsControl;
   readonly events: EventsAccessorFromSchema<M>;
   readonly constraints: ConstraintsControl;
   readonly effects: EffectsControl;
   readonly resolvers: ResolversControl;
-  /** Per-run changelog entries (null if debug.runHistory is not enabled) */
-  readonly runHistory: RunChangelogEntry[] | null;
+  /** Per-run trace entries (null if trace is not enabled) */
+  readonly trace: TraceEntry[] | null;
 
   /** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
   initialize(): void;
@@ -496,11 +504,11 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   onSettledChange(listener: () => void): () => void;
 
   /**
-   * Subscribe to time-travel state changes.
-   * Called whenever a snapshot is taken or time-travel navigation occurs.
+   * Subscribe to history state changes.
+   * Called whenever a snapshot is taken or history navigation occurs.
    * Returns an unsubscribe function.
    */
-  onTimeTravelChange(listener: () => void): () => void;
+  onHistoryChange(listener: () => void): () => void;
 
   read<K extends DerivationKeys<M>>(id: K): DerivationReturnType<M, K>;
   read<K extends FactKeys<M>>(id: K): FactReturnType<M, K>;
@@ -637,7 +645,8 @@ export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
   modules: Array<ModuleDef<M>>;
   // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
   plugins?: Array<Plugin<any>>;
-  debug?: DebugConfig;
+  history?: HistoryOption;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   /**
    * Callback invoked after module inits but before first reconcile.

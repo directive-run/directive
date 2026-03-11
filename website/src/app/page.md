@@ -108,11 +108,11 @@ Full state history. Go back, go forward, export, import.
 ```typescript
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true, maxSnapshots: 100 }
+  history: true,
 });
 
-system.debug.goBack();
-system.debug.goForward();
+system.history.goBack();
+system.history.goForward();
 ```
 
 ### Framework Agnostic

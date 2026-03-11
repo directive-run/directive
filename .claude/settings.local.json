@@ -122,7 +122,13 @@
       "Bash(do echo \"=== $proj ===\")",
       "Read(//Users/jasonwcomes/Desktop/Sizls/projects/$proj/**)",
       "Bash(pnpm lint:*)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(for f in /Users/jasonwcomes/Desktop/Sizls/projects/directive/packages/*/package.json)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//Users/jasonwcomes/Desktop/Sizls/projects/directive/**)",
+      "Bash(gzip:*)",
+      "Bash(node:*)",
+      "Bash(git log:*)"
     ]
   }
 }

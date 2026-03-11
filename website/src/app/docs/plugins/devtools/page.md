@@ -55,7 +55,7 @@ The panel shows:
 - **Performance** – Reconcile count/avg, per-resolver stats, effect run/error counts (sorted by total time)
 - **Dependency Graph** – Live SVG showing facts &rarr; derivations &rarr; constraints &rarr; requirements &rarr; resolvers
 - **Timeline** – Flamechart-style waterfall showing resolver execution timing with swim lanes per resolver
-- **Time-Travel** – Undo/redo buttons (when `debug: { timeTravel: true }`)
+- **Time-Travel** – Undo/redo buttons (when `history: true`)
 - **Events** – Scrollable event log with timestamps (when `trace: true`)
 - **Record & Replay** – Capture sessions and export as JSON
 
@@ -310,13 +310,13 @@ Stats are collected from lifecycle hooks and update in real time after each reco
 
 ## Time-Travel Controls
 
-When the system has `debug: { timeTravel: true }`, the panel renders **Time-Travel** controls:
+When the system has `history: true`, the panel renders **Time-Travel** controls:
 
 - **Back / Forward** buttons with snapshot count display
 - **Position indicator** – shows current index / total snapshots
 - Buttons are disabled when there's nowhere to navigate
 
-No extra configuration – the panel detects `system.debug` and shows the controls automatically.
+No extra configuration – the panel detects `system.history` and shows the controls automatically.
 
 ---
 
@@ -503,6 +503,6 @@ For richer debugging beyond the console and floating panel:
 ## Next Steps
 
 - [Logging](/docs/plugins/logging) – Console output
-- [Time-Travel](/docs/advanced/time-travel) – Snapshot debugging
+- [Time-Travel](/docs/advanced/history) – Snapshot debugging
 - [Plugin Overview](/docs/plugins/overview) – All plugins
 - [AI Chat Demo](/ai/examples/chat) – Interactive visual debugger

@@ -168,7 +168,7 @@ const guardrailModule = createModule("guardrails", {
 
 export const system = createSystem({
   module: guardrailModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "ai-guardrails" })],
 });
 

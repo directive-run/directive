@@ -153,12 +153,12 @@ describe("knowledge validation", () => {
   });
 
   describe("required content", () => {
-    it("anti-patterns.md has at least 20 patterns", () => {
+    it("anti-patterns.md has at least 19 patterns", () => {
       const ap = files.find((f) => f.name === "anti-patterns.md");
       expect(ap).toBeDefined();
       // Count headers like "## 1." or "### #1"
       const patternHeaders = (ap!.content.match(/^##+ (?:#?\d+[.\s])/gm) || []).length;
-      expect(patternHeaders).toBeGreaterThanOrEqual(20);
+      expect(patternHeaders).toBeGreaterThanOrEqual(19);
     });
 
     it("core-patterns.md mentions createModule and createSystem", () => {

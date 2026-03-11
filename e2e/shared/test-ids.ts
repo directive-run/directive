@@ -47,12 +47,12 @@ export const TestIds = {
   reqStatusPending: "req-status-pending",
   reqStatusLoading: "req-status-loading",
 
-  // useTimeTravel
-  timeTravelCanUndo: "tt-can-undo",
-  timeTravelCanRedo: "tt-can-redo",
-  timeTravelIndex: "tt-index",
-  timeTravelTotal: "tt-total",
-  timeTravelEnabled: "tt-enabled",
+  // useHistory
+  historyCanUndo: "history-can-undo",
+  historyCanRedo: "history-can-redo",
+  historyIndex: "history-index",
+  historyTotal: "history-total",
+  historyEnabled: "history-enabled",
 
   // useDirective
   directiveFact: "directive-fact",

@@ -9,13 +9,13 @@
  *
  * Factories: createDerived, createFact, createInspect,
  * createRequirementStatus, createWatch,
- * createDirectiveSelector, useDispatch, useEvents, useTimeTravel,
+ * createDirectiveSelector, useDispatch, useEvents, useHistory,
  * getDerived, getFact, createTypedHooks, shallowEqual
  */
 
 import type {
   CreateSystemOptionsSingle,
-  DebugConfig,
+  TraceOption,
   ErrorBoundaryConfig,
   InferDerivations,
   InferEvents,
@@ -27,7 +27,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
-  TimeTravelState,
+  HistoryState,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -39,7 +39,7 @@ import {
   type InspectState,
   type TrackedSelectorResult,
   assertSystem,
-  buildTimeTravelState,
+  buildHistoryState,
   computeInspectState,
   createThrottle,
   defaultEquality,
@@ -631,7 +631,7 @@ export class ModuleController<M extends ModuleSchema>
   private config?: {
     // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
     plugins?: Plugin<any>[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
@@ -667,7 +667,7 @@ export class ModuleController<M extends ModuleSchema>
     config?: {
       // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
       plugins?: Plugin<any>[];
-      debug?: DebugConfig;
+      trace?: TraceOption;
       errorBoundary?: ErrorBoundaryConfig;
       tickMs?: number;
       zeroConfig?: boolean;
@@ -696,7 +696,7 @@ export class ModuleController<M extends ModuleSchema>
     const system = createSystem({
       module: this.moduleDef,
       plugins: allPlugins.length > 0 ? allPlugins : undefined,
-      debug: this.config?.debug,
+      trace: this.config?.trace,
       errorBoundary: this.config?.errorBoundary,
       tickMs: this.config?.tickMs,
       zeroConfig: this.config?.zeroConfig,
@@ -853,7 +853,7 @@ export function createModule<M extends ModuleSchema>(
   config?: {
     // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
     plugins?: Plugin<any>[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
@@ -889,13 +889,13 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(
 }
 
 /**
- * Reactive controller for time-travel state.
+ * Reactive controller for history state.
  * Triggers host updates when snapshots change or navigation occurs.
  *
  * @example
  * ```typescript
  * class MyElement extends LitElement {
- *   private tt = new TimeTravelController(this, system);
+ *   private tt = new HistoryController(this, system);
  *   render() {
  *     const { canUndo, undo } = this.tt.value ?? {};
  *     return html`<button ?disabled=${!canUndo} @click=${undo}>Undo</button>`;
@@ -903,8 +903,8 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(
  * }
  * ```
  */
-export class TimeTravelController implements ReactiveController {
-  value: TimeTravelState | null = null;
+export class HistoryController implements ReactiveController {
+  value: HistoryState | null = null;
   private _unsub?: () => void;
 
   constructor(
@@ -916,9 +916,9 @@ export class TimeTravelController implements ReactiveController {
   }
 
   hostConnected(): void {
-    this.value = buildTimeTravelState(this._system);
-    this._unsub = this._system.onTimeTravelChange(() => {
-      this.value = buildTimeTravelState(this._system);
+    this.value = buildHistoryState(this._system);
+    this._unsub = this._system.onHistoryChange(() => {
+      this.value = buildHistoryState(this._system);
       this._host.requestUpdate();
     });
   }
@@ -930,15 +930,15 @@ export class TimeTravelController implements ReactiveController {
 }
 
 /**
- * Functional helper for time-travel state (non-reactive, snapshot).
- * For reactive updates, use TimeTravelController.
+ * Functional helper for history state (non-reactive, snapshot).
+ * For reactive updates, use HistoryController.
  */
 // biome-ignore lint/suspicious/noExplicitAny: System type varies
-export function useTimeTravel(
+export function useHistory(
   system: SingleModuleSystem<any>,
-): TimeTravelState | null {
-  assertSystem("useTimeTravel", system);
-  return buildTimeTravelState(system);
+): HistoryState | null {
+  assertSystem("useHistory", system);
+  return buildHistoryState(system);
 }
 
 export function getDerived<T>(

@@ -3,14 +3,14 @@
  *
  * 15 active exports: useFact, useDerived, useDispatch, useSelector,
  * useWatch, useInspect, useRequirementStatus, useEvents, useExplain,
- * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
+ * useConstraintStatus, useOptimisticUpdate, useDirective, useHistory,
  * createTypedHooks, shallowEqual
  *
  * Store factories: createDerivedStore, createDerivedsStore, createFactStore, createInspectStore
  */
 
 import type {
-  DebugConfig,
+  TraceOption,
   ErrorBoundaryConfig,
   InferDerivations,
   InferEvents,
@@ -24,7 +24,7 @@ import type {
   SingleModuleSystem,
   SystemInspection,
   SystemSnapshot,
-  TimeTravelState,
+  HistoryState,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -35,7 +35,7 @@ import {
   type ConstraintInfo,
   type InspectState,
   assertSystem,
-  buildTimeTravelState,
+  buildHistoryState,
   computeInspectState,
   createThrottle,
   defaultEquality,
@@ -681,28 +681,28 @@ export function useOptimisticUpdate(
 }
 
 // ============================================================================
-// useTimeTravel — reactive time-travel store
+// useHistory — reactive history store
 // ============================================================================
 
 /**
- * Reactive time-travel Svelte store. Returns a Readable that updates
+ * Reactive history Svelte store. Returns a Readable that updates
  * when snapshots are taken or navigation occurs.
  *
  * @example
  * ```svelte
- * const tt = useTimeTravel(system);
+ * const tt = useHistory(system);
  * <button disabled={!$tt?.canUndo} on:click={() => $tt?.undo()}>Undo</button>
  * ```
  */
-export function useTimeTravel(
+export function useHistory(
   // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
-): Readable<TimeTravelState | null> {
-  assertSystem("useTimeTravel", system);
-  return readable<TimeTravelState | null>(
-    buildTimeTravelState(system),
+): Readable<HistoryState | null> {
+  assertSystem("useHistory", system);
+  return readable<HistoryState | null>(
+    buildHistoryState(system),
     (set) => {
-      return system.onTimeTravelChange(() => set(buildTimeTravelState(system)));
+      return system.onHistoryChange(() => set(buildHistoryState(system)));
     },
   );
 }
@@ -715,7 +715,7 @@ export function useTimeTravel(
 interface UseDirectiveConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
-  debug?: DebugConfig;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
@@ -760,7 +760,7 @@ export function useDirective<M extends ModuleSchema>(
   const system = createSystem({
     module: moduleDef,
     plugins: allPlugins.length > 0 ? allPlugins : undefined,
-    debug: config?.debug,
+    trace: config?.trace,
     errorBoundary: config?.errorBoundary,
     tickMs: config?.tickMs,
     zeroConfig: config?.zeroConfig,

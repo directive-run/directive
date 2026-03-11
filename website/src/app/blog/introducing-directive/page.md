@@ -451,7 +451,7 @@ Every module built with Directive inherits runtime behaviors that you'd otherwis
 - **Requirement deduplication.** Two constraints requiring `FETCH_USER` for the same userId produce one resolver execution, not two. Custom `key` functions control deduplication granularity.
 - **Automatic cancellation.** When a requirement is no longer needed (the constraint that emitted it is now satisfied), in-flight resolvers receive an abort signal via `context.signal`.
 - **Error boundaries.** Resolver failures are caught and routed through configurable recovery strategies &ndash; retry, skip, or escalate. See [Error Boundaries](/docs/advanced/errors).
-- **Time-travel debugging.** Record snapshots of every fact mutation and replay them forward and backward. Export and import state for bug reproduction. See [Time Travel](/docs/advanced/time-travel).
+- **Time-travel debugging.** Record snapshots of every fact mutation and replay them forward and backward. Export and import state for bug reproduction. See [Time Travel](/docs/advanced/history).
 - **Plugin system.** Lifecycle hooks for logging, persistence, devtools, and custom integrations. Ship with built-in logging and devtools plugins. See [Plugins](/docs/plugins/overview).
 - **Testing utilities.** Mock resolvers, fake timers, constraint assertions, and isolated test systems. See [Testing](/docs/testing/overview).
 - **Framework adapters.** First-class bindings for React, Vue, Svelte, Solid, and Lit. See [React](/docs/api/react).

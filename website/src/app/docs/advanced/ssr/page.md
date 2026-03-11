@@ -133,7 +133,7 @@ const snapshot = system.getDistributableSnapshot({
 res.json(snapshot);
 ```
 
-The snapshot includes `createdAt` and `expiresAt` timestamps. Use `isSnapshotExpired()` to check validity before serving cached values. See [Time-Travel & Snapshots](/docs/advanced/time-travel) for the full API.
+The snapshot includes `createdAt` and `expiresAt` timestamps. Use `isSnapshotExpired()` to check validity before serving cached values. See [Time-Travel & Snapshots](/docs/advanced/history) for the full API.
 
 ---
 
@@ -155,6 +155,6 @@ export function getSystem() {
 
 ## Next Steps
 
-- [Time-Travel & Snapshots](/docs/advanced/time-travel) &ndash; Distributable snapshots, signing, TTL, serialization
+- [Time-Travel & Snapshots](/docs/advanced/history) &ndash; Distributable snapshots, signing, TTL, serialization
 - [React Adapter](/docs/adapters/react) &ndash; Client setup
 - [Module and System](/docs/module-system) &ndash; Basics

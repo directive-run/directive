@@ -21,7 +21,7 @@ import {
 
 let system = createSystem({
   modules: { dashboard: dashboardModule },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "dynamic-modules" })],
 });
 system.start();
@@ -382,7 +382,7 @@ function resetDemo(): void {
 
   system = createSystem({
     modules: { dashboard: dashboardModule },
-    debug: { runHistory: true },
+    trace: true,
     plugins: [devtoolsPlugin({ name: "dynamic-modules" })],
   });
   system.start();

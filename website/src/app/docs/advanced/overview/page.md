@@ -12,7 +12,7 @@ Advanced features for production Directive applications – composition patterns
 | Feature | Page | When to Use |
 |---------|------|------------|
 | [Multi-Module](/docs/advanced/multi-module) | Compose multiple modules into one system | Apps with distinct domains (auth, cart, UI) |
-| [Time-Travel & Snapshots](/docs/advanced/time-travel) | Step through state history, undo/redo, serialize and distribute state | Debugging, persistence, sharing |
+| [Time-Travel & Snapshots](/docs/advanced/history) | Step through state history, undo/redo, serialize and distribute state | Debugging, persistence, sharing |
 | [SSR & Hydration](/docs/advanced/ssr) | Server-render Directive state, hydrate on client | Next.js, Remix, SvelteKit |
 | [Error Handling](/docs/advanced/errors) | Error boundaries, retry policies, circuit breakers | Production resilience |
 
@@ -42,15 +42,15 @@ system.facts.cart.items;
 Enable snapshots and navigate state history:
 
 ```typescript
-// Enable time-travel with a snapshot history limit
+// Enable time-travel with history
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: true,
 });
 
 // Navigate backward and forward through state history
-system.debug.goBack();    // Undo
-system.debug.goForward(); // Redo
+system.history.goBack();    // Undo
+system.history.goForward(); // Redo
 ```
 
 ---
@@ -58,5 +58,5 @@ system.debug.goForward(); // Redo
 ## Next Steps
 
 - **Building a large app?** Start with [Multi-Module](/docs/advanced/multi-module)
-- **Debugging issues?** See [Time-Travel](/docs/advanced/time-travel)
+- **Debugging issues?** See [Time-Travel](/docs/advanced/history)
 - **Going to production?** See [Error Handling](/docs/advanced/errors)

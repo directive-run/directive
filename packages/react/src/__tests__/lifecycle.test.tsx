@@ -106,7 +106,7 @@ describe("useDirectiveRef", () => {
   it("with debug config", () => {
     const { result } = renderHook(() =>
       useDirectiveRef(counterModule, {
-        debug: { timeTravel: true, maxSnapshots: 50 },
+        history: { maxSnapshots: 50 },
       }),
     );
 

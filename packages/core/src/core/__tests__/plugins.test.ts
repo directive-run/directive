@@ -459,12 +459,12 @@ describe("createPluginManager", () => {
       expect(hook).toHaveBeenCalledWith(snapshot);
     });
 
-    it("emitTimeTravel passes from and to indices", () => {
+    it("emitHistoryNavigate passes from and to indices", () => {
       const pm = createPluginManager();
       const hook = vi.fn();
 
-      pm.register(makePlugin("p", { onTimeTravel: hook }));
-      pm.emitTimeTravel(3, 1);
+      pm.register(makePlugin("p", { onHistoryNavigate: hook }));
+      pm.emitHistoryNavigate(3, 1);
 
       expect(hook).toHaveBeenCalledWith(3, 1);
     });
@@ -549,19 +549,19 @@ describe("createPluginManager", () => {
   });
 
   // ============================================================================
-  // Run History Hooks
+  // Trace Hooks
   // ============================================================================
 
-  describe("run history hooks", () => {
-    it("emitRunComplete passes the run changelog entry", () => {
+  describe("trace hooks", () => {
+    it("emitTraceComplete passes the trace entry", () => {
       const pm = createPluginManager();
       const hook = vi.fn();
-      const run = { id: 1, timestamp: Date.now(), changes: [] };
+      const entry = { id: 1, timestamp: Date.now(), changes: [] };
 
-      pm.register(makePlugin("p", { onRunComplete: hook }));
-      pm.emitRunComplete(run as never);
+      pm.register(makePlugin("p", { onTraceComplete: hook }));
+      pm.emitTraceComplete(entry as never);
 
-      expect(hook).toHaveBeenCalledWith(run);
+      expect(hook).toHaveBeenCalledWith(entry);
     });
   });
 });

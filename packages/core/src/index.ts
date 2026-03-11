@@ -101,12 +101,15 @@ export type {
   ResolversControl,
   SystemInspection,
   SystemSnapshot,
-  RunChangelogEntry,
+  TraceEntry,
+  TraceConfig,
+  TraceOption,
   DistributableSnapshotOptions,
   DistributableSnapshot,
-  DebugConfig,
-  TimeTravelAPI,
-  TimeTravelState,
+  HistoryConfig,
+  HistoryOption,
+  HistoryAPI,
+  HistoryState,
   SnapshotMeta,
   RequirementExplanation,
   // Accessors
@@ -241,17 +244,6 @@ export {
   type ModuleConfigWithDeps,
 } from "./core/module.js";
 export { createSystem } from "./core/system.js";
-export {
-  module,
-  type ModuleBuilder,
-} from "./core/builder.js";
-export {
-  constraint,
-  when,
-  type WhenConstraint,
-} from "./core/constraint-builders.js";
-export { system } from "./core/system-builder.js";
-
 // Convenience helper for status plugin setup
 export { createSystemWithStatus } from "./utils/system-with-status.js";
 
@@ -336,9 +328,9 @@ export {
   type PendingRetry,
 } from "./core/errors.js";
 export {
-  createTimeTravelManager,
-  createDisabledTimeTravel,
-} from "./utils/time-travel.js";
+  createHistoryManager,
+  createDisabledHistory,
+} from "./utils/history.js";
 export { createEngine } from "./core/engine.js";
 
 // ============================================================================

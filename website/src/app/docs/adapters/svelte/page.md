@@ -718,20 +718,20 @@ Re-exported utility for use with `useSelector`:
 
 ## Time-Travel Debugging
 
-`useTimeTravel` returns a `Readable<TimeTravelState | null>` store – `null` when disabled, otherwise the full reactive API. Use `$timeTravel` to auto-subscribe in templates:
+`useHistory` returns a `Readable<HistoryState | null>` store – `null` when disabled, otherwise the full reactive API. Use `$history` to auto-subscribe in templates:
 
 ### Undo / Redo Controls
 
 ```html
 <script>
-  import { useTimeTravel } from '@directive-run/svelte';
+  import { useHistory } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 </script>
 
-{#if $timeTravel}
-  {@const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = $timeTravel}
+{#if $history}
+  {@const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = $history}
   <button on:click={undo} disabled={!canUndo}>Undo</button>
   <button on:click={redo} disabled={!canRedo}>Redo</button>
   <span>{currentIndex + 1} / {totalSnapshots}</span>
@@ -743,8 +743,8 @@ Re-exported utility for use with `useSelector`:
 `snapshots` is lightweight metadata only (no facts data). Use `getSnapshotFacts(id)` to lazily load a snapshot's state on demand:
 
 ```html
-{#if $timeTravel}
-  {@const { snapshots, goTo, getSnapshotFacts } = $timeTravel}
+{#if $history}
+  {@const { snapshots, goTo, getSnapshotFacts } = $history}
   <ul>
     {#each snapshots as snap (snap.id)}
       <li>
@@ -763,8 +763,8 @@ Re-exported utility for use with `useSelector`:
 ### Navigation
 
 ```html
-{#if $timeTravel}
-  {@const { goBack, goForward, goTo, replay } = $timeTravel}
+{#if $history}
+  {@const { goBack, goForward, goTo, replay } = $history}
   <button on:click={() => goBack(5)}>Back 5</button>
   <button on:click={() => goForward(5)}>Forward 5</button>
   <button on:click={() => goTo(0)}>Jump to Start</button>
@@ -776,26 +776,26 @@ Re-exported utility for use with `useSelector`:
 
 ```html
 <script>
-  import { useTimeTravel } from '@directive-run/svelte';
+  import { useHistory } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   function saveSession() {
-    if ($timeTravel) {
-      localStorage.setItem('debug', $timeTravel.exportSession());
+    if ($history) {
+      localStorage.setItem('debug', $history.exportSession());
     }
   }
 
   function restoreSession() {
     const saved = localStorage.getItem('debug');
-    if (saved && $timeTravel) {
-      $timeTravel.importSession(saved);
+    if (saved && $history) {
+      $history.importSession(saved);
     }
   }
 </script>
 
-{#if $timeTravel}
+{#if $history}
   <button on:click={saveSession}>Save Session</button>
   <button on:click={restoreSession}>Restore Session</button>
 {/if}
@@ -807,15 +807,15 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```html
 <script>
-  import { useTimeTravel } from '@directive-run/svelte';
+  import { useHistory } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   function handleComplexAction() {
-    $timeTravel?.beginChangeset('Move piece A→B');
+    $history?.beginChangeset('Move piece A→B');
     // ... multiple fact mutations ...
-    $timeTravel?.endChangeset();
+    $history?.endChangeset();
     // Now undo/redo treats all mutations as one step
   }
 </script>
@@ -826,15 +826,15 @@ Group multiple fact mutations into a single undo/redo unit:
 ### Recording Control
 
 ```html
-{#if $timeTravel}
-  {@const { isPaused, pause, resume } = $timeTravel}
+{#if $history}
+  {@const { isPaused, pause, resume } = $history}
   <button on:click={isPaused ? resume : pause}>
     {isPaused ? 'Resume' : 'Pause'} Recording
   </button>
 {/if}
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/history) for the full `HistoryState` interface and keyboard shortcuts.
 
 ---
 
@@ -854,7 +854,7 @@ See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` int
 | `useRequirementStatus` | Hook | Requirement status – `useRequirementStatus(statusPlugin, type)` |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback – `useOptimisticUpdate(system, statusPlugin?, type?)` |
 | `useDirective` | Hook | Scoped system with selected or all subscriptions |
-| `useTimeTravel` | Hook | Reactive time-travel state – `useTimeTravel(system)` |
+| `useHistory` | Hook | Reactive time-travel state – `useHistory(system)` |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |

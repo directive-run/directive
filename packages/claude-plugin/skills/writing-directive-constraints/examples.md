@@ -700,7 +700,7 @@ import {
 
 const system = createSystem({
   module: debounceSearchModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "debounce-constraints" })],
 });
 system.start();
@@ -1071,7 +1071,7 @@ const batchModule = createModule("batch-loader", {
 
 export const system = createSystem({
   module: batchModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "batch-resolver" })],
 });
 ```
@@ -1425,7 +1425,7 @@ let currentStrategy: RecoveryStrategy = "retry-later";
 
 export const system = createSystem({
   module: dashboardModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
     onResolverError: (_error, resolver) => {

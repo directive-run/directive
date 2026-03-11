@@ -642,12 +642,8 @@ export const fraudAnalysisModule = createModule("fraud", {
 export const system = createSystem({
   module: fraudAnalysisModule,
   plugins: [devtoolsPlugin({ name: "fraud-analysis", panel: true })],
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 50,
-    runHistory: true,
-    maxRuns: 100,
-  },
+  history: { maxSnapshots: 50 },
+  trace: { maxRuns: 100 },
 });
 
 // ============================================================================

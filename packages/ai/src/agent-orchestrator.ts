@@ -555,14 +555,14 @@ export function createAgentOrchestrator<
     timeline = createDebugTimeline({
       getSnapshotId: () => {
         try {
-          return (system as any).debug?.currentIndex ?? null;
+          return (system as any).history?.currentIndex ?? null;
         } catch {
           return null;
         }
       },
       goToSnapshot: (snapshotId: number) => {
         try {
-          (system as any).debug?.goTo?.(snapshotId);
+          (system as any).history?.goTo?.(snapshotId);
         } catch {
           // System may not support goTo
         }
@@ -618,7 +618,7 @@ export function createAgentOrchestrator<
     allPlugins.push(
       createDebugTimelinePlugin(timeline, () => {
         try {
-          return (system as any).debug?.currentIndex ?? null;
+          return (system as any).history?.currentIndex ?? null;
         } catch {
           return null;
         }
@@ -630,7 +630,7 @@ export function createAgentOrchestrator<
   system = createSystem({
     module: orchestratorModule,
     plugins: allPlugins,
-    debug: debug ? { timeTravel: true } : undefined,
+    history: debug ? true : undefined,
   });
 
   system.start();
@@ -2034,9 +2034,9 @@ export function createAgentOrchestrator<
       if (agentState.status === "running") {
         throw new Error("[Directive] Cannot checkpoint while agent is running");
       }
-      if (!system.debug?.export) {
+      if (!system.history?.export) {
         throw new Error(
-          "[Directive] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
+          "[Directive] Checkpointing requires history. Set `debug: true` in orchestrator options.",
         );
       }
 
@@ -2045,7 +2045,7 @@ export function createAgentOrchestrator<
         id: createCheckpointId(),
         createdAt: new Date().toISOString(),
         label: cpOptions?.label,
-        systemExport: system.debug.export(),
+        systemExport: system.history.export(),
         timelineExport: timeline?.export() ?? null,
         localState: { type: "single" },
         memoryExport: memory ? ((memory as any).export?.() ?? null) : null,
@@ -2068,13 +2068,13 @@ export function createAgentOrchestrator<
           "[Directive] Cannot restore multi-agent checkpoint in single-agent orchestrator",
         );
       }
-      if (!system.debug?.import) {
+      if (!system.history?.import) {
         throw new Error(
-          "[Directive] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
+          "[Directive] Restoring a checkpoint requires history. Set `debug: true` in orchestrator options.",
         );
       }
 
-      system.debug.import(cp.systemExport);
+      system.history.import(cp.systemExport);
 
       if (
         restoreOpts?.restoreTimeline !== false &&

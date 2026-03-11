@@ -3,14 +3,14 @@
  *
  * 16 active exports: useFact, useDerived, useDispatch, useSelector,
  * useWatch, useInspect, useRequirementStatus, useEvents, useExplain,
- * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
+ * useConstraintStatus, useOptimisticUpdate, useDirective, useHistory,
  * createTypedHooks, useSuspenseRequirement, shallowEqual
  *
  * Signal factories: createDerivedSignal, createFactSignal
  */
 
 import type {
-  DebugConfig,
+  TraceOption,
   ErrorBoundaryConfig,
   InferDerivations,
   InferEvents,
@@ -33,7 +33,7 @@ import {
   type ConstraintInfo,
   type InspectState,
   assertSystem,
-  buildTimeTravelState,
+  buildHistoryState,
   computeInspectState,
   createThrottle,
   defaultEquality,
@@ -662,29 +662,29 @@ export function useSuspenseRequirement(
 }
 
 // ============================================================================
-// useTimeTravel — reactive time-travel signal
+// useHistory — reactive history signal
 // ============================================================================
 
 /**
- * Reactive time-travel signal. Returns an Accessor that updates
+ * Reactive history signal. Returns an Accessor that updates
  * when snapshots are taken or navigation occurs.
  *
  * @example
  * ```tsx
- * const tt = useTimeTravel(system);
+ * const tt = useHistory(system);
  * <button disabled={!tt()?.canUndo} onClick={() => tt()?.undo()}>Undo</button>
  * ```
  */
-export function useTimeTravel(
+export function useHistory(
   // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
-): Accessor<ReturnType<typeof buildTimeTravelState>> {
-  assertSystem("useTimeTravel", system);
+): Accessor<ReturnType<typeof buildHistoryState>> {
+  assertSystem("useHistory", system);
   const [state, setState] = createSignal<
-    ReturnType<typeof buildTimeTravelState>
-  >(buildTimeTravelState(system));
-  const unsub = system.onTimeTravelChange(() =>
-    setState(buildTimeTravelState(system)),
+    ReturnType<typeof buildHistoryState>
+  >(buildHistoryState(system));
+  const unsub = system.onHistoryChange(() =>
+    setState(buildHistoryState(system)),
   );
   onCleanup(unsub);
   return state;
@@ -698,7 +698,7 @@ export function useTimeTravel(
 interface UseDirectiveConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
-  debug?: DebugConfig;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
@@ -743,7 +743,7 @@ export function useDirective<M extends ModuleSchema>(
   const system = createSystem({
     module: moduleDef,
     plugins: allPlugins.length > 0 ? allPlugins : undefined,
-    debug: config?.debug,
+    trace: config?.trace,
     errorBoundary: config?.errorBoundary,
     tickMs: config?.tickMs,
     zeroConfig: config?.zeroConfig,

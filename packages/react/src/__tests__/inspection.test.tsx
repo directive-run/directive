@@ -4,7 +4,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import {
   useInspect,
-  useTimeTravel,
+  useHistory,
   useExplain,
   useConstraintStatus,
 } from "../index";
@@ -55,7 +55,7 @@ function createTestSystem() {
   return system;
 }
 
-function createTimeTravelSystem() {
+function createHistorySystem() {
   const mod = createModule("tt", {
     schema: {
       facts: {
@@ -68,14 +68,14 @@ function createTimeTravelSystem() {
   });
   const system = createSystem({
     module: mod,
-    debug: { timeTravel: true, maxSnapshots: 50 },
+    history: { maxSnapshots: 50 },
   });
   system.start();
 
   return system;
 }
 
-function createNoTimeTravelSystem() {
+function createNoHistorySystem() {
   const mod = createModule("nott", {
     schema: {
       facts: {
@@ -353,14 +353,14 @@ describe("useInspect", () => {
 });
 
 // ============================================================================
-// useTimeTravel
+// useHistory
 // ============================================================================
 
-describe("useTimeTravel", () => {
-  it("returns null when time-travel is disabled", () => {
-    const system = createNoTimeTravelSystem();
+describe("useHistory", () => {
+  it("returns null when history is disabled", () => {
+    const system = createNoHistorySystem();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     expect(result.current).toBeNull();
 
@@ -368,10 +368,10 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("returns TimeTravelState when enabled", () => {
-    const system = createTimeTravelSystem();
+  it("returns HistoryState when enabled", () => {
+    const system = createHistorySystem();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     expect(result.current).not.toBeNull();
     expect(result.current).toHaveProperty("canUndo");
@@ -387,12 +387,12 @@ describe("useTimeTravel", () => {
   });
 
   it("canUndo is false initially (no snapshots yet)", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let the initial reconcile run so any init snapshots are taken
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     expect(result.current).not.toBeNull();
     // With only 0-1 snapshots, canUndo should be false
@@ -405,12 +405,12 @@ describe("useTimeTravel", () => {
   });
 
   it("after taking snapshot, canUndo becomes true", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let initial reconcile run
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     // Make two changes, each triggers a reconcile + snapshot
     await act(async () => {
@@ -433,12 +433,12 @@ describe("useTimeTravel", () => {
   });
 
   it("undo restores previous state", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let initial reconcile run
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     await act(async () => {
       system.facts.count = 10;
@@ -464,12 +464,12 @@ describe("useTimeTravel", () => {
   });
 
   it("redo restores undone state", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let initial reconcile run
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     await act(async () => {
       system.facts.count = 10;
@@ -500,12 +500,12 @@ describe("useTimeTravel", () => {
   });
 
   it("totalSnapshots tracks count", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let initial reconcile run
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     const initialCount = result.current!.totalSnapshots;
 
@@ -528,12 +528,12 @@ describe("useTimeTravel", () => {
   });
 
   it("currentIndex reflects position", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     // Let initial reconcile run
     await flush();
 
-    const { result, unmount } = renderHook(() => useTimeTravel(system));
+    const { result, unmount } = renderHook(() => useHistory(system));
 
     await act(async () => {
       system.facts.count = 1;
