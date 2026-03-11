@@ -35,7 +35,7 @@ When enabled, `system.history` exposes the history API. When disabled, `system.h
 
 By default, **every** event that changes facts creates a history snapshot. In interactive apps this means UI-only events (cell selection, timer ticks) pollute the undo history, making Ctrl+Z useless.
 
-Add `snapshotEvents` to your module to declare which events create snapshots:
+Add a `history` option to your module to declare which events create snapshots:
 
 ```typescript
 const game = createModule("game", {
@@ -43,7 +43,7 @@ const game = createModule("game", {
 
   // Only these events appear in undo/redo history.
   // Omit this field to snapshot ALL events (the default).
-  snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"],
+  history: { snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"] },
 
   events: {
     tick: (facts) => { /* timer – no snapshot */ },
@@ -62,7 +62,7 @@ const game = createModule("game", {
 - **Provided** &ndash; only listed events create snapshots; unlisted events silently skip.
 - **Direct fact mutations** (`system.facts.x = 5`) always create snapshots regardless of filtering.
 - **Resolver and effect** fact changes always create snapshots.
-- **Multi-module** &ndash; each module controls its own events. A module without `snapshotEvents` still snapshots all of its events, even if another module in the system uses filtering. Use `history.snapshotModules` to filter at the system level instead.
+- **Multi-module** &ndash; each module controls its own events. A module without `history.snapshotEvents` still snapshots all of its events, even if another module in the system uses filtering. Use `history.snapshotModules` to filter at the system level instead.
 
 ### Module-Level Filtering
 
@@ -85,24 +85,24 @@ const system = createSystem({
 
 - **Omitted** &ndash; all modules create snapshots (backward compatible).
 - **Provided** &ndash; only events from listed modules create snapshots; events from excluded modules silently skip.
-- **Intersects with `snapshotEvents`** &ndash; if a module has `snapshotEvents: ["move"]` AND is in `snapshotModules`, only `move` events create snapshots.
+- **Intersects with `history.snapshotEvents`** &ndash; if a module has `history: { snapshotEvents: ["move"] }` AND is in `snapshotModules`, only `move` events create snapshots.
 - **Direct fact mutations** and resolver/effect changes always create snapshots regardless of filtering.
 
 **When to use which:**
 
 | Scenario | Use |
 |----------|-----|
-| Filter specific events within a module | `snapshotEvents` on `createModule()` |
+| Filter specific events within a module | `history.snapshotEvents` on `createModule()` |
 | Exclude entire modules from snapshots | `history.snapshotModules` on `createSystem()` |
-| Both | They intersect &ndash; the module must be in `snapshotModules` AND the event must be in `snapshotEvents` |
+| Both | They intersect &ndash; the module must be in `snapshotModules` AND the event must be in `history.snapshotEvents` |
 
 ### Type Safety
 
-`snapshotEvents` entries are type-checked against your schema events. Typos or removed event names produce compile-time errors:
+`history.snapshotEvents` entries are type-checked against your schema events. Typos or removed event names produce compile-time errors:
 
 ```typescript
-snapshotEvents: ["inputNumber", "typoEvent"],
-//                               ^^^^^^^^^ Type error: not in schema.events
+history: { snapshotEvents: ["inputNumber", "typoEvent"] },
+//                                         ^^^^^^^^^ Type error: not in schema.events
 ```
 
 ---
