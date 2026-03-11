@@ -38,7 +38,13 @@ const game = createModule("game", {
 
   // Only these events appear in undo/redo history.
   // Omit to snapshot ALL events (the default).
-  history: { snapshotEvents: ["inputNumber", "requestHint", "newGame"] },
+  history: {
+    snapshotEvents: [
+      "inputNumber",
+      "requestHint",
+      "newGame",
+    ],
+  },
 
   events: {
     tick: (facts) => { /* no snapshot */ },
