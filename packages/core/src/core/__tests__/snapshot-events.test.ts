@@ -38,16 +38,18 @@ function createTestModule(options?: {
         facts.label = "";
       },
     },
-    snapshotEvents: options?.snapshotEvents,
+    history: options?.snapshotEvents
+      ? { snapshotEvents: options.snapshotEvents }
+      : undefined,
   });
 }
 
 // ============================================================================
-// snapshotEvents
+// history.snapshotEvents
 // ============================================================================
 
-describe("snapshotEvents", () => {
-  it("snapshots all events when snapshotEvents is omitted (backward compat)", async () => {
+describe("history.snapshotEvents", () => {
+  it("snapshots all events when history.snapshotEvents is omitted (backward compat)", async () => {
     const mod = createTestModule();
     const system = createSystem({
       module: mod,
@@ -113,7 +115,7 @@ describe("snapshotEvents", () => {
 
     const initialIndex = system.history!.currentIndex;
 
-    // setLabel is NOT in snapshotEvents — no snapshot
+    // setLabel is NOT in history.snapshotEvents — no snapshot
     system.events.setLabel({ label: "a" });
     await system.settle();
     system.events.setLabel({ label: "b" });
@@ -123,7 +125,7 @@ describe("snapshotEvents", () => {
 
     expect(system.history!.currentIndex).toBe(initialIndex);
 
-    // But increment IS in snapshotEvents
+    // But increment IS in history.snapshotEvents
     system.events.increment();
     await system.settle();
 
@@ -207,7 +209,7 @@ describe("snapshotEvents", () => {
         },
       },
       // Only setX snapshots
-      snapshotEvents: ["setX"],
+      history: { snapshotEvents: ["setX"] },
     });
 
     const moduleB = createModule("modB", {
@@ -231,7 +233,7 @@ describe("snapshotEvents", () => {
           facts.y = facts.y as number;
         },
       },
-      // No snapshotEvents — ALL events from moduleB snapshot
+      // No history.snapshotEvents — ALL events from moduleB snapshot
     });
 
     const system = createSystem({
@@ -243,7 +245,7 @@ describe("snapshotEvents", () => {
 
     const initialIndex = system.history!.currentIndex;
 
-    // moduleA.setX — in snapshotEvents → snapshots
+    // moduleA.setX — in history.snapshotEvents → snapshots
     system.events.a.setX({ value: 10 });
     await system.settle();
     expect(system.history!.currentIndex).toBe(initialIndex + 1);
@@ -256,7 +258,7 @@ describe("snapshotEvents", () => {
     system.destroy();
   });
 
-  it("dev warning for invalid snapshotEvents entries", () => {
+  it("dev warning for invalid history.snapshotEvents entries", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     createModule("test", {
@@ -275,7 +277,7 @@ describe("snapshotEvents", () => {
         },
       },
       // @ts-expect-error — intentionally passing invalid event name to test dev warning
-      snapshotEvents: ["increment", "nonExistentEvent"],
+      history: { snapshotEvents: ["increment", "nonExistentEvent"] },
     });
 
     expect(warnSpy).toHaveBeenCalledWith(
@@ -285,7 +287,7 @@ describe("snapshotEvents", () => {
     warnSpy.mockRestore();
   });
 
-  it("dev warning for empty snapshotEvents array", () => {
+  it("dev warning for empty history.snapshotEvents array", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     createModule("test", {
@@ -303,7 +305,7 @@ describe("snapshotEvents", () => {
           facts.count = (facts.count as number) + 1;
         },
       },
-      snapshotEvents: [],
+      history: { snapshotEvents: [] },
     });
 
     expect(warnSpy).toHaveBeenCalledWith(
@@ -313,7 +315,7 @@ describe("snapshotEvents", () => {
     warnSpy.mockRestore();
   });
 
-  it("snapshotEvents: [] disables all event snapshots", async () => {
+  it("history.snapshotEvents: [] disables all event snapshots", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const mod = createTestModule({ snapshotEvents: [] });
@@ -344,7 +346,7 @@ describe("snapshotEvents", () => {
     warnSpy.mockRestore();
   });
 
-  it("dispatch() path respects snapshotEvents filtering", async () => {
+  it("dispatch() path respects history.snapshotEvents filtering", async () => {
     const mod = createTestModule({ snapshotEvents: ["increment"] });
     const system = createSystem({
       module: mod,
@@ -394,7 +396,7 @@ describe("snapshotEvents", () => {
           facts.count = (facts.count as number) + 1;
         },
       },
-      snapshotEvents: ["increment"],
+      history: { snapshotEvents: ["increment"] },
     });
 
     const system = createSystem({
@@ -539,7 +541,7 @@ describe("snapshotEvents", () => {
       system.destroy();
     });
 
-    it("intersects with per-module snapshotEvents", async () => {
+    it("intersects with per-module history.snapshotEvents", async () => {
       const moduleA = createModule("modA", {
         schema: {
           facts: { x: t.number() },
@@ -562,7 +564,7 @@ describe("snapshotEvents", () => {
           },
         },
         // Only setX snapshots at the module level
-        snapshotEvents: ["setX"],
+        history: { snapshotEvents: ["setX"] },
       });
 
       const moduleB = createModule("modB", {
@@ -594,12 +596,12 @@ describe("snapshotEvents", () => {
 
       const initialIndex = system.history!.currentIndex;
 
-      // moduleA.setX — in snapshotModules AND in per-module snapshotEvents → snapshots
+      // moduleA.setX — in snapshotModules AND in per-module history.snapshotEvents → snapshots
       system.events.a.setX({ value: 10 });
       await system.settle();
       expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
-      // moduleA.resetX — in snapshotModules BUT NOT in per-module snapshotEvents → no snapshot
+      // moduleA.resetX — in snapshotModules BUT NOT in per-module history.snapshotEvents → no snapshot
       system.events.a.resetX();
       await system.settle();
       expect(system.history!.currentIndex).toBe(initialIndex + 1);
@@ -689,7 +691,7 @@ describe("snapshotEvents", () => {
         },
       },
       // Only setX snapshots
-      snapshotEvents: ["setX"],
+      history: { snapshotEvents: ["setX"] },
     });
 
     const moduleB = createModule("modB", {
@@ -709,7 +711,7 @@ describe("snapshotEvents", () => {
           facts.y = value;
         },
       },
-      // No snapshotEvents — ALL events from moduleB snapshot
+      // No history.snapshotEvents — ALL events from moduleB snapshot
     });
 
     const system = createSystem({
@@ -721,12 +723,12 @@ describe("snapshotEvents", () => {
 
     const initialIndex = system.history!.currentIndex;
 
-    // moduleA.noopA — NOT in snapshotEvents, handler is a no-op → no snapshot
+    // moduleA.noopA — NOT in history.snapshotEvents, handler is a no-op → no snapshot
     system.events.a.noopA();
     await system.settle();
     expect(system.history!.currentIndex).toBe(initialIndex);
 
-    // moduleA.setX — IN snapshotEvents → snapshots
+    // moduleA.setX — IN history.snapshotEvents → snapshots
     system.events.a.setX({ value: 10 });
     await system.settle();
     expect(system.history!.currentIndex).toBe(initialIndex + 1);
