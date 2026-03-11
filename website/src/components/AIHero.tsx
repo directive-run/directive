@@ -10,7 +10,7 @@ import { HeroBackground } from "@/components/HeroBackground";
 import blurCyanImage from "@/images/blur-cyan.png";
 import blurIndigoImage from "@/images/blur-indigo.png";
 
-const singleAgentCode = `import { createAgentOrchestrator, createPIIGuardrail } from '@directive-run/ai';
+const singleAgentCode = `import { createAgentOrchestrator } from '@directive-run/ai';
 import { createOpenAIRunner } from '@directive-run/ai/openai';
 
 const orchestrator = createAgentOrchestrator({
@@ -29,7 +29,10 @@ const orchestrator = createAgentOrchestrator({
       requirement: 'ESCALATE',
       resolve: async (req, context) => {
         await context.runAgent(
-          { name: 'senior-support', instructions: 'Resolve escalated tickets.' },
+          {
+            name: 'senior-support',
+            instructions: 'Resolve escalated tickets.',
+          },
           context.facts.agent.input!,
         );
       },
@@ -39,11 +42,17 @@ const orchestrator = createAgentOrchestrator({
 });
 
 const result = await orchestrator.run(
-  { name: 'support', instructions: 'Help customers with billing questions.' },
+  {
+    name: 'support',
+    instructions: 'Help with billing questions.',
+  },
   'My card ending in 4242 was charged twice.',
 );`;
 
-const multiAgentCode = `import { createMultiAgentOrchestrator, createToolGuardrail } from '@directive-run/ai';
+const multiAgentCode = `import {
+  createMultiAgentOrchestrator,
+  createToolGuardrail,
+} from '@directive-run/ai';
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
@@ -52,17 +61,23 @@ const orchestrator = createMultiAgentOrchestrator({
       agent: {
         name: 'researcher',
         model: 'gpt-4o',
-        instructions: 'Find accurate data with citations. Verify all claims.',
+        instructions:
+          'Find accurate data with citations.',
       },
       guardrails: {
-        toolCall: [createToolGuardrail({ allowlist: ['search', 'readUrl'] })],
+        toolCall: [
+          createToolGuardrail({
+            allowlist: ['search', 'readUrl'],
+          }),
+        ],
       },
     },
     writer: {
       agent: {
         name: 'writer',
         model: 'gpt-4o-mini',
-        instructions: 'Write concise reports for executive audiences.',
+        instructions:
+          'Write concise executive reports.',
       },
     },
   },
@@ -71,7 +86,7 @@ const orchestrator = createMultiAgentOrchestrator({
 
 const results = await orchestrator.runSequential(
   ['researcher', 'writer'],
-  'Competitive analysis: How does our pricing compare to Stripe and Square?',
+  'How does our pricing compare to Stripe?',
 );`;
 
 const tabs = [

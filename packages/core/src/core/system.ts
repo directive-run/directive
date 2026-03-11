@@ -600,12 +600,14 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       constraints: prefixedConstraints,
       resolvers: prefixedResolvers,
       hooks: mod.hooks,
-      snapshotEvents:
-        snapshotModulesSet && !snapshotModulesSet.has(namespace)
-          ? [] // Module excluded from snapshots
-          : mod.snapshotEvents?.map(
-              (e: string) => `${namespace}${SEPARATOR}${e}`,
-            ),
+      history: {
+        snapshotEvents:
+          snapshotModulesSet && !snapshotModulesSet.has(namespace)
+            ? [] // Module excluded from snapshots
+            : mod.history?.snapshotEvents?.map(
+                (e: string) => `${namespace}${SEPARATOR}${e}`,
+              ),
+      },
       // biome-ignore lint/suspicious/noExplicitAny: Module transformation
     } as any);
   }
@@ -697,7 +699,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       constraints: mod.constraints,
       resolvers: mod.resolvers,
       hooks: mod.hooks,
-      snapshotEvents: mod.snapshotEvents,
+      history: mod.history,
     })) as any,
     plugins: options.plugins,
     history,
@@ -1368,12 +1370,14 @@ function createNamespacedSystem<Modules extends ModulesMap>(
             ? prefixedResolvers
             : undefined,
         hooks: mod.hooks,
-        snapshotEvents:
-          snapshotModulesSet && !snapshotModulesSet.has(namespace)
-            ? [] // Module excluded from snapshots
-            : mod.snapshotEvents?.map(
-                (e: string) => `${namespace}${SEPARATOR}${e}`,
-              ),
+        history: {
+          snapshotEvents:
+            snapshotModulesSet && !snapshotModulesSet.has(namespace)
+              ? [] // Module excluded from snapshots
+              : mod.history?.snapshotEvents?.map(
+                  (e: string) => `${namespace}${SEPARATOR}${e}`,
+                ),
+        },
       });
     },
 
@@ -1996,7 +2000,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     if (singleHistoryConfig?.snapshotModules) {
       console.warn(
         "[Directive] history.snapshotModules has no effect in single-module mode. " +
-          "Use snapshotEvents on the module definition instead, or switch to " +
+          "Use history.snapshotEvents on the module definition instead, or switch to " +
           "createSystem({ modules: { ... } }) for multi-module filtering.",
       );
     }
@@ -2042,7 +2046,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         constraints: mod.constraints,
         resolvers: mod.resolvers,
         hooks: mod.hooks,
-        snapshotEvents: mod.snapshotEvents,
+        history: mod.history,
       },
       // biome-ignore lint/suspicious/noExplicitAny: Module format
     ] as any,
@@ -2235,7 +2239,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         constraints: moduleDef.constraints,
         resolvers: moduleDef.resolvers,
         hooks: moduleDef.hooks,
-        snapshotEvents: moduleDef.snapshotEvents,
+        history: moduleDef.history,
       });
     },
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing

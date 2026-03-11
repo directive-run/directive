@@ -239,7 +239,7 @@ system.start();
 The system automatically dispatches the `tick` event at the configured interval. A dev warning is shown if `tickMs` is set but no module defines a `tick` event handler.
 
 {% callout type="note" title="Time-travel tip" %}
-Tick events fire frequently and clutter undo history. Use `snapshotEvents` to exclude them from time-travel snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/history#filtering-snapshot-events).
+Tick events fire frequently and clutter undo history. Use `history.snapshotEvents` to exclude them from time-travel snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/history#filtering-snapshot-events).
 {% /callout %}
 
 ---

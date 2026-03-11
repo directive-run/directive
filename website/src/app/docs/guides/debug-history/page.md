@@ -71,7 +71,7 @@ function DebugPanel({ system }) {
         <button onClick={() => system.history.goBack()}>← Back</button>
         <button onClick={() => system.history.goForward()}>Forward →</button>
         <button onClick={() => system.history.goTo(0)}>Reset</button>
-        <p>Snapshot label: {inspection.currentSnapshot?.label}</p>
+        <p>Snapshot trigger: {inspection.currentSnapshot?.trigger}</p>
       </section>
 
       {/* Active resolvers */}
@@ -120,7 +120,7 @@ system.history.goBack(); // See the state before that
 
 ## Step by Step
 
-1. **Enable history in the system config** – `history: true` (or `history: { maxSnapshots: N }`) tells the engine to snapshot state after reconciliation cycles. By default every event that changes facts creates a snapshot. Use `snapshotEvents` on your module to limit which events create snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/history#filtering-snapshot-events).
+1. **Enable history in the system config** – `history: true` (or `history: { maxSnapshots: N }`) tells the engine to snapshot state after reconciliation cycles. By default every event that changes facts creates a snapshot. Use `history.snapshotEvents` on your module to limit which events create snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/history#filtering-snapshot-events).
 
 2. **`useInspect` gives you the engine's internal state** – all constraints (with their `when` results), all resolvers (with their status), and the snapshot timeline. This is read-only and doesn't affect the system.
 
@@ -152,17 +152,16 @@ function App({ system }) {
 }
 ```
 
-### Export/import snapshots for bug reports
+### Export/import history for bug reports
 
 ```typescript
-// Export current snapshot timeline
-const exported = system.history.exportSnapshots();
-const blob = new Blob([JSON.stringify(exported)], { type: 'application/json' });
+// Export current snapshot timeline as a JSON string
+const exported = system.history.export();
+const blob = new Blob([exported], { type: 'application/json' });
 
-// Import a snapshot from a bug report
-const imported = JSON.parse(fileContent);
-system.history.importSnapshots(imported);
-system.history.goTo(imported.failureIndex);
+// Import history from a bug report
+system.history.import(fileContent);
+system.history.goTo(0); // Jump to the first snapshot
 ```
 
 ### Logging plugin for production debugging

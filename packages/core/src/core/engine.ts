@@ -166,20 +166,20 @@ export function createEngine<S extends Schema>(
   }
 
   // Build snapshotEventNames: Set<string> | null
-  // If any module declares snapshotEvents, build the filter set.
-  // Modules WITHOUT snapshotEvents have all their events added (they still snapshot).
+  // If any module declares history.snapshotEvents, build the filter set.
+  // Modules WITHOUT history.snapshotEvents have all their events added (they still snapshot).
   let snapshotEventNames: Set<string> | null = null;
-  // biome-ignore lint/suspicious/noExplicitAny: Module may have snapshotEvents at runtime
+  // biome-ignore lint/suspicious/noExplicitAny: Module may have history.snapshotEvents at runtime
   const hasAnySnapshotEvents = config.modules.some(
-    (m: any) => m.snapshotEvents,
+    (m: any) => m.history?.snapshotEvents,
   );
   if (hasAnySnapshotEvents) {
     snapshotEventNames = new Set<string>();
     for (const module of config.modules) {
-      // biome-ignore lint/suspicious/noExplicitAny: Module may have snapshotEvents at runtime
+      // biome-ignore lint/suspicious/noExplicitAny: Module may have history.snapshotEvents at runtime
       const mod = module as any;
-      if (mod.snapshotEvents) {
-        for (const eventName of mod.snapshotEvents) {
+      if (mod.history?.snapshotEvents) {
+        for (const eventName of mod.history.snapshotEvents) {
           snapshotEventNames.add(eventName);
         }
       } else if (mod.events) {
@@ -2389,7 +2389,7 @@ export function createEngine<S extends Schema>(
       onStop?: (s: unknown) => void;
       onError?: (e: unknown, ctx: unknown) => void;
     };
-    snapshotEvents?: string[];
+    history?: { snapshotEvents?: string[] };
   }): void {
     // Guard: cannot register during reconciliation (would corrupt iteration state)
     if (state.isReconciling) {
@@ -2451,12 +2451,12 @@ export function createEngine<S extends Schema>(
     }
 
     // Update snapshotEventNames BEFORE merging events so we capture pre-merge state
-    if (module.snapshotEvents) {
+    if (module.history?.snapshotEvents) {
       if (snapshotEventNames === null) {
-        // First module with snapshotEvents — initialize the set with all existing event names
+        // First module with history.snapshotEvents — initialize the set with all existing event names
         snapshotEventNames = new Set<string>(Object.keys(mergedEvents));
       }
-      for (const eventName of module.snapshotEvents) {
+      for (const eventName of module.history.snapshotEvents) {
         snapshotEventNames.add(eventName);
       }
     } else if (snapshotEventNames !== null && module.events) {

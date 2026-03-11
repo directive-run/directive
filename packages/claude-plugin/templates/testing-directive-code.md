@@ -323,7 +323,7 @@ describe("logPhase effect", () => {
 Enable time-travel in the test system config. In most cases, prefer `assertFact` over snapshot testing.
 
 ```typescript
-describe("time-travel", () => {
+describe("history", () => {
   it("can undo a fact change", () => {
     const system = createTestSystem(editorModule, {
       history: { maxSnapshots: 20 },
@@ -332,10 +332,10 @@ describe("time-travel", () => {
     system.facts.text = "Hello";
     system.facts.text = "Hello, world";
 
-    const tt = system.history;
+    const history = system.history;
     expect(system.facts.text).toBe("Hello, world");
 
-    tt.undo();
+    history.goBack();
     expect(system.facts.text).toBe("Hello");
   });
 
@@ -347,11 +347,11 @@ describe("time-travel", () => {
     system.facts.count = 1;
     system.facts.count = 2;
 
-    const tt = system.history;
-    const exported = tt.exportHistory();
+    const history = system.history;
+    const exported = history.export();
 
-    tt.importHistory(exported);
-    tt.goToSnapshot(0);
+    history.import(exported);
+    history.goTo(0);
     expect(system.facts.count).toBe(1);
   });
 });

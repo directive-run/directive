@@ -80,7 +80,7 @@ describe("createModule", () => {
     expect(mod.events).toEqual({});
   });
 
-  it("passes through snapshotEvents", () => {
+  it("passes through history.snapshotEvents", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Test — loose types
     const mod = createModule("snap", {
       schema: fullSchema,
@@ -89,9 +89,9 @@ describe("createModule", () => {
         increment: (f: any) => { f.count += 1; },
         setName: (f: any, p: any) => { f.name = p.name; },
       },
-      snapshotEvents: ["increment"],
+      history: { snapshotEvents: ["increment"] },
     } as any);
-    expect(mod.snapshotEvents).toEqual(["increment"]);
+    expect(mod.history?.snapshotEvents).toEqual(["increment"]);
   });
 
   it("stores crossModuleDeps when provided", () => {
@@ -204,11 +204,11 @@ describe("createModule", () => {
     warnSpy.mockRestore();
   });
 
-  it("warns on empty snapshotEvents array", () => {
+  it("warns on empty history.snapshotEvents array", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     createModule("empty-snap", {
       schema: minimalSchema,
-      snapshotEvents: [],
+      history: { snapshotEvents: [] },
     });
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("empty array"),
@@ -216,7 +216,7 @@ describe("createModule", () => {
     warnSpy.mockRestore();
   });
 
-  it("warns on snapshotEvents referencing unknown event", () => {
+  it("warns on history.snapshotEvents referencing unknown event", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     createModule("bad-snap", {
       schema: {
@@ -226,7 +226,8 @@ describe("createModule", () => {
         requirements: {},
       },
       events: { click: () => {} } as any,
-      snapshotEvents: ["nonexistent" as any],
+      // @ts-expect-error — intentionally passing invalid event name to test dev warning
+      history: { snapshotEvents: ["nonexistent"] },
     });
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('"nonexistent" not declared'),

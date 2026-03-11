@@ -105,7 +105,7 @@ export const sudokuSchema = {
 
 export const sudokuGame = createModule("sudoku", {
   schema: sudokuSchema,
-  snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"],
+  history: { snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"] },
 
   init: (facts) => {
     const { puzzle, solution } = generatePuzzle("easy");
