@@ -538,6 +538,45 @@ The primitive family uses simple nouns: **facts**, **constraints**, **resolvers*
 
 If pronunciation becomes a real adoption blocker (conference talks, video tutorials), "computed" is the strongest alternative &ndash; but that's a v2 conversation.
 
+## Feature Lifecycle: Lab → Prod → Deprecated
+
+Directive uses file suffixes to manage feature readiness across source code, docs, navigation, and search indexing.
+
+### Phases
+
+| Phase | Source | Docs | Nav | Embeddings | Bundle |
+|-------|--------|------|-----|------------|--------|
+| **Lab** | `file.lab.ts` | `page.lab.md` | Commented out | Skipped | Excluded |
+| **Prod** | `file.ts` | `page.md` | Listed | Indexed | Included |
+| **Deprecated** | `file.deprecated.ts` | `page.md` + banner | Listed with badge | Indexed (migration info) | Included, warns at runtime |
+
+### How It Works
+
+- **Source code:** Barrel files (`index.ts`) only export from `.ts` files. `.lab.ts` files are never referenced in exports, so bundlers exclude them. Type-only imports (`import type`) from `.lab.ts` are fine — they're erased at compile time.
+- **Docs pages:** Next.js routes from `page.md`. Renaming to `page.lab.md` removes the route. The embedding generator globs `**/page.md`, so `.lab.md` files are automatically skipped.
+- **Navigation:** Comment out the nav entry in `website/src/lib/navigation.ts` with a note: `// Feature — lab (reason)`.
+- **Examples:** Private examples can import directly from `.lab.ts` via relative path. Published packages never reference lab files.
+
+### Conventions
+
+- Always leave a comment at the old export site explaining why it's in lab: `// createObservability moved to observability.lab.ts — re-evaluating vs OTel`
+- Keep types exported from the barrel even when runtime code is in lab (other modules may need the types)
+- Track all lab/deprecated items in `LAB.md` at the repo root
+
+### Promoting Lab → Prod
+
+1. Rename `file.lab.ts` → `file.ts` and `page.lab.md` → `page.md`
+2. Add runtime exports back to barrel files
+3. Uncomment nav entry
+4. Remove from `LAB.md`
+
+### Demoting Prod → Deprecated
+
+1. Rename `file.ts` → `file.deprecated.ts`
+2. Add deprecation banner to docs page
+3. Add runtime warning: `console.warn("[Directive] X is deprecated. Use Y instead.")`
+4. Add to `LAB.md` with removal target version
+
 ## Security: Prototype Pollution Defense
 
 Directive uses a consistent defense-in-depth strategy against prototype pollution across both `@directive-run/core` and `@directive-run/ai`.

@@ -173,7 +173,15 @@ pnpm test           # Run tests
 pnpm lint           # Lint/format
 ```
 
+## Feature Lifecycle
+
+Features use file suffixes to control bundle inclusion and docs visibility:
+- **`.lab.ts` / `.lab.md`** — Not shipped. Out of bundle, nav, and search. Tracked in `LAB.md`.
+- **`.deprecated.ts`** — Being removed. In bundle with runtime warnings.
+- See `docs/ARCHITECTURE.md` → "Feature Lifecycle" for full convention.
+
 ## Resources
 
 - Full Plan: `docs/PLAN.md`
+- Lab Tracking: `LAB.md`
 - MVP Spec: `/Users/jasonwcomes/Desktop/Sizls/MVP_TOOL.md`

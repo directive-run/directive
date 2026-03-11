@@ -363,19 +363,17 @@ export {
   type MessageFilter,
 } from "./communication.js";
 
-// Observability
-export {
-  createObservability,
-  createAgentMetrics,
-  type ObservabilityInstance,
-  type ObservabilityConfig,
-  type MetricType,
-  type MetricDataPoint,
-  type AggregatedMetric,
-  type TraceSpan,
-  type AlertConfig,
-  type AlertEvent,
-  type DashboardData,
+// Observability — runtime createObservability/createAgentMetrics moved to alpha (re-evaluating vs OTel)
+export type {
+  ObservabilityInstance,
+  ObservabilityConfig,
+  MetricType,
+  MetricDataPoint,
+  AggregatedMetric,
+  TraceSpan,
+  AlertConfig,
+  AlertEvent,
+  DashboardData,
 } from "@directive-run/core/plugins";
 
 // OTLP Exporter
