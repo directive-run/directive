@@ -311,6 +311,33 @@ interface SystemSnapshot {
 }
 ```
 
+### DistributableSnapshotOptions
+
+```typescript
+interface DistributableSnapshotOptions {
+  includeDerivations?: string[];        // which derivations to include (default: all)
+  excludeDerivations?: string[];        // derivations to exclude
+  includeFacts?: string[];              // which facts to include (default: none)
+  ttlSeconds?: number;                  // snapshot TTL in seconds
+  metadata?: Record<string, unknown>;   // custom metadata attached to snapshot
+  includeVersion?: boolean;             // include a version hash for cache diffing
+}
+```
+
+Derivations are included by default — they're computed read-only values safe to distribute. Facts are opt-in to avoid distributing mutable source-of-truth state that could become stale.
+
+### DistributableSnapshot
+
+```typescript
+interface DistributableSnapshot<T = Record<string, unknown>> {
+  data: T;                              // the selected derivations and/or facts
+  createdAt: number;                    // timestamp when snapshot was created
+  expiresAt?: number;                   // timestamp when snapshot expires (if ttlSeconds set)
+  version?: string;                     // version hash (if includeVersion set)
+  metadata?: Record<string, unknown>;   // custom metadata (if provided)
+}
+```
+
 ### SystemInspection
 
 ```typescript
