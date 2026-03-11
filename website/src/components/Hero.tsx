@@ -46,15 +46,15 @@ export default createModule("publish", {
   resolvers: {
     validate: {
       requirement: "VALIDATE",
-      resolve: async (req, context) => {
-        context.facts.validated = await checkDraft(context.facts.draft);
+      resolve: async (req, { facts }) => {
+        facts.validated = await checkDraft(facts.draft);
       },
     },
     save: {
       requirement: "SAVE",
-      resolve: async (req, context) => {
-        await saveDraft(context.facts.draft);
-        context.facts.saved = true;
+      resolve: async (req, { facts }) => {
+        await saveDraft(facts.draft);
+        facts.saved = true;
       },
     },
   },
