@@ -108,7 +108,7 @@ import { loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: { maxSnapshots: 100 },
 });
 
 // Multi-module – namespaced access: system.facts.auth.token

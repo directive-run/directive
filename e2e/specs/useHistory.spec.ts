@@ -2,20 +2,20 @@ import { expect } from "@playwright/test";
 import { forEachFramework, tid } from "../helpers/framework-test";
 import { TestIds } from "../shared/test-ids";
 
-forEachFramework("useTimeTravel", async (_fw, { page }) => {
-  // Time-travel is enabled
-  await expect(tid(page, TestIds.timeTravelEnabled)).toHaveText("true");
+forEachFramework("useHistory", async (_fw, { page }) => {
+  // History is enabled
+  await expect(tid(page, TestIds.historyEnabled)).toHaveText("true");
 
   // Initial state: can't undo/redo
-  await expect(tid(page, TestIds.timeTravelCanUndo)).toHaveText("false");
-  await expect(tid(page, TestIds.timeTravelCanRedo)).toHaveText("false");
+  await expect(tid(page, TestIds.historyCanUndo)).toHaveText("false");
+  await expect(tid(page, TestIds.historyCanRedo)).toHaveText("false");
 
   // Increment to create snapshots
   await tid(page, TestIds.btnIncrement).click();
   await expect(tid(page, TestIds.factSingle)).toHaveText("1");
 
   // Can now undo
-  await expect(tid(page, TestIds.timeTravelCanUndo)).toHaveText("true", {
+  await expect(tid(page, TestIds.historyCanUndo)).toHaveText("true", {
     timeout: 2000,
   });
 
@@ -26,7 +26,7 @@ forEachFramework("useTimeTravel", async (_fw, { page }) => {
   });
 
   // Can now redo
-  await expect(tid(page, TestIds.timeTravelCanRedo)).toHaveText("true", {
+  await expect(tid(page, TestIds.historyCanRedo)).toHaveText("true", {
     timeout: 2000,
   });
 

@@ -192,7 +192,7 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
       });
     },
 
-    onTimeTravel: (from, to) => {
+    onHistoryNavigate: (from, to) => {
       log("info", "timetravel.jump", { from, to });
     },
 

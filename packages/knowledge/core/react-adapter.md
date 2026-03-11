@@ -129,7 +129,7 @@ function GameBoard() {
   // System created on mount, destroyed on unmount
   const gameSystem = useSystem({
     module: gameModule,
-    debug: { timeTravel: true },
+    history: true,
   });
 
   const score = useSelector(gameSystem, (s) => s.facts.score);

@@ -19,7 +19,7 @@ import {
   useExplain,
   useConstraintStatus,
   useOptimisticUpdate,
-  useTimeTravel,
+  useHistory,
   useDirective,
   useNamespacedSelector,
   createTypedHooks,
@@ -133,7 +133,7 @@ function createConstraintSystem() {
   return system;
 }
 
-function createTimeTravelSystem() {
+function createHistorySystem() {
   const mod = createModule("tt", {
     schema: {
       facts: {
@@ -146,14 +146,14 @@ function createTimeTravelSystem() {
   });
   const system = createSystem({
     module: mod,
-    debug: { timeTravel: true, maxSnapshots: 50 },
+    history: { maxSnapshots: 50 },
   });
   system.start();
 
   return system;
 }
 
-function createNoTimeTravelSystem() {
+function createNoHistorySystem() {
   const mod = createModule("nott", {
     schema: {
       facts: {
@@ -1317,23 +1317,23 @@ describe("useOptimisticUpdate", () => {
 });
 
 // ============================================================================
-// useTimeTravel
+// useHistory
 // ============================================================================
 
-describe("useTimeTravel", () => {
+describe("useHistory", () => {
   let scope: EffectScope;
 
   afterEach(() => {
     scope?.stop();
   });
 
-  it("returns null when time-travel is disabled", () => {
-    const system = createNoTimeTravelSystem();
+  it("returns null when history is disabled", () => {
+    const system = createNoHistorySystem();
     scope = effectScope();
-    let state!: ShallowRef<ReturnType<typeof useTimeTravel>["value"]>;
+    let state!: ShallowRef<ReturnType<typeof useHistory>["value"]>;
 
     scope.run(() => {
-      state = useTimeTravel(system);
+      state = useHistory(system);
     });
 
     expect(state.value).toBeNull();
@@ -1342,13 +1342,13 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("returns TimeTravelState when enabled", () => {
-    const system = createTimeTravelSystem();
+  it("returns HistoryState when enabled", () => {
+    const system = createHistorySystem();
     scope = effectScope();
-    let state!: ShallowRef<ReturnType<typeof useTimeTravel>["value"]>;
+    let state!: ShallowRef<ReturnType<typeof useHistory>["value"]>;
 
     scope.run(() => {
-      state = useTimeTravel(system);
+      state = useHistory(system);
     });
 
     expect(state.value).not.toBeNull();
@@ -1364,15 +1364,15 @@ describe("useTimeTravel", () => {
   });
 
   it("after taking snapshots, canUndo becomes true", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     await flush();
 
     scope = effectScope();
-    let state!: ShallowRef<ReturnType<typeof useTimeTravel>["value"]>;
+    let state!: ShallowRef<ReturnType<typeof useHistory>["value"]>;
 
     scope.run(() => {
-      state = useTimeTravel(system);
+      state = useHistory(system);
     });
 
     system.facts.count = 1;
@@ -1390,15 +1390,15 @@ describe("useTimeTravel", () => {
   });
 
   it("undo restores previous state", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
 
     await flush();
 
     scope = effectScope();
-    let state!: ShallowRef<ReturnType<typeof useTimeTravel>["value"]>;
+    let state!: ShallowRef<ReturnType<typeof useHistory>["value"]>;
 
     scope.run(() => {
-      state = useTimeTravel(system);
+      state = useHistory(system);
     });
 
     system.facts.count = 10;

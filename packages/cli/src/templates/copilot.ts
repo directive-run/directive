@@ -7,22 +7,21 @@ import { generateCursorRules } from "./cursor.js";
 export function generateCopilotRules(): string {
   const base = generateCursorRules();
 
-  // Add anti-patterns 11-20 that cursor doesn't include
+  // Add anti-patterns 11-19 that cursor doesn't include
   const extraAntiPatterns = `
-## Anti-Patterns 11-20
+## Anti-Patterns 11-19
 
 | # | WRONG | CORRECT |
 |---|-------|---------|
-| 11 | \`module("name").schema({...}).build()\` | Prefer \`createModule("name", {...})\` object syntax |
-| 12 | Returning data from \`resolve\` | Resolvers return \`void\` — mutate \`context.facts\` |
-| 13 | Async logic in \`init\` | \`init\` is synchronous, facts assignment only |
-| 14 | \`await system.start()\` without settle | Add \`await system.settle()\` after start |
-| 15 | Missing \`crossModuleDeps\` | Declare \`crossModuleDeps: { auth: authSchema }\` |
-| 16 | \`require: "TYPE"\` string literal | \`require: { type: "TYPE" }\` object form |
-| 17 | Passthrough derivation \`(f) => f.count\` | Remove — read fact directly |
-| 18 | \`from '@directive-run/core/module'\` | \`from '@directive-run/core'\` (main export) |
-| 19 | \`async when()\` without \`deps\` | Add \`deps: ['factName']\` for async constraints |
-| 20 | No error boundary on resolver | Use try-catch or module error boundary config |
+| 11 | Returning data from \`resolve\` | Resolvers return \`void\` — mutate \`context.facts\` |
+| 12 | Async logic in \`init\` | \`init\` is synchronous, facts assignment only |
+| 13 | \`await system.start()\` without settle | Add \`await system.settle()\` after start |
+| 14 | Missing \`crossModuleDeps\` | Declare \`crossModuleDeps: { auth: authSchema }\` |
+| 15 | \`require: "TYPE"\` string literal | \`require: { type: "TYPE" }\` object form |
+| 16 | Passthrough derivation \`(f) => f.count\` | Remove — read fact directly |
+| 17 | \`from '@directive-run/core/module'\` | \`from '@directive-run/core'\` (main export) |
+| 18 | \`async when()\` without \`deps\` | Add \`deps: ['factName']\` for async constraints |
+| 19 | No error boundary on resolver | Use try-catch or module error boundary config |
 `;
 
   // Add multi-module basics

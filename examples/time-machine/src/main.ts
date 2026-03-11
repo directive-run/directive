@@ -13,7 +13,7 @@ import { addTimeline, schema, system, timeline } from "./module.js";
 
 system.start();
 
-const tt = system.debug!;
+const tt = system.history!;
 
 // ============================================================================
 // DOM References

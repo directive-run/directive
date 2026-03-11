@@ -9,7 +9,7 @@ const statusPlugin = createRequirementStatusPlugin();
 export const system = createSystem({
   module: testModule,
   plugins: [statusPlugin.plugin],
-  debug: { timeTravel: true, maxSnapshots: 50 },
+  history: { maxSnapshots: 50 },
 });
 
 export { statusPlugin };

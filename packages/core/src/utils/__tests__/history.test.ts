@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import {
-  createTimeTravelManager,
-  createDisabledTimeTravel,
-} from "../time-travel.js";
+  createHistoryManager,
+  createDisabledHistory,
+} from "../history.js";
 import { createFactsStore, createFactsProxy } from "../../core/facts.js";
 
 // ---------------------------------------------------------------------------
@@ -10,10 +10,9 @@ import { createFactsStore, createFactsProxy } from "../../core/facts.js";
 // ---------------------------------------------------------------------------
 
 function setup(opts: {
-  timeTravel?: boolean;
-  maxSnapshots?: number;
+  historyOption?: boolean | { maxSnapshots?: number };
   onSnapshot?: (s: unknown) => void;
-  onTimeTravel?: (from: number, to: number) => void;
+  onHistoryChange?: (from: number, to: number) => void;
 } = {}) {
   const schema = { count: { _type: 0 }, name: { _type: "" } } as const;
   // biome-ignore lint/suspicious/noExplicitAny: Test helper — schema types are checked at runtime
@@ -25,33 +24,32 @@ function setup(opts: {
   facts.count = 0;
   facts.name = "init";
 
+  const historyOption = opts.historyOption ?? true;
+
   // biome-ignore lint/suspicious/noExplicitAny: Test helper
-  const manager = createTimeTravelManager<any>({
-    config: {
-      timeTravel: opts.timeTravel ?? true,
-      maxSnapshots: opts.maxSnapshots,
-    },
+  const manager = createHistoryManager<any>({
+    historyOption,
     facts,
     store,
     onSnapshot: opts.onSnapshot,
-    onTimeTravel: opts.onTimeTravel,
+    onHistoryChange: opts.onHistoryChange,
   });
 
   return { schema, store, facts, manager };
 }
 
 // ---------------------------------------------------------------------------
-// createTimeTravelManager
+// createHistoryManager
 // ---------------------------------------------------------------------------
 
-describe("createTimeTravelManager", () => {
+describe("createHistoryManager", () => {
   // ---- basic properties ---------------------------------------------------
 
   it("reports isEnabled based on config", () => {
-    const enabled = setup({ timeTravel: true });
+    const enabled = setup({ historyOption: true });
     expect(enabled.manager.isEnabled).toBe(true);
 
-    const disabled = setup({ timeTravel: false });
+    const disabled = setup({ historyOption: false });
     expect(disabled.manager.isEnabled).toBe(false);
   });
 
@@ -102,7 +100,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("takeSnapshot returns noop when disabled", () => {
-    const { manager } = setup({ timeTravel: false });
+    const { manager } = setup({ historyOption: false });
     const snap = manager.takeSnapshot("nope");
     expect(snap.id).toBe(-1);
     expect(manager.snapshots).toHaveLength(0);
@@ -119,7 +117,7 @@ describe("createTimeTravelManager", () => {
   // ---- ring buffer --------------------------------------------------------
 
   it("enforces maxSnapshots (ring buffer)", () => {
-    const { manager, facts } = setup({ maxSnapshots: 3 });
+    const { manager, facts } = setup({ historyOption: { maxSnapshots: 3 } });
     for (let i = 0; i < 5; i++) {
       facts.count = i;
       manager.takeSnapshot(`snap-${i}`);
@@ -169,7 +167,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("restore does nothing when disabled", () => {
-    const { manager, facts } = setup({ timeTravel: false });
+    const { manager, facts } = setup({ historyOption: false });
     facts.count = 10;
     const snap = { id: 1, timestamp: 0, facts: { count: 99, name: "x" }, trigger: "t" };
     manager.restore(snap);
@@ -196,8 +194,8 @@ describe("createTimeTravelManager", () => {
   // ---- goBack / goForward -------------------------------------------------
 
   it("goBack navigates to previous snapshot", () => {
-    const onTimeTravel = vi.fn();
-    const { manager, facts } = setup({ onTimeTravel });
+    const onHistoryChange = vi.fn();
+    const { manager, facts } = setup({ onHistoryChange });
 
     facts.count = 1;
     manager.takeSnapshot("s1");
@@ -209,7 +207,7 @@ describe("createTimeTravelManager", () => {
     manager.goBack();
     expect(manager.currentIndex).toBe(1);
     expect(facts.count).toBe(2);
-    expect(onTimeTravel).toHaveBeenCalledWith(2, 1);
+    expect(onHistoryChange).toHaveBeenCalledWith(2, 1);
   });
 
   it("goBack does not go below 0", () => {
@@ -224,8 +222,8 @@ describe("createTimeTravelManager", () => {
   });
 
   it("goForward navigates to next snapshot", () => {
-    const onTimeTravel = vi.fn();
-    const { manager, facts } = setup({ onTimeTravel });
+    const onHistoryChange = vi.fn();
+    const { manager, facts } = setup({ onHistoryChange });
 
     facts.count = 1;
     manager.takeSnapshot("s1");
@@ -241,7 +239,7 @@ describe("createTimeTravelManager", () => {
     manager.goForward();
     expect(manager.currentIndex).toBe(1);
     expect(facts.count).toBe(2);
-    expect(onTimeTravel).toHaveBeenLastCalledWith(0, 1);
+    expect(onHistoryChange).toHaveBeenLastCalledWith(0, 1);
   });
 
   it("goForward does not exceed max index", () => {
@@ -254,7 +252,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("goBack/goForward noop when empty or disabled", () => {
-    const disabled = setup({ timeTravel: false });
+    const disabled = setup({ historyOption: false });
     disabled.manager.goBack();
     disabled.manager.goForward();
 
@@ -293,7 +291,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("goTo noop when disabled", () => {
-    const { manager } = setup({ timeTravel: false });
+    const { manager } = setup({ historyOption: false });
     manager.goTo(1);
   });
 
@@ -315,7 +313,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("replay noop when empty or disabled", () => {
-    const disabled = setup({ timeTravel: false });
+    const disabled = setup({ historyOption: false });
     disabled.manager.replay();
 
     const empty = setup();
@@ -374,7 +372,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("import noop when disabled", () => {
-    const { manager } = setup({ timeTravel: false });
+    const { manager } = setup({ historyOption: false });
     manager.import(JSON.stringify({ version: 1, snapshots: [], currentIndex: -1 }));
   });
 
@@ -415,7 +413,7 @@ describe("createTimeTravelManager", () => {
   });
 
   it("beginChangeset noop when disabled", () => {
-    const { manager } = setup({ timeTravel: false });
+    const { manager } = setup({ historyOption: false });
     manager.beginChangeset("nope");
     manager.endChangeset();
   });
@@ -466,12 +464,12 @@ describe("createTimeTravelManager", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createDisabledTimeTravel
+// createDisabledHistory
 // ---------------------------------------------------------------------------
 
-describe("createDisabledTimeTravel", () => {
+describe("createDisabledHistory", () => {
   it("returns a noop manager", () => {
-    const manager = createDisabledTimeTravel();
+    const manager = createDisabledHistory();
 
     expect(manager.isEnabled).toBe(false);
     expect(manager.isRestoring).toBe(false);
@@ -481,7 +479,7 @@ describe("createDisabledTimeTravel", () => {
   });
 
   it("all methods are safe to call", () => {
-    const manager = createDisabledTimeTravel();
+    const manager = createDisabledHistory();
 
     const snap = manager.takeSnapshot("noop");
     expect(snap.id).toBe(-1);

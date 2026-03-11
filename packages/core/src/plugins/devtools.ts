@@ -55,10 +55,10 @@ import {
   removeTableRow,
   renderRequirements,
   renderStatus,
-  setupTimeTravelButtons,
+  setupHistoryButtons,
   updateDerivations,
   updatePerfSection,
-  updateTimeTravelControls,
+  updateHistoryControls,
   upsertTableRow,
 } from "./devtools-panel.js";
 
@@ -440,7 +440,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       updateDependencyGraph(refs, sys, depGraph);
     }
     if (flags & D_TT) {
-      updateTimeTravelControls(refs, sys);
+      updateHistoryControls(refs, sys);
     }
     if (flags & D_TIMELINE) {
       updateTimeline(refs, timeline);
@@ -518,8 +518,8 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
             }>,
           );
         }
-        updateTimeTravelControls(refs, sys);
-        setupTimeTravelButtons(refs, sys);
+        updateHistoryControls(refs, sys);
+        setupHistoryButtons(refs, sys);
         updateDependencyGraph(refs, sys, depGraph);
 
         // Wire record & export buttons
@@ -906,7 +906,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       });
     },
 
-    onTimeTravel: (from, to) => {
+    onHistoryNavigate: (from, to) => {
       addEvent("timetravel.jump", { from, to });
       recordEvent("timetravel.jump", { from, to });
       if (panel && state.system) {
@@ -957,17 +957,17 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       panelEvent("error.recovery", { source: error.source, strategy });
     },
 
-    onRunComplete: (run) => {
-      addEvent("run.complete", {
-        id: run.id,
-        status: run.status,
-        facts: run.factChanges.length,
-        constraints: run.constraintsHit.length,
-        requirements: run.requirementsAdded.length,
-        resolvers: run.resolversStarted.length,
-        effects: run.effectsRun.length,
+    onTraceComplete: (entry) => {
+      addEvent("trace.complete", {
+        id: entry.id,
+        status: entry.status,
+        facts: entry.factChanges.length,
+        constraints: entry.constraintsHit.length,
+        requirements: entry.requirementsAdded.length,
+        resolvers: entry.resolversStarted.length,
+        effects: entry.effectsRun.length,
       });
-      panelEvent("run.complete", { id: run.id });
+      panelEvent("trace.complete", { id: entry.id });
     },
 
     onDefinitionRegister: (type, id) => {

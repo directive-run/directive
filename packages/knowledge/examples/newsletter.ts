@@ -209,6 +209,6 @@ const newsletter = createModule("newsletter", {
 
 export const system = createSystem({
   module: newsletter,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "newsletter" })],
 });

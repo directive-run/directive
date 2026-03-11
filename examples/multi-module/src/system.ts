@@ -30,11 +30,8 @@ export const system = createSystem({
     devtoolsPlugin({ name: "multi-module" }),
     loggingPlugin({ level: "info" }),
   ],
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 50,
-    runHistory: true,
-  },
+  history: { maxSnapshots: 50 },
+  trace: true,
 });
 
 // Type-safe access to facts through namespaces

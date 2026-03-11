@@ -245,7 +245,7 @@ const pipelineModule = createModule("pipeline", {
 
 export const system = createSystem({
   module: pipelineModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "ai-checkpoint" })],
 });
 
@@ -723,7 +723,7 @@ const routerModule = createModule("router", {
 
 export const system = createSystem({
   module: routerModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "provider-routing" })],
 });
 

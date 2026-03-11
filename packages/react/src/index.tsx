@@ -5,7 +5,7 @@
  * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
  * useSuspenseRequirement, useEvents, useExplain, useConstraintStatus,
  * useOptimisticUpdate, DirectiveHydrator, useHydratedSystem,
- * useTimeTravel, shallowEqual
+ * useHistory, shallowEqual
  *
  * @example
  * ```tsx
@@ -31,7 +31,7 @@
  */
 
 import type {
-  DebugConfig,
+  TraceOption,
   DistributableSnapshot,
   ErrorBoundaryConfig,
   InferDerivations,
@@ -45,7 +45,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
-  TimeTravelState,
+  HistoryState,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -56,7 +56,7 @@ import {
   type ConstraintInfo,
   type InspectState,
   assertSystem,
-  buildTimeTravelState,
+  buildHistoryState,
   computeInspectState,
   createThrottle,
   defaultEquality,
@@ -857,16 +857,16 @@ function _useInspectSync(
 }
 
 // ============================================================================
-// useTimeTravel — reactive time-travel state
+// useHistory — reactive history state
 // ============================================================================
 
 /**
- * Reactive time-travel hook. Returns null when time-travel is disabled.
+ * Reactive history hook. Returns null when history is disabled.
  * Re-renders when snapshots are taken or navigation occurs.
  *
  * @example
  * ```tsx
- * const tt = useTimeTravel(system);
+ * const tt = useHistory(system);
  * if (tt) {
  *   return (
  *     <div>
@@ -878,20 +878,20 @@ function _useInspectSync(
  * }
  * ```
  */
-export function useTimeTravel(
+export function useHistory(
   // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
-): TimeTravelState | null {
-  assertSystem("useTimeTravel", system);
-  const cachedRef = useRef<TimeTravelState | null>(null);
+): HistoryState | null {
+  assertSystem("useHistory", system);
+  const cachedRef = useRef<HistoryState | null>(null);
 
   const subscribe = useCallback(
-    (onStoreChange: () => void) => system.onTimeTravelChange(onStoreChange),
+    (onStoreChange: () => void) => system.onHistoryChange(onStoreChange),
     [system],
   );
 
   const getSnapshot = useCallback(() => {
-    const state = buildTimeTravelState(system);
+    const state = buildHistoryState(system);
     if (!state) return null;
 
     // Return stable reference when values haven't changed
@@ -1152,7 +1152,7 @@ function _useSuspenseRequirementMulti(
 interface DirectiveRefBaseConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
-  debug?: DebugConfig;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
@@ -1225,7 +1225,7 @@ export function useDirectiveRef(
         // --- Namespaced mode: { modules: { ... } } ---
         const { modules, ...rest } = options;
         const plugins = config?.plugins ?? rest.plugins ?? [];
-        const debug = config?.debug ?? rest.debug;
+        const trace = config?.trace ?? rest.trace;
         const errorBoundary = config?.errorBoundary ?? rest.errorBoundary;
         const tickMs = config?.tickMs ?? rest.tickMs;
         const zeroConfig = config?.zeroConfig ?? rest.zeroConfig;
@@ -1234,7 +1234,7 @@ export function useDirectiveRef(
         const sys = createSystem({
           modules,
           plugins: plugins.length > 0 ? plugins : undefined,
-          debug,
+          trace,
           errorBoundary,
           tickMs,
           zeroConfig,
@@ -1256,7 +1256,7 @@ export function useDirectiveRef(
       const mod = isModule ? options : options.module;
       const baseOpts = isModule ? {} : (options as DirectiveRefBaseConfig);
       const plugins = config?.plugins ?? baseOpts.plugins ?? [];
-      const debug = config?.debug ?? baseOpts.debug;
+      const trace = config?.trace ?? baseOpts.trace;
       const errorBoundary = config?.errorBoundary ?? baseOpts.errorBoundary;
       const tickMs = config?.tickMs ?? baseOpts.tickMs;
       const zeroConfig = config?.zeroConfig ?? baseOpts.zeroConfig;
@@ -1277,7 +1277,7 @@ export function useDirectiveRef(
       const sys = createSystem({
         module: mod,
         plugins: allPlugins.length > 0 ? allPlugins : undefined,
-        debug,
+        trace,
         errorBoundary,
         tickMs,
         zeroConfig,

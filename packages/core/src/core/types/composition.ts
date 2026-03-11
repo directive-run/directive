@@ -33,16 +33,17 @@ import type {
 } from "./schema.js";
 import type {
   ConstraintsControl,
-  DebugConfig,
   DerivationsControl,
   DistributableSnapshot,
   DistributableSnapshotOptions,
   EffectsControl,
   ResolversControl,
-  RunChangelogEntry,
+  TraceEntry,
+  TraceOption,
   SystemInspection,
   SystemSnapshot,
-  TimeTravelAPI,
+  HistoryAPI,
+  HistoryOption,
 } from "./system.js";
 
 // ============================================================================
@@ -209,8 +210,10 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
   modules: Modules;
   /** Plugins to register */
   plugins?: Array<Plugin<ModuleSchema>>;
-  /** Debug configuration */
-  debug?: DebugConfig;
+  /** History configuration for snapshot-based state history */
+  history?: HistoryOption;
+  /** Trace: per-run reconciliation changelog */
+  trace?: TraceOption;
   /** Error boundary configuration */
   errorBoundary?: ErrorBoundaryConfig;
   /**
@@ -261,8 +264,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly _mode: "namespaced";
   /** Namespaced facts accessor: system.facts.auth.token */
   readonly facts: MutableNamespacedFacts<Modules>;
-  /** Time-travel debugging API (if enabled) */
-  readonly debug: TimeTravelAPI | null;
+  /** History API for undo/redo, rollback, audit trails (if enabled) */
+  readonly history: HistoryAPI | null;
   /** Namespaced derivations accessor: system.derive.auth.status */
   readonly derive: NamespacedDerivations<Modules> & DerivationsControl;
   /** Events accessor (union of all module events) */
@@ -273,8 +276,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly effects: EffectsControl;
   /** Runtime control for resolvers (dynamic CRUD) */
   readonly resolvers: ResolversControl;
-  /** Per-run changelog entries (null if debug.runHistory is not enabled) */
-  readonly runHistory: RunChangelogEntry[] | null;
+  /** Per-run trace entries (null if trace is not enabled) */
+  readonly trace: TraceEntry[] | null;
 
   /** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
   initialize(): void;
@@ -338,8 +341,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
    */
   onSettledChange(listener: () => void): () => void;
 
-  /** Subscribe to time-travel state changes (snapshot taken, navigation). */
-  onTimeTravelChange(listener: () => void): () => void;
+  /** Subscribe to history state changes (snapshot taken, navigation). */
+  onHistoryChange(listener: () => void): () => void;
 
   /**
    * Read a derivation value by namespaced key.
@@ -599,8 +602,10 @@ export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
   module: ModuleDef<S>;
   /** Plugins to register */
   plugins?: Array<Plugin<ModuleSchema>>;
-  /** Debug configuration */
-  debug?: DebugConfig;
+  /** History configuration for snapshot-based state history */
+  history?: HistoryOption;
+  /** Trace: per-run reconciliation changelog */
+  trace?: TraceOption;
   /** Error boundary configuration */
   errorBoundary?: ErrorBoundaryConfig;
   /** Tick interval for time-based systems (ms) */
@@ -623,8 +628,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly _mode: "single";
   /** Direct facts accessor: system.facts.count */
   readonly facts: Facts<S["facts"]>;
-  /** Time-travel debugging API (if enabled) */
-  readonly debug: TimeTravelAPI | null;
+  /** History API for undo/redo, rollback, audit trails (if enabled) */
+  readonly history: HistoryAPI | null;
   /** Direct derivations accessor: system.derive.doubled */
   readonly derive: InferDerivations<S> & DerivationsControl;
   /** Direct events accessor: system.events.increment() */
@@ -635,8 +640,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly effects: EffectsControl;
   /** Runtime control for resolvers (register/assign/unregister/call) */
   readonly resolvers: ResolversControl;
-  /** Per-run changelog entries (null if debug.runHistory is not enabled) */
-  readonly runHistory: RunChangelogEntry[] | null;
+  /** Per-run trace entries (null if trace is not enabled) */
+  readonly trace: TraceEntry[] | null;
 
   /** Initialize facts and derivations without starting reconciliation. Safe for SSR. */
   initialize(): void;
@@ -679,8 +684,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
    */
   onSettledChange(listener: () => void): () => void;
 
-  /** Subscribe to time-travel state changes (snapshot taken, navigation). */
-  onTimeTravelChange(listener: () => void): () => void;
+  /** Subscribe to history state changes (snapshot taken, navigation). */
+  onHistoryChange(listener: () => void): () => void;
 
   /**
    * Read a derivation value by key.

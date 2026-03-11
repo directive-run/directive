@@ -233,8 +233,10 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   const moduleNamespaces = new Set(Object.keys(modulesMap));
 
   // Build snapshot module filter set (null = all modules snapshot)
-  const snapshotModulesSet = options.debug?.snapshotModules
-    ? new Set(options.debug.snapshotModules)
+  const historyConfig =
+    typeof options.history === "object" ? options.history : null;
+  const snapshotModulesSet = historyConfig?.snapshotModules
+    ? new Set(historyConfig.snapshotModules)
     : null;
 
   // Validate tickMs if provided
@@ -265,11 +267,11 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   }
 
   // Dev-mode: Validate snapshotModules references existing modules
-  if (process.env.NODE_ENV !== "production" && options.debug?.snapshotModules) {
-    for (const name of options.debug.snapshotModules) {
+  if (process.env.NODE_ENV !== "production" && historyConfig?.snapshotModules) {
+    for (const name of historyConfig.snapshotModules) {
       if (!moduleNamespaces.has(name)) {
         console.warn(
-          `[Directive] debug.snapshotModules entry "${name}" doesn't match any module. ` +
+          `[Directive] history.snapshotModules entry "${name}" doesn't match any module. ` +
             `Available modules: ${[...moduleNamespaces].join(", ")}`,
         );
       }
@@ -304,17 +306,14 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   }
 
   // Apply zero-config defaults if enabled
-  let debug = options.debug;
+  let history = options.history;
+  let trace = options.trace;
   let errorBoundary = options.errorBoundary;
 
   if (options.zeroConfig) {
     const isDev = process.env.NODE_ENV !== "production";
 
-    debug = {
-      timeTravel: isDev,
-      maxSnapshots: 100,
-      ...options.debug,
-    };
+    history = history ?? isDev;
 
     errorBoundary = {
       onConstraintError: "skip",
@@ -701,7 +700,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       snapshotEvents: mod.snapshotEvents,
     })) as any,
     plugins: options.plugins,
-    debug,
+    history,
+    trace,
     errorBoundary,
     tickMs: options.tickMs,
     // Callback to apply initialFacts/hydrate during init phase (after module inits, before reconcile)
@@ -771,15 +771,15 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   const system: NamespacedSystem<Modules> = {
     _mode: "namespaced",
     facts: namespacedFactsProxy,
-    debug: engine.debug,
+    history: engine.history,
     derive: namespacedDeriveProxy,
     events: namespacedEventsProxy,
     constraints: engine.constraints,
     effects: engine.effects,
     resolvers: engine.resolvers,
 
-    get runHistory() {
-      return engine.runHistory;
+    get trace() {
+      return engine.trace;
     },
 
     get isRunning() {
@@ -962,7 +962,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     },
 
     onSettledChange: engine.onSettledChange.bind(engine),
-    onTimeTravelChange: engine.onTimeTravelChange.bind(engine),
+    onHistoryChange: engine.onHistoryChange.bind(engine),
     inspect: engine.inspect.bind(engine),
     settle: engine.settle.bind(engine),
     explain: engine.explain.bind(engine),
@@ -1991,9 +1991,11 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     }
 
     // Warn if snapshotModules is set (has no effect in single-module mode)
-    if (options.debug?.snapshotModules) {
+    const singleHistoryConfig =
+      typeof options.history === "object" ? options.history : null;
+    if (singleHistoryConfig?.snapshotModules) {
       console.warn(
-        "[Directive] debug.snapshotModules has no effect in single-module mode. " +
+        "[Directive] history.snapshotModules has no effect in single-module mode. " +
           "Use snapshotEvents on the module definition instead, or switch to " +
           "createSystem({ modules: { ... } }) for multi-module filtering.",
       );
@@ -2001,17 +2003,14 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   }
 
   // Apply zero-config defaults if enabled
-  let debug = options.debug;
+  let history = options.history;
+  let trace = options.trace;
   let errorBoundary = options.errorBoundary;
 
   if (options.zeroConfig) {
     const isDev = process.env.NODE_ENV !== "production";
 
-    debug = {
-      timeTravel: isDev,
-      maxSnapshots: 100,
-      ...options.debug,
-    };
+    history = history ?? isDev;
 
     errorBoundary = {
       onConstraintError: "skip",
@@ -2048,7 +2047,8 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       // biome-ignore lint/suspicious/noExplicitAny: Module format
     ] as any,
     plugins: options.plugins,
-    debug,
+    history,
+    trace,
     errorBoundary,
     tickMs: options.tickMs,
     onAfterModuleInit: () => {
@@ -2108,15 +2108,15 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   const system: SingleModuleSystem<S> = {
     _mode: "single",
     facts: engine.facts,
-    debug: engine.debug,
+    history: engine.history,
     derive: engine.derive,
     events: eventsProxy as SingleModuleSystem<S>["events"],
     constraints: engine.constraints,
     effects: engine.effects,
     resolvers: engine.resolvers,
 
-    get runHistory() {
-      return engine.runHistory;
+    get trace() {
+      return engine.trace;
     },
 
     get isRunning() {
@@ -2213,7 +2213,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     },
 
     onSettledChange: engine.onSettledChange.bind(engine),
-    onTimeTravelChange: engine.onTimeTravelChange.bind(engine),
+    onHistoryChange: engine.onHistoryChange.bind(engine),
     inspect: engine.inspect.bind(engine),
     settle: engine.settle.bind(engine),
     explain: engine.explain.bind(engine),

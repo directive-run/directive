@@ -378,7 +378,8 @@ const numberMatch = createModule("number-match", {
 export const system = createSystem({
   module: numberMatch,
   plugins: [devtoolsPlugin({ name: "number-match" })],
-  debug: { timeTravel: true, runHistory: true },
+  history: true,
+  trace: true,
 });
 ```
 
@@ -801,10 +802,7 @@ export const system = createSystem({
     auth: authModule,
   },
   plugins: [devtoolsPlugin({ name: "shopping-cart", panel: true })],
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 50,
-    runHistory: true,
-  },
+  history: { maxSnapshots: 50 },
+  trace: true,
 });
 ```

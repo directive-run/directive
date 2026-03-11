@@ -371,5 +371,6 @@ const numberMatch = createModule("number-match", {
 export const system = createSystem({
   module: numberMatch,
   plugins: [devtoolsPlugin({ name: "number-match" })],
-  debug: { timeTravel: true, runHistory: true },
+  history: true,
+  trace: true,
 });

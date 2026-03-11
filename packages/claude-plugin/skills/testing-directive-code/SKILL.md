@@ -35,7 +35,7 @@ What are you testing?
 ├── A derivation computes correctly    → Set facts, call assertDerivation
 ├── Async/retry behavior               → settleWithFakeTimers(system, vi)
 ├── Intermediate state (mid-resolve)   → flushMicrotasks()
-└── Time-travel / snapshots            → Enable timeTravel in createTestSystem options
+└── Time-travel / snapshots            → Enable history in createTestSystem options
 ```
 
 ---
@@ -326,13 +326,13 @@ Enable time-travel in the test system config. In most cases, prefer `assertFact`
 describe("time-travel", () => {
   it("can undo a fact change", () => {
     const system = createTestSystem(editorModule, {
-      debug: { timeTravel: true, maxSnapshots: 20 },
+      history: { maxSnapshots: 20 },
     });
 
     system.facts.text = "Hello";
     system.facts.text = "Hello, world";
 
-    const tt = system.debug.timeTravel;
+    const tt = system.history;
     expect(system.facts.text).toBe("Hello, world");
 
     tt.undo();
@@ -341,13 +341,13 @@ describe("time-travel", () => {
 
   it("can export and import history", () => {
     const system = createTestSystem(myModule, {
-      debug: { timeTravel: true },
+      history: true,
     });
 
     system.facts.count = 1;
     system.facts.count = 2;
 
-    const tt = system.debug.timeTravel;
+    const tt = system.history;
     const exported = tt.exportHistory();
 
     tt.importHistory(exported);
@@ -476,4 +476,4 @@ const { facts, requirements, resolvers, inflight } = system.inspect();
 ## Reference Files
 
 - `testing.md` – full testing API, createTestSystem options, multi-module test setup
-- `time-travel.md` – time-travel API, changesets, export/import, performance considerations
+- `history.md` – history API, changesets, export/import, performance considerations

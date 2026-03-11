@@ -104,7 +104,7 @@ const label = useSelector(system, (state) => {
 | `useExplain(system, reqId)` | `Ref<string \| null>` | Human-readable requirement explanation |
 | `useConstraintStatus(system)` | `ComputedRef<ConstraintInfo[]>` | All constraint states |
 | `useOptimisticUpdate(system)` | `{ mutate, isPending: Ref, error: Ref, rollback }` | Optimistic mutation with auto-rollback |
-| `useTimeTravel(system)` | `ShallowRef<TimeTravelState \| null>` | Undo/redo navigation |
+| `useHistory(system)` | `ShallowRef<HistoryState \| null>` | Undo/redo navigation |
 
 ### Vue-Specific
 

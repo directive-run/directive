@@ -7,7 +7,7 @@ import { testModule } from "../../../../shared/test-module";
 @customElement("use-directive-page")
 export class UseDirectivePage extends LitElement {
   private _module = new ModuleController(this, testModule, {
-    debug: { timeTravel: true, maxSnapshots: 50 },
+    history: { maxSnapshots: 50 },
   });
 
   render() {

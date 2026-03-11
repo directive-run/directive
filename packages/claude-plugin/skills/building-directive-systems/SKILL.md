@@ -54,7 +54,7 @@ import { loggingPlugin, devtoolsPlugin } from "@directive-run/core/plugins";
 const system = createSystem({
   module: myModule,
   plugins: [loggingPlugin(), devtoolsPlugin()],
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: { maxSnapshots: 100 },
 });
 
 system.start();
@@ -328,7 +328,7 @@ import { useSystem } from "@directive-run/react";
 function GameBoard() {
   const gameSystem = useSystem({   // Created on mount, destroyed on unmount
     module: gameModule,
-    debug: { timeTravel: true },
+    history: true,
   });
   const score = useSelector(gameSystem, (s) => s.facts.score);
 

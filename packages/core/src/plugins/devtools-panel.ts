@@ -135,8 +135,8 @@ export function createPanel(
   container.appendChild(statusRow);
 
   // Time-travel controls — 44px touch targets (M6)
-  const timeTravelSection = document.createElement("div");
-  Object.assign(timeTravelSection.style, {
+  const historySection = document.createElement("div");
+  Object.assign(historySection.style, {
     display: "none",
     marginBottom: "8px",
     padding: "4px 8px",
@@ -175,13 +175,13 @@ export function createPanel(
   });
   redoBtn.textContent = "Redo \u25B6";
   redoBtn.disabled = true;
-  const timeTravelLabel = document.createElement("span");
-  timeTravelLabel.style.color = S.muted;
-  timeTravelLabel.style.fontSize = "10px";
-  timeTravelSection.appendChild(undoBtn);
-  timeTravelSection.appendChild(redoBtn);
-  timeTravelSection.appendChild(timeTravelLabel);
-  container.appendChild(timeTravelSection);
+  const historyLabel = document.createElement("span");
+  historyLabel.style.color = S.muted;
+  historyLabel.style.fontSize = "10px";
+  historySection.appendChild(undoBtn);
+  historySection.appendChild(redoBtn);
+  historySection.appendChild(historyLabel);
+  container.appendChild(historySection);
 
   // Helper: create table section
   function createTableSection(label: string, open: boolean) {
@@ -552,8 +552,8 @@ export function createPanel(
       unmetCount: unmetSection.countSpan,
       perfSection: perfDetails,
       perfBody,
-      timeTravelSection,
-      timeTravelLabel,
+      historySection,
+      historyLabel,
       undoBtn,
       redoBtn,
       flowSection: flowDetails,
@@ -849,21 +849,21 @@ export function updatePerfSection(refs: PanelRefs, perf: PerfMetrics) {
 }
 
 /** @internal Update time-travel button states and snapshot label. */
-export function updateTimeTravelControls(
+export function updateHistoryControls(
   refs: PanelRefs,
   system: System<ModuleSchema>,
 ) {
-  const tt = system.debug;
+  const tt = system.history;
   if (!tt) {
-    refs.timeTravelSection.style.display = "none";
+    refs.historySection.style.display = "none";
 
     return;
   }
-  refs.timeTravelSection.style.display = "flex";
+  refs.historySection.style.display = "flex";
 
   const current = tt.currentIndex;
   const total = tt.snapshots.length;
-  refs.timeTravelLabel.textContent =
+  refs.historyLabel.textContent =
     total > 0 ? `${current + 1} / ${total}` : "0 snapshots";
 
   const canUndo = current > 0;
@@ -875,21 +875,21 @@ export function updateTimeTravelControls(
 }
 
 /** @internal Wire click handlers for undo/redo time-travel buttons. */
-export function setupTimeTravelButtons(
+export function setupHistoryButtons(
   refs: PanelRefs,
   system: System<ModuleSchema>,
 ) {
   refs.undoBtn.addEventListener("click", () => {
-    if (system.debug && system.debug.currentIndex > 0) {
-      system.debug.goBack(1);
+    if (system.history && system.history.currentIndex > 0) {
+      system.history.goBack(1);
     }
   });
   refs.redoBtn.addEventListener("click", () => {
     if (
-      system.debug &&
-      system.debug.currentIndex < system.debug.snapshots.length - 1
+      system.history &&
+      system.history.currentIndex < system.history.snapshots.length - 1
     ) {
-      system.debug.goForward(1);
+      system.history.goForward(1);
     }
   });
 }

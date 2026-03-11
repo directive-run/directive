@@ -1,5 +1,5 @@
 /**
- * Time-Travel Debugging - Snapshot-based state history
+ * History — Snapshot-based state history
  *
  * Features:
  * - Ring buffer of state snapshots
@@ -9,25 +9,25 @@
  */
 
 import type {
-  DebugConfig,
   Facts,
   FactsStore,
+  HistoryAPI,
+  HistoryOption,
   Schema,
   Snapshot,
-  TimeTravelAPI,
 } from "../core/types.js";
 import { isPrototypeSafe } from "./utils.js";
 
 // ============================================================================
-// Time-Travel Manager
+// History Manager
 // ============================================================================
 
 /**
  * A changeset groups multiple snapshots into a single undo/redo unit.
  *
  * @remarks
- * Use {@link TimeTravelManager.beginChangeset} and
- * {@link TimeTravelManager.endChangeset} to create changesets. When navigating
+ * Use {@link HistoryManager.beginChangeset} and
+ * {@link HistoryManager.endChangeset} to create changesets. When navigating
  * with `goBack`/`goForward`, the entire changeset is traversed as one step.
  *
  * @internal
@@ -39,7 +39,7 @@ export interface Changeset {
 }
 
 /**
- * Internal time-travel manager that extends the public {@link TimeTravelAPI}
+ * Internal history manager that extends the public {@link HistoryAPI}
  * with snapshot capture, restoration, and pause/resume controls.
  *
  * @remarks
@@ -56,12 +56,12 @@ export interface Changeset {
  * @internal
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
+export interface HistoryManager<_S extends Schema> extends HistoryAPI {
   /** Take a snapshot of current state */
   takeSnapshot(trigger: string): Snapshot;
   /** Restore facts from a snapshot */
   restore(snapshot: Snapshot): void;
-  /** Check if time-travel is enabled */
+  /** Check if history is enabled */
   readonly isEnabled: boolean;
   /** True while restoring a snapshot (engine should skip reconciliation) */
   readonly isRestoring: boolean;
@@ -72,24 +72,43 @@ export interface TimeTravelManager<_S extends Schema> extends TimeTravelAPI {
 }
 
 /**
- * Options for creating a time-travel manager via {@link createTimeTravelManager}.
+ * Options for creating a history manager via {@link createHistoryManager}.
  *
  * @typeParam S - The facts schema type.
  *
  * @internal
  */
-export interface CreateTimeTravelOptions<S extends Schema> {
-  config: DebugConfig;
+export interface CreateHistoryOptions<S extends Schema> {
+  historyOption: HistoryOption;
   facts: Facts<S>;
   store: FactsStore<S>;
   /** Callback when a snapshot is taken */
   onSnapshot?: (snapshot: Snapshot) => void;
-  /** Callback when time-travel occurs */
-  onTimeTravel?: (from: number, to: number) => void;
+  /** Callback when history navigation occurs */
+  onHistoryChange?: (from: number, to: number) => void;
 }
 
 /**
- * Create a snapshot-based time-travel debugger backed by a ring buffer.
+ * Resolve a HistoryOption (boolean | HistoryConfig) into concrete values.
+ * @internal
+ */
+function resolveHistoryOption(option: HistoryOption): {
+  enabled: boolean;
+  maxSnapshots: number;
+} {
+  if (typeof option === "boolean") {
+    return { enabled: option, maxSnapshots: 100 };
+  }
+
+  // Object config — presence implies enabled
+  return {
+    enabled: true,
+    maxSnapshots: option.maxSnapshots ?? 100,
+  };
+}
+
+/**
+ * Create a snapshot-based history manager backed by a ring buffer.
  *
  * @remarks
  * Snapshots are taken automatically after fact changes (during reconciliation)
@@ -101,18 +120,18 @@ export interface CreateTimeTravelOptions<S extends Schema> {
  * Call `pause()` to temporarily stop recording snapshots (e.g., during bulk
  * fact imports) and `resume()` to re-enable recording.
  *
- * @param options - Debug config, facts proxy, store, and optional snapshot/time-travel callbacks.
- * @returns A {@link TimeTravelManager} with snapshot capture, navigation, changeset, and export/import methods.
+ * @param options - History config, facts proxy, store, and optional snapshot/history callbacks.
+ * @returns A {@link HistoryManager} with snapshot capture, navigation, changeset, and export/import methods.
  *
  * @internal
  */
-export function createTimeTravelManager<S extends Schema>(
-  options: CreateTimeTravelOptions<S>,
-): TimeTravelManager<S> {
-  const { config, facts, store, onSnapshot, onTimeTravel } = options;
+export function createHistoryManager<S extends Schema>(
+  options: CreateHistoryOptions<S>,
+): HistoryManager<S> {
+  const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
 
-  const isEnabled = config.timeTravel ?? false;
-  const maxSnapshots = config.maxSnapshots ?? 100;
+  const { enabled: isEnabled, maxSnapshots } =
+    resolveHistoryOption(historyOption);
 
   // Ring buffer of snapshots
   const snapshots: Snapshot[] = [];
@@ -168,7 +187,7 @@ export function createTimeTravelManager<S extends Schema>(
     });
   }
 
-  const manager: TimeTravelManager<S> = {
+  const manager: HistoryManager<S> = {
     get isEnabled() {
       return isEnabled;
     },
@@ -273,7 +292,7 @@ export function createTimeTravelManager<S extends Schema>(
       const snapshot = snapshots[currentIndex];
       if (snapshot) {
         this.restore(snapshot);
-        onTimeTravel?.(fromIndex, toIndex);
+        onHistoryChange?.(fromIndex, toIndex);
       }
     },
 
@@ -299,7 +318,7 @@ export function createTimeTravelManager<S extends Schema>(
       const snapshot = snapshots[currentIndex];
       if (snapshot) {
         this.restore(snapshot);
-        onTimeTravel?.(fromIndex, toIndex);
+        onHistoryChange?.(fromIndex, toIndex);
       }
     },
 
@@ -317,7 +336,7 @@ export function createTimeTravelManager<S extends Schema>(
       const snapshot = snapshots[currentIndex];
       if (snapshot) {
         this.restore(snapshot);
-        onTimeTravel?.(fromIndex, index);
+        onHistoryChange?.(fromIndex, index);
       }
     },
 
@@ -348,21 +367,19 @@ export function createTimeTravelManager<S extends Schema>(
 
         // Validate import data structure to prevent prototype pollution
         if (typeof data !== "object" || data === null) {
-          throw new Error("Invalid time-travel data: expected object");
+          throw new Error("Invalid history data: expected object");
         }
         if (data.version !== 1) {
           throw new Error(
-            `Unsupported time-travel export version: ${data.version}`,
+            `Unsupported history export version: ${data.version}`,
           );
         }
         if (!Array.isArray(data.snapshots)) {
-          throw new Error(
-            "Invalid time-travel data: snapshots must be an array",
-          );
+          throw new Error("Invalid history data: snapshots must be an array");
         }
         if (typeof data.currentIndex !== "number") {
           throw new Error(
-            "Invalid time-travel data: currentIndex must be a number",
+            "Invalid history data: currentIndex must be a number",
           );
         }
 
@@ -397,7 +414,7 @@ export function createTimeTravelManager<S extends Schema>(
           this.restore(snapshot);
         }
       } catch (error) {
-        console.error("[Directive] Failed to import time-travel data:", error);
+        console.error("[Directive] Failed to import history data:", error);
       }
     },
 
@@ -433,20 +450,20 @@ export function createTimeTravelManager<S extends Schema>(
 }
 
 /**
- * Create a no-op time-travel manager for use when `debug.timeTravel` is disabled.
+ * Create a no-op history manager for use when history is disabled.
  *
  * @remarks
  * All methods are safe to call but perform no work. This avoids null-checks
- * throughout the engine -- callers can use the same {@link TimeTravelManager}
- * interface regardless of whether time-travel is enabled.
+ * throughout the engine -- callers can use the same {@link HistoryManager}
+ * interface regardless of whether history is enabled.
  *
- * @returns A {@link TimeTravelManager} where every method is a no-op and `isEnabled` is `false`.
+ * @returns A {@link HistoryManager} where every method is a no-op and `isEnabled` is `false`.
  *
  * @internal
  */
-export function createDisabledTimeTravel<
+export function createDisabledHistory<
   S extends Schema,
->(): TimeTravelManager<S> {
+>(): HistoryManager<S> {
   const noopSnapshot: Snapshot = {
     id: -1,
     timestamp: 0,

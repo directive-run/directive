@@ -14,7 +14,7 @@ const routes: Record<string, string> = {
   useConstraintStatus: "use-constraint-status-page",
   useOptimisticUpdate: "use-optimistic-update-page",
   useRequirementStatus: "use-requirement-status-page",
-  useTimeTravel: "use-time-travel-page",
+  useHistory: "use-history-page",
   useDirective: "use-directive-page",
 };
 

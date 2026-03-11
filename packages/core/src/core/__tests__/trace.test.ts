@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
-import type { RunChangelogEntry } from "../types.js";
+import type { TraceEntry } from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -71,34 +71,31 @@ function createSystemWithHistory(opts?: { maxRuns?: number }) {
 
   return createSystem({
     module: mod,
-    debug: {
-      runHistory: true,
-      maxRuns: opts?.maxRuns ?? 100,
-    },
+    trace: opts?.maxRuns ? { maxRuns: opts.maxRuns } : true,
   });
 }
 
 // ============================================================================
-// Run History Tests
+// Trace Tests
 // ============================================================================
 
-describe("Run History", () => {
+describe("Trace", () => {
   // -----------------------------------------------------------------------
   // 1. Disabled by default
   // -----------------------------------------------------------------------
-  it("returns null when runHistory is not enabled", () => {
+  it("returns null when trace is not enabled", () => {
     const mod = createTestModule();
     const system = createSystem({ module: mod });
     system.start();
 
-    expect(system.runHistory).toBeNull();
+    expect(system.trace).toBeNull();
     system.destroy();
   });
 
   // -----------------------------------------------------------------------
-  // 2. Basic run creation
+  // 2. Basic trace creation
   // -----------------------------------------------------------------------
-  it("creates a run entry on fact change", async () => {
+  it("creates a trace entry on fact change", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -106,7 +103,7 @@ describe("Run History", () => {
     system.facts.count = 1;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     expect(history.length).toBeGreaterThanOrEqual(1);
 
     const lastRun = history[history.length - 1]!;
@@ -131,7 +128,7 @@ describe("Run History", () => {
     system.facts.count = 3;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const lastRun = history[history.length - 1]!;
 
     const derivEntry = lastRun.derivationsRecomputed.find(
@@ -158,7 +155,7 @@ describe("Run History", () => {
     system.facts.count = 10;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const triggeringRun = history.find((r) =>
       r.constraintsHit.some((c) => c.id === "needsData"),
     );
@@ -177,7 +174,7 @@ describe("Run History", () => {
   // -----------------------------------------------------------------------
   // 5. Async resolver attribution
   // -----------------------------------------------------------------------
-  it("attributes async resolver completion to the correct run", async () => {
+  it("attributes async resolver completion to the correct trace", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -185,18 +182,18 @@ describe("Run History", () => {
     system.facts.count = 10;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
 
-    // Find the run that started the resolver
-    const runWithResolver = history.find((r) => r.resolversStarted.length > 0);
+    // Find the trace that started the resolver
+    const traceWithResolver = history.find((r) => r.resolversStarted.length > 0);
 
-    expect(runWithResolver).toBeDefined();
-    expect(runWithResolver!.resolversCompleted.length).toBeGreaterThanOrEqual(
+    expect(traceWithResolver).toBeDefined();
+    expect(traceWithResolver!.resolversCompleted.length).toBeGreaterThanOrEqual(
       1,
     );
-    expect(runWithResolver!.resolversCompleted[0]!.resolver).toBe("loadData");
+    expect(traceWithResolver!.resolversCompleted[0]!.resolver).toBe("loadData");
     expect(
-      runWithResolver!.resolversCompleted[0]!.duration,
+      traceWithResolver!.resolversCompleted[0]!.duration,
     ).toBeGreaterThanOrEqual(0);
 
     system.destroy();
@@ -205,7 +202,7 @@ describe("Run History", () => {
   // -----------------------------------------------------------------------
   // 6. Resolver error attribution
   // -----------------------------------------------------------------------
-  it("attributes resolver errors to the correct run", async () => {
+  it("attributes resolver errors to the correct trace", async () => {
     const mod = createModule("err", {
       schema: {
         facts: { trigger: t.boolean() },
@@ -234,7 +231,7 @@ describe("Run History", () => {
 
     const system = createSystem({
       module: mod,
-      debug: { runHistory: true },
+      trace: true,
     });
     system.start();
     await system.settle();
@@ -242,7 +239,7 @@ describe("Run History", () => {
     system.facts.trigger = true;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const errRun = history.find((r) => r.resolversErrored.length > 0);
 
     expect(errRun).toBeDefined();
@@ -252,9 +249,9 @@ describe("Run History", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 7. Multi-resolver run stays pending
+  // 7. Multi-resolver trace stays pending
   // -----------------------------------------------------------------------
-  it("keeps run pending while multiple resolvers are inflight", async () => {
+  it("keeps trace pending while multiple resolvers are inflight", async () => {
     const resolvers: { a: (() => void) | null; b: (() => void) | null } = {
       a: null,
       b: null,
@@ -308,7 +305,7 @@ describe("Run History", () => {
 
     const system = createSystem({
       module: mod,
-      debug: { runHistory: true },
+      trace: true,
     });
     system.start();
     await system.settle();
@@ -317,7 +314,7 @@ describe("Run History", () => {
     // Let microtasks flush so reconcile runs and resolvers start
     await new Promise((r) => setTimeout(r, 50));
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const pendingRun = history.find(
       (r) => r.resolversStarted.length >= 2 && r.status === "pending",
     );
@@ -329,8 +326,8 @@ describe("Run History", () => {
     resolvers.b?.();
     await system.settle();
 
-    // Now the run should be settled
-    const updatedHistory = system.runHistory!;
+    // Now the trace should be settled
+    const updatedHistory = system.trace!;
     const settledRun = updatedHistory.find(
       (r) => r.resolversStarted.length >= 2 && r.status === "settled",
     );
@@ -354,7 +351,7 @@ describe("Run History", () => {
       await system.settle();
     }
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     expect(history.length).toBeLessThanOrEqual(3);
 
     system.destroy();
@@ -378,7 +375,7 @@ describe("Run History", () => {
     system.facts.count = 100;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     expect(history.length).toBeLessThanOrEqual(2);
     expect(
       history[history.length - 1]!.factChanges.some(
@@ -390,20 +387,20 @@ describe("Run History", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 10. Empty run filtering
+  // 10. Empty trace filtering
   // -----------------------------------------------------------------------
-  it("skips runs with no activity", async () => {
+  it("skips traces with no activity", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
 
-    const initialLength = system.runHistory!.length;
+    const initialLength = system.trace!.length;
 
-    // Setting same value should not create a new run with activity
+    // Setting same value should not create a new trace with activity
     await system.settle();
 
     // Length should not increase for empty reconciles
-    expect(system.runHistory!.length).toBe(initialLength);
+    expect(system.trace!.length).toBe(initialLength);
 
     system.destroy();
   });
@@ -419,7 +416,7 @@ describe("Run History", () => {
     system.facts.count = 10; // triggers constraint → resolver
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const resolverRun = history.find((r) => r.resolversStarted.length > 0);
 
     if (resolverRun) {
@@ -431,15 +428,15 @@ describe("Run History", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 12. onRunComplete plugin hook
+  // 12. onTraceComplete plugin hook
   // -----------------------------------------------------------------------
-  it("calls onRunComplete plugin hook with finalized run", async () => {
-    const onRunComplete = vi.fn();
+  it("calls onTraceComplete plugin hook with finalized trace entry", async () => {
+    const onTraceComplete = vi.fn();
     const mod = createTestModule();
     const system = createSystem({
       module: mod,
-      debug: { runHistory: true },
-      plugins: [{ name: "test-plugin", onRunComplete }],
+      trace: true,
+      plugins: [{ name: "test-plugin", onTraceComplete }],
     });
     system.start();
     await system.settle();
@@ -447,19 +444,19 @@ describe("Run History", () => {
     system.facts.count = 1;
     await system.settle();
 
-    expect(onRunComplete).toHaveBeenCalled();
-    const run = onRunComplete.mock.calls[
-      onRunComplete.mock.calls.length - 1
-    ]![0] as RunChangelogEntry;
-    expect(run.status).toBe("settled");
+    expect(onTraceComplete).toHaveBeenCalled();
+    const entry = onTraceComplete.mock.calls[
+      onTraceComplete.mock.calls.length - 1
+    ]![0] as TraceEntry;
+    expect(entry.status).toBe("settled");
 
     system.destroy();
   });
 
   // -----------------------------------------------------------------------
-  // 13. inspect() includes runHistory
+  // 13. inspect() includes trace
   // -----------------------------------------------------------------------
-  it("includes runHistory in inspect() when enabled", async () => {
+  it("includes trace in inspect() when enabled", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -468,9 +465,9 @@ describe("Run History", () => {
     await system.settle();
 
     const inspection = system.inspect();
-    expect(inspection.runHistory).toBeDefined();
-    expect(Array.isArray(inspection.runHistory)).toBe(true);
-    expect(inspection.runHistory!.length).toBeGreaterThanOrEqual(1);
+    expect(inspection.trace).toBeDefined();
+    expect(Array.isArray(inspection.trace)).toBe(true);
+    expect(inspection.trace!.length).toBeGreaterThanOrEqual(1);
 
     system.destroy();
   });
@@ -478,7 +475,7 @@ describe("Run History", () => {
   // -----------------------------------------------------------------------
   // 14. destroy() cleanup
   // -----------------------------------------------------------------------
-  it("cleans up run history state on destroy", async () => {
+  it("cleans up trace state on destroy", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -486,7 +483,7 @@ describe("Run History", () => {
     system.facts.count = 1;
     await system.settle();
 
-    expect(system.runHistory!.length).toBeGreaterThan(0);
+    expect(system.trace!.length).toBeGreaterThan(0);
 
     system.destroy();
 
@@ -510,7 +507,7 @@ describe("Run History", () => {
     system.facts.count = 0;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const removalRun = history.find((r) => r.requirementsRemoved.length > 0);
 
     if (removalRun) {
@@ -527,10 +524,10 @@ describe("Run History", () => {
   // 16. Derivation entries have correct shape (E12)
   // -----------------------------------------------------------------------
   it("derivation entries use object format with id and deps", async () => {
-    // Derivations only appear in run history when recomputed during the reconcile cycle.
+    // Derivations only appear in trace when recomputed during the reconcile cycle.
     // Since derivations are lazy (recomputed on read), they only show up when
     // an effect or constraint reads them during reconcile.
-    // This test verifies the TYPE shape is correct by checking any run that
+    // This test verifies the TYPE shape is correct by checking any trace that
     // happens to track derivation recomputes.
     const system = createSystemWithHistory();
     system.start();
@@ -542,28 +539,28 @@ describe("Run History", () => {
     await system.settle();
     unsub();
 
-    const history = system.runHistory!;
-    // If any run captured derivations, verify shape
-    const runWithDeriv = history.find(
+    const history = system.trace!;
+    // If any trace captured derivations, verify shape
+    const traceWithDeriv = history.find(
       (r) => r.derivationsRecomputed.length > 0,
     );
 
-    if (runWithDeriv) {
-      const entry = runWithDeriv.derivationsRecomputed[0]!;
+    if (traceWithDeriv) {
+      const entry = traceWithDeriv.derivationsRecomputed[0]!;
       expect(typeof entry).toBe("object");
       expect(entry.id).toBe("doubled");
       expect(Array.isArray(entry.deps)).toBe(true);
     }
 
     // The type system ensures entries are { id: string; deps: string[] }
-    // Even if no derivations were captured in the run, the array accepts that shape
+    // Even if no derivations were captured in the trace, the array accepts that shape
     system.destroy();
   });
 
   // -----------------------------------------------------------------------
   // 17. Causal chain generation (Part 6)
   // -----------------------------------------------------------------------
-  it("generates causal chain on settled runs", async () => {
+  it("generates causal chain on settled traces", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -571,7 +568,7 @@ describe("Run History", () => {
     system.facts.count = 1;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const lastRun = history[history.length - 1]!;
 
     expect(lastRun.causalChain).toBeDefined();
@@ -593,7 +590,7 @@ describe("Run History", () => {
     system.facts.count = 2;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const runWithEffect = history.find((r) => r.effectsRun.length > 0);
 
     expect(runWithEffect).toBeDefined();
@@ -616,7 +613,7 @@ describe("Run History", () => {
     system.facts.count = 10;
     await system.settle();
 
-    const history = system.runHistory!;
+    const history = system.trace!;
     const runWithConstraint = history.find((r) => r.constraintsHit.length > 0);
 
     expect(runWithConstraint).toBeDefined();
@@ -638,8 +635,8 @@ describe("Run History", () => {
     system.facts.count = 1;
     await system.settle();
 
-    const ref1 = system.runHistory;
-    const ref2 = system.runHistory;
+    const ref1 = system.trace;
+    const ref2 = system.trace;
 
     // Same reference when no changes
     expect(ref1).toBe(ref2);
@@ -650,7 +647,7 @@ describe("Run History", () => {
   // -----------------------------------------------------------------------
   // 21. Deep copy in inspect
   // -----------------------------------------------------------------------
-  it("returns deep-copied run history from inspect() (M5)", async () => {
+  it("returns deep-copied trace from inspect() (M5)", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();
@@ -659,16 +656,16 @@ describe("Run History", () => {
     await system.settle();
 
     const inspection = system.inspect();
-    const run = inspection.runHistory![0]!;
+    const entry = inspection.trace![0]!;
 
     // Mutating the returned data should not affect the internal state
-    run.factChanges.push({ key: "fake", oldValue: 0, newValue: 1 });
+    entry.factChanges.push({ key: "fake", oldValue: 0, newValue: 1 });
 
     const inspection2 = system.inspect();
-    const run2 = inspection2.runHistory![0]!;
+    const entry2 = inspection2.trace![0]!;
 
     // The mutation should not have persisted
-    expect(run2.factChanges.find((fc) => fc.key === "fake")).toBeUndefined();
+    expect(entry2.factChanges.find((fc) => fc.key === "fake")).toBeUndefined();
 
     system.destroy();
   });

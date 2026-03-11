@@ -51,12 +51,12 @@ describe("snapshotEvents", () => {
     const mod = createTestModule();
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     system.events.increment();
     await system.settle();
@@ -68,7 +68,7 @@ describe("snapshotEvents", () => {
     await system.settle();
 
     // All 3 events should have created snapshots
-    expect(system.debug!.currentIndex).toBe(initialIndex + 3);
+    expect(system.history!.currentIndex).toBe(initialIndex + 3);
 
     system.destroy();
   });
@@ -77,12 +77,12 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: ["increment"] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // This should snapshot
     system.events.increment();
@@ -97,7 +97,7 @@ describe("snapshotEvents", () => {
     await system.settle();
 
     // Only increment created a snapshot
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     system.destroy();
   });
@@ -106,12 +106,12 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: ["increment", "reset"] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // setLabel is NOT in snapshotEvents — no snapshot
     system.events.setLabel({ label: "a" });
@@ -121,13 +121,13 @@ describe("snapshotEvents", () => {
     system.events.setLabel({ label: "c" });
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex);
+    expect(system.history!.currentIndex).toBe(initialIndex);
 
     // But increment IS in snapshotEvents
     system.events.increment();
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     system.destroy();
   });
@@ -136,18 +136,18 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: ["increment"] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // Direct mutation should always snapshot
     system.facts.count = 42;
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
     expect(system.facts.count).toBe(42);
 
     system.destroy();
@@ -157,7 +157,7 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: ["increment"] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
@@ -177,7 +177,7 @@ describe("snapshotEvents", () => {
     expect(system.facts.count).toBe(2);
 
     // Undo should revert to count=1 (the last snapshot state)
-    system.debug!.goBack();
+    system.history!.goBack();
 
     expect(system.facts.count).toBe(1);
 
@@ -236,22 +236,22 @@ describe("snapshotEvents", () => {
 
     const system = createSystem({
       modules: { a: moduleA, b: moduleB },
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // moduleA.setX — in snapshotEvents → snapshots
     system.events.a.setX({ value: 10 });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     // moduleB.setY — no filter on moduleB → snapshots
     system.events.b.setY({ value: 20 });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 2);
+    expect(system.history!.currentIndex).toBe(initialIndex + 2);
 
     system.destroy();
   });
@@ -319,12 +319,12 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: [] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // No events should create snapshots
     system.events.increment();
@@ -332,13 +332,13 @@ describe("snapshotEvents", () => {
     system.events.setLabel({ label: "hello" });
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex);
+    expect(system.history!.currentIndex).toBe(initialIndex);
 
     // But direct fact mutations still snapshot
     system.facts.count = 99;
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     system.destroy();
     warnSpy.mockRestore();
@@ -348,22 +348,22 @@ describe("snapshotEvents", () => {
     const mod = createTestModule({ snapshotEvents: ["increment"] });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // dispatch() with snapshot event — should snapshot
     system.dispatch({ type: "increment" });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     // dispatch() with non-snapshot event — should NOT snapshot
     system.dispatch({ type: "setLabel", label: "hello" });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     system.destroy();
   });
@@ -399,12 +399,12 @@ describe("snapshotEvents", () => {
 
     const system = createSystem({
       module: throwingModule,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // Dispatch a throwing event — should not corrupt state
     expect(() => system.events.throwingEvent()).toThrow("Handler error");
@@ -413,17 +413,17 @@ describe("snapshotEvents", () => {
     system.facts.count = 42;
     await system.settle();
 
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
     expect(system.facts.count).toBe(42);
 
     system.destroy();
   });
 
   // ============================================================================
-  // debug.snapshotModules
+  // history.snapshotModules
   // ============================================================================
 
-  describe("debug.snapshotModules", () => {
+  describe("history.snapshotModules", () => {
     it("only listed modules create snapshots", async () => {
       const moduleA = createModule("modA", {
         schema: {
@@ -461,8 +461,7 @@ describe("snapshotEvents", () => {
 
       const system = createSystem({
         modules: { a: moduleA, b: moduleB },
-        debug: {
-          timeTravel: true,
+        history: {
           maxSnapshots: 50,
           snapshotModules: ["a"],
         },
@@ -470,17 +469,17 @@ describe("snapshotEvents", () => {
       system.start();
       await system.settle();
 
-      const initialIndex = system.debug!.currentIndex;
+      const initialIndex = system.history!.currentIndex;
 
       // moduleA event — in snapshotModules → snapshots
       system.events.a.setX({ value: 10 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       // moduleB event — NOT in snapshotModules → no snapshot
       system.events.b.setY({ value: 20 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       system.destroy();
     });
@@ -522,20 +521,20 @@ describe("snapshotEvents", () => {
 
       const system = createSystem({
         modules: { a: moduleA, b: moduleB },
-        debug: { timeTravel: true, maxSnapshots: 50 },
+        history: { maxSnapshots: 50 },
       });
       system.start();
       await system.settle();
 
-      const initialIndex = system.debug!.currentIndex;
+      const initialIndex = system.history!.currentIndex;
 
       system.events.a.setX({ value: 10 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       system.events.b.setY({ value: 20 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 2);
+      expect(system.history!.currentIndex).toBe(initialIndex + 2);
 
       system.destroy();
     });
@@ -585,8 +584,7 @@ describe("snapshotEvents", () => {
 
       const system = createSystem({
         modules: { a: moduleA, b: moduleB },
-        debug: {
-          timeTravel: true,
+        history: {
           maxSnapshots: 50,
           snapshotModules: ["a"], // Only module a
         },
@@ -594,22 +592,22 @@ describe("snapshotEvents", () => {
       system.start();
       await system.settle();
 
-      const initialIndex = system.debug!.currentIndex;
+      const initialIndex = system.history!.currentIndex;
 
       // moduleA.setX — in snapshotModules AND in per-module snapshotEvents → snapshots
       system.events.a.setX({ value: 10 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       // moduleA.resetX — in snapshotModules BUT NOT in per-module snapshotEvents → no snapshot
       system.events.a.resetX();
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       // moduleB.setY — NOT in snapshotModules → no snapshot
       system.events.b.setY({ value: 20 });
       await system.settle();
-      expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+      expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
       system.destroy();
     });
@@ -631,15 +629,14 @@ describe("snapshotEvents", () => {
 
       const system = createSystem({
         modules: { a: moduleA },
-        debug: {
-          timeTravel: true,
+        history: {
           snapshotModules: ["a", "nonExistent"],
         },
       });
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'debug.snapshotModules entry "nonExistent" doesn\'t match any module',
+          'history.snapshotModules entry "nonExistent" doesn\'t match any module',
         ),
       );
 
@@ -653,15 +650,14 @@ describe("snapshotEvents", () => {
       const mod = createTestModule();
       const system = createSystem({
         module: mod,
-        debug: {
-          timeTravel: true,
+        history: {
           snapshotModules: ["test"],
         },
       });
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          "debug.snapshotModules has no effect in single-module mode",
+          "history.snapshotModules has no effect in single-module mode",
         ),
       );
 
@@ -718,27 +714,27 @@ describe("snapshotEvents", () => {
 
     const system = createSystem({
       modules: { a: moduleA, b: moduleB },
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
     await system.settle();
 
-    const initialIndex = system.debug!.currentIndex;
+    const initialIndex = system.history!.currentIndex;
 
     // moduleA.noopA — NOT in snapshotEvents, handler is a no-op → no snapshot
     system.events.a.noopA();
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex);
+    expect(system.history!.currentIndex).toBe(initialIndex);
 
     // moduleA.setX — IN snapshotEvents → snapshots
     system.events.a.setX({ value: 10 });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 1);
+    expect(system.history!.currentIndex).toBe(initialIndex + 1);
 
     // moduleB.setY — no filter on moduleB → snapshots
     system.events.b.setY({ value: 20 });
     await system.settle();
-    expect(system.debug!.currentIndex).toBe(initialIndex + 2);
+    expect(system.history!.currentIndex).toBe(initialIndex + 2);
 
     system.destroy();
   });

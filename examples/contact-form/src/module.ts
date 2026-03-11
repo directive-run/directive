@@ -318,6 +318,6 @@ const contactForm = createModule("contact-form", {
 
 export const system = createSystem({
   module: contactForm,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "contact-form" })],
 });

@@ -21,7 +21,7 @@ const dataModule = createModule("data", { ... });
 const system = createSystem({
   modules: { auth: authModule, data: dataModule },
   plugins: [loggingPlugin()],
-  debug: { timeTravel: true },
+  history: true,
 });
 // Access: system.facts.auth.token, system.facts.data.users
 ```

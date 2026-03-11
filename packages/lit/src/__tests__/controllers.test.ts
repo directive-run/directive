@@ -11,7 +11,7 @@ import {
   ExplainController,
   ConstraintStatusController,
   OptimisticUpdateController,
-  TimeTravelController,
+  HistoryController,
   SystemController,
   ModuleController,
   createFact,
@@ -116,7 +116,7 @@ function createTestSystem() {
   return system;
 }
 
-function createTimeTravelSystem() {
+function createHistorySystem() {
   const mod = createModule("tt", {
     schema: testSchema,
     init: (facts) => {
@@ -140,7 +140,7 @@ function createTimeTravelSystem() {
 
   const system = createSystem({
     module: mod,
-    debug: { timeTravel: true, maxSnapshots: 50 },
+    history: { maxSnapshots: 50 },
   });
   system.start();
 
@@ -148,7 +148,7 @@ function createTimeTravelSystem() {
 }
 
 // ============================================================================
-// Suppress expected console.warn from createTestSystem/createTimeTravelSystem
+// Suppress expected console.warn from createTestSystem/createHistorySystem
 // (schema.events["increment"]/["setName"] has no matching handler warnings)
 // ============================================================================
 
@@ -799,15 +799,15 @@ describe("OptimisticUpdateController", () => {
 });
 
 // ============================================================================
-// TimeTravelController
+// HistoryController
 // ============================================================================
 
-describe("TimeTravelController", () => {
-  it("returns null when time-travel is disabled", () => {
+describe("HistoryController", () => {
+  it("returns null when history is disabled", () => {
     const system = createTestSystem();
     const host = createMockHost();
 
-    const controller = new TimeTravelController(host, system);
+    const controller = new HistoryController(host, system);
     controller.hostConnected();
 
     expect(controller.value).toBeNull();
@@ -816,11 +816,11 @@ describe("TimeTravelController", () => {
     system.destroy();
   });
 
-  it("returns TimeTravelState when time-travel is enabled", () => {
-    const system = createTimeTravelSystem();
+  it("returns HistoryState when history is enabled", () => {
+    const system = createHistorySystem();
     const host = createMockHost();
 
-    const controller = new TimeTravelController(host, system);
+    const controller = new HistoryController(host, system);
     controller.hostConnected();
 
     expect(controller.value).not.toBeNull();
@@ -840,10 +840,10 @@ describe("TimeTravelController", () => {
   });
 
   it("supports undo and redo after state changes", async () => {
-    const system = createTimeTravelSystem();
+    const system = createHistorySystem();
     const host = createMockHost();
 
-    const controller = new TimeTravelController(host, system);
+    const controller = new HistoryController(host, system);
     controller.hostConnected();
 
     // Let initial reconcile run

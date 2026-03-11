@@ -11,7 +11,7 @@ import UseInspect from "./hooks/UseInspect.vue";
 import UseOptimisticUpdate from "./hooks/UseOptimisticUpdate.vue";
 import UseRequirementStatus from "./hooks/UseRequirementStatus.vue";
 import UseSelector from "./hooks/UseSelector.vue";
-import UseTimeTravel from "./hooks/UseTimeTravel.vue";
+import UseHistory from "./hooks/UseHistory.vue";
 import UseWatch from "./hooks/UseWatch.vue";
 
 const routes: Record<string, any> = {
@@ -26,7 +26,7 @@ const routes: Record<string, any> = {
   useConstraintStatus: UseConstraintStatus,
   useOptimisticUpdate: UseOptimisticUpdate,
   useRequirementStatus: UseRequirementStatus,
-  useTimeTravel: UseTimeTravel,
+  useHistory: UseHistory,
   useDirective: UseDirective,
 };
 

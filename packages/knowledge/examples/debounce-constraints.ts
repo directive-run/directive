@@ -25,7 +25,7 @@ import {
 
 const system = createSystem({
   module: debounceSearchModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "debounce-constraints" })],
 });
 system.start();
