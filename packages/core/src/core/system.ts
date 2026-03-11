@@ -2058,16 +2058,32 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     onAfterModuleInit: () => {
       // Apply initialFacts
       if (options.initialFacts) {
-        for (const [key, value] of Object.entries(options.initialFacts)) {
-          if (BLOCKED_PROPS.has(key)) continue;
-          (engine.facts as Record<string, unknown>)[key] = value;
+        if (!isPrototypeSafe(options.initialFacts)) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(
+              "[Directive] initialFacts contains potentially dangerous keys. Skipping.",
+            );
+          }
+        } else {
+          for (const [key, value] of Object.entries(options.initialFacts)) {
+            if (BLOCKED_PROPS.has(key)) continue;
+            (engine.facts as Record<string, unknown>)[key] = value;
+          }
         }
       }
       // Apply hydrated facts (takes precedence)
       if (hydratedFacts) {
-        for (const [key, value] of Object.entries(hydratedFacts)) {
-          if (BLOCKED_PROPS.has(key)) continue;
-          (engine.facts as Record<string, unknown>)[key] = value;
+        if (!isPrototypeSafe(hydratedFacts)) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(
+              "[Directive] hydrate() data contains potentially dangerous keys. Skipping.",
+            );
+          }
+        } else {
+          for (const [key, value] of Object.entries(hydratedFacts)) {
+            if (BLOCKED_PROPS.has(key)) continue;
+            (engine.facts as Record<string, unknown>)[key] = value;
+          }
         }
         hydratedFacts = null;
       }

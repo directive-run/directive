@@ -584,53 +584,16 @@ resolve: async (req, context) => {
 
 ## Runtime Registration
 
-Register, override, or remove resolvers at runtime — useful for lazy-loading resolvers, plugin-provided handlers, or hot-swapping logic:
+Resolvers support dynamic registration and overrides:
 
 ```typescript
-// Register a new resolver at runtime
-system.resolvers.register("loadData", {
-  requirement: "LOAD_DATA",
-  resolve: async (req, context) => {
-    const data = await fetch(`/api/data/${req.source}`);
-    context.facts.data = await data.json();
-  },
-});
-
-// Override an existing resolver's logic
-system.resolvers.assign("fetchUser", {
-  requirement: "FETCH_USER",
-  resolve: async (req, context) => {
-    // New implementation
-    context.facts.user = await newUserService.get(req.userId);
-  },
-});
-
-// Remove a dynamically registered resolver
+system.resolvers.register("loadData", { requirement: "LOAD_DATA", resolve: ... });
+system.resolvers.assign("fetchUser", { requirement: "FETCH_USER", resolve: ... });
 system.resolvers.unregister("loadData");
-
-// Execute a resolver directly with a requirement
 await system.resolvers.call("fetchUser", { type: "FETCH_USER", userId: 42 });
 ```
 
-### Introspection
-
-```typescript
-system.resolvers.isDynamic("loadData");  // true
-system.resolvers.listDynamic();          // ["loadData"]
-```
-
-### Semantics
-
-| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
-|--------|-------------------|---------------------|--------------------|
-| `register` | throws | throws | creates |
-| `assign` | overrides | overrides | throws |
-| `unregister` | dev warning, no-op | removes | dev warning, no-op |
-| `call` | executes | executes | throws |
-
-{% callout type="note" title="Deferred during reconciliation" %}
-If you call `register`, `assign`, or `unregister` during a reconciliation cycle (e.g., inside another resolver), the operation is automatically deferred and applied after the current cycle completes.
-{% /callout %}
+All four subsystems (constraints, effects, resolvers, derivations) share the same registration interface. See [Runtime Dynamics](/docs/advanced/runtime) for the full semantics table, introspection methods, and use cases.
 
 ---
 

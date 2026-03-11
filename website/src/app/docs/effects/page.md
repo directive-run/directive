@@ -362,22 +362,19 @@ effects: {
 
 ---
 
-## Runtime Control
+## Runtime Control & Registration
 
-Disable or enable effects at runtime:
+Effects support enable/disable toggling and dynamic registration:
 
 ```typescript
-// Disable an effect – it won't run during reconciliation
 system.effects.disable("expensiveAnalytics");
-
-// Re-enable it later
 system.effects.enable("expensiveAnalytics");
-
-// Check whether an effect is currently enabled
-system.effects.isEnabled("expensiveAnalytics"); // false
+system.effects.register("logger", { run: (facts) => console.log(facts) });
+system.effects.assign("existing", { run: (facts) => { /* ... */ } });
+system.effects.unregister("logger");
 ```
 
-This is useful for suppressing noisy effects during tests, pausing analytics, or toggling behavior based on user preferences.
+All four subsystems (constraints, effects, resolvers, derivations) share the same registration interface. See [Runtime Dynamics](/docs/advanced/runtime) for the full semantics table, introspection methods, and use cases.
 
 ---
 
@@ -392,60 +389,6 @@ This is useful for suppressing noisy effects during tests, pausing analytics, or
 | Fire-and-forget | Yes | No (tracked, retried, cancelled) |
 | Error handling | Isolated (logged, never breaks engine) | Full lifecycle (retry, timeout, abort) |
 | Execution | Parallel | Parallel (sequential via `after`) |
-
----
-
-## Runtime Registration
-
-Register, override, or remove effects at runtime — useful for plugin-provided side effects, analytics toggles, or dev tools:
-
-```typescript
-// Register a new effect at runtime
-system.effects.register("analytics", {
-  run: (facts) => {
-    trackEvent("page_view", { page: facts.currentPage });
-  },
-});
-
-// Override an existing effect's logic
-system.effects.assign("log", {
-  run: (facts, prev) => {
-    if (prev?.status !== facts.status) {
-      console.log(`Status changed: ${facts.status}`);
-    }
-  },
-});
-
-// Remove a dynamically registered effect
-system.effects.unregister("analytics");
-
-// Execute an effect immediately
-await system.effects.call("log");
-```
-
-### Introspection
-
-```typescript
-system.effects.isDynamic("analytics");  // true
-system.effects.listDynamic();           // ["analytics"]
-```
-
-### Semantics
-
-| Method | ID exists (static) | ID exists (dynamic) | ID doesn't exist |
-|--------|-------------------|---------------------|--------------------|
-| `register` | throws | throws | creates |
-| `assign` | overrides | overrides | throws |
-| `unregister` | dev warning, no-op | removes | dev warning, no-op |
-| `call` | executes | executes | throws |
-
-{% callout type="note" title="Disabled effects" %}
-`call()` respects the disabled state — calling a disabled effect is a no-op and does not execute the `run` function. Use `enable()` to re-enable it before calling.
-{% /callout %}
-
-{% callout type="note" title="Deferred during reconciliation" %}
-If you call `register`, `assign`, or `unregister` during a reconciliation cycle, the operation is automatically deferred and applied after the current cycle completes.
-{% /callout %}
 
 ---
 

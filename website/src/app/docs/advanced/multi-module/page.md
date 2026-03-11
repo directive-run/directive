@@ -181,7 +181,7 @@ system.facts.chat.messages;
 system.events.chat.sendMessage({ text: "Hello!" });
 ```
 
-The registered module is fully wired into the system – its constraints, resolvers, effects, and derivations all activate immediately. Existing modules continue running uninterrupted.
+The registered module is fully wired into the system – its constraints, resolvers, effects, and derivations all activate immediately. Existing modules continue running uninterrupted. See [Runtime Dynamics](/docs/advanced/runtime) for more on runtime registration, overrides, and introspection across all subsystems.
 
 ### Restrictions
 

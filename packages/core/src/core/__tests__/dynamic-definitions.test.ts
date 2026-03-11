@@ -77,7 +77,7 @@ describe("Constraints dynamic definitions", () => {
     await flushMicrotasks();
 
     system.constraints.register("highCount", {
-      when: (facts: Record<string, unknown>) => (facts.count as number) > 10,
+      when: (facts) => facts.count > 10,
       require: { type: "LOAD_DATA", source: "dynamic" },
     });
 
@@ -208,7 +208,7 @@ describe("Resolvers dynamic definitions", () => {
 
     system.resolvers.register("loadData", {
       requirement: "LOAD_DATA",
-      resolve: async (req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (req, context) => {
         context.facts.label = `loaded from ${req.source}`;
       },
     });
@@ -239,7 +239,7 @@ describe("Resolvers dynamic definitions", () => {
 
     system.resolvers.assign("increment", {
       requirement: "INCREMENT",
-      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req, context) => {
         context.facts.count = 42;
       },
     });
@@ -293,8 +293,8 @@ describe("Derivations dynamic definitions", () => {
     const system = createStartedSystem();
     await flushMicrotasks();
 
-    system.derive.register("tripled", (facts: Record<string, unknown>) => {
-      return (facts.count as number) * 3;
+    system.derive.register("tripled", (facts) => {
+      return facts.count * 3;
     });
 
     expect(system.derive.isDynamic("tripled")).toBe(true);
@@ -309,8 +309,8 @@ describe("Derivations dynamic definitions", () => {
     await flushMicrotasks();
 
     expect(() => {
-      system.derive.register("doubled", (facts: Record<string, unknown>) => {
-        return (facts.count as number) * 2;
+      system.derive.register("doubled", (facts) => {
+        return facts.count * 2;
       });
     }).toThrow('Derivation "doubled" already exists');
 
@@ -325,8 +325,8 @@ describe("Derivations dynamic definitions", () => {
     expect(system.derive.doubled).toBe(0);
 
     // Override it to return count * 10
-    system.derive.assign("doubled", (facts: Record<string, unknown>) => {
-      return (facts.count as number) * 10;
+    system.derive.assign("doubled", (facts) => {
+      return facts.count * 10;
     });
 
     system.facts.count = 5;
@@ -341,8 +341,8 @@ describe("Derivations dynamic definitions", () => {
     const system = createStartedSystem();
     await flushMicrotasks();
 
-    system.derive.register("custom", (facts: Record<string, unknown>) => {
-      return (facts.count as number) + 100;
+    system.derive.register("custom", (facts) => {
+      return facts.count + 100;
     });
 
     expect((system.derive as unknown as Record<string, unknown>).custom).toBe(100);
@@ -756,7 +756,7 @@ describe("Deferred operations during reconciliation", () => {
           run: (facts) => {
             if (facts.trigger && systemRef) {
               // This runs during reconciliation, so registration is deferred
-              systemRef.derive.register("dynamicDerived", (f: Record<string, unknown>) => {
+              systemRef.derive.register("dynamicDerived", (f: { trigger: boolean; result: string }) => {
                 return `derived-${f.trigger}`;
               });
             }
@@ -878,7 +878,7 @@ describe("Lifecycle: assign → unregister", () => {
 
     system.resolvers.register("dynRes", {
       requirement: "LOAD_DATA",
-      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req, context) => {
         context.facts.label = "v1";
       },
     });
@@ -888,7 +888,7 @@ describe("Lifecycle: assign → unregister", () => {
     // Assign override
     system.resolvers.assign("dynRes", {
       requirement: "LOAD_DATA",
-      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req, context) => {
         context.facts.label = "v2";
       },
     });
@@ -1013,7 +1013,7 @@ describe("Namespaced system dynamic registration", () => {
     // Dynamic IDs don't use :: (that's reserved for engine-internal namespacing).
     // Users register with plain IDs; the constraint references namespaced fact keys.
     system.constraints.register("dynamicAuthCheck", {
-      when: (facts: Record<string, unknown>) => facts["auth::role"] === "admin",
+      when: (facts) => facts["auth::role"] === "admin",
       require: { type: "UPGRADE" },
     });
 
@@ -1023,7 +1023,7 @@ describe("Namespaced system dynamic registration", () => {
     // Register a dynamic resolver
     system.resolvers.register("dynamicFetch", {
       requirement: "FETCH",
-      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req, context) => {
         context.facts["data::loaded"] = true;
       },
     });
@@ -1142,7 +1142,7 @@ describe("Resolver assign triggers reconciliation", () => {
     // Assign a new resolver — should trigger scheduleReconcile
     system.resolvers.assign("increment", {
       requirement: "INCREMENT",
-      resolve: async (_req: Record<string, unknown>, context: { facts: Record<string, unknown> }) => {
+      resolve: async (_req, context) => {
         context.facts.count = 99;
       },
     });

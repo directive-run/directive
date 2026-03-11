@@ -148,6 +148,10 @@ export type {
   DerivationsControl,
   EffectsControl,
   ResolversControl,
+  // Dynamic definition types
+  DynamicConstraintDef,
+  DynamicEffectDef,
+  DynamicResolverDef,
   // System interfaces
   System,
   SystemConfig,
