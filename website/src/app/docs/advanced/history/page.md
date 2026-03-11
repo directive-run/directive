@@ -43,7 +43,14 @@ const game = createModule("game", {
 
   // Only these events appear in undo/redo history.
   // Omit this field to snapshot ALL events (the default).
-  history: { snapshotEvents: ["inputNumber", "toggleNote", "requestHint", "newGame"] },
+  history: {
+    snapshotEvents: [
+      "inputNumber",
+      "toggleNote",
+      "requestHint",
+      "newGame",
+    ],
+  },
 
   events: {
     tick: (facts) => { /* timer – no snapshot */ },
@@ -101,8 +108,13 @@ const system = createSystem({
 `history.snapshotEvents` entries are type-checked against your schema events. Typos or removed event names produce compile-time errors:
 
 ```typescript
-history: { snapshotEvents: ["inputNumber", "typoEvent"] },
-//                                         ^^^^^^^^^ Type error: not in schema.events
+history: {
+  snapshotEvents: [
+    "inputNumber",
+    "typoEvent",
+//   ^^^^^^^^^ Type error: not in schema.events
+  ],
+},
 ```
 
 ---

@@ -425,15 +425,42 @@ system.restore(snapshot);
 
 ### getDistributableSnapshot
 
-Get a distributable snapshot of computed derivations for use outside the runtime.
+Export state for use outside the runtime (edge cache, API response, Redis). Derivations are included by default since they're computed read-only values safe to distribute. Facts are opt-in since they're mutable source-of-truth state that could become stale.
 
 ```typescript
-// Export selected derivations for use outside the runtime (e.g., edge cache)
+// Options
+interface DistributableSnapshotOptions {
+  includeDerivations?: string[];  // Which derivations to include (default: all)
+  excludeDerivations?: string[];  // Derivations to exclude
+  includeFacts?: string[];        // Which facts to include (default: none)
+  ttlSeconds?: number;            // Snapshot TTL in seconds
+  metadata?: Record<string, unknown>; // Custom metadata attached to snapshot
+  includeVersion?: boolean;       // Include a version hash for diffing
+}
+```
+
+```typescript
+// Export selected derivations (default behavior — safe to distribute)
 const snapshot = system.getDistributableSnapshot({
   includeDerivations: ["effectivePlan", "canUseFeature"],
-  ttlSeconds: 3600, // snapshot expires after 1 hour
+  ttlSeconds: 3600,
+});
+
+// Include specific facts alongside derivations
+const snapshot = system.getDistributableSnapshot({
+  includeDerivations: ["effectivePlan"],
+  includeFacts: ["userId", "plan"],
+  ttlSeconds: 3600,
+});
+
+// Export all derivations with version for cache diffing
+const snapshot = system.getDistributableSnapshot({
+  includeVersion: true,
+  metadata: { region: "us-east-1" },
 });
 ```
+
+Returns `{ data: T, createdAt: number, expiresAt?: number, version?: string, metadata?: Record<string, unknown> }`.
 
 ### watchDistributableSnapshot
 
