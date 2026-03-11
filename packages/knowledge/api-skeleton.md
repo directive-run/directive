@@ -7,10 +7,6 @@
 
 ### Functions
 
-- `constraint` — Create a constraint using the full builder pattern.
-  ```ts
-  function constraint(): ConstraintBuilderStart<M>
-  ```
 - `createConstraintFactory` — Create a typed constraint factory for a specific schema.
 - `createConstraintsManager` — Create a manager that evaluates constraint rules and produces unmet
   ```ts
@@ -20,7 +16,7 @@
   ```ts
   function createDerivationsManager(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D>
   ```
-- `createDisabledHistory` — Create a no-op history manager for use when `history` is disabled.
+- `createDisabledHistory` — Create a no-op history manager for use when history is disabled.
   ```ts
   function createDisabledHistory(): HistoryManager<S>
   ```
@@ -47,6 +43,10 @@
 - `createFactsStore` — Create a reactive facts store backed by a Map with schema validation,
   ```ts
   function createFactsStore(options: CreateFactsStoreOptions<S>): FactsStore<S>
+  ```
+- `createHistoryManager` — Create a snapshot-based history manager backed by a ring buffer.
+  ```ts
+  function createHistoryManager(options: CreateHistoryOptions<S>): HistoryManager<S>
   ```
 - `createModule` — Create a module definition with full type inference.
   ```ts
@@ -75,10 +75,6 @@
 - `createSystemWithStatus` — Create a Directive system with a status plugin pre-configured.
   ```ts
   function createSystemWithStatus(options: CreateSystemWithStatusOptions<M>): SystemWithStatus<M>
-  ```
-- `createHistoryManager` — Create a snapshot-based time-travel debugger backed by a ring buffer.
-  ```ts
-  function createHistoryManager(options: CreateHistoryOptions<S>): HistoryManager<S>
   ```
 - `diffSnapshots` — Compare two distributable snapshots and return the differences.
 - `forType` — Create a type-guard function suitable for a resolver's `requirement`
@@ -113,10 +109,6 @@
   ```ts
   function isTracking(): boolean
   ```
-- `module` — Create a new module using the fluent builder pattern.
-  ```ts
-  function module(id: string): ModuleBuilder<ModuleSchema>
-  ```
 - `req` — Create a typed requirement factory for a given requirement type string.
   ```ts
   function req(type: T): <P extends Record<string, unknown>>(props: P) => Requirement & { type: T; } & P
@@ -128,10 +120,6 @@
 - `signSnapshot` — Sign a distributable snapshot using HMAC-SHA256.
   ```ts
   function signSnapshot(snapshot: DistributableSnapshotLike<T>, secret: string | Uint8Array): Promise<SignedSnapshot<T>>
-  ```
-- `system` — Create a Directive system using the fluent builder pattern.
-  ```ts
-  function system(): SystemBuilderStart
   ```
 - `trackAccess` — Track a specific key in the current context.
   ```ts
@@ -152,10 +140,6 @@
 - `verifySnapshotSignature` — Verify the signature of a signed snapshot.
   ```ts
   function verifySnapshotSignature(signedSnapshot: SignedSnapshot<T>, secret: string | Uint8Array): Promise<boolean>
-  ```
-- `when` — Quick shorthand for creating constraints.
-  ```ts
-  function when(condition: WhenFn<M>): WhenBuilder<M>
   ```
 - `withoutTracking` — Run a function without tracking.
   ```ts
@@ -219,14 +203,6 @@
   ```ts
   export interface CrossModuleEffectDef<
   ```
-- `TraceConfig` — Trace configuration for per-run reconciliation changelogs
-  ```ts
-  export interface TraceConfig {
-  ```
-- `TraceOption` — Shorthand: `true` enables tracing with defaults, or pass a `TraceConfig`
-  ```ts
-  export type TraceOption = boolean | TraceConfig
-  ```
 - `DerivationsControl` — Runtime control for derivations (dynamic registration + value access)
   ```ts
   export interface DerivationsControl {
@@ -271,13 +247,21 @@
   ```ts
   export interface FactsStore<S extends Schema = Schema>
   ```
+- `HistoryAPI` — History API for snapshot navigation, changesets, and export/import
+  ```ts
+  export interface HistoryAPI {
+  ```
+- `HistoryConfig` — History configuration for snapshot-based state history (undo/redo, rollback, audit trails)
+  ```ts
+  export interface HistoryConfig {
+  ```
+- `HistoryState` — Reactive history state for framework hooks
+  ```ts
+  export interface HistoryState {
+  ```
 - `InflightInfo` — Summary of a resolver that is currently in flight.
   ```ts
   export interface InflightInfo {
-  ```
-- `ModuleBuilder` — Fluent builder interface for constructing {@link ModuleDef} instances step by step.
-  ```ts
-  export interface ModuleBuilder<M extends ModuleSchema = ModuleSchema> {
   ```
 - `ModuleConfig` — Module configuration with consolidated schema.
   ```ts
@@ -347,10 +331,6 @@
   ```ts
   export interface RetryPolicy {
   ```
-- `TraceEntry` — A structured record of one reconciliation run — from facts through resolvers and effects.
-  ```ts
-  export interface TraceEntry {
-  ```
 - `SchemaType` — Primitive type definitions for schema
   ```ts
   export interface SchemaType<T> {
@@ -395,13 +375,13 @@
   ```ts
   export interface SystemSnapshot {
   ```
-- `HistoryAPI` — History API (undo/redo, snapshots, replay)
+- `TraceConfig` — Trace configuration for per-run reconciliation changelogs
   ```ts
-  export interface HistoryAPI {
+  export interface TraceConfig {
   ```
-- `HistoryState` — Reactive time-travel state for framework hooks
+- `TraceEntry` — A structured record of one reconciliation run — fact changes, derivation recomputes, constraints hit, resolvers, effects.
   ```ts
-  export interface HistoryState {
+  export interface TraceEntry {
   ```
 - `TypedConstraint` — External constraint definition with full typing.
   ```ts
@@ -538,6 +518,10 @@
   ```ts
   export type FlexibleEventHandler<S extends Schema> = (
   ```
+- `HistoryOption` — History option: boolean shorthand or full config (presence implies enabled)
+  ```ts
+  export type HistoryOption = boolean | HistoryConfig;
+  ```
 - `InferDerivations` — Infer derivation values from a module schema.
   ```ts
   export type InferDerivations<M extends ModuleSchema> = {
@@ -638,6 +622,10 @@
   ```ts
   export type SystemMode = "single" | "namespaced";
   ```
+- `TraceOption` — Trace option: boolean shorthand or full config (presence implies enabled)
+  ```ts
+  export type TraceOption = boolean | TraceConfig;
+  ```
 - `TypedConstraintsDef` — Typed constraints definition using the module schema.
   ```ts
   export type TypedConstraintsDef<M extends ModuleSchema> = Record<
@@ -657,10 +645,6 @@
 - `UnionEvents` — Union of all module events (not namespaced).
   ```ts
   export type UnionEvents<Modules extends ModulesMap> = {
-  ```
-- `WhenConstraint` — Result from when().require() — a valid constraint with optional immutable chaining
-  ```ts
-  export type WhenConstraint<M extends ModuleSchema> = TypedConstraintDef<M> & {
   ```
 
 ### Constants
@@ -728,10 +712,6 @@
 - `createAgentMemory` — Create an agent memory instance for managing conversation history.
   ```ts
   function createAgentMemory(config: AgentMemoryConfig): AgentMemory
-  ```
-- `createAgentMetrics` — Create standard agent metrics for an observability instance.
-  ```ts
-  declare function createAgentMetrics(obs: ObservabilityInstance): {
   ```
 - `createAgentNetwork` — Create an agent network for coordinated communication.
   ```ts
@@ -855,10 +835,6 @@
 - `createMultiAgentOrchestrator` — Create a multi-agent orchestrator backed by a Directive System.
   ```ts
   function createMultiAgentOrchestrator(options: MultiAgentOrchestratorOptions): MultiAgentOrchestrator
-  ```
-- `createObservability` — Create an observability instance for monitoring AI agents.
-  ```ts
-  declare function createObservability(config?: ObservabilityConfig): ObservabilityInstance
   ```
 - `createOtelPlugin` — Create an OpenTelemetry plugin for AI observability.
   ```ts

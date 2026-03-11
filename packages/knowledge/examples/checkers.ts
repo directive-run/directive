@@ -43,11 +43,14 @@ import {
 import type { CacheStats } from "@directive-run/ai";
 import {
   type CircuitState,
-  createAgentMetrics,
   createCircuitBreaker,
   createOTLPExporter,
-  createObservability,
 } from "@directive-run/core/plugins";
+// createObservability is alpha (not in bundle) — direct source import
+import {
+  createObservability,
+  createAgentMetrics,
+} from "../../../packages/core/src/plugins/observability.lab.js";
 import {
   analysisAgent,
   chatAgent,

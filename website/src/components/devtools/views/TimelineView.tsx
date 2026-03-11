@@ -639,6 +639,7 @@ export function TimelineView() {
             <div
               className="space-y-2"
               style={{ width: `${zoom * 100}%`, minWidth: "100%" }}
+              onMouseLeave={handleLaneMouseLeave}
             >
               {laneIds.map((laneId, i) => (
                 <div key={laneId}>
