@@ -226,11 +226,9 @@ export function buildHistoryState(
   }));
 
   return {
-    // Existing
-    canUndo: debug.currentIndex > 0,
-    canRedo: debug.currentIndex < debug.snapshots.length - 1,
-    undo: () => debug.goBack(),
-    redo: () => debug.goForward(),
+    // Navigation state
+    canGoBack: debug.currentIndex > 0,
+    canGoForward: debug.currentIndex < debug.snapshots.length - 1,
     currentIndex: debug.currentIndex,
     totalSnapshots: debug.snapshots.length,
 
@@ -243,8 +241,8 @@ export function buildHistoryState(
 
     // Navigation
     goTo: (snapshotId: number) => debug.goTo(snapshotId),
-    goBack: (steps: number) => debug.goBack(steps),
-    goForward: (steps: number) => debug.goForward(steps),
+    goBack: (steps?: number) => debug.goBack(steps),
+    goForward: (steps?: number) => debug.goForward(steps),
     replay: () => debug.replay(),
 
     // Session persistence

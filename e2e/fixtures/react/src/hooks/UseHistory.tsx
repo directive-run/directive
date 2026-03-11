@@ -11,11 +11,11 @@ export function UseHistoryPage() {
     <div>
       <span data-testid={TestIds.factSingle}>{count}</span>
       <span data-testid={TestIds.historyEnabled}>{String(history !== null)}</span>
-      <span data-testid={TestIds.historyCanUndo}>
-        {String(history?.canUndo ?? false)}
+      <span data-testid={TestIds.historyCanGoBack}>
+        {String(history?.canGoBack ?? false)}
       </span>
-      <span data-testid={TestIds.historyCanRedo}>
-        {String(history?.canRedo ?? false)}
+      <span data-testid={TestIds.historyCanGoForward}>
+        {String(history?.canGoForward ?? false)}
       </span>
       <span data-testid={TestIds.historyIndex}>
         {history?.currentIndex ?? -1}
@@ -29,11 +29,11 @@ export function UseHistoryPage() {
       >
         inc
       </button>
-      <button data-testid={TestIds.btnUndo} onClick={() => history?.undo()}>
-        undo
+      <button data-testid={TestIds.btnGoBack} onClick={() => history?.goBack()}>
+        goBack
       </button>
-      <button data-testid={TestIds.btnRedo} onClick={() => history?.redo()}>
-        redo
+      <button data-testid={TestIds.btnGoForward} onClick={() => history?.goForward()}>
+        goForward
       </button>
     </div>
   );

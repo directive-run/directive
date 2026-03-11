@@ -895,10 +895,10 @@ export function useEvents<M extends ModuleSchema = ModuleSchema>(
  * @example
  * ```typescript
  * class MyElement extends LitElement {
- *   private tt = new HistoryController(this, system);
+ *   private _history = new HistoryController(this, system);
  *   render() {
- *     const { canUndo, undo } = this.tt.value ?? {};
- *     return html`<button ?disabled=${!canUndo} @click=${undo}>Undo</button>`;
+ *     const h = this._history.value;
+ *     return html`<button ?disabled=${!h?.canGoBack} @click=${() => h?.goBack()}>Undo</button>`;
  *   }
  * }
  * ```

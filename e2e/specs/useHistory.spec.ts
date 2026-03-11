@@ -6,32 +6,32 @@ forEachFramework("useHistory", async (_fw, { page }) => {
   // History is enabled
   await expect(tid(page, TestIds.historyEnabled)).toHaveText("true");
 
-  // Initial state: can't undo/redo
-  await expect(tid(page, TestIds.historyCanUndo)).toHaveText("false");
-  await expect(tid(page, TestIds.historyCanRedo)).toHaveText("false");
+  // Initial state: can't go back/forward
+  await expect(tid(page, TestIds.historyCanGoBack)).toHaveText("false");
+  await expect(tid(page, TestIds.historyCanGoForward)).toHaveText("false");
 
   // Increment to create snapshots
   await tid(page, TestIds.btnIncrement).click();
   await expect(tid(page, TestIds.factSingle)).toHaveText("1");
 
-  // Can now undo
-  await expect(tid(page, TestIds.historyCanUndo)).toHaveText("true", {
+  // Can now go back
+  await expect(tid(page, TestIds.historyCanGoBack)).toHaveText("true", {
     timeout: 2000,
   });
 
-  // Undo restores previous count
-  await tid(page, TestIds.btnUndo).click();
+  // Go back restores previous count
+  await tid(page, TestIds.btnGoBack).click();
   await expect(tid(page, TestIds.factSingle)).toHaveText("0", {
     timeout: 2000,
   });
 
-  // Can now redo
-  await expect(tid(page, TestIds.historyCanRedo)).toHaveText("true", {
+  // Can now go forward
+  await expect(tid(page, TestIds.historyCanGoForward)).toHaveText("true", {
     timeout: 2000,
   });
 
-  // Redo goes forward
-  await tid(page, TestIds.btnRedo).click();
+  // Go forward
+  await tid(page, TestIds.btnGoForward).click();
   await expect(tid(page, TestIds.factSingle)).toHaveText("1", {
     timeout: 2000,
   });

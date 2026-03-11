@@ -1352,10 +1352,10 @@ describe("useHistory", () => {
     });
 
     expect(state.value).not.toBeNull();
-    expect(state.value).toHaveProperty("canUndo");
-    expect(state.value).toHaveProperty("canRedo");
-    expect(state.value).toHaveProperty("undo");
-    expect(state.value).toHaveProperty("redo");
+    expect(state.value).toHaveProperty("canGoBack");
+    expect(state.value).toHaveProperty("canGoForward");
+    expect(state.value).toHaveProperty("goBack");
+    expect(state.value).toHaveProperty("goForward");
     expect(state.value).toHaveProperty("currentIndex");
     expect(state.value).toHaveProperty("totalSnapshots");
 
@@ -1363,7 +1363,7 @@ describe("useHistory", () => {
     system.destroy();
   });
 
-  it("after taking snapshots, canUndo becomes true", async () => {
+  it("after taking snapshots, canGoBack becomes true", async () => {
     const system = createHistorySystem();
 
     await flush();
@@ -1383,13 +1383,13 @@ describe("useHistory", () => {
 
     expect(state.value).not.toBeNull();
     expect(state.value!.totalSnapshots).toBeGreaterThanOrEqual(2);
-    expect(state.value!.canUndo).toBe(true);
+    expect(state.value!.canGoBack).toBe(true);
 
     scope.stop();
     system.destroy();
   });
 
-  it("undo restores previous state", async () => {
+  it("goBack restores previous state", async () => {
     const system = createHistorySystem();
 
     await flush();
@@ -1409,7 +1409,7 @@ describe("useHistory", () => {
 
     expect(system.facts.count).toBe(20);
 
-    state.value!.undo();
+    state.value!.goBack();
 
     expect(system.facts.count).toBe(10);
 
