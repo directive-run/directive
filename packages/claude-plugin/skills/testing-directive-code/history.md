@@ -129,10 +129,8 @@ interface SnapshotMeta {
 
 interface HistoryState {
   // Convenience booleans (not on core API)
-  canUndo: boolean;    // True when currentIndex > 0
-  canRedo: boolean;    // True when currentIndex < totalSnapshots - 1
-  undo: () => void;    // Alias for goBack()
-  redo: () => void;    // Alias for goForward()
+  canGoBack: boolean;    // True when currentIndex > 0
+  canGoForward: boolean; // True when currentIndex < totalSnapshots - 1
   currentIndex: number;
   totalSnapshots: number;
 
@@ -172,8 +170,8 @@ function HistoryToolbar() {
 
   return (
     <div>
-      <button onClick={history.undo} disabled={!history.canUndo}>Undo</button>
-      <button onClick={history.redo} disabled={!history.canRedo}>Redo</button>
+      <button onClick={() => history.goBack()} disabled={!history.canGoBack}>Undo</button>
+      <button onClick={() => history.goForward()} disabled={!history.canGoForward}>Redo</button>
       <span>{history.currentIndex + 1} / {history.totalSnapshots}</span>
     </div>
   );

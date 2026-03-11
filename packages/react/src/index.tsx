@@ -866,13 +866,13 @@ function _useInspectSync(
  *
  * @example
  * ```tsx
- * const tt = useHistory(system);
- * if (tt) {
+ * const history = useHistory(system);
+ * if (history) {
  *   return (
  *     <div>
- *       <button disabled={!tt.canUndo} onClick={tt.undo}>Undo</button>
- *       <button disabled={!tt.canRedo} onClick={tt.redo}>Redo</button>
- *       <span>{tt.currentIndex + 1} / {tt.totalSnapshots}</span>
+ *       <button disabled={!history.canGoBack} onClick={() => history.goBack()}>Undo</button>
+ *       <button disabled={!history.canGoForward} onClick={() => history.goForward()}>Redo</button>
+ *       <span>{history.currentIndex + 1} / {history.totalSnapshots}</span>
  *     </div>
  *   );
  * }
@@ -897,8 +897,8 @@ export function useHistory(
     // Return stable reference when values haven't changed
     if (
       cachedRef.current &&
-      cachedRef.current.canUndo === state.canUndo &&
-      cachedRef.current.canRedo === state.canRedo &&
+      cachedRef.current.canGoBack === state.canGoBack &&
+      cachedRef.current.canGoForward === state.canGoForward &&
       cachedRef.current.currentIndex === state.currentIndex &&
       cachedRef.current.totalSnapshots === state.totalSnapshots &&
       cachedRef.current.isPaused === state.isPaused

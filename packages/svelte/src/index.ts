@@ -690,8 +690,8 @@ export function useOptimisticUpdate(
  *
  * @example
  * ```svelte
- * const tt = useHistory(system);
- * <button disabled={!$tt?.canUndo} on:click={() => $tt?.undo()}>Undo</button>
+ * const history = useHistory(system);
+ * <button disabled={!$history?.canGoBack} on:click={() => $history?.goBack()}>Undo</button>
  * ```
  */
 export function useHistory(

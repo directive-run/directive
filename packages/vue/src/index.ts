@@ -604,8 +604,8 @@ export function useOptimisticUpdate(
  *
  * @example
  * ```vue
- * const tt = useHistory(system);
- * <button :disabled="!tt.value?.canUndo" @click="tt.value?.undo()">Undo</button>
+ * const history = useHistory(system);
+ * <button :disabled="!history.value?.canGoBack" @click="history.value?.goBack()">Undo</button>
  * ```
  */
 export function useHistory(

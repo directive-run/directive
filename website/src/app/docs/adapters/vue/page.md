@@ -488,8 +488,8 @@ const history = useHistory(system);
 
 <template>
   <div v-if="history">
-    <button @click="history.undo" :disabled="!history.canUndo">Undo</button>
-    <button @click="history.redo" :disabled="!history.canRedo">Redo</button>
+    <button @click="history.goBack()" :disabled="!history.canGoBack">Undo</button>
+    <button @click="history.goForward()" :disabled="!history.canGoForward">Redo</button>
     <span>{{ history.currentIndex + 1 }} / {{ history.totalSnapshots }}</span>
   </div>
 </template>
@@ -719,7 +719,7 @@ const coords = useSelector(system, (state) => ({ x: state.position?.x, y: state.
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
-| `useHistory` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Composable | Reactive history state (canGoBack, canGoForward, goBack, goForward) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---

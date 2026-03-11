@@ -223,11 +223,9 @@ interface SnapshotMeta {
 }
 
 interface HistoryState {
-  // Undo / Redo
-  canUndo: boolean;          // True when there are earlier snapshots
-  canRedo: boolean;          // True when there are later snapshots
-  undo: () => void;          // One step backward (changeset-aware)
-  redo: () => void;          // One step forward (changeset-aware)
+  // Back / Forward
+  canGoBack: boolean;        // True when there are earlier snapshots
+  canGoForward: boolean;     // True when there are later snapshots
   currentIndex: number;      // Position in the snapshot array
   totalSnapshots: number;    // Total number of recorded snapshots
 
@@ -270,7 +268,7 @@ function HistoryToolbar() {
 
   // Destructure exactly what you need
   const {
-    canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+    canGoBack, canGoForward, currentIndex, totalSnapshots,
     snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
     exportSession, importSession,
     beginChangeset, endChangeset,
@@ -279,9 +277,9 @@ function HistoryToolbar() {
 
   return (
     <div>
-      {/* Undo / Redo */}
-      <button onClick={undo} disabled={!canUndo}>Undo</button>
-      <button onClick={redo} disabled={!canRedo}>Redo</button>
+      {/* Back / Forward */}
+      <button onClick={() => goBack()} disabled={!canGoBack}>Undo</button>
+      <button onClick={() => goForward()} disabled={!canGoForward}>Redo</button>
       <span>{currentIndex + 1} / {totalSnapshots}</span>
 
       {/* Navigation */}
@@ -344,9 +342,9 @@ function restoreSession() {
 
 <template>
   <div v-if="history">
-    <!-- Undo / Redo -->
-    <button @click="history.undo" :disabled="!history.canUndo">Undo</button>
-    <button @click="history.redo" :disabled="!history.canRedo">Redo</button>
+    <!-- Back / Forward -->
+    <button @click="history.goBack()" :disabled="!history.canGoBack">Undo</button>
+    <button @click="history.goForward()" :disabled="!history.canGoForward">Redo</button>
     <span>{{ history.currentIndex + 1 }} / {{ history.totalSnapshots }}</span>
 
     <!-- Navigation -->
@@ -399,14 +397,14 @@ function restoreSession() {
 
 {#if $history}
   {@const {
-    canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+    canGoBack, canGoForward, currentIndex, totalSnapshots,
     snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
     isPaused, pause, resume,
   } = $history}
 
-  <!-- Undo / Redo -->
-  <button on:click={undo} disabled={!canUndo}>Undo</button>
-  <button on:click={redo} disabled={!canRedo}>Redo</button>
+  <!-- Back / Forward -->
+  <button on:click={() => goBack()} disabled={!canGoBack}>Undo</button>
+  <button on:click={() => goForward()} disabled={!canGoForward}>Redo</button>
   <span>{currentIndex + 1} / {totalSnapshots}</span>
 
   <!-- Navigation -->
@@ -452,7 +450,7 @@ function HistoryToolbar() {
     <Show when={history()}>
       {(state) => {
         const {
-          canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+          canGoBack, canGoForward, currentIndex, totalSnapshots,
           snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
           exportSession, importSession,
           isPaused, pause, resume,
@@ -460,9 +458,9 @@ function HistoryToolbar() {
 
         return (
           <div>
-            {/* Undo / Redo */}
-            <button onClick={undo} disabled={!canUndo}>Undo</button>
-            <button onClick={redo} disabled={!canRedo}>Redo</button>
+            {/* Back / Forward */}
+            <button onClick={() => goBack()} disabled={!canGoBack}>Undo</button>
+            <button onClick={() => goForward()} disabled={!canGoForward}>Redo</button>
             <span>{currentIndex + 1} / {totalSnapshots}</span>
 
             {/* Navigation */}
@@ -525,16 +523,16 @@ class HistoryToolbar extends LitElement {
     }
 
     const {
-      canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
+      canGoBack, canGoForward, currentIndex, totalSnapshots,
       snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
       exportSession, importSession,
       isPaused, pause, resume,
     } = history;
 
     return html`
-      <!-- Undo / Redo -->
-      <button @click=${undo} ?disabled=${!canUndo}>Undo</button>
-      <button @click=${redo} ?disabled=${!canRedo}>Redo</button>
+      <!-- Back / Forward -->
+      <button @click=${() => goBack()} ?disabled=${!canGoBack}>Undo</button>
+      <button @click=${() => goForward()} ?disabled=${!canGoForward}>Redo</button>
       <span>${currentIndex + 1} / ${totalSnapshots}</span>
 
       <!-- Navigation -->

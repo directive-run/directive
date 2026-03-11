@@ -27,7 +27,7 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
-| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive history state (canGoBack, canGoForward, goBack, goForward) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -643,7 +643,7 @@ function Counter() {
 
 ## useHistory
 
-Reactive time-travel state. Returns `null` when time-travel is disabled on the system.
+Reactive history state. Returns `null` when history is disabled on the system.
 
 ```typescript
 function useHistory(
@@ -655,30 +655,30 @@ function useHistory(
 
 ```typescript
 interface HistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
   currentIndex: number;
   totalSnapshots: number;
+  goBack: (steps?: number) => void;
+  goForward: (steps?: number) => void;
 }
 ```
 
 ```tsx
 import { useHistory } from '@directive-run/react';
 
-// Get reactive time-travel controls
+// Get reactive history controls
 const tt = useHistory(system);
 
-// Only render controls when time-travel is enabled
+// Only render controls when history is enabled
 if (!tt) {
   return null;
 }
 
 return (
   <div>
-    <button onClick={tt.undo} disabled={!tt.canUndo}>Undo</button>
-    <button onClick={tt.redo} disabled={!tt.canRedo}>Redo</button>
+    <button onClick={() => tt.goBack()} disabled={!tt.canGoBack}>Undo</button>
+    <button onClick={() => tt.goForward()} disabled={!tt.canGoForward}>Redo</button>
   </div>
 );
 ```

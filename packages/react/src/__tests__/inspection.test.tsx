@@ -374,10 +374,10 @@ describe("useHistory", () => {
     const { result, unmount } = renderHook(() => useHistory(system));
 
     expect(result.current).not.toBeNull();
-    expect(result.current).toHaveProperty("canUndo");
-    expect(result.current).toHaveProperty("canRedo");
-    expect(result.current).toHaveProperty("undo");
-    expect(result.current).toHaveProperty("redo");
+    expect(result.current).toHaveProperty("canGoBack");
+    expect(result.current).toHaveProperty("canGoForward");
+    expect(result.current).toHaveProperty("goBack");
+    expect(result.current).toHaveProperty("goForward");
     expect(result.current).toHaveProperty("currentIndex");
     expect(result.current).toHaveProperty("totalSnapshots");
     expect(result.current).toHaveProperty("isPaused");
@@ -386,7 +386,7 @@ describe("useHistory", () => {
     system.destroy();
   });
 
-  it("canUndo is false initially (no snapshots yet)", async () => {
+  it("canGoBack is false initially (no snapshots yet)", async () => {
     const system = createHistorySystem();
 
     // Let the initial reconcile run so any init snapshots are taken
@@ -395,16 +395,16 @@ describe("useHistory", () => {
     const { result, unmount } = renderHook(() => useHistory(system));
 
     expect(result.current).not.toBeNull();
-    // With only 0-1 snapshots, canUndo should be false
+    // With only 0-1 snapshots, canGoBack should be false
     if (result.current!.totalSnapshots <= 1) {
-      expect(result.current!.canUndo).toBe(false);
+      expect(result.current!.canGoBack).toBe(false);
     }
 
     unmount();
     system.destroy();
   });
 
-  it("after taking snapshot, canUndo becomes true", async () => {
+  it("after taking snapshot, canGoBack becomes true", async () => {
     const system = createHistorySystem();
 
     // Let initial reconcile run
@@ -423,16 +423,16 @@ describe("useHistory", () => {
       await flush();
     });
 
-    // After two changes, there should be multiple snapshots and canUndo should be true
+    // After two changes, there should be multiple snapshots and canGoBack should be true
     expect(result.current).not.toBeNull();
     expect(result.current!.totalSnapshots).toBeGreaterThanOrEqual(2);
-    expect(result.current!.canUndo).toBe(true);
+    expect(result.current!.canGoBack).toBe(true);
 
     unmount();
     system.destroy();
   });
 
-  it("undo restores previous state", async () => {
+  it("goBack restores previous state", async () => {
     const system = createHistorySystem();
 
     // Let initial reconcile run
@@ -452,9 +452,9 @@ describe("useHistory", () => {
 
     expect(system.facts.count).toBe(20);
 
-    // Undo — should restore the snapshot taken when count was 10
+    // Go back — should restore the snapshot taken when count was 10
     act(() => {
-      result.current!.undo();
+      result.current!.goBack();
     });
 
     expect(system.facts.count).toBe(10);
@@ -463,7 +463,7 @@ describe("useHistory", () => {
     system.destroy();
   });
 
-  it("redo restores undone state", async () => {
+  it("goForward restores undone state", async () => {
     const system = createHistorySystem();
 
     // Let initial reconcile run
@@ -481,16 +481,16 @@ describe("useHistory", () => {
       await flush();
     });
 
-    // Undo
+    // Go back
     act(() => {
-      result.current!.undo();
+      result.current!.goBack();
     });
 
     expect(system.facts.count).toBe(10);
 
-    // Redo
+    // Go forward
     act(() => {
-      result.current!.redo();
+      result.current!.goForward();
     });
 
     expect(system.facts.count).toBe(20);
@@ -553,16 +553,16 @@ describe("useHistory", () => {
     const lastIndex = result.current!.currentIndex;
     expect(lastIndex).toBeGreaterThanOrEqual(2);
 
-    // Undo one step
+    // Go back one step
     act(() => {
-      result.current!.undo();
+      result.current!.goBack();
     });
 
     expect(result.current!.currentIndex).toBe(lastIndex - 1);
 
-    // Undo another step
+    // Go back another step
     act(() => {
-      result.current!.undo();
+      result.current!.goBack();
     });
 
     expect(result.current!.currentIndex).toBe(lastIndex - 2);

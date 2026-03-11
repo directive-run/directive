@@ -120,11 +120,9 @@ export interface SnapshotMeta {
 
 /** Reactive history state for framework hooks */
 export interface HistoryState {
-  // Existing (unchanged)
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  // Navigation state
+  canGoBack: boolean;
+  canGoForward: boolean;
   currentIndex: number;
   totalSnapshots: number;
 
@@ -134,8 +132,8 @@ export interface HistoryState {
 
   // Navigation
   goTo: (snapshotId: number) => void;
-  goBack: (steps: number) => void;
-  goForward: (steps: number) => void;
+  goBack: (steps?: number) => void;
+  goForward: (steps?: number) => void;
   replay: () => void;
 
   // Session persistence

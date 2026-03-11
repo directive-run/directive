@@ -24,7 +24,7 @@ Vue composables API reference. All composables take an explicit `system` paramet
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
-| `useHistory` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Composable | Reactive history state (canGoBack, canGoForward, goBack, goForward) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -574,12 +574,12 @@ function useHistory(system: System): ShallowRef<HistoryState | null>
 
 ```typescript
 interface HistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-  undo: () => void;
-  redo: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
   currentIndex: number;
   totalSnapshots: number;
+  goBack: (steps?: number) => void;
+  goForward: (steps?: number) => void;
 }
 ```
 
@@ -596,8 +596,8 @@ const tt = useHistory(system);
 
 <template>
   <div v-if="tt">
-    <button :disabled="!tt.canUndo" @click="tt.undo()">Undo</button>
-    <button :disabled="!tt.canRedo" @click="tt.redo()">Redo</button>
+    <button :disabled="!tt.canGoBack" @click="tt.goBack()">Undo</button>
+    <button :disabled="!tt.canGoForward" @click="tt.goForward()">Redo</button>
     <span>{{ tt.currentIndex + 1 }} / {{ tt.totalSnapshots }}</span>
   </div>
 </template>

@@ -570,11 +570,11 @@ class UndoRedo extends LitElement {
       return html``;
     }
 
-    const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = history;
+    const { canGoBack, canGoForward, goBack, goForward, currentIndex, totalSnapshots } = history;
 
     return html`
-      <button @click=${undo} ?disabled=${!canUndo}>Undo</button>
-      <button @click=${redo} ?disabled=${!canRedo}>Redo</button>
+      <button @click=${() => goBack()} ?disabled=${!canGoBack}>Undo</button>
+      <button @click=${() => goForward()} ?disabled=${!canGoForward}>Redo</button>
       <span>${currentIndex + 1} / ${totalSnapshots}</span>
     `;
   }
@@ -695,13 +695,13 @@ import { useHistory } from '@directive-run/lit';
 const history = useHistory(system);
 
 if (history) {
-  const { undo, redo, goTo, goBack, goForward, replay } = history;
+  const { goTo, goBack, goForward, replay } = history;
   const { exportSession, importSession } = history;
   const { beginChangeset, endChangeset } = history;
   const { isPaused, pause, resume } = history;
 
   // Navigate
-  undo();
+  goBack();
   goBack(3);
   goTo(0);
 

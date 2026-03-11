@@ -627,7 +627,7 @@ test('displays user name', async () => {
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
-| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive history state (canGoBack, canGoForward, goBack, goForward) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -648,12 +648,12 @@ function UndoRedo() {
     return null;
   }
 
-  const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = history;
+  const { canGoBack, canGoForward, goBack, goForward, currentIndex, totalSnapshots } = history;
 
   return (
     <div>
-      <button onClick={undo} disabled={!canUndo}>Undo</button>
-      <button onClick={redo} disabled={!canRedo}>Redo</button>
+      <button onClick={() => goBack()} disabled={!canGoBack}>Undo</button>
+      <button onClick={() => goForward()} disabled={!canGoForward}>Redo</button>
       <span>{currentIndex + 1} / {totalSnapshots}</span>
     </div>
   );

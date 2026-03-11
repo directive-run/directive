@@ -534,12 +534,12 @@ function UndoRedo() {
   return (
     <Show when={history()}>
       {(state) => {
-        const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = state();
+        const { canGoBack, canGoForward, goBack, goForward, currentIndex, totalSnapshots } = state();
 
         return (
           <div>
-            <button onClick={undo} disabled={!canUndo}>Undo</button>
-            <button onClick={redo} disabled={!canRedo}>Redo</button>
+            <button onClick={() => goBack()} disabled={!canGoBack}>Undo</button>
+            <button onClick={() => goForward()} disabled={!canGoForward}>Redo</button>
             <span>{currentIndex + 1} / {totalSnapshots}</span>
           </div>
         );
@@ -784,7 +784,7 @@ test('displays user name', async () => {
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createDerivedSignal` | Factory | Create a derivation signal outside components |
 | `createFactSignal` | Factory | Create a fact signal outside components |
-| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive history state (canGoBack, canGoForward, goBack, goForward) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
