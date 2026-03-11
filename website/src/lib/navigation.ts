@@ -79,7 +79,8 @@ export const docsNavigation: NavigationSection[] = [
       { title: "Persistence", href: "/docs/plugins/persistence" },
       { title: "Performance", href: "/docs/plugins/performance" },
       { title: "Circuit Breaker", href: "/docs/plugins/circuit-breaker" },
-      { title: "Observability", href: "/docs/plugins/observability" },
+      // Observability — lab (re-evaluating vs OTel)
+      // { title: "Observability", href: "/docs/plugins/observability" },
       { title: "Custom Plugins", href: "/docs/plugins/custom" },
     ],
   },
@@ -199,6 +200,7 @@ export const aiNavigation: NavigationSection[] = [
       { title: "Pattern Checkpoints", href: "/ai/checkpoints" },
       { title: "Breakpoints & Checkpoints", href: "/ai/breakpoints" },
       { title: "DevTools", href: "/ai/devtools" },
+      // Lab — pages exist as page.lab.md, not routable or indexed
       // { title: 'Evals', href: '/ai/evals' },
       // { title: 'OpenTelemetry', href: '/ai/otel' },
       // { title: 'Testing', href: '/ai/testing' },
