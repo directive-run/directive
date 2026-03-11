@@ -43,7 +43,7 @@ system.start();
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createDerivedSignal` | Factory | Create a derivation signal outside components |
 | `createFactSignal` | Factory | Create a fact signal outside components |
-| `useTimeTravel` | Hook | Reactive time-travel state |
+| `useHistory` | Hook | Reactive time-travel state |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -422,7 +422,7 @@ useDirective<M extends ModuleSchema>(moduleDef: ModuleDef<M>, config?: {
   facts?: string[];
   derived?: string[];
   plugins?: Plugin[];
-  debug?: DebugConfig;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
@@ -534,18 +534,18 @@ const [count, unsub] = createFactSignal<number>(system, 'count');
 
 ---
 
-## useTimeTravel
+## useHistory
 
 Reactive time-travel state. Returns an Accessor that updates when snapshots are taken or navigation occurs. Returns `null` when time-travel is disabled. Takes `system` as the first parameter.
 
 ```typescript
-useTimeTravel(system: System): Accessor<TimeTravelState | null>
+useHistory(system: System): Accessor<HistoryState | null>
 ```
 
-### TimeTravelState
+### HistoryState
 
 ```typescript
-interface TimeTravelState {
+interface HistoryState {
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -556,11 +556,11 @@ interface TimeTravelState {
 ```
 
 ```tsx
-import { useTimeTravel } from '@directive-run/solid';
+import { useHistory } from '@directive-run/solid';
 
 function UndoControls() {
   // Get reactive time-travel controls (null when disabled)
-  const tt = useTimeTravel(system);
+  const tt = useHistory(system);
 
   return (
     <Show when={tt()}>

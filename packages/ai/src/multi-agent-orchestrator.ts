@@ -1685,14 +1685,14 @@ export function createMultiAgentOrchestrator(
     timeline = createDebugTimeline({
       getSnapshotId: () => {
         try {
-          return (system as any).debug?.currentIndex ?? null;
+          return (system as any).history?.currentIndex ?? null;
         } catch {
           return null;
         }
       },
       goToSnapshot: (snapshotId: number) => {
         try {
-          (system as any).debug?.goTo?.(snapshotId);
+          (system as any).history?.goTo?.(snapshotId);
         } catch {
           // System may not support goTo
         }
@@ -1933,7 +1933,7 @@ export function createMultiAgentOrchestrator(
     // Create timeline plugin after system is available (uses lazy getSnapshotId)
     timelinePlugin = createDebugTimelinePlugin(timeline, () => {
       try {
-        return (system as any).debug?.currentIndex ?? null;
+        return (system as any).history?.currentIndex ?? null;
       } catch {
         return null;
       }
@@ -1944,7 +1944,7 @@ export function createMultiAgentOrchestrator(
   const system = createSystem({
     modules: modulesMap,
     plugins: allPlugins,
-    debug: debug ? { timeTravel: true } : undefined,
+    history: debug ? true : undefined,
   } as any);
 
   system.start();
@@ -7828,9 +7828,9 @@ export function createMultiAgentOrchestrator(
           );
         }
       }
-      if (!(system as any).debug?.export) {
+      if (!(system as any).history?.export) {
         throw new Error(
-          "[Directive MultiAgent] Checkpointing requires debug mode. Set `debug: true` in orchestrator options.",
+          "[Directive MultiAgent] Checkpointing requires history. Set `debug: true` in orchestrator options.",
         );
       }
 
@@ -7839,7 +7839,7 @@ export function createMultiAgentOrchestrator(
         id: createCheckpointId(),
         createdAt: new Date().toISOString(),
         label: opts?.label,
-        systemExport: (system as any).debug.export(),
+        systemExport: (system as any).history.export(),
         timelineExport: timeline?.export() ?? null,
         localState: {
           type: "multi",
@@ -7894,12 +7894,12 @@ export function createMultiAgentOrchestrator(
       }
 
       // Restore system state
-      if (!(system as any).debug?.import) {
+      if (!(system as any).history?.import) {
         throw new Error(
-          "[Directive MultiAgent] Restoring a checkpoint requires debug mode. Set `debug: true` in orchestrator options.",
+          "[Directive MultiAgent] Restoring a checkpoint requires history. Set `debug: true` in orchestrator options.",
         );
       }
-      (system as any).debug.import(cp.systemExport);
+      (system as any).history.import(cp.systemExport);
 
       // Restore timeline
       if (opts?.restoreTimeline !== false && cp.timelineExport && timeline) {

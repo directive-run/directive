@@ -98,7 +98,7 @@ export const SYSTEM_EVENT_COLORS: Record<string, string> = {
   "requirement.created": "bg-orange-400",
   "requirement.met": "bg-orange-500",
   "requirement.canceled": "bg-orange-300",
-  "run.complete": "bg-emerald-400",
+  "trace.complete": "bg-emerald-400",
   "timetravel.snapshot": "bg-violet-400",
   "timetravel.jump": "bg-violet-500",
 };
@@ -130,7 +130,7 @@ export const SYSTEM_EVENT_LABELS: Record<string, string> = {
   "requirement.created": "Req Created",
   "requirement.met": "Req Met",
   "requirement.canceled": "Req Canceled",
-  "run.complete": "Run Complete",
+  "trace.complete": "Trace Complete",
   "timetravel.snapshot": "TT Snapshot",
   "timetravel.jump": "TT Jump",
 };
@@ -162,7 +162,7 @@ export const TRACE_EVENT_CATEGORIES: Record<string, string> = {
   destroy: "System",
   error: "System",
   "error.recovery": "System",
-  "run.complete": "System",
+  "trace.complete": "System",
   "timetravel.snapshot": "System",
   "timetravel.jump": "System",
 };

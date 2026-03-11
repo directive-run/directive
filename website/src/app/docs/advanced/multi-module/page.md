@@ -292,5 +292,5 @@ function App() {
 ## Next Steps
 
 - [Module and System](/docs/module-system) – Basics
-- [Time-Travel & Snapshots](/docs/advanced/time-travel) – Debugging
+- [Time-Travel & Snapshots](/docs/advanced/history) – Debugging
 - [Error Handling](/docs/advanced/errors) – Recovery strategies

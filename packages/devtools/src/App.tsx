@@ -8,7 +8,7 @@ import { TimelineView } from "./views/TimelineView";
 
 import { ReplayControls } from "./components/ReplayControls";
 import { SessionPanel } from "./components/SessionPanel";
-import { TimeTravelEditor } from "./components/TimeTravelEditor";
+import { HistoryEditor } from "./components/HistoryEditor";
 import type { TimeFormat } from "./lib/time-format";
 import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
 import { BreakpointView } from "./views/BreakpointView";
@@ -480,7 +480,7 @@ export function App() {
             {/* I2: Time-travel editor panel */}
             {editingSnapshot ? (
               <div className="w-full">
-                <TimeTravelEditor
+                <HistoryEditor
                   snapshot={editingSnapshot}
                   onFork={handleForkFromEditor}
                   onClose={handleCloseEditor}

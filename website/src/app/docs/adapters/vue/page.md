@@ -474,23 +474,23 @@ events.increment();                    // Also typed!
 
 ## Time-Travel Debugging
 
-`useTimeTravel` returns a `ShallowRef<TimeTravelState | null>` – `null` when disabled, otherwise the full reactive API. The ref auto-unwraps in templates, so you can access properties directly:
+`useHistory` returns a `ShallowRef<HistoryState | null>` – `null` when disabled, otherwise the full reactive API. The ref auto-unwraps in templates, so you can access properties directly:
 
 ### Undo / Redo Controls
 
 ```html
 <script setup>
-import { useTimeTravel } from '@directive-run/vue';
+import { useHistory } from '@directive-run/vue';
 import { system } from './system';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 </script>
 
 <template>
-  <div v-if="timeTravel">
-    <button @click="timeTravel.undo" :disabled="!timeTravel.canUndo">Undo</button>
-    <button @click="timeTravel.redo" :disabled="!timeTravel.canRedo">Redo</button>
-    <span>{{ timeTravel.currentIndex + 1 }} / {{ timeTravel.totalSnapshots }}</span>
+  <div v-if="history">
+    <button @click="history.undo" :disabled="!history.canUndo">Undo</button>
+    <button @click="history.redo" :disabled="!history.canRedo">Redo</button>
+    <span>{{ history.currentIndex + 1 }} / {{ history.totalSnapshots }}</span>
   </div>
 </template>
 ```
@@ -501,12 +501,12 @@ const timeTravel = useTimeTravel(system);
 
 ```html
 <template>
-  <ul v-if="timeTravel">
-    <li v-for="snap in timeTravel.snapshots" :key="snap.id">
-      <button @click="timeTravel.goTo(snap.id)">
+  <ul v-if="history">
+    <li v-for="snap in history.snapshots" :key="snap.id">
+      <button @click="history.goTo(snap.id)">
         {{ snap.trigger }} – {{ new Date(snap.timestamp).toLocaleTimeString() }}
       </button>
-      <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
+      <button @click="console.log(history.getSnapshotFacts(snap.id))">
         Inspect
       </button>
     </li>
@@ -518,11 +518,11 @@ const timeTravel = useTimeTravel(system);
 
 ```html
 <template>
-  <div v-if="timeTravel">
-    <button @click="timeTravel.goBack(5)">Back 5</button>
-    <button @click="timeTravel.goForward(5)">Forward 5</button>
-    <button @click="timeTravel.goTo(0)">Jump to Start</button>
-    <button @click="timeTravel.replay()">Replay All</button>
+  <div v-if="history">
+    <button @click="history.goBack(5)">Back 5</button>
+    <button @click="history.goForward(5)">Forward 5</button>
+    <button @click="history.goTo(0)">Jump to Start</button>
+    <button @click="history.replay()">Replay All</button>
   </div>
 </template>
 ```
@@ -531,27 +531,27 @@ const timeTravel = useTimeTravel(system);
 
 ```html
 <script setup>
-import { useTimeTravel } from '@directive-run/vue';
+import { useHistory } from '@directive-run/vue';
 import { system } from './system';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 
 function saveSession() {
-  if (timeTravel.value) {
-    localStorage.setItem('debug', timeTravel.value.exportSession());
+  if (history.value) {
+    localStorage.setItem('debug', history.value.exportSession());
   }
 }
 
 function restoreSession() {
   const saved = localStorage.getItem('debug');
-  if (saved && timeTravel.value) {
-    timeTravel.value.importSession(saved);
+  if (saved && history.value) {
+    history.value.importSession(saved);
   }
 }
 </script>
 
 <template>
-  <div v-if="timeTravel">
+  <div v-if="history">
     <button @click="saveSession">Save Session</button>
     <button @click="restoreSession">Restore Session</button>
   </div>
@@ -564,15 +564,15 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```html
 <script setup>
-import { useTimeTravel } from '@directive-run/vue';
+import { useHistory } from '@directive-run/vue';
 import { system } from './system';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 
 function handleComplexAction() {
-  timeTravel.value?.beginChangeset('Move piece A→B');
+  history.value?.beginChangeset('Move piece A→B');
   // ... multiple fact mutations ...
-  timeTravel.value?.endChangeset();
+  history.value?.endChangeset();
   // Now undo/redo treats all mutations as one step
 }
 </script>
@@ -586,13 +586,13 @@ function handleComplexAction() {
 
 ```html
 <template>
-  <button v-if="timeTravel" @click="timeTravel.isPaused ? timeTravel.resume() : timeTravel.pause()">
-    {{ timeTravel.isPaused ? 'Resume' : 'Pause' }} Recording
+  <button v-if="history" @click="history.isPaused ? history.resume() : history.pause()">
+    {{ history.isPaused ? 'Resume' : 'Pause' }} Recording
   </button>
 </template>
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/history) for the full `HistoryState` interface and keyboard shortcuts.
 
 ---
 
@@ -719,7 +719,7 @@ const coords = useSelector(system, (state) => ({ x: state.position?.x, y: state.
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
-| `useTimeTravel` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---

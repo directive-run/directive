@@ -1,6 +1,6 @@
 ---
-title: Time-Travel & Snapshots
-description: Debug your application with time-travel state navigation, and capture, restore, and diff system snapshots.
+title: History & Snapshots
+description: Debug your application with history state navigation, and capture, restore, and diff system snapshots.
 ---
 
 Navigate through state history for debugging, and save or restore complete system state with snapshots. {% .lead %}
@@ -14,27 +14,26 @@ Navigate through state history for debugging, and save or restore complete syste
 
 ---
 
-## Enable Time-Travel
+## Enable History
 
 ```typescript
 const system = createSystem({
   module: myModule,
 
-  // Enable time-travel and cap history at 100 snapshots
-  debug: {
-    timeTravel: true,
+  // Enable history and cap at 100 snapshots
+  history: {
     maxSnapshots: 100,
   },
 });
 ```
 
-When enabled, `system.debug` exposes the time-travel API. When disabled, `system.debug` is `null`.
+When enabled, `system.history` exposes the history API. When disabled, `system.history` is `null`.
 
 ---
 
 ## Filtering Snapshot Events
 
-By default, **every** event that changes facts creates a time-travel snapshot. In interactive apps this means UI-only events (cell selection, timer ticks) pollute the undo history, making Ctrl+Z useless.
+By default, **every** event that changes facts creates a history snapshot. In interactive apps this means UI-only events (cell selection, timer ticks) pollute the undo history, making Ctrl+Z useless.
 
 Add `snapshotEvents` to your module to declare which events create snapshots:
 
@@ -63,7 +62,7 @@ const game = createModule("game", {
 - **Provided** &ndash; only listed events create snapshots; unlisted events silently skip.
 - **Direct fact mutations** (`system.facts.x = 5`) always create snapshots regardless of filtering.
 - **Resolver and effect** fact changes always create snapshots.
-- **Multi-module** &ndash; each module controls its own events. A module without `snapshotEvents` still snapshots all of its events, even if another module in the system uses filtering. Use `debug.snapshotModules` to filter at the system level instead.
+- **Multi-module** &ndash; each module controls its own events. A module without `snapshotEvents` still snapshots all of its events, even if another module in the system uses filtering. Use `history.snapshotModules` to filter at the system level instead.
 
 ### Module-Level Filtering
 
@@ -75,8 +74,8 @@ const system = createSystem({
     ui: uiModule,       // UI-only state (selection, hover, etc.)
     game: gameModule,    // Core game logic (moves, scores)
   },
-  debug: {
-    timeTravel: true,
+  history: {
+    maxSnapshots: 100,
     snapshotModules: ["game"],  // Only game events create snapshots
   },
 });
@@ -94,7 +93,7 @@ const system = createSystem({
 | Scenario | Use |
 |----------|-----|
 | Filter specific events within a module | `snapshotEvents` on `createModule()` |
-| Exclude entire modules from snapshots | `debug.snapshotModules` on `createSystem()` |
+| Exclude entire modules from snapshots | `history.snapshotModules` on `createSystem()` |
 | Both | They intersect &ndash; the module must be in `snapshotModules` AND the event must be in `snapshotEvents` |
 
 ### Type Safety
@@ -111,25 +110,25 @@ snapshotEvents: ["inputNumber", "typoEvent"],
 ## Basic Navigation
 
 ```typescript
-// system.debug is null when time-travel is disabled
-const timeTravel = system.debug; // TimeTravelAPI | null
+// system.history is null when history is disabled
+const history = system.history; // HistoryAPI | null
 
-if (timeTravel) {
+if (history) {
   // Inspect the current snapshot history
-  console.log(`${timeTravel.snapshots.length} snapshots`);
-  console.log(`Currently at index ${timeTravel.currentIndex}`);
+  console.log(`${history.snapshots.length} snapshots`);
+  console.log(`Currently at index ${history.currentIndex}`);
 
   // Step backward through history (one step by default)
-  timeTravel.goBack();
+  history.goBack();
 
   // Jump back multiple steps at once
-  timeTravel.goBack(3);
+  history.goBack(3);
 
   // Step forward (redo)
-  timeTravel.goForward();
+  history.goForward();
 
   // Jump directly to a specific snapshot by its index
-  timeTravel.goTo(5);
+  history.goTo(5);
 }
 ```
 
@@ -157,17 +156,17 @@ The `trigger` string describes what caused the snapshot (e.g., a fact change or 
 Save and restore an entire debugging session:
 
 ```typescript
-const timeTravel = system.debug;
+const history = system.history;
 
-if (timeTravel) {
+if (history) {
   // Serialize the entire snapshot history to a JSON string
-  const exported = timeTravel.export();
+  const exported = history.export();
   localStorage.setItem('debug-session', exported);
 
   // Restore a previously saved session (e.g., after a page refresh)
   const saved = localStorage.getItem('debug-session');
   if (saved) {
-    timeTravel.import(saved);
+    history.import(saved);
   }
 }
 ```
@@ -179,12 +178,12 @@ if (timeTravel) {
 Replay from the current snapshot forward:
 
 ```typescript
-const timeTravel = system.debug;
+const history = system.history;
 
-if (timeTravel) {
+if (history) {
   // Rewind to snapshot 5, then replay all subsequent snapshots forward
-  timeTravel.goTo(5);
-  timeTravel.replay();
+  history.goTo(5);
+  history.replay();
 }
 ```
 
@@ -197,24 +196,24 @@ A single user action often produces multiple snapshots (e.g., moving a piece cha
 Use `beginChangeset` / `endChangeset` to group snapshots into a single undo/redo unit:
 
 ```typescript
-const timeTravel = system.debug;
+const history = system.history;
 
-if (timeTravel) {
+if (history) {
   // Group multiple snapshots into one logical "undo" unit
-  timeTravel.beginChangeset("Move piece from A to B");
+  history.beginChangeset("Move piece from A to B");
   // ... multiple fact mutations happen here ...
-  timeTravel.endChangeset();
+  history.endChangeset();
 
   // Undo reverts the entire changeset, not individual snapshots
-  timeTravel.goBack();
+  history.goBack();
 }
 ```
 
 ---
 
-## Reactive `useTimeTravel` Hook
+## Reactive `useHistory` Hook
 
-Each framework adapter provides a reactive `useTimeTravel` that re-renders when snapshot state changes. Returns `null` when time-travel is disabled, otherwise a `TimeTravelState` object:
+Each framework adapter provides a reactive `useHistory` that re-renders when snapshot state changes. Returns `null` when history is disabled, otherwise a `HistoryState` object:
 
 ```typescript
 interface SnapshotMeta {
@@ -223,7 +222,7 @@ interface SnapshotMeta {
   trigger: string;           // What caused this snapshot (e.g., "fact:count")
 }
 
-interface TimeTravelState {
+interface HistoryState {
   // Undo / Redo
   canUndo: boolean;          // True when there are earlier snapshots
   canRedo: boolean;          // True when there are later snapshots
@@ -260,12 +259,12 @@ interface TimeTravelState {
 ### React
 
 ```tsx
-import { useTimeTravel } from '@directive-run/react';
+import { useHistory } from '@directive-run/react';
 
-function TimeTravelToolbar() {
-  const timeTravel = useTimeTravel(system);
+function HistoryToolbar() {
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
@@ -276,7 +275,7 @@ function TimeTravelToolbar() {
     exportSession, importSession,
     beginChangeset, endChangeset,
     isPaused, pause, resume,
-  } = timeTravel;
+  } = history;
 
   return (
     <div>
@@ -328,40 +327,40 @@ function TimeTravelToolbar() {
 
 ```html
 <script setup>
-import { useTimeTravel } from '@directive-run/vue';
+import { useHistory } from '@directive-run/vue';
 import { system } from './system';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 
 function saveSession() {
-  if (timeTravel.value) localStorage.setItem('debug', timeTravel.value.exportSession());
+  if (history.value) localStorage.setItem('debug', history.value.exportSession());
 }
 
 function restoreSession() {
   const saved = localStorage.getItem('debug');
-  if (saved && timeTravel.value) timeTravel.value.importSession(saved);
+  if (saved && history.value) history.value.importSession(saved);
 }
 </script>
 
 <template>
-  <div v-if="timeTravel">
+  <div v-if="history">
     <!-- Undo / Redo -->
-    <button @click="timeTravel.undo" :disabled="!timeTravel.canUndo">Undo</button>
-    <button @click="timeTravel.redo" :disabled="!timeTravel.canRedo">Redo</button>
-    <span>{{ timeTravel.currentIndex + 1 }} / {{ timeTravel.totalSnapshots }}</span>
+    <button @click="history.undo" :disabled="!history.canUndo">Undo</button>
+    <button @click="history.redo" :disabled="!history.canRedo">Redo</button>
+    <span>{{ history.currentIndex + 1 }} / {{ history.totalSnapshots }}</span>
 
     <!-- Navigation -->
-    <button @click="timeTravel.goBack(5)">Back 5</button>
-    <button @click="timeTravel.goForward(5)">Forward 5</button>
-    <button @click="timeTravel.replay()">Replay All</button>
+    <button @click="history.goBack(5)">Back 5</button>
+    <button @click="history.goForward(5)">Forward 5</button>
+    <button @click="history.replay()">Replay All</button>
 
     <!-- Snapshot timeline (metadata only – no facts, keeps re-renders cheap) -->
     <ul>
-      <li v-for="snap in timeTravel.snapshots" :key="snap.id">
-        <button @click="timeTravel.goTo(snap.id)">
+      <li v-for="snap in history.snapshots" :key="snap.id">
+        <button @click="history.goTo(snap.id)">
           {{ snap.trigger }} – {{ new Date(snap.timestamp).toLocaleTimeString() }}
         </button>
-        <button @click="console.log(timeTravel.getSnapshotFacts(snap.id))">
+        <button @click="console.log(history.getSnapshotFacts(snap.id))">
           Inspect
         </button>
       </li>
@@ -372,8 +371,8 @@ function restoreSession() {
     <button @click="restoreSession">Restore Session</button>
 
     <!-- Recording control -->
-    <button @click="timeTravel.isPaused ? timeTravel.resume() : timeTravel.pause()">
-      {{ timeTravel.isPaused ? 'Resume' : 'Pause' }} Recording
+    <button @click="history.isPaused ? history.resume() : history.pause()">
+      {{ history.isPaused ? 'Resume' : 'Pause' }} Recording
     </button>
   </div>
 </template>
@@ -383,27 +382,27 @@ function restoreSession() {
 
 ```html
 <script>
-import { useTimeTravel } from '@directive-run/svelte';
+import { useHistory } from '@directive-run/svelte';
 import { system } from '$lib/directive';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 
 function saveSession() {
-  if ($timeTravel) localStorage.setItem('debug', $timeTravel.exportSession());
+  if ($history) localStorage.setItem('debug', $history.exportSession());
 }
 
 function restoreSession() {
   const saved = localStorage.getItem('debug');
-  if (saved && $timeTravel) $timeTravel.importSession(saved);
+  if (saved && $history) $history.importSession(saved);
 }
 </script>
 
-{#if $timeTravel}
+{#if $history}
   {@const {
     canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
     snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
     isPaused, pause, resume,
-  } = $timeTravel}
+  } = $history}
 
   <!-- Undo / Redo -->
   <button on:click={undo} disabled={!canUndo}>Undo</button>
@@ -443,14 +442,14 @@ function restoreSession() {
 ### Solid
 
 ```tsx
-import { useTimeTravel } from '@directive-run/solid';
+import { useHistory } from '@directive-run/solid';
 import { Show, For } from 'solid-js';
 
-function TimeTravelToolbar() {
-  const timeTravel = useTimeTravel(system);
+function HistoryToolbar() {
+  const history = useHistory(system);
 
   return (
-    <Show when={timeTravel()}>
+    <Show when={history()}>
       {(state) => {
         const {
           canUndo, canRedo, undo, redo, currentIndex, totalSnapshots,
@@ -513,15 +512,15 @@ function TimeTravelToolbar() {
 ### Lit
 
 ```typescript
-import { TimeTravelController } from '@directive-run/lit';
+import { HistoryController } from '@directive-run/lit';
 
-class TimeTravelToolbar extends LitElement {
-  private _timeTravel = new TimeTravelController(this, system);
+class HistoryToolbar extends LitElement {
+  private _history = new HistoryController(this, system);
 
   render() {
-    const timeTravel = this._timeTravel.value;
+    const history = this._history.value;
 
-    if (!timeTravel) {
+    if (!history) {
       return html``;
     }
 
@@ -530,7 +529,7 @@ class TimeTravelToolbar extends LitElement {
       snapshots, getSnapshotFacts, goTo, goBack, goForward, replay,
       exportSession, importSession,
       isPaused, pause, resume,
-    } = timeTravel;
+    } = history;
 
     return html`
       <!-- Undo / Redo -->
@@ -581,7 +580,7 @@ class TimeTravelToolbar extends LitElement {
 
 ## Keyboard Shortcuts
 
-Common keyboard shortcuts for time-travel:
+Common keyboard shortcuts for history:
 
 ```typescript
 // Wire up standard undo/redo keyboard shortcuts
@@ -590,9 +589,9 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
 
     if (e.shiftKey) {
-      system.debug?.goForward();  // Cmd+Shift+Z = Redo
+      system.history?.goForward();  // Cmd+Shift+Z = Redo
     } else {
-      system.debug?.goBack();     // Cmd+Z = Undo
+      system.history?.goBack();     // Cmd+Z = Undo
     }
   }
 });

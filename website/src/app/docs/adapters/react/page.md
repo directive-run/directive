@@ -166,7 +166,7 @@ With initial facts and plugins:
 const system = useDirectiveRef(myModule, {
   initialFacts: { count: 10 },
   plugins: [loggingPlugin()],
-  debug: { timeTravel: true },
+  history: true,
 });
 ```
 
@@ -214,7 +214,7 @@ System config (`plugins`, `initialFacts`, `debug`, etc.) goes in the same option
 const { facts, derived, events, dispatch } = useDirective(counterModule, {
   initialFacts: { count: 10 },
   plugins: [loggingPlugin()],
-  debug: { timeTravel: true },
+  history: true,
   status: true, // adds statusPlugin to return value
 });
 ```
@@ -627,28 +627,28 @@ test('displays user name', async () => {
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
-| `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
 
 ## Time-Travel Debugging
 
-`useTimeTravel` returns `null` when disabled, otherwise a reactive `TimeTravelState` with the full API. Destructure to pull out exactly what you need:
+`useHistory` returns `null` when disabled, otherwise a reactive `HistoryState` with the full API. Destructure to pull out exactly what you need:
 
 ### Undo / Redo Controls
 
 ```tsx
-import { useTimeTravel } from '@directive-run/react';
+import { useHistory } from '@directive-run/react';
 
 function UndoRedo() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
-  const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = timeTravel;
+  const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = history;
 
   return (
     <div>
@@ -666,13 +666,13 @@ function UndoRedo() {
 
 ```tsx
 function SnapshotTimeline() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
-  const { snapshots, goTo, getSnapshotFacts } = timeTravel;
+  const { snapshots, goTo, getSnapshotFacts } = history;
 
   return (
     <ul>
@@ -695,13 +695,13 @@ function SnapshotTimeline() {
 
 ```tsx
 function NavigationControls() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
-  const { goBack, goForward, goTo, replay } = timeTravel;
+  const { goBack, goForward, goTo, replay } = history;
 
   return (
     <div>
@@ -718,13 +718,13 @@ function NavigationControls() {
 
 ```tsx
 function SessionControls() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
-  const { exportSession, importSession } = timeTravel;
+  const { exportSession, importSession } = history;
 
   return (
     <div>
@@ -748,12 +748,12 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```tsx
 function BatchedAction() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
   function handleComplexAction() {
-    timeTravel?.beginChangeset('Move piece A→B');
+    history?.beginChangeset('Move piece A→B');
     // ... multiple fact mutations ...
-    timeTravel?.endChangeset();
+    history?.endChangeset();
     // Now undo/redo treats all mutations as one step
   }
 
@@ -765,13 +765,13 @@ function BatchedAction() {
 
 ```tsx
 function RecordingToggle() {
-  const timeTravel = useTimeTravel(system);
+  const history = useHistory(system);
 
-  if (!timeTravel) {
+  if (!history) {
     return null;
   }
 
-  const { isPaused, pause, resume } = timeTravel;
+  const { isPaused, pause, resume } = history;
 
   return (
     <button onClick={isPaused ? resume : pause}>
@@ -781,7 +781,7 @@ function RecordingToggle() {
 }
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/history) for the full `HistoryState` interface and keyboard shortcuts.
 
 ---
 

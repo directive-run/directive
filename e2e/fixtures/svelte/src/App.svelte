@@ -35,10 +35,10 @@ onMount(() => {
   <UseOptimisticUpdatePage />
 {:else if route === "useRequirementStatus"}
   <UseRequirementStatusPage />
-{:else if route === "useTimeTravel"}
-  <UseTimeTravelPage />
+{:else if route === "useHistory"}
+  <UseHistoryPage />
 {:else if route === "useDirective"}
   <UseDirectivePage />
 {:else}
-  <div>Select a route: useFact, useDerived, useSelector, useDispatch, useWatch, useInspect, useEvents, useExplain, useConstraintStatus, useOptimisticUpdate, useRequirementStatus, useTimeTravel, useDirective</div>
+  <div>Select a route: useFact, useDerived, useSelector, useDispatch, useWatch, useInspect, useEvents, useExplain, useConstraintStatus, useOptimisticUpdate, useRequirementStatus, useHistory, useDirective</div>
 {/if}

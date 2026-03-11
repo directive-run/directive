@@ -116,7 +116,7 @@ Initialize the system by telling the worker which registered modules to use, the
 // Initialize the system with registered modules and options
 await client.init({
   moduleNames: ['analytics', 'pricing'],
-  debug: { timeTravel: true, maxSnapshots: 50 },
+  history: true,
 });
 
 // Start the system (triggers init, constraints, resolvers)

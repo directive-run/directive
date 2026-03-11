@@ -327,7 +327,7 @@ class AppElement extends LitElement {
   // Create a scoped system with plugins, time-travel, and status tracking
   private mod = new ModuleController(this, myModule, {
     plugins: [loggingPlugin()],
-    debug: { timeTravel: true },
+    history: true,
     status: true,
     initialFacts: { count: 10 },
   });
@@ -485,7 +485,7 @@ class CounterApp extends LitElement {
   // Create a scoped system with the module factory
   private mod = createModule(this, counterModule, {
     status: true,
-    debug: { timeTravel: true },
+    history: true,
   });
 
   render() {
@@ -551,26 +551,26 @@ class UserIds extends LitElement {
 }
 ```
 
-### TimeTravelController
+### HistoryController
 
-Reactive controller – returns `null` when disabled, otherwise the full `TimeTravelState`. Destructure in `render()` to pull out what you need:
+Reactive controller – returns `null` when disabled, otherwise the full `HistoryState`. Destructure in `render()` to pull out what you need:
 
 #### Undo / Redo Controls
 
 ```typescript
-import { TimeTravelController } from '@directive-run/lit';
+import { HistoryController } from '@directive-run/lit';
 
 class UndoRedo extends LitElement {
-  private _timeTravel = new TimeTravelController(this, system);
+  private _history = new HistoryController(this, system);
 
   render() {
-    const timeTravel = this._timeTravel.value;
+    const history = this._history.value;
 
-    if (!timeTravel) {
+    if (!history) {
       return html``;
     }
 
-    const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = timeTravel;
+    const { canUndo, canRedo, undo, redo, currentIndex, totalSnapshots } = history;
 
     return html`
       <button @click=${undo} ?disabled=${!canUndo}>Undo</button>
@@ -587,16 +587,16 @@ class UndoRedo extends LitElement {
 
 ```typescript
 class SnapshotTimeline extends LitElement {
-  private _timeTravel = new TimeTravelController(this, system);
+  private _history = new HistoryController(this, system);
 
   render() {
-    const timeTravel = this._timeTravel.value;
+    const history = this._history.value;
 
-    if (!timeTravel) {
+    if (!history) {
       return html``;
     }
 
-    const { snapshots, goTo, getSnapshotFacts } = timeTravel;
+    const { snapshots, goTo, getSnapshotFacts } = history;
 
     return html`
       <ul>
@@ -619,13 +619,13 @@ class SnapshotTimeline extends LitElement {
 #### Navigation, Session Persistence & Recording
 
 ```typescript
-class TimeTravelControls extends LitElement {
-  private _timeTravel = new TimeTravelController(this, system);
+class HistoryControls extends LitElement {
+  private _history = new HistoryController(this, system);
 
   render() {
-    const timeTravel = this._timeTravel.value;
+    const history = this._history.value;
 
-    if (!timeTravel) {
+    if (!history) {
       return html``;
     }
 
@@ -633,7 +633,7 @@ class TimeTravelControls extends LitElement {
       goBack, goForward, goTo, replay,
       exportSession, importSession,
       isPaused, pause, resume,
-    } = timeTravel;
+    } = history;
 
     return html`
       <!-- Navigation -->
@@ -670,12 +670,12 @@ Group multiple fact mutations into a single undo/redo unit:
 
 ```typescript
 class BatchedAction extends LitElement {
-  private _timeTravel = new TimeTravelController(this, system);
+  private _history = new HistoryController(this, system);
 
   private _handleComplexAction() {
-    this._timeTravel.value?.beginChangeset('Move piece A→B');
+    this._history.value?.beginChangeset('Move piece A→B');
     // ... multiple fact mutations ...
-    this._timeTravel.value?.endChangeset();
+    this._history.value?.endChangeset();
     // Now undo/redo treats all mutations as one step
   }
 
@@ -685,20 +685,20 @@ class BatchedAction extends LitElement {
 }
 ```
 
-### useTimeTravel
+### useHistory
 
 Non-reactive shorthand (useful outside Lit elements for imperative code):
 
 ```typescript
-import { useTimeTravel } from '@directive-run/lit';
+import { useHistory } from '@directive-run/lit';
 
-const timeTravel = useTimeTravel(system);
+const history = useHistory(system);
 
-if (timeTravel) {
-  const { undo, redo, goTo, goBack, goForward, replay } = timeTravel;
-  const { exportSession, importSession } = timeTravel;
-  const { beginChangeset, endChangeset } = timeTravel;
-  const { isPaused, pause, resume } = timeTravel;
+if (history) {
+  const { undo, redo, goTo, goBack, goForward, replay } = history;
+  const { exportSession, importSession } = history;
+  const { beginChangeset, endChangeset } = history;
+  const { isPaused, pause, resume } = history;
 
   // Navigate
   undo();
@@ -718,7 +718,7 @@ if (timeTravel) {
 }
 ```
 
-See [Time-Travel](/docs/advanced/time-travel) for the full `TimeTravelState` interface and keyboard shortcuts.
+See [Time-Travel](/docs/advanced/history) for the full `HistoryState` interface and keyboard shortcuts.
 
 ### getDerived / getFact
 
@@ -779,7 +779,7 @@ class AppElement extends LitElement {
   private directive = new SystemController(this, {
     module: myModule,
     plugins: [loggingPlugin()],
-    debug: { timeTravel: true },
+    history: true,
   });
 }
 ```

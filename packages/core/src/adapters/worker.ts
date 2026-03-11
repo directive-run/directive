@@ -73,9 +73,8 @@ export type WorkerOutboundMessage =
 export interface WorkerSystemConfig {
   /** Module names to initialize (modules must be registered in worker) */
   moduleNames: string[];
-  /** Debug configuration */
-  debug?: {
-    timeTravel?: boolean;
+  /** History configuration for snapshot-based state history */
+  history?: boolean | {
     maxSnapshots?: number;
   };
 }
@@ -564,7 +563,7 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
   const system = createSystem({
     modules: modules as any,
     plugins: [trackingPlugin],
-    debug: config.debug,
+    history: config.history,
   });
 
   return {

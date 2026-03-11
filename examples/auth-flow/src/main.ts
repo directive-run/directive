@@ -17,7 +17,7 @@ import { authFlowModule, authFlowSchema } from "./auth-flow.js";
 
 const system = createSystem({
   module: authFlowModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "auth-flow" })],
 });
 system.start();

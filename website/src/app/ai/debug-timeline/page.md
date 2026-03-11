@@ -188,7 +188,7 @@ timeline.forkFrom(5);
 await orchestrator.run(agent, 'Try a different approach');
 ```
 
-This calls `system.debug.goTo(snapshotId)` under the hood, restoring the full system state.
+This calls `system.history.goTo(snapshotId)` under the hood, restoring the full system state.
 
 ---
 
@@ -231,7 +231,7 @@ timeline.record({
 });
 
 // Bridge core constraint/resolver events
-const plugin = createDebugTimelinePlugin(timeline, () => system.debug?.currentIndex ?? null);
+const plugin = createDebugTimelinePlugin(timeline, () => system.history?.currentIndex ?? null);
 ```
 
 ---

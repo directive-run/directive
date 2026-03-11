@@ -3,12 +3,12 @@
  *
  * Exports: useFact, useDerived, useDispatch, useSelector,
  * useWatch, useInspect, useRequirementStatus, useEvents, useExplain,
- * useConstraintStatus, useOptimisticUpdate, useDirective, useTimeTravel,
+ * useConstraintStatus, useOptimisticUpdate, useDirective, useHistory,
  * createTypedHooks, shallowEqual
  */
 
 import type {
-  DebugConfig,
+  TraceOption,
   ErrorBoundaryConfig,
   InferDerivations,
   InferEvents,
@@ -31,7 +31,7 @@ import {
   type ConstraintInfo,
   type InspectState,
   assertSystem,
-  buildTimeTravelState,
+  buildHistoryState,
   computeInspectState,
   createThrottle,
   defaultEquality,
@@ -595,29 +595,29 @@ export function useOptimisticUpdate(
 }
 
 // ============================================================================
-// useTimeTravel — reactive time-travel state
+// useHistory — reactive history state
 // ============================================================================
 
 /**
- * Reactive time-travel composable. Returns a ShallowRef that updates
+ * Reactive history composable. Returns a ShallowRef that updates
  * when snapshots are taken or navigation occurs.
  *
  * @example
  * ```vue
- * const tt = useTimeTravel(system);
+ * const tt = useHistory(system);
  * <button :disabled="!tt.value?.canUndo" @click="tt.value?.undo()">Undo</button>
  * ```
  */
-export function useTimeTravel(
+export function useHistory(
   // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
-): ShallowRef<ReturnType<typeof buildTimeTravelState>> {
-  assertSystem("useTimeTravel", system);
-  const state = shallowRef<ReturnType<typeof buildTimeTravelState>>(
-    buildTimeTravelState(system),
+): ShallowRef<ReturnType<typeof buildHistoryState>> {
+  assertSystem("useHistory", system);
+  const state = shallowRef<ReturnType<typeof buildHistoryState>>(
+    buildHistoryState(system),
   );
-  const unsub = system.onTimeTravelChange(() => {
-    state.value = buildTimeTravelState(system);
+  const unsub = system.onHistoryChange(() => {
+    state.value = buildHistoryState(system);
   });
   onScopeDispose(unsub);
   return state;
@@ -631,7 +631,7 @@ export function useTimeTravel(
 interface UseDirectiveConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
-  debug?: DebugConfig;
+  trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
@@ -676,7 +676,7 @@ export function useDirective<M extends ModuleSchema>(
   const system = createSystem({
     module: moduleDef,
     plugins: allPlugins.length > 0 ? allPlugins : undefined,
-    debug: config?.debug,
+    trace: config?.trace,
     errorBoundary: config?.errorBoundary,
     tickMs: config?.tickMs,
     zeroConfig: config?.zeroConfig,

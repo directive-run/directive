@@ -27,7 +27,7 @@ React hooks API reference. All hooks use a system-first pattern – pass the sys
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback |
 | `DirectiveHydrator` | Component | SSR snapshot hydration provider |
 | `useHydratedSystem` | Hook | Create system from hydration context |
-| `useTimeTravel` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Hook | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -496,7 +496,7 @@ function useDirectiveRef<M>(
   opts?: {
     status?: boolean;
     plugins?: Plugin[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     initialFacts?: Partial<InferFacts<M>>;
   },
 ): SingleModuleSystem<M>
@@ -507,7 +507,7 @@ function useDirectiveRef<M>(
 | `module` | `ModuleDef<M>` | The module definition |
 | `opts.status` | `boolean` | Enable the status plugin |
 | `opts.plugins` | `Plugin[]` | Additional plugins |
-| `opts.debug` | `DebugConfig` | Debug configuration |
+| `opts.trace` | `TraceOption` | Trace configuration |
 | `opts.initialFacts` | `Partial<InferFacts<M>>` | Initial fact values |
 
 ```tsx
@@ -541,7 +541,7 @@ function useDirective<M, FK, DK>(
     derived?: DK[];
     status?: boolean;
     plugins?: Plugin[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     initialFacts?: Partial<InferFacts<M>>;
   },
 ): {
@@ -621,7 +621,7 @@ Creates a system pre-hydrated from the nearest `DirectiveHydrator` context.
 ```typescript
 function useHydratedSystem<M>(
   module: ModuleDef<M>,
-  opts?: { plugins?: Plugin[]; debug?: DebugConfig },
+  opts?: { plugins?: Plugin[]; trace?: TraceOption },
 ): SingleModuleSystem<M>
 ```
 
@@ -641,20 +641,20 @@ function Counter() {
 
 ---
 
-## useTimeTravel
+## useHistory
 
 Reactive time-travel state. Returns `null` when time-travel is disabled on the system.
 
 ```typescript
-function useTimeTravel(
+function useHistory(
   system: SingleModuleSystem<any>,
-): TimeTravelState | null
+): HistoryState | null
 ```
 
-### useTimeTravel Returns
+### useHistory Returns
 
 ```typescript
-interface TimeTravelState {
+interface HistoryState {
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -665,10 +665,10 @@ interface TimeTravelState {
 ```
 
 ```tsx
-import { useTimeTravel } from '@directive-run/react';
+import { useHistory } from '@directive-run/react';
 
 // Get reactive time-travel controls
-const tt = useTimeTravel(system);
+const tt = useHistory(system);
 
 // Only render controls when time-travel is enabled
 if (!tt) {

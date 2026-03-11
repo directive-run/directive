@@ -100,7 +100,7 @@ Auto-tracking selector over facts and derivations. Returns a `Readable` store:
 | `useExplain(system, reqId)` | `Readable<string \| null>` | Human-readable requirement explanation |
 | `useConstraintStatus(system)` | `Readable<ConstraintInfo[]>` | All constraint states |
 | `useOptimisticUpdate(system)` | `{ mutate, isPending: Readable, error: Readable, rollback }` | Optimistic mutation with auto-rollback |
-| `useTimeTravel(system)` | `Readable<TimeTravelState \| null>` | Undo/redo navigation |
+| `useHistory(system)` | `Readable<HistoryState \| null>` | Undo/redo navigation |
 
 ### Svelte-Specific
 

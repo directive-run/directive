@@ -1,6 +1,6 @@
 "use client";
 
-import type { RunChangelogEntry } from "@directive-run/core";
+import type { TraceEntry } from "@directive-run/core";
 import { useSelector } from "@directive-run/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDevToolsSystem } from "../DevToolsSystemContext";
@@ -56,10 +56,10 @@ function formatValue(value: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// LatestRunSummary — Zone 2
+// LatestTraceSummary — Zone 2
 // ---------------------------------------------------------------------------
 
-function LatestRunSummary({ run }: { run: RunChangelogEntry }) {
+function LatestTraceSummary({ run }: { run: TraceEntry }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusColor =
@@ -386,28 +386,28 @@ function RunSection({
 function ConstraintRow({
   c,
   now,
-  latestRun,
+  latestTrace,
   isExpanded,
   onToggle,
   onToggleDisable,
 }: {
   c: Constraint;
   now: number;
-  latestRun: RunChangelogEntry | null;
+  latestTrace: TraceEntry | null;
   isExpanded: boolean;
   onToggle: (id: string) => void;
   onToggleDisable: (c: Constraint) => void;
 }) {
-  // Find deps from the latest run that hit this constraint
+  // Find deps from the latest trace that hit this constraint
   const deps = useMemo(() => {
-    if (!latestRun) {
+    if (!latestTrace) {
       return null;
     }
 
-    const hit = latestRun.constraintsHit.find((h) => h.id === c.id);
+    const hit = latestTrace.constraintsHit.find((h) => h.id === c.id);
 
     return hit?.deps ?? null;
-  }, [latestRun, c.id]);
+  }, [latestTrace, c.id]);
 
   // Visual state: disabled takes precedence over active/inactive
   const isDisabled = c.disabled;
@@ -512,13 +512,13 @@ function ConstraintRow({
 
 function RequirementRow({
   r,
-  latestRun,
+  latestTrace,
   resolverStats,
   isExpanded,
   onToggle,
 }: {
   r: Requirement;
-  latestRun: RunChangelogEntry | null;
+  latestTrace: TraceEntry | null;
   resolverStats: Record<string, { count: number; errors: number }>;
   isExpanded: boolean;
   onToggle: (id: string) => void;
@@ -538,13 +538,13 @@ function RequirementRow({
     ? "border-amber-200 dark:border-amber-800/30"
     : "border-red-200 dark:border-red-800/30";
 
-  // Find resolver from run history (actual data, not heuristic)
+  // Find resolver from trace (actual data, not heuristic)
   const resolverFromHistory = useMemo(() => {
-    if (!latestRun) {
+    if (!latestTrace) {
       return null;
     }
 
-    const started = latestRun.resolversStarted.find(
+    const started = latestTrace.resolversStarted.find(
       (s) => s.requirementId === r.id,
     );
     if (started) {
@@ -564,20 +564,20 @@ function RequirementRow({
         );
       }) ?? null
     );
-  }, [latestRun, r.id, r.type, resolverStats]);
+  }, [latestTrace, r.id, r.type, resolverStats]);
 
-  // Find actual error from run history
+  // Find actual error from trace
   const resolverError = useMemo(() => {
-    if (!latestRun || !resolverFromHistory) {
+    if (!latestTrace || !resolverFromHistory) {
       return null;
     }
 
-    const errored = latestRun.resolversErrored.find(
+    const errored = latestTrace.resolversErrored.find(
       (e) => e.resolver === resolverFromHistory,
     );
 
     return errored?.error ?? null;
-  }, [latestRun, resolverFromHistory]);
+  }, [latestTrace, resolverFromHistory]);
 
   return (
     <div className={`rounded font-mono text-xs ${bgClass}`}>
@@ -665,7 +665,7 @@ function ResolverRow({
   name,
   stats,
   maxCount,
-  latestRun,
+  latestTrace,
   requirementType,
   isExpanded,
   onToggle,
@@ -673,7 +673,7 @@ function ResolverRow({
   name: string;
   stats: { count: number; errors: number; totalMs?: number };
   maxCount: number;
-  latestRun: RunChangelogEntry | null;
+  latestTrace: TraceEntry | null;
   requirementType?: string;
   isExpanded: boolean;
   onToggle: (name: string) => void;
@@ -690,16 +690,16 @@ function ResolverRow({
       : 0;
   const isIdle = stats.count === 0 && stats.errors === 0;
 
-  // Get latest error from run history
+  // Get latest error from trace
   const latestError = useMemo(() => {
-    if (!latestRun) {
+    if (!latestTrace) {
       return null;
     }
 
-    const errored = latestRun.resolversErrored.find((e) => e.resolver === name);
+    const errored = latestTrace.resolversErrored.find((e) => e.resolver === name);
 
     return errored?.error ?? null;
-  }, [latestRun, name]);
+  }, [latestTrace, name]);
 
   return (
     <div
@@ -799,19 +799,19 @@ export function PipelineView() {
     system,
     (s) => s.facts.runtime.resolverDefs,
   ) as RuntimeResolverDef[];
-  const runHistory = useSelector(system, (s) => s.facts.runtime.runHistory);
+  const traceLog = useSelector(system, (s) => s.facts.runtime.trace);
   const systemName = useSelector(system, (s) => s.facts.runtime.systemName);
-  const runHistoryEnabled = useSelector(
+  const traceEnabled = useSelector(
     system,
-    (s) => s.facts.runtime.runHistoryEnabled,
+    (s) => s.facts.runtime.traceEnabled,
   );
-  const latestRun = useSelector(
+  const latestTrace = useSelector(
     system,
-    (s) => s.derive.runtime.latestRun,
-  ) as RunChangelogEntry | null;
-  const runCount = useSelector(
+    (s) => s.derive.runtime.latestTrace,
+  ) as TraceEntry | null;
+  const traceCount = useSelector(
     system,
-    (s) => s.derive.runtime.runCount,
+    (s) => s.derive.runtime.traceCount,
   ) as number;
 
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -1000,7 +1000,7 @@ export function PipelineView() {
     ...resolverEntries.map(([, s]) => s.count),
     1,
   );
-  const hasRunHistory = runHistory && runHistory.length > 0;
+  const hasTrace = traceLog && traceLog.length > 0;
 
   return (
     <div className="flex h-full flex-col gap-4">
@@ -1022,20 +1022,20 @@ export function PipelineView() {
         />
       </div>
 
-      {/* Zone 2: Latest Run Summary */}
-      {hasRunHistory && latestRun && <LatestRunSummary run={latestRun} />}
+      {/* Zone 2: Latest Trace Summary */}
+      {hasTrace && latestTrace && <LatestTraceSummary run={latestTrace} />}
 
-      {!hasRunHistory && runHistoryEnabled && (
+      {!hasTrace && traceEnabled && (
         <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
           Waiting for first reconciliation...
         </div>
       )}
 
-      {!runHistoryEnabled && (
+      {!traceEnabled && (
         <div className="rounded border border-dashed border-zinc-200 px-3 py-2 text-center font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
           Enable{" "}
           <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-            runHistory: true
+            trace: true
           </code>{" "}
           in debug config for pipeline timeline
         </div>
@@ -1062,7 +1062,7 @@ export function PipelineView() {
                   key={c.id}
                   c={c}
                   now={now}
-                  latestRun={latestRun}
+                  latestTrace={latestTrace}
                   isExpanded={expandedItems.has(`c:${c.id}`)}
                   onToggle={(id) => toggleItem(`c:${id}`)}
                   onToggleDisable={handleToggleDisable}
@@ -1089,7 +1089,7 @@ export function PipelineView() {
                     <RequirementRow
                       key={`${r.id}:${r.fromConstraint}:${i}`}
                       r={r}
-                      latestRun={latestRun}
+                      latestTrace={latestTrace}
                       resolverStats={resolverStats}
                       isExpanded={expandedItems.has(`r:${r.id}`)}
                       onToggle={(id) => toggleItem(`r:${id}`)}
@@ -1134,7 +1134,7 @@ export function PipelineView() {
                   name={name}
                   stats={stats}
                   maxCount={maxResolverCount}
-                  latestRun={latestRun}
+                  latestTrace={latestTrace}
                   requirementType={resolverRequirementMap.get(name)}
                   isExpanded={expandedItems.has(`res:${name}`)}
                   onToggle={(n) => toggleItem(`res:${n}`)}

@@ -87,7 +87,7 @@ import {
   useExplain,
   useConstraintStatus,
   useOptimisticUpdate,
-  useTimeTravel,
+  useHistory,
   useDirective,
   createTypedHooks,
   useNamespacedSelector,
@@ -1083,15 +1083,15 @@ describe("useOptimisticUpdate", () => {
 });
 
 // ============================================================================
-// useTimeTravel
+// useHistory
 // ============================================================================
 
-describe("useTimeTravel", () => {
+describe("useHistory", () => {
   afterEach(() => {
     clearDestroyCallbacks();
   });
 
-  it("returns null when time-travel is disabled", () => {
+  it("returns null when history is disabled", () => {
     const mod = createModule("tt-disabled", {
       schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
       init: (facts) => { facts.x = 0; },
@@ -1099,7 +1099,7 @@ describe("useTimeTravel", () => {
     const system = createSystem({ module: mod });
     system.start();
 
-    const store = useTimeTravel(system);
+    const store = useHistory(system);
     const { getValue, unsubscribe } = subscribeToStore(store);
 
     expect(getValue()).toBeNull();
@@ -1108,18 +1108,18 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("returns TimeTravelState when enabled", () => {
+  it("returns HistoryState when enabled", () => {
     const mod = createModule("tt-enabled", {
       schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
       init: (facts) => { facts.x = 0; },
     });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
 
-    const store = useTimeTravel(system);
+    const store = useHistory(system);
     const { getValue, unsubscribe } = subscribeToStore(store);
     const tt = getValue();
 
@@ -1135,18 +1135,18 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("provides time-travel API methods", () => {
+  it("provides history API methods", () => {
     const mod = createModule("tt-api", {
       schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
       init: (facts) => { facts.x = 0; },
     });
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     });
     system.start();
 
-    const store = useTimeTravel(system);
+    const store = useHistory(system);
     const { getValue, unsubscribe } = subscribeToStore(store);
 
     const tt = getValue();

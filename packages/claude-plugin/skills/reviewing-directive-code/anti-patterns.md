@@ -1,6 +1,6 @@
 # Anti-Patterns
 
-20 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
+19 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
 
 ## 1. Unnecessary Type Casting on Facts/Derivations
 
@@ -155,23 +155,7 @@ const status = facts.auth.status;
 const token = facts.auth.token;
 ```
 
-## 11. Builder/Chaining API
-
-```typescript
-// WRONG – there is no builder pattern
-const mod = module("counter")
-  .schema({ count: t.number() })
-  .build();
-
-// CORRECT – use createModule with object syntax
-const mod = createModule("counter", {
-  schema: {
-    facts: { count: t.number() },
-  },
-});
-```
-
-## 12. Returning Data from Resolvers
+## 11. Returning Data from Resolvers
 
 ```typescript
 // WRONG – resolvers return void, not data
@@ -188,7 +172,7 @@ resolve: async (req, context) => {
 },
 ```
 
-## 13. Async Logic in `init`
+## 12. Async Logic in `init`
 
 ```typescript
 // WRONG – init is synchronous, facts assignment only
@@ -211,7 +195,7 @@ constraints: {
 },
 ```
 
-## 14. Missing `settle()` After `start()`
+## 13. Missing `settle()` After `start()`
 
 ```typescript
 // WRONG – constraints fire on start, resolvers are async
@@ -224,7 +208,7 @@ await system.settle();
 console.log(system.facts.data); // Resolved
 ```
 
-## 15. Missing `crossModuleDeps` Declaration
+## 14. Missing `crossModuleDeps` Declaration
 
 ```typescript
 // WRONG – accessing auth facts without declaring dependency
@@ -251,7 +235,7 @@ const dataModule = createModule("data", {
 });
 ```
 
-## 16. String Literal for `require`
+## 15. String Literal for `require`
 
 ```typescript
 // WRONG – require must be an object with type property
@@ -271,7 +255,7 @@ constraints: {
 },
 ```
 
-## 17. Passthrough Derivations
+## 16. Passthrough Derivations
 
 ```typescript
 // WRONG – derivation just returns a fact value unchanged
@@ -283,7 +267,7 @@ derive: {
 // system.facts.count instead of system.derive.count
 ```
 
-## 18. Deep Import Paths
+## 17. Deep Import Paths
 
 ```typescript
 // WRONG – internal module paths are not public API
@@ -297,7 +281,7 @@ import { createModule, createSystem } from "@directive-run/core";
 import { loggingPlugin } from "@directive-run/core/plugins";
 ```
 
-## 19. Async `when()` Without `deps`
+## 18. Async `when()` Without `deps`
 
 ```typescript
 // WRONG – async constraints need explicit deps for tracking
@@ -328,7 +312,7 @@ constraints: {
 },
 ```
 
-## 20. No Error Handling on Failing Resolvers
+## 19. No Error Handling on Failing Resolvers
 
 ```typescript
 // WRONG – unhandled errors crash the system

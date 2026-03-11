@@ -6,12 +6,12 @@
 
 import { createSystem } from "../core/system.js";
 import type {
-  DebugConfig,
   ErrorBoundaryConfig,
   ModuleDef,
   ModuleSchema,
   Plugin,
   SingleModuleSystem,
+  TraceOption,
 } from "../core/types.js";
 import { createRequirementStatusPlugin } from "./requirement-status.js";
 
@@ -22,8 +22,8 @@ export interface CreateSystemWithStatusOptions<M extends ModuleSchema> {
   /** Additional plugins to include alongside the status plugin */
   // biome-ignore lint/suspicious/noExplicitAny: Plugin generic contravariance issues
   plugins?: Plugin<any>[];
-  /** Debug configuration */
-  debug?: DebugConfig;
+  /** Trace: per-run reconciliation changelog */
+  trace?: TraceOption;
   /** Error boundary configuration */
   errorBoundary?: ErrorBoundaryConfig;
   /** Tick interval in milliseconds */
@@ -97,7 +97,7 @@ export function createSystemWithStatus<M extends ModuleSchema>(
   const system = createSystem({
     module: options.module,
     plugins: allPlugins,
-    debug: options.debug,
+    trace: options.trace,
     errorBoundary: options.errorBoundary,
     tickMs: options.tickMs,
     zeroConfig: options.zeroConfig,

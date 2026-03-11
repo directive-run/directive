@@ -277,7 +277,7 @@ const system = createSystem({
   // initOrder: ["auth", "data", "cart"], // Explicit order
 
   plugins: [loggingPlugin()],
-  debug: { timeTravel: true },
+  history: true,
 });
 
 // Hydrate from async source (call before start)

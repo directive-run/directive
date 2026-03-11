@@ -1,5 +1,5 @@
 ---
-title: How to Debug with Time-Travel & DevTools
+title: How to Debug with History & DevTools
 description: Step-by-step debugging workflow when constraints aren't firing as expected.
 ---
 
@@ -23,8 +23,7 @@ const system = createSystem({
     loggingPlugin({ level: 'debug' }),
     devtoolsPlugin(),
   ],
-  debug: {
-    timeTravel: true,
+  history: {
     maxSnapshots: 200,
   },
 });
@@ -66,12 +65,12 @@ function DebugPanel({ system }) {
         )}
       </section>
 
-      {/* Time-travel controls */}
+      {/* History controls */}
       <section>
-        <h3>Time Travel ({inspection.snapshotIndex + 1}/{inspection.snapshotCount})</h3>
-        <button onClick={() => system.debug.goBack()}>← Back</button>
-        <button onClick={() => system.debug.goForward()}>Forward →</button>
-        <button onClick={() => system.debug.goTo(0)}>Reset</button>
+        <h3>History ({inspection.snapshotIndex + 1}/{inspection.snapshotCount})</h3>
+        <button onClick={() => system.history.goBack()}>← Back</button>
+        <button onClick={() => system.history.goForward()}>Forward →</button>
+        <button onClick={() => system.history.goTo(0)}>Reset</button>
         <p>Snapshot label: {inspection.currentSnapshot?.label}</p>
       </section>
 
@@ -113,21 +112,21 @@ console.log('Requirements:', status.requirements);
 console.log('Registered resolvers:', system.inspect().resolvers.registered);
 // If missing → no resolver matches the requirement type
 
-// Step 6: Step through time-travel snapshots
-system.debug.goBack(); // See the previous state
-system.debug.goBack(); // See the state before that
+// Step 6: Step through history snapshots
+system.history.goBack(); // See the previous state
+system.history.goBack(); // See the state before that
 // Find the snapshot where things went wrong
 ```
 
 ## Step by Step
 
-1. **Enable time-travel in the system config** – `debug: { timeTravel: true }` tells the engine to snapshot state after reconciliation cycles. By default every event that changes facts creates a snapshot. Use `snapshotEvents` on your module to limit which events create snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/time-travel#filtering-snapshot-events).
+1. **Enable history in the system config** – `history: true` (or `history: { maxSnapshots: N }`) tells the engine to snapshot state after reconciliation cycles. By default every event that changes facts creates a snapshot. Use `snapshotEvents` on your module to limit which events create snapshots &ndash; see [Filtering Snapshot Events](/docs/advanced/history#filtering-snapshot-events).
 
 2. **`useInspect` gives you the engine's internal state** – all constraints (with their `when` results), all resolvers (with their status), and the snapshot timeline. This is read-only and doesn't affect the system.
 
 3. **`useExplain` answers "why isn't X working?"** – select a constraint and see exactly why it's active or not: the `when()` result, which dependencies it tracks, what requirements it produced, and what's blocking it.
 
-4. **Time-travel lets you see state at each step** – `goBack()` and `goForward()` move through the snapshot timeline. The entire system state (facts, derived, constraints) updates to show what it looked like at that point.
+4. **History lets you see state at each step** – `goBack()` and `goForward()` move through the snapshot timeline. The entire system state (facts, derived, constraints) updates to show what it looked like at that point.
 
 ## Common Variations
 
@@ -157,13 +156,13 @@ function App({ system }) {
 
 ```typescript
 // Export current snapshot timeline
-const exported = system.debug.exportSnapshots();
+const exported = system.history.exportSnapshots();
 const blob = new Blob([JSON.stringify(exported)], { type: 'application/json' });
 
 // Import a snapshot from a bug report
 const imported = JSON.parse(fileContent);
-system.debug.importSnapshots(imported);
-system.debug.goTo(imported.failureIndex);
+system.history.importSnapshots(imported);
+system.history.goTo(imported.failureIndex);
 ```
 
 ### Logging plugin for production debugging
@@ -180,7 +179,7 @@ loggingPlugin({
 
 ## Related
 
-- [Time-Travel](/docs/advanced/time-travel) – time-travel API reference
+- [History](/docs/advanced/history) – history API reference
 - [Plugin Overview](/docs/plugins/overview) – logging and devtools plugins
 - [DevTools Plugin](/docs/plugins/devtools) – browser extension integration
 - [Testing](/docs/testing/overview) – debugging in test environments

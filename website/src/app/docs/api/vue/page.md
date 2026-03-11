@@ -24,7 +24,7 @@ Vue composables API reference. All composables take an explicit `system` paramet
 | `useOptimisticUpdate` | Composable | Optimistic mutations with rollback |
 | `useDirective` | Composable | Scoped system with selected or all subscriptions |
 | `createTypedHooks` | Factory | Create typed composables for a schema |
-| `useTimeTravel` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
+| `useHistory` | Composable | Reactive time-travel state (canUndo, canRedo, undo, redo) |
 | `shallowEqual` | Utility | Shallow equality for selectors |
 
 ---
@@ -462,7 +462,7 @@ function useDirective<M extends ModuleSchema>(
     facts?: string[];
     derived?: string[];
     plugins?: Plugin[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
@@ -488,7 +488,7 @@ import { counterModule } from './counter-module';
 
 // Subscribe all: omit keys for everything
 const { facts, derived, events, dispatch } = useDirective(counterModule, {
-  debug: { timeTravel: true },
+  history: true,
   status: true,
 });
 </script>
@@ -562,18 +562,18 @@ const total = useDerived(system, 'cartTotal'); // Ref<number>
 
 ---
 
-## useTimeTravel
+## useHistory
 
 Reactive time-travel composable. Returns a `ShallowRef` that updates when snapshots are taken or navigation occurs. Returns `null` when time-travel is disabled.
 
 ```typescript
-function useTimeTravel(system: System): ShallowRef<TimeTravelState | null>
+function useHistory(system: System): ShallowRef<HistoryState | null>
 ```
 
-### useTimeTravel Returns
+### useHistory Returns
 
 ```typescript
-interface TimeTravelState {
+interface HistoryState {
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -583,15 +583,15 @@ interface TimeTravelState {
 }
 ```
 
-### useTimeTravel Usage
+### useHistory Usage
 
 ```html
 <script setup>
-import { useTimeTravel } from '@directive-run/vue';
+import { useHistory } from '@directive-run/vue';
 import { system } from './system';
 
 // Get reactive time-travel controls (null when disabled)
-const tt = useTimeTravel(system);
+const tt = useHistory(system);
 </script>
 
 <template>
@@ -609,7 +609,7 @@ Enable time-travel in the system configuration:
 // Enable time-travel debugging on the system
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: true,
 });
 ```
 

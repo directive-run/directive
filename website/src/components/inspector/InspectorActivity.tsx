@@ -14,8 +14,8 @@ const EVENT_COLORS: Record<string, string> = {
   "resolver:complete": "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-400",
   "resolver:error": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   "effect:run": "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-400",
-  "run:start": "bg-zinc-100 text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-400",
-  "run:settled": "bg-zinc-100 text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-400",
+  "trace:start": "bg-zinc-100 text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-400",
+  "trace:settled": "bg-zinc-100 text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-400",
 };
 
 const DEFAULT_COLOR = "bg-zinc-100 text-zinc-600 dark:bg-zinc-700/50 dark:text-zinc-400";

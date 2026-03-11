@@ -23,7 +23,7 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 | `OptimisticUpdateController` | Controller | Optimistic mutations with rollback |
 | `ModuleController` | Controller | Scoped system tied to element lifecycle |
 | `SystemController` | Controller | Create system scoped to element lifecycle |
-| `TimeTravelController` | Controller | Reactive time-travel state |
+| `HistoryController` | Controller | Reactive time-travel state |
 
 ### Selector Controller
 
@@ -52,7 +52,7 @@ Lit controllers API reference. All controllers follow the Reactive Controller pa
 |---|---|---|
 | `useDispatch` | Function | Typed dispatch function |
 | `useEvents` | Function | Typed event dispatchers |
-| `useTimeTravel` | Function | Non-reactive time-travel access |
+| `useHistory` | Function | Non-reactive time-travel access |
 | `getDerived` | Function | Non-reactive derivation getter |
 | `getFact` | Function | Non-reactive fact getter |
 | `createTypedHooks` | Factory | Create typed controllers for a schema |
@@ -460,7 +460,7 @@ new ModuleController(host: ReactiveControllerHost, module: Module, opts?: Module
 | `host` | `ReactiveControllerHost` | The Lit element (`this`) |
 | `module` | `Module` | The Directive module definition |
 | `opts.status` | `boolean` | Enable the status plugin |
-| `opts.debug` | `DebugOpts` | Debug options (time-travel, etc.) |
+| `opts.trace` | `TraceOption` | Per-run reconciliation trace |
 | `opts.plugins` | `Plugin[]` | Additional plugins |
 
 | Property | Type | Description |
@@ -498,7 +498,7 @@ new SystemController(host: ReactiveControllerHost, module: Module)
 new SystemController(host: ReactiveControllerHost, config: {
   module: Module,
   plugins?: Plugin[],
-  debug?: DebugOpts,
+  trace?: TraceOption,
 })
 ```
 
@@ -507,7 +507,7 @@ new SystemController(host: ReactiveControllerHost, config: {
 | `host` | `ReactiveControllerHost` | The Lit element (`this`) |
 | `module` | `Module` | The Directive module definition |
 | `config.plugins` | `Plugin[]` | Optional plugins |
-| `config.debug` | `DebugOpts` | Optional debug options |
+| `config.trace` | `TraceOption` | Per-run reconciliation trace |
 
 | Property | Type | Description |
 |---|---|---|
@@ -519,7 +519,7 @@ class AppElement extends LitElement {
   private ctrl = new SystemController(this, {
     module: appModule,
     plugins: [loggingPlugin()],
-    debug: { timeTravel: true },
+    history: true,
   });
 
   render() {
@@ -531,14 +531,14 @@ class AppElement extends LitElement {
 
 ---
 
-## TimeTravelController
+## HistoryController
 
 Reactive time-travel state. Provides undo/redo capabilities and snapshot navigation.
 
 ```typescript
-import { TimeTravelController } from '@directive-run/lit';
+import { HistoryController } from '@directive-run/lit';
 
-new TimeTravelController(host: ReactiveControllerHost, system: System)
+new HistoryController(host: ReactiveControllerHost, system: System)
 ```
 
 | Parameter | Type | Description |
@@ -548,12 +548,12 @@ new TimeTravelController(host: ReactiveControllerHost, system: System)
 
 | Property | Type | Description |
 |---|---|---|
-| `.value` | `TimeTravelState \| null` | Current time-travel state or null if not enabled |
+| `.value` | `HistoryState \| null` | Current time-travel state or null if not enabled |
 
 ```typescript
-class TimeTravelElement extends LitElement {
+class HistoryElement extends LitElement {
   // Get reactive time-travel controls (null when not enabled)
-  private tt = new TimeTravelController(this, system);
+  private tt = new HistoryController(this, system);
 
   render() {
     const state = this.tt.value;
@@ -633,7 +633,7 @@ These functions return values or proxies directly without subscribing to changes
 import {
   useDispatch,
   useEvents,
-  useTimeTravel,
+  useHistory,
   getDerived,
   getFact,
   createTypedHooks,
@@ -675,17 +675,17 @@ events.increment(1);
 events.reset();
 ```
 
-### useTimeTravel
+### useHistory
 
-Returns the current time-travel state without subscribing to changes. For reactive subscriptions, use `TimeTravelController` instead.
+Returns the current time-travel state without subscribing to changes. For reactive subscriptions, use `HistoryController` instead.
 
 ```typescript
-useTimeTravel(system: System): TimeTravelState | null
+useHistory(system: System): HistoryState | null
 ```
 
 ```typescript
 // Get the current time-travel state (non-reactive)
-const tt = useTimeTravel(system);
+const tt = useHistory(system);
 
 // Undo the last action if possible
 if (tt?.canUndo) tt.undo();

@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { useDevToolsSystem } from "./DevToolsSystemContext";
 import { DirectiveLogomark } from "./DirectiveLogomark";
 import { SystemSelector } from "./SystemSelector";
-import { useTimeTravel } from "./hooks/useTimeTravel";
+import { useHistory } from "./hooks/useHistory";
 import type { ConnectionStatus } from "./types";
 import { DRAWER_CLOSE_MS, DRAWER_OPEN_MS, Z_DRAWER } from "./z-index";
 
@@ -70,14 +70,14 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
   ) as boolean;
   const isFullscreen = useSelector(system, (s) => s.facts.shell.isFullscreen);
   const {
-    timeTravelEnabled,
+    historyEnabled,
     snapshotIndex,
     snapshotCount,
     canUndo,
     canRedo,
     handleUndo,
     handleRedo,
-  } = useTimeTravel();
+  } = useHistory();
 
   // Portal mount target
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -293,7 +293,7 @@ export function DrawerPanel({ children }: DrawerPanelProps) {
 
         <div className="flex items-center gap-1">
           {/* Snapshot back/forward — only when time-travel is enabled */}
-          {timeTravelEnabled && (
+          {historyEnabled && (
             <>
               {snapshotCount > 0 && (
                 <span

@@ -292,6 +292,6 @@ const batchModule = createModule("batch-loader", {
 
 export const system = createSystem({
   module: batchModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "batch-resolver" })],
 });

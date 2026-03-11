@@ -6,7 +6,7 @@ export function UseDirectivePage() {
   const { system, facts, derived, events } = useDirective(testModule, {
     facts: ["count", "name"],
     derived: ["doubled"],
-    debug: { timeTravel: true, maxSnapshots: 50 },
+    history: { maxSnapshots: 50 },
   });
 
   return (

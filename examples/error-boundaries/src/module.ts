@@ -340,7 +340,7 @@ let currentStrategy: RecoveryStrategy = "retry-later";
 
 export const system = createSystem({
   module: dashboardModule,
-  debug: { runHistory: true },
+  trace: true,
   plugins: [perf, devtoolsPlugin({ name: "error-boundaries" })],
   errorBoundary: {
     onResolverError: (_error, resolver) => {

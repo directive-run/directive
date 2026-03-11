@@ -55,7 +55,7 @@ export function TimeMachineDemo({
         <div className="space-y-3 text-sm text-slate-600 dark:text-slate-400">
           <p>
             Each brush stroke is a fact mutation captured as a time-travel
-            snapshot. Directive&rsquo;s built-in <code>TimeTravelManager</code>{" "}
+            snapshot. Directive&rsquo;s built-in <code>HistoryManager</code>{" "}
             provides the full history API.
           </p>
           <ol className="list-inside list-decimal space-y-2 pl-1">

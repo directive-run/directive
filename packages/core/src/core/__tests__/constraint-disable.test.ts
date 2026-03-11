@@ -167,18 +167,18 @@ describe("inspect() includes disabled field on constraints", () => {
     system.destroy();
   });
 
-  it("inspect().runHistoryEnabled reflects debug config", () => {
+  it("inspect().traceEnabled reflects trace config", () => {
     const withHistory = createSystem({
       module: createTestModule(),
-      debug: { runHistory: true },
+      trace: true,
     });
     withHistory.start();
-    expect(withHistory.inspect().runHistoryEnabled).toBe(true);
+    expect(withHistory.inspect().traceEnabled).toBe(true);
     withHistory.destroy();
 
     const withoutHistory = createSystem({ module: createTestModule() });
     withoutHistory.start();
-    expect(withoutHistory.inspect().runHistoryEnabled).toBe(false);
+    expect(withoutHistory.inspect().traceEnabled).toBe(false);
     withoutHistory.destroy();
   });
 });

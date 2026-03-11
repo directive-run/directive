@@ -878,7 +878,7 @@ describe("devtoolsPlugin", () => {
       const system = createSystem({
         module: mod,
         plugins: [devtoolsPlugin({ name: "tt-test", trace: true })],
-        debug: { timeTravel: true, maxSnapshots: 50 },
+        history: { maxSnapshots: 50 },
       });
       system.start();
       await system.settle();
@@ -897,7 +897,7 @@ describe("devtoolsPlugin", () => {
       const system = createSystem({
         module: mod,
         plugins: [devtoolsPlugin({ name: "tt-jump", trace: true })],
-        debug: { timeTravel: true, maxSnapshots: 50 },
+        history: { maxSnapshots: 50 },
       });
       system.start();
       await system.settle();
@@ -905,7 +905,7 @@ describe("devtoolsPlugin", () => {
       system.events.increment();
       await system.settle();
 
-      system.debug!.goBack();
+      system.history!.goBack();
 
       const events = dt().getEvents("tt-jump");
       expect(events.some((e) => e.type === "timetravel.jump")).toBe(true);

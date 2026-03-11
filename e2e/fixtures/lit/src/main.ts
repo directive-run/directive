@@ -10,5 +10,5 @@ import "./elements/use-explain-page.js";
 import "./elements/use-constraint-status-page.js";
 import "./elements/use-optimistic-update-page.js";
 import "./elements/use-requirement-status-page.js";
-import "./elements/use-time-travel-page.js";
+import "./elements/use-history-page.js";
 import "./elements/use-directive-page.js";

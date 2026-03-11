@@ -39,7 +39,7 @@ All adapters share the same core hook names and signatures (adapted to each fram
 | `useConstraintStatus(system)` | Reactive constraint inspection |
 | `useRequirementStatus(statusPlugin, type)` | Requirement loading/error status (takes `statusPlugin`, not `system`) |
 | `useOptimisticUpdate(system, statusPlugin?, type?)` | Optimistic mutations with rollback |
-| `useTimeTravel(system)` | Time-travel controls (undo/redo) |
+| `useHistory(system)` | Time-travel controls (undo/redo) |
 | `useDirective(moduleDef)` | Scoped system with selected or all subscriptions |
 | `createTypedHooks<M>()` | Factory for fully typed hook variants |
 

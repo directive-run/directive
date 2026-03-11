@@ -34,11 +34,8 @@ const system = createSystem({
     loggingPlugin({ level: "info" }),
     devtoolsPlugin({ name: "async-chains", trace: true }),
   ],
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 50,
-    runHistory: true,
-  },
+  history: { maxSnapshots: 50 },
+  trace: true,
 });
 system.start();
 

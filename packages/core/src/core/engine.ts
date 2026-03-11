@@ -10,10 +10,10 @@
  */
 
 import {
-  type TimeTravelManager,
-  createDisabledTimeTravel,
-  createTimeTravelManager,
-} from "../utils/time-travel.js";
+  type HistoryManager,
+  createDisabledHistory,
+  createHistoryManager,
+} from "../utils/history.js";
 import { hashObject, isPrototypeSafe } from "../utils/utils.js";
 import {
   type ConstraintsManager,
@@ -42,7 +42,7 @@ import type {
   InferSchema,
   ReconcileResult,
   ResolversDef,
-  RunChangelogEntry,
+  TraceEntry,
   Schema,
   System,
   SystemConfig,
@@ -71,7 +71,7 @@ interface EngineState<_S extends Schema> {
 
 /**
  * Create the core Directive reconciliation engine that wires facts, derivations,
- * effects, constraints, resolvers, plugins, error boundaries, and time-travel
+ * effects, constraints, resolvers, plugins, error boundaries, and history
  * into a single reactive system.
  *
  * @remarks
@@ -231,33 +231,33 @@ export function createEngine<S extends Schema>(
   let invalidateManyDerivations: (keys: string[]) => void = () => {};
 
   // Forward-declared so onChange/onBatch closures can check isRestoring.
-  // Assigned after createTimeTravelManager() below.
-  let timeTravelRef: TimeTravelManager<S> | null = null;
+  // Assigned after createHistoryManager() below.
+  let historyRef: HistoryManager<S> | null = null;
 
-  // Run history (gated by debug.runHistory)
-  const runHistoryEnabled = config.debug?.runHistory ?? false;
-  const maxRuns = config.debug?.maxRuns ?? 100;
-  const runHistory: RunChangelogEntry[] = [];
-  const runHistoryById = new Map<number, RunChangelogEntry>();
-  let runIdCounter = 0;
-  let currentRun: RunChangelogEntry | null = null;
+  // Trace (per-run reconciliation changelog, gated by config.trace)
+  const traceEnabled = config.trace === true || (typeof config.trace === "object" && config.trace !== null);
+  const maxRuns = (typeof config.trace === "object" && config.trace !== null ? config.trace.maxRuns : undefined) ?? 100;
+  const traceEntries: TraceEntry[] = [];
+  const traceById = new Map<number, TraceEntry>();
+  let traceIdCounter = 0;
+  let currentTrace: TraceEntry | null = null;
   const pendingFactChanges: Array<{
     key: string;
     oldValue: unknown;
     newValue: unknown;
   }> = [];
-  // Async resolver attribution: requirementId → runId
-  const resolverRunMap = new Map<string, number>();
-  // Track inflight resolvers per run: runId → count of pending resolvers
-  const runInflightCount = new Map<number, number>();
-  // Consistent duration: track start time per run (performance.now() based)
-  const runStartMs = new Map<number, number>();
-  // Cached runHistory getter (E1): avoid spread on every access
-  let runHistoryCache: RunChangelogEntry[] | null = null;
-  let runHistoryCacheVersion = 0;
+  // Async resolver attribution: requirementId → traceId
+  const resolverTraceMap = new Map<string, number>();
+  // Track inflight resolvers per trace: traceId → count of pending resolvers
+  const traceInflightCount = new Map<number, number>();
+  // Consistent duration: track start time per trace (performance.now() based)
+  const traceStartMs = new Map<number, number>();
+  // Cached trace getter (E1): avoid spread on every access
+  let traceCache: TraceEntry[] | null = null;
+  let traceCacheVersion = 0;
   let currentCacheVersion = 0;
   // Anomaly detection statistics
-  const runStats = {
+  const traceStats = {
     count: 0,
     totalDuration: 0,
     avgDuration: 0,
@@ -274,18 +274,18 @@ export function createEngine<S extends Schema>(
       pluginManager.emitFactSet(key, value, prev);
       // Invalidate derivations so they recompute on read
       invalidateDerivation(key);
-      // Track fact changes for run history
-      if (runHistoryEnabled) {
+      // Track fact changes for trace
+      if (traceEnabled) {
         pendingFactChanges.push({
           key: String(key),
           oldValue: prev,
           newValue: value,
         });
       }
-      // During time-travel restore, skip change tracking and reconciliation.
+      // During history restore, skip change tracking and reconciliation.
       // The restored state is already reconciled; re-reconciling would create
       // spurious snapshots that break undo/redo.
-      if (timeTravelRef?.isRestoring) return;
+      if (historyRef?.isRestoring) return;
       // Direct fact mutations (outside event dispatch) always create snapshots
       if (dispatchDepth === 0) {
         shouldTakeSnapshot = true;
@@ -299,8 +299,8 @@ export function createEngine<S extends Schema>(
       for (const change of changes) {
         keys.push(change.key);
       }
-      // Track fact changes for run history
-      if (runHistoryEnabled) {
+      // Track fact changes for trace
+      if (traceEnabled) {
         for (const change of changes) {
           if (change.type === "delete") {
             pendingFactChanges.push({
@@ -320,8 +320,8 @@ export function createEngine<S extends Schema>(
       // Invalidate all affected derivations at once — listeners fire only
       // after ALL keys are invalidated, so they see consistent state.
       invalidateManyDerivations(keys);
-      // During time-travel restore, skip change tracking and reconciliation.
-      if (timeTravelRef?.isRestoring) return;
+      // During history restore, skip change tracking and reconciliation.
+      if (historyRef?.isRestoring) return;
       // Resolver/effect batches (outside event dispatch) always create snapshots
       if (dispatchDepth === 0) {
         shouldTakeSnapshot = true;
@@ -343,8 +343,8 @@ export function createEngine<S extends Schema>(
     store,
     onCompute: (id, value, oldValue, deps) => {
       pluginManager.emitDerivationCompute(id, value, deps);
-      if (currentRun) {
-        currentRun.derivationsRecomputed.push({
+      if (currentTrace) {
+        currentTrace.derivationsRecomputed.push({
           id,
           deps: deps ? [...deps] : [],
           oldValue,
@@ -374,8 +374,8 @@ export function createEngine<S extends Schema>(
     store,
     onRun: (id, deps) => {
       pluginManager.emitEffectRun(id);
-      if (currentRun) {
-        currentRun.effectsRun.push({
+      if (currentTrace) {
+        currentTrace.effectsRun.push({
           id,
           triggeredBy: deps,
         });
@@ -385,8 +385,8 @@ export function createEngine<S extends Schema>(
       const strategy = errorBoundary.handleError("effect", id, error);
       pluginManager.emitEffectError(id, error);
 
-      if (currentRun) {
-        currentRun.effectErrors.push({ id, error: String(error) });
+      if (currentTrace) {
+        currentTrace.effectErrors.push({ id, error: String(error) });
       }
 
       if (strategy === "disable") {
@@ -416,126 +416,126 @@ export function createEngine<S extends Schema>(
     },
   });
 
-  /** Finalize a run when all its resolvers have settled */
-  function finalizeRun(runId: number): void {
-    const run = runHistoryById.get(runId);
-    if (run && run.status === "pending") {
-      run.status = "settled";
+  /** Finalize a trace entry when all its resolvers have settled */
+  function finalizeTrace(traceId: number): void {
+    const entry = traceById.get(traceId);
+    if (entry && entry.status === "pending") {
+      entry.status = "settled";
       // Consistent duration: use performance.now() when available
-      const startMs = runStartMs.get(runId);
-      run.duration =
+      const startMs = traceStartMs.get(traceId);
+      entry.duration =
         startMs !== undefined
           ? performance.now() - startMs
-          : Date.now() - run.timestamp;
-      runStartMs.delete(runId);
-      runInflightCount.delete(runId);
+          : Date.now() - entry.timestamp;
+      traceStartMs.delete(traceId);
+      traceInflightCount.delete(traceId);
       // Build causal chain on settlement
-      run.causalChain = buildCausalChain(run);
+      entry.causalChain = buildCausalChain(entry);
       // Anomaly detection
-      updateRunStats(run);
+      updateTraceStats(entry);
       currentCacheVersion++;
-      pluginManager.emitRunComplete(run);
+      pluginManager.emitTraceComplete(entry);
     }
   }
 
-  /** Decrement inflight count for a run and finalize if settled */
-  function decrementRunInflight(requirementId: string): void {
-    const runId = resolverRunMap.get(requirementId);
-    resolverRunMap.delete(requirementId);
-    if (runId !== undefined) {
-      const remaining = (runInflightCount.get(runId) ?? 1) - 1;
+  /** Decrement inflight count for a trace entry and finalize if settled */
+  function decrementTraceInflight(requirementId: string): void {
+    const traceId = resolverTraceMap.get(requirementId);
+    resolverTraceMap.delete(requirementId);
+    if (traceId !== undefined) {
+      const remaining = (traceInflightCount.get(traceId) ?? 1) - 1;
       if (remaining <= 0) {
-        finalizeRun(runId);
+        finalizeTrace(traceId);
       } else {
-        runInflightCount.set(runId, remaining);
+        traceInflightCount.set(traceId, remaining);
       }
     }
   }
 
-  /** Evict the oldest run from the ring buffer, cleaning up associated state (C1) */
-  function evictOldestRun(): void {
-    const evicted = runHistory.shift();
+  /** Evict the oldest trace entry from the ring buffer, cleaning up associated state (C1) */
+  function evictOldestTrace(): void {
+    const evicted = traceEntries.shift();
     if (evicted) {
-      runHistoryById.delete(evicted.id);
-      runStartMs.delete(evicted.id);
+      traceById.delete(evicted.id);
+      traceStartMs.delete(evicted.id);
       if (evicted.status === "pending") {
-        runInflightCount.delete(evicted.id);
-        for (const [reqId, rId] of resolverRunMap) {
+        traceInflightCount.delete(evicted.id);
+        for (const [reqId, rId] of resolverTraceMap) {
           if (rId === evicted.id) {
-            resolverRunMap.delete(reqId);
+            resolverTraceMap.delete(reqId);
           }
         }
       }
     }
   }
 
-  /** Build a human-readable causal chain summary from a run entry (Part 6) */
-  function buildCausalChain(run: RunChangelogEntry): string {
+  /** Build a human-readable causal chain summary from a trace entry (Part 6) */
+  function buildCausalChain(entry: TraceEntry): string {
     const parts: string[] = [];
 
-    for (const fc of run.factChanges) {
+    for (const fc of entry.factChanges) {
       parts.push(`${fc.key} changed`);
     }
 
-    for (const d of run.derivationsRecomputed) {
+    for (const d of entry.derivationsRecomputed) {
       parts.push(`${d.id} recomputed`);
     }
 
-    for (const c of run.constraintsHit) {
+    for (const c of entry.constraintsHit) {
       parts.push(`${c.id} constraint hit`);
     }
 
-    for (const r of run.requirementsAdded) {
+    for (const r of entry.requirementsAdded) {
       parts.push(`${r.type} requirement added`);
     }
 
-    for (const rs of run.resolversCompleted) {
+    for (const rs of entry.resolversCompleted) {
       parts.push(`${rs.resolver} resolved (${rs.duration.toFixed(0)}ms)`);
     }
 
-    for (const rs of run.resolversErrored) {
+    for (const rs of entry.resolversErrored) {
       parts.push(`${rs.resolver} errored`);
     }
 
-    for (const e of run.effectsRun) {
+    for (const e of entry.effectsRun) {
       parts.push(`${e.id} effect ran`);
     }
 
     return parts.join(" → ");
   }
 
-  /** Update running statistics and flag anomalies on a finalized run (Part 8) */
-  function updateRunStats(run: RunChangelogEntry): void {
-    runStats.count++;
-    runStats.totalDuration += run.duration;
-    runStats.avgDuration = runStats.totalDuration / runStats.count;
-    if (run.duration > runStats.maxDuration) {
-      runStats.maxDuration = run.duration;
+  /** Update running statistics and flag anomalies on a finalized trace entry (Part 8) */
+  function updateTraceStats(entry: TraceEntry): void {
+    traceStats.count++;
+    traceStats.totalDuration += entry.duration;
+    traceStats.avgDuration = traceStats.totalDuration / traceStats.count;
+    if (entry.duration > traceStats.maxDuration) {
+      traceStats.maxDuration = entry.duration;
     }
 
-    const resolverCount = run.resolversStarted.length;
-    runStats.totalResolverCount += resolverCount;
-    runStats.avgResolverCount = runStats.totalResolverCount / runStats.count;
+    const resolverCount = entry.resolversStarted.length;
+    traceStats.totalResolverCount += resolverCount;
+    traceStats.avgResolverCount = traceStats.totalResolverCount / traceStats.count;
 
-    const factChangeCount = run.factChanges.length;
-    runStats.totalFactChangeCount += factChangeCount;
-    runStats.avgFactChangeCount =
-      runStats.totalFactChangeCount / runStats.count;
+    const factChangeCount = entry.factChanges.length;
+    traceStats.totalFactChangeCount += factChangeCount;
+    traceStats.avgFactChangeCount =
+      traceStats.totalFactChangeCount / traceStats.count;
 
     // Flag anomalies (only after enough data)
     const anomalies: string[] = [];
-    if (runStats.count > 3 && run.duration > runStats.avgDuration * 5) {
+    if (traceStats.count > 3 && entry.duration > traceStats.avgDuration * 5) {
       anomalies.push(
-        `Duration ${run.duration.toFixed(0)}ms is 5x+ above average (${runStats.avgDuration.toFixed(0)}ms)`,
+        `Duration ${entry.duration.toFixed(0)}ms is 5x+ above average (${traceStats.avgDuration.toFixed(0)}ms)`,
       );
     }
 
-    if (run.resolversErrored.length > 0) {
-      anomalies.push(`${run.resolversErrored.length} resolver(s) errored`);
+    if (entry.resolversErrored.length > 0) {
+      anomalies.push(`${entry.resolversErrored.length} resolver(s) errored`);
     }
 
     if (anomalies.length > 0) {
-      run.anomalies = anomalies;
+      entry.anomalies = anomalies;
     }
   }
 
@@ -551,20 +551,20 @@ export function createEngine<S extends Schema>(
       pluginManager.emitRequirementMet(req, resolver);
       // Mark the constraint as resolved for `after` ordering
       constraintsManager.markResolved(req.fromConstraint);
-      // Attribute to the run that started this resolver
-      if (runHistoryEnabled) {
-        const runId = resolverRunMap.get(req.id);
-        if (runId !== undefined) {
-          const run = runHistoryById.get(runId);
-          if (run) {
-            run.resolversCompleted.push({
+      // Attribute to the trace entry that started this resolver
+      if (traceEnabled) {
+        const traceId = resolverTraceMap.get(req.id);
+        if (traceId !== undefined) {
+          const entry = traceById.get(traceId);
+          if (entry) {
+            entry.resolversCompleted.push({
               resolver,
               requirementId: req.id,
               duration,
             });
           }
         }
-        decrementRunInflight(req.id);
+        decrementTraceInflight(req.id);
       }
     },
     onError: (resolver, req, error) => {
@@ -599,20 +599,20 @@ export function createEngine<S extends Schema>(
         }
       }
 
-      // Attribute error to the run that started this resolver
-      if (runHistoryEnabled) {
-        const runId = resolverRunMap.get(req.id);
-        if (runId !== undefined) {
-          const run = runHistoryById.get(runId);
-          if (run) {
-            run.resolversErrored.push({
+      // Attribute error to the trace entry that started this resolver
+      if (traceEnabled) {
+        const traceId = resolverTraceMap.get(req.id);
+        if (traceId !== undefined) {
+          const entry = traceById.get(traceId);
+          if (entry) {
+            entry.resolversErrored.push({
               resolver,
               requirementId: req.id,
               error: String(error),
             });
           }
         }
-        decrementRunInflight(req.id);
+        decrementTraceInflight(req.id);
       }
     },
     onRetry: (resolver, req, attempt) =>
@@ -620,9 +620,9 @@ export function createEngine<S extends Schema>(
     onCancel: (resolver, req) => {
       pluginManager.emitResolverCancel(resolver, req);
       pluginManager.emitRequirementCanceled(req);
-      // Decrement inflight for the run
-      if (runHistoryEnabled) {
-        decrementRunInflight(req.id);
+      // Decrement inflight for the trace entry
+      if (traceEnabled) {
+        decrementTraceInflight(req.id);
       }
     },
     onResolutionComplete: () => {
@@ -632,32 +632,32 @@ export function createEngine<S extends Schema>(
     },
   });
 
-  // Time-travel listeners — notified when snapshot state changes
-  const timeTravelListeners = new Set<() => void>();
+  // History listeners — notified when snapshot state changes
+  const historyListeners = new Set<() => void>();
 
-  function notifyTimeTravelChange(): void {
-    for (const listener of timeTravelListeners) {
+  function notifyHistoryChange(): void {
+    for (const listener of historyListeners) {
       listener();
     }
   }
 
-  // Create time-travel manager
-  const timeTravelManager: TimeTravelManager<S> = config.debug?.timeTravel
-    ? createTimeTravelManager({
-        config: config.debug,
+  // Create history manager
+  const historyManager: HistoryManager<S> = config.history
+    ? createHistoryManager({
+        historyOption: config.history,
         facts,
         store,
         onSnapshot: (snapshot) => {
           pluginManager.emitSnapshot(snapshot);
-          notifyTimeTravelChange();
+          notifyHistoryChange();
         },
-        onTimeTravel: (from, to) => {
-          pluginManager.emitTimeTravel(from, to);
-          notifyTimeTravelChange();
+        onHistoryChange: (from, to) => {
+          pluginManager.emitHistoryNavigate(from, to);
+          notifyHistoryChange();
         },
       })
-    : createDisabledTimeTravel();
-  timeTravelRef = timeTravelManager;
+    : createDisabledHistory();
+  historyRef = historyManager;
 
   // Settlement listeners — notified when isSettled may have changed
   const settlementListeners = new Set<() => void>();
@@ -1128,8 +1128,8 @@ export function createEngine<S extends Schema>(
             `Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
         );
       }
-      // Drain pending fact changes so they don't leak into the next run (M4)
-      if (runHistoryEnabled) {
+      // Drain pending fact changes so they don't leak into the next trace entry (M4)
+      if (traceEnabled) {
         pendingFactChanges.length = 0;
       }
       reconcileDepth = 0;
@@ -1139,14 +1139,14 @@ export function createEngine<S extends Schema>(
     state.isReconciling = true;
     notifySettlementChange();
 
-    const reconcileStartMs = runHistoryEnabled ? performance.now() : 0;
+    const reconcileStartMs = traceEnabled ? performance.now() : 0;
 
-    // Start a new run entry
-    if (runHistoryEnabled) {
-      const runId = ++runIdCounter;
-      runStartMs.set(runId, reconcileStartMs);
-      currentRun = {
-        id: runId,
+    // Start a new trace entry
+    if (traceEnabled) {
+      const traceId = ++traceIdCounter;
+      traceStartMs.set(traceId, reconcileStartMs);
+      currentTrace = {
+        id: traceId,
         timestamp: Date.now(),
         duration: 0,
         status: "pending",
@@ -1167,7 +1167,7 @@ export function createEngine<S extends Schema>(
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
       if (state.changedKeys.size > 0) {
         if (snapshotEventNames === null || shouldTakeSnapshot) {
-          timeTravelManager.takeSnapshot(
+          historyManager.takeSnapshot(
             `facts-changed:${[...state.changedKeys].join(",")}`,
           );
         }
@@ -1199,8 +1199,8 @@ export function createEngine<S extends Schema>(
         pluginManager.emitRequirementCreated(req);
       }
 
-      // Capture which constraints produced requirements for run history
-      if (currentRun) {
+      // Capture which constraints produced requirements for trace
+      if (currentTrace) {
         const hitConstraintIds = new Set(
           currentRequirements.map((r) => r.fromConstraint),
         );
@@ -1208,7 +1208,7 @@ export function createEngine<S extends Schema>(
           const cState = constraintsManager.getState(cId);
           if (cState) {
             const cDeps = constraintsManager.getDependencies(cId);
-            currentRun.constraintsHit.push({
+            currentTrace.constraintsHit.push({
               id: cId,
               priority: cState.priority,
               deps: cDeps ? [...cDeps] : [],
@@ -1220,17 +1220,17 @@ export function createEngine<S extends Schema>(
       // Diff with previous requirements
       const { added, removed } = currentSet.diff(state.previousRequirements);
 
-      // Capture requirement diff for run history
-      if (currentRun) {
+      // Capture requirement diff for trace
+      if (currentTrace) {
         for (const req of added) {
-          currentRun.requirementsAdded.push({
+          currentTrace.requirementsAdded.push({
             id: req.id,
             type: req.requirement.type,
             fromConstraint: req.fromConstraint,
           });
         }
         for (const req of removed) {
-          currentRun.requirementsRemoved.push({
+          currentTrace.requirementsRemoved.push({
             id: req.id,
             type: req.requirement.type,
             fromConstraint: req.fromConstraint,
@@ -1248,19 +1248,19 @@ export function createEngine<S extends Schema>(
         resolversManager.resolve(req);
       }
 
-      // Capture resolver starts for run history
-      if (currentRun) {
+      // Capture resolver starts for trace
+      if (currentTrace) {
         const inflightNow = resolversManager.getInflightInfo();
         // Build Map for O(1) lookups instead of O(n) find per requirement
         const inflightById = new Map(inflightNow.map((i) => [i.id, i]));
         for (const req of added) {
           const info = inflightById.get(req.id);
-          currentRun.resolversStarted.push({
+          currentTrace.resolversStarted.push({
             resolver: info?.resolverId ?? "unknown",
             requirementId: req.id,
           });
           // Track attribution for async completion
-          resolverRunMap.set(req.id, currentRun.id);
+          resolverTraceMap.set(req.id, currentTrace.id);
         }
       }
 
@@ -1293,49 +1293,49 @@ export function createEngine<S extends Schema>(
         }
       }
     } finally {
-      // Finalize the current run entry
-      if (currentRun) {
-        currentRun.duration = performance.now() - reconcileStartMs;
+      // Finalize the current trace entry
+      if (currentTrace) {
+        currentTrace.duration = performance.now() - reconcileStartMs;
 
         // Skip empty runs
         const hasActivity =
-          currentRun.factChanges.length > 0 ||
-          currentRun.constraintsHit.length > 0 ||
-          currentRun.requirementsAdded.length > 0 ||
-          currentRun.effectsRun.length > 0;
+          currentTrace.factChanges.length > 0 ||
+          currentTrace.constraintsHit.length > 0 ||
+          currentTrace.requirementsAdded.length > 0 ||
+          currentTrace.effectsRun.length > 0;
 
         if (hasActivity) {
-          const inflightCount = currentRun.resolversStarted.length;
+          const inflightCount = currentTrace.resolversStarted.length;
           if (inflightCount === 0) {
             // No resolvers — finalize immediately
-            currentRun.status = "settled";
+            currentTrace.status = "settled";
             // Build causal chain for settled runs
-            currentRun.causalChain = buildCausalChain(currentRun);
+            currentTrace.causalChain = buildCausalChain(currentTrace);
             // Anomaly detection
-            updateRunStats(currentRun);
-            runHistory.push(currentRun);
-            runHistoryById.set(currentRun.id, currentRun);
-            if (runHistory.length > maxRuns) {
-              evictOldestRun();
+            updateTraceStats(currentTrace);
+            traceEntries.push(currentTrace);
+            traceById.set(currentTrace.id, currentTrace);
+            if (traceEntries.length > maxRuns) {
+              evictOldestTrace();
             }
             currentCacheVersion++;
-            pluginManager.emitRunComplete(currentRun);
+            pluginManager.emitTraceComplete(currentTrace);
           } else {
             // Has resolvers — stays pending until they settle
-            currentRun.status = "pending";
-            runHistory.push(currentRun);
-            runHistoryById.set(currentRun.id, currentRun);
-            if (runHistory.length > maxRuns) {
-              evictOldestRun();
+            currentTrace.status = "pending";
+            traceEntries.push(currentTrace);
+            traceById.set(currentTrace.id, currentTrace);
+            if (traceEntries.length > maxRuns) {
+              evictOldestTrace();
             }
             currentCacheVersion++;
-            runInflightCount.set(currentRun.id, inflightCount);
+            traceInflightCount.set(currentTrace.id, inflightCount);
           }
         } else {
-          // Empty run — clean up start time
-          runStartMs.delete(currentRun.id);
+          // Empty trace entry — clean up start time
+          traceStartMs.delete(currentTrace.id);
         }
-        currentRun = null;
+        currentTrace = null;
       }
 
       state.isReconciling = false;
@@ -1511,7 +1511,7 @@ export function createEngine<S extends Schema>(
   // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
   const system: System<any> = {
     facts,
-    debug: timeTravelManager.isEnabled ? timeTravelManager : null,
+    history: historyManager.isEnabled ? historyManager : null,
     // biome-ignore lint/suspicious/noExplicitAny: Proxy provides both derivation values and control methods at runtime
     derive: deriveAccessor as any,
     events: eventsAccessor,
@@ -1546,17 +1546,17 @@ export function createEngine<S extends Schema>(
       listDynamic: () => [...dynamicIds.resolvers],
     },
 
-    get runHistory(): RunChangelogEntry[] | null {
-      if (!runHistoryEnabled) {
+    get trace(): TraceEntry[] | null {
+      if (!traceEnabled) {
         return null;
       }
 
-      if (!runHistoryCache || runHistoryCacheVersion !== currentCacheVersion) {
-        runHistoryCache = [...runHistory];
-        runHistoryCacheVersion = currentCacheVersion;
+      if (!traceCache || traceCacheVersion !== currentCacheVersion) {
+        traceCache = [...traceEntries];
+        traceCacheVersion = currentCacheVersion;
       }
 
-      return runHistoryCache;
+      return traceCache;
     },
 
     initialize(): void {
@@ -1675,18 +1675,18 @@ export function createEngine<S extends Schema>(
       // Clean up error boundary
       errorBoundary.clearErrors();
       settlementListeners.clear();
-      timeTravelListeners.clear();
+      historyListeners.clear();
       // Clean up deferred registrations (prevent closure retention)
       deferredRegistrations.length = 0;
-      // Clean up run history state (C1)
-      runHistory.length = 0;
-      runHistoryById.clear();
-      resolverRunMap.clear();
-      runInflightCount.clear();
-      runStartMs.clear();
+      // Clean up trace state (C1)
+      traceEntries.length = 0;
+      traceById.clear();
+      resolverTraceMap.clear();
+      traceInflightCount.clear();
+      traceStartMs.clear();
       pendingFactChanges.length = 0;
-      currentRun = null;
-      runHistoryCache = null;
+      currentTrace = null;
+      traceCache = null;
       // Clean up dynamic definition state
       dynamicIds.constraints.clear();
       dynamicIds.resolvers.clear();
@@ -1877,10 +1877,10 @@ export function createEngine<S extends Schema>(
               ? def.requirement
               : "(predicate)",
         })),
-        runHistoryEnabled,
-        ...(runHistoryEnabled
+        traceEnabled,
+        ...(traceEnabled
           ? {
-              runHistory: runHistory.map((r) => ({
+              trace: traceEntries.map((r) => ({
                 ...r,
                 factChanges: r.factChanges.map((fc) => ({ ...fc })),
                 derivationsRecomputed: r.derivationsRecomputed.map((d) => ({
@@ -2309,10 +2309,10 @@ export function createEngine<S extends Schema>(
       };
     },
 
-    onTimeTravelChange(listener: () => void): () => void {
-      timeTravelListeners.add(listener);
+    onHistoryChange(listener: () => void): () => void {
+      historyListeners.add(listener);
       return () => {
-        timeTravelListeners.delete(listener);
+        historyListeners.delete(listener);
       };
     },
 

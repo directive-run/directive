@@ -20,7 +20,7 @@ export function useChatSystem(apiEndpoint: string) {
     systemRef.current = createSystem({
       module: chatSession,
       plugins: [devtoolsPlugin({ name: "ai-chat" })],
-      debug: { runHistory: true },
+      trace: true,
     });
   }
 

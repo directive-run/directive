@@ -23,7 +23,7 @@ Svelte hooks API reference. All hooks take `system` as an explicit first paramet
 | `useRequirementStatus` | Hook | Requirement status – `useRequirementStatus(statusPlugin, type)` |
 | `useOptimisticUpdate` | Hook | Optimistic mutations with rollback – `useOptimisticUpdate(system, statusPlugin?, type?)` |
 | `useDirective` | Hook | Scoped system with selected or all subscriptions |
-| `useTimeTravel` | Hook | Reactive time-travel state – `useTimeTravel(system)` |
+| `useHistory` | Hook | Reactive time-travel state – `useHistory(system)` |
 | `createTypedHooks` | Factory | Create fully typed hooks for a schema |
 | `createFactStore` | Factory | Fact store outside components |
 | `createDerivedStore` | Factory | Derivation store outside components |
@@ -410,7 +410,7 @@ function useDirective<M extends ModuleSchema>(
     facts?: string[];
     derived?: string[];
     plugins?: Plugin[];
-    debug?: DebugConfig;
+    trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
@@ -568,16 +568,16 @@ export const total$ = createDerivedStore(system, 'cartTotal');
 
 ---
 
-## useTimeTravel
+## useHistory
 
 Reactive time-travel state. Returns a `Readable` store containing the time-travel controls, or `null` when time-travel is disabled.
 
 ```typescript
-function useTimeTravel(system: System): Readable<TimeTravelState | null>
+function useHistory(system: System): Readable<HistoryState | null>
 ```
 
 ```typescript
-interface TimeTravelState {
+interface HistoryState {
   canUndo: boolean;
   canRedo: boolean;
   undo: () => void;
@@ -587,15 +587,15 @@ interface TimeTravelState {
 }
 ```
 
-### useTimeTravel Usage
+### useHistory Usage
 
 ```html
 <script>
-  import { useTimeTravel } from '@directive-run/svelte';
+  import { useHistory } from '@directive-run/svelte';
   import { system } from '$lib/directive';
 
   // Get reactive time-travel controls (null when disabled)
-  const tt = useTimeTravel(system);
+  const tt = useHistory(system);
 </script>
 
 {#if $tt}
@@ -611,7 +611,7 @@ Enable time-travel in the system configuration:
 // Enable time-travel debugging on the system
 const system = createSystem({
   module: myModule,
-  debug: { timeTravel: true, maxSnapshots: 100 },
+  history: true,
 });
 ```
 

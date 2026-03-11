@@ -7,10 +7,10 @@
 
 import { withTracking } from "./core/tracking.js";
 import type {
+  HistoryAPI,
+  HistoryState,
   SnapshotMeta,
   SystemInspection,
-  TimeTravelAPI,
-  TimeTravelState,
 } from "./core/types.js";
 
 // ============================================================================
@@ -25,7 +25,7 @@ import type {
  */
 export interface SystemLike {
   readonly isSettled: boolean;
-  readonly debug: TimeTravelAPI | null;
+  readonly history: HistoryAPI | null;
   readonly facts: {
     $store: {
       get(key: string): unknown;
@@ -208,14 +208,14 @@ export function defaultEquality<T>(a: T, b: T): boolean {
 }
 
 /**
- * Build a TimeTravelState object from a system's debug instance.
- * Returns null when time-travel is disabled.
+ * Build a HistoryState object from a system's history instance.
+ * Returns null when history is disabled.
  * @internal
  */
-export function buildTimeTravelState(
+export function buildHistoryState(
   system: SystemLike,
-): TimeTravelState | null {
-  const debug = system.debug;
+): HistoryState | null {
+  const debug = system.history;
   if (!debug) return null;
 
   // Build lightweight metadata array (no facts data)

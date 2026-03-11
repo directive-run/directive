@@ -1,17 +1,17 @@
 import { useCallback, useState } from "react";
 import type { DevToolsSnapshot } from "../lib/types";
 
-interface TimeTravelEditorProps {
+interface HistoryEditorProps {
   snapshot: DevToolsSnapshot | null;
   onFork: (snapshot: DevToolsSnapshot) => void;
   onClose: () => void;
 }
 
-export function TimeTravelEditor({
+export function HistoryEditor({
   snapshot,
   onFork,
   onClose,
-}: TimeTravelEditorProps) {
+}: HistoryEditorProps) {
   const [jsonText, setJsonText] = useState(() =>
     snapshot ? JSON.stringify(snapshot, null, 2) : "{}",
   );

@@ -39,7 +39,7 @@ Scaling beyond one module with cross-module patterns.
 | Guide | What You'll Build |
 |-------|-------------------|
 | [Test Async Chains](/docs/guides/test-async-chains) | Deterministic testing of multi-step constraint-resolver flows |
-| [Debug with Time-Travel](/docs/guides/debug-time-travel) | Step-by-step debugging when constraints aren't firing as expected |
+| [Debug with Time-Travel](/docs/guides/debug-history) | Step-by-step debugging when constraints aren't firing as expected |
 
 ---
 

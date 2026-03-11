@@ -5,15 +5,15 @@ import { useCallback } from "react";
 import { useDevToolsSystem } from "../DevToolsSystemContext";
 
 /**
- * Shared time-travel hook — used by DrawerPanel (header arrows) and TimeTravelView.
+ * Shared history hook — used by DrawerPanel (header arrows) and HistoryView.
  * Encapsulates undo/redo callbacks and reactive state selectors.
  */
-export function useTimeTravel() {
+export function useHistory() {
   const system = useDevToolsSystem();
 
-  const timeTravelEnabled = useSelector(
+  const historyEnabled = useSelector(
     system,
-    (s) => s.facts.runtime.timeTravelEnabled,
+    (s) => s.facts.runtime.historyEnabled,
   );
   const snapshotIndex = useSelector(
     system,
@@ -33,8 +33,8 @@ export function useTimeTravel() {
     }
 
     const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined);
-    if (sys?.debug?.goBack) {
-      sys.debug.goBack(1);
+    if (sys?.history?.goBack) {
+      sys.history.goBack(1);
       system.events.runtime.refresh();
     }
   }, [system, systemName]);
@@ -45,14 +45,14 @@ export function useTimeTravel() {
     }
 
     const sys = window.__DIRECTIVE__.getSystem(systemName ?? undefined);
-    if (sys?.debug?.goForward) {
-      sys.debug.goForward(1);
+    if (sys?.history?.goForward) {
+      sys.history.goForward(1);
       system.events.runtime.refresh();
     }
   }, [system, systemName]);
 
   return {
-    timeTravelEnabled,
+    historyEnabled,
     snapshotIndex,
     snapshotCount,
     canUndo,

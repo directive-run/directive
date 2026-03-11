@@ -26,7 +26,8 @@ import { getAllValidMoves, toRowCol } from "./rules.js";
 
 const system = createSystem({
   modules: { game: checkersGame, chat: checkersChat },
-  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
+  history: { maxSnapshots: 200 },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "checkers" })],
 });
 system.start();
@@ -328,7 +329,7 @@ function render() {
   const circuitState = system.facts.chat.circuitState;
 
   // Undo/redo button state
-  const dbg = system.debug;
+  const dbg = system.history;
   if (dbg) {
     undoBtn.disabled = dbg.currentIndex <= 0;
     redoBtn.disabled = dbg.currentIndex >= dbg.snapshots.length - 1;
@@ -643,12 +644,12 @@ dashboardToggle.addEventListener("click", () => {
 // Undo/Redo
 undoBtn.addEventListener("click", () => {
   aiTurnPending = false;
-  system.debug?.goBack();
+  system.history?.goBack();
   messageEl.textContent = "Undone.";
 });
 
 redoBtn.addEventListener("click", () => {
-  system.debug?.goForward();
+  system.history?.goForward();
   messageEl.textContent = "Redone.";
 });
 
@@ -662,11 +663,11 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "z") {
     e.preventDefault();
     if (e.shiftKey) {
-      system.debug?.goForward();
+      system.history?.goForward();
       messageEl.textContent = "Redone.";
     } else {
       aiTurnPending = false;
-      system.debug?.goBack();
+      system.history?.goBack();
       messageEl.textContent = "Undone.";
     }
   }

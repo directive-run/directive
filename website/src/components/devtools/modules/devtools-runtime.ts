@@ -1,7 +1,7 @@
 // @ts-nocheck — createModule inference collapses with complex object/array schema types (t.array<T>, t.object<T>).
 // All errors below cascade from the same root cause. Fix by improving InferSchema for nested generics in core.
 import { createModule, t } from "@directive-run/core";
-import type { RunChangelogEntry } from "@directive-run/core";
+import type { TraceEntry } from "@directive-run/core";
 import type {
   EventBreakpointDef,
   EventBreakpointHit,
@@ -67,16 +67,16 @@ interface InspectionResult {
   }>;
   resolverStats?: Record<string, RuntimeResolverStats>;
   resolverDefs?: Array<{ id?: string; requirement?: string }>;
-  runHistoryEnabled?: boolean;
-  runHistory?: RunChangelogEntry[];
-  timeTravel?: { currentIndex?: number; snapshotCount?: number };
+  traceEnabled?: boolean;
+  trace?: TraceEntry[];
+  history?: { currentIndex?: number; snapshotCount?: number };
 }
 
 /** Subset of a Directive system instance used for direct proxy reads */
 interface DirectiveSystemRef {
   facts?: Record<string, unknown>;
   derive?: Record<string, unknown>;
-  debug?: {
+  history?: {
     isEnabled?: boolean;
     currentIndex?: number;
     snapshots?: unknown[];
@@ -115,14 +115,14 @@ export const devtoolsRuntime = createModule("runtime", {
       unmet: t.array<RuntimeRequirementInfo>(),
       resolverStats: t.object<Record<string, RuntimeResolverStats>>(),
       resolverDefs: t.array<RuntimeResolverDef>(),
-      timeTravelEnabled: t.boolean(),
+      historyEnabled: t.boolean(),
       snapshotIndex: t.number(),
       snapshotCount: t.number(),
       lastEventType: t.nullable(t.string()),
-      // Per-run changelog from the connected system
-      runHistory: t.array<RunChangelogEntry>(),
-      // Whether the connected system has runHistory enabled
-      runHistoryEnabled: t.boolean(),
+      // Per-run trace log from the connected system
+      trace: t.array<TraceEntry>(),
+      // Whether the connected system has trace enabled
+      traceEnabled: t.boolean(),
       // Tick counter bumped on each subscription callback — drives reactivity
       tick: t.number(),
       // Accumulated trace events from the connected system (capped at MAX_TRACE_EVENTS)
@@ -137,7 +137,7 @@ export const devtoolsRuntime = createModule("runtime", {
       pausedOnHit: t.nullable(t.string()),
     },
     derivations: {
-      hasTimeTravel: t.boolean(),
+      hasHistory: t.boolean(),
       canUndo: t.boolean(),
       canRedo: t.boolean(),
       factCount: t.number(),
@@ -145,8 +145,8 @@ export const devtoolsRuntime = createModule("runtime", {
       activeConstraintCount: t.number(),
       inflightCount: t.number(),
       unmetCount: t.number(),
-      latestRun: t.nullable(t.object<RunChangelogEntry>()),
-      runCount: t.number(),
+      latestTrace: t.nullable(t.object<TraceEntry>()),
+      traceCount: t.number(),
       factBreakpointHitCount: t.number(),
       eventBreakpointHitCount: t.number(),
       totalBreakpointHitCount: t.number(),
@@ -182,12 +182,12 @@ export const devtoolsRuntime = createModule("runtime", {
     facts.unmet = [];
     facts.resolverStats = {};
     facts.resolverDefs = [];
-    facts.timeTravelEnabled = false;
+    facts.historyEnabled = false;
     facts.snapshotIndex = -1;
     facts.snapshotCount = 0;
     facts.lastEventType = null;
-    facts.runHistory = [];
-    facts.runHistoryEnabled = false;
+    facts.trace = [];
+    facts.traceEnabled = false;
     facts.tick = 0;
     facts.traceEvents = [];
     facts.traceEventIdCounter = 0;
@@ -200,22 +200,22 @@ export const devtoolsRuntime = createModule("runtime", {
   },
 
   derive: {
-    hasTimeTravel: (facts) =>
-      facts.timeTravelEnabled && facts.snapshotCount > 0,
-    canUndo: (facts) => facts.timeTravelEnabled && facts.snapshotIndex > 0,
+    hasHistory: (facts) =>
+      facts.historyEnabled && facts.snapshotCount > 0,
+    canUndo: (facts) => facts.historyEnabled && facts.snapshotIndex > 0,
     canRedo: (facts) =>
-      facts.timeTravelEnabled && facts.snapshotIndex < facts.snapshotCount - 1,
+      facts.historyEnabled && facts.snapshotIndex < facts.snapshotCount - 1,
     factCount: (facts) => Object.keys(facts.facts).length,
     derivationCount: (facts) => Object.keys(facts.derivations).length,
     activeConstraintCount: (facts) =>
       facts.constraints.filter((c) => c.active).length,
     inflightCount: (facts) => facts.inflight.length,
     unmetCount: (facts) => facts.unmet.length,
-    latestRun: (facts) => {
-      const h = facts.runHistory;
+    latestTrace: (facts) => {
+      const h = facts.trace;
       return h && h.length > 0 ? h[h.length - 1] : null;
     },
-    runCount: (facts) => facts.runHistory?.length ?? 0,
+    traceCount: (facts) => facts.trace?.length ?? 0,
     factBreakpointHitCount: (facts) => facts.factBreakpointHits.length,
     eventBreakpointHitCount: (facts) => facts.eventBreakpointHits.length,
     totalBreakpointHitCount: (facts) =>
@@ -255,12 +255,12 @@ export const devtoolsRuntime = createModule("runtime", {
       facts.unmet = [];
       facts.resolverStats = {};
       facts.resolverDefs = [];
-      facts.timeTravelEnabled = false;
+      facts.historyEnabled = false;
       facts.snapshotIndex = -1;
       facts.snapshotCount = 0;
       facts.lastEventType = null;
-      facts.runHistory = [];
-      facts.runHistoryEnabled = false;
+      facts.trace = [];
+      facts.traceEnabled = false;
       facts.tick = 0;
       facts.traceEvents = [];
       facts.traceEventIdCounter = 0;
@@ -344,8 +344,8 @@ export const devtoolsRuntime = createModule("runtime", {
         const sys = window.__DIRECTIVE__.getSystem(
           facts.systemName ?? undefined,
         );
-        if (sys?.debug && typeof (sys.debug as any).resume === "function") {
-          (sys.debug as any).resume();
+        if (sys?.history && typeof (sys.history as any).resume === "function") {
+          (sys.history as any).resume();
         }
       }
     },
@@ -567,10 +567,10 @@ export const devtoolsRuntime = createModule("runtime", {
                   facts.breakpointPaused = true;
                   facts.pausedOnHit = "fact";
                   if (
-                    sys?.debug &&
-                    typeof (sys.debug as any).pause === "function"
+                    sys?.history &&
+                    typeof (sys.history as any).pause === "function"
                   ) {
-                    (sys.debug as any).pause();
+                    (sys.history as any).pause();
                   }
                 }
               },
@@ -646,7 +646,7 @@ function checkEventBreakpoints(
           facts.systemName ?? undefined,
         );
         if (sys?.debug && typeof (sys.debug as any).pause === "function") {
-          (sys.debug as any).pause();
+          (sys.history as any).pause();
         }
       }
     }
@@ -771,24 +771,24 @@ function applyInspection(
     }));
   }
 
-  // Run history
-  facts.runHistoryEnabled = inspection.runHistoryEnabled ?? false;
-  if (Array.isArray(inspection.runHistory)) {
-    facts.runHistory = inspection.runHistory;
+  // Trace log
+  facts.traceEnabled = inspection.traceEnabled ?? false;
+  if (Array.isArray(inspection.trace)) {
+    facts.trace = inspection.trace;
   }
 
-  // Time-travel — prefer inspect() data, fall back to system.debug
-  if (inspection.timeTravel) {
-    facts.timeTravelEnabled = true;
-    facts.snapshotIndex = inspection.timeTravel.currentIndex ?? -1;
-    facts.snapshotCount = inspection.timeTravel.snapshotCount ?? 0;
-  } else if (system?.debug?.isEnabled) {
-    const debug = system.debug;
-    facts.timeTravelEnabled = true;
+  // Time-travel — prefer inspect() data, fall back to system.history
+  if (inspection.history) {
+    facts.historyEnabled = true;
+    facts.snapshotIndex = inspection.history.currentIndex ?? -1;
+    facts.snapshotCount = inspection.history.snapshotCount ?? 0;
+  } else if (system?.history?.isEnabled) {
+    const history = system.history;
+    facts.historyEnabled = true;
     facts.snapshotIndex =
-      typeof debug.currentIndex === "number" ? debug.currentIndex : -1;
-    facts.snapshotCount = Array.isArray(debug.snapshots)
-      ? debug.snapshots.length
+      typeof history.currentIndex === "number" ? history.currentIndex : -1;
+    facts.snapshotCount = Array.isArray(history.snapshots)
+      ? history.snapshots.length
       : 0;
   }
 }

@@ -104,7 +104,7 @@ function Summary() {
 | `useExplain(system, reqId)` | `Accessor<string \| null>` | Human-readable requirement explanation |
 | `useConstraintStatus(system)` | `Accessor<ConstraintInfo[]>` | All constraint states |
 | `useOptimisticUpdate(system)` | `{ mutate, isPending: Accessor, error: Accessor, rollback }` | Optimistic mutation with auto-rollback |
-| `useTimeTravel(system)` | `Accessor<TimeTravelState \| null>` | Undo/redo navigation |
+| `useHistory(system)` | `Accessor<HistoryState \| null>` | Undo/redo navigation |
 
 ### Solid-Specific
 

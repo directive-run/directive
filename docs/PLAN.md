@@ -245,7 +245,7 @@ Week 4: Resolution Layer
 Week 5: Orchestration
 ├── engine.ts - Reconciliation loop
 ├── plugins.ts - Plugin architecture
-├── time-travel.ts - Debugging support
+├── history.ts - Time-travel debugging
 ├── Integration tests
 └── Deliverable: Working engine
 
@@ -409,23 +409,20 @@ const system = createSystem({
     devtoolsPlugin(),
   ],
   // Time-travel debugging
-  debug: {
-    timeTravel: true,
-    maxSnapshots: 100,
-  },
+  history: { maxSnapshots: 100 },
   tickMs: 1000,
 });
 
 // Start the system
 system.start();
 
-// Time-travel API
-system.debug.snapshots;      // Get all snapshots
-system.debug.goBack(5);      // Rewind 5 steps
-system.debug.goTo(snapshot); // Jump to specific snapshot
-system.debug.replay();       // Replay from current position
-system.debug.export();       // Export history as JSON
-system.debug.import(json);   // Import history
+// History API (time-travel debugging)
+system.history.snapshots;      // Get all snapshots
+system.history.goBack(5);      // Rewind 5 steps
+system.history.goTo(snapshot); // Jump to specific snapshot
+system.history.replay();       // Replay from current position
+system.history.export();       // Export history as JSON
+system.history.import(json);   // Import history
 
 // Testing utilities
 import { createTestSystem, mockResolver, fakeTimers } from '@directive-run/core/testing';
@@ -492,7 +489,7 @@ interface Plugin {
 
   // Time-travel hooks
   onSnapshot?: (snapshot: Snapshot) => void;
-  onTimeTravel?: (from: number, to: number) => void;
+  onHistoryNavigate?: (from: number, to: number) => void;
 
   // Error boundary hooks
   onError?: (error: DirectiveError) => void;

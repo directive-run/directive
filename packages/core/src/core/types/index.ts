@@ -126,10 +126,13 @@ export type {
   DerivationKeys,
   DerivationReturnType,
   ObservableKeys,
-  // Debug & time-travel
-  DebugConfig,
-  TimeTravelAPI,
-  TimeTravelState,
+  // History & trace
+  HistoryConfig,
+  HistoryOption,
+  TraceConfig,
+  TraceOption,
+  HistoryAPI,
+  HistoryState,
   SnapshotMeta,
   // Inspection
   SystemInspection,
@@ -138,8 +141,8 @@ export type {
   // Distributable snapshots
   DistributableSnapshotOptions,
   DistributableSnapshot,
-  // Run changelog
-  RunChangelogEntry,
+  // Trace entries
+  TraceEntry,
   // Runtime controls
   ConstraintsControl,
   DerivationsControl,

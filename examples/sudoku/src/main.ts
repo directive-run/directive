@@ -17,7 +17,8 @@ import { sudokuGame, sudokuSchema } from "./sudoku.js";
 
 const system = createSystem({
   module: sudokuGame,
-  debug: { timeTravel: true, maxSnapshots: 200, runHistory: true },
+  history: { maxSnapshots: 200 },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "sudoku" })],
 });
 system.start();
@@ -280,11 +281,11 @@ hintBtn.addEventListener("click", () => {
 
 // Undo / Redo
 undoBtn.addEventListener("click", () => {
-  system.debug?.goBack();
+  system.history?.goBack();
 });
 
 redoBtn.addEventListener("click", () => {
-  system.debug?.goForward();
+  system.history?.goForward();
 });
 
 // New game
@@ -395,9 +396,9 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "z") {
     e.preventDefault();
     if (e.shiftKey) {
-      system.debug?.goForward();
+      system.history?.goForward();
     } else {
-      system.debug?.goBack();
+      system.history?.goBack();
     }
 
     return;

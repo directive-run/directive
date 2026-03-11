@@ -318,6 +318,6 @@ export const system = createSystem({
     permissions: permissionsModule,
     content: contentModule,
   },
-  debug: { runHistory: true },
+  trace: true,
   plugins: [devtoolsPlugin({ name: "permissions" })],
 });

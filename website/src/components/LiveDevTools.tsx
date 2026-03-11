@@ -29,7 +29,7 @@ import { GuardrailsView } from "./devtools/views/GuardrailsView";
 import { MemoryView } from "./devtools/views/MemoryView";
 import { StateView } from "./devtools/views/StateView";
 import { SystemGraphView } from "./devtools/views/SystemGraphView";
-import { TimeTravelView } from "./devtools/views/TimeTravelView";
+import { HistoryView } from "./devtools/views/HistoryView";
 import { TimelineView } from "./devtools/views/TimelineView";
 import { Z_FULLSCREEN } from "./devtools/z-index";
 import "./devtools/devtools.css";
@@ -46,7 +46,7 @@ const VIEW_REGISTRY: Record<(typeof ALL_VIEWS)[number], React.ComponentType> = {
   Derivations: DerivationsView,
   Pipeline: PipelineView,
   "System Graph": SystemGraphView,
-  "Time Travel": TimeTravelView,
+  "Time Travel": HistoryView,
   Breakpoints: BreakpointsView,
   // Shared views (system + AI)
   Timeline: TimelineView,

@@ -20,9 +20,9 @@
   ```ts
   function createDerivationsManager(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D>
   ```
-- `createDisabledTimeTravel` — Create a no-op time-travel manager for use when `debug.timeTravel` is disabled.
+- `createDisabledHistory` — Create a no-op history manager for use when `history` is disabled.
   ```ts
-  function createDisabledTimeTravel(): TimeTravelManager<S>
+  function createDisabledHistory(): HistoryManager<S>
   ```
 - `createEffectsManager` — Create a manager for fire-and-forget side effects that run after facts
   ```ts
@@ -76,9 +76,9 @@
   ```ts
   function createSystemWithStatus(options: CreateSystemWithStatusOptions<M>): SystemWithStatus<M>
   ```
-- `createTimeTravelManager` — Create a snapshot-based time-travel debugger backed by a ring buffer.
+- `createHistoryManager` — Create a snapshot-based time-travel debugger backed by a ring buffer.
   ```ts
-  function createTimeTravelManager(options: CreateTimeTravelOptions<S>): TimeTravelManager<S>
+  function createHistoryManager(options: CreateHistoryOptions<S>): HistoryManager<S>
   ```
 - `diffSnapshots` — Compare two distributable snapshots and return the differences.
 - `forType` — Create a type-guard function suitable for a resolver's `requirement`
@@ -219,9 +219,13 @@
   ```ts
   export interface CrossModuleEffectDef<
   ```
-- `DebugConfig` — Debug configuration
+- `TraceConfig` — Trace configuration for per-run reconciliation changelogs
   ```ts
-  export interface DebugConfig {
+  export interface TraceConfig {
+  ```
+- `TraceOption` — Shorthand: `true` enables tracing with defaults, or pass a `TraceConfig`
+  ```ts
+  export type TraceOption = boolean | TraceConfig
   ```
 - `DerivationsControl` — Runtime control for derivations (dynamic registration + value access)
   ```ts
@@ -343,9 +347,9 @@
   ```ts
   export interface RetryPolicy {
   ```
-- `RunChangelogEntry` — A structured record of one reconciliation run — from facts through resolvers and effects.
+- `TraceEntry` — A structured record of one reconciliation run — from facts through resolvers and effects.
   ```ts
-  export interface RunChangelogEntry {
+  export interface TraceEntry {
   ```
 - `SchemaType` — Primitive type definitions for schema
   ```ts
@@ -391,13 +395,13 @@
   ```ts
   export interface SystemSnapshot {
   ```
-- `TimeTravelAPI` — Time-travel API
+- `HistoryAPI` — History API (undo/redo, snapshots, replay)
   ```ts
-  export interface TimeTravelAPI {
+  export interface HistoryAPI {
   ```
-- `TimeTravelState` — Reactive time-travel state for framework hooks
+- `HistoryState` — Reactive time-travel state for framework hooks
   ```ts
-  export interface TimeTravelState {
+  export interface HistoryState {
   ```
 - `TypedConstraint` — External constraint definition with full typing.
   ```ts

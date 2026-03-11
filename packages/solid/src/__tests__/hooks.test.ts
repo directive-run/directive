@@ -20,7 +20,7 @@ import {
   useExplain,
   useConstraintStatus,
   useOptimisticUpdate,
-  useTimeTravel,
+  useHistory,
   useDirective,
   createFactSignal,
   createDerivedSignal,
@@ -996,16 +996,16 @@ describe("useOptimisticUpdate", () => {
 });
 
 // ============================================================================
-// useTimeTravel
+// useHistory
 // ============================================================================
 
-describe("useTimeTravel", () => {
-  it("returns null when time-travel is not enabled", () => {
+describe("useHistory", () => {
+  it("returns null when history is not enabled", () => {
     const { system } = createTestSystem();
     let dispose: () => void;
     createRoot((_dispose) => {
       dispose = _dispose;
-      const tt = useTimeTravel(system);
+      const tt = useHistory(system);
 
       expect(tt()).toBeNull();
     });
@@ -1013,7 +1013,7 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("returns time-travel state when enabled", () => {
+  it("returns history state when enabled", () => {
     const mod = createModule("tt-test", {
       schema: testSchema,
       init: (facts) => {
@@ -1037,14 +1037,14 @@ describe("useTimeTravel", () => {
 
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     } as any) as SingleModuleSystem<typeof testSchema>;
     system.start();
 
     let dispose: () => void;
     createRoot((_dispose) => {
       dispose = _dispose;
-      const tt = useTimeTravel(system);
+      const tt = useHistory(system);
       const val = tt();
 
       expect(val).not.toBeNull();
@@ -1059,7 +1059,7 @@ describe("useTimeTravel", () => {
     system.destroy();
   });
 
-  it("updates reactively on time-travel changes", () => {
+  it("updates reactively on history changes", () => {
     const mod = createModule("tt-reactive", {
       schema: testSchema,
       init: (facts) => {
@@ -1083,7 +1083,7 @@ describe("useTimeTravel", () => {
 
     const system = createSystem({
       module: mod,
-      debug: { timeTravel: true, maxSnapshots: 50 },
+      history: { maxSnapshots: 50 },
     } as any) as SingleModuleSystem<typeof testSchema>;
     system.start();
 
@@ -1091,7 +1091,7 @@ describe("useTimeTravel", () => {
     let tt: () => any;
     createRoot((_dispose) => {
       dispose = _dispose;
-      tt = useTimeTravel(system);
+      tt = useHistory(system);
     });
 
     const before = tt!();
