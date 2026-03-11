@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@0.6.0
+  - @directive-run/react@0.6.0
+  - @directive-run/ai@0.6.0
+
 ## 0.1.6
 
 ### Patch Changes
