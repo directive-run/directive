@@ -99,6 +99,10 @@ export type {
   DerivationsControl,
   EffectsControl,
   ResolversControl,
+  // Dynamic Definition Types
+  DynamicConstraintDef,
+  DynamicEffectDef,
+  DynamicResolverDef,
   SystemInspection,
   SystemSnapshot,
   TraceEntry,

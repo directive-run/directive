@@ -212,6 +212,120 @@ system.constraints.isDisabled("fetchWhenReady"); // true
 system.constraints.enable("fetchWhenReady");
 ```
 
+## SSR and Hydration
+
+Four mechanisms for populating a system with external state:
+
+```typescript
+// 1. initialFacts – simplest, at construction time
+const system = createSystem({
+  module: myModule,
+  initialFacts: { userId: "user-1", name: "Alice" },
+});
+system.start();
+
+// 2. system.hydrate() – async, before start()
+const system = createSystem({ module: myModule });
+await system.hydrate(async () => {
+  const res = await fetch('/api/state');
+
+  return res.json();
+});
+system.start();
+
+// 3. system.restore() – sync, applies facts from a snapshot
+const system = createSystem({ module: myModule });
+system.restore(serverSnapshot);
+system.start();
+
+// 4. DirectiveHydrator + useHydratedSystem (React only)
+// Server: getDistributableSnapshot() → serialize
+// Client: <DirectiveHydrator snapshot={s}><App /></DirectiveHydrator>
+//         useHydratedSystem(module) inside App
+```
+
+### SSR Lifecycle
+
+```typescript
+// Server: create → start → settle → snapshot → destroy
+const system = createSystem({
+  module: pageModule,
+  initialFacts: { userId: req.user.id },
+});
+system.start();
+await system.settle(5000); // Throws on timeout
+const snapshot = system.getSnapshot();
+system.stop();
+system.destroy();
+```
+
+### Snapshot Types
+
+- `SystemSnapshot` – facts only, used with `getSnapshot()` / `restore()`
+- `DistributableSnapshot` – facts + derivations + metadata + TTL, used with `getDistributableSnapshot()` and `DirectiveHydrator`
+
+### Avoiding Singletons
+
+Never use module-level systems in SSR – they share state across concurrent requests. Always create a fresh system per request and destroy it when done.
+
+## Runtime Dynamics
+
+All four subsystems (constraints, resolvers, derivations, effects) share a uniform dynamic definition interface:
+
+### Enable / Disable (Constraints & Effects only)
+
+```typescript
+system.constraints.disable("id");
+system.constraints.enable("id");
+system.constraints.isDisabled("id");
+
+system.effects.disable("id");
+system.effects.enable("id");
+system.effects.isEnabled("id");
+```
+
+### Register / Assign / Unregister (All 4 subsystems)
+
+```typescript
+// Register a new definition at runtime
+system.constraints.register("id", { when: ..., require: ... });
+system.resolvers.register("id", { requirement: "TYPE", resolve: ... });
+system.derive.register("id", (facts) => facts.count * 3);
+system.effects.register("id", { run: (facts) => { ... } });
+
+// Override an existing definition
+system.constraints.assign("id", { when: ..., require: ... });
+
+// Remove a dynamically registered definition (static = no-op + dev warning)
+system.constraints.unregister("id");
+```
+
+Semantics: `register` throws if ID exists. `assign` throws if ID doesn't exist. `unregister` on static ID = dev warning, no-op. All three are deferred if called during reconciliation.
+
+### Introspection
+
+```typescript
+system.constraints.isDynamic("id");  // true if registered at runtime
+system.constraints.listDynamic();    // all dynamic constraint IDs
+```
+
+### getOriginal / restoreOriginal
+
+When `assign()` overrides a static definition, the original is saved:
+
+```typescript
+system.getOriginal("constraint", "id");    // returns original definition
+system.restoreOriginal("constraint", "id"); // restores it, returns true/false
+```
+
+### Dynamic Module Registration
+
+```typescript
+system.registerModule("chat", chatModule); // adds module to running system
+```
+
+See docs: https://directive.run/docs/advanced/runtime
+
 ## Common Mistakes
 
 ### Reading facts before settling

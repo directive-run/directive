@@ -13,9 +13,11 @@ import type {
   InferDerivations,
   InferEvents,
   InferFacts,
+  InferSchema,
   InferSchemaType,
   ModuleSchema,
 } from "./schema.js";
+import type { RetryPolicy, BatchConfig } from "./resolvers.js";
 
 // ============================================================================
 // Derive Accessor Types
@@ -322,7 +324,7 @@ export interface DistributableSnapshot<T = Record<string, unknown>> {
  * Provides full type inference for facts, derivations, events, and dispatch.
  */
 /** Runtime control for constraints */
-export interface ConstraintsControl {
+export interface ConstraintsControl<M extends ModuleSchema = ModuleSchema> {
   /** Disable a constraint by ID — it will be excluded from evaluation */
   disable(id: string): void;
   /** Enable a previously disabled constraint — it will be re-evaluated on the next cycle */
@@ -334,14 +336,14 @@ export interface ConstraintsControl {
    * @throws If a constraint with this ID already exists (use `assign` to override)
    * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
    */
-  register(id: string, def: Record<string, unknown>): void;
+  register(id: string, def: DynamicConstraintDef<M>): void;
   /**
    * Override an existing constraint (static or dynamic).
    * Stores the original definition for potential inspection.
    * @throws If no constraint with this ID exists (use `register` to create)
    * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
    */
-  assign(id: string, def: Record<string, unknown>): void;
+  assign(id: string, def: DynamicConstraintDef<M>): void;
   /**
    * Remove a dynamically registered constraint.
    * Static (module-defined) constraints cannot be unregistered — logs a dev warning and no-ops.
@@ -362,7 +364,7 @@ export interface ConstraintsControl {
 }
 
 /** Runtime control for effects */
-export interface EffectsControl {
+export interface EffectsControl<M extends ModuleSchema = ModuleSchema> {
   /** Disable an effect by ID — it will be skipped during reconciliation */
   disable(id: string): void;
   /** Enable a previously disabled effect */
@@ -374,14 +376,14 @@ export interface EffectsControl {
    * @throws If an effect with this ID already exists (use `assign` to override)
    * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
    */
-  register(id: string, def: Record<string, unknown>): void;
+  register(id: string, def: DynamicEffectDef<M>): void;
   /**
    * Override an existing effect (static or dynamic).
    * Runs cleanup of the old effect before replacing.
    * @throws If no effect with this ID exists (use `register` to create)
    * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
    */
-  assign(id: string, def: Record<string, unknown>): void;
+  assign(id: string, def: DynamicEffectDef<M>): void;
   /**
    * Remove a dynamically registered effect.
    * Static (module-defined) effects cannot be unregistered — logs a dev warning and no-ops.
@@ -400,19 +402,19 @@ export interface EffectsControl {
 }
 
 /** Runtime control for derivations (dynamic registration + value access) */
-export interface DerivationsControl {
+export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
   /**
    * Register a new derivation at runtime.
    * @throws If a derivation with this ID already exists (use `assign` to override)
    * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
    */
-  register(id: string, fn: (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown): void;
+  register(id: string, fn: (facts: Readonly<InferSchema<M["facts"]>>, derived: Readonly<InferDerivations<M>>) => unknown): void;
   /**
    * Override an existing derivation (static or dynamic).
    * @throws If no derivation with this ID exists (use `register` to create)
    * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
    */
-  assign(id: string, fn: (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown): void;
+  assign(id: string, fn: (facts: Readonly<InferSchema<M["facts"]>>, derived: Readonly<InferDerivations<M>>) => unknown): void;
   /**
    * Remove a dynamically registered derivation.
    * Static (module-defined) derivations cannot be unregistered — logs a dev warning and no-ops.
@@ -421,9 +423,10 @@ export interface DerivationsControl {
   unregister(id: string): void;
   /**
    * Recompute and return a derivation's current value.
+   * Use the type parameter to specify the return type: `call<number>("id")`.
    * @throws If no derivation with this ID exists
    */
-  call(id: string): unknown;
+  call<T = unknown>(id: string): T;
   /** Check if a derivation was dynamically registered (not from a module definition) */
   isDynamic(id: string): boolean;
   /** List all dynamically registered derivation IDs */
@@ -431,20 +434,20 @@ export interface DerivationsControl {
 }
 
 /** Runtime control for resolvers */
-export interface ResolversControl {
+export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
   /**
    * Register a new resolver at runtime.
    * @throws If a resolver with this ID already exists (use `assign` to override)
    * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
    */
-  register(id: string, def: Record<string, unknown>): void;
+  register(id: string, def: DynamicResolverDef<M>): void;
   /**
    * Override an existing resolver (static or dynamic).
    * Clears the resolver-by-type cache.
    * @throws If no resolver with this ID exists (use `register` to create)
    * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
    */
-  assign(id: string, def: Record<string, unknown>): void;
+  assign(id: string, def: DynamicResolverDef<M>): void;
   /**
    * Remove a dynamically registered resolver.
    * Static (module-defined) resolvers cannot be unregistered — logs a dev warning and no-ops.
@@ -462,14 +465,53 @@ export interface ResolversControl {
   listDynamic(): string[];
 }
 
+// ============================================================================
+// Dynamic Definition Types (for register/assign)
+// ============================================================================
+
+/** Constraint definition for dynamic registration — typed facts, relaxed requirements */
+export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
+  priority?: number;
+  async?: boolean;
+  when: (facts: Readonly<InferSchema<M["facts"]>>) => boolean | Promise<boolean>;
+  require:
+    | { type: string; [key: string]: unknown }
+    | { type: string; [key: string]: unknown }[]
+    | null
+    | ((facts: Readonly<InferSchema<M["facts"]>>) =>
+        | { type: string; [key: string]: unknown }
+        | { type: string; [key: string]: unknown }[]
+        | null);
+  timeout?: number;
+  after?: string[];
+  deps?: string[];
+}
+
+/** Effect definition for dynamic registration — typed facts */
+export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
+  run: (facts: Readonly<InferSchema<M["facts"]>>, prev: InferSchema<M["facts"]> | null) => void | (() => void) | Promise<void | (() => void)>;
+  deps?: Array<string & keyof InferSchema<M["facts"]>>;
+}
+
+/** Resolver definition for dynamic registration — typed context.facts, relaxed requirement */
+export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
+  requirement: string;
+  key?: (req: { type: string; [key: string]: unknown }) => string;
+  retry?: RetryPolicy;
+  timeout?: number;
+  batch?: BatchConfig;
+  resolve?: (req: { type: string; [key: string]: unknown }, context: { facts: InferSchema<M["facts"]>; signal: AbortSignal; snapshot: () => InferSchema<M["facts"]> }) => Promise<void>;
+  resolveBatch?: (reqs: { type: string; [key: string]: unknown }[], context: { facts: InferSchema<M["facts"]>; signal: AbortSignal; snapshot: () => InferSchema<M["facts"]> }) => Promise<void>;
+}
+
 export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly facts: Facts<M["facts"]>;
   readonly history: HistoryAPI | null;
-  readonly derive: InferDerivations<M> & DerivationsControl;
+  readonly derive: InferDerivations<M> & DerivationsControl<M>;
   readonly events: EventsAccessorFromSchema<M>;
-  readonly constraints: ConstraintsControl;
-  readonly effects: EffectsControl;
-  readonly resolvers: ResolversControl;
+  readonly constraints: ConstraintsControl<M>;
+  readonly effects: EffectsControl<M>;
+  readonly resolvers: ResolversControl<M>;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
