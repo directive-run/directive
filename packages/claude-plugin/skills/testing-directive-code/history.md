@@ -237,6 +237,17 @@ history.endChangeset();
 // One goBack() reverts both events
 ```
 
+Also works for direct fact mutations across separate synchronous blocks:
+
+```typescript
+history.beginChangeset("Update user");
+system.facts.firstName = "Alice";
+system.facts.lastName = "Smith";
+// These batch into one snapshot synchronously, but changeset
+// still works if an async gap separates them
+history.endChangeset();
+```
+
 Always close your changesets. If you forget `endChangeset()`, all subsequent mutations get grouped into the same changeset.
 
 ## Exporting and Importing History
