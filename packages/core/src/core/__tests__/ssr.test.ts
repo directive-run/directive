@@ -181,7 +181,7 @@ describe("SSR", () => {
         resolvers: {
           slowFetch: {
             requirement: "SLOW_FETCH",
-            resolve: async (req, context) => {
+            resolve: async (_req, context) => {
               // Simulate a very slow resolver
               await new Promise((resolve) => setTimeout(resolve, 10000));
               context.facts.status = "done";
