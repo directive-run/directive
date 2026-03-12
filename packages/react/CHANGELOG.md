@@ -1,5 +1,11 @@
 # @directive-run/react
 
+## 0.7.0
+
+### Patch Changes
+
+- [`702a3f6`](https://github.com/directive-run/directive/commit/702a3f6732f6c59ce95ab339b7b96d979d7d7fd7) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix missing `history` option on `useDirectiveRef` — `DirectiveRefBaseConfig` now accepts `history?: HistoryOption` and passes it through to `createSystem` in both single-module and namespaced modes.
+
 ## 0.6.0
 
 ### Minor Changes

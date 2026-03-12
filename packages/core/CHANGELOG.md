@@ -1,5 +1,15 @@
 # @directive-run/core
 
+## 0.7.0
+
+### Minor Changes
+
+- [`72ed25c`](https://github.com/directive-run/directive/commit/72ed25c1a6b00019a3f6e9e119de85d5107a5676) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add type-safe runtime dynamics for dynamic definition APIs.
+  - Add `DynamicConstraintDef`, `DynamicEffectDef`, `DynamicResolverDef` types for typed `register()` and `assign()` callbacks
+  - Parameterize `ConstraintsControl`, `EffectsControl`, `DerivationsControl`, `ResolversControl` on module schema — dynamic definition callbacks now receive typed `facts` with autocomplete
+  - Add generic `call<T>()` on `DerivationsControl` for typed derivation return values
+  - Thread type params through `System<M>` and `SingleModuleSystem<S>`
+
 ## 0.6.0
 
 ### Minor Changes
