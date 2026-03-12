@@ -90,8 +90,8 @@ const results = await orchestrator.runSequential(
 );`;
 
 const tabs = [
-  { name: "support.ts", language: "typescript" },
-  { name: "pipeline.ts", language: "typescript" },
+  { name: "single-agent.ts", language: "typescript" },
+  { name: "multi-agent.ts", language: "typescript" },
 ];
 
 const codeBlocks = [singleAgentCode, multiAgentCode];
