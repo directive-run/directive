@@ -6,7 +6,9 @@ import Link from "next/link";
 import { Logomark } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeSelector";
 import { DiscordIcon } from "@/components/icons/DiscordIcon";
-import { GitHubIcon } from "@/components/icons/GitHubIcon";
+// TODO: Uncomment when repo is public
+// import { GitHubIcon } from "@/components/icons/GitHubIcon";
+import { NpmIcon } from "@/components/icons/NpmIcon";
 
 const footerLinkClass =
   "text-[15px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300";
@@ -127,6 +129,7 @@ export function Footer() {
         <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-slate-200/80 pt-6 text-xs text-slate-400 sm:flex-row dark:border-slate-800 dark:text-slate-500">
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {/* TODO: Uncomment when repo is public
             <Link
               href="https://github.com/directive-run/directive"
               target="_blank"
@@ -135,6 +138,16 @@ export function Footer() {
               aria-label="GitHub"
             >
               <GitHubIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
+            </Link>
+            */}
+            <Link
+              href="https://www.npmjs.com/package/@directive-run/core"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 transition-colors hover:bg-slate-200 dark:bg-brand-surface-raised dark:hover:bg-slate-700"
+              aria-label="npm"
+            >
+              <NpmIcon className="h-4 w-4 fill-slate-400 group-hover:fill-slate-500 dark:fill-slate-500 dark:group-hover:fill-slate-400" />
             </Link>
             <Link
               href="https://discord.gg/SVzqPbHsy8"

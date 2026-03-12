@@ -142,11 +142,19 @@ export function AIHero() {
               </p>
               <div className="mt-8 flex gap-4 md:justify-center lg:justify-start">
                 <Button href="/ai/running-agents">Get started</Button>
+                {/* TODO: Uncomment when repo is public
                 <Button
                   href="https://github.com/directive-run/directive"
                   variant="secondary"
                 >
                   View on GitHub
+                </Button>
+                */}
+                <Button
+                  href="https://www.npmjs.com/package/@directive-run/core"
+                  variant="secondary"
+                >
+                  View on npm
                 </Button>
               </div>
             </div>

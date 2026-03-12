@@ -21,7 +21,9 @@ import { Search } from "@/components/Search";
 import { ShareButton } from "@/components/ShareButton";
 import { ThemeToggle } from "@/components/ThemeSelector";
 import { VersionSelector } from "@/components/VersionSelector";
-import { GitHubIcon } from "@/components/icons/GitHubIcon";
+// TODO: Uncomment when repo is public
+// import { GitHubIcon } from "@/components/icons/GitHubIcon";
+import { NpmIcon } from "@/components/icons/NpmIcon";
 import {
   useCanUseChat,
   useCanUseSearch,
@@ -130,12 +132,21 @@ function Header() {
             <BrandPresetSwitcher className="relative z-10" />
           </div>
           {canUseShareButton && <ShareButton />}
+          {/* TODO: Uncomment when repo is public
           <Link
             href="https://github.com/directive-run/directive"
             className="group flex h-6 w-6 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
             aria-label="GitHub"
           >
             <GitHubIcon className="h-6 w-6 fill-slate-400 group-hover:fill-slate-500 dark:group-hover:fill-slate-300" />
+          </Link>
+          */}
+          <Link
+            href="https://www.npmjs.com/package/@directive-run/core"
+            className="group flex h-6 w-6 items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary"
+            aria-label="npm"
+          >
+            <NpmIcon className="h-6 w-6 fill-slate-400 group-hover:fill-slate-500 dark:group-hover:fill-slate-300" />
           </Link>
         </div>
       </div>
