@@ -1,5 +1,13 @@
 # @directive-run/example-shopping-cart
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [[`72ed25c`](https://github.com/directive-run/directive/commit/72ed25c1a6b00019a3f6e9e119de85d5107a5676)]:
+  - @directive-run/core@0.7.0
+  - @directive-run/el@0.5.0
+
 ## 0.0.8
 
 ### Patch Changes
