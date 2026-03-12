@@ -104,8 +104,8 @@ npm install @directive-run/react
 import { useDerived, useDispatch } from '@directive-run/react';
 
 function UserGreeting({ system }) {
-  const greeting = useDerived<string>(system, "greeting");
-  const isLoggedIn = useDerived<boolean>(system, "isLoggedIn");
+  const greeting = useDerived(system, "greeting");
+  const isLoggedIn = useDerived(system, "isLoggedIn");
 
   return (
     <div>
