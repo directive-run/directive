@@ -181,7 +181,7 @@
   ```
 - `ConstraintsControl` — Runtime control for constraints
   ```ts
-  export interface ConstraintsControl {
+  export interface ConstraintsControl<M extends ModuleSchema = ModuleSchema> {
   ```
 - `ConstraintState` — Internal constraint state
   ```ts
@@ -205,7 +205,7 @@
   ```
 - `DerivationsControl` — Runtime control for derivations (dynamic registration + value access)
   ```ts
-  export interface DerivationsControl {
+  export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
   ```
 - `DerivationState` — Internal derivation state
   ```ts
@@ -223,9 +223,21 @@
   ```ts
   export interface DistributableSnapshotOptions {
   ```
+- `DynamicConstraintDef` — Constraint definition for dynamic registration — typed facts, relaxed requirements
+  ```ts
+  export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
+  ```
+- `DynamicEffectDef` — Effect definition for dynamic registration — typed facts
+  ```ts
+  export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
+  ```
+- `DynamicResolverDef` — Resolver definition for dynamic registration — typed context.facts, relaxed requirement
+  ```ts
+  export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
+  ```
 - `EffectsControl` — Runtime control for effects
   ```ts
-  export interface EffectsControl {
+  export interface EffectsControl<M extends ModuleSchema = ModuleSchema> {
   ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
@@ -321,7 +333,7 @@
   ```
 - `ResolversControl` — Runtime control for resolvers
   ```ts
-  export interface ResolversControl {
+  export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
   ```
 - `RetryLaterConfig` — Configuration for retry-later strategy.
   ```ts
