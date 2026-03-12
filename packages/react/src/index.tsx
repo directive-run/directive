@@ -45,6 +45,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
+  HistoryOption,
   HistoryState,
 } from "@directive-run/core";
 import {
@@ -1152,6 +1153,7 @@ function _useSuspenseRequirementMulti(
 interface DirectiveRefBaseConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
+  history?: HistoryOption;
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
@@ -1225,6 +1227,7 @@ export function useDirectiveRef(
         // --- Namespaced mode: { modules: { ... } } ---
         const { modules, ...rest } = options;
         const plugins = config?.plugins ?? rest.plugins ?? [];
+        const history = config?.history ?? rest.history;
         const trace = config?.trace ?? rest.trace;
         const errorBoundary = config?.errorBoundary ?? rest.errorBoundary;
         const tickMs = config?.tickMs ?? rest.tickMs;
@@ -1234,6 +1237,7 @@ export function useDirectiveRef(
         const sys = createSystem({
           modules,
           plugins: plugins.length > 0 ? plugins : undefined,
+          history,
           trace,
           errorBoundary,
           tickMs,
@@ -1256,6 +1260,7 @@ export function useDirectiveRef(
       const mod = isModule ? options : options.module;
       const baseOpts = isModule ? {} : (options as DirectiveRefBaseConfig);
       const plugins = config?.plugins ?? baseOpts.plugins ?? [];
+      const history = config?.history ?? baseOpts.history;
       const trace = config?.trace ?? baseOpts.trace;
       const errorBoundary = config?.errorBoundary ?? baseOpts.errorBoundary;
       const tickMs = config?.tickMs ?? baseOpts.tickMs;
@@ -1277,6 +1282,7 @@ export function useDirectiveRef(
       const sys = createSystem({
         module: mod,
         plugins: allPlugins.length > 0 ? allPlugins : undefined,
+        history,
         trace,
         errorBoundary,
         tickMs,
