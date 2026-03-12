@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`702a3f6`](https://github.com/directive-run/directive/commit/702a3f6732f6c59ce95ab339b7b96d979d7d7fd7), [`72ed25c`](https://github.com/directive-run/directive/commit/72ed25c1a6b00019a3f6e9e119de85d5107a5676)]:
+  - @directive-run/react@0.7.0
+  - @directive-run/core@0.7.0
+  - @directive-run/ai@0.7.0
+
 ## 0.1.7
 
 ### Patch Changes
