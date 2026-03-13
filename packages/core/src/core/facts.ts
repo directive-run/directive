@@ -488,9 +488,44 @@ export function createFactsStore<S extends Schema>(
 }
 
 // ============================================================================
-// Proxy-based Facts Accessor
+// Dev-mode nested mutation warning
 // ============================================================================
 
+/**
+ * Wrap an object in a Proxy that warns when properties are set.
+ * Catches `facts.user.name = "John"` which silently skips reactivity.
+ * Only used in dev mode — tree-shaken in production builds.
+ */
+function wrapWithNestedWarning(
+  obj: object,
+  rootKey: string,
+  path = rootKey,
+): object {
+  return new Proxy(obj, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop);
+      if (typeof prop === "symbol" || typeof value !== "object" || value === null) {
+        return value;
+      }
+
+      return wrapWithNestedWarning(value as object, rootKey, `${path}.${String(prop)}`);
+    },
+    set(target, prop, newValue) {
+      if (typeof prop !== "symbol") {
+        console.warn(
+          `[Directive] Nested mutation on "facts.${path}.${String(prop)}" will not trigger reactivity. ` +
+            `Use: facts.${rootKey} = { ...facts.${rootKey}, ... }`,
+        );
+      }
+
+      return Reflect.set(target, prop, newValue);
+    },
+  });
+}
+
+// ============================================================================
+// Proxy-based Facts Accessor
+// ============================================================================
 
 /**
  * Create a Proxy wrapper around a {@link FactsStore} for clean property-style
@@ -546,8 +581,18 @@ export function createFactsProxy<S extends Schema>(
         return undefined;
       }
 
-      // Track and return the value
-      return store.get(prop as keyof InferSchema<S>);
+      const value = store.get(prop as keyof InferSchema<S>);
+
+      // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
+      if (
+        process.env.NODE_ENV !== "production" &&
+        value !== null &&
+        typeof value === "object"
+      ) {
+        return wrapWithNestedWarning(value as object, prop);
+      }
+
+      return value;
     },
 
     set(_, prop: string | symbol, value: unknown) {

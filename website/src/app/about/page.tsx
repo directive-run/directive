@@ -51,7 +51,7 @@ export default function AboutPage() {
         <p className="mt-4 text-xl text-slate-600 dark:text-slate-400">
           Directive is an open-source runtime for TypeScript that replaces
           manual state orchestration with declarative constraints. Hardened by
-          1,400+ tests, designed to scale from UI state to AI agent
+          3,050+ tests, designed to scale from UI state to AI agent
           coordination.
         </p>
 
@@ -79,7 +79,7 @@ export default function AboutPage() {
           <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div className="rounded-lg bg-brand-surface-card px-4 py-3 ring-1 ring-slate-200/60 dark:bg-slate-800/60 dark:ring-slate-700/40">
               <p className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-                1,400+
+                3,050+
               </p>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 tests passing

@@ -1035,3 +1035,159 @@ describe("createFacts", () => {
     }).toThrow(/Validation failed/);
   });
 });
+
+// ============================================================================
+// Nested Mutation Detection (dev mode)
+// ============================================================================
+
+describe("nested mutation detection (dev mode)", () => {
+  it("warns when setting a nested property on an object fact", () => {
+    const { facts } = createFacts({
+      schema: { user: t.object<{ name: string; age: number }>() },
+      validate: false,
+    });
+
+    facts.user = { name: "Alice", age: 30 };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts.user as { name: string }).name = "Bob";
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Nested mutation on "facts.user.name"'),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("will not trigger reactivity"),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("warns on deeply nested mutations", () => {
+    const { facts } = createFacts({
+      schema: {
+        config: t.object<{ db: { host: string; port: number } }>(),
+      },
+      validate: false,
+    });
+
+    facts.config = { db: { host: "localhost", port: 5432 } };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts.config as { db: { host: string } }).db.host = "remote";
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Nested mutation on "facts.config.db.host"'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("includes spread pattern suggestion in warning", () => {
+    const { facts } = createFacts({
+      schema: { user: t.object<{ name: string }>() },
+      validate: false,
+    });
+
+    facts.user = { name: "Alice" };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts.user as { name: string }).name = "Bob";
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("facts.user = { ...facts.user, ... }"),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("does not warn on top-level assignment (normal reactivity)", () => {
+    const { facts } = createFacts({
+      schema: { user: t.object<{ name: string }>() },
+      validate: false,
+    });
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    facts.user = { name: "Alice" };
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("does not wrap primitive values", () => {
+    const { facts } = createFacts({
+      schema: { count: t.number(), label: t.string() },
+      validate: false,
+    });
+
+    facts.count = 5;
+    facts.label = "test";
+
+    // Primitives can't have properties set on them — just verify no error
+    expect(facts.count).toBe(5);
+    expect(facts.label).toBe("test");
+  });
+
+  it("does not wrap null values", () => {
+    const { facts } = createFacts({
+      schema: { data: t.nullable(t.object<{ x: number }>()) },
+      validate: false,
+    });
+
+    facts.data = null;
+
+    // null should pass through without wrapping
+    expect(facts.data).toBeNull();
+  });
+
+  it("warns on array index mutation", () => {
+    const { facts } = createFacts({
+      schema: { items: t.array<string>() },
+      validate: false,
+    });
+
+    facts.items = ["a", "b", "c"];
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts.items as string[])[0] = "z";
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Nested mutation on "facts.items.0"'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("the actual mutation still takes effect (non-breaking)", () => {
+    const { facts, store } = createFacts({
+      schema: { user: t.object<{ name: string }>() },
+      validate: false,
+    });
+
+    facts.user = { name: "Alice" };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts.user as { name: string }).name = "Bob";
+
+    // The mutation happens on the underlying object (just no reactivity)
+    const raw = store.get("user") as { name: string };
+    expect(raw.name).toBe("Bob");
+    warnSpy.mockRestore();
+  });
+
+  it("reads through the warning proxy return correct values", () => {
+    const { facts } = createFacts({
+      schema: {
+        user: t.object<{ name: string; address: { city: string } }>(),
+      },
+      validate: false,
+    });
+
+    facts.user = { name: "Alice", address: { city: "NYC" } };
+
+    // Reading nested values should work normally
+    expect((facts.user as { name: string }).name).toBe("Alice");
+    expect(
+      (facts.user as { address: { city: string } }).address.city,
+    ).toBe("NYC");
+  });
+});
