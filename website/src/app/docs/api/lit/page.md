@@ -688,7 +688,9 @@ useHistory(system: System): HistoryState | null
 const tt = useHistory(system);
 
 // Undo the last action if possible
-if (tt?.canGoBack) tt.goBack();
+if (tt?.canGoBack) {
+  tt.goBack();
+}
 ```
 
 ### getDerived
@@ -760,7 +762,10 @@ shallowEqual(a: unknown, b: unknown): boolean
 ```typescript
 // Use shallowEqual to prevent re-renders when name/age haven't changed
 const selected = new DirectiveSelectorController(
-  this, system, (facts) => ({ name: facts.user?.name, age: facts.user?.age }), shallowEqual
+  this,
+  system,
+  (facts) => ({ name: facts.user?.name, age: facts.user?.age }),
+  shallowEqual
 );
 ```
 

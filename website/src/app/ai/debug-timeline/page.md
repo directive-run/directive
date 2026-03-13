@@ -243,7 +243,10 @@ In a multi-agent orchestrator, every event includes `agentId`, making it easy to
 ```typescript
 const multi = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   debug: true,
 });
 

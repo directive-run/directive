@@ -161,7 +161,10 @@ const orchestrator = createAgentOrchestrator({
 // Multi-agent – cache guardrail at orchestrator level applies to all agents
 const multi = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   guardrails: { input: [guardrail] },
 });
 ```

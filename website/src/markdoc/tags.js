@@ -1,4 +1,5 @@
 import { AiArchitectureDiagram } from "@/components/AiArchitectureDiagram";
+import { GuardrailFlowDiagram } from "@/components/GuardrailFlowDiagram";
 import { Callout } from "@/components/Callout";
 import { ComparisonTable } from "@/components/ComparisonTable";
 import { ConstraintDependencyDiagram } from "@/components/ConstraintDependencyDiagram";
@@ -87,6 +88,10 @@ const tags = {
   },
   "ai-architecture-diagram": {
     render: AiArchitectureDiagram,
+    selfClosing: true,
+  },
+  "guardrail-flow-diagram": {
+    render: GuardrailFlowDiagram,
     selfClosing: true,
   },
   "security-pipeline-diagram": {

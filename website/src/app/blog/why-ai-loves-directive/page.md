@@ -263,8 +263,16 @@ resilientRunner = withFallback([
 // Rolling budget windows prevent runaway spend
 resilientRunner = withBudget(resilientRunner, {
   budgets: [
-    { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-    { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    {
+      window: 'hour' as const,
+      maxCost: 5.00,
+      pricing: { inputPerMillion: 0.8, outputPerMillion: 4 },
+    },
+    {
+      window: 'day' as const,
+      maxCost: 50.00,
+      pricing: { inputPerMillion: 0.8, outputPerMillion: 4 },
+    },
   ],
 });
 ```

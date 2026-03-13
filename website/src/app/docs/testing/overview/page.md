@@ -259,7 +259,9 @@ test('effect runs on fact change', async () => {
     effects: {
       logChange: {
         run: (facts, prev) => {
-          if (prev?.value !== facts.value) logs.push(facts.value);
+          if (prev?.value !== facts.value) {
+            logs.push(facts.value);
+          }
         },
       },
     },

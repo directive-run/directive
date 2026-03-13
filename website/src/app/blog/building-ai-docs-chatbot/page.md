@@ -154,9 +154,15 @@ const matches = await enricher.retrieve(message, 7)
 // Re-rank with source-type boost
 const ranked = matches.map((chunk) => {
   let boost = 0
-  if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') boost += 0.1
-  if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') boost += 0.05
-  if (safePath && chunk.metadata.url?.startsWith(safePath)) boost += 0.05
+  if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') {
+    boost += 0.1
+  }
+  if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') {
+    boost += 0.05
+  }
+  if (safePath && chunk.metadata.url?.startsWith(safePath)) {
+    boost += 0.05
+  }
 
   return { ...chunk, boostedScore: chunk.similarity + boost }
 })
@@ -196,7 +202,9 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 function evictExpired() {
   const now = Date.now()
   for (const [ip, entry] of rateLimitMap) {
-    if (now > entry.resetAt) rateLimitMap.delete(ip)
+    if (now > entry.resetAt) {
+      rateLimitMap.delete(ip)
+    }
   }
 }
 
@@ -205,7 +213,9 @@ function isRateLimited(ip: string): boolean {
   const entry = rateLimitMap.get(ip)
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
-    if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) evictExpired()
+    if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+      evictExpired()
+    }
 
     return false
   }
@@ -517,8 +527,12 @@ export async function POST(request: NextRequest) {
     const ranked = matches
       .map((chunk) => {
         let boost = 0
-        if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') boost += 0.1
-        if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') boost += 0.05
+        if (intent === 'api' && chunk.metadata.sourceType === 'api-reference') {
+          boost += 0.1
+        }
+        if (intent === 'conceptual' && chunk.metadata.sourceType === 'guide') {
+          boost += 0.05
+        }
         return { ...chunk, boostedScore: chunk.similarity + boost }
       })
       .sort((a, b) => b.boostedScore - a.boostedScore)

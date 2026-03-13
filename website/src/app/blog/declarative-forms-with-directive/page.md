@@ -33,7 +33,9 @@ function ContactForm() {
   const canSubmit = isValid && status === "idle" && !isRateLimited;
 
   useEffect(() => {
-    if (status !== "submitting") return;
+    if (status !== "submitting") {
+      return;
+    }
     const controller = new AbortController();
     fetch("https://formspree.io/f/...", {
       method: "POST",
@@ -50,7 +52,9 @@ function ContactForm() {
   }, [status, name, email, subject, message]);
 
   useEffect(() => {
-    if (status !== "success") return;
+    if (status !== "success") {
+      return;
+    }
     const timer = setTimeout(() => {
       setName(""); setEmail(""); setSubject(""); setMessage("");
       setTouched({}); setStatus("idle"); setErrorMessage("");
@@ -541,7 +545,9 @@ This is where Directive diverges most from React patterns. The two constraints &
 ```typescript
 // Imperative: "when status changes to submitting, do this..."
 useEffect(() => {
-  if (status !== "submitting") return;
+  if (status !== "submitting") {
+    return;
+  }
   fetch(...)
   return () => controller.abort();
 }, [status, name, email, subject, message]);

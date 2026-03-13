@@ -733,7 +733,9 @@ function SessionControls() {
       </button>
       <button onClick={() => {
         const saved = localStorage.getItem('debug');
-        if (saved) importSession(saved);
+        if (saved) {
+          importSession(saved);
+        }
       }}>
         Restore Session
       </button>

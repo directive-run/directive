@@ -232,7 +232,9 @@ const orchestrator = createMultiAgentOrchestrator({
     validate: {
       run: async (input, signal, context) => {
         const data = JSON.parse(input);
-        if (!data.result) throw new Error('Missing result');
+        if (!data.result) {
+          throw new Error('Missing result');
+        }
         return input;
       },
       label: 'Validate',
@@ -325,7 +327,10 @@ See [Streaming](/ai/streaming) for chunk types and stream operators.
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   autoApproveToolCalls: false,
   approvalTimeoutMs: 60000,
 
@@ -401,7 +406,10 @@ const orchestrator = createMultiAgentOrchestrator({
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   maxTokenBudget: 50000,
   budgetWarningThreshold: 0.75,
   onBudgetWarning: ({ currentTokens, maxBudget, percentage }) => {

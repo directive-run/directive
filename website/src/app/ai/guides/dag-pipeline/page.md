@@ -100,19 +100,34 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     researcher: {
-      agent: { name: 'researcher', instructions: 'Research the topic. Return structured findings.' },
+      agent: {
+        name: 'researcher',
+        instructions: 'Research the topic. Return structured findings.',
+      },
     },
     'fact-checker': {
-      agent: { name: 'fact-checker', instructions: 'Verify claims. Return confirmed and unconfirmed facts.' },
+      agent: {
+        name: 'fact-checker',
+        instructions: 'Verify claims. Return confirmed and unconfirmed facts.',
+      },
     },
     writer: {
-      agent: { name: 'writer', instructions: 'Write a blog post from research and verified facts.' },
+      agent: {
+        name: 'writer',
+        instructions: 'Write a blog post from research and verified facts.',
+      },
     },
     editor: {
-      agent: { name: 'editor', instructions: 'Edit for clarity and grammar. Return final version.' },
+      agent: {
+        name: 'editor',
+        instructions: 'Edit for clarity and grammar. Return final version.',
+      },
     },
     'seo-optimizer': {
-      agent: { name: 'seo-optimizer', instructions: 'Optimize the final post for SEO. Add meta description and keywords.' },
+      agent: {
+        name: 'seo-optimizer',
+        instructions: 'Optimize the final post for SEO. Add meta description and keywords.',
+      },
     },
   },
   patterns: {

@@ -11,14 +11,7 @@ audit trails, and GDPR/CCPA compliance &ndash; see
 [Security & Compliance](/ai/security/overview).
 {% /callout %}
 
-```
-    Raw Input ──validate──► Injection Check ──redact──► PII Redaction
-                                                            │
-                                                         execute
-                                                            │
-                                                            ▼
-                                          Output Validation ◄── Agent Execution
-```
+{% guardrail-flow-diagram /%}
 
 ---
 
@@ -666,7 +659,9 @@ async function send(input: string) {
     await orchestrator.run(myAgent, input);
   } catch (err) {
     // Surface guardrail errors to the user
-    if (isGuardrailError(err)) error.value = err.userMessage;
+    if (isGuardrailError(err)) {
+      error.value = err.userMessage;
+    }
   }
 }
 </script>
@@ -697,7 +692,9 @@ async function send(input) {
   try {
     await orchestrator.run(myAgent, input);
   } catch (err) {
-    if (isGuardrailError(err)) error = err.userMessage;
+    if (isGuardrailError(err)) {
+      error = err.userMessage;
+    }
   }
 }
 </script>
@@ -727,7 +724,9 @@ function GuardedChat() {
     try {
       await orchestrator.run(myAgent, input);
     } catch (err) {
-      if (isGuardrailError(err)) setError(err.userMessage);
+      if (isGuardrailError(err)) {
+        setError(err.userMessage);
+      }
     }
   }
 

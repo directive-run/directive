@@ -22,13 +22,22 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     researcher: {
-      agent: { name: 'researcher', instructions: 'Research the given topic thoroughly. Return key findings as bullet points.' },
+      agent: {
+        name: 'researcher',
+        instructions: 'Research the given topic thoroughly. Return key findings as bullet points.',
+      },
     },
     writer: {
-      agent: { name: 'writer', instructions: 'Write a blog post based on the research provided.' },
+      agent: {
+        name: 'writer',
+        instructions: 'Write a blog post based on the research provided.',
+      },
     },
     reviewer: {
-      agent: { name: 'reviewer', instructions: 'Review the draft for accuracy, clarity, and tone. Return feedback.' },
+      agent: {
+        name: 'reviewer',
+        instructions: 'Review the draft for accuracy, clarity, and tone. Return feedback.',
+      },
     },
   },
 });
@@ -64,7 +73,10 @@ const orchestrator = createMultiAgentOrchestrator({
   runner, // See Running Agents (/ai/running-agents) for setup
   agents: {
     researcher: {
-      agent: { name: 'researcher', instructions: 'Research the topic. Return structured findings with sources.' },
+      agent: {
+        name: 'researcher',
+        instructions: 'Research the topic. Return structured findings with sources.',
+      },
       guardrails: {
         output: [
           createLengthGuardrail({ maxTokens: 2000 }),
@@ -72,7 +84,10 @@ const orchestrator = createMultiAgentOrchestrator({
       },
     },
     writer: {
-      agent: { name: 'writer', instructions: 'Write a 500-word blog post based on the research.' },
+      agent: {
+        name: 'writer',
+        instructions: 'Write a 500-word blog post based on the research.',
+      },
       guardrails: {
         output: [
           createLengthGuardrail({ maxTokens: 1500 }),
@@ -80,7 +95,10 @@ const orchestrator = createMultiAgentOrchestrator({
       },
     },
     editor: {
-      agent: { name: 'editor', instructions: 'Edit for clarity, grammar, and tone. Return the final version.' },
+      agent: {
+        name: 'editor',
+        instructions: 'Edit for clarity, grammar, and tone. Return the final version.',
+      },
     },
   },
   guardrails: {

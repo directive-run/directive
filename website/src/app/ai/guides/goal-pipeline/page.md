@@ -167,13 +167,31 @@ Register the goal as a reusable pattern:
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, analyst: { agent: analyst }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    analyst: { agent: analyst },
+    writer: { agent: writer },
+  },
   patterns: {
     report: goal(
       {
-        researcher: { handler: 'researcher', produces: ['findings'], extractOutput: (r) => ({ findings: r.output }) },
-        analyst: { handler: 'analyst', produces: ['analysis'], requires: ['findings'], extractOutput: (r) => ({ analysis: r.output }) },
-        writer: { handler: 'writer', produces: ['report'], requires: ['analysis'], extractOutput: (r) => ({ report: r.output }) },
+        researcher: {
+          handler: 'researcher',
+          produces: ['findings'],
+          extractOutput: (r) => ({ findings: r.output }),
+        },
+        analyst: {
+          handler: 'analyst',
+          produces: ['analysis'],
+          requires: ['findings'],
+          extractOutput: (r) => ({ analysis: r.output }),
+        },
+        writer: {
+          handler: 'writer',
+          produces: ['report'],
+          requires: ['analysis'],
+          extractOutput: (r) => ({ report: r.output }),
+        },
       },
       (facts) => facts.report != null,
       { maxSteps: 10, extract: (facts) => facts.report },

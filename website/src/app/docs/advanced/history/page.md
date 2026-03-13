@@ -397,7 +397,9 @@ function HistoryToolbar() {
       </button>
       <button onClick={() => {
         const saved = localStorage.getItem('debug');
-        if (saved) importSession(saved);
+        if (saved) {
+          importSession(saved);
+        }
       }}>
         Restore Session
       </button>
@@ -421,12 +423,16 @@ import { system } from './system';
 const history = useHistory(system);
 
 function saveSession() {
-  if (history.value) localStorage.setItem('debug', history.value.exportSession());
+  if (history.value) {
+    localStorage.setItem('debug', history.value.exportSession());
+  }
 }
 
 function restoreSession() {
   const saved = localStorage.getItem('debug');
-  if (saved && history.value) history.value.importSession(saved);
+  if (saved && history.value) {
+    history.value.importSession(saved);
+  }
 }
 </script>
 
@@ -476,12 +482,16 @@ import { system } from '$lib/directive';
 const history = useHistory(system);
 
 function saveSession() {
-  if ($history) localStorage.setItem('debug', $history.exportSession());
+  if ($history) {
+    localStorage.setItem('debug', $history.exportSession());
+  }
 }
 
 function restoreSession() {
   const saved = localStorage.getItem('debug');
-  if (saved && $history) $history.importSession(saved);
+  if (saved && $history) {
+    $history.importSession(saved);
+  }
 }
 </script>
 
@@ -580,7 +590,9 @@ function HistoryToolbar() {
             </button>
             <button onClick={() => {
               const saved = localStorage.getItem('debug');
-              if (saved) importSession(saved);
+              if (saved) {
+                importSession(saved);
+              }
             }}>
               Restore Session
             </button>
@@ -650,7 +662,9 @@ class HistoryToolbar extends LitElement {
       </button>
       <button @click=${() => {
         const saved = localStorage.getItem('debug');
-        if (saved) importSession(saved);
+        if (saved) {
+          importSession(saved);
+        }
       }}>
         Restore Session
       </button>

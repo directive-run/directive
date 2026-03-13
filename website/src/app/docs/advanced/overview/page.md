@@ -28,7 +28,10 @@ import { createSystem } from '@directive-run/core';
 
 // Compose multiple modules into a single system
 const system = createSystem({
-  modules: { auth: authModule, cart: cartModule },
+  modules: {
+    auth: authModule,
+    cart: cartModule,
+  },
 });
 
 // Each module's facts live under its namespace

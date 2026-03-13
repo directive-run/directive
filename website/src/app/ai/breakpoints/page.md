@@ -132,7 +132,10 @@ import { createMultiAgentOrchestrator } from '@directive-run/ai';
 
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   breakpoints: [
     { type: 'pre_handoff', agentIds: ['researcher'] },
     { type: 'pre_pattern_step', patternIds: ['pipeline'] },

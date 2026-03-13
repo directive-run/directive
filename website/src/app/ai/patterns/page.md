@@ -731,9 +731,21 @@ When goal resolution stalls, progressively apply recovery strategies:
 ```typescript
 goal(nodes, when, {
   relaxation: [
-    { label: 'retry-reviewer', afterStallSteps: 3, strategy: { type: 'allow_rerun', nodes: ['reviewer'] } },
-    { label: 'inject-defaults', afterStallSteps: 5, strategy: { type: 'inject_facts', facts: { 'article.approved': true } } },
-    { label: 'accept-partial', afterStallSteps: 8, strategy: { type: 'accept_partial' } },
+    {
+      label: 'retry-reviewer',
+      afterStallSteps: 3,
+      strategy: { type: 'allow_rerun', nodes: ['reviewer'] },
+    },
+    {
+      label: 'inject-defaults',
+      afterStallSteps: 5,
+      strategy: { type: 'inject_facts', facts: { 'article.approved': true } },
+    },
+    {
+      label: 'accept-partial',
+      afterStallSteps: 8,
+      strategy: { type: 'accept_partial' },
+    },
   ],
 });
 ```

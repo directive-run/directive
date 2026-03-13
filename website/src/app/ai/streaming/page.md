@@ -126,8 +126,12 @@ const orchestrator = createMultiAgentOrchestrator({
 const { stream, result, abort } = orchestrator.runAgentStream<string>('writer', 'Write about AI');
 
 for await (const chunk of stream) {
-  if (chunk.type === 'token') process.stdout.write(chunk.data);
-  if (chunk.type === 'done') console.log(`\nDone: ${chunk.totalTokens} tokens`);
+  if (chunk.type === 'token') {
+    process.stdout.write(chunk.data);
+  }
+  if (chunk.type === 'done') {
+    console.log(`\nDone: ${chunk.totalTokens} tokens`);
+  }
 }
 
 const finalResult = await result;
@@ -171,7 +175,9 @@ const chatAgent = {
 const { stream, result, abort } = streamRunner(chatAgent, 'Hello!');
 
 for await (const chunk of stream) {
-  if (chunk.type === 'token') process.stdout.write(chunk.data);
+  if (chunk.type === 'token') {
+    process.stdout.write(chunk.data);
+  }
 }
 
 const finalResult = await result;
@@ -282,7 +288,9 @@ const streamRunner = createStreamingRunner(
     let fullContent = '';
 
     for await (const chunk of stream) {
-      if (callbacks.signal?.aborted) break;    // Stop if the caller cancelled
+      if (callbacks.signal?.aborted) {
+        break; // Stop if the caller cancelled
+      }
 
       const token = chunk.choices[0]?.delta?.content ?? '';
       if (token) {
@@ -379,7 +387,9 @@ for await (const chunk of stream) {
       break;
     case 'guardrail_triggered':
       console.warn(`${chunk.guardrailName}: ${chunk.reason}`);
-      if (chunk.stopped) break;
+      if (chunk.stopped) {
+        break;
+      }
       break;
     case 'error':
       console.error('Stream error:', chunk.error);
@@ -452,8 +462,12 @@ const { stream } = orchestrator.runStream(agent, input);
 
 // Observe each chunk for side effects (logging, metrics) without modifying it
 const logged = tapStream(stream, (chunk) => {
-  if (chunk.type === 'token') tokenCount++;
-  if (chunk.type === 'error') reportError(chunk.error);
+  if (chunk.type === 'token') {
+    tokenCount++;
+  }
+  if (chunk.type === 'error') {
+    reportError(chunk.error);
+  }
 });
 
 for await (const chunk of logged) {
@@ -520,7 +534,9 @@ function ChatStream() {
 
     // Append each token to state as it arrives
     for await (const chunk of stream) {
-      if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
+      if (chunk.type === 'token') {
+        setOutput((prev) => prev + chunk.data);
+      }
     }
   }, [orchestrator]);
 
@@ -552,7 +568,9 @@ async function send(input: string) {
 
   const { stream } = orchestrator.runStream(myAgent, input);
   for await (const chunk of stream) {
-    if (chunk.type === 'token') output.value += chunk.data;  // Append tokens reactively
+    if (chunk.type === 'token') {
+      output.value += chunk.data; // Append tokens reactively
+    }
   }
 }
 </script>
@@ -582,7 +600,9 @@ async function send(input) {
 
   const { stream } = orchestrator.runStream(myAgent, input);
   for await (const chunk of stream) {
-    if (chunk.type === 'token') output += chunk.data;  // Svelte reactively updates the template
+    if (chunk.type === 'token') {
+      output += chunk.data; // Svelte reactively updates the template
+    }
   }
 }
 </script>
@@ -611,7 +631,9 @@ function ChatStream() {
 
     const { stream } = orchestrator.runStream(myAgent, input);
     for await (const chunk of stream) {
-      if (chunk.type === 'token') setOutput((prev) => prev + chunk.data);
+      if (chunk.type === 'token') {
+        setOutput((prev) => prev + chunk.data);
+      }
     }
   }
 

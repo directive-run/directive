@@ -137,14 +137,30 @@ const featureFlags = createModule("feature-flags", {
       facts.shareButtonEnabled && !facts.maintenanceMode,
     enabledCount: (facts) => {
       let count = 0;
-      if (facts.chatEnabled) count++;
-      if (facts.searchEnabled) count++;
-      if (facts.playgroundEnabled) count++;
-      if (facts.brandSwitcherEnabled) count++;
-      if (facts.themeSelectorEnabled) count++;
-      if (facts.onboardingToastEnabled) count++;
-      if (facts.versionSelectorEnabled) count++;
-      if (facts.shareButtonEnabled) count++;
+      if (facts.chatEnabled) {
+        count++;
+      }
+      if (facts.searchEnabled) {
+        count++;
+      }
+      if (facts.playgroundEnabled) {
+        count++;
+      }
+      if (facts.brandSwitcherEnabled) {
+        count++;
+      }
+      if (facts.themeSelectorEnabled) {
+        count++;
+      }
+      if (facts.onboardingToastEnabled) {
+        count++;
+      }
+      if (facts.versionSelectorEnabled) {
+        count++;
+      }
+      if (facts.shareButtonEnabled) {
+        count++;
+      }
 
       return count;
     },

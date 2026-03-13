@@ -392,8 +392,16 @@ runner = withFallback([runner, openaiRunner]);
 // P1: Cost budget – rolling windows prevent runaway spend
 runner = withBudget(runner, {
   budgets: [
-    { window: 'hour' as const, maxCost: 5.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
-    { window: 'day' as const, maxCost: 50.00, pricing: { inputPerMillion: 0.8, outputPerMillion: 4 } },
+    {
+      window: 'hour' as const,
+      maxCost: 5.00,
+      pricing: { inputPerMillion: 0.8, outputPerMillion: 4 },
+    },
+    {
+      window: 'day' as const,
+      maxCost: 50.00,
+      pricing: { inputPerMillion: 0.8, outputPerMillion: 4 },
+    },
   ],
 });
 

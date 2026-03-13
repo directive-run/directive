@@ -275,7 +275,11 @@ import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 
 const system = createSystem({
-  modules: { rocket: rocketModule, ship: shipModule, nav: navModule },
+  modules: {
+    rocket: rocketModule,
+    ship: shipModule,
+    nav: navModule,
+  },
 });
 system.start();
 

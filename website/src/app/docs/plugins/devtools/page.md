@@ -250,7 +250,9 @@ auth.start();
 // Enable tracing only on the system you're actively debugging
 const dashboard = createSystem({
   module: dashboardModule,
-  plugins: [devtoolsPlugin({ name: 'dashboard', trace: true, panel: true })],
+  plugins: [
+    devtoolsPlugin({ name: 'dashboard', trace: true, panel: true }),
+  ],
 });
 dashboard.start();
 ```
@@ -279,7 +281,9 @@ const plugins = [];
 
 // Devtools add a global object and event recording –exclude from production
 if (process.env.NODE_ENV === 'development') {
-  plugins.push(devtoolsPlugin({ name: 'my-app', trace: true, panel: true }));
+  plugins.push(
+    devtoolsPlugin({ name: 'my-app', trace: true, panel: true }),
+  );
 }
 
 const system = createSystem({
@@ -392,7 +396,9 @@ import { devtoolsPlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
   module: myModule,
-  plugins: [devtoolsPlugin({ panel: true, trace: true, position: 'bottom-right' })],
+  plugins: [
+    devtoolsPlugin({ panel: true, trace: true, position: 'bottom-right' }),
+  ],
 });
 
 system.start();

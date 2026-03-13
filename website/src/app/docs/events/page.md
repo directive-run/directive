@@ -145,7 +145,11 @@ const cartModule = createModule("cart", {
     },
 
     events: {
-      addToCart: { productId: t.string(), price: t.number(), quantity: t.number() },
+      addToCart: {
+        productId: t.string(),
+        price: t.number(),
+        quantity: t.number(),
+      },
       removeFromCart: { productId: t.string() },
       clearCart: {},
     },
@@ -198,11 +202,20 @@ const system = createSystem({
 
 // Access events through the module namespace
 system.events.auth.login({ token: "abc" });
-system.events.cart.addToCart({ productId: "123", price: 999, quantity: 1 });
+system.events.cart.addToCart({
+  productId: "123",
+  price: 999,
+  quantity: 1,
+});
 
 // Or use dispatch with prefixed type names
 system.dispatch({ type: "auth::login", token: "abc" });
-system.dispatch({ type: "cart::addToCart", productId: "123", price: 999, quantity: 1 });
+system.dispatch({
+  type: "cart::addToCart",
+  productId: "123",
+  price: 999,
+  quantity: 1,
+});
 ```
 
 ---

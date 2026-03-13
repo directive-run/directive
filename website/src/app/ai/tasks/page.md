@@ -68,7 +68,9 @@ tasks: {
   validate: {
     run: async (input) => {
       const data = JSON.parse(input);
-      if (!data.result) throw new Error('Missing result');
+      if (!data.result) {
+        throw new Error('Missing result');
+      }
       return input;
     },
     retry: {

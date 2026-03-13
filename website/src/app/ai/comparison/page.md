@@ -145,7 +145,10 @@ const result = await chain.invoke("query");
 // Directive
 const orchestrator = createMultiAgentOrchestrator({
   runner,
-  agents: { retriever: { agent: retriever }, writer: { agent: writer } },
+  agents: {
+    retriever: { agent: retriever },
+    writer: { agent: writer },
+  },
   patterns: { pipeline: sequential(['retriever', 'writer']) },
 });
 const result = await orchestrator.runPattern('pipeline', 'query');

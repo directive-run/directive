@@ -104,7 +104,9 @@ app.post('/api/chat', async (req, res) => {
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      break;
+    }
     res.write(value);
   }
   res.end();
@@ -158,7 +160,9 @@ let buffer = '';
 
 while (true) {
   const { done, value } = await reader.read();
-  if (done) break;
+  if (done) {
+    break;
+  }
 
   // Append new bytes – a single SSE frame may split across two reads
   buffer += decoder.decode(value, { stream: true });
@@ -167,9 +171,13 @@ while (true) {
   buffer = lines.pop() ?? '';  // Retain the incomplete trailing line
 
   for (const line of lines) {
-    if (!line.startsWith('data: ')) continue;
+    if (!line.startsWith('data: ')) {
+      continue;
+    }
     const data = line.slice(6).trim();
-    if (!data) continue;
+    if (!data) {
+      continue;
+    }
 
     let event: SSEEvent;
     try {
@@ -319,7 +327,11 @@ const anthropicStreamingRunner = createAnthropicStreamingRunner({
 
 const streamRunner = createStreamingRunner(anthropicStreamingRunner);
 
-const chatAgent = { name: 'chat', instructions: 'You are helpful.', model: 'claude-sonnet-4-5-20250929' };
+const chatAgent = {
+  name: 'chat',
+  instructions: 'You are helpful.',
+  model: 'claude-sonnet-4-5-20250929',
+};
 
 // Create a streamable wrapper for SSE transport
 const streamable = {
@@ -419,8 +431,16 @@ import { createAnthropicRunner, createAnthropicStreamingRunner } from '@directiv
 
 const apiKey = process.env.ANTHROPIC_API_KEY!;
 
-const researcher = { name: 'researcher', instructions: 'Research topics.', model: 'claude-sonnet-4-5-20250929' };
-const writer = { name: 'writer', instructions: 'Write articles.', model: 'claude-sonnet-4-5-20250929' };
+const researcher = {
+  name: 'researcher',
+  instructions: 'Research topics.',
+  model: 'claude-sonnet-4-5-20250929',
+};
+const writer = {
+  name: 'writer',
+  instructions: 'Write articles.',
+  model: 'claude-sonnet-4-5-20250929',
+};
 
 const streamRunner = createStreamingRunner(
   createAnthropicStreamingRunner({ apiKey }),

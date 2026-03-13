@@ -156,7 +156,9 @@ const useUserStore = create<UserStore>((set, get) => ({
 
   reset: () => {
     const { retryTimeoutId } = get();
-    if (retryTimeoutId) clearTimeout(retryTimeoutId);
+    if (retryTimeoutId) {
+      clearTimeout(retryTimeoutId);
+    }
     set({
       userId: null,
       user: null,

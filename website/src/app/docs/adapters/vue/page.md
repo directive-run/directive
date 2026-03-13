@@ -697,7 +697,11 @@ import { useSelector, shallowEqual } from '@directive-run/vue';
 import { system } from './system';
 
 // Use shallowEqual to prevent updates when x/y values haven't changed
-const coords = useSelector(system, (state) => ({ x: state.position?.x, y: state.position?.y }), shallowEqual);
+const coords = useSelector(
+  system,
+  (state) => ({ x: state.position?.x, y: state.position?.y }),
+  shallowEqual,
+);
 ```
 
 ---

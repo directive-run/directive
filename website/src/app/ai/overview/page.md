@@ -90,7 +90,10 @@ const result = await single.run(agent, 'Hello!');
 // Multi-agent
 const multi = createMultiAgentOrchestrator({
   runner,
-  agents: { researcher: { agent: researcher }, writer: { agent: writer } },
+  agents: {
+    researcher: { agent: researcher },
+    writer: { agent: writer },
+  },
   guardrails,
   maxTokenBudget: 50000,
 });

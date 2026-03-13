@@ -393,7 +393,12 @@ import { createSystem } from '@directive-run/core';
 import { loggingPlugin } from '@directive-run/core/plugins';
 
 const system = createSystem({
-  modules: { safety: agentSafety, pii: piiGuardrail, tool: toolGuardrail, approval: approvalGuardrail },
+  modules: {
+    safety: agentSafety,
+    pii: piiGuardrail,
+    tool: toolGuardrail,
+    approval: approvalGuardrail,
+  },
   plugins: [
     loggingPlugin({
       logConstraints: true,
