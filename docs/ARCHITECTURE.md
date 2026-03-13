@@ -158,6 +158,15 @@ ctx.facts.config = { ...ctx.facts.config, timeout: 5000 };
 ctx.facts.items = [...ctx.facts.items, "new item"];
 ```
 
+In dev mode (`NODE_ENV !== "production"`), Directive wraps returned objects in a recursive Proxy that warns on nested sets:
+
+```
+[Directive] Nested mutation on "facts.user.name" will not trigger reactivity.
+Use: facts.user = { ...facts.user, ... }
+```
+
+The warning proxy is tree-shaken in production builds. The mutation still applies — it just won't be reactive.
+
 This is the same pattern used by:
 - **React useState**: `setUser({ ...user, name: "John" })`
 - **Redux**: Reducers return new state objects
