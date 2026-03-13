@@ -124,6 +124,8 @@ context.facts.user.name = "John";
 // Good: replace the object
 context.facts.user = { ...context.facts.user, name: "John" };
 ```
+
+In dev mode, Directive catches these and logs a warning with the exact path and suggested fix. The detection is tree-shaken in production.
 {% /callout %}
 
 ---

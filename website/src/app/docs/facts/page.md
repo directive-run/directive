@@ -234,6 +234,15 @@ system.facts.tags.push("new-tag");
 system.facts.user = { ...system.facts.user, name: "New" };
 system.facts.tags = [...system.facts.tags, "new-tag"];
 ```
+
+In dev mode, Directive detects nested mutations and logs a warning with the exact path and a suggested fix:
+
+```
+[Directive] Nested mutation on "facts.user.name" will not trigger reactivity.
+Use: facts.user = { ...facts.user, ... }
+```
+
+This warning is tree-shaken in production builds.
 {% /callout %}
 
 ---
