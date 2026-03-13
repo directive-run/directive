@@ -37,8 +37,9 @@ website/public/embeddings.json
 # Generated API reference (rebuild with `pnpm build:api-docs`)
 website/docs/generated/
 
-# Claude Code local settings (may contain API keys)
-.claude/settings.local.json
+# Claude Code
+.claude/
+.claude-plugin/
 
 # Playwright
 playwright-report/
