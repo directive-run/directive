@@ -64,7 +64,7 @@ const ANIMATION_STEPS = [
 ] as const;
 
 const NODE_WIDTH = 440;
-const ROW_GAP = 180;
+const ROW_GAP = 280;
 
 export const GuardrailFlowDiagram = memo(function GuardrailFlowDiagram() {
   const { phase, isPlaying, toggle } = useAnimationLoop({
@@ -226,7 +226,7 @@ export const GuardrailFlowDiagram = memo(function GuardrailFlowDiagram() {
   return (
     <div className="guardrail-flow-diagram">
       <DiagramWrapper
-        height={680}
+        height={900}
         className="diagram-semi-compact"
         nodes={nodes}
         edges={edges}
