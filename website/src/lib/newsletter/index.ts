@@ -1,1 +1,0 @@
-export { newsletter } from "./module";
