@@ -388,6 +388,7 @@ export async function POST(request: NextRequest) {
           let boost = 0;
           if (intent === "api" && sourceType === "api-reference") boost += 0.1;
           if (intent === "conceptual" && sourceType === "guide") boost += 0.05;
+          if (intent === "conceptual" && sourceType === "page") boost += 0.05;
           if (intent === "pattern" && sourceType === "knowledge") boost += 0.1;
           if (intent === "pattern" && sourceType === "guide") boost += 0.05;
           if (intent === "debug" && sourceType === "knowledge") boost += 0.1;

@@ -24,7 +24,7 @@ import { log } from "../../scripts/lib/log";
 // Types
 // ---------------------------------------------------------------------------
 
-type SourceType = "guide" | "api-reference" | "blog" | "knowledge";
+type SourceType = "guide" | "api-reference" | "blog" | "knowledge" | "page";
 
 interface EmbeddingEntry {
   id: string;
@@ -573,6 +573,98 @@ async function main() {
   }
 
   log.item(`${allChunks.length} chunks`);
+
+  // =========================================================================
+  // Phase 1.5: TSX page companion content → section chunks
+  // =========================================================================
+
+  const contentFiles = glob.sync("**/page.content.md", { cwd: pagesDir });
+  log.step(`Phase 1.5: Page content (${contentFiles.length} files)`);
+  log.reads([`website/src/app/**/page.content.md (${contentFiles.length} files)`]);
+
+  let pageChunkCount = 0;
+  for (const file of contentFiles) {
+    const raw = fs.readFileSync(path.join(pagesDir, file), "utf8");
+
+    // Extract YAML frontmatter
+    const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!fmMatch) continue;
+
+    const frontmatter = fmMatch[1];
+    const body = fmMatch[2];
+
+    const titleMatch = frontmatter.match(/^title:\s*(.+)$/m);
+    const urlMatch = frontmatter.match(/^url:\s*(.+)$/m);
+    const pageTitle = titleMatch?.[1]?.trim() ?? path.basename(path.dirname(file));
+    const pageUrl = urlMatch?.[1]?.trim() ?? `/${file.replace(/\/page\.content\.md$/, "")}`;
+
+    const sections = splitMarkdownByHeading(body, pageTitle);
+
+    for (const section of sections) {
+      const tokens = estimateTokens(section.content);
+      if (tokens < MIN_CHUNK_TOKENS) continue;
+
+      if (tokens <= MAX_CHUNK_TOKENS) {
+        allChunks.push({
+          content: section.content,
+          url: `${pageUrl}#${slugify(section.heading)}`,
+          title: pageTitle,
+          section: section.heading,
+          sourceType: "page",
+        });
+        pageChunkCount++;
+      } else {
+        // Split large sections at paragraph boundaries
+        const paragraphs = section.content.split(/\n\n+/);
+        let currentParts: string[] = [section.heading];
+        let currentTokens = estimateTokens(section.heading);
+
+        for (const para of paragraphs) {
+          const paraTokens = estimateTokens(para);
+          if (
+            currentTokens + paraTokens > MAX_CHUNK_TOKENS &&
+            currentParts.length > 1
+          ) {
+            allChunks.push({
+              content: currentParts.join("\n\n"),
+              url: `${pageUrl}#${slugify(section.heading)}`,
+              title: pageTitle,
+              section: section.heading,
+              sourceType: "page",
+            });
+            pageChunkCount++;
+            currentParts = [`${section.heading} (continued)`];
+            currentTokens = estimateTokens(currentParts[0]);
+          }
+          currentParts.push(para);
+          currentTokens += paraTokens;
+        }
+
+        if (currentParts.length > 1 && currentTokens >= MIN_CHUNK_TOKENS) {
+          allChunks.push({
+            content: currentParts.join("\n\n"),
+            url: `${pageUrl}#${slugify(section.heading)}`,
+            title: pageTitle,
+            section: section.heading,
+            sourceType: "page",
+          });
+          pageChunkCount++;
+        }
+      }
+    }
+  }
+
+  log.item(`${pageChunkCount} chunks`);
+
+  // Warn about known marketing routes missing a companion file
+  const MARKETING_ROUTES = ["about", "philosophy", "contact", "support", "labs"];
+  for (const route of MARKETING_ROUTES) {
+    const tsxPath = path.join(pagesDir, route, "page.tsx");
+    const contentPath = path.join(pagesDir, route, "page.content.md");
+    if (fs.existsSync(tsxPath) && !fs.existsSync(contentPath)) {
+      log.warn(`Missing page.content.md for /${route} (page.tsx exists)`);
+    }
+  }
 
   // =========================================================================
   // Phase 2: Generated API reference → function-level chunks
