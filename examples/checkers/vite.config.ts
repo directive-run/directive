@@ -1,25 +1,29 @@
 import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
 import { defineConfig } from "vite";
 
+const NODE_SHIMS = [
+  "ws",
+  "fs",
+  "path",
+  "http",
+  "https",
+  "net",
+  "tls",
+  "crypto",
+  "stream",
+  "url",
+  "zlib",
+];
+
 export default defineConfig({
   base: "/examples/checkers/",
   build: {
     target: "esnext",
-    rollupOptions: {
-      external: [
-        "ws",
-        "fs",
-        "path",
-        "http",
-        "https",
-        "net",
-        "tls",
-        "crypto",
-        "stream",
-        "url",
-        "zlib",
-      ],
-    },
+  },
+  resolve: {
+    alias: Object.fromEntries(
+      NODE_SHIMS.map((mod) => [mod, new URL("./src/empty-shim.ts", import.meta.url).pathname]),
+    ),
   },
   plugins: [
     apiProxy({
