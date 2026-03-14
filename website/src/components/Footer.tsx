@@ -68,11 +68,6 @@ export function Footer() {
                         Brand Guide
                       </Link>
                     </li>
-                    <li>
-                      <Link href="/branding/logos" className={footerLinkClass}>
-                        Logo Concepts
-                      </Link>
-                    </li>
                   </>
                 )}
               </ul>

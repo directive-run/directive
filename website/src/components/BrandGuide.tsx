@@ -4,6 +4,8 @@ import { CaretDown } from "@phosphor-icons/react";
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 
+import { LogoShowcase } from "./LogoShowcase";
+
 const GOOGLE_FONTS_URL =
   "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500&family=Bricolage+Grotesque:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap";
 
@@ -2107,6 +2109,20 @@ function IndividualReviews() {
   );
 }
 
+function LogoPresetsSection() {
+  return (
+    <section>
+      <h2 className="mb-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        1. Logo
+      </h2>
+      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">
+        9 logomark presets with WCAG contrast validation. Click to expand, apply as site logo to preview in context.
+      </p>
+      <LogoShowcase />
+    </section>
+  );
+}
+
 function AEReviewSection() {
   return (
     <section>
@@ -2135,6 +2151,8 @@ export function BrandGuide() {
 
   return (
     <div className="space-y-16">
+      <LogoPresetsSection />
+      <hr className="border-slate-200 dark:border-slate-700" />
       <ColorPaletteSection />
       <hr className="border-slate-200 dark:border-slate-700" />
       <ComboPairingsSection />
