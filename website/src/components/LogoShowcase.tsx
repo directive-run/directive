@@ -41,9 +41,12 @@ function PresetCard({
   const barDark = resolveColor("bar", "dark");
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`group relative flex flex-col items-center gap-3 rounded-xl border p-4 transition-all ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(); } }}
+      className={`group relative flex cursor-pointer flex-col items-center gap-3 rounded-xl border p-4 transition-all ${
         isSelected
           ? "border-sky-500 bg-sky-500/10 ring-1 ring-sky-500/30"
           : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600"
@@ -93,7 +96,7 @@ function PresetCard({
           Apply as site logo
         </button>
       )}
-    </button>
+    </div>
   );
 }
 

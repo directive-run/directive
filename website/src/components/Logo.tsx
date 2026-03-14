@@ -81,7 +81,8 @@ export function Logo(props: React.ComponentPropsWithoutRef<"svg">) {
   // Derive text dimensions proportional to the coordinate space
   const fontSize = height * 0.493;
   const textY = height * 0.695;
-  const textWidth = height * 1.165;
+  // fontSize * 4.5 ensures "directive" in Lexend fits at any viewBox scale
+  const textWidth = fontSize * 4.5;
   const totalWidth = preset.lockupTextX + textWidth;
 
   return (
@@ -103,7 +104,7 @@ export function Logo(props: React.ComponentPropsWithoutRef<"svg">) {
           letterSpacing: "-0.025em",
         }}
       >
-        directive
+        Directive
       </text>
     </svg>
   );
