@@ -85,8 +85,12 @@ export interface CreateDerivationsOptions<
  * Notifications are deferred during invalidation so listeners always see
  * consistent state across multiple simultaneous fact changes.
  *
- * @param options - Derivation definitions, facts proxy, store, and optional lifecycle callbacks
- * @returns A `DerivationsManager` with get/invalidate/subscribe/getProxy methods
+ * @param options - Derivation definitions, facts proxy, store, and optional
+ *   lifecycle callbacks.
+ * @returns A {@link DerivationsManager} for accessing, invalidating, and
+ *   subscribing to derived values.
+ *
+ * @internal
  */
 export function createDerivationsManager<
   S extends Schema,
