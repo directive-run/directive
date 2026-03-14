@@ -31,11 +31,8 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
-# Generated embeddings (rebuild with `pnpm build:embeddings`)
-website/public/embeddings.json
-
-# Generated API reference (rebuild with `pnpm build:api-docs`)
-website/docs/generated/
+# Extracted website (now in directive-run/directive-docs)
+website/
 
 # Claude Code
 .claude/
