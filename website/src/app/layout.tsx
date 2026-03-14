@@ -21,7 +21,11 @@ import localFont from "next/font/local";
 import Script from "next/script";
 
 import { Providers } from "@/app/providers";
-import { SoftwareJsonLd, WebsiteJsonLd } from "@/components/JsonLd";
+import {
+  OrganizationJsonLd,
+  SoftwareJsonLd,
+  WebsiteJsonLd,
+} from "@/components/JsonLd";
 import { Layout } from "@/components/Layout";
 import { buildPresetInlineScript } from "@/lib/preset-inline-script";
 
@@ -247,6 +251,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{ __html: buildPresetInlineScript() }}
         />
+        <OrganizationJsonLd />
         <WebsiteJsonLd />
         <SoftwareJsonLd />
       </head>

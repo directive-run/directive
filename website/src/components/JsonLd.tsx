@@ -1,3 +1,25 @@
+export function OrganizationJsonLd() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Directive",
+    url: "https://directive.run",
+    logo: "https://directive.run/icon.svg",
+    sameAs: [
+      "https://github.com/directive-run/directive",
+      "https://www.npmjs.com/package/@directive-run/core",
+      "https://discord.gg/SVzqPbHsy8",
+    ],
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+
 export function WebsiteJsonLd() {
   const jsonLd = {
     "@context": "https://schema.org",
@@ -110,6 +132,10 @@ export function ArticleJsonLd({
       "@type": "Organization",
       name: "Directive",
       url: "https://directive.run",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://directive.run/icon.svg",
+      },
     },
     ...(image ? { image } : {}),
     ...(keywords && keywords.length > 0
@@ -149,6 +175,10 @@ export function DocumentationJsonLd({
       "@type": "Organization",
       name: "Directive",
       url: "https://directive.run",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://directive.run/icon.svg",
+      },
     },
     about: {
       "@type": "SoftwareApplication",

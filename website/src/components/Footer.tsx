@@ -61,11 +61,20 @@ export function Footer() {
                     Labs
                   </Link>
                 </li>
-                <li>
-                  <Link href="/branding" className={footerLinkClass}>
-                    Brand Guide
-                  </Link>
-                </li>
+                {process.env.NODE_ENV === "development" && (
+                  <>
+                    <li>
+                      <Link href="/branding" className={footerLinkClass}>
+                        Brand Guide
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/branding/logos" className={footerLinkClass}>
+                        Logo Concepts
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ul>
             </div>
             <div>

@@ -290,6 +290,20 @@ export function BroadcastMark(props: ConceptProps) {
   );
 }
 
+/** AI-1: D Monogram Traced — Illustrator trace of Midjourney D letterform */
+export function DMonogramTracedMark(props: ConceptProps) {
+  return (
+    <Wrapper {...props} viewBox="0 0 411.6 446.1">
+      {/* Vertical bar */}
+      <polygon points="105.5 445.12 105.48 446 0 446.1 0 .13 105.29 .15 105.5 445.12" fill="#e5e8ec" />
+      {/* Lower D curve (sky) */}
+      <path d="M105.48,446l.02-.88c.68-.39,1.78-1.14,2.7-2.07l110.1-110.61,15.59-15.76,90.58-91.02c1.37-1.51,2.2-2.81,2.74-4.24,2.86-1.6,5.24-3.72,7.91-6.4l64.26-64.55c5.93,22.62,11.7,45.66,12.17,69.86.56,28.8-4.32,56-14.29,82.95-19.91,53.8-59.13,98.45-111.34,122.77-28.36,13.21-53.68,20.05-85.67,20.02l-94.77-.07Z" fill="#01cbe7" />
+      {/* Upper D curve (dark blue) */}
+      <path d="M105.85.46l17.52-.46,77.95.27c51.09.17,98.81,21.03,136.61,54.53,8.01,7.1,15.23,14.59,21.99,22.86,12.65,15.47,32.54,46.44,37.36,64.8l2.1,8.02-64.26,64.55c-2.67,2.68-5.05,4.81-7.91,6.4-1-.77-1.92-1.56-3.31-2.95" fill="#0389c9" />
+    </Wrapper>
+  );
+}
+
 // All concepts for iteration
 export const LOGO_CONCEPTS = [
   { id: "current", name: "Current", rank: "—", Component: CurrentMark, description: "Chevron + constraint bar" },
@@ -310,4 +324,5 @@ export const LOGO_CONCEPTS = [
   { id: "double-chevron", name: "Double Chevron", rank: "MJ", Component: DoubleChevronMark, description: "Two stacked right-pointing arrows" },
   { id: "equilibrium-bold", name: "Equilibrium Bold", rank: "MJ", Component: EquilibriumBoldMark, description: "Filled diamond-chevrons with dot" },
   { id: "broadcast", name: "The Broadcast", rank: "MJ", Component: BroadcastMark, description: "Circle with thick concentric arcs" },
+  { id: "d-monogram-traced", name: "D Monogram (AI)", rank: "AI", Component: DMonogramTracedMark, description: "Illustrator-traced D letterform" },
 ] as const;

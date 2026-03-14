@@ -15,7 +15,9 @@ import {
   findColorPreset,
   findTypoPreset,
 } from "@/lib/brand-presets";
+import { LOGO_PRESETS, findLogoPreset } from "@/lib/logo-presets";
 import { useThemePresets } from "@/lib/useThemePresets";
+import { LogoPresetThumbnail } from "./LogoPresetThumbnail";
 
 export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   className,
@@ -29,10 +31,12 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
   const {
     colorId,
     typoId,
+    logoId,
     fontScale,
     mounted,
     handleColorChange,
     handleTypoChange,
+    handleLogoChange,
     handleFontSizeChange,
     handleReset,
     handleColorHover,
@@ -187,6 +191,36 @@ export const BrandPresetSwitcher = memo(function BrandPresetSwitcher({
                   </div>
                   <span className="max-w-full truncate text-[9px] font-medium text-slate-500 dark:text-slate-400">
                     {preset.id === "default" ? "Def" : preset.id}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Logo */}
+          <div className="mt-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Logo
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {LOGO_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => handleLogoChange(preset)}
+                  className={clsx(
+                    "group flex cursor-pointer flex-col items-center gap-1.5 rounded-lg px-1.5 pt-3 pb-2 transition",
+                    logoId === preset.id
+                      ? "bg-slate-100 ring-2 ring-slate-900 dark:bg-slate-700 dark:ring-white"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                  )}
+                  aria-label={preset.name}
+                  title={`${preset.name}: ${preset.description}`}
+                >
+                  <div className="flex items-center justify-center rounded bg-[#0f172a] p-1.5">
+                    <LogoPresetThumbnail preset={preset} size={24} />
+                  </div>
+                  <span className="max-w-full truncate text-[9px] font-medium text-slate-500 dark:text-slate-400">
+                    {preset.name}
                   </span>
                 </button>
               ))}

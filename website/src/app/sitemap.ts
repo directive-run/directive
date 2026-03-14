@@ -65,7 +65,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
       changeFrequency: "monthly" as const,
     },
-    { path: "/branding", priority: 0.5, changeFrequency: "monthly" as const },
+    // branding is dev-only, excluded from production sitemap
   ];
 
   for (const page of tsxPages) {

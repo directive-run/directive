@@ -13,6 +13,12 @@ import {
   findColorPreset,
   findTypoPreset,
 } from "@/lib/brand-presets";
+import { useLogoPreset } from "@/lib/LogoPresetContext";
+import {
+  DEFAULT_LOGO_PRESET,
+  type LogoPreset,
+  findLogoPreset,
+} from "@/lib/logo-presets";
 import {
   STORAGE_KEYS,
   safeGetItem,
@@ -26,6 +32,7 @@ export function useThemePresets() {
   const [fontScale, setFontScale] = useState<number>(100);
   const [mounted, setMounted] = useState(false);
   const activeColorRef = useRef(colorId);
+  const { preset: logoPreset, setPreset: setLogoPreset, resetPreset: resetLogoPreset } = useLogoPreset();
 
   useEffect(() => {
     setMounted(true);
@@ -85,16 +92,25 @@ export function useThemePresets() {
     }
   }, []);
 
+  const handleLogoChange = useCallback(
+    (preset: LogoPreset) => {
+      setLogoPreset(preset);
+    },
+    [setLogoPreset],
+  );
+
   const handleReset = useCallback(() => {
     activeColorRef.current = "default";
     clearPresets();
     setColorId("default");
     setTypoId(0);
     setFontScale(100);
+    resetLogoPreset();
     safeRemoveItem(STORAGE_KEYS.COLOR);
     safeRemoveItem(STORAGE_KEYS.TYPO);
     safeRemoveItem(STORAGE_KEYS.FONT_SIZE);
-  }, []);
+    safeRemoveItem(STORAGE_KEYS.LOGO);
+  }, [resetLogoPreset]);
 
   const handleColorHover = useCallback((preset: ColorPreset) => {
     applyColorPreset(preset);
@@ -110,11 +126,13 @@ export function useThemePresets() {
   return {
     colorId,
     typoId,
+    logoId: logoPreset.id,
     fontScale,
     mounted,
     activeColorRef,
     handleColorChange,
     handleTypoChange,
+    handleLogoChange,
     handleFontSizeChange,
     handleReset,
     handleColorHover,

@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   TYPO: "directive-brand-typo",
   FIRST_VISIT: "directive-brand-first-visit",
   FONT_SIZE: "directive-brand-font-size",
+  LOGO: "directive-brand-logo",
   EXPERIMENTS: "directive-labs-experiments",
   DISMISSED_NOTIFICATIONS: "directive-dismissed-notifications",
 } as const;
