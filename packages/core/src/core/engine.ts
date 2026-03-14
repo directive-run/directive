@@ -24,6 +24,9 @@ import {
   createDerivationsManager,
 } from "./derivations.js";
 import { type EffectsManager, createEffectsManager } from "./effects.js";
+import { createDeriveAccessor, createEventsAccessor } from "./engine-accessors.js";
+import { createDefinitionsRegistry } from "./engine-definitions.js";
+import { createTraceManager } from "./engine-trace.js";
 import {
   type ErrorBoundaryManager,
   createErrorBoundaryManager,
@@ -234,39 +237,12 @@ export function createEngine<S extends Schema>(
   // Assigned after createHistoryManager() below.
   let historyRef: HistoryManager<S> | null = null;
 
-  // Trace (per-run reconciliation changelog, gated by config.trace)
-  const traceEnabled = config.trace === true || (typeof config.trace === "object" && config.trace !== null);
-  const maxRuns = (typeof config.trace === "object" && config.trace !== null ? config.trace.maxRuns : undefined) ?? 100;
-  const traceEntries: TraceEntry[] = [];
-  const traceById = new Map<number, TraceEntry>();
-  let traceIdCounter = 0;
-  let currentTrace: TraceEntry | null = null;
-  const pendingFactChanges: Array<{
-    key: string;
-    oldValue: unknown;
-    newValue: unknown;
-  }> = [];
-  // Async resolver attribution: requirementId → traceId
-  const resolverTraceMap = new Map<string, number>();
-  // Track inflight resolvers per trace: traceId → count of pending resolvers
-  const traceInflightCount = new Map<number, number>();
-  // Consistent duration: track start time per trace (performance.now() based)
-  const traceStartMs = new Map<number, number>();
-  // Cached trace getter (E1): avoid spread on every access
-  let traceCache: TraceEntry[] | null = null;
-  let traceCacheVersion = 0;
-  let currentCacheVersion = 0;
-  // Anomaly detection statistics
-  const traceStats = {
-    count: 0,
-    totalDuration: 0,
-    avgDuration: 0,
-    maxDuration: 0,
-    avgResolverCount: 0,
-    totalResolverCount: 0,
-    avgFactChangeCount: 0,
-    totalFactChangeCount: 0,
-  };
+  // Trace management (per-run reconciliation changelog, gated by config.trace)
+  const traceManager = createTraceManager({
+    traceConfig: config.trace,
+    pluginManager,
+  });
+  const traceEnabled = traceManager.enabled;
 
   const { store, facts } = createFacts<S>({
     schema: mergedSchema,
@@ -276,11 +252,7 @@ export function createEngine<S extends Schema>(
       invalidateDerivation(key);
       // Track fact changes for trace
       if (traceEnabled) {
-        pendingFactChanges.push({
-          key: String(key),
-          oldValue: prev,
-          newValue: value,
-        });
+        traceManager.recordFactChange(String(key), prev, value);
       }
       // During history restore, skip change tracking and reconciliation.
       // The restored state is already reconciled; re-reconciling would create
@@ -302,19 +274,11 @@ export function createEngine<S extends Schema>(
       // Track fact changes for trace
       if (traceEnabled) {
         for (const change of changes) {
-          if (change.type === "delete") {
-            pendingFactChanges.push({
-              key: change.key,
-              oldValue: change.prev,
-              newValue: undefined,
-            });
-          } else {
-            pendingFactChanges.push({
-              key: change.key,
-              oldValue: change.prev,
-              newValue: change.value,
-            });
-          }
+          traceManager.recordFactChange(
+            change.key,
+            change.prev,
+            change.type === "delete" ? undefined : change.value,
+          );
         }
       }
       // Invalidate all affected derivations at once — listeners fire only
@@ -343,8 +307,8 @@ export function createEngine<S extends Schema>(
     store,
     onCompute: (id, value, oldValue, deps) => {
       pluginManager.emitDerivationCompute(id, value, deps);
-      if (currentTrace) {
-        currentTrace.derivationsRecomputed.push({
+      if (traceManager.currentTrace) {
+        traceManager.currentTrace.derivationsRecomputed.push({
           id,
           deps: deps ? [...deps] : [],
           oldValue,
@@ -374,8 +338,8 @@ export function createEngine<S extends Schema>(
     store,
     onRun: (id, deps) => {
       pluginManager.emitEffectRun(id);
-      if (currentTrace) {
-        currentTrace.effectsRun.push({
+      if (traceManager.currentTrace) {
+        traceManager.currentTrace.effectsRun.push({
           id,
           triggeredBy: deps,
         });
@@ -385,8 +349,8 @@ export function createEngine<S extends Schema>(
       const strategy = errorBoundary.handleError("effect", id, error);
       pluginManager.emitEffectError(id, error);
 
-      if (currentTrace) {
-        currentTrace.effectErrors.push({ id, error: String(error) });
+      if (traceManager.currentTrace) {
+        traceManager.currentTrace.effectErrors.push({ id, error: String(error) });
       }
 
       if (strategy === "disable") {
@@ -416,129 +380,6 @@ export function createEngine<S extends Schema>(
     },
   });
 
-  /** Finalize a trace entry when all its resolvers have settled */
-  function finalizeTrace(traceId: number): void {
-    const entry = traceById.get(traceId);
-    if (entry && entry.status === "pending") {
-      entry.status = "settled";
-      // Consistent duration: use performance.now() when available
-      const startMs = traceStartMs.get(traceId);
-      entry.duration =
-        startMs !== undefined
-          ? performance.now() - startMs
-          : Date.now() - entry.timestamp;
-      traceStartMs.delete(traceId);
-      traceInflightCount.delete(traceId);
-      // Build causal chain on settlement
-      entry.causalChain = buildCausalChain(entry);
-      // Anomaly detection
-      updateTraceStats(entry);
-      currentCacheVersion++;
-      pluginManager.emitTraceComplete(entry);
-    }
-  }
-
-  /** Decrement inflight count for a trace entry and finalize if settled */
-  function decrementTraceInflight(requirementId: string): void {
-    const traceId = resolverTraceMap.get(requirementId);
-    resolverTraceMap.delete(requirementId);
-    if (traceId !== undefined) {
-      const remaining = (traceInflightCount.get(traceId) ?? 1) - 1;
-      if (remaining <= 0) {
-        finalizeTrace(traceId);
-      } else {
-        traceInflightCount.set(traceId, remaining);
-      }
-    }
-  }
-
-  /** Evict the oldest trace entry from the ring buffer, cleaning up associated state (C1) */
-  function evictOldestTrace(): void {
-    const evicted = traceEntries.shift();
-    if (evicted) {
-      traceById.delete(evicted.id);
-      traceStartMs.delete(evicted.id);
-      if (evicted.status === "pending") {
-        traceInflightCount.delete(evicted.id);
-        for (const [reqId, rId] of resolverTraceMap) {
-          if (rId === evicted.id) {
-            resolverTraceMap.delete(reqId);
-          }
-        }
-      }
-    }
-  }
-
-  /** Build a human-readable causal chain summary from a trace entry (Part 6) */
-  function buildCausalChain(entry: TraceEntry): string {
-    const parts: string[] = [];
-
-    for (const fc of entry.factChanges) {
-      parts.push(`${fc.key} changed`);
-    }
-
-    for (const d of entry.derivationsRecomputed) {
-      parts.push(`${d.id} recomputed`);
-    }
-
-    for (const c of entry.constraintsHit) {
-      parts.push(`${c.id} constraint hit`);
-    }
-
-    for (const r of entry.requirementsAdded) {
-      parts.push(`${r.type} requirement added`);
-    }
-
-    for (const rs of entry.resolversCompleted) {
-      parts.push(`${rs.resolver} resolved (${rs.duration.toFixed(0)}ms)`);
-    }
-
-    for (const rs of entry.resolversErrored) {
-      parts.push(`${rs.resolver} errored`);
-    }
-
-    for (const e of entry.effectsRun) {
-      parts.push(`${e.id} effect ran`);
-    }
-
-    return parts.join(" → ");
-  }
-
-  /** Update running statistics and flag anomalies on a finalized trace entry (Part 8) */
-  function updateTraceStats(entry: TraceEntry): void {
-    traceStats.count++;
-    traceStats.totalDuration += entry.duration;
-    traceStats.avgDuration = traceStats.totalDuration / traceStats.count;
-    if (entry.duration > traceStats.maxDuration) {
-      traceStats.maxDuration = entry.duration;
-    }
-
-    const resolverCount = entry.resolversStarted.length;
-    traceStats.totalResolverCount += resolverCount;
-    traceStats.avgResolverCount = traceStats.totalResolverCount / traceStats.count;
-
-    const factChangeCount = entry.factChanges.length;
-    traceStats.totalFactChangeCount += factChangeCount;
-    traceStats.avgFactChangeCount =
-      traceStats.totalFactChangeCount / traceStats.count;
-
-    // Flag anomalies (only after enough data)
-    const anomalies: string[] = [];
-    if (traceStats.count > 3 && entry.duration > traceStats.avgDuration * 5) {
-      anomalies.push(
-        `Duration ${entry.duration.toFixed(0)}ms is 5x+ above average (${traceStats.avgDuration.toFixed(0)}ms)`,
-      );
-    }
-
-    if (entry.resolversErrored.length > 0) {
-      anomalies.push(`${entry.resolversErrored.length} resolver(s) errored`);
-    }
-
-    if (anomalies.length > 0) {
-      entry.anomalies = anomalies;
-    }
-  }
-
   // Create resolvers manager
   const resolversManager: ResolversManager<S> = createResolversManager({
     definitions: mergedResolvers,
@@ -553,18 +394,8 @@ export function createEngine<S extends Schema>(
       constraintsManager.markResolved(req.fromConstraint);
       // Attribute to the trace entry that started this resolver
       if (traceEnabled) {
-        const traceId = resolverTraceMap.get(req.id);
-        if (traceId !== undefined) {
-          const entry = traceById.get(traceId);
-          if (entry) {
-            entry.resolversCompleted.push({
-              resolver,
-              requirementId: req.id,
-              duration,
-            });
-          }
-        }
-        decrementTraceInflight(req.id);
+        traceManager.recordResolverComplete(req.id, resolver, duration);
+        traceManager.decrementInflight(req.id);
       }
     },
     onError: (resolver, req, error) => {
@@ -601,18 +432,8 @@ export function createEngine<S extends Schema>(
 
       // Attribute error to the trace entry that started this resolver
       if (traceEnabled) {
-        const traceId = resolverTraceMap.get(req.id);
-        if (traceId !== undefined) {
-          const entry = traceById.get(traceId);
-          if (entry) {
-            entry.resolversErrored.push({
-              resolver,
-              requirementId: req.id,
-              error: String(error),
-            });
-          }
-        }
-        decrementTraceInflight(req.id);
+        traceManager.recordResolverError(req.id, resolver, String(error));
+        traceManager.decrementInflight(req.id);
       }
     },
     onRetry: (resolver, req, attempt) =>
@@ -622,7 +443,7 @@ export function createEngine<S extends Schema>(
       pluginManager.emitRequirementCanceled(req);
       // Decrement inflight for the trace entry
       if (traceEnabled) {
-        decrementTraceInflight(req.id);
+        traceManager.decrementInflight(req.id);
       }
     },
     onResolutionComplete: () => {
@@ -688,409 +509,21 @@ export function createEngine<S extends Schema>(
     readyResolve: null,
   };
 
-  // ============================================================================
-  // Dynamic Definition Infrastructure
-  // ============================================================================
-
-  /** Track which definitions were dynamically registered (not from module defs) */
-  const dynamicIds = {
-    constraints: new Set<string>(),
-    resolvers: new Set<string>(),
-    derivations: new Set<string>(),
-    effects: new Set<string>(),
-  };
-
-  /** Originals map for assigned definitions (stores the definition that was overridden) */
-  const originals = {
-    constraints: new Map<string, unknown>(),
-    resolvers: new Map<string, unknown>(),
-    derivations: new Map<string, unknown>(),
-    effects: new Map<string, unknown>(),
-  };
-
-  /** Reserved derive method names — derivation IDs cannot use these */
-  const RESERVED_DERIVE_NAMES = new Set([
-    "register", "assign", "unregister", "call", "isDynamic", "listDynamic",
-  ]);
-
-  type DefType = "constraint" | "resolver" | "derivation" | "effect";
-  type DeferredOp =
-    | { op: "register"; type: DefType; id: string; def: unknown }
-    | { op: "assign"; type: DefType; id: string; def: unknown }
-    | { op: "unregister"; type: DefType; id: string };
-
-  /**
-   * Deferred registrations queue — applied after reconcile settles.
-   *
-   * While operations are deferred (i.e. during reconciliation), isDynamic()
-   * and listDynamic() will NOT reflect the pending registration/unregistration
-   * until the deferred queue is flushed after the current cycle completes.
-   */
-  const deferredRegistrations: DeferredOp[] = [];
-
-  /** Validate a definition ID for safety */
-  function validateDefId(id: string): void {
-    if (typeof id !== "string" || id.length === 0) {
-      throw new Error(
-        `[Directive] Definition ID must be a non-empty string. Received: ${String(id)}`,
-      );
-    }
-    if (BLOCKED_PROPS.has(id)) {
-      throw new Error(
-        `[Directive] Security: Definition ID "${id}" is a blocked property.`,
-      );
-    }
-    if (id.includes("::")) {
-      throw new Error(
-        `[Directive] Definition ID "${id}" cannot contain "::". This separator is reserved for namespacing.`,
-      );
-    }
-  }
-
-  /** Register a definition (called by engine, handles deferral) */
-  function registerDefinition(type: DefType, id: string, def: unknown): void {
-    if (state.isDestroyed) {
-      throw new Error(
-        `[Directive] Cannot register ${type} "${id}" on a destroyed system.`,
-      );
-    }
-
-    validateDefId(id);
-
-    // If reconciling, defer
-    if (state.isReconciling) {
-      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
-        throw new Error(
-          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
-        );
-      }
-      deferredRegistrations.push({ op: "register", type, id, def });
-
-      return;
-    }
-
-    applyRegister(type, id, def);
-  }
-
-  /** Assign (override) a definition */
-  function assignDefinition(type: DefType, id: string, def: unknown): void {
-    if (state.isDestroyed) {
-      throw new Error(
-        `[Directive] Cannot assign ${type} "${id}" on a destroyed system.`,
-      );
-    }
-
-    validateDefId(id);
-
-    if (state.isReconciling) {
-      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
-        throw new Error(
-          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
-        );
-      }
-      deferredRegistrations.push({ op: "assign", type, id, def });
-
-      return;
-    }
-
-    applyAssign(type, id, def);
-  }
-
-  /** Unregister a definition */
-  function unregisterDefinition(type: DefType, id: string): void {
-    if (state.isDestroyed) {
-      throw new Error(
-        `[Directive] Cannot unregister ${type} "${id}" on a destroyed system.`,
-      );
-    }
-
-    validateDefId(id);
-
-    if (state.isReconciling) {
-      if (deferredRegistrations.length >= MAX_DEFERRED_REGISTRATIONS) {
-        throw new Error(
-          `[Directive] Too many deferred registrations (max ${MAX_DEFERRED_REGISTRATIONS}). Avoid calling register/assign/unregister in resolver or effect callbacks during reconciliation.`,
-        );
-      }
-      deferredRegistrations.push({ op: "unregister", type, id });
-
-      return;
-    }
-
-    applyUnregister(type, id);
-  }
-
-  /** Call/invoke a definition */
-  function callDefinition(type: DefType, id: string, props?: unknown): unknown {
-    if (state.isDestroyed) {
-      throw new Error(
-        `[Directive] Cannot call ${type} "${id}" on a destroyed system.`,
-      );
-    }
-
-    validateDefId(id);
-    pluginManager.emitDefinitionCall(type, id, props);
-
-    switch (type) {
-      case "constraint":
-        return constraintsManager.callOne(id, props as Record<string, unknown> | undefined);
-      case "resolver":
-        return resolversManager.callOne(id, props as { type: string; [key: string]: unknown });
-      case "derivation":
-        return derivationsManager.callOne(id);
-      case "effect":
-        return effectsManager.callOne(id);
-    }
-  }
-
-  /** Apply a register operation immediately */
-  function applyRegister(type: DefType, id: string, def: unknown): void {
-    switch (type) {
-      case "constraint": {
-        if (id in mergedConstraints) {
-          throw new Error(
-            `[Directive] Constraint "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const constraintDef = def as Record<string, unknown>;
-        (mergedConstraints as Record<string, unknown>)[id] = constraintDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        constraintsManager.registerDefinitions({ [id]: constraintDef } as any);
-        dynamicIds.constraints.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        scheduleReconcile();
-        break;
-      }
-      case "resolver": {
-        if (id in mergedResolvers) {
-          throw new Error(
-            `[Directive] Resolver "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const resolverDef = def as Record<string, unknown>;
-        (mergedResolvers as Record<string, unknown>)[id] = resolverDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        resolversManager.registerDefinitions({ [id]: resolverDef } as any);
-        dynamicIds.resolvers.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        scheduleReconcile();
-        break;
-      }
-      case "derivation": {
-        if (RESERVED_DERIVE_NAMES.has(id)) {
-          throw new Error(
-            `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
-          );
-        }
-        if (id in mergedDerive) {
-          throw new Error(
-            `[Directive] Derivation "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        (mergedDerive as Record<string, unknown>)[id] = def;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        derivationsManager.registerDefinitions({ [id]: def } as any);
-        dynamicIds.derivations.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        break;
-      }
-      case "effect": {
-        if (id in mergedEffects) {
-          throw new Error(
-            `[Directive] Effect "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const effectDef = def as Record<string, unknown>;
-        (mergedEffects as Record<string, unknown>)[id] = effectDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        effectsManager.registerDefinitions({ [id]: effectDef } as any);
-        dynamicIds.effects.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        break;
-      }
-    }
-  }
-
-  /**
-   * Apply an assign operation immediately.
-   *
-   * Ordering is important for atomicity: the manager's assignDefinition() is
-   * called first (it may validate and throw, e.g. cycle detection). Only on
-   * success do we commit the original and update the merged map.
-   */
-  function applyAssign(type: DefType, id: string, def: unknown): void {
-    switch (type) {
-      case "constraint": {
-        if (!(id in mergedConstraints)) {
-          throw new Error(
-            `[Directive] Constraint "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedConstraints as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        constraintsManager.assignDefinition(id, def as any);
-        originals.constraints.set(id, original);
-        (mergedConstraints as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        scheduleReconcile();
-        break;
-      }
-      case "resolver": {
-        if (!(id in mergedResolvers)) {
-          throw new Error(
-            `[Directive] Resolver "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedResolvers as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        resolversManager.assignDefinition(id, def as any);
-        originals.resolvers.set(id, original);
-        (mergedResolvers as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        scheduleReconcile();
-        break;
-      }
-      case "derivation": {
-        if (RESERVED_DERIVE_NAMES.has(id)) {
-          throw new Error(
-            `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
-          );
-        }
-        if (!(id in mergedDerive)) {
-          throw new Error(
-            `[Directive] Derivation "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedDerive as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        derivationsManager.assignDefinition(id, def as any);
-        originals.derivations.set(id, original);
-        (mergedDerive as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        break;
-      }
-      case "effect": {
-        if (!(id in mergedEffects)) {
-          throw new Error(
-            `[Directive] Effect "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedEffects as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        effectsManager.assignDefinition(id, def as any);
-        originals.effects.set(id, original);
-        (mergedEffects as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        break;
-      }
-    }
-  }
-
-  /** Apply an unregister operation immediately */
-  function applyUnregister(type: DefType, id: string): void {
-    switch (type) {
-      case "constraint": {
-        if (!dynamicIds.constraints.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static constraint "${id}". Only dynamically registered constraints can be removed.`,
-            );
-          }
-
-          return;
-        }
-        constraintsManager.unregisterDefinition(id);
-        delete (mergedConstraints as Record<string, unknown>)[id];
-        dynamicIds.constraints.delete(id);
-        originals.constraints.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        scheduleReconcile();
-        break;
-      }
-      case "resolver": {
-        if (!dynamicIds.resolvers.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static resolver "${id}". Only dynamically registered resolvers can be removed.`,
-            );
-          }
-
-          return;
-        }
-        resolversManager.unregisterDefinition(id);
-        delete (mergedResolvers as Record<string, unknown>)[id];
-        dynamicIds.resolvers.delete(id);
-        originals.resolvers.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
-      case "derivation": {
-        if (!dynamicIds.derivations.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static derivation "${id}". Only dynamically registered derivations can be removed.`,
-            );
-          }
-
-          return;
-        }
-        derivationsManager.unregisterDefinition(id);
-        delete (mergedDerive as Record<string, unknown>)[id];
-        dynamicIds.derivations.delete(id);
-        originals.derivations.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
-      case "effect": {
-        if (!dynamicIds.effects.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static effect "${id}". Only dynamically registered effects can be removed.`,
-            );
-          }
-
-          return;
-        }
-        effectsManager.unregisterDefinition(id);
-        delete (mergedEffects as Record<string, unknown>)[id];
-        dynamicIds.effects.delete(id);
-        originals.effects.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
-    }
-  }
-
-  /** Flush deferred registrations after reconcile settles */
-  function flushDeferredRegistrations(): void {
-    if (deferredRegistrations.length === 0) {
-      return;
-    }
-
-    const ops = deferredRegistrations.splice(0);
-    for (const op of ops) {
-      try {
-        switch (op.op) {
-          case "register":
-            applyRegister(op.type, op.id, op.def);
-            break;
-          case "assign":
-            applyAssign(op.type, op.id, op.def);
-            break;
-          case "unregister":
-            applyUnregister(op.type, op.id);
-            break;
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
-          console.error(
-            `[Directive] Error in deferred ${op.op} for ${op.type} "${op.id}":`,
-            error,
-          );
-        }
-      }
-    }
-  }
+  // Dynamic definition registry (register, assign, unregister, call)
+  const definitions = createDefinitionsRegistry({
+    mergedConstraints,
+    mergedResolvers,
+    mergedDerive,
+    mergedEffects,
+    constraintsManager,
+    resolversManager,
+    derivationsManager,
+    effectsManager,
+    pluginManager,
+    getState: () => state,
+    scheduleReconcile,
+    maxDeferredRegistrations: MAX_DEFERRED_REGISTRATIONS,
+  });
 
   /** Schedule a reconciliation on the next microtask */
   function scheduleReconcile(): void {
@@ -1130,7 +563,7 @@ export function createEngine<S extends Schema>(
       }
       // Drain pending fact changes so they don't leak into the next trace entry (M4)
       if (traceEnabled) {
-        pendingFactChanges.length = 0;
+        traceManager.drainPendingChanges();
       }
       reconcileDepth = 0;
       return;
@@ -1139,29 +572,8 @@ export function createEngine<S extends Schema>(
     state.isReconciling = true;
     notifySettlementChange();
 
-    const reconcileStartMs = traceEnabled ? performance.now() : 0;
-
-    // Start a new trace entry
-    if (traceEnabled) {
-      const traceId = ++traceIdCounter;
-      traceStartMs.set(traceId, reconcileStartMs);
-      currentTrace = {
-        id: traceId,
-        timestamp: Date.now(),
-        duration: 0,
-        status: "pending",
-        factChanges: pendingFactChanges.splice(0), // move + clear
-        derivationsRecomputed: [],
-        constraintsHit: [],
-        requirementsAdded: [],
-        requirementsRemoved: [],
-        resolversStarted: [],
-        resolversCompleted: [],
-        resolversErrored: [],
-        effectsRun: [],
-        effectErrors: [],
-      };
-    }
+    const reconcileStartMs = traceEnabled ? traceManager.startRun() : 0;
+    const currentTrace = traceManager.currentTrace;
 
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
@@ -1260,7 +672,7 @@ export function createEngine<S extends Schema>(
             requirementId: req.id,
           });
           // Track attribution for async completion
-          resolverTraceMap.set(req.id, currentTrace.id);
+          traceManager.attributeResolverStart(req.id);
         }
       }
 
@@ -1294,55 +706,15 @@ export function createEngine<S extends Schema>(
       }
     } finally {
       // Finalize the current trace entry
-      if (currentTrace) {
-        currentTrace.duration = performance.now() - reconcileStartMs;
-
-        // Skip empty runs
-        const hasActivity =
-          currentTrace.factChanges.length > 0 ||
-          currentTrace.constraintsHit.length > 0 ||
-          currentTrace.requirementsAdded.length > 0 ||
-          currentTrace.effectsRun.length > 0;
-
-        if (hasActivity) {
-          const inflightCount = currentTrace.resolversStarted.length;
-          if (inflightCount === 0) {
-            // No resolvers — finalize immediately
-            currentTrace.status = "settled";
-            // Build causal chain for settled runs
-            currentTrace.causalChain = buildCausalChain(currentTrace);
-            // Anomaly detection
-            updateTraceStats(currentTrace);
-            traceEntries.push(currentTrace);
-            traceById.set(currentTrace.id, currentTrace);
-            if (traceEntries.length > maxRuns) {
-              evictOldestTrace();
-            }
-            currentCacheVersion++;
-            pluginManager.emitTraceComplete(currentTrace);
-          } else {
-            // Has resolvers — stays pending until they settle
-            currentTrace.status = "pending";
-            traceEntries.push(currentTrace);
-            traceById.set(currentTrace.id, currentTrace);
-            if (traceEntries.length > maxRuns) {
-              evictOldestTrace();
-            }
-            currentCacheVersion++;
-            traceInflightCount.set(currentTrace.id, inflightCount);
-          }
-        } else {
-          // Empty trace entry — clean up start time
-          traceStartMs.delete(currentTrace.id);
-        }
-        currentTrace = null;
+      if (traceEnabled) {
+        traceManager.finalizeCurrentRun(reconcileStartMs);
       }
 
       state.isReconciling = false;
 
       // Flush any deferred dynamic definition operations that were queued
       // during this reconciliation cycle
-      flushDeferredRegistrations();
+      definitions.flushDeferred();
 
       // Schedule next reconcile BEFORE notifying settlement change,
       // so listeners never see a brief isSettled=true flash when
@@ -1358,154 +730,46 @@ export function createEngine<S extends Schema>(
     }
   }
 
-  // Method properties for derive accessor (dynamic definitions API)
-  const deriveMethods: Record<string, unknown> = {
-    register: (id: string, fn: unknown) => registerDefinition("derivation", id, fn),
-    assign: (id: string, fn: unknown) => assignDefinition("derivation", id, fn),
-    unregister: (id: string) => unregisterDefinition("derivation", id),
-    call: (id: string) => callDefinition("derivation", id),
-    isDynamic: (id: string) => dynamicIds.derivations.has(id),
-    listDynamic: () => [...dynamicIds.derivations],
-  };
+  /** Dispatch an event by name, handling snapshot flags and batching */
+  function dispatchEventByName(
+    eventName: string,
+    payload?: Record<string, unknown>,
+  ): void {
+    const handler = mergedEvents[eventName];
+    if (handler) {
+      dispatchDepth++;
+      if (snapshotEventNames === null || snapshotEventNames.has(eventName)) {
+        shouldTakeSnapshot = true;
+      }
+      try {
+        store.batch(() => {
+          handler(facts, { type: eventName, ...payload });
+        });
+      } finally {
+        dispatchDepth--;
+      }
+    } else if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[Directive] Unknown event type "${eventName}". ` +
+          "No handler is registered for this event. " +
+          `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
+      );
+    }
+  }
 
   // Create typed derive accessor using a Proxy
-  const deriveAccessor = new Proxy({} as Record<string, unknown>, {
-    get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return undefined;
-      }
-      // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      // Check for method properties first (register, assign, etc.)
-      if (prop in deriveMethods) {
-        return deriveMethods[prop];
-      }
-      // Return undefined for unknown derivation keys instead of throwing.
-      // React 19 dev-mode traverses objects accessing $$typeof, toJSON, then, etc.
-      if (!(prop in mergedDerive)) {
-        return undefined;
-      }
-      return derivationsManager.get(prop as keyof DerivationsDef<S>);
-    },
-    has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return false;
-      }
-      // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-      return prop in mergedDerive || prop in deriveMethods;
-    },
-    ownKeys() {
-      return Object.keys(mergedDerive);
-    },
-    getOwnPropertyDescriptor(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return undefined;
-      }
-      // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      if (prop in mergedDerive || prop in deriveMethods) {
-        return { configurable: true, enumerable: true };
-      }
-      return undefined;
-    },
-    set() {
-      return false;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
+  const deriveAccessor = createDeriveAccessor({
+    mergedDerive: mergedDerive as Record<string, unknown>,
+    getDerivation: (key) =>
+      derivationsManager.get(key as keyof DerivationsDef<S>),
+    definitions,
   });
 
   // Create typed events accessor using a Proxy
-  // This provides system.events.eventName(payload) syntax
-  const eventsAccessor = new Proxy(
-    {} as Record<string, (payload?: Record<string, unknown>) => void>,
-    {
-      get(_, prop: string | symbol) {
-        if (typeof prop === "symbol") {
-          return undefined;
-        }
-        // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) {
-          return undefined;
-        }
-        // Return a function that dispatches the event
-        return (payload?: Record<string, unknown>) => {
-          const handler = mergedEvents[prop];
-          if (handler) {
-            dispatchDepth++;
-            if (snapshotEventNames === null || snapshotEventNames.has(prop)) {
-              shouldTakeSnapshot = true;
-            }
-            try {
-              store.batch(() => {
-                handler(facts, { type: prop, ...payload });
-              });
-            } finally {
-              dispatchDepth--;
-            }
-          } else if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Unknown event type "${prop}". ` +
-                "No handler is registered for this event. " +
-                `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
-            );
-          }
-        };
-      },
-      has(_, prop: string | symbol) {
-        if (typeof prop === "symbol") {
-          return false;
-        }
-        // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) {
-          return false;
-        }
-        return prop in mergedEvents;
-      },
-      ownKeys() {
-        return Object.keys(mergedEvents);
-      },
-      getOwnPropertyDescriptor(_, prop: string | symbol) {
-        if (typeof prop === "symbol") {
-          return undefined;
-        }
-        // Prototype pollution protection
-        if (BLOCKED_PROPS.has(prop)) {
-          return undefined;
-        }
-        if (prop in mergedEvents) {
-          return { configurable: true, enumerable: true };
-        }
-        return undefined;
-      },
-      set() {
-        return false;
-      },
-      defineProperty() {
-        return false;
-      },
-      getPrototypeOf() {
-        return null;
-      },
-      setPrototypeOf() {
-        return false;
-      },
-    },
-  );
+  const eventsAccessor = createEventsAccessor({
+    mergedEvents: mergedEvents as Record<string, unknown>,
+    dispatchEvent: dispatchEventByName,
+  });
 
   // Create the system interface
   // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
@@ -1520,49 +784,40 @@ export function createEngine<S extends Schema>(
       enable: (id: string) => constraintsManager.enable(id),
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
-      register: (id: string, def: any) => registerDefinition("constraint", id, def),
+      register: (id: string, def: any) => definitions.register("constraint", id, def),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
-      assign: (id: string, def: any) => assignDefinition("constraint", id, def),
-      unregister: (id: string) => unregisterDefinition("constraint", id),
-      call: (id: string, props?: Record<string, unknown>) => callDefinition("constraint", id, props) as Promise<Record<string, unknown>[]>,
-      isDynamic: (id: string) => dynamicIds.constraints.has(id),
-      listDynamic: () => [...dynamicIds.constraints],
+      assign: (id: string, def: any) => definitions.assign("constraint", id, def),
+      unregister: (id: string) => definitions.unregister("constraint", id),
+      call: (id: string, props?: Record<string, unknown>) => definitions.call("constraint", id, props) as Promise<Record<string, unknown>[]>,
+      isDynamic: (id: string) => definitions.isDynamic("constraint", id),
+      listDynamic: () => definitions.listDynamic("constraint"),
     },
     effects: {
       disable: (id: string) => effectsManager.disable(id),
       enable: (id: string) => effectsManager.enable(id),
       isEnabled: (id: string) => effectsManager.isEnabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
-      register: (id: string, def: any) => registerDefinition("effect", id, def),
+      register: (id: string, def: any) => definitions.register("effect", id, def),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
-      assign: (id: string, def: any) => assignDefinition("effect", id, def),
-      unregister: (id: string) => unregisterDefinition("effect", id),
-      call: (id: string) => callDefinition("effect", id) as Promise<void>,
-      isDynamic: (id: string) => dynamicIds.effects.has(id),
-      listDynamic: () => [...dynamicIds.effects],
+      assign: (id: string, def: any) => definitions.assign("effect", id, def),
+      unregister: (id: string) => definitions.unregister("effect", id),
+      call: (id: string) => definitions.call("effect", id) as Promise<void>,
+      isDynamic: (id: string) => definitions.isDynamic("effect", id),
+      listDynamic: () => definitions.listDynamic("effect"),
     },
     resolvers: {
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
-      register: (id: string, def: any) => registerDefinition("resolver", id, def),
+      register: (id: string, def: any) => definitions.register("resolver", id, def),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
-      assign: (id: string, def: any) => assignDefinition("resolver", id, def),
-      unregister: (id: string) => unregisterDefinition("resolver", id),
-      call: (id: string, requirement: { type: string; [key: string]: unknown }) => callDefinition("resolver", id, requirement) as Promise<void>,
-      isDynamic: (id: string) => dynamicIds.resolvers.has(id),
-      listDynamic: () => [...dynamicIds.resolvers],
+      assign: (id: string, def: any) => definitions.assign("resolver", id, def),
+      unregister: (id: string) => definitions.unregister("resolver", id),
+      call: (id: string, requirement: { type: string; [key: string]: unknown }) => definitions.call("resolver", id, requirement) as Promise<void>,
+      isDynamic: (id: string) => definitions.isDynamic("resolver", id),
+      listDynamic: () => definitions.listDynamic("resolver"),
     },
 
     get trace(): TraceEntry[] | null {
-      if (!traceEnabled) {
-        return null;
-      }
-
-      if (!traceCache || traceCacheVersion !== currentCacheVersion) {
-        traceCache = [...traceEntries];
-        traceCacheVersion = currentCacheVersion;
-      }
-
-      return traceCache;
+      return traceManager.getEntries();
     },
 
     initialize(): void {
@@ -1682,51 +937,16 @@ export function createEngine<S extends Schema>(
       errorBoundary.clearErrors();
       settlementListeners.clear();
       historyListeners.clear();
-      // Clean up deferred registrations (prevent closure retention)
-      deferredRegistrations.length = 0;
       // Clean up trace state (C1)
-      traceEntries.length = 0;
-      traceById.clear();
-      resolverTraceMap.clear();
-      traceInflightCount.clear();
-      traceStartMs.clear();
-      pendingFactChanges.length = 0;
-      currentTrace = null;
-      traceCache = null;
+      traceManager.destroy();
       // Clean up dynamic definition state
-      dynamicIds.constraints.clear();
-      dynamicIds.resolvers.clear();
-      dynamicIds.derivations.clear();
-      dynamicIds.effects.clear();
-      originals.constraints.clear();
-      originals.resolvers.clear();
-      originals.derivations.clear();
-      originals.effects.clear();
+      definitions.destroy();
       pluginManager.emitDestroy(system);
     },
 
     dispatch(event: SystemEvent): void {
       if (BLOCKED_PROPS.has(event.type)) return;
-      const handler = mergedEvents[event.type];
-      if (handler) {
-        dispatchDepth++;
-        if (snapshotEventNames === null || snapshotEventNames.has(event.type)) {
-          shouldTakeSnapshot = true;
-        }
-        try {
-          store.batch(() => {
-            handler(facts, event);
-          });
-        } finally {
-          dispatchDepth--;
-        }
-      } else if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          `[Directive] Unknown event type "${event.type}". ` +
-            "No handler is registered for this event. " +
-            `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
-        );
-      }
+      dispatchEventByName(event.type, event as Record<string, unknown>);
     },
 
     read<T = unknown>(derivationId: string): T {
@@ -1886,7 +1106,7 @@ export function createEngine<S extends Schema>(
         traceEnabled,
         ...(traceEnabled
           ? {
-              trace: traceEntries.map((r) => ({
+              trace: (traceManager.getEntries() ?? []).map((r) => ({
                 ...r,
                 factChanges: r.factChanges.map((fc) => ({ ...fc })),
                 derivationsRecomputed: r.derivationsRecomputed.map((d) => ({
@@ -1973,39 +1193,11 @@ export function createEngine<S extends Schema>(
     },
 
     getOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): unknown | undefined {
-      const typeMap: Record<string, Map<string, unknown>> = {
-        constraint: originals.constraints,
-        resolver: originals.resolvers,
-        derivation: originals.derivations,
-        effect: originals.effects,
-      };
-      const map = typeMap[type];
-
-      if (!map) {
-        return undefined;
-      }
-
-      return map.get(id);
+      return definitions.getOriginal(type, id);
     },
 
     restoreOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): boolean {
-      const typeMap: Record<string, Map<string, unknown>> = {
-        constraint: originals.constraints,
-        resolver: originals.resolvers,
-        derivation: originals.derivations,
-        effect: originals.effects,
-      };
-      const map = typeMap[type];
-
-      if (!map || !map.has(id)) {
-        return false;
-      }
-
-      const original = map.get(id);
-      assignDefinition(type, id, original);
-      map.delete(id);
-
-      return true;
+      return definitions.restoreOriginal(type, id);
     },
 
     async settle(maxWait = 5000): Promise<void> {

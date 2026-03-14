@@ -22,11 +22,14 @@ import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   CreateSystemOptionsNamed,
   CreateSystemOptionsSingle,
+  ErrorBoundaryConfig,
+  HistoryOption,
   ModuleDef,
   ModuleSchema,
   ModulesMap,
   NamespacedSystem,
   SingleModuleSystem,
+  TraceOption,
 } from "./types.js";
 
 /** Namespace separator for internal key prefixing (e.g., "auth::token") */
@@ -306,23 +309,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   }
 
   // Apply zero-config defaults if enabled
-  let history = options.history;
-  let trace = options.trace;
-  let errorBoundary = options.errorBoundary;
-
-  if (options.zeroConfig) {
-    const isDev = process.env.NODE_ENV !== "production";
-
-    history = history ?? isDev;
-
-    errorBoundary = {
-      onConstraintError: "skip",
-      onResolverError: "skip",
-      onEffectError: "skip",
-      onDerivationError: "skip",
-      ...options.errorBoundary,
-    };
-  }
+  const { history, trace, errorBoundary } = applyZeroConfigDefaults(options);
 
   // Validate module names and schema keys don't contain the separator
   for (const namespace of Object.keys(modulesMap)) {
@@ -780,28 +767,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     effects: engine.effects,
     resolvers: engine.resolvers,
 
-    get trace() {
-      return engine.trace;
-    },
-
-    get isRunning() {
-      return engine.isRunning;
-    },
-
-    get isSettled() {
-      return engine.isSettled;
-    },
-
-    get isInitialized() {
-      return engine.isInitialized;
-    },
-
-    get isReady() {
-      return engine.isReady;
-    },
-
-    whenReady: engine.whenReady.bind(engine),
-
     async hydrate(
       loader: () =>
         | Promise<Record<string, Record<string, unknown>>>
@@ -855,14 +820,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     },
 
     dispatch(event: { type: string; [key: string]: unknown }) {
-      // Events are dispatched with namespace prefix
-      // e.g., { type: "login", token: "abc" } from auth module
-      // becomes { type: "auth::login", token: "abc" }
-      // But we keep them simple - the event type should match the schema
       engine.dispatch(event);
     },
-
-    batch: engine.batch.bind(engine),
 
     /**
      * Read a derivation value using namespaced syntax.
@@ -962,14 +921,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
         options,
       );
     },
-
-    onSettledChange: engine.onSettledChange.bind(engine),
-    onHistoryChange: engine.onHistoryChange.bind(engine),
-    inspect: engine.inspect.bind(engine),
-    settle: engine.settle.bind(engine),
-    explain: engine.explain.bind(engine),
-    getSnapshot: engine.getSnapshot.bind(engine),
-    restore: engine.restore.bind(engine),
 
     /**
      * Get a distributable snapshot with namespaced key translation.
@@ -1384,8 +1335,121 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
   } as any;
 
-  // Dev-mode warning if system.start() is never called
-  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
+  bindEnginePassthroughs(system, engine);
+  warnIfNotStarted(system);
+
+  return system;
+}
+
+// ============================================================================
+// Shared Helpers (deduplication between single-module and namespaced systems)
+// ============================================================================
+
+/**
+ * Apply zero-config defaults to system options (history, trace, errorBoundary).
+ * Returns the resolved values; does not mutate the options object.
+ */
+function applyZeroConfigDefaults(options: {
+  zeroConfig?: boolean;
+  history?: HistoryOption;
+  trace?: TraceOption;
+  errorBoundary?: ErrorBoundaryConfig;
+}): {
+  history: HistoryOption | undefined;
+  trace: TraceOption | undefined;
+  errorBoundary: ErrorBoundaryConfig | undefined;
+} {
+  let history: HistoryOption | undefined = options.history;
+  let trace: TraceOption | undefined = options.trace;
+  let errorBoundary: ErrorBoundaryConfig | undefined = options.errorBoundary;
+
+  if (options.zeroConfig) {
+    const isDev = process.env.NODE_ENV !== "production";
+
+    history = history ?? isDev;
+
+    errorBoundary = {
+      onConstraintError: "skip",
+      onResolverError: "skip",
+      onEffectError: "skip",
+      onDerivationError: "skip",
+      ...options.errorBoundary,
+    };
+  }
+
+  return { history, trace, errorBoundary };
+}
+
+/**
+ * Bind shared engine passthrough properties and methods onto a system object.
+ * These are identical between single-module and namespaced systems.
+ */
+function bindEnginePassthroughs(
+  // biome-ignore lint/suspicious/noExplicitAny: Engine type
+  system: any,
+  // biome-ignore lint/suspicious/noExplicitAny: Engine type
+  engine: any,
+): void {
+  Object.defineProperties(system, {
+    trace: {
+      get() {
+        return engine.trace;
+      },
+      enumerable: true,
+      configurable: true,
+    },
+    isRunning: {
+      get() {
+        return engine.isRunning;
+      },
+      enumerable: true,
+      configurable: true,
+    },
+    isSettled: {
+      get() {
+        return engine.isSettled;
+      },
+      enumerable: true,
+      configurable: true,
+    },
+    isInitialized: {
+      get() {
+        return engine.isInitialized;
+      },
+      enumerable: true,
+      configurable: true,
+    },
+    isReady: {
+      get() {
+        return engine.isReady;
+      },
+      enumerable: true,
+      configurable: true,
+    },
+  });
+
+  system.whenReady = engine.whenReady.bind(engine);
+  system.batch = engine.batch.bind(engine);
+  system.onSettledChange = engine.onSettledChange.bind(engine);
+  system.onHistoryChange = engine.onHistoryChange.bind(engine);
+  system.inspect = engine.inspect.bind(engine);
+  system.settle = engine.settle.bind(engine);
+  system.explain = engine.explain.bind(engine);
+  system.getSnapshot = engine.getSnapshot.bind(engine);
+  system.restore = engine.restore.bind(engine);
+}
+
+/**
+ * Emit a dev-mode warning if system.start() is never called.
+ */
+function warnIfNotStarted(
+  // biome-ignore lint/suspicious/noExplicitAny: System type
+  system: any,
+): void {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.NODE_ENV !== "test"
+  ) {
     setTimeout(() => {
       if (!system.isRunning && !system.isInitialized) {
         console.warn(
@@ -1395,8 +1459,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       }
     }, 0);
   }
-
-  return system;
 }
 
 // ============================================================================
@@ -2007,23 +2069,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   }
 
   // Apply zero-config defaults if enabled
-  let history = options.history;
-  let trace = options.trace;
-  let errorBoundary = options.errorBoundary;
-
-  if (options.zeroConfig) {
-    const isDev = process.env.NODE_ENV !== "production";
-
-    history = history ?? isDev;
-
-    errorBoundary = {
-      onConstraintError: "skip",
-      onResolverError: "skip",
-      onEffectError: "skip",
-      onDerivationError: "skip",
-      ...options.errorBoundary,
-    };
-  }
+  const { history, trace, errorBoundary } = applyZeroConfigDefaults(options);
 
   // Store for hydrated facts
   let hydratedFacts: Record<string, unknown> | null = null;
@@ -2135,28 +2181,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     effects: engine.effects,
     resolvers: engine.resolvers,
 
-    get trace() {
-      return engine.trace;
-    },
-
-    get isRunning() {
-      return engine.isRunning;
-    },
-
-    get isSettled() {
-      return engine.isSettled;
-    },
-
-    get isInitialized() {
-      return engine.isInitialized;
-    },
-
-    get isReady() {
-      return engine.isReady;
-    },
-
-    whenReady: engine.whenReady.bind(engine),
-
     async hydrate(
       loader: () => Promise<Record<string, unknown>> | Record<string, unknown>,
     ) {
@@ -2207,8 +2231,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       engine.dispatch(event);
     },
 
-    batch: engine.batch.bind(engine),
-
     read<T = unknown>(derivationId: string): T {
       return engine.read(derivationId);
     },
@@ -2232,13 +2254,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       return engine.when(predicate, options);
     },
 
-    onSettledChange: engine.onSettledChange.bind(engine),
-    onHistoryChange: engine.onHistoryChange.bind(engine),
-    inspect: engine.inspect.bind(engine),
-    settle: engine.settle.bind(engine),
-    explain: engine.explain.bind(engine),
-    getSnapshot: engine.getSnapshot.bind(engine),
-    restore: engine.restore.bind(engine),
     getDistributableSnapshot: engine.getDistributableSnapshot.bind(engine),
     watchDistributableSnapshot: engine.watchDistributableSnapshot.bind(engine),
 
@@ -2261,17 +2276,8 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing
   } as any;
 
-  // Dev-mode warning if system.start() is never called
-  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
-    setTimeout(() => {
-      if (!system.isRunning && !system.isInitialized) {
-        console.warn(
-          "[Directive] System created but start() was never called. " +
-            "Constraints, resolvers, and effects will not run until you call system.start().",
-        );
-      }
-    }, 0);
-  }
+  bindEnginePassthroughs(system, engine);
+  warnIfNotStarted(system);
 
   return system;
 }
