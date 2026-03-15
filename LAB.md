@@ -11,10 +11,10 @@ Features under evaluation. Not in the bundle, not in docs navigation, not indexe
 | Feature | Files | Reason | Added |
 |---------|-------|--------|-------|
 | Observability Plugin | `packages/core/src/plugins/observability.lab.ts` | Homebrew metrics/tracing/alerting — re-evaluating vs OpenTelemetry | 2026-03-11 |
-| Observability Docs | `website/src/app/docs/plugins/observability/page.lab.md` | Docs for lab plugin | 2026-03-11 |
-| AI Evals | `website/src/app/ai/evals/page.lab.md` | AI evals page — not yet ready | 2026-03-11 |
-| AI OpenTelemetry | `website/src/app/ai/otel/page.lab.md` | AI OTel integration docs — needs rework after observability lab | 2026-03-11 |
-| AI Testing | `website/src/app/ai/testing/page.lab.md` | AI testing docs — not yet ready | 2026-03-11 |
+| Observability Docs | `directive-docs: src/app/docs/plugins/observability/page.lab.md` | Docs for lab plugin | 2026-03-11 |
+| AI Evals | `directive-docs: src/app/ai/evals/page.lab.md` | AI evals page — not yet ready | 2026-03-11 |
+| AI OpenTelemetry | `directive-docs: src/app/ai/otel/page.lab.md` | AI OTel integration docs — needs rework after observability lab | 2026-03-11 |
+| AI Testing | `directive-docs: src/app/ai/testing/page.lab.md` | AI testing docs — not yet ready | 2026-03-11 |
 
 ### Notes
 

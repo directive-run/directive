@@ -15,16 +15,13 @@ import { fileURLToPath } from "node:url";
 import { log } from "../../../scripts/lib/log";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const JSON_PATH = join(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "website",
-  "docs",
-  "generated",
-  "api-reference.json",
-);
+
+// Accept path as CLI arg, or check sibling directive-docs repo, or fall back to legacy path
+const JSON_PATH = process.argv[2]
+  ? join(process.cwd(), process.argv[2])
+  : existsSync(join(__dirname, "..", "..", "..", "..", "directive-docs", "docs", "generated", "api-reference.json"))
+    ? join(__dirname, "..", "..", "..", "..", "directive-docs", "docs", "generated", "api-reference.json")
+    : join(__dirname, "..", "..", "..", "website", "docs", "generated", "api-reference.json");
 const OUTPUT = join(__dirname, "..", "api-skeleton.md");
 
 interface ApiDocEntry {
