@@ -18,8 +18,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm changeset publish",
-    "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
-    "build:docs-pipeline": "pnpm -r build && pnpm --filter directive-website build:api-docs && pnpm --filter @directive-run/knowledge build && pnpm --filter @directive-run/claude-plugin build && pnpm --filter directive-website build:embeddings"
+    "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

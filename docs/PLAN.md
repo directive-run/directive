@@ -3,7 +3,7 @@
 ## Executive Summary
 
 **Project:** Directive - A constraint-driven runtime library for TypeScript
-**Type:** Open Source Library (npm packages + website + docs)
+**Type:** Open Source Library (npm packages + docs)
 **Domain:** directive.run
 **Goal:** Create "the next runtime tool" - a significant open source contribution to the state management ecosystem
 
@@ -68,7 +68,6 @@ directive/
 │   ├── traffic-light/
 │   └── data-fetching/
 ├── docs/                      # Documentation
-├── website/                   # Marketing landing page (directive.run)
 ├── codemods/                  # Migration tools
 │   ├── from-redux/
 │   ├── from-zustand/

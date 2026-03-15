@@ -563,7 +563,7 @@ Directive uses file suffixes to manage feature readiness across source code, doc
 
 - **Source code:** Barrel files (`index.ts`) only export from `.ts` files. `.lab.ts` files are never referenced in exports, so bundlers exclude them. Type-only imports (`import type`) from `.lab.ts` are fine — they're erased at compile time.
 - **Docs pages:** Next.js routes from `page.md`. Renaming to `page.lab.md` removes the route. The embedding generator globs `**/page.md`, so `.lab.md` files are automatically skipped.
-- **Navigation:** Comment out the nav entry in `website/src/lib/navigation.ts` with a note: `// Feature — lab (reason)`.
+- **Navigation:** Comment out the nav entry in `directive-docs: src/lib/navigation.ts` with a note: `// Feature — lab (reason)`.
 - **Examples:** Private examples can import directly from `.lab.ts` via relative path. Published packages never reference lab files.
 
 ### Conventions

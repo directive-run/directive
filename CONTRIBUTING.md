@@ -10,7 +10,7 @@ Everything you need to know about how the monorepo fits together &ndash; from lo
 directive/
 ├── .changeset/              # Changesets config (versioning + npm publishing)
 ├── .claude/                 # Claude Code skills + project context
-│   └── commands/            # 9 skills (/release, /changeset, /deploy, etc.)
+│   └── commands/            # 7 skills (/release, /changeset, /validate, etc.)
 ├── .github/workflows/
 │   ├── ci.yml               # PR quality gate
 │   └── release.yml          # npm publish on merge to main
@@ -25,12 +25,9 @@ directive/
 │   ├── solid/               # @directive-run/solid
 │   ├── lit/                 # @directive-run/lit
 │   └── vite-plugin-api-proxy/
-├── website/                 # Next.js 15 docs site (directive.run)
-│   ├── scripts/
-│   │   ├── extract-api-docs.ts    # ts-morph → JSON/MD from JSDoc
-│   │   └── generate-embeddings.ts # OpenAI embeddings for chatbot
-│   └── docs/generated/      # Build artifacts (gitignored)
 └── docs/                    # Internal planning docs
+
+> **Note:** The documentation website has been extracted to [directive-run/directive-docs](https://github.com/directive-run/directive-docs).
 ```
 
 ### Package Dependency Graph
@@ -59,8 +56,6 @@ directive/
 | Biome | 1.9+ | Lint + format (single tool) |
 | Changesets | 2.29+ | Versioning + npm publishing |
 | Playwright | 1.49+ | End-to-end framework tests |
-| Next.js | 15 | Documentation website |
-| Vercel | &ndash; | Website hosting (auto-deploy on push to main) |
 
 ---
 
@@ -154,8 +149,6 @@ pnpm clean                # Remove all dist/ and node_modules/
 ```bash
 pnpm --filter @directive-run/core build
 pnpm --filter @directive-run/core test
-pnpm --filter website dev          # Start docs site at localhost:3000
-pnpm --filter website build        # Full website build (API docs → embeddings → Next.js)
 ```
 
 ---
@@ -168,132 +161,43 @@ pnpm --filter website build        # Full website build (API docs → embeddings
 
 ### Docs Pipeline
 
-The full docs pipeline runs 6 steps across 3 packages, feeding outputs forward:
+> **Note:** The docs pipeline scripts (extract-api-docs, generate-embeddings) now live in [directive-docs](https://github.com/directive-run/directive-docs). The knowledge package's `generate-api-skeleton.ts` accepts a CLI path argument to locate `api-reference.json`.
 
-```
-  TS Source Files                    Knowledge Files
-  (core/src, ai/src)                 (core/*.md, ai/*.md)
-        │                                  │
-        ▼                                  │
-  ┌──────────────────┐                     │
-  │ extract-api-docs │ website/scripts     │
-  │ (ts-morph)       │                     │
-  └────────┬─────────┘                     │
-           │                               │
-           ▼                               │
-  docs/generated/                          │
-  ├── api-reference.json ──┐               │
-  └── api-reference.md     │               │
-                           │               │
-           ┌───────────────┘               │
-           ▼                               │
-  ┌─────────────────────┐                  │
-  │ generate-api-skeleton│ knowledge/      │
-  └────────┬────────────┘  scripts         │
-           │                               │
-           ▼                               │
-  knowledge/api-skeleton.md                │
-           │                               │
-           ├───────────────────────────────┐│
-           ▼                               ▼│
-  ┌──────────────────┐            ┌────────────────┐
-  │ extract-examples │            │validate-knowledge│
-  └────────┬─────────┘            └────────────────┘
-           │                               │
-           ▼                               │
-  knowledge/examples/*.ts                  │
-           │                               │
-           ├───────────────────────────────┘
-           ▼
-  ┌──────────────────┐
-  │ build-skills     │ claude-plugin/scripts
-  └────────┬─────────┘
-           │
-           ▼
-  claude-plugin/skills/
-  (12 skill directories)
-           │
-           ▼
-  ┌─────────────────────┐
-  │ generate-embeddings  │ website/scripts
-  │ (OpenAI API)         │
-  └────────┬─────────────┘
-           │
-           ▼
-  public/embeddings.json
-```
-
-### One-Command Pipeline
-
-```bash
-pnpm build:docs-pipeline
-```
-
-Runs all 6 steps in sequence: package builds &rarr; extract API docs &rarr; knowledge build (skeleton + examples) &rarr; build skills &rarr; generate embeddings.
-
-### Individual Steps
+The knowledge package still provides these steps:
 
 | Step | Command | Reads | Writes |
 |------|---------|-------|--------|
-| 1. Extract API Docs | `pnpm --filter directive-website build:api-docs` | `packages/{core,ai}/src/**/*.ts` | `docs/generated/api-reference.{json,md}` |
-| 2. Generate API Skeleton | `pnpm --filter @directive-run/knowledge generate` | `docs/generated/api-reference.json` | `packages/knowledge/api-skeleton.md` |
-| 3. Extract Examples | `pnpm --filter @directive-run/knowledge extract-examples` | `examples/*/src/*.ts` | `packages/knowledge/examples/*.ts` |
-| 4. Validate Knowledge | `pnpm --filter @directive-run/knowledge validate` | `api-skeleton.md`, `{core,ai}/*.md` | (validation only) |
-| 5. Build Skills | `pnpm --filter @directive-run/claude-plugin build` | `knowledge/{core,ai,examples}/*` | `claude-plugin/skills/` |
-| 6. Generate Embeddings | `pnpm --filter directive-website build:embeddings` | docs, api-reference.json, knowledge | `public/embeddings.json` |
-
-### Generated Files
-
-These files are gitignored and must be rebuilt:
-
-| File | Rebuilt By | When to Rebuild |
-|------|-----------|-----------------|
-| `docs/generated/api-reference.json` | Step 1 | JSDoc or exports change in core/ai |
-| `docs/generated/api-reference.md` | Step 1 | Same as above |
-| `packages/knowledge/api-skeleton.md` | Step 2 | After step 1, or manually |
-| `packages/knowledge/examples/*.ts` | Step 3 | Example source files change |
-| `claude-plugin/skills/*` | Step 5 | Knowledge files or templates change |
-| `public/embeddings.json` | Step 6 | Any content change (docs, API, knowledge) |
-
-### When to Run What
-
-| What Changed | Run |
-|--------------|-----|
-| TypeScript source (JSDoc, exports) | Full pipeline: `pnpm build:docs-pipeline` |
-| Knowledge files (`core/*.md`, `ai/*.md`) | Steps 4-6: validate &rarr; build-skills &rarr; embeddings |
-| Example source files | Steps 3-6: extract-examples &rarr; build-skills &rarr; embeddings |
-| Skill templates | Step 5: `pnpm --filter @directive-run/claude-plugin build` |
-| Doc pages (Markdoc) | Step 6: `pnpm --filter directive-website build:embeddings` |
-| Everything / not sure | `pnpm build:docs-pipeline` |
-
-### LLMs.txt
-
-The website exposes dynamic API routes that serve documentation content formatted for AI context windows. These are generated at request time from the doc pages.
+| Generate API Skeleton | `pnpm --filter @directive-run/knowledge generate [path-to-api-reference.json]` | `api-reference.json` | `packages/knowledge/api-skeleton.md` |
+| Extract Examples | `pnpm --filter @directive-run/knowledge extract-examples` | `examples/*/src/*.ts` | `packages/knowledge/examples/*.ts` |
+| Validate Knowledge | `pnpm --filter @directive-run/knowledge validate` | `api-skeleton.md`, `{core,ai}/*.md` | (validation only) |
+| Build Skills | `pnpm --filter @directive-run/claude-plugin build` | `knowledge/{core,ai,examples}/*` | `claude-plugin/skills/` |
 
 ---
 
 ## CI/CD Pipeline
 
-Three parallel processes trigger on different events:
+Two processes trigger on different events:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Push / PR to main                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  PR opened/updated          Merge to main     Merge to main │
-│       │                          │                  │       │
-│       ▼                          ▼                  ▼       │
-│   ci.yml                    release.yml         Vercel      │
-│   ┌──────────┐              ┌──────────┐      ┌──────────┐  │
-│   │ test     │              │ typecheck│      │ embeds   │  │
-│   │ lint     │              │ test     │      │ next     │  │
-│   │ typecheck│              │ publish  │      │ build    │  │
-│   └──────────┘              └──────────┘      └──────────┘  │
-│   Quality gate              npm release       Website deploy│
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│                Push / PR to main                 │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  PR opened/updated          Merge to main        │
+│       │                          │               │
+│       ▼                          ▼               │
+│   ci.yml                    release.yml          │
+│   ┌──────────┐              ┌──────────┐         │
+│   │ test     │              │ typecheck│         │
+│   │ lint     │              │ test     │         │
+│   │ typecheck│              │ publish  │         │
+│   └──────────┘              └──────────┘         │
+│   Quality gate              npm release          │
+│                                                  │
+└─────────────────────────────────────────────────┘
 ```
+
+> **Note:** Website deployment now happens from the [directive-docs](https://github.com/directive-run/directive-docs) repo via Vercel.
 
 ### PR to main &ndash; `ci.yml`
 
@@ -318,14 +222,6 @@ Runs on push to main when `packages/`, `.changeset/`, `release.yml`, or `pnpm-lo
 6. **Changesets action:**
    - If pending changesets exist → creates/updates a "Version Packages" PR
    - If no pending changesets (version PR was just merged) → publishes to npm with provenance, creates git tags, creates GitHub Releases
-
-### Merge to main &ndash; Vercel
-
-Vercel auto-deploys the website on every push to main:
-
-1. Detects `pnpm-workspace.yaml` → builds workspace dependencies first
-2. Runs `pnpm --filter website build` (the full chain: API docs → embeddings → Next.js)
-3. Deploys to production at directive.run
 
 ---
 
@@ -385,7 +281,6 @@ Merging triggers `release.yml` again. This time there are no pending changesets,
 - Publishes to npm with provenance signing (`id-token: write` permission)
 - Creates git tags (e.g., `@directive-run/core@0.2.0`)
 - Creates GitHub Releases for each published package
-- Vercel auto-redeploys the website with updated API docs
 
 ### `pnpm changeset publish` vs `pnpm publish -r`
 
@@ -430,31 +325,6 @@ git push --follow-tags         # Push commits + tags
 
 ---
 
-## Website Deployment
-
-### Automatic (Vercel)
-
-Every push to main triggers a Vercel deployment. The build command runs the full pipeline (API docs → embeddings → Next.js build).
-
-**Requirements:**
-- `OPENAI_API_KEY` set in Vercel project environment variables (production + preview)
-- Without it, embeddings are skipped (chatbot search won't work, but site still builds)
-
-### Manual Deploy
-
-Use the `/deploy` skill in Claude Code for ad-hoc production pushes.
-
-### When to Regenerate Embeddings
-
-Embeddings are regenerated on every Vercel deploy. They should be regenerated when:
-- Documentation content changes (new pages, updated guides)
-- API signatures change (JSDoc updates, new exports)
-- New blog posts are added
-
-Since Vercel rebuilds on every push to main, this happens automatically.
-
----
-
 ## Skills Reference
 
 Claude Code skills available via `/command`:
@@ -467,8 +337,6 @@ Claude Code skills available via `/command`:
 | `/typecheck` | TypeScript type checking across all packages |
 | `/audit` | Security and code quality audit (deps, secrets, licenses) |
 | `/status` | Project health dashboard &ndash; versions, tests, build, bundle sizes |
-| `/deploy` | Build and deploy the website to production |
-| `/blog` | Scaffold a new blog post with frontmatter and structure |
 | `/new-package` | Scaffold a new `@directive-run/*` package in the monorepo |
 
 ### Common Workflows
@@ -481,13 +349,6 @@ pnpm typecheck           # Check types
 # or all at once: /validate
 ```
 
-**"I changed documentation"**
-```bash
-pnpm --filter website dev              # Preview locally at localhost:3000
-pnpm --filter website build:api-docs   # Regenerate API docs (if JSDoc changed)
-pnpm --filter website build:embeddings # Regenerate embeddings (needs OPENAI_API_KEY)
-```
-
 **"I'm ready to release"**
 ```bash
 pnpm changeset           # Create changeset describing changes
@@ -495,10 +356,7 @@ git add . && git commit   # Commit changeset with your changes
 # Push, open PR, merge → Changesets handles the rest
 ```
 
-**"I need to deploy the website now"**
-```bash
-# Use /deploy skill, or push to main (Vercel auto-deploys)
-```
+> **Note:** Website deployment and documentation workflows are now managed in [directive-docs](https://github.com/directive-run/directive-docs).
 
 ---
 
