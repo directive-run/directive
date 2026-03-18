@@ -1,5 +1,20 @@
 # @directive-run/core
 
+## 0.8.0
+
+### Minor Changes
+
+- ### Features
+  - Dev-mode nested mutation detection in facts store
+  - Docs-artifacts CI job with knowledge bundling
+
+  ### Refactors
+  - Extract engine subsystems (accessors, definitions, trace) and deduplicate system.ts
+
+  ### Chores
+  - Update docs references for standalone directive-docs repo
+  - Website extraction cleanup
+
 ## 0.7.0
 
 ### Minor Changes
