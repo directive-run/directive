@@ -71,7 +71,7 @@ jobs:
       - run: pnpm -r --filter './packages/*' build
 
       - name: Install docs tooling
-        run: npm i -g @directive-run/docs-theme@latest
+        run: npm i -g @directive-run/toolkit@latest
 
       - name: Extract API docs
         run: |
