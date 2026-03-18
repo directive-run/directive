@@ -67,11 +67,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --filter './packages/*' build
 
       - name: Install docs tooling
         run: npm i -g @directive-run/toolkit@latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract API docs
         run: |
