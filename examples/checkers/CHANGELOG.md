@@ -1,5 +1,14 @@
 # @directive-run/example-checkers
 
+## 0.0.10
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@0.8.0
+  - @directive-run/ai@0.8.0
+  - @directive-run/el@0.5.0
+
 ## 0.0.9
 
 ### Patch Changes

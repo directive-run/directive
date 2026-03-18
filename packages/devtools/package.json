@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/devtools",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Visual DevTools for Directive AI orchestration — timeline, DAG, health, breakpoints.",
   "type": "module",
