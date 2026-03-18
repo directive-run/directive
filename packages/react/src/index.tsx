@@ -147,6 +147,8 @@ function _useSingleFact(
     }
   }
 
+  const cachedValue = useRef<unknown>(UNINITIALIZED);
+
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       return system.facts.$store.subscribe([factKey], onStoreChange);
@@ -155,8 +157,7 @@ function _useSingleFact(
   );
 
   const getSnapshot = useCallback(() => {
-    // biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-    return (system.facts as any)[factKey];
+    return system.facts.$store.get(factKey as never);
   }, [system, factKey]);
 
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -182,8 +183,7 @@ function _useFacts(
   const getSnapshot = useCallback(() => {
     const result: Record<string, unknown> = {};
     for (const key of factKeys) {
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
-      result[key] = (system.facts as any)[key];
+      result[key] = system.facts.$store.get(key as never);
     }
 
     if (cachedValue.current !== UNINITIALIZED) {
