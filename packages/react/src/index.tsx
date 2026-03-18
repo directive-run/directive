@@ -147,8 +147,6 @@ function _useSingleFact(
     }
   }
 
-  const cachedValue = useRef<unknown>(UNINITIALIZED);
-
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
       return system.facts.$store.subscribe([factKey], onStoreChange);
