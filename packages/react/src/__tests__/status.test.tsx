@@ -194,8 +194,10 @@ describe("useRequirementStatus", () => {
       expect(typeof status.isLoading).toBe("boolean");
       expect(typeof status.hasError).toBe("boolean");
 
-      system.start();
-      await system.settle();
+      await act(async () => {
+        system.start();
+        await system.settle();
+      });
       system.destroy();
     });
 

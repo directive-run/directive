@@ -168,9 +168,11 @@ describe("useInspect", () => {
     const { result, unmount } = renderHook(() => useInspect(system));
 
     // After start, the constraint evaluates and produces a requirement
-    await vi.waitFor(() => {
-      expect(result.current.hasUnmet).toBe(true);
-      expect(result.current.unmet.length).toBeGreaterThan(0);
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(result.current.hasUnmet).toBe(true);
+        expect(result.current.unmet.length).toBeGreaterThan(0);
+      });
     });
 
     unmount();
@@ -222,6 +224,9 @@ describe("useInspect", () => {
   it("with throttleMs option delays updates", async () => {
     const system = createTestSystem();
 
+    // Settle before rendering to prevent state updates outside act()
+    await system.settle();
+
     const { result, unmount } = renderHook(() =>
       useInspect(system, { throttleMs: 200 }),
     );
@@ -231,14 +236,8 @@ describe("useInspect", () => {
     expect(result.current).toHaveProperty("unmet");
     expect(result.current).toHaveProperty("isWorking");
 
-    await act(async () => {
-      await system.settle();
-    });
-
-    // After settle + throttle, state should reflect settled
-    await vi.waitFor(() => {
-      expect(result.current.isSettled).toBe(true);
-    });
+    // System already settled — initial snapshot reflects settled state
+    expect(result.current.isSettled).toBe(true);
 
     unmount();
     system.destroy();
@@ -334,8 +333,10 @@ describe("useInspect", () => {
     const { result, unmount } = renderHook(() => useInspect(system));
 
     // Wait for the resolver to start (but it hasn't completed)
-    await vi.waitFor(() => {
-      expect(result.current.isWorking).toBe(true);
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(result.current.isWorking).toBe(true);
+      });
     });
 
     // Now resolve the promise
