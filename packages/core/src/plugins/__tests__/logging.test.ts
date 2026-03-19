@@ -42,7 +42,7 @@ function mockSnapshot(id = 1, trigger = "manual") {
 }
 
 function mockDirectiveError(
-  source = "resolver" as const,
+  source: string = "resolver",
   sourceId = "myResolver",
   message = "something broke",
 ) {
@@ -78,7 +78,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
 
       expect(logger.debug).not.toHaveBeenCalled();
     });
@@ -93,7 +93,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger, level: "debug" });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
 
       expect(logger.debug).toHaveBeenCalledWith("[Directive] init");
     });
@@ -129,7 +129,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger, level: "info" });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
       plugin.onFactSet!("key", "val", undefined);
       plugin.onDerivationCompute!("d1", 42, ["key"]);
 
@@ -153,7 +153,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger, level: "warn" });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
       plugin.onStart!({} as never);
       plugin.onRequirementMet!(mockRequirement() as never, "resolver-1");
 
@@ -176,7 +176,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger, level: "error" });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
       plugin.onStart!({} as never);
       plugin.onResolverRetry!("r1", mockRequirement() as never, 2);
 
@@ -205,7 +205,7 @@ describe("loggingPlugin", () => {
       const filter = vi.fn().mockReturnValue(false);
       const plugin = loggingPlugin({ logger, level: "debug", filter });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
 
       expect(filter).toHaveBeenCalledWith("init");
       expect(logger.debug).not.toHaveBeenCalled();
@@ -216,7 +216,7 @@ describe("loggingPlugin", () => {
       const filter = vi.fn().mockReturnValue(true);
       const plugin = loggingPlugin({ logger, level: "debug", filter });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
 
       expect(filter).toHaveBeenCalledWith("init");
       expect(logger.debug).toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe("loggingPlugin", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger, level: "debug" });
 
-      plugin.onInit!();
+      plugin.onInit!({} as never);
       plugin.onStart!({} as never);
       plugin.onResolverRetry!("r1", mockRequirement() as never, 2);
       plugin.onError!(mockDirectiveError() as never);
@@ -288,7 +288,7 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger, level: "debug" });
 
-        plugin.onInit!();
+        plugin.onInit!({} as never);
 
         expect(logger.debug).toHaveBeenCalledWith("[Directive] init");
       });

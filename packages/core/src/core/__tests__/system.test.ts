@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 
@@ -511,7 +511,7 @@ describe("Topological Sort", () => {
           requirements: {},
         },
       },
-      init: (facts) => {
+      init: (facts: Record<string, unknown>) => {
         initOrder.push("dependent");
         facts.result = 0;
       },
@@ -545,7 +545,7 @@ describe("Topological Sort", () => {
           requirements: {},
         },
       },
-      init: (facts) => { facts.x = 0; },
+      init: (facts: Record<string, unknown>) => { facts.x = 0; },
     // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
@@ -564,7 +564,7 @@ describe("Topological Sort", () => {
           requirements: {},
         },
       },
-      init: (facts) => { facts.y = 0; },
+      init: (facts: Record<string, unknown>) => { facts.y = 0; },
     // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
@@ -793,10 +793,10 @@ describe("Distributable Snapshot", () => {
     });
     const data = snapshot.data as Record<string, Record<string, unknown>>;
 
-    expect(data.auth.token).toBe("snap-token");
-    expect(data.auth.loggedIn).toBe(false);
-    expect(data.data.count).toBe(3);
-    expect(data.data.items).toEqual([]);
+    expect(data.auth!.token).toBe("snap-token");
+    expect(data.auth!.loggedIn).toBe(false);
+    expect(data.data!.count).toBe(3);
+    expect(data.data!.items).toEqual([]);
 
     system.destroy();
   });
@@ -812,7 +812,7 @@ describe("Distributable Snapshot", () => {
     });
     const data = snapshot.data as Record<string, Record<string, unknown>>;
 
-    expect(data.auth.isLoggedIn).toBe(true);
+    expect(data.auth!.isLoggedIn).toBe(true);
 
     system.destroy();
   });
@@ -842,9 +842,9 @@ describe("Distributable Snapshot", () => {
     await flushMicrotasks();
 
     expect(callback).toHaveBeenCalled();
-    const lastCall = callback.mock.calls[callback.mock.calls.length - 1][0];
+    const lastCall = callback.mock.calls[callback.mock.calls.length - 1]![0];
     const data = lastCall.data as Record<string, Record<string, unknown>>;
-    expect(data.auth.isLoggedIn).toBe(true);
+    expect(data.auth!.isLoggedIn).toBe(true);
 
     unsub();
     system.destroy();
@@ -973,10 +973,10 @@ describe("InitialFacts & Hydration", () => {
     } as any);
     system.start();
 
-    expect(system.facts.auth.token).toBe("initial-token");
-    expect(system.facts.auth.loggedIn).toBe(true);
-    expect(system.facts.data.count).toBe(10);
-    expect(system.facts.data.items).toEqual(["a", "b"]);
+    expect((system.facts.auth as Record<string, unknown>).token).toBe("initial-token");
+    expect((system.facts.auth as Record<string, unknown>).loggedIn).toBe(true);
+    expect((system.facts.data as Record<string, unknown>).count).toBe(10);
+    expect((system.facts.data as Record<string, unknown>).items).toEqual(["a", "b"]);
 
     system.destroy();
   });
@@ -1114,9 +1114,9 @@ describe("Cross-Module Dependencies", () => {
           requirements: {},
         },
       },
-      init: (facts) => { facts.multiplier = 2; },
+      init: (facts: Record<string, unknown>) => { facts.multiplier = 2; },
       derive: {
-        computed: (facts) => {
+        computed: (facts: Record<string, unknown>) => {
           const baseValue = (facts as Record<string, Record<string, unknown>>).base?.value as number ?? 0;
           const mult = (facts as Record<string, Record<string, unknown>>).self?.multiplier as number ?? 1;
 
@@ -1268,7 +1268,7 @@ describe("dispatch()", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    system.dispatch({ type: "auth::login", token: "raw-dispatch" });
+    system.dispatch({ type: "auth::login" as "login", token: "raw-dispatch" });
     expect(system.facts.auth.token).toBe("raw-dispatch");
 
     system.destroy();

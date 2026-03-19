@@ -27,7 +27,7 @@ export const SEPARATOR = "::";
  *
  * @internal
  */
-interface HardenedProxyConfig<T> {
+interface HardenedProxyConfig {
   /** Return the value for a string property access */
   get: (prop: string) => unknown;
   /** Handle property assignment. Omit for read-only proxies (returns false). */
@@ -52,7 +52,7 @@ interface HardenedProxyConfig<T> {
  *
  * @internal
  */
-function createHardenedProxy<T>(config: HardenedProxyConfig<T>): T {
+function createHardenedProxy<T extends object>(config: HardenedProxyConfig): T {
   return new Proxy({} as T, {
     get(_, prop: string | symbol) {
       if (typeof prop === "symbol") {

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   prefixModuleDefinition,
   type PrefixModuleOptions,
-  type FlatModuleDefinition,
 } from "../system-module-transform.js";
 import type { ModuleDef, ModuleSchema, ModulesMap } from "../types.js";
 
@@ -263,7 +262,7 @@ describe("prefixModuleDefinition", () => {
         derive: {
           doubled: (facts: any) => facts.count * 2,
           label: (facts: any) => `${facts.name}-label`,
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "app" }));
 
@@ -275,14 +274,14 @@ describe("prefixModuleDefinition", () => {
         schema: fullSchema,
         derive: {
           doubled: (facts: any) => facts.count * 2,
-          label: () => "x",
-        },
+          label: () => "x" as any,
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
       const flatFacts = { "m::count": 5 };
       const flatDerive = {};
-      const value = result.derive!["m::doubled"](flatFacts, flatDerive);
+      const value = result.derive!["m::doubled"]!(flatFacts, flatDerive);
 
       expect(value).toBe(10);
     });
@@ -292,14 +291,14 @@ describe("prefixModuleDefinition", () => {
         schema: fullSchema,
         derive: {
           doubled: (facts: any) => facts.count * 2,
-          label: (facts: any, derived: any) => `${derived.doubled}-label`,
-        },
+          label: (_facts: any, derived: any) => `${derived.doubled}-label`,
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "z" }));
 
       const flatFacts = { "z::count": 3 };
       const flatDerive = { "z::doubled": 6 };
-      const value = result.derive!["z::label"](flatFacts, flatDerive);
+      const value = result.derive!["z::label"]!(flatFacts, flatDerive);
 
       expect(value).toBe("6-label");
     });
@@ -310,15 +309,15 @@ describe("prefixModuleDefinition", () => {
         schema: fullSchema,
         derive: {
           doubled: (facts: any) => facts.self.count * 2,
-          label: () => "x",
-        },
+          label: () => "x" as any,
+        } as any,
         crossModuleDeps: { other: otherSchema },
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
       const flatFacts = { "m::count": 7, "other::token": "abc" };
       const flatDerive = {};
-      const value = result.derive!["m::doubled"](flatFacts, flatDerive);
+      const value = result.derive!["m::doubled"]!(flatFacts, flatDerive);
 
       expect(value).toBe(14);
     });
@@ -330,13 +329,13 @@ describe("prefixModuleDefinition", () => {
         derive: {
           doubled: () => 0,
           label: (facts: any) => `token:${facts.other.token}`,
-        },
+        } as any,
         crossModuleDeps: { other: otherSchema },
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
       const flatFacts = { "m::count": 1, "other::token": "xyz" };
-      const value = result.derive!["m::label"](flatFacts, {});
+      const value = result.derive!["m::label"]!(flatFacts, {});
 
       expect(value).toBe("token:xyz");
     });
@@ -371,7 +370,7 @@ describe("prefixModuleDefinition", () => {
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ev" }));
 
       const flatStore: Record<string, unknown> = { "ev::count": 10 };
-      result.events!["ev::increment"](flatStore, {});
+      result.events!["ev::increment"]!(flatStore, {});
 
       expect(flatStore["ev::count"]).toBe(11);
     });
@@ -390,7 +389,7 @@ describe("prefixModuleDefinition", () => {
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ev" }));
 
       const payload = { name: "test" };
-      result.events!["ev::setName"]({}, payload);
+      result.events!["ev::setName"]!({}, payload);
 
       expect(receivedPayload).toBe(payload);
     });
@@ -409,7 +408,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -429,7 +428,7 @@ describe("prefixModuleDefinition", () => {
             },
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -449,7 +448,7 @@ describe("prefixModuleDefinition", () => {
             when: (facts: any) => facts.count > 100,
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -464,7 +463,7 @@ describe("prefixModuleDefinition", () => {
         schema: fullSchema,
         constraints: {
           check: { when: () => true, require: staticReq },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -481,7 +480,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: (facts: any) => ({ type: "FETCH", id: facts.name }),
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -501,7 +500,7 @@ describe("prefixModuleDefinition", () => {
             require: { type: "FETCH", id: "1" },
             deps: ["count", "name"],
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -523,7 +522,7 @@ describe("prefixModuleDefinition", () => {
             require: { type: "SAVE" },
             after: ["first"],
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -541,7 +540,7 @@ describe("prefixModuleDefinition", () => {
             require: { type: "FETCH", id: "1" },
             after: ["local", "other::remote"],
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -559,7 +558,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -578,7 +577,7 @@ describe("prefixModuleDefinition", () => {
             when: () => Promise.resolve(true),
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -602,7 +601,7 @@ describe("prefixModuleDefinition", () => {
             },
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
         crossModuleDeps: { other: otherSchema },
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
@@ -622,7 +621,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: (facts: any) => ({ type: "FETCH", id: facts.other.token }),
           },
-        },
+        } as any,
         crossModuleDeps: { other: otherSchema },
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
@@ -641,7 +640,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -658,7 +657,7 @@ describe("prefixModuleDefinition", () => {
             when: () => true,
             require: { type: "FETCH", id: "1" },
           },
-        },
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
 
@@ -744,7 +743,7 @@ describe("prefixModuleDefinition", () => {
     });
 
     it("resolve receives namespaced facts proxy scoped to own module", async () => {
-      const resolveFn = vi.fn(async (req: any, ctx: any) => {
+      const resolveFn = vi.fn(async (_req: any, ctx: any) => {
         ctx.facts.count = 100;
       });
       const mod = makeModule({
@@ -1059,12 +1058,12 @@ describe("prefixModuleDefinition", () => {
 
             return facts.count * 2;
           },
-          label: () => "x",
-        },
+          label: () => "x" as any,
+        } as any,
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
-      result.derive!["m::doubled"]({ "m::count": 8 }, {});
+      result.derive!["m::doubled"]!({ "m::count": 8 }, {});
 
       expect(readSelf).toBe(8);
     });
@@ -1082,13 +1081,13 @@ describe("prefixModuleDefinition", () => {
 
             return facts.self.count * 2;
           },
-          label: () => "x",
-        },
+          label: () => "x" as any,
+        } as any,
         crossModuleDeps: { other: otherSchema },
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
-      result.derive!["m::doubled"](
+      result.derive!["m::doubled"]!(
         { "m::count": 4, "other::token": "tok" },
         {},
       );
@@ -1107,13 +1106,13 @@ describe("prefixModuleDefinition", () => {
 
             return facts.count * 2;
           },
-          label: () => "x",
-        },
+          label: () => "x" as any,
+        } as any,
         crossModuleDeps: {},
       });
       const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
 
-      result.derive!["m::doubled"]({ "m::count": 3 }, {});
+      result.derive!["m::doubled"]!({ "m::count": 3 }, {});
 
       expect(readCount).toBe(3);
     });
@@ -1134,7 +1133,7 @@ describe("prefixModuleDefinition", () => {
         derive: {
           doubled: (facts: any) => facts.count * 2,
           label: (facts: any) => facts.name,
-        },
+        } as any,
         events: {
           increment: (facts: any) => { facts.count += 1; },
           setName: (facts: any, p: any) => { facts.name = p.name; },
@@ -1148,7 +1147,7 @@ describe("prefixModuleDefinition", () => {
             require: { type: "FETCH", id: "1" },
             deps: ["count"],
           },
-        },
+        } as any,
         resolvers: {
           fetch: {
             requirement: "FETCH",

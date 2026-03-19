@@ -125,7 +125,7 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(onError.mock.calls[0]![0]).toBeInstanceOf(Error);
     });
 
     it("calls onError when stored data contains __proto__ key (prototype pollution)", () => {
@@ -143,7 +143,7 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0][0].message).toContain("prototype pollution");
+      expect(onError.mock.calls[0]![0].message).toContain("prototype pollution");
       // Facts should NOT have been modified
       expect(system.facts.__proto__).not.toHaveProperty("admin");
     });
@@ -165,7 +165,7 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0][0].message).toContain("prototype pollution");
+      expect(onError.mock.calls[0]![0].message).toContain("prototype pollution");
     });
 
     it("does not throw when onError is not provided and JSON is invalid", () => {
@@ -255,13 +255,13 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       // Set a tracked, included key
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("label");
-      plugin.onFactSet!("secret");
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("label", undefined, undefined);
+      plugin.onFactSet!("secret", undefined, undefined);
       vi.advanceTimersByTime(100);
 
       const saved = JSON.parse(
-        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0][1],
+        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0]![1],
       );
       expect(saved).toEqual({ count: 1, label: "x" });
       expect(saved).not.toHaveProperty("secret");
@@ -299,12 +299,12 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("secret");
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("secret", undefined, undefined);
       vi.advanceTimersByTime(100);
 
       const saved = JSON.parse(
-        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0][1],
+        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0]![1],
       );
       expect(saved).toEqual({ count: 1 });
       expect(saved).not.toHaveProperty("secret");
@@ -324,7 +324,7 @@ describe("persistencePlugin", () => {
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
       // Not saved yet (debounced)
       expect(storage.setItem).not.toHaveBeenCalled();
 
@@ -332,7 +332,7 @@ describe("persistencePlugin", () => {
       expect(storage.setItem).toHaveBeenCalledOnce();
 
       const saved = JSON.parse(
-        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0][1],
+        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0]![1],
       );
       expect(saved.count).toBe(99);
     });
@@ -349,7 +349,7 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("secret");
+      plugin.onFactSet!("secret", undefined, undefined);
       vi.advanceTimersByTime(200);
 
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -367,7 +367,7 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("other");
+      plugin.onFactSet!("other", undefined, undefined);
       vi.advanceTimersByTime(200);
 
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -388,12 +388,12 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       // First track the key
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
       vi.advanceTimersByTime(100);
       (storage.setItem as ReturnType<typeof vi.fn>).mockClear();
 
       // Now delete it
-      plugin.onFactDelete!("count");
+      plugin.onFactDelete!("count", undefined);
       vi.advanceTimersByTime(100);
 
       expect(storage.setItem).toHaveBeenCalledOnce();
@@ -411,7 +411,7 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactDelete!("temp");
+      plugin.onFactDelete!("temp", undefined);
       vi.advanceTimersByTime(200);
 
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -432,8 +432,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "count" },
-        { type: "delete", key: "label" },
+        { type: "set", key: "count", value: undefined, prev: undefined },
+        { type: "delete", key: "label", value: undefined, prev: undefined },
       ]);
 
       vi.advanceTimersByTime(100);
@@ -453,8 +453,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "temp1" },
-        { type: "set", key: "temp2" },
+        { type: "set", key: "temp1", value: undefined, prev: undefined },
+        { type: "set", key: "temp2", value: undefined, prev: undefined },
       ]);
 
       vi.advanceTimersByTime(200);
@@ -474,8 +474,8 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       plugin.onFactsBatch!([
-        { type: "set", key: "temp" },
-        { type: "set", key: "count" },
+        { type: "set", key: "temp", value: undefined, prev: undefined },
+        { type: "set", key: "count", value: undefined, prev: undefined },
       ]);
 
       vi.advanceTimersByTime(100);
@@ -497,11 +497,11 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       // Rapid fire 5 changes
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("count", undefined, undefined);
 
       vi.advanceTimersByTime(100);
       expect(storage.setItem).toHaveBeenCalledOnce();
@@ -515,11 +515,11 @@ describe("persistencePlugin", () => {
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
       vi.advanceTimersByTime(80); // 80ms into debounce
       expect(storage.setItem).not.toHaveBeenCalled();
 
-      plugin.onFactSet!("count"); // Resets timer
+      plugin.onFactSet!("count", undefined, undefined); // Resets timer
       vi.advanceTimersByTime(80); // 80ms into NEW debounce
       expect(storage.setItem).not.toHaveBeenCalled();
 
@@ -539,7 +539,7 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
       vi.advanceTimersByTime(200);
       expect(storage.setItem).not.toHaveBeenCalled();
@@ -561,14 +561,14 @@ describe("persistencePlugin", () => {
 
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
       // Destroy before debounce fires
-      plugin.onDestroy!();
+      plugin.onDestroy!({} as never);
 
       expect(storage.setItem).toHaveBeenCalledOnce();
       const saved = JSON.parse(
-        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0][1],
+        (storage.setItem as ReturnType<typeof vi.fn>).mock.calls[0]![1],
       );
       expect(saved.count).toBe(42);
     });
@@ -580,10 +580,10 @@ describe("persistencePlugin", () => {
 
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
       // Destroy clears timeout + does final save
-      plugin.onDestroy!();
+      plugin.onDestroy!({} as never);
       (storage.setItem as ReturnType<typeof vi.fn>).mockClear();
 
       // Advancing timers should NOT trigger another save
@@ -597,7 +597,7 @@ describe("persistencePlugin", () => {
 
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
       // Wait for debounce to fire naturally
       vi.useFakeTimers();
@@ -605,7 +605,7 @@ describe("persistencePlugin", () => {
       (storage.setItem as ReturnType<typeof vi.fn>).mockClear();
 
       // Destroy should still save (final save always runs)
-      plugin.onDestroy!();
+      plugin.onDestroy!({} as never);
       expect(storage.setItem).toHaveBeenCalledOnce();
     });
   });
@@ -628,8 +628,8 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
-      plugin.onFactSet!("label");
+      plugin.onFactSet!("count", undefined, undefined);
+      plugin.onFactSet!("label", undefined, undefined);
       vi.advanceTimersByTime(100);
 
       expect(onSave).toHaveBeenCalledOnce();
@@ -647,9 +647,9 @@ describe("persistencePlugin", () => {
         onSave,
       });
       plugin.onInit!(system);
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
-      plugin.onDestroy!();
+      plugin.onDestroy!({} as never);
 
       expect(onSave).toHaveBeenCalledOnce();
       expect(onSave).toHaveBeenCalledWith({ count: 3 });
@@ -677,11 +677,11 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
       vi.advanceTimersByTime(100);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0][0].message).toBe("QuotaExceededError");
+      expect(onError.mock.calls[0]![0].message).toBe("QuotaExceededError");
     });
 
     it("wraps non-Error throws in an Error", () => {
@@ -700,12 +700,12 @@ describe("persistencePlugin", () => {
       });
       plugin.onInit!(system);
 
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
       vi.advanceTimersByTime(100);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(onError.mock.calls[0][0].message).toBe("string error");
+      expect(onError.mock.calls[0]![0]).toBeInstanceOf(Error);
+      expect(onError.mock.calls[0]![0].message).toBe("string error");
     });
 
     it("does not throw when onError is not provided and save fails", () => {
@@ -718,7 +718,7 @@ describe("persistencePlugin", () => {
 
       const plugin = persistencePlugin({ storage, key: "app-state" });
       plugin.onInit!(system);
-      plugin.onFactSet!("count");
+      plugin.onFactSet!("count", undefined, undefined);
 
       expect(() => vi.advanceTimersByTime(100)).not.toThrow();
     });
@@ -736,7 +736,7 @@ describe("persistencePlugin", () => {
       const plugin = persistencePlugin({ storage, key: "app-state" });
 
       // Destroy without init — save() should bail because system is null
-      plugin.onDestroy!();
+      plugin.onDestroy!({} as never);
 
       expect(storage.setItem).not.toHaveBeenCalled();
     });
