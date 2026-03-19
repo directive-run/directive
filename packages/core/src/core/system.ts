@@ -18,6 +18,15 @@
 
 import { isPrototypeSafe } from "../utils/utils.js";
 import { createEngine } from "./engine.js";
+import { prefixModuleDefinition } from "./system-module-transform.js";
+import {
+  SEPARATOR,
+  createNamespacedDeriveProxy,
+  createNamespacedEventsProxy,
+  createNamespacedFactsProxy,
+  denormalizeFlatKeys,
+  toInternalKey,
+} from "./system-proxies.js";
 import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   CreateSystemOptionsNamed,
@@ -31,9 +40,6 @@ import type {
   SingleModuleSystem,
   TraceOption,
 } from "./types.js";
-
-/** Namespace separator for internal key prefixing (e.g., "auth::token") */
-const SEPARATOR = "::";
 
 // ============================================================================
 // Topological Sort for Module Dependencies
@@ -49,6 +55,7 @@ function topologicalSort<Modules extends ModulesMap>(
   modulesMap: Modules,
 ): Array<keyof Modules & string> {
   const namespaces = Object.keys(modulesMap) as Array<keyof Modules & string>;
+  const namespacesSet = new Set<string>(namespaces);
   const visited = new Set<string>();
   const visiting = new Set<string>(); // For cycle detection
   const result: Array<keyof Modules & string> = [];
@@ -75,7 +82,7 @@ function topologicalSort<Modules extends ModulesMap>(
     const mod = modulesMap[namespace];
     if (mod?.crossModuleDeps) {
       for (const depNamespace of Object.keys(mod.crossModuleDeps)) {
-        if (namespaces.includes(depNamespace as keyof Modules & string)) {
+        if (namespacesSet.has(depNamespace)) {
           visit(depNamespace);
         }
       }
@@ -94,42 +101,26 @@ function topologicalSort<Modules extends ModulesMap>(
   return result;
 }
 
-// ============================================================================
-// Proxy Cache (Performance)
-// ============================================================================
-
 /**
- * WeakMap to cache module facts proxies. Keyed by the facts store object.
- * Inner map is keyed by namespace string.
+ * Build the list of internal prefixed keys (facts + derivations) for a module namespace.
+ * Used by subscribe/subscribeModule to map namespaces to their engine keys.
  */
-const moduleFactsProxyCache = new WeakMap<
-  Record<string, unknown>,
-  Map<string, Record<string, unknown>>
->();
+function collectNamespaceKeys(
+  namespace: string,
+  mod: ModuleDef<ModuleSchema>,
+): string[] {
+  const keys: string[] = [];
+  for (const key of Object.keys(mod.schema.facts)) {
+    keys.push(`${namespace}${SEPARATOR}${key}`);
+  }
+  if (mod.schema.derivations) {
+    for (const key of Object.keys(mod.schema.derivations)) {
+      keys.push(`${namespace}${SEPARATOR}${key}`);
+    }
+  }
 
-/**
- * WeakMap to cache namespaced facts proxies.
- */
-const namespacedFactsProxyCache = new WeakMap<
-  Record<string, unknown>,
-  Record<string, Record<string, unknown>>
->();
-
-/**
- * WeakMap to cache namespaced derive proxies.
- */
-const namespacedDeriveProxyCache = new WeakMap<
-  Record<string, unknown>,
-  Record<string, Record<string, unknown>>
->();
-
-/**
- * WeakMap to cache module derive proxies.
- */
-const moduleDeriveProxyCache = new WeakMap<
-  Record<string, unknown>,
-  Map<string, Record<string, unknown>>
->();
+  return keys;
+}
 
 // ============================================================================
 // createSystem
@@ -332,279 +323,34 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     }
   }
 
+  // Cached module names array, shared by all namespaced proxies.
+  // Set to null on registerModule to lazily recompute.
+  const moduleNamesCache: { names: string[] | null } = { names: null };
+  function getModuleNames(): string[] {
+    if (moduleNamesCache.names === null) {
+      moduleNamesCache.names = Object.keys(modulesMap);
+    }
+
+    return moduleNamesCache.names;
+  }
+
   // Transform modules to flat format with prefixed keys
   // auth.token → auth::token internally
   // Process in dependency order (determined above)
-  const flatModules: Array<ModuleDef<ModuleSchema>> = [];
+  const flatModules = orderedNamespaces
+    .map((namespace) => {
+      const mod = modulesMap[namespace];
+      if (!mod) return null; // TypeScript guard - should never happen
 
-  for (const namespace of orderedNamespaces) {
-    const mod = modulesMap[namespace];
-    if (!mod) continue; // TypeScript guard - should never happen
-    // Compute cross-module deps info once per module (used by derive, constraints, effects)
-    const hasCrossModuleDeps =
-      mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0;
-    const depNamespaces = hasCrossModuleDeps
-      ? Object.keys(mod.crossModuleDeps!)
-      : [];
-
-    // Prefix all fact keys with namespace
-    const prefixedFacts: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(mod.schema.facts)) {
-      prefixedFacts[`${namespace}${SEPARATOR}${key}`] = value;
-    }
-
-    // Prefix all derivation keys with namespace
-    const prefixedDerivations: Record<string, unknown> = {};
-    if (mod.schema.derivations) {
-      for (const [key, value] of Object.entries(mod.schema.derivations)) {
-        prefixedDerivations[`${namespace}${SEPARATOR}${key}`] = value;
-      }
-    }
-
-    // Prefix all event keys with namespace
-    const prefixedEvents: Record<string, unknown> = {};
-    if (mod.schema.events) {
-      for (const [key, value] of Object.entries(mod.schema.events)) {
-        prefixedEvents[`${namespace}${SEPARATOR}${key}`] = value;
-      }
-    }
-
-    // Transform init to use prefixed keys
-    // biome-ignore lint/suspicious/noExplicitAny: Facts proxy type coercion
-    const prefixedInit = mod.init
-      ? (facts: any) => {
-          // Create a proxy that translates unprefixed keys to prefixed
-          const moduleFactsProxy = createModuleFactsProxy(facts, namespace);
-          // biome-ignore lint/suspicious/noExplicitAny: Module init type coercion
-          (mod.init as any)(moduleFactsProxy);
-        }
-      : undefined;
-
-    // Transform derive functions to use prefixed keys
-    const prefixedDerive: Record<
-      string,
-      (facts: unknown, derive: unknown) => unknown
-    > = {};
-    if (mod.derive) {
-      for (const [key, fn] of Object.entries(mod.derive)) {
-        prefixedDerive[`${namespace}${SEPARATOR}${key}`] = (
-          facts: unknown,
-          derive: unknown,
-        ) => {
-          // Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-          // Otherwise use flat access to own module only
-          const factsProxy = hasCrossModuleDeps
-            ? createCrossModuleFactsProxy(
-                facts as Record<string, unknown>,
-                namespace,
-                depNamespaces,
-              )
-            : createModuleFactsProxy(
-                facts as Record<string, unknown>,
-                namespace,
-              );
-          // Derive proxy stays scoped to own module
-          const deriveProxy = createModuleDeriveProxy(
-            derive as Record<string, unknown>,
-            namespace,
-          );
-          // biome-ignore lint/suspicious/noExplicitAny: Derive function type coercion
-          return (fn as any)(factsProxy, deriveProxy);
-        };
-      }
-    }
-
-    // Transform event handlers to use prefixed keys
-    const prefixedEventHandlers: Record<
-      string,
-      (facts: unknown, event: unknown) => void
-    > = {};
-    if (mod.events) {
-      for (const [key, handler] of Object.entries(mod.events)) {
-        prefixedEventHandlers[`${namespace}${SEPARATOR}${key}`] = (
-          facts: unknown,
-          event: unknown,
-        ) => {
-          const moduleFactsProxy = createModuleFactsProxy(
-            facts as Record<string, unknown>,
-            namespace,
-          );
-          // biome-ignore lint/suspicious/noExplicitAny: Event handler type coercion
-          (handler as any)(moduleFactsProxy, event);
-        };
-      }
-    }
-
-    // Transform constraints to use namespaced facts proxy
-    const prefixedConstraints: Record<string, unknown> = {};
-    if (mod.constraints) {
-      for (const [key, constraint] of Object.entries(mod.constraints)) {
-        const constraintDef = constraint as {
-          when: (facts: unknown) => boolean | Promise<boolean>;
-          require: unknown | ((facts: unknown) => unknown);
-          priority?: number;
-          async?: boolean;
-          timeout?: number;
-          deps?: string[];
-          after?: string[];
-        };
-
-        prefixedConstraints[`${namespace}${SEPARATOR}${key}`] = {
-          ...constraintDef,
-          // Transform deps to use prefixed keys
-          deps: constraintDef.deps?.map(
-            (dep) => `${namespace}${SEPARATOR}${dep}`,
-          ),
-          // Transform after to use prefixed keys (same-module references)
-          after: constraintDef.after?.map((dep) =>
-            dep.includes(SEPARATOR)
-              ? dep
-              : `${namespace}${SEPARATOR}${dep}`,
-          ),
-          when: (facts: unknown) => {
-            // Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-            // Otherwise use module-scoped proxy for direct access (facts.key → namespace::key)
-            const factsProxy = hasCrossModuleDeps
-              ? createCrossModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                  depNamespaces,
-                )
-              : createModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                );
-            return constraintDef.when(factsProxy);
-          },
-          require:
-            typeof constraintDef.require === "function"
-              ? (facts: unknown) => {
-                  const factsProxy = hasCrossModuleDeps
-                    ? createCrossModuleFactsProxy(
-                        facts as Record<string, unknown>,
-                        namespace,
-                        depNamespaces,
-                      )
-                    : createModuleFactsProxy(
-                        facts as Record<string, unknown>,
-                        namespace,
-                      );
-                  return (constraintDef.require as (facts: unknown) => unknown)(
-                    factsProxy,
-                  );
-                }
-              : constraintDef.require,
-        };
-      }
-    }
-
-    // Transform resolvers to use namespaced facts proxy
-    const prefixedResolvers: Record<string, unknown> = {};
-    if (mod.resolvers) {
-      for (const [key, resolver] of Object.entries(mod.resolvers)) {
-        const resolverDef = resolver as {
-          requirement: string;
-          resolve: (
-            req: unknown,
-            ctx: { facts: unknown; signal: AbortSignal },
-          ) => Promise<void>;
-          key?: (req: unknown) => string;
-          retry?: unknown;
-          timeout?: number;
-        };
-
-        prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
-          ...resolverDef,
-          resolve: async (
-            req: unknown,
-            ctx: { facts: unknown; signal: AbortSignal },
-          ) => {
-            const namespacedFacts = createNamespacedFactsProxy(
-              ctx.facts as Record<string, unknown>,
-              modulesMap,
-              () => Object.keys(modulesMap),
-            );
-            await resolverDef.resolve(req, {
-              facts: namespacedFacts[namespace],
-              signal: ctx.signal,
-            });
-          },
-        };
-      }
-    }
-
-    // Transform effects to use namespaced facts proxy
-    const prefixedEffects: Record<string, unknown> = {};
-    if (mod.effects) {
-      for (const [key, effect] of Object.entries(mod.effects)) {
-        const effectDef = effect as {
-          // biome-ignore lint/suspicious/noExplicitAny: Effect run function type
-          run: (facts: any, prev: any) => void | Promise<void>;
-          deps?: string[];
-        };
-
-        prefixedEffects[`${namespace}${SEPARATOR}${key}`] = {
-          ...effectDef,
-          // biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
-          run: (facts: any, prev: any) => {
-            // Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined
-            // Otherwise use module-scoped proxy for direct access (facts.key → namespace::key)
-            const factsProxy = hasCrossModuleDeps
-              ? createCrossModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                  depNamespaces,
-                )
-              : createModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                );
-            const prevProxy = prev
-              ? hasCrossModuleDeps
-                ? createCrossModuleFactsProxy(
-                    prev as Record<string, unknown>,
-                    namespace,
-                    depNamespaces,
-                  )
-                : createModuleFactsProxy(
-                    prev as Record<string, unknown>,
-                    namespace,
-                  )
-              : undefined;
-            return effectDef.run(factsProxy, prevProxy);
-          },
-          // Transform deps to use prefixed keys
-          deps: effectDef.deps?.map((dep) => `${namespace}${SEPARATOR}${dep}`),
-        };
-      }
-    }
-
-    flatModules.push({
-      id: mod.id,
-      schema: {
-        facts: prefixedFacts,
-        derivations: prefixedDerivations,
-        events: prefixedEvents,
-        requirements: mod.schema.requirements ?? {},
-      },
-      init: prefixedInit,
-      derive: prefixedDerive,
-      events: prefixedEventHandlers,
-      effects: prefixedEffects,
-      constraints: prefixedConstraints,
-      resolvers: prefixedResolvers,
-      hooks: mod.hooks,
-      history: {
-        snapshotEvents:
-          snapshotModulesSet && !snapshotModulesSet.has(namespace)
-            ? [] // Module excluded from snapshots
-            : mod.history?.snapshotEvents?.map(
-                (e: string) => `${namespace}${SEPARATOR}${e}`,
-              ),
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: Module transformation
-    } as any);
-  }
+      return prefixModuleDefinition({
+        mod,
+        namespace,
+        modulesMap,
+        getModuleNames,
+        snapshotModulesSet,
+      });
+    })
+    .filter(Boolean);
 
   // Dev-mode warning: tickMs set without tick event handler
   if (
@@ -682,19 +428,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   // Create engine with flat modules
   engine = createEngine({
     // biome-ignore lint/suspicious/noExplicitAny: Module format conversion
-    modules: flatModules.map((mod) => ({
-      id: mod.id,
-      schema: mod.schema.facts,
-      requirements: mod.schema.requirements,
-      init: mod.init,
-      derive: mod.derive,
-      events: mod.events,
-      effects: mod.effects,
-      constraints: mod.constraints,
-      resolvers: mod.resolvers,
-      hooks: mod.hooks,
-      history: mod.history,
-    })) as any,
+    modules: flatModules as any,
     plugins: options.plugins,
     history,
     trace,
@@ -721,26 +455,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   for (const namespace of Object.keys(modulesMap)) {
     const mod = modulesMap[namespace];
     if (!mod) continue;
-    const keys: string[] = [];
-    for (const key of Object.keys(mod.schema.facts)) {
-      keys.push(`${namespace}${SEPARATOR}${key}`);
-    }
-    if (mod.schema.derivations) {
-      for (const key of Object.keys(mod.schema.derivations)) {
-        keys.push(`${namespace}${SEPARATOR}${key}`);
-      }
-    }
-    namespaceKeysMap.set(namespace, keys);
-  }
-
-  // Cached module names array, shared by all namespaced proxies.
-  // Set to null on registerModule to lazily recompute.
-  const moduleNamesCache: { names: string[] | null } = { names: null };
-  function getModuleNames(): string[] {
-    if (moduleNamesCache.names === null) {
-      moduleNamesCache.names = Object.keys(modulesMap);
-    }
-    return moduleNamesCache.names;
+    namespaceKeysMap.set(namespace, collectNamespaceKeys(namespace, mod));
   }
 
   // Create namespaced proxies for external access
@@ -802,12 +517,19 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
       if (tickMs && tickMs > 0) {
         // Find the first module with a tick event and dispatch to it
-        const tickEventKey = Object.keys(flatModules[0]?.events ?? {}).find(
-          (k) => k.endsWith(`${SEPARATOR}tick`),
-        );
+        let tickEventKey: string | undefined;
+        for (const m of flatModules) {
+          if (m?.events) {
+            tickEventKey = Object.keys(m.events).find(
+              (k) => k.endsWith(`${SEPARATOR}tick`),
+            );
+            if (tickEventKey) break;
+          }
+        }
         if (tickEventKey) {
+          const key = tickEventKey;
           tickInterval = setInterval(() => {
-            engine.dispatch({ type: tickEventKey });
+            engine.dispatch({ type: key });
           }, tickMs);
         }
       }
@@ -959,32 +681,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       const snapshot = engine.getDistributableSnapshot(internalOptions);
 
       // Transform data keys from internal format (auth::status) to namespaced format (auth: { status })
-      const namespacedData: Record<string, Record<string, unknown>> = {};
-
-      for (const [key, value] of Object.entries(
-        snapshot.data as Record<string, unknown>,
-      )) {
-        // Find the namespace prefix (first separator)
-        const sepIndex = key.indexOf(SEPARATOR);
-        if (sepIndex > 0) {
-          const namespace = key.slice(0, sepIndex);
-          const localKey = key.slice(sepIndex + SEPARATOR.length);
-          if (!namespacedData[namespace]) {
-            namespacedData[namespace] = {};
-          }
-          namespacedData[namespace][localKey] = value;
-        } else {
-          // No namespace found, keep as-is
-          if (!namespacedData._root) {
-            namespacedData._root = {};
-          }
-          namespacedData._root[key] = value;
-        }
-      }
-
       return {
         ...snapshot,
-        data: namespacedData as T,
+        data: denormalizeFlatKeys(snapshot.data as Record<string, unknown>) as T,
       };
     },
 
@@ -1028,28 +727,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           metadata?: Record<string, unknown>;
         }) => {
           // Transform data keys from internal format to namespaced format
-          const namespacedData: Record<string, Record<string, unknown>> = {};
-
-          for (const [key, value] of Object.entries(snapshot.data)) {
-            const sepIndex = key.indexOf(SEPARATOR);
-            if (sepIndex > 0) {
-              const namespace = key.slice(0, sepIndex);
-              const localKey = key.slice(sepIndex + SEPARATOR.length);
-              if (!namespacedData[namespace]) {
-                namespacedData[namespace] = {};
-              }
-              namespacedData[namespace][localKey] = value;
-            } else {
-              if (!namespacedData._root) {
-                namespacedData._root = {};
-              }
-              namespacedData._root[key] = value;
-            }
-          }
-
           callback({
             ...snapshot,
-            data: namespacedData as T,
+            data: denormalizeFlatKeys(snapshot.data as Record<string, unknown>) as T,
           });
         },
       );
@@ -1086,205 +766,15 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       }
 
       const mod = moduleDef;
-      const hasCrossModuleDeps =
-        mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0;
-      const depNamespaces = hasCrossModuleDeps
-        ? Object.keys(mod.crossModuleDeps!)
-        : [];
 
-      // Build prefixed schema, derive, events, effects, constraints, resolvers
-      // (same logic as initial createNamespacedSystem)
-      const prefixedFacts: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(mod.schema.facts)) {
-        prefixedFacts[`${namespace}${SEPARATOR}${key}`] = value;
-      }
-
-      const prefixedInit = mod.init
-        ? // biome-ignore lint/suspicious/noExplicitAny: Module init type coercion
-          (facts: any) => {
-            const moduleFactsProxy = createModuleFactsProxy(facts, namespace);
-            // biome-ignore lint/suspicious/noExplicitAny: Module init type coercion
-            (mod.init as any)(moduleFactsProxy);
-          }
-        : undefined;
-
-      const prefixedDerive: Record<
-        string,
-        (facts: unknown, derive: unknown) => unknown
-      > = {};
-      if (mod.derive) {
-        for (const [key, fn] of Object.entries(mod.derive)) {
-          prefixedDerive[`${namespace}${SEPARATOR}${key}`] = (
-            facts: unknown,
-            derive: unknown,
-          ) => {
-            const factsProxy = hasCrossModuleDeps
-              ? createCrossModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                  depNamespaces,
-                )
-              : createModuleFactsProxy(
-                  facts as Record<string, unknown>,
-                  namespace,
-                );
-            const deriveProxy = createModuleDeriveProxy(
-              derive as Record<string, unknown>,
-              namespace,
-            );
-            // biome-ignore lint/suspicious/noExplicitAny: Derive function type coercion
-            return (fn as any)(factsProxy, deriveProxy);
-          };
-        }
-      }
-
-      const prefixedEventHandlers: Record<
-        string,
-        (facts: unknown, event: unknown) => void
-      > = {};
-      if (mod.events) {
-        for (const [key, handler] of Object.entries(mod.events)) {
-          prefixedEventHandlers[`${namespace}${SEPARATOR}${key}`] = (
-            facts: unknown,
-            event: unknown,
-          ) => {
-            const moduleFactsProxy = createModuleFactsProxy(
-              facts as Record<string, unknown>,
-              namespace,
-            );
-            // biome-ignore lint/suspicious/noExplicitAny: Event handler type coercion
-            (handler as any)(moduleFactsProxy, event);
-          };
-        }
-      }
-
-      const prefixedConstraints: Record<string, unknown> = {};
-      if (mod.constraints) {
-        for (const [key, constraint] of Object.entries(mod.constraints)) {
-          const constraintDef = constraint as {
-            when: (facts: unknown) => boolean | Promise<boolean>;
-            require: unknown | ((facts: unknown) => unknown);
-            priority?: number;
-            async?: boolean;
-            timeout?: number;
-            deps?: string[];
-          };
-          prefixedConstraints[`${namespace}${SEPARATOR}${key}`] = {
-            ...constraintDef,
-            deps: constraintDef.deps?.map(
-              (dep) => `${namespace}${SEPARATOR}${dep}`,
-            ),
-            when: (facts: unknown) => {
-              const factsProxy = hasCrossModuleDeps
-                ? createCrossModuleFactsProxy(
-                    facts as Record<string, unknown>,
-                    namespace,
-                    depNamespaces,
-                  )
-                : createModuleFactsProxy(
-                    facts as Record<string, unknown>,
-                    namespace,
-                  );
-              return constraintDef.when(factsProxy);
-            },
-            require:
-              typeof constraintDef.require === "function"
-                ? (facts: unknown) => {
-                    const factsProxy = hasCrossModuleDeps
-                      ? createCrossModuleFactsProxy(
-                          facts as Record<string, unknown>,
-                          namespace,
-                          depNamespaces,
-                        )
-                      : createModuleFactsProxy(
-                          facts as Record<string, unknown>,
-                          namespace,
-                        );
-                    return (
-                      constraintDef.require as (facts: unknown) => unknown
-                    )(factsProxy);
-                  }
-                : constraintDef.require,
-          };
-        }
-      }
-
-      const prefixedResolvers: Record<string, unknown> = {};
-      if (mod.resolvers) {
-        for (const [key, resolver] of Object.entries(mod.resolvers)) {
-          const resolverDef = resolver as {
-            requirement: string;
-            resolve: (
-              req: unknown,
-              ctx: { facts: unknown; signal: AbortSignal },
-            ) => Promise<void>;
-            key?: (req: unknown) => string;
-            retry?: unknown;
-            timeout?: number;
-          };
-          prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
-            ...resolverDef,
-            resolve: async (
-              req: unknown,
-              ctx: { facts: unknown; signal: AbortSignal },
-            ) => {
-              // Use live modulesMap reference (already mutated by registerModule before this runs)
-              const namespacedFacts = createNamespacedFactsProxy(
-                ctx.facts as Record<string, unknown>,
-                modulesMap,
-                getModuleNames,
-              );
-              await resolverDef.resolve(req, {
-                facts: namespacedFacts[namespace],
-                signal: ctx.signal,
-              });
-            },
-          };
-        }
-      }
-
-      const prefixedEffects: Record<string, unknown> = {};
-      if (mod.effects) {
-        for (const [key, effect] of Object.entries(mod.effects)) {
-          const effectDef = effect as {
-            // biome-ignore lint/suspicious/noExplicitAny: Effect run function type
-            run: (facts: any, prev: any) => void | Promise<void>;
-            deps?: string[];
-          };
-          prefixedEffects[`${namespace}${SEPARATOR}${key}`] = {
-            ...effectDef,
-            // biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
-            run: (facts: any, prev: any) => {
-              const factsProxy = hasCrossModuleDeps
-                ? createCrossModuleFactsProxy(
-                    facts as Record<string, unknown>,
-                    namespace,
-                    depNamespaces,
-                  )
-                : createModuleFactsProxy(
-                    facts as Record<string, unknown>,
-                    namespace,
-                  );
-              const prevProxy = prev
-                ? hasCrossModuleDeps
-                  ? createCrossModuleFactsProxy(
-                      prev as Record<string, unknown>,
-                      namespace,
-                      depNamespaces,
-                    )
-                  : createModuleFactsProxy(
-                      prev as Record<string, unknown>,
-                      namespace,
-                    )
-                : undefined;
-              return effectDef.run(factsProxy, prevProxy);
-            },
-            deps: effectDef.deps?.map(
-              (dep) => `${namespace}${SEPARATOR}${dep}`,
-            ),
-          };
-        }
-      }
+      // Transform module definition with namespace prefixing
+      const flat = prefixModuleDefinition({
+        mod,
+        namespace,
+        modulesMap,
+        getModuleNames,
+        snapshotModulesSet,
+      });
 
       // Register namespace
       moduleNamespaces.add(namespace);
@@ -1293,50 +783,11 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       moduleNamesCache.names = null;
 
       // Update namespace keys map
-      const keys: string[] = [];
-      for (const key of Object.keys(mod.schema.facts)) {
-        keys.push(`${namespace}${SEPARATOR}${key}`);
-      }
-      if (mod.schema.derivations) {
-        for (const key of Object.keys(mod.schema.derivations)) {
-          keys.push(`${namespace}${SEPARATOR}${key}`);
-        }
-      }
-      namespaceKeysMap.set(namespace, keys);
+      namespaceKeysMap.set(namespace, collectNamespaceKeys(namespace, mod));
 
       // Delegate to engine's registerModule
       // biome-ignore lint/suspicious/noExplicitAny: Engine registerModule type
-      (engine as any).registerModule({
-        id: mod.id,
-        schema: prefixedFacts,
-        requirements: mod.schema.requirements ?? {},
-        init: prefixedInit,
-        derive:
-          Object.keys(prefixedDerive).length > 0 ? prefixedDerive : undefined,
-        events:
-          Object.keys(prefixedEventHandlers).length > 0
-            ? prefixedEventHandlers
-            : undefined,
-        effects:
-          Object.keys(prefixedEffects).length > 0 ? prefixedEffects : undefined,
-        constraints:
-          Object.keys(prefixedConstraints).length > 0
-            ? prefixedConstraints
-            : undefined,
-        resolvers:
-          Object.keys(prefixedResolvers).length > 0
-            ? prefixedResolvers
-            : undefined,
-        hooks: mod.hooks,
-        history: {
-          snapshotEvents:
-            snapshotModulesSet && !snapshotModulesSet.has(namespace)
-              ? [] // Module excluded from snapshots
-              : mod.history?.snapshotEvents?.map(
-                  (e: string) => `${namespace}${SEPARATOR}${e}`,
-                ),
-        },
-      });
+      (engine as any).registerModule(flat);
     },
 
     // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
@@ -1390,6 +841,10 @@ function applyZeroConfigDefaults(options: {
 /**
  * Bind shared engine passthrough properties and methods onto a system object.
  * These are identical between single-module and namespaced systems.
+ *
+ * For methods that namespaced systems override (dispatch, read, subscribe,
+ * watch, when, getDistributableSnapshot, watchDistributableSnapshot),
+ * only binds them if not already defined on the system object.
  */
 function bindEnginePassthroughs(
   // biome-ignore lint/suspicious/noExplicitAny: Engine type
@@ -1444,6 +899,18 @@ function bindEnginePassthroughs(
   system.explain = engine.explain.bind(engine);
   system.getSnapshot = engine.getSnapshot.bind(engine);
   system.restore = engine.restore.bind(engine);
+
+  // Direct engine passthroughs — only bind if not already defined
+  // (namespaced systems override these with key-translating versions)
+  const overridableMethods = [
+    "dispatch", "read", "subscribe", "watch", "when",
+    "getDistributableSnapshot", "watchDistributableSnapshot",
+  ] as const;
+  for (const method of overridableMethods) {
+    if (!(method in system)) {
+      system[method] = engine[method].bind(engine);
+    }
+  }
 }
 
 /**
@@ -1468,545 +935,7 @@ function warnIfNotStarted(
   }
 }
 
-// ============================================================================
-// Key Conversion Helpers
-// ============================================================================
-
-/**
- * Convert a namespaced key (e.g., "auth.status") to internal prefixed format ("auth::status").
- * If the key is already in prefixed format, returns it unchanged.
- *
- * @example
- * toInternalKey("auth.status") // → "auth::status"
- * toInternalKey("auth::status") // → "auth::status" (unchanged)
- * toInternalKey("status")      // → "status" (unchanged)
- */
-function toInternalKey(key: string): string {
-  // If key contains a dot, convert to separator format
-  if (key.includes(".")) {
-    const [namespace, ...rest] = key.split(".");
-    return `${namespace}${SEPARATOR}${rest.join(SEPARATOR)}`;
-  }
-  // Already in internal format or simple key
-  return key;
-}
-
-// ============================================================================
-// Proxy Helpers
-// ============================================================================
-
-/**
- * Create a proxy for a single module's facts (used in init, event handlers).
- * Translates unprefixed keys to prefixed: `token` → `auth::token`
- *
- * Proxies are cached per facts store and namespace for performance.
- */
-function createModuleFactsProxy(
-  facts: Record<string, unknown>,
-  namespace: string,
-): Record<string, unknown> {
-  // Check cache first
-  let namespaceCache = moduleFactsProxyCache.get(facts);
-  if (namespaceCache) {
-    const cached = namespaceCache.get(namespace);
-    if (cached) {
-      return cached;
-    }
-  } else {
-    namespaceCache = new Map();
-    moduleFactsProxyCache.set(facts, namespaceCache);
-  }
-
-  const proxy = new Proxy({} as Record<string, unknown>, {
-    get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return undefined;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      // Special properties pass through
-      if (prop === "$store" || prop === "$snapshot") {
-        return (facts as Record<string, unknown>)[prop];
-      }
-      return (facts as Record<string, unknown>)[
-        `${namespace}${SEPARATOR}${prop}`
-      ];
-    },
-    set(_, prop: string | symbol, value: unknown) {
-      if (typeof prop === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-      (facts as Record<string, unknown>)[`${namespace}${SEPARATOR}${prop}`] =
-        value;
-      return true;
-    },
-    has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-      return `${namespace}${SEPARATOR}${prop}` in facts;
-    },
-    deleteProperty(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-      delete (facts as Record<string, unknown>)[
-        `${namespace}${SEPARATOR}${prop}`
-      ];
-      return true;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
-  });
-
-  namespaceCache.set(namespace, proxy);
-  return proxy;
-}
-
-/**
- * Create a nested proxy for namespaced facts access.
- * `facts.auth.token` → reads `auth::token` from flat store
- *
- * Uses Set for O(1) namespace lookups and caches the outer proxy.
- */
-function createNamespacedFactsProxy(
-  facts: Record<string, unknown>,
-  modulesMap: ModulesMap,
-  getModuleNames: () => string[],
-): Record<string, Record<string, unknown>> {
-  // Check cache first
-  const cached = namespacedFactsProxyCache.get(facts);
-  if (cached) {
-    return cached;
-  }
-
-  const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
-    get(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return undefined;
-      }
-      if (BLOCKED_PROPS.has(namespace)) {
-        return undefined;
-      }
-      if (!Object.hasOwn(modulesMap, namespace)) {
-        return undefined;
-      }
-
-      // Return a cached proxy for this module's facts
-      return createModuleFactsProxy(facts, namespace);
-    },
-    has(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(namespace)) {
-        return false;
-      }
-      return Object.hasOwn(modulesMap, namespace);
-    },
-    ownKeys() {
-      return getModuleNames();
-    },
-    getOwnPropertyDescriptor(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return undefined;
-      }
-      if (Object.hasOwn(modulesMap, namespace)) {
-        return { configurable: true, enumerable: true };
-      }
-      return undefined;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
-  });
-
-  namespacedFactsProxyCache.set(facts, proxy);
-  return proxy;
-}
-
-/**
- * WeakMap to cache cross-module facts proxies.
- * Keyed by facts store, then by "selfNamespace:depKeys" string.
- */
-const crossModuleFactsProxyCache = new WeakMap<
-  Record<string, unknown>,
-  Map<string, Record<string, Record<string, unknown>>>
->();
-
-/**
- * Create a proxy for cross-module facts access with "self" for own module.
- * `facts.self.users` → reads own module's facts
- * `facts.auth.token` → reads dependency module's facts
- *
- * Used when a module has crossModuleDeps defined.
- */
-function createCrossModuleFactsProxy(
-  facts: Record<string, unknown>,
-  selfNamespace: string,
-  depNamespaces: string[],
-): Record<string, Record<string, unknown>> {
-  // Create cache key using JSON.stringify for robustness with special characters
-  const cacheKey = `${selfNamespace}:${JSON.stringify([...depNamespaces].sort())}`;
-
-  // Check cache first
-  let namespaceCache = crossModuleFactsProxyCache.get(facts);
-  if (namespaceCache) {
-    const cached = namespaceCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-  } else {
-    namespaceCache = new Map();
-    crossModuleFactsProxyCache.set(facts, namespaceCache);
-  }
-
-  const depNamesSet = new Set(depNamespaces);
-  const allKeys = ["self", ...depNamespaces];
-
-  const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
-    get(_, key: string | symbol) {
-      if (typeof key === "symbol") {
-        return undefined;
-      }
-      if (BLOCKED_PROPS.has(key)) {
-        return undefined;
-      }
-
-      // "self" maps to own module's namespace
-      if (key === "self") {
-        return createModuleFactsProxy(facts, selfNamespace);
-      }
-
-      // Check if it's a declared dependency
-      if (depNamesSet.has(key)) {
-        return createModuleFactsProxy(facts, key);
-      }
-
-      // Dev-mode warning for undeclared cross-module access
-      if (process.env.NODE_ENV !== "production" && typeof key === "string") {
-        console.warn(
-          `[Directive] Module "${selfNamespace}" accessed undeclared cross-module property "${key}". ` +
-            `Add it to crossModuleDeps or use "facts.self.${key}" for own module facts.`,
-        );
-      }
-
-      return undefined;
-    },
-    has(_, key: string | symbol) {
-      if (typeof key === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(key)) {
-        return false;
-      }
-      return key === "self" || depNamesSet.has(key);
-    },
-    ownKeys() {
-      return allKeys;
-    },
-    getOwnPropertyDescriptor(_, key: string | symbol) {
-      if (typeof key === "symbol") {
-        return undefined;
-      }
-      if (key === "self" || depNamesSet.has(key)) {
-        return { configurable: true, enumerable: true };
-      }
-      return undefined;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
-  });
-
-  namespaceCache.set(cacheKey, proxy);
-  return proxy;
-}
-
-/**
- * Create a proxy for a single module's derivations.
- * Translates unprefixed keys to prefixed: `status` → `auth::status`
- *
- * Proxies are cached per derive store and namespace for performance.
- */
-function createModuleDeriveProxy(
-  derive: Record<string, unknown>,
-  namespace: string,
-): Record<string, unknown> {
-  // Check cache first
-  let namespaceCache = moduleDeriveProxyCache.get(derive);
-  if (namespaceCache) {
-    const cached = namespaceCache.get(namespace);
-    if (cached) {
-      return cached;
-    }
-  } else {
-    namespaceCache = new Map();
-    moduleDeriveProxyCache.set(derive, namespaceCache);
-  }
-
-  const proxy = new Proxy({} as Record<string, unknown>, {
-    get(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return undefined;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-      return derive[`${namespace}${SEPARATOR}${prop}`];
-    },
-    has(_, prop: string | symbol) {
-      if (typeof prop === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(prop)) {
-        return false;
-      }
-      return `${namespace}${SEPARATOR}${prop}` in derive;
-    },
-    set() {
-      return false;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
-  });
-
-  namespaceCache.set(namespace, proxy);
-  return proxy;
-}
-
-/**
- * Create a nested proxy for namespaced derivations access.
- * `derive.auth.status` → reads `auth::status` from flat derive
- *
- * Uses Set for O(1) namespace lookups and caches the outer proxy.
- */
-function createNamespacedDeriveProxy(
-  derive: Record<string, unknown>,
-  modulesMap: ModulesMap,
-  getModuleNames: () => string[],
-): Record<string, Record<string, unknown>> {
-  // Check cache first
-  const cached = namespacedDeriveProxyCache.get(derive);
-  if (cached) {
-    return cached;
-  }
-
-  const proxy = new Proxy({} as Record<string, Record<string, unknown>>, {
-    get(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return undefined;
-      }
-      if (BLOCKED_PROPS.has(namespace)) {
-        return undefined;
-      }
-      if (!Object.hasOwn(modulesMap, namespace)) {
-        return undefined;
-      }
-
-      // Return a cached proxy for this module's derivations
-      return createModuleDeriveProxy(derive, namespace);
-    },
-    has(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return false;
-      }
-      if (BLOCKED_PROPS.has(namespace)) {
-        return false;
-      }
-      return Object.hasOwn(modulesMap, namespace);
-    },
-    ownKeys() {
-      return getModuleNames();
-    },
-    getOwnPropertyDescriptor(_, namespace: string | symbol) {
-      if (typeof namespace === "symbol") {
-        return undefined;
-      }
-      if (Object.hasOwn(modulesMap, namespace)) {
-        return { configurable: true, enumerable: true };
-      }
-      return undefined;
-    },
-    set() {
-      return false;
-    },
-    defineProperty() {
-      return false;
-    },
-    getPrototypeOf() {
-      return null;
-    },
-    setPrototypeOf() {
-      return false;
-    },
-  });
-
-  namespacedDeriveProxyCache.set(derive, proxy);
-  return proxy;
-}
-
-/**
- * WeakMap to cache module events proxies.
- */
-const moduleEventsProxyCache = new WeakMap<
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type for cache key
-  any,
-  Map<string, Record<string, (payload?: Record<string, unknown>) => void>>
->();
-
-/**
- * Create a nested proxy for namespaced events access.
- * `events.auth.login({ token })` → dispatches `{ type: "auth::login", token }`
- *
- * Uses Set for O(1) namespace lookups and caches proxies for performance.
- */
-function createNamespacedEventsProxy(
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
-  engine: any,
-  modulesMap: ModulesMap,
-  getModuleNames: () => string[],
-): Record<string, Record<string, (payload?: Record<string, unknown>) => void>> {
-  // Get or create the namespace cache for this engine
-  let namespaceCache = moduleEventsProxyCache.get(engine);
-  if (!namespaceCache) {
-    namespaceCache = new Map();
-    moduleEventsProxyCache.set(engine, namespaceCache);
-  }
-
-  return new Proxy(
-    {} as Record<
-      string,
-      Record<string, (payload?: Record<string, unknown>) => void>
-    >,
-    {
-      get(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") {
-          return undefined;
-        }
-        if (BLOCKED_PROPS.has(namespace)) {
-          return undefined;
-        }
-        if (!Object.hasOwn(modulesMap, namespace)) {
-          return undefined;
-        }
-
-        // Check cache for this namespace's event proxy
-        const cached = namespaceCache!.get(namespace);
-        if (cached) {
-          return cached;
-        }
-
-        // Create and cache the module events proxy
-        const moduleEventsProxy = new Proxy(
-          {} as Record<string, (payload?: Record<string, unknown>) => void>,
-          {
-            get(_, eventName: string | symbol) {
-              if (typeof eventName === "symbol") {
-                return undefined;
-              }
-              if (BLOCKED_PROPS.has(eventName)) {
-                return undefined;
-              }
-
-              // Return a function that dispatches the prefixed event
-              return (payload?: Record<string, unknown>) => {
-                engine.dispatch({
-                  type: `${namespace}${SEPARATOR}${eventName}`,
-                  ...payload,
-                });
-              };
-            },
-            set() {
-              return false;
-            },
-            defineProperty() {
-              return false;
-            },
-            getPrototypeOf() {
-              return null;
-            },
-            setPrototypeOf() {
-              return false;
-            },
-          },
-        );
-
-        namespaceCache!.set(namespace, moduleEventsProxy);
-        return moduleEventsProxy;
-      },
-      has(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") {
-          return false;
-        }
-        if (BLOCKED_PROPS.has(namespace)) {
-          return false;
-        }
-        return Object.hasOwn(modulesMap, namespace);
-      },
-      ownKeys() {
-        return getModuleNames();
-      },
-      getOwnPropertyDescriptor(_, namespace: string | symbol) {
-        if (typeof namespace === "symbol") {
-          return undefined;
-        }
-        if (Object.hasOwn(modulesMap, namespace)) {
-          return { configurable: true, enumerable: true };
-        }
-        return undefined;
-      },
-      set() {
-        return false;
-      },
-      defineProperty() {
-        return false;
-      },
-      getPrototypeOf() {
-        return null;
-      },
-      setPrototypeOf() {
-        return false;
-      },
-    },
-  );
-}
+// Proxy helpers and key conversion utilities are in system-proxies.ts
 
 // ============================================================================
 // Single Module System
@@ -2109,19 +1038,11 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     errorBoundary,
     tickMs: options.tickMs,
     onAfterModuleInit: () => {
-      // Apply initialFacts
+      // Apply initialFacts (already validated for prototype safety above)
       if (options.initialFacts) {
-        if (!isPrototypeSafe(options.initialFacts)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              "[Directive] initialFacts contains potentially dangerous keys. Skipping.",
-            );
-          }
-        } else {
-          for (const [key, value] of Object.entries(options.initialFacts)) {
-            if (BLOCKED_PROPS.has(key)) continue;
-            (engine.facts as Record<string, unknown>)[key] = value;
-          }
+        for (const [key, value] of Object.entries(options.initialFacts)) {
+          if (BLOCKED_PROPS.has(key)) continue;
+          (engine.facts as Record<string, unknown>)[key] = value;
         }
       }
       // Apply hydrated facts (takes precedence)
@@ -2159,7 +1080,36 @@ function createSingleModuleSystem<S extends ModuleSchema>(
           engine.dispatch({ type: eventName, ...payload });
         };
       },
+      has(_, prop: string | symbol) {
+        if (typeof prop === "symbol") {
+          return false;
+        }
+        if (BLOCKED_PROPS.has(prop)) {
+          return false;
+        }
+
+        return mod.events ? prop in mod.events : false;
+      },
+      ownKeys() {
+        return mod.events ? Object.keys(mod.events) : [];
+      },
+      getOwnPropertyDescriptor(_, prop: string | symbol) {
+        if (typeof prop === "symbol") {
+          return undefined;
+        }
+        if (BLOCKED_PROPS.has(prop)) {
+          return undefined;
+        }
+        if (mod.events && prop in mod.events) {
+          return { configurable: true, enumerable: true };
+        }
+
+        return undefined;
+      },
       set() {
+        return false;
+      },
+      deleteProperty() {
         return false;
       },
       defineProperty() {
@@ -2233,36 +1183,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       this.stop();
       engine.destroy();
     },
-
-    dispatch(event: { type: string; [key: string]: unknown }) {
-      engine.dispatch(event);
-    },
-
-    read<T = unknown>(derivationId: string): T {
-      return engine.read(derivationId);
-    },
-
-    subscribe(ids: string[], listener: () => void): () => void {
-      return engine.subscribe(ids, listener);
-    },
-
-    watch<T = unknown>(
-      id: string,
-      callback: (newValue: T, previousValue: T | undefined) => void,
-      options?: { equalityFn?: (a: T, b: T | undefined) => boolean },
-    ): () => void {
-      return engine.watch(id, callback, options);
-    },
-
-    when(
-      predicate: (facts: Record<string, unknown>) => boolean,
-      options?: { timeout?: number },
-    ): Promise<void> {
-      return engine.when(predicate, options);
-    },
-
-    getDistributableSnapshot: engine.getDistributableSnapshot.bind(engine),
-    watchDistributableSnapshot: engine.watchDistributableSnapshot.bind(engine),
 
     registerModule(moduleDef: ModuleDef<ModuleSchema>): void {
       // biome-ignore lint/suspicious/noExplicitAny: Engine registerModule type
