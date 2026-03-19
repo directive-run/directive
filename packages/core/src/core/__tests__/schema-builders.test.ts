@@ -79,7 +79,7 @@ describe("t.string()", () => {
     expect(validates(schema, "@user")).toBe(true);
     expect(validates(schema, "user")).toBe(false);
     expect(schema._refinements).toHaveLength(1);
-    expect(schema._refinements![0].message).toBe("must start with @");
+    expect(schema._refinements![0]!.message).toBe("must start with @");
   });
 
   it(".nullable() accepts null and valid strings", () => {
@@ -169,7 +169,7 @@ describe("t.number()", () => {
     expect(validates(schema, 4)).toBe(true);
     expect(validates(schema, 3)).toBe(false);
     expect(schema._refinements).toHaveLength(1);
-    expect(schema._refinements![0].message).toBe("must be even");
+    expect(schema._refinements![0]!.message).toBe("must be even");
   });
 });
 

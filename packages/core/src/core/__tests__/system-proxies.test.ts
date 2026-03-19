@@ -211,10 +211,8 @@ describe("createModuleFactsProxy", () => {
   });
 
   describe("security hardening", () => {
-    let proxy: Record<string, unknown>;
-
     beforeEach(() => {
-      proxy = createModuleFactsProxy(
+      createModuleFactsProxy(
         { "ns::key": "val" } as Record<string, unknown>,
         "ns",
       );
@@ -250,8 +248,8 @@ describe("createNamespacedFactsProxy", () => {
       getModuleNames,
     );
 
-    expect(proxy.auth.token).toBe("abc");
-    expect(proxy.data.users).toEqual([1, 2]);
+    expect(proxy.auth!.token).toBe("abc");
+    expect(proxy.data!.users).toEqual([1, 2]);
   });
 
   it("returns undefined for unknown namespace", () => {
@@ -332,13 +330,13 @@ describe("createCrossModuleFactsProxy", () => {
   it("maps 'self' to own module namespace", () => {
     const proxy = createCrossModuleFactsProxy(facts, "users", ["auth"]);
 
-    expect(proxy.self.list).toEqual([1, 2, 3]);
+    expect(proxy.self!.list).toEqual([1, 2, 3]);
   });
 
   it("maps declared dependency namespaces", () => {
     const proxy = createCrossModuleFactsProxy(facts, "users", ["auth"]);
 
-    expect(proxy.auth.token).toBe("secret");
+    expect(proxy.auth!.token).toBe("secret");
   });
 
   it("returns undefined for undeclared namespaces", () => {
@@ -405,14 +403,14 @@ describe("createCrossModuleFactsProxy", () => {
       "billing",
     ]);
 
-    expect(proxy.auth.token).toBe("secret");
-    expect(proxy.billing.plan).toBe("pro");
+    expect(proxy.auth!.token).toBe("secret");
+    expect(proxy.billing!.plan).toBe("pro");
   });
 
   it("handles empty dep list", () => {
     const proxy = createCrossModuleFactsProxy(facts, "users", []);
 
-    expect(proxy.self.list).toEqual([1, 2, 3]);
+    expect(proxy.self!.list).toEqual([1, 2, 3]);
     expect(Object.keys(proxy)).toEqual(["self"]);
   });
 
@@ -546,8 +544,8 @@ describe("createNamespacedDeriveProxy", () => {
       getModuleNames,
     );
 
-    expect(proxy.auth.isLoggedIn).toBe(true);
-    expect(proxy.data.count).toBe(42);
+    expect(proxy.auth!.isLoggedIn).toBe(true);
+    expect(proxy.data!.count).toBe(42);
   });
 
   it("returns undefined for unknown namespace", () => {
@@ -631,7 +629,7 @@ describe("createNamespacedEventsProxy", () => {
       modulesMap as any,
       getModuleNames,
     );
-    proxy.auth.login({ token: "abc" });
+    proxy.auth!.login!({ token: "abc" });
 
     expect(engine.dispatch).toHaveBeenCalledWith({
       type: "auth::login",
@@ -645,7 +643,7 @@ describe("createNamespacedEventsProxy", () => {
       modulesMap as any,
       getModuleNames,
     );
-    proxy.auth.logout();
+    proxy.auth!.logout!();
 
     expect(engine.dispatch).toHaveBeenCalledWith({
       type: "auth::logout",
@@ -689,8 +687,8 @@ describe("createNamespacedEventsProxy", () => {
       modulesMap as any,
       getModuleNames,
     );
-    proxy.billing.charge({ amount: 100 });
-    proxy.billing.refund({ amount: 50 });
+    proxy.billing!.charge!({ amount: 100 });
+    proxy.billing!.refund!({ amount: 50 });
 
     expect(engine.dispatch).toHaveBeenCalledWith({
       type: "billing::charge",
@@ -958,7 +956,7 @@ describe("cross-proxy interaction", () => {
 
     moduleProxy.token = "hello";
 
-    expect(nsProxy.auth.token).toBe("hello");
+    expect(nsProxy.auth!.token).toBe("hello");
   });
 
   it("cross-module proxy self writes are visible in namespaced proxy", () => {
@@ -972,9 +970,9 @@ describe("cross-proxy interaction", () => {
       () => ["users", "auth"],
     );
 
-    crossProxy.self.count = 5;
+    crossProxy.self!.count = 5;
 
-    expect(nsProxy.users.count).toBe(5);
+    expect(nsProxy.users!.count).toBe(5);
     expect(facts["users::count"]).toBe(5);
   });
 });

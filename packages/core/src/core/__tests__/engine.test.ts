@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 
@@ -422,7 +422,7 @@ describe("Engine — Events", () => {
     const system = createSystem({ module: counterModule() });
     system.start();
 
-    system.dispatch({ type: "nonexistent" });
+    system.dispatch({ type: "nonexistent" as "increment" });
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("Unknown event type"),
@@ -1009,8 +1009,8 @@ describe("Engine — Security", () => {
     system.start();
 
     // Should not throw, just be silently ignored
-    system.dispatch({ type: "__proto__" });
-    system.dispatch({ type: "constructor" });
+    system.dispatch({ type: "__proto__" as "increment" });
+    system.dispatch({ type: "constructor" as "increment" });
 
     expect(system.facts.count).toBe(0);
 

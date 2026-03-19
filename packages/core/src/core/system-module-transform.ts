@@ -89,8 +89,9 @@ export function prefixModuleDefinition(
     options;
 
   // Compute cross-module deps info once (used by derive, constraints, effects)
-  const hasCrossModuleDeps =
-    mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0;
+  const hasCrossModuleDeps = !!(
+    mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0
+  );
   const depNamespaces = hasCrossModuleDeps
     ? Object.keys(mod.crossModuleDeps!)
     : [];
