@@ -446,6 +446,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           async?: boolean;
           timeout?: number;
           deps?: string[];
+          after?: string[];
         };
 
         prefixedConstraints[`${namespace}${SEPARATOR}${key}`] = {
@@ -453,6 +454,12 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           // Transform deps to use prefixed keys
           deps: constraintDef.deps?.map(
             (dep) => `${namespace}${SEPARATOR}${dep}`,
+          ),
+          // Transform after to use prefixed keys (same-module references)
+          after: constraintDef.after?.map((dep) =>
+            dep.includes(SEPARATOR)
+              ? dep
+              : `${namespace}${SEPARATOR}${dep}`,
           ),
           when: (facts: unknown) => {
             // Use cross-module proxy (facts.self + facts.{dep}) if crossModuleDeps is defined

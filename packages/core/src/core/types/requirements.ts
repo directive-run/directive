@@ -111,7 +111,7 @@ export interface ConstraintDef<
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
    * If a dependency's resolver fails, this constraint remains blocked.
-   * Cross-module: use "moduleName::constraintName" format (after references are not auto-prefixed).
+   * Same-module references are auto-prefixed. Cross-module: use "moduleName::constraintName" format.
    */
   after?: string[];
   /**
