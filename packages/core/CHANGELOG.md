@@ -1,5 +1,16 @@
 # @directive-run/core
 
+## 0.8.2
+
+### Patch Changes
+
+- [`5257894`](https://github.com/directive-run/directive/commit/52578949f868d5c17aec80f30c13f0391bac56c2) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Refactor system internals and fix proxy hardening gaps.
+
+  - Extract proxy factories and module transformation into dedicated modules for maintainability
+  - Fix tickMs dispatching only searching first module instead of all modules
+  - Harden single-module events proxy with missing security traps (has, deleteProperty, ownKeys)
+  - Replace O(n) array lookup with O(1) Set check in topological sort
+
 ## 0.8.1
 
 ## 0.8.0
