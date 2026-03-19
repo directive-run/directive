@@ -155,7 +155,16 @@ export function createHistoryManager<S extends Schema>(
     const factsObj = getCurrentFacts();
 
     // Deep clone to prevent mutation
-    return structuredClone(factsObj);
+    try {
+      return structuredClone(factsObj);
+    } catch {
+      // Fallback for non-cloneable values (functions, DOM nodes, etc.)
+      try {
+        return JSON.parse(JSON.stringify(factsObj));
+      } catch {
+        return { ...factsObj };
+      }
+    }
   }
 
   /** Deserialize and restore facts from a snapshot */

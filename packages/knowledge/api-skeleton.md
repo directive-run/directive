@@ -105,7 +105,7 @@
   ```ts
   function isSnapshotExpired(snapshot: DistributableSnapshotLike<T>, now: number = Date.now()): boolean
   ```
-- `isTracking` — Check if we're currently tracking dependencies.
+- `isTracking` — Check if dependency tracking is currently active.
   ```ts
   function isTracking(): boolean
   ```
