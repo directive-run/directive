@@ -350,7 +350,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
         snapshotModulesSet,
       });
     })
-    .filter(Boolean);
+    .filter((m): m is NonNullable<typeof m> => m !== null);
 
   // Dev-mode warning: tickMs set without tick event handler
   if (
