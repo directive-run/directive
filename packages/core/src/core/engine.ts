@@ -665,7 +665,6 @@ export function createEngine<S extends Schema>(
         resolversManager.resolve(req);
       }
 
-
       // Capture resolver starts for trace
       if (currentTrace) {
         const inflightNow = resolversManager.getInflightInfo();

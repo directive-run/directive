@@ -345,8 +345,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       return prefixModuleDefinition({
         mod,
         namespace,
-        modulesMap,
-        getModuleNames,
         snapshotModulesSet,
       });
     })
@@ -771,8 +769,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       const flat = prefixModuleDefinition({
         mod,
         namespace,
-        modulesMap,
-        getModuleNames,
         snapshotModulesSet,
       });
 

@@ -3,7 +3,7 @@ import {
   prefixModuleDefinition,
   type PrefixModuleOptions,
 } from "../system-module-transform.js";
-import type { ModuleDef, ModuleSchema, ModulesMap } from "../types.js";
+import type { ModuleDef, ModuleSchema } from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -47,14 +47,11 @@ function makeOptions(
   overrides: Partial<PrefixModuleOptions> = {},
 ): PrefixModuleOptions {
   const mod = overrides.mod ?? makeModule();
-  const modulesMap: ModulesMap = overrides.modulesMap ?? { auth: mod };
   const namespace = overrides.namespace ?? "auth";
 
   return {
     mod,
     namespace,
-    modulesMap,
-    getModuleNames: overrides.getModuleNames ?? (() => Object.keys(modulesMap)),
     snapshotModulesSet: overrides.snapshotModulesSet ?? null,
   };
 }
@@ -755,9 +752,8 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const modulesMap: ModulesMap = { r: mod };
       const result = prefixModuleDefinition(
-        makeOptions({ mod, namespace: "r", modulesMap }),
+        makeOptions({ mod, namespace: "r" }),
       );
 
       const resolver = result.resolvers!["r::fetch"] as any;
@@ -786,9 +782,8 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const modulesMap: ModulesMap = { r: mod };
       const result = prefixModuleDefinition(
-        makeOptions({ mod, namespace: "r", modulesMap }),
+        makeOptions({ mod, namespace: "r" }),
       );
 
       const resolver = result.resolvers!["r::fetch"] as any;
@@ -815,9 +810,8 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const modulesMap: ModulesMap = { r: mod };
       const result = prefixModuleDefinition(
-        makeOptions({ mod, namespace: "r", modulesMap }),
+        makeOptions({ mod, namespace: "r" }),
       );
 
       const resolver = result.resolvers!["r::fetch"] as any;
@@ -826,6 +820,92 @@ describe("prefixModuleDefinition", () => {
       await resolver.resolve(req, { facts: {}, signal: new AbortController().signal });
 
       expect(receivedReq).toBe(req);
+    });
+
+    it("resolve uses cross-module proxy when crossModuleDeps defined", async () => {
+      const otherSchema: ModuleSchema = { facts: { token: { _type: "" } } };
+      let readToken: unknown;
+      const mod = makeModule({
+        schema: fullSchema,
+        resolvers: {
+          fetch: {
+            requirement: "FETCH",
+            resolve: async (_req: any, ctx: any) => {
+              readToken = ctx.facts.other.token;
+              ctx.facts.self.count = 42;
+            },
+          },
+        } as any,
+        crossModuleDeps: { other: otherSchema },
+      });
+      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+
+      const resolver = result.resolvers!["r::fetch"] as any;
+      const flatFacts: Record<string, unknown> = {
+        "r::count": 0,
+        "other::token": "secret",
+      };
+
+      await resolver.resolve(
+        { type: "FETCH", id: "1" },
+        { facts: flatFacts, signal: new AbortController().signal },
+      );
+
+      expect(readToken).toBe("secret");
+      expect(flatFacts["r::count"]).toBe(42);
+    });
+
+    it("resolveBatch receives scoped proxy", async () => {
+      const mod = makeModule({
+        schema: fullSchema,
+        resolvers: {
+          fetch: {
+            requirement: "FETCH",
+            resolveBatch: async (reqs: any[], ctx: any) => {
+              ctx.facts.count = reqs.length;
+            },
+          },
+        },
+      });
+      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+
+      const resolver = result.resolvers!["r::fetch"] as any;
+      const flatFacts: Record<string, unknown> = { "r::count": 0 };
+
+      await resolver.resolveBatch(
+        [{ type: "FETCH", id: "1" }, { type: "FETCH", id: "2" }],
+        { facts: flatFacts, signal: new AbortController().signal },
+      );
+
+      expect(flatFacts["r::count"]).toBe(2);
+    });
+
+    it("resolveBatchWithResults receives scoped proxy", async () => {
+      const mod = makeModule({
+        schema: fullSchema,
+        resolvers: {
+          fetch: {
+            requirement: "FETCH",
+            resolveBatchWithResults: async (reqs: any[], ctx: any) => {
+              ctx.facts.count = reqs.length;
+
+              return reqs.map(() => ({ success: true }));
+            },
+          },
+        },
+      });
+      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+
+      const resolver = result.resolvers!["r::fetch"] as any;
+      const flatFacts: Record<string, unknown> = { "r::count": 0 };
+
+      const results = await resolver.resolveBatchWithResults(
+        [{ type: "FETCH", id: "1" }],
+        { facts: flatFacts, signal: new AbortController().signal },
+      );
+
+      expect(flatFacts["r::count"]).toBe(1);
+      expect(results).toEqual([{ success: true }]);
     });
   });
 
@@ -1158,9 +1238,8 @@ describe("prefixModuleDefinition", () => {
         history: { snapshotEvents: ["increment"] },
       });
 
-      const modulesMap: ModulesMap = { app: mod };
       const result = prefixModuleDefinition(
-        makeOptions({ mod, namespace: "app", modulesMap }),
+        makeOptions({ mod, namespace: "app" }),
       );
 
       // Schema
