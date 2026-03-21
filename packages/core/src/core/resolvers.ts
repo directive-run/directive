@@ -783,6 +783,9 @@ export function createResolversManager<S extends Schema>(
     cleanupStatuses();
   }
 
+  /** Hard cap for batch queues without explicit maxSize — prevents OOM */
+  const DEFAULT_MAX_QUEUE_SIZE = 10_000;
+
   /** Add a requirement to a batch */
   function addToBatch(resolverId: string, req: RequirementWithId): void {
     const def = definitions[resolverId];
@@ -798,6 +801,17 @@ export function createResolversManager<S extends Schema>(
     }
 
     const batch = batches.get(resolverId)!;
+
+    // Enforce hard cap to prevent OOM from unbounded accumulation
+    const effectiveMax = batchConfig.maxSize || DEFAULT_MAX_QUEUE_SIZE;
+    if (batch.requirements.length >= effectiveMax) {
+      if (batch.timer) {
+        clearTimeout(batch.timer);
+        batch.timer = null;
+      }
+      processBatch(resolverId);
+    }
+
     batch.requirements.push(req);
 
     // Flush immediately if maxSize reached
