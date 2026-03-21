@@ -13,7 +13,6 @@ import {
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
   createModuleFactsProxy,
-  createNamespacedFactsProxy,
 } from "./system-proxies.js";
 import type { ModuleDef, ModuleSchema, ModulesMap } from "./types.js";
 
@@ -28,7 +27,9 @@ export interface FlatModuleDefinition {
   schema: Record<string, unknown>;
   requirements: Record<string, unknown>;
   init: ((facts: Record<string, unknown>) => void) | undefined;
-  derive: Record<string, (facts: unknown, derive: unknown) => unknown> | undefined;
+  derive:
+    | Record<string, (facts: unknown, derive: unknown) => unknown>
+    | undefined;
   events: Record<string, (facts: unknown, event: unknown) => void> | undefined;
   effects: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
@@ -85,8 +86,7 @@ function createScopedFactsProxy(
 export function prefixModuleDefinition(
   options: PrefixModuleOptions,
 ): FlatModuleDefinition {
-  const { mod, namespace, modulesMap, getModuleNames, snapshotModulesSet } =
-    options;
+  const { mod, namespace, snapshotModulesSet } = options;
 
   // Compute cross-module deps info once (used by derive, constraints, effects)
   const hasCrossModuleDeps = !!(
@@ -126,7 +126,12 @@ export function prefixModuleDefinition(
         facts: unknown,
         derive: unknown,
       ) => {
-        const factsProxy = createScopedFactsProxy(facts as Record<string, unknown>, namespace, hasCrossModuleDeps, depNamespaces);
+        const factsProxy = createScopedFactsProxy(
+          facts as Record<string, unknown>,
+          namespace,
+          hasCrossModuleDeps,
+          depNamespaces,
+        );
         const deriveProxy = createModuleDeriveProxy(
           derive as Record<string, unknown>,
           namespace,
@@ -182,19 +187,27 @@ export function prefixModuleDefinition(
         ),
         // Transform after to use prefixed keys (same-module references)
         after: constraintDef.after?.map((dep) =>
-          dep.includes(SEPARATOR)
-            ? dep
-            : `${namespace}${SEPARATOR}${dep}`,
+          dep.includes(SEPARATOR) ? dep : `${namespace}${SEPARATOR}${dep}`,
         ),
         when: (facts: unknown) => {
-          const factsProxy = createScopedFactsProxy(facts as Record<string, unknown>, namespace, hasCrossModuleDeps, depNamespaces);
+          const factsProxy = createScopedFactsProxy(
+            facts as Record<string, unknown>,
+            namespace,
+            hasCrossModuleDeps,
+            depNamespaces,
+          );
 
           return constraintDef.when(factsProxy);
         },
         require:
           typeof constraintDef.require === "function"
             ? (facts: unknown) => {
-                const factsProxy = createScopedFactsProxy(facts as Record<string, unknown>, namespace, hasCrossModuleDeps, depNamespaces);
+                const factsProxy = createScopedFactsProxy(
+                  facts as Record<string, unknown>,
+                  namespace,
+                  hasCrossModuleDeps,
+                  depNamespaces,
+                );
 
                 return (constraintDef.require as (facts: unknown) => unknown)(
                   factsProxy,
@@ -227,13 +240,16 @@ export function prefixModuleDefinition(
           req: unknown,
           ctx: { facts: unknown; signal: AbortSignal },
         ) => {
-          const namespacedFacts = createNamespacedFactsProxy(
+          // Use the same scoped proxy as constraints/derive so resolvers
+          // can access facts.self.* and facts.{dep}.* consistently
+          const factsProxy = createScopedFactsProxy(
             ctx.facts as Record<string, unknown>,
-            modulesMap,
-            getModuleNames,
+            namespace,
+            hasCrossModuleDeps,
+            depNamespaces,
           );
           await resolverDef.resolve(req, {
-            facts: namespacedFacts[namespace],
+            facts: factsProxy,
             signal: ctx.signal,
           });
         },
@@ -256,9 +272,19 @@ export function prefixModuleDefinition(
         ...effectDef,
         // biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
         run: (facts: any, prev: any) => {
-          const factsProxy = createScopedFactsProxy(facts as Record<string, unknown>, namespace, hasCrossModuleDeps, depNamespaces);
+          const factsProxy = createScopedFactsProxy(
+            facts as Record<string, unknown>,
+            namespace,
+            hasCrossModuleDeps,
+            depNamespaces,
+          );
           const prevProxy = prev
-            ? createScopedFactsProxy(prev as Record<string, unknown>, namespace, hasCrossModuleDeps, depNamespaces)
+            ? createScopedFactsProxy(
+                prev as Record<string, unknown>,
+                namespace,
+                hasCrossModuleDeps,
+                depNamespaces,
+              )
             : undefined;
 
           return effectDef.run(factsProxy, prevProxy);

@@ -565,6 +565,11 @@ export function createEngine<S extends Schema>(
       if (traceEnabled) {
         traceManager.drainPendingChanges();
       }
+      // Clear previous requirements so the next reconcile treats all
+      // requirements as "added" and re-dispatches them to resolvers.
+      // This recovers from situations where reconcile crashed (e.g.,
+      // structuredClone failure) and left requirements stuck.
+      state.previousRequirements = new RequirementSet();
       reconcileDepth = 0;
       return;
     }
@@ -659,6 +664,7 @@ export function createEngine<S extends Schema>(
       for (const req of added) {
         resolversManager.resolve(req);
       }
+
 
       // Capture resolver starts for trace
       if (currentTrace) {
