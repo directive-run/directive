@@ -52,12 +52,12 @@
   },
   "peerDependencies": {
     "@directive-run/core": "*",
-    "svelte": ">=4"
+    "svelte": ">=4 || >=5"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
     "@types/node": "^25.2.0",
-    "svelte": "^4.2.0",
+    "svelte": "^5.54.0",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2"
   }
