@@ -14,7 +14,7 @@ import {
   createModuleDeriveProxy,
   createModuleFactsProxy,
 } from "./system-proxies.js";
-import type { ModuleDef, ModuleSchema, ModulesMap } from "./types.js";
+import type { ModuleDef, ModuleSchema } from "./types.js";
 
 /**
  * The flat engine module format produced by prefixModuleDefinition.
@@ -48,10 +48,6 @@ export interface PrefixModuleOptions {
   mod: ModuleDef<ModuleSchema>;
   /** The namespace to prefix keys with */
   namespace: string;
-  /** The full modules map (used by resolver facts proxy) */
-  modulesMap: ModulesMap;
-  /** Function returning current module names (used by namespaced proxies for ownKeys enumeration and dynamic registration) */
-  getModuleNames: () => string[];
   /** Set of modules to snapshot (null = all). Used for history filtering. */
   snapshotModulesSet: Set<string> | null;
 }
@@ -225,34 +221,65 @@ export function prefixModuleDefinition(
     for (const [key, resolver] of Object.entries(mod.resolvers)) {
       const resolverDef = resolver as {
         requirement: string;
-        resolve: (
+        resolve?: (
           req: unknown,
           ctx: { facts: unknown; signal: AbortSignal },
         ) => Promise<void>;
+        resolveBatch?: (
+          reqs: unknown[],
+          ctx: { facts: unknown; signal: AbortSignal },
+        ) => Promise<void>;
+        resolveBatchWithResults?: (
+          reqs: unknown[],
+          ctx: { facts: unknown; signal: AbortSignal },
+        ) => Promise<unknown>;
         key?: (req: unknown) => string;
         retry?: unknown;
         timeout?: number;
       };
 
-      prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
-        ...resolverDef,
-        resolve: async (
-          req: unknown,
-          ctx: { facts: unknown; signal: AbortSignal },
-        ) => {
-          // Use the same scoped proxy as constraints/derive so resolvers
-          // can access facts.self.* and facts.{dep}.* consistently
-          const factsProxy = createScopedFactsProxy(
+      /** Wrap resolver ctx.facts with the module-scoped proxy */
+      function wrapCtx(ctx: { facts: unknown; signal: AbortSignal }): {
+        facts: unknown;
+        signal: AbortSignal;
+      } {
+        return {
+          facts: createScopedFactsProxy(
             ctx.facts as Record<string, unknown>,
             namespace,
             hasCrossModuleDeps,
             depNamespaces,
-          );
-          await resolverDef.resolve(req, {
-            facts: factsProxy,
-            signal: ctx.signal,
-          });
-        },
+          ),
+          signal: ctx.signal,
+        };
+      }
+
+      prefixedResolvers[`${namespace}${SEPARATOR}${key}`] = {
+        ...resolverDef,
+        ...(resolverDef.resolve && {
+          resolve: async (
+            req: unknown,
+            ctx: { facts: unknown; signal: AbortSignal },
+          ) => {
+            await resolverDef.resolve!(req, wrapCtx(ctx));
+          },
+        }),
+        ...(resolverDef.resolveBatch && {
+          resolveBatch: async (
+            reqs: unknown[],
+            ctx: { facts: unknown; signal: AbortSignal },
+          ) => {
+            await resolverDef.resolveBatch!(reqs, wrapCtx(ctx));
+          },
+        }),
+        ...(resolverDef.resolveBatchWithResults && {
+          resolveBatchWithResults: async (
+            reqs: unknown[],
+            ctx: { facts: unknown; signal: AbortSignal },
+          ) => {
+            return resolverDef.resolveBatchWithResults!(reqs, wrapCtx(ctx));
+          },
+        }),
       };
     }
   }
