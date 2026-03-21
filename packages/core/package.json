@@ -41,6 +41,11 @@
       "require": "./dist/index.cjs",
       "import": "./dist/index.js"
     },
+    "./internals": {
+      "types": "./dist/internals.d.ts",
+      "require": "./dist/internals.cjs",
+      "import": "./dist/internals.js"
+    },
     "./plugins": {
       "types": "./dist/plugins/index.d.ts",
       "require": "./dist/plugins/index.cjs",

@@ -313,8 +313,10 @@ export const Backoff = {
 } as const;
 
 // ============================================================================
-// Lower-level APIs (for advanced use)
+// Lower-level APIs (also available via "@directive-run/core/internals")
 // ============================================================================
+// Prefer importing from "@directive-run/core/internals" for direct access
+// to manager factories, the engine, and tracking utilities.
 
 export {
   createFacts,

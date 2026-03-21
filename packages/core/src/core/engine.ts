@@ -605,9 +605,12 @@ export function createEngine<S extends Schema>(
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
       if (state.changedKeys.size > 0) {
         if (snapshotEventNames === null || shouldTakeSnapshot) {
-          historyManager.takeSnapshot(
-            `facts-changed:${[...state.changedKeys].join(",")}`,
-          );
+          const keys = state.changedKeys;
+          const label =
+            keys.size <= 5
+              ? `facts-changed:${[...keys].join(",")}`
+              : `facts-changed:${[...keys].slice(0, 5).join(",")}+${keys.size - 5}more`;
+          historyManager.takeSnapshot(label);
         }
         shouldTakeSnapshot = false;
       }
@@ -705,22 +708,27 @@ export function createEngine<S extends Schema>(
       // Update previous requirements
       state.previousRequirements = currentSet;
 
-      // Build reconcile result
+      // Build reconcile result (only if plugins are listening)
       const inflightInfo = resolversManager.getInflightInfo();
-      const result: ReconcileResult = {
-        unmet: currentRequirements.filter(
-          (r) => !resolversManager.isResolving(r.id),
-        ),
-        inflight: inflightInfo,
-        completed: [], // Completed resolvers are tracked separately via onComplete callback
-        canceled: removed.map((r) => ({
-          id: r.id,
-          resolverId:
-            inflightInfo.find((i) => i.id === r.id)?.resolverId ?? "unknown",
-        })),
-      };
-
-      pluginManager.emitReconcileEnd(result);
+      if (config.plugins && config.plugins.length > 0) {
+        // Build Map for O(1) lookups on canceled requirements
+        const inflightMap =
+          removed.length > 0
+            ? new Map(inflightInfo.map((i) => [i.id, i.resolverId]))
+            : undefined;
+        const result: ReconcileResult = {
+          unmet: currentRequirements.filter(
+            (r) => !resolversManager.isResolving(r.id),
+          ),
+          inflight: inflightInfo,
+          completed: [], // Completed resolvers are tracked separately via onComplete callback
+          canceled: removed.map((r) => ({
+            id: r.id,
+            resolverId: inflightMap?.get(r.id) ?? "unknown",
+          })),
+        };
+        pluginManager.emitReconcileEnd(result);
+      }
 
       // Mark system as ready after first successful reconcile
       if (!state.isReady) {
@@ -1133,34 +1141,7 @@ export function createEngine<S extends Schema>(
         })),
         traceEnabled,
         ...(traceEnabled
-          ? {
-              trace: (traceManager.getEntries() ?? []).map((r) => ({
-                ...r,
-                factChanges: r.factChanges.map((fc) => ({ ...fc })),
-                derivationsRecomputed: r.derivationsRecomputed.map((d) => ({
-                  ...d,
-                  deps: [...d.deps],
-                })),
-                constraintsHit: r.constraintsHit.map((c) => ({
-                  ...c,
-                  deps: [...c.deps],
-                })),
-                requirementsAdded: r.requirementsAdded.map((ra) => ({ ...ra })),
-                requirementsRemoved: r.requirementsRemoved.map((rr) => ({
-                  ...rr,
-                })),
-                resolversStarted: r.resolversStarted.map((rs) => ({ ...rs })),
-                resolversCompleted: r.resolversCompleted.map((rc) => ({
-                  ...rc,
-                })),
-                resolversErrored: r.resolversErrored.map((re) => ({ ...re })),
-                effectsRun: r.effectsRun.map((e) => ({
-                  ...e,
-                  triggeredBy: [...e.triggeredBy],
-                })),
-                effectErrors: r.effectErrors.map((ee) => ({ ...ee })),
-              })),
-            }
+          ? { trace: structuredClone(traceManager.getEntries() ?? []) }
           : {}),
       };
     },
@@ -1343,18 +1324,19 @@ export function createEngine<S extends Schema>(
 
       // Collect derivation keys to include
       const allDerivationKeys = Object.keys(mergedDerive);
+      const allDerivationSet = new Set(allDerivationKeys);
       let derivationKeys: string[];
 
       if (includeDerivations) {
-        // Only include specified derivations
+        // Only include specified derivations (Set lookup: O(1) per key)
         derivationKeys = includeDerivations.filter((k) =>
-          allDerivationKeys.includes(k),
+          allDerivationSet.has(k),
         );
 
         // Warn about unknown derivation keys in dev mode
         if (process.env.NODE_ENV !== "production") {
           const unknown = includeDerivations.filter(
-            (k) => !allDerivationKeys.includes(k),
+            (k) => !allDerivationSet.has(k),
           );
           if (unknown.length > 0) {
             console.warn(

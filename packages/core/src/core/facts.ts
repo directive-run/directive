@@ -503,6 +503,9 @@ function wrapWithNestedWarning(
 ): object {
   return new Proxy(obj, {
     get(target, prop) {
+      if (typeof prop === "string" && BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       const value = Reflect.get(target, prop);
       if (typeof prop === "symbol" || typeof value !== "object" || value === null) {
         return value;

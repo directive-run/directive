@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    internals: "src/internals.ts",
     "plugins/index": "src/plugins/index.ts",
     testing: "src/utils/testing.ts",
     migration: "src/utils/migration.ts",
