@@ -117,6 +117,7 @@ export function createEngine<S extends Schema>(
 
   // Track which module defined each key for collision detection
   const schemaOwners = new Map<string, string>();
+  const definitionOwners = new Map<string, string>();
 
   for (const module of config.modules) {
     // Security: Validate module definitions for dangerous keys
@@ -145,19 +146,39 @@ export function createEngine<S extends Schema>(
     validateKeys(module.constraints, "constraints");
     validateKeys(module.resolvers, "resolvers");
 
-    // Check for schema collisions
-    if (process.env.NODE_ENV !== "production") {
-      for (const key of Object.keys(module.schema)) {
-        const existingOwner = schemaOwners.get(key);
-        if (existingOwner) {
+    // Check for schema collisions (unconditional — data integrity, not dev convenience)
+    for (const key of Object.keys(module.schema)) {
+      const existingOwner = schemaOwners.get(key);
+      if (existingOwner) {
+        throw new Error(
+          `[Directive] Schema collision: Fact "${key}" is defined in both module "${existingOwner}" and "${module.id}". ` +
+            `Use namespacing (e.g., "${module.id}::${key}") or merge into one module.`,
+        );
+      }
+      schemaOwners.set(key, module.id);
+    }
+
+    // Check for definition collisions across modules (derive, effects, constraints, resolvers)
+    const checkCollisions = (obj: object | undefined, section: string) => {
+      if (!obj) {
+        return;
+      }
+      for (const key of Object.keys(obj)) {
+        const owner = definitionOwners.get(key);
+        if (owner && owner !== module.id) {
           throw new Error(
-            `[Directive] Schema collision: Fact "${key}" is defined in both module "${existingOwner}" and "${module.id}". ` +
-              `Use namespacing (e.g., "${module.id}::${key}") or merge into one module.`,
+            `[Directive] Definition collision: ${section} "${key}" is defined in both module "${owner}" and "${module.id}". ` +
+              "Use namespacing or rename to avoid conflicts.",
           );
         }
-        schemaOwners.set(key, module.id);
+        definitionOwners.set(key, module.id);
       }
-    }
+    };
+    checkCollisions(module.derive, "derivation");
+    checkCollisions(module.effects, "effect");
+    checkCollisions(module.constraints, "constraint");
+    checkCollisions(module.resolvers, "resolver");
+    checkCollisions(module.events, "event");
 
     Object.assign(mergedSchema, module.schema);
     if (module.events) Object.assign(mergedEvents, module.events);
@@ -724,11 +745,13 @@ export function createEngine<S extends Schema>(
       // Schedule next reconcile BEFORE notifying settlement change,
       // so listeners never see a brief isSettled=true flash when
       // more changes are pending.
+      // Reset depth counter at the end of each top-level reconcile.
+      // Previously only reset on full settlement, which allowed depth
+      // to climb toward MAX in long-running systems with continuous changes.
+      reconcileDepth = 0;
+
       if (state.changedKeys.size > 0) {
         scheduleReconcile();
-      } else if (!state.reconcileScheduled) {
-        // System has settled — reset depth counter
-        reconcileDepth = 0;
       }
 
       notifySettlementChange();
@@ -1154,13 +1177,18 @@ export function createEngine<S extends Schema>(
       const constraintState = constraintsManager.getState(req.fromConstraint);
       const resolverStatus = resolversManager.getStatus(requirementId);
 
-      // Get relevant facts by looking at the constraint's last known state
+      // Get relevant facts from the constraint's tracked dependencies
       const relevantFacts: Record<string, unknown> = {};
-      const factsSnapshot = store.toObject();
-
-      // Include all facts for now (could be optimized with dependency tracking)
-      for (const [key, value] of Object.entries(factsSnapshot)) {
-        relevantFacts[key] = value;
+      const constraintDeps = constraintsManager.getDependencies(req.fromConstraint);
+      if (constraintDeps) {
+        for (const key of constraintDeps) {
+          relevantFacts[key] = store.get(key);
+        }
+      } else {
+        // Fallback: include all facts if deps not tracked
+        for (const [key, value] of Object.entries(store.toObject())) {
+          relevantFacts[key] = value;
+        }
       }
 
       const lines: string[] = [
@@ -1206,36 +1234,43 @@ export function createEngine<S extends Schema>(
     },
 
     async settle(maxWait = 5000): Promise<void> {
-      const startTime = Date.now();
+      /** Check if the system is fully settled */
+      const isSettled = (): boolean =>
+        resolversManager.getInflightInfo().length === 0 &&
+        !state.isReconciling &&
+        !state.reconcileScheduled &&
+        !resolversManager.hasPendingBatches();
 
-      // Use while loop instead of recursion to prevent stack overflow
-      while (true) {
-        // Flush any pending batches so they start executing
-        if (resolversManager.hasPendingBatches()) {
-          resolversManager.processBatches();
-        }
+      // Flush pending batches and yield once for microtasks
+      if (resolversManager.hasPendingBatches()) {
+        resolversManager.processBatches();
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-        // Wait for any pending microtasks
-        await new Promise((resolve) => setTimeout(resolve, 0));
+      if (isSettled()) {
+        return;
+      }
 
-        // Check if we have inflight resolvers or unmet requirements with resolvers
-        const inspection = this.inspect();
-        const settled =
-          inspection.inflight.length === 0 &&
-          !state.isReconciling &&
-          !state.reconcileScheduled &&
-          !resolversManager.hasPendingBatches();
+      // Event-driven: resolve when settlement state changes
+      return new Promise<void>((resolve, reject) => {
+        let done = false;
 
-        if (settled) {
-          return;
-        }
+        const cleanup = () => {
+          if (done) {
+            return;
+          }
+          done = true;
+          clearTimeout(timeout);
+          unsubscribe();
+        };
 
-        // Check timeout
-        if (Date.now() - startTime > maxWait) {
+        const timeout = setTimeout(() => {
+          cleanup();
           const details: string[] = [];
-          if (inspection.inflight.length > 0) {
+          const inflight = resolversManager.getInflightInfo();
+          if (inflight.length > 0) {
             details.push(
-              `${inspection.inflight.length} resolvers inflight: ${inspection.inflight.map((r) => r.resolverId).join(", ")}`,
+              `${inflight.length} resolvers inflight: ${inflight.map((r) => r.resolverId).join(", ")}`,
             );
           }
           if (state.isReconciling) {
@@ -1244,21 +1279,32 @@ export function createEngine<S extends Schema>(
           if (state.reconcileScheduled) {
             details.push("reconcile scheduled");
           }
-          // Include pending requirements for better debugging
           const unmet = state.previousRequirements.all();
           if (unmet.length > 0) {
             details.push(
               `${unmet.length} unmet requirements: ${unmet.map((r) => r.requirement.type).join(", ")}`,
             );
           }
-          throw new Error(
-            `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+          reject(
+            new Error(
+              `[Directive] settle() timed out after ${maxWait}ms. ${details.join("; ")}`,
+            ),
           );
-        }
+        }, maxWait);
 
-        // Wait a bit and check again
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
+        const unsubscribe = this.onSettledChange(() => {
+          if (resolversManager.hasPendingBatches()) {
+            resolversManager.processBatches();
+          }
+          // Yield a microtask to let pending reconciles complete
+          setTimeout(() => {
+            if (!done && isSettled()) {
+              cleanup();
+              resolve();
+            }
+          }, 0);
+        });
+      });
     },
 
     getSnapshot() {
