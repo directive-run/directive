@@ -27,7 +27,16 @@
     "guardrails",
     "orchestration",
     "llm",
-    "constraint-driven"
+    "constraint-driven",
+    "ai-safety",
+    "prompt-injection",
+    "pii-detection",
+    "cost-tracking",
+    "multi-agent",
+    "openai",
+    "anthropic",
+    "ollama",
+    "gemini"
   ],
   "sideEffects": false,
   "type": "module",
