@@ -1,6 +1,7 @@
+import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
 import { createDerivationsManager } from "../derivations.js";
-import { createFacts, t } from "../../index.js";
+import { t } from "../../index.js";
 
 // ============================================================================
 // Helpers
