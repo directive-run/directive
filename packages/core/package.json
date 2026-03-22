@@ -28,7 +28,11 @@
     "reactive",
     "runtime",
     "typescript",
-    "signals"
+    "ai-guardrails",
+    "zero-dependencies",
+    "auto-tracking",
+    "framework-agnostic",
+    "declarative"
   ],
   "sideEffects": false,
   "type": "module",
