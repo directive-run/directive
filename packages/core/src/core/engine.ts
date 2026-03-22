@@ -106,6 +106,18 @@ interface EngineState<_S extends Schema> {
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
+  // Pro feature gate — dynamic definitions require pro: true (or a license key)
+  const isPro = !!config.pro;
+
+  function requirePro(method: string): void {
+    if (!isPro) {
+      throw new Error(
+        `[Directive] ${method}() requires a Pro license. ` +
+          "Pass pro: true to createSystem() or get a license at https://directive.run/pricing",
+      );
+    }
+  }
+
   // Merge all module definitions with collision detection
   // Use Object.create(null) to prevent prototype chain traversal (e.g., "toString" in mergedEvents)
   const mergedSchema = Object.create(null) as S;
@@ -820,10 +832,10 @@ export function createEngine<S extends Schema>(
       enable: (id: string) => constraintsManager.enable(id),
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
-      register: (id: string, def: any) => definitions.register("constraint", id, def),
+      register: (id: string, def: any) => { requirePro("constraints.register"); definitions.register("constraint", id, def); },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
-      assign: (id: string, def: any) => definitions.assign("constraint", id, def),
-      unregister: (id: string) => definitions.unregister("constraint", id),
+      assign: (id: string, def: any) => { requirePro("constraints.assign"); definitions.assign("constraint", id, def); },
+      unregister: (id: string) => { requirePro("constraints.unregister"); definitions.unregister("constraint", id); },
       call: (id: string, props?: Record<string, unknown>) => definitions.call("constraint", id, props) as Promise<Record<string, unknown>[]>,
       isDynamic: (id: string) => definitions.isDynamic("constraint", id),
       listDynamic: () => definitions.listDynamic("constraint"),
@@ -833,20 +845,20 @@ export function createEngine<S extends Schema>(
       enable: (id: string) => effectsManager.enable(id),
       isEnabled: (id: string) => effectsManager.isEnabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
-      register: (id: string, def: any) => definitions.register("effect", id, def),
+      register: (id: string, def: any) => { requirePro("effects.register"); definitions.register("effect", id, def); },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
-      assign: (id: string, def: any) => definitions.assign("effect", id, def),
-      unregister: (id: string) => definitions.unregister("effect", id),
+      assign: (id: string, def: any) => { requirePro("effects.assign"); definitions.assign("effect", id, def); },
+      unregister: (id: string) => { requirePro("effects.unregister"); definitions.unregister("effect", id); },
       call: (id: string) => definitions.call("effect", id) as Promise<void>,
       isDynamic: (id: string) => definitions.isDynamic("effect", id),
       listDynamic: () => definitions.listDynamic("effect"),
     },
     resolvers: {
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
-      register: (id: string, def: any) => definitions.register("resolver", id, def),
+      register: (id: string, def: any) => { requirePro("resolvers.register"); definitions.register("resolver", id, def); },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
-      assign: (id: string, def: any) => definitions.assign("resolver", id, def),
-      unregister: (id: string) => definitions.unregister("resolver", id),
+      assign: (id: string, def: any) => { requirePro("resolvers.assign"); definitions.assign("resolver", id, def); },
+      unregister: (id: string) => { requirePro("resolvers.unregister"); definitions.unregister("resolver", id); },
       call: (id: string, requirement: { type: string; [key: string]: unknown }) => definitions.call("resolver", id, requirement) as Promise<void>,
       isDynamic: (id: string) => definitions.isDynamic("resolver", id),
       listDynamic: () => definitions.listDynamic("resolver"),
@@ -1207,10 +1219,14 @@ export function createEngine<S extends Schema>(
     },
 
     getOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): unknown | undefined {
+      requirePro("getOriginal");
+
       return definitions.getOriginal(type, id);
     },
 
     restoreOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): boolean {
+      requirePro("restoreOriginal");
+
       return definitions.restoreOriginal(type, id);
     },
 

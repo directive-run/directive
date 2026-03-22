@@ -432,6 +432,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     trace,
     errorBoundary,
     tickMs: options.tickMs,
+    pro: options.pro,
     // Callback to apply initialFacts/hydrate during init phase (after module inits, before reconcile)
     onAfterModuleInit: () => {
       // Apply initialFacts first
@@ -1033,6 +1034,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     trace,
     errorBoundary,
     tickMs: options.tickMs,
+    pro: options.pro,
     onAfterModuleInit: () => {
       // Apply initialFacts (already validated for prototype safety above)
       if (options.initialFacts) {
