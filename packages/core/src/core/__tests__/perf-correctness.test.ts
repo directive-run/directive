@@ -1,10 +1,11 @@
+import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
 import { createDerivationsManager } from "../derivations.js";
 import { createFactsStore } from "../facts.js";
 import { createResolversManager } from "../resolvers.js";
 import { createConstraintsManager } from "../constraints.js";
 import { createEffectsManager } from "../effects.js";
-import { createFacts, createModule, createSystem, t } from "../../index.js";
+import { createModule, createSystem, t } from "../../index.js";
 
 // ============================================================================
 // Helpers

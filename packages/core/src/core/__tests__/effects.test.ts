@@ -1,5 +1,6 @@
+import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
-import { createFacts, t } from "../../index.js";
+import { t } from "../../index.js";
 import { createEffectsManager } from "../effects.js";
 
 // ============================================================================

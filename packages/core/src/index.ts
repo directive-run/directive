@@ -4,6 +4,7 @@
  * Constraint-driven runtime for TypeScript.
  *
  * Also available:
+ * - `@directive-run/core/internals` – Manager factories, engine, tracking, and internal types
  * - `@directive-run/core/plugins` – Logging, devtools, persistence, observability, circuit breaker
  * - `@directive-run/core/testing` – Mock resolvers, fake timers, assertion helpers
  * - `@directive-run/core/migration` – Redux/Zustand/XState migration codemods
@@ -14,143 +15,82 @@
  */
 
 // ============================================================================
-// Core Types
+// Core Types — what 90% of users need
 // ============================================================================
 
 export type {
   // Schema
   Schema,
   SchemaType,
-  InferSchema,
   InferSchemaType,
-  // Consolidated Module Schema
+
+  // Module Schema (consolidated)
   ModuleSchema,
-  DerivationsSchema,
-  EventsSchema,
-  EventPayloadSchema,
   InferFacts,
   InferDerivations,
   InferSelectorState,
-  InferEventPayloadFromSchema,
   InferEvents,
-  InferRequirementPayloadFromSchema,
   InferRequirements,
   InferRequirementTypes,
+
   // Facts
   Facts,
   FactsSnapshot,
-  FactsStore,
-  FactChange,
-  // Derivations
-  DerivationsDef,
-  DerivationState,
-  DerivedValues,
-  TypedDerivationsDef,
-  // Effects
-  EffectsDef,
-  EffectCleanup,
+
   // Requirements
   Requirement,
   RequirementWithId,
-  RequirementKeyFn,
-  RequirementPayloadSchema,
-  RequirementsSchema,
-  RequirementOutput,
-  // Constraints
-  ConstraintsDef,
-  ConstraintState,
-  TypedConstraintDef,
-  TypedConstraintsDef,
-  // Resolvers
-  ResolversDef,
-  ResolverContext,
-  ResolverStatus,
+
+  // Constraints + Resolvers (config types)
   RetryPolicy,
   BatchConfig,
-  BatchItemResult,
-  BatchResolveResults,
-  TypedResolverContext,
-  TypedResolverDef,
-  TypedResolversDef,
+
   // Plugins
   Plugin,
-  ReconcileResult,
   Snapshot,
-  RecoveryStrategy,
+
   // Errors
-  ErrorSource,
   ErrorBoundaryConfig,
-  RetryLaterConfig,
+
   // Module
   ModuleDef,
   ModuleHooks,
-  TypedEventsDef,
-  // Events
-  EventsDef,
-  SystemEvent,
-  EventsAccessorFromSchema,
-  DispatchEventsFromSchema,
-  FlexibleEventHandler,
+
   // System
   System,
   SystemConfig,
-  // Runtime Controls
-  ConstraintsControl,
-  DerivationsControl,
-  EffectsControl,
-  ResolversControl,
-  // Dynamic Definition Types
-  DynamicConstraintDef,
-  DynamicEffectDef,
-  DynamicResolverDef,
   SystemInspection,
   SystemSnapshot,
+
+  // Trace
   TraceEntry,
-  TraceConfig,
   TraceOption,
-  DistributableSnapshotOptions,
-  DistributableSnapshot,
-  HistoryConfig,
+
+  // History
   HistoryOption,
   HistoryAPI,
   HistoryState,
-  SnapshotMeta,
-  RequirementExplanation,
-  // Accessors
-  DeriveAccessor,
-  EventsAccessor,
-  FactKeys,
-  FactReturnType,
-  DerivationKeys,
-  DerivationReturnType,
-  ObservableKeys,
-  // Typed Helper Utilities
-  TypedConstraint,
-  TypedResolver,
+
   // Composition (Namespaced Multi-Module)
   ModulesMap,
-  NamespacedFacts,
-  MutableNamespacedFacts,
-  NamespacedDerivations,
-  UnionEvents,
   NamespacedSystem,
-  NamespacedEventsAccessor,
   CreateSystemOptionsNamed,
-  // Single Module (no namespace)
+
+  // Single Module
   CreateSystemOptionsSingle,
   SingleModuleSystem,
+
   // Type Guards
   SystemMode,
   AnySystem,
-  // Cross-Module Dependencies (for modules)
+
+  // Cross-Module Dependencies
   CrossModuleDeps,
-  CrossModuleFactsWithSelf,
-  CrossModuleDerivationFn,
-  CrossModuleDerivationsDef,
-  CrossModuleConstraintDef,
-  CrossModuleConstraintsDef,
-  CrossModuleEffectDef,
-  CrossModuleEffectsDef,
+
+  // Dynamic Definitions (Pro)
+  DynamicConstraintDef,
+  DynamicEffectDef,
+  DynamicResolverDef,
 } from "./core/types.js";
 
 // ============================================================================
@@ -166,45 +106,6 @@ export { DirectiveError } from "./core/types.js";
 /**
  * Schema type builders for defining fact types.
  *
- * Provides type-safe schema definitions with optional runtime validation:
- *
- * **Basic Types:**
- * - `t.string<T>()` - String type (with optional literal union)
- * - `t.number()` - Number type with `.min()` and `.max()` validation
- * - `t.boolean()` - Boolean type
- * - `t.bigint()` - BigInt type for large integers
- *
- * **Complex Types:**
- * - `t.array<T>()` - Array type with `.of()`, `.nonEmpty()`, `.minLength()`, `.maxLength()`
- * - `t.object<T>()` - Object type with `.shape()`, `.nonNull()`, `.hasKeys()`
- * - `t.record<V>(valueType)` - Record/map type `Record<string, V>`
- * - `t.tuple(types...)` - Fixed-length tuple type
- * - `t.union(types...)` - Union of multiple types
- *
- * **Literal & Enum Types:**
- * - `t.enum(...values)` - String enum from literal values
- * - `t.literal(value)` - Exact value matching (string, number, or boolean)
- *
- * **Wrappers:**
- * - `t.nullable(type)` - Nullable wrapper (`T | null`)
- * - `t.optional(type)` - Optional wrapper (`T | undefined`)
- *
- * **Validation Types:**
- * - `t.date()` - Date type
- * - `t.uuid()` - UUID string format
- * - `t.email()` - Email string format
- * - `t.url()` - URL string format
- *
- * **Chainable Methods (available on most types):**
- * - `.default(value)` - Set default value
- * - `.transform(fn)` - Transform values
- * - `.brand<B>()` - Add branded/nominal type
- * - `.describe(text)` - Add schema documentation
- * - `.refine(predicate, message)` - Custom validation with error message
- * - `.nullable()` - Make nullable (chainable alternative to `t.nullable()`)
- * - `.optional()` - Make optional (chainable alternative to `t.optional()`)
- * - `.validate(fn)` - Add custom validator
- *
  * @example
  * ```ts
  * import { t } from '@directive-run/core';
@@ -212,21 +113,13 @@ export { DirectiveError } from "./core/types.js";
  * const schema = {
  *   facts: {
  *     count: t.number().min(0).default(0),
- *     name: t.string().describe("User's display name"),
- *     status: t.enum("idle", "loading", "success", "error"),
+ *     name: t.string(),
+ *     status: t.enum("idle", "loading", "error"),
  *     user: t.object<User>().nullable(),
- *     config: t.object<Config>().optional(),
- *     userId: t.string().brand<"UserId">(),
- *     age: t.number().refine(n => n >= 0, "Age must be non-negative"),
  *   },
- *   derivations: {
- *     doubled: t.number(),
- *   },
- *   events: {
- *     increment: {},
- *     setStatus: { status: t.enum("idle", "loading", "success", "error") },
- *   },
- *   requirements: {},
+ *   derivations: { doubled: t.number() },
+ *   events: { increment: {} },
+ *   requirements: { FETCH_USER: {} },
  * };
  * ```
  */
@@ -248,13 +141,10 @@ export {
   type ModuleConfigWithDeps,
 } from "./core/module.js";
 export { createSystem } from "./core/system.js";
-// Convenience helper for status plugin setup
 export { createSystemWithStatus } from "./utils/system-with-status.js";
 
-// Helper factory functions for external constraint/resolver definitions
+// Helper factory functions for typed constraint/resolver definitions
 export {
-  createConstraintFactory,
-  createResolverFactory,
   typedConstraint,
   typedResolver,
 } from "./core/types.js";
@@ -286,21 +176,12 @@ export {
 
 /**
  * Backoff strategy constants for retry policies.
- * Use for autocomplete when configuring resolver retry policies.
  *
  * @example
  * ```ts
  * import { Backoff } from '@directive-run/core';
  *
- * const resolver = {
- *   requirement: "FETCH_DATA",
- *   retry: {
- *     attempts: 3,
- *     backoff: Backoff.Exponential, // Autocomplete-friendly!
- *     initialDelay: 100,
- *   },
- *   resolve: async (req, ctx) => { ... },
- * };
+ * retry: { attempts: 3, backoff: Backoff.Exponential, initialDelay: 100 }
  * ```
  */
 export const Backoff = {
@@ -313,45 +194,6 @@ export const Backoff = {
 } as const;
 
 // ============================================================================
-// Lower-level APIs (also available via "@directive-run/core/internals")
-// ============================================================================
-// Prefer importing from "@directive-run/core/internals" for direct access
-// to manager factories, the engine, and tracking utilities.
-
-export {
-  createFacts,
-  createFactsStore,
-  createFactsProxy,
-} from "./core/facts.js";
-export { createDerivationsManager } from "./core/derivations.js";
-export { createEffectsManager } from "./core/effects.js";
-export { createConstraintsManager } from "./core/constraints.js";
-export { createResolversManager, type InflightInfo } from "./core/resolvers.js";
-export { createPluginManager } from "./core/plugins.js";
-export {
-  createErrorBoundaryManager,
-  createRetryLaterManager,
-  type PendingRetry,
-} from "./core/errors.js";
-export {
-  createHistoryManager,
-  createDisabledHistory,
-} from "./utils/history.js";
-export { createEngine } from "./core/engine.js";
-
-// ============================================================================
-// Tracking (for custom derivations)
-// ============================================================================
-
-export {
-  getCurrentTracker,
-  isTracking,
-  withTracking,
-  withoutTracking,
-  trackAccess,
-} from "./core/tracking.js";
-
-// ============================================================================
 // Requirement Status Utilities
 // ============================================================================
 
@@ -362,7 +204,7 @@ export {
 } from "./utils/requirement-status.js";
 
 // ============================================================================
-// Distributable Snapshot Utilities
+// Snapshot Utilities
 // ============================================================================
 
 export {
@@ -379,5 +221,14 @@ export {
   type SignedSnapshot,
 } from "./utils/utils.js";
 
+// ============================================================================
+// Lower-level APIs — use "@directive-run/core/internals" for these
+// ============================================================================
+// Manager factories, engine, tracking, and internal types are available at:
+//   import { createEngine, createFacts, withTracking } from "@directive-run/core/internals"
+//
+// Internal types (FactsStore, FactChange, DerivationState, ConstraintState,
+// DerivationsDef, ConstraintsDef, ResolversDef, EventsDef, ReconcileResult,
+// RecoveryStrategy, ErrorSource, etc.) are also in internals.
+
 // Migration utilities available via "@directive-run/core/migration" subpath export.
-// Not re-exported from main entrypoint to avoid bundle bloat for all consumers.

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { t } from "../../index.js";
 import {
   createFacts,
   createFactsStore,
   createFactsProxy,
-  t,
-} from "../../index.js";
+} from "../../internals.js";
 
 // ============================================================================
 // Store Core
