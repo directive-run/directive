@@ -1,7 +1,7 @@
 {
   "name": "@directive-run/ai",
   "version": "0.8.2",
-  "description": "AI agent orchestration, guardrails, and multi-agent coordination for Directive.",
+  "description": "AI guardrails and orchestration for TypeScript. Prompt injection, PII detection, cost tracking, multi-agent patterns. Zero SDK dependencies.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {

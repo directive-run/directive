@@ -1,7 +1,7 @@
 {
   "name": "@directive-run/core",
   "version": "0.8.2",
-  "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
+  "description": "Constraint-driven runtime for TypeScript. AI guardrails, reactive state, zero dependencies. Declare what must be true — the runtime makes it happen.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
