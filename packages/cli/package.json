@@ -2,7 +2,7 @@
   "name": "@directive-run/cli",
   "version": "0.8.2",
   "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",

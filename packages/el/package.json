@@ -2,7 +2,7 @@
   "name": "@directive-run/el",
   "version": "0.5.0",
   "description": "Vanilla DOM adapter for Directive. Typed element creation + reactive bindings + JSX runtime.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",

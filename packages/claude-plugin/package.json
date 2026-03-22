@@ -3,7 +3,7 @@
   "version": "0.8.2",
   "private": true,
   "description": "Claude Code plugin for Directive — coding guidance via skills.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "type": "module",
   "scripts": {

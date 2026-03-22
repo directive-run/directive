@@ -2,7 +2,7 @@
   "name": "@directive-run/core",
   "version": "0.8.2",
   "description": "Constraint-driven runtime for TypeScript. Declare requirements, let the runtime resolve them.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",

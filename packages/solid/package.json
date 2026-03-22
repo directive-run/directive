@@ -2,7 +2,7 @@
   "name": "@directive-run/solid",
   "version": "0.8.2",
   "description": "Solid.js signals adapter for Directive.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",
