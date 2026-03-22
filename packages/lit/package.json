@@ -51,7 +51,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "*",
+    "@directive-run/core": "^0.8.0",
     "lit": ">=3"
   },
   "devDependencies": {
