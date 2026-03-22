@@ -1,59 +1,69 @@
 # Directive
 
-**Constraint-driven runtime for TypeScript.** Declare requirements. Let the runtime resolve them.
+**The constraint-driven runtime for TypeScript.** Declare what must be true. The runtime makes it happen.
 
 [![npm](https://img.shields.io/npm/v/@directive-run/core)](https://www.npmjs.com/package/@directive-run/core)
+[![tests](https://img.shields.io/badge/tests-3%2C744-brightgreen)](#)
+[![zero deps](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![license](https://img.shields.io/npm/l/@directive-run/core)](./LICENSE)
 
-## What is Directive?
+- **Constraint-Driven Resolution** &ndash; declare requirements, resolvers fulfill them automatically with retry, batching, and error boundaries
+- **AI Guardrails** &ndash; prompt injection detection, PII redaction, cost tracking, multi-agent orchestration with 4 LLM adapters (zero SDK dependencies)
+- **Auto-Tracking Derivations** &ndash; computed values that track their own dependencies, no manual dep arrays
+- **5 Framework Adapters** &ndash; React, Vue, Svelte, Solid, Lit from a single state layer
+- **Zero Runtime Dependencies** &ndash; nothing to audit, nothing to break
+- **Time-Travel Debugging** &ndash; snapshot, rewind, replay, export/import system state
 
-Directive is a state management library that automatically resolves what your system needs. Instead of imperatively managing state transitions, you:
+---
 
-1. **Declare constraints** &ndash; What must be true
-2. **Define resolvers** &ndash; How to make it true
-3. **Let the runtime figure out when** &ndash; Automatic reconciliation
+## How It Works
 
-## Installation
+Other state libraries react to what happened. Directive enforces what must be true.
+
+```typescript
+// Traditional: describe HOW to change state
+dispatch({ type: 'FETCH_USER', id: 123 });
+// then write a thunk, saga, or effect to handle it...
+
+// Directive: declare WHAT must be true
+constraints: {
+  needsUser: {
+    when: (facts) => facts.userId > 0 && !facts.user,
+    require: { type: "FETCH_USER" },
+  },
+}
+// The runtime handles when, how, retry, and error recovery.
+```
+
+Set `userId = 123` and the constraint fires, the resolver fetches the user, and the system settles &mdash; automatically.
+
+---
+
+## Quick Start
 
 ```bash
 npm install @directive-run/core
-# or
-pnpm add @directive-run/core
-# or
-yarn add @directive-run/core
 ```
-
-## Quick Start
 
 ```typescript
 import { createModule, createSystem, t, type ModuleSchema } from '@directive-run/core';
 
-// Define your schema (single source of truth for all types)
-const schema = {
-  facts: {
-    userId: t.number(),
-    user: t.object<{ id: number; name: string } | null>(),
-  },
-  derivations: {
-    isLoggedIn: t.boolean(),
-    greeting: t.string(),
-  },
-  events: {},
-  requirements: {
-    FETCH_USER: {},
-  },
-} satisfies ModuleSchema;
-
-// Create the module
 const userModule = createModule("user", {
-  schema,
+  schema: {
+    facts: {
+      userId: t.number(),
+      user: t.object<{ id: number; name: string } | null>(),
+    },
+    derivations: { isLoggedIn: t.boolean() },
+    events: {},
+    requirements: { FETCH_USER: {} },
+  } satisfies ModuleSchema,
 
   init: (facts) => {
     facts.userId = 0;
     facts.user = null;
   },
 
-  // Constraints: Declare what must be true
   constraints: {
     needsUser: {
       when: (facts) => facts.userId > 0 && facts.user === null,
@@ -61,38 +71,66 @@ const userModule = createModule("user", {
     },
   },
 
-  // Resolvers: Define how to fulfill requirements
   resolvers: {
     fetchUser: {
       requirement: "FETCH_USER",
       resolve: async (req, context) => {
-        const response = await fetch(`/api/users/${context.facts.userId}`);
-        context.facts.user = await response.json();
+        const res = await fetch(`/api/users/${context.facts.userId}`);
+        context.facts.user = await res.json();
       },
     },
   },
 
-  // Derivations: Computed values with auto-tracking
   derive: {
     isLoggedIn: (facts) => facts.user !== null,
-    greeting: (facts) => facts.user ? `Hello, ${facts.user.name}!` : "Please log in",
   },
-
-  // Events: Type-safe state mutations
-  events: {},
 });
 
-// Create and start the system
 const system = createSystem({ module: userModule });
 system.start();
 
-// Set userId - the constraint will automatically trigger FETCH_USER
-system.facts.userId = 123;
-
-// Wait for resolution
-await system.settle();
-console.log(system.read("greeting")); // "Hello, John!"
+system.facts.userId = 123;       // Constraint fires automatically
+await system.settle();            // Wait for resolution
+console.log(system.facts.user);   // { id: 123, name: "John" }
 ```
+
+---
+
+## AI Guardrails and Orchestration
+
+The same constraint-driven model powers AI agent safety. Guardrails are constraints. Agent runs are resolvers. The runtime enforces them automatically.
+
+```bash
+npm install @directive-run/ai
+```
+
+```typescript
+import { createAgentOrchestrator } from '@directive-run/ai';
+import { createAnthropicAdapter } from '@directive-run/ai/anthropic';
+
+const orchestrator = createAgentOrchestrator({
+  agent: {
+    name: "assistant",
+    model: createAnthropicAdapter({ model: "claude-sonnet-4-5-20250514" }),
+    systemPrompt: "You are a helpful assistant.",
+  },
+  guardrails: {
+    input: [promptInjectionGuardrail(), piiGuardrail()],
+    output: [contentModerationGuardrail()],
+  },
+  budget: { maxTotalCost: 1.00 },
+});
+```
+
+- **4 LLM adapters** &ndash; OpenAI, Anthropic, Ollama, Gemini (pure `fetch`, zero SDK deps)
+- **Built-in guardrails** &ndash; PII redaction, prompt injection, content moderation, rate limiting
+- **Multi-agent patterns** &ndash; parallel, sequential, supervisor, debate, DAG, goal-driven
+- **Cost tracking + budget enforcement** &ndash; per-agent and per-system limits
+- **Streaming with backpressure** &ndash; real-time token streaming with inline constraint evaluation
+
+[AI Documentation &rarr;](https://directive.run/ai/overview)
+
+---
 
 ## React Integration
 
@@ -101,61 +139,70 @@ npm install @directive-run/react
 ```
 
 ```tsx
-import { useDerived, useDispatch } from '@directive-run/react';
+import { useFact, useDerived } from '@directive-run/react';
 
-function UserGreeting({ system }) {
-  const greeting = useDerived(system, "greeting");
+function UserProfile({ system }) {
+  const user = useFact(system, "user");
   const isLoggedIn = useDerived(system, "isLoggedIn");
 
-  return (
-    <div>
-      <p>{greeting}</p>
-      {!isLoggedIn && <LoginButton />}
-    </div>
-  );
+  if (!isLoggedIn) return <p>Please log in</p>;
+  return <p>Hello, {user?.name}!</p>;
 }
 ```
 
 ## Framework Support
 
-Directive works with any framework:
-
-| Framework | Package | Features |
-|-----------|---------|----------|
-| **React** | `@directive-run/react` | Hooks with useSyncExternalStore |
+| Framework | Package | Style |
+|-----------|---------|-------|
+| **React** | `@directive-run/react` | Hooks with `useSyncExternalStore` |
 | **Vue** | `@directive-run/vue` | Composables with reactive refs |
 | **Svelte** | `@directive-run/svelte` | Stores with `$` syntax |
 | **Solid** | `@directive-run/solid` | Signals with fine-grained reactivity |
 | **Lit** | `@directive-run/lit` | Reactive Controllers for Web Components |
 
+---
+
+## Why Directive?
+
+| | Redux | Zustand | XState | Directive |
+|---|---|---|---|---|
+| Constraint-driven resolution | | | | Yes |
+| Auto-tracking derivations | | | | Yes |
+| AI guardrails + orchestration | | | | Yes |
+| Retry, batching, error boundaries | Manual | Manual | Manual | Built-in |
+| Time-travel debugging | Extension | | Partial | Built-in |
+| Framework-agnostic (5 adapters) | React only | React only | Any | Any |
+| Zero runtime dependencies | | Yes | | Yes |
+| `explain()` &ndash; why does this state exist? | | | | Yes |
+
+---
+
 ## Packages
 
 | Package | Description |
 |---------|-------------|
-| [`@directive-run/core`](./packages/core) | Core runtime, modules, systems, plugins, testing |
-| [`@directive-run/react`](./packages/react) | React hooks (useFact, useDerived, useEvents, etc.) |
+| [`@directive-run/core`](./packages/core) | Core runtime &ndash; modules, systems, plugins, testing |
+| [`@directive-run/react`](./packages/react) | React hooks (useFact, useDerived, useSelector, etc.) |
 | [`@directive-run/vue`](./packages/vue) | Vue composables with reactive refs |
 | [`@directive-run/svelte`](./packages/svelte) | Svelte stores with `$` syntax |
 | [`@directive-run/solid`](./packages/solid) | Solid signals with fine-grained reactivity |
-| [`@directive-run/lit`](./packages/lit) | Lit reactive controllers for Web Components |
-| [`@directive-run/ai`](./packages/ai) | AI agent orchestration, guardrails, multi-agent |
-| `@directive-run/ai/openai` | OpenAI / Azure / Together adapter |
-| `@directive-run/ai/anthropic` | Anthropic Claude adapter |
-| `@directive-run/ai/ollama` | Local Ollama inference adapter |
-| `@directive-run/ai/gemini` | Google Gemini adapter |
-| [`@directive-run/cli`](./packages/cli) | CLI – scaffolding, inspection, AI coding rules |
-| [`@directive-run/knowledge`](./packages/knowledge) | Knowledge files, examples, and validation scripts |
+| [`@directive-run/lit`](./packages/lit) | Lit reactive controllers |
+| [`@directive-run/ai`](./packages/ai) | AI orchestration, guardrails, multi-agent |
+| [`@directive-run/cli`](./packages/cli) | CLI &ndash; scaffolding, inspection, AI coding rules |
 
 ## Documentation
 
-- [Full Documentation](https://directive.run/docs)
-- [API Reference](https://directive.run/api)
+- [Getting Started](https://directive.run/docs/quick-start)
+- [Core Concepts](https://directive.run/docs/core-concepts)
+- [AI Guardrails](https://directive.run/ai/overview)
+- [API Reference](https://directive.run/docs/api)
 - [Examples](https://github.com/directive-run/directive/tree/main/examples)
+- [Pricing](https://directive.run/pricing)
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, architecture overview, and release process.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and architecture overview. A [CLA](./CLA.md) signature is required for all contributions.
 
 ## License
 
-MIT
+[MIT OR Apache-2.0](./LICENSE) &mdash; your choice.
