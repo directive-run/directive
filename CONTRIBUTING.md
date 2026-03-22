@@ -2,6 +2,12 @@
 
 Everything you need to know about how the monorepo fits together &ndash; from local setup through production deployment.
 
+## Contributor License Agreement
+
+Before your first pull request can be merged, you must sign our [Contributor License Agreement (CLA)](./CLA.md). The CLA bot will automatically comment on your PR with signing instructions. This is a one-time process.
+
+The CLA grants Sizls LLC the right to include your contributions under the project's current and future licenses. The open-source version of Directive will always remain available under MIT OR Apache-2.0.
+
 ---
 
 ## Architecture Overview
