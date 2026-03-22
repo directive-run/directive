@@ -1,6 +1,6 @@
 {
-  "name": "@directive-run/example-counter",
-  "version": "0.0.1",
+  "name": "@directive-run/example-number-match",
+  "version": "0.0.12",
   "private": true,
   "type": "module",
   "scripts": {
