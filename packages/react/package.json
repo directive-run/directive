@@ -2,7 +2,7 @@
   "name": "@directive-run/react",
   "version": "0.8.2",
   "description": "React hooks and components for Directive.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",

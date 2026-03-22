@@ -2,7 +2,7 @@
   "name": "@directive-run/svelte",
   "version": "0.8.2",
   "description": "Svelte stores adapter for Directive.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",

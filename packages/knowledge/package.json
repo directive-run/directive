@@ -2,7 +2,7 @@
   "name": "@directive-run/knowledge",
   "version": "0.8.2",
   "description": "Knowledge files, examples, and validation for Directive — the constraint-driven TypeScript runtime.",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
   "repository": {
     "type": "git",
