@@ -23,7 +23,6 @@ export type {
   Schema,
   SchemaType,
   InferSchemaType,
-
   // Module Schema (consolidated)
   ModuleSchema,
   InferFacts,
@@ -32,61 +31,47 @@ export type {
   InferEvents,
   InferRequirements,
   InferRequirementTypes,
-
   // Facts
   Facts,
   FactsSnapshot,
-
   // Requirements
   Requirement,
   RequirementWithId,
-
   // Constraints + Resolvers (config types)
   RetryPolicy,
   BatchConfig,
-
   // Plugins
   Plugin,
   Snapshot,
-
   // Errors
   ErrorBoundaryConfig,
-
   // Module
   ModuleDef,
   ModuleHooks,
-
   // System
   System,
   SystemConfig,
   SystemInspection,
   SystemSnapshot,
-
   // Trace
   TraceEntry,
   TraceOption,
-
   // History
   HistoryOption,
   HistoryAPI,
   HistoryState,
-
   // Composition (Namespaced Multi-Module)
   ModulesMap,
   NamespacedSystem,
   CreateSystemOptionsNamed,
-
   // Single Module
   CreateSystemOptionsSingle,
   SingleModuleSystem,
-
   // Type Guards
   SystemMode,
   AnySystem,
-
   // Cross-Module Dependencies
   CrossModuleDeps,
-
   // Dynamic Definitions (Pro)
   DynamicConstraintDef,
   DynamicEffectDef,

@@ -356,7 +356,10 @@ export interface ConstraintsControl<M extends ModuleSchema = ModuleSchema> {
    * to the resolver system.
    * @throws If no constraint with this ID exists
    */
-  call(id: string, props?: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+  call(
+    id: string,
+    props?: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]>;
   /** Check if a constraint was dynamically registered (not from a module definition) */
   isDynamic(id: string): boolean;
   /** List all dynamically registered constraint IDs */
@@ -408,13 +411,25 @@ export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
    * @throws If a derivation with this ID already exists (use `assign` to override)
    * @remarks During reconciliation, the registration is deferred and applied after the current cycle completes.
    */
-  register(id: string, fn: (facts: Readonly<InferSchema<M["facts"]>>, derived: Readonly<InferDerivations<M>>) => unknown): void;
+  register(
+    id: string,
+    fn: (
+      facts: Readonly<InferSchema<M["facts"]>>,
+      derived: Readonly<InferDerivations<M>>,
+    ) => unknown,
+  ): void;
   /**
    * Override an existing derivation (static or dynamic).
    * @throws If no derivation with this ID exists (use `register` to create)
    * @remarks During reconciliation, the assignment is deferred and applied after the current cycle completes.
    */
-  assign(id: string, fn: (facts: Readonly<InferSchema<M["facts"]>>, derived: Readonly<InferDerivations<M>>) => unknown): void;
+  assign(
+    id: string,
+    fn: (
+      facts: Readonly<InferSchema<M["facts"]>>,
+      derived: Readonly<InferDerivations<M>>,
+    ) => unknown,
+  ): void;
   /**
    * Remove a dynamically registered derivation.
    * Static (module-defined) derivations cannot be unregistered — logs a dev warning and no-ops.
@@ -458,7 +473,10 @@ export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
    * Execute a resolver's `resolve()` with a requirement object.
    * @throws If no resolver with this ID exists
    */
-  call(id: string, requirement: { type: string; [key: string]: unknown }): Promise<void>;
+  call(
+    id: string,
+    requirement: { type: string; [key: string]: unknown },
+  ): Promise<void>;
   /** Check if a resolver was dynamically registered (not from a module definition) */
   isDynamic(id: string): boolean;
   /** List all dynamically registered resolver IDs */
@@ -473,12 +491,16 @@ export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
 export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   priority?: number;
   async?: boolean;
-  when: (facts: Readonly<InferSchema<M["facts"]>>) => boolean | Promise<boolean>;
+  when: (
+    facts: Readonly<InferSchema<M["facts"]>>,
+  ) => boolean | Promise<boolean>;
   require:
     | { type: string; [key: string]: unknown }
     | { type: string; [key: string]: unknown }[]
     | null
-    | ((facts: Readonly<InferSchema<M["facts"]>>) =>
+    | ((
+        facts: Readonly<InferSchema<M["facts"]>>,
+      ) =>
         | { type: string; [key: string]: unknown }
         | { type: string; [key: string]: unknown }[]
         | null);
@@ -489,7 +511,10 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
 
 /** Effect definition for dynamic registration — typed facts */
 export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
-  run: (facts: Readonly<InferSchema<M["facts"]>>, prev: InferSchema<M["facts"]> | null) => void | (() => void) | Promise<void | (() => void)>;
+  run: (
+    facts: Readonly<InferSchema<M["facts"]>>,
+    prev: InferSchema<M["facts"]> | null,
+  ) => void | (() => void) | Promise<void | (() => void)>;
   deps?: Array<string & keyof InferSchema<M["facts"]>>;
 }
 
@@ -500,8 +525,22 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   retry?: RetryPolicy;
   timeout?: number;
   batch?: BatchConfig;
-  resolve?: (req: { type: string; [key: string]: unknown }, context: { facts: InferSchema<M["facts"]>; signal: AbortSignal; snapshot: () => InferSchema<M["facts"]> }) => Promise<void>;
-  resolveBatch?: (reqs: { type: string; [key: string]: unknown }[], context: { facts: InferSchema<M["facts"]>; signal: AbortSignal; snapshot: () => InferSchema<M["facts"]> }) => Promise<void>;
+  resolve?: (
+    req: { type: string; [key: string]: unknown },
+    context: {
+      facts: InferSchema<M["facts"]>;
+      signal: AbortSignal;
+      snapshot: () => InferSchema<M["facts"]>;
+    },
+  ) => Promise<void>;
+  resolveBatch?: (
+    reqs: { type: string; [key: string]: unknown }[],
+    context: {
+      facts: InferSchema<M["facts"]>;
+      signal: AbortSignal;
+      snapshot: () => InferSchema<M["facts"]>;
+    },
+  ) => Promise<void>;
 }
 
 export interface System<M extends ModuleSchema = ModuleSchema> {
@@ -624,14 +663,20 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * Get the original definition that was overridden by `assign()`.
    * Returns undefined if no original exists for this type/id.
    */
-  getOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): unknown | undefined;
+  getOriginal(
+    type: "constraint" | "resolver" | "derivation" | "effect",
+    id: string,
+  ): unknown | undefined;
 
   /**
    * Restore the original definition that was overridden by `assign()`.
    * Re-assigns the original definition and removes the override tracking.
    * Returns true if restoration succeeded, false if no original exists.
    */
-  restoreOriginal(type: "constraint" | "resolver" | "derivation" | "effect", id: string): boolean;
+  restoreOriginal(
+    type: "constraint" | "resolver" | "derivation" | "effect",
+    id: string,
+  ): boolean;
 
   /**
    * Get a distributable snapshot of computed derivations.

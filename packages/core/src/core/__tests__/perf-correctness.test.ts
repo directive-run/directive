@@ -82,8 +82,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
       doubled: (facts) => (facts.count as number) * 2,
       named: (facts) => `${facts.name}-${facts.count}`,
       // both depends on "count" — a shared chain root
-      combined: (_facts, derived) =>
-        `${derived.doubled}-${derived.named}`,
+      combined: (_facts, derived) => `${derived.doubled}-${derived.named}`,
     });
 
     // Force computation
@@ -152,9 +151,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
     expect(invalidatedIds).toContain("right");
     expect(invalidatedIds).toContain("bottom");
     // bottom should appear exactly once (not twice from left + right)
-    expect(
-      invalidatedIds.filter((id) => id === "bottom"),
-    ).toHaveLength(1);
+    expect(invalidatedIds.filter((id) => id === "bottom")).toHaveLength(1);
   });
 });
 

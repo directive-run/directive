@@ -825,9 +825,7 @@ describe("schema validators (t.*)", () => {
         validate: true,
       });
 
-      expect(() => store.set("val", 42 as never)).toThrow(
-        /Validation failed/,
-      );
+      expect(() => store.set("val", 42 as never)).toThrow(/Validation failed/);
     });
   });
 
@@ -1186,8 +1184,8 @@ describe("nested mutation detection (dev mode)", () => {
 
     // Reading nested values should work normally
     expect((facts.user as { name: string }).name).toBe("Alice");
-    expect(
-      (facts.user as { address: { city: string } }).address.city,
-    ).toBe("NYC");
+    expect((facts.user as { address: { city: string } }).address.city).toBe(
+      "NYC",
+    );
   });
 });

@@ -76,31 +76,25 @@ export type {
   InferRequirementPayloadFromSchema,
   RequirementPayloadSchema,
   RequirementsSchema,
-
   // Facts internals
   FactsStore,
   FactChange,
-
   // Derivations internals
   DerivationsDef,
   DerivationState,
   DerivedValues,
   TypedDerivationsDef,
-
   // Effects internals
   EffectsDef,
   EffectCleanup,
-
   // Requirements internals
   RequirementKeyFn,
   RequirementOutput,
-
   // Constraints internals
   ConstraintsDef,
   ConstraintState,
   TypedConstraintDef,
   TypedConstraintsDef,
-
   // Resolvers internals
   ResolversDef,
   ResolverContext,
@@ -110,15 +104,12 @@ export type {
   TypedResolverContext,
   TypedResolverDef,
   TypedResolversDef,
-
   // Plugin internals
   ReconcileResult,
   RecoveryStrategy,
-
   // Error internals
   ErrorSource,
   RetryLaterConfig,
-
   // Events internals
   EventsDef,
   SystemEvent,
@@ -126,7 +117,6 @@ export type {
   DispatchEventsFromSchema,
   FlexibleEventHandler,
   TypedEventsDef,
-
   // System internals
   DistributableSnapshotOptions,
   DistributableSnapshot,
@@ -134,7 +124,6 @@ export type {
   SnapshotMeta,
   RequirementExplanation,
   TraceConfig,
-
   // Accessor types
   DeriveAccessor,
   EventsAccessor,
@@ -143,17 +132,14 @@ export type {
   DerivationKeys,
   DerivationReturnType,
   ObservableKeys,
-
   // Runtime control types
   ConstraintsControl,
   DerivationsControl,
   EffectsControl,
   ResolversControl,
-
   // Typed helper utilities
   TypedConstraint,
   TypedResolver,
-
   // Cross-module composition internals
   NamespacedFacts,
   MutableNamespacedFacts,
