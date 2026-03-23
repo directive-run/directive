@@ -741,13 +741,13 @@ export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
   onAfterModuleInit?: () => void;
   tickMs?: number;
   /**
-   * Enable Pro features: dynamic definitions (register, assign, unregister,
+   * Enable Plus features: dynamic definitions (register, assign, unregister,
    * getOriginal, restoreOriginal) and HMAC snapshot signing.
    *
    * Pass `true` to enable, or a license key string for validated access.
-   * Without this flag, Pro methods throw a descriptive error.
+   * Without this flag, Plus methods throw a descriptive error.
    *
    * @see https://directive.run/pricing
    */
-  pro?: boolean | string;
+  plus?: boolean | string;
 }

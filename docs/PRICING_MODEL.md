@@ -27,7 +27,7 @@ Everything free, adoption-first, MIT licensed. Build traction before monetizatio
 | Tier | Price | Target |
 |------|-------|--------|
 | **Free** | $0 | Solo devs, hobbyists, open source |
-| **Pro** | $19–29/mo | Professional developers, small teams |
+| **Plus** | $19–29/mo | Professional developers, small teams |
 | **Team** | $49–99/mo | Teams needing collaboration + shared sessions |
 | **Enterprise** | Custom | Large orgs needing SLA, SSO, compliance |
 

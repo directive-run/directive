@@ -109,14 +109,44 @@ interface EngineState<_S extends Schema> {
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
-  // Pro feature gate — dynamic definitions require pro: true (or a license key)
-  const isPro = !!config.pro;
+  // Plus feature gate — dynamic definitions require plus: true or a license key
+  let isPlus = false;
 
-  function requirePro(method: string): void {
-    if (!isPro) {
+  if (typeof config.plus === "string") {
+    // License key validation — format check is synchronous, RSA is async
+    const keyStr = config.plus;
+    if (!keyStr.startsWith("dk_live_") || !keyStr.includes(".")) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[Directive] Invalid license key format. Plus features disabled.",
+        );
+      }
+    } else {
+      // Optimistic: format is valid, enable Plus immediately
+      isPlus = true;
+      // Background RSA + nonce verification (revokes if tampered/expired)
+      import("../utils/license.js").then(({ validateLicenseKey }) => {
+        validateLicenseKey(keyStr).then((result) => {
+          if (!result.valid) {
+            isPlus = false;
+            if (process.env.NODE_ENV !== "production") {
+              console.warn(
+                `[Directive] License: ${result.reason}. Plus features disabled.`,
+              );
+            }
+          }
+        });
+      });
+    }
+  } else {
+    isPlus = !!config.plus;
+  }
+
+  function requirePlus(method: string): void {
+    if (!isPlus) {
       throw new Error(
-        `[Directive] ${method}() requires a Pro license. ` +
-          "Pass pro: true to createSystem() or get a license at https://directive.run/pricing",
+        `[Directive] ${method}() requires a Plus license. ` +
+          "Pass plus: true to createSystem() or get a license at https://directive.run/pricing",
       );
     }
   }
@@ -839,16 +869,16 @@ export function createEngine<S extends Schema>(
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       register: (id: string, def: any) => {
-        requirePro("constraints.register");
+        requirePlus("constraints.register");
         definitions.register("constraint", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       assign: (id: string, def: any) => {
-        requirePro("constraints.assign");
+        requirePlus("constraints.assign");
         definitions.assign("constraint", id, def);
       },
       unregister: (id: string) => {
-        requirePro("constraints.unregister");
+        requirePlus("constraints.unregister");
         definitions.unregister("constraint", id);
       },
       call: (id: string, props?: Record<string, unknown>) =>
@@ -864,16 +894,16 @@ export function createEngine<S extends Schema>(
       isEnabled: (id: string) => effectsManager.isEnabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       register: (id: string, def: any) => {
-        requirePro("effects.register");
+        requirePlus("effects.register");
         definitions.register("effect", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       assign: (id: string, def: any) => {
-        requirePro("effects.assign");
+        requirePlus("effects.assign");
         definitions.assign("effect", id, def);
       },
       unregister: (id: string) => {
-        requirePro("effects.unregister");
+        requirePlus("effects.unregister");
         definitions.unregister("effect", id);
       },
       call: (id: string) => definitions.call("effect", id) as Promise<void>,
@@ -883,16 +913,16 @@ export function createEngine<S extends Schema>(
     resolvers: {
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       register: (id: string, def: any) => {
-        requirePro("resolvers.register");
+        requirePlus("resolvers.register");
         definitions.register("resolver", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       assign: (id: string, def: any) => {
-        requirePro("resolvers.assign");
+        requirePlus("resolvers.assign");
         definitions.assign("resolver", id, def);
       },
       unregister: (id: string) => {
-        requirePro("resolvers.unregister");
+        requirePlus("resolvers.unregister");
         definitions.unregister("resolver", id);
       },
       call: (
@@ -1263,7 +1293,7 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): unknown | undefined {
-      requirePro("getOriginal");
+      requirePlus("getOriginal");
 
       return definitions.getOriginal(type, id);
     },
@@ -1272,7 +1302,7 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): boolean {
-      requirePro("restoreOriginal");
+      requirePlus("restoreOriginal");
 
       return definitions.restoreOriginal(type, id);
     },
