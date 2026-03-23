@@ -61,7 +61,7 @@ function createTestModule() {
 }
 
 function createStartedSystem() {
-  const system = createSystem({ module: createTestModule(), pro: true });
+  const system = createSystem({ module: createTestModule(), plus: true });
   system.start();
 
   return system;
@@ -772,7 +772,7 @@ describe("Deferred operations during reconciliation", () => {
       },
     });
 
-    const system = createSystem({ module, pro: true });
+    const system = createSystem({ module, plus: true });
     systemRef = system;
     system.start();
     await flushMicrotasks();
@@ -1018,7 +1018,7 @@ describe("Namespaced system dynamic registration", () => {
 
     const system = createSystem({
       modules: { auth: authModule, data: dataModule },
-      pro: true,
+      plus: true,
     });
     system.start();
     await flushMicrotasks();
@@ -1120,7 +1120,7 @@ describe("Concurrent deferred operations", () => {
       },
     });
 
-    const system = createSystem({ module, pro: true });
+    const system = createSystem({ module, plus: true });
     systemRef = system;
     system.start();
     await flushMicrotasks();
