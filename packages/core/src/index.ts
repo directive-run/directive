@@ -76,6 +76,9 @@ export type {
   DynamicConstraintDef,
   DynamicEffectDef,
   DynamicResolverDef,
+  // Distributable Snapshots
+  DistributableSnapshot,
+  DistributableSnapshotOptions,
 } from "./core/types.js";
 
 // ============================================================================
