@@ -299,7 +299,9 @@ describe("Derivations dynamic definitions", () => {
 
     expect(system.derive.isDynamic("tripled")).toBe(true);
     expect(system.derive.listDynamic()).toContain("tripled");
-    expect((system.derive as unknown as Record<string, unknown>).tripled).toBe(0);
+    expect((system.derive as unknown as Record<string, unknown>).tripled).toBe(
+      0,
+    );
 
     system.destroy();
   });
@@ -345,7 +347,9 @@ describe("Derivations dynamic definitions", () => {
       return facts.count + 100;
     });
 
-    expect((system.derive as unknown as Record<string, unknown>).custom).toBe(100);
+    expect((system.derive as unknown as Record<string, unknown>).custom).toBe(
+      100,
+    );
     expect(system.derive.isDynamic("custom")).toBe(true);
 
     system.derive.unregister("custom");
@@ -756,9 +760,12 @@ describe("Deferred operations during reconciliation", () => {
           run: (facts) => {
             if (facts.trigger && systemRef) {
               // This runs during reconciliation, so registration is deferred
-              systemRef.derive.register("dynamicDerived", (f: { trigger: boolean; result: string }) => {
-                return `derived-${f.trigger}`;
-              });
+              systemRef.derive.register(
+                "dynamicDerived",
+                (f: { trigger: boolean; result: string }) => {
+                  return `derived-${f.trigger}`;
+                },
+              );
             }
           },
         },
@@ -776,7 +783,9 @@ describe("Deferred operations during reconciliation", () => {
 
     // The deferred registration should have been applied after reconciliation
     expect(system.derive.isDynamic("dynamicDerived")).toBe(true);
-    expect((system.derive as unknown as Record<string, unknown>).dynamicDerived).toBe("derived-true");
+    expect(
+      (system.derive as unknown as Record<string, unknown>).dynamicDerived,
+    ).toBe("derived-true");
 
     system.destroy();
   });
@@ -894,7 +903,10 @@ describe("Lifecycle: assign → unregister", () => {
     });
 
     // Call the overridden resolver
-    await system.resolvers.call("dynRes", { type: "LOAD_DATA", source: "test" });
+    await system.resolvers.call("dynRes", {
+      type: "LOAD_DATA",
+      source: "test",
+    });
     await flushMicrotasks();
 
     expect(system.facts.label).toBe("v2");

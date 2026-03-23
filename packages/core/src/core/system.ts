@@ -519,8 +519,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
         let tickEventKey: string | undefined;
         for (const m of flatModules) {
           if (m?.events) {
-            tickEventKey = Object.keys(m.events).find(
-              (k) => k.endsWith(`${SEPARATOR}tick`),
+            tickEventKey = Object.keys(m.events).find((k) =>
+              k.endsWith(`${SEPARATOR}tick`),
             );
             if (tickEventKey) break;
           }
@@ -682,7 +682,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       // Transform data keys from internal format (auth::status) to namespaced format (auth: { status })
       return {
         ...snapshot,
-        data: denormalizeFlatKeys(snapshot.data as Record<string, unknown>) as T,
+        data: denormalizeFlatKeys(
+          snapshot.data as Record<string, unknown>,
+        ) as T,
       };
     },
 
@@ -728,7 +730,9 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           // Transform data keys from internal format to namespaced format
           callback({
             ...snapshot,
-            data: denormalizeFlatKeys(snapshot.data as Record<string, unknown>) as T,
+            data: denormalizeFlatKeys(
+              snapshot.data as Record<string, unknown>,
+            ) as T,
           });
         },
       );
@@ -900,8 +904,13 @@ function bindEnginePassthroughs(
   // Direct engine passthroughs — only bind if not already defined
   // (namespaced systems override these with key-translating versions)
   const overridableMethods = [
-    "dispatch", "read", "subscribe", "watch", "when",
-    "getDistributableSnapshot", "watchDistributableSnapshot",
+    "dispatch",
+    "read",
+    "subscribe",
+    "watch",
+    "when",
+    "getDistributableSnapshot",
+    "watchDistributableSnapshot",
   ] as const;
   for (const method of overridableMethods) {
     if (!(method in system)) {

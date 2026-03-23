@@ -11,7 +11,10 @@ const schema = { count: t.number(), name: t.string() };
 
 function setup(
   // biome-ignore lint/suspicious/noExplicitAny: Test helper — effect run signatures vary
-  definitions: Record<string, { run: (...args: any[]) => any; deps?: string[] }> = {},
+  definitions: Record<
+    string,
+    { run: (...args: any[]) => any; deps?: string[] }
+  > = {},
   callbacks: {
     onRun?: (id: string, deps: string[]) => void;
     onError?: (id: string, error: unknown) => void;
@@ -22,7 +25,9 @@ function setup(
   facts.name = "alice";
 
   const manager = createEffectsManager({
-    definitions: definitions as Parameters<typeof createEffectsManager>[0]["definitions"],
+    definitions: definitions as Parameters<
+      typeof createEffectsManager
+    >[0]["definitions"],
     facts: facts as never,
     store: store as never,
     ...callbacks,
@@ -323,7 +328,9 @@ describe("effects", () => {
 
   describe("error isolation", () => {
     it("throwing effect does not propagate the error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const { manager } = setup({
         bad: {
           deps: ["count"],
@@ -333,13 +340,17 @@ describe("effects", () => {
         },
       });
 
-      await expect(manager.runEffects(new Set(["count"]))).resolves.toBeUndefined();
+      await expect(
+        manager.runEffects(new Set(["count"])),
+      ).resolves.toBeUndefined();
 
       consoleSpy.mockRestore();
     });
 
     it("throwing effect does not prevent other effects from running", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const goodRun = vi.fn();
       const { manager } = setup({
         bad: {
@@ -358,7 +369,9 @@ describe("effects", () => {
     });
 
     it("throwing cleanup does not propagate the error", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const { manager } = setup({
         bad: {
           deps: ["count"],
@@ -371,7 +384,9 @@ describe("effects", () => {
       await manager.runEffects(new Set(["count"]));
 
       // Trigger cleanup by running again
-      await expect(manager.runEffects(new Set(["count"]))).resolves.toBeUndefined();
+      await expect(
+        manager.runEffects(new Set(["count"])),
+      ).resolves.toBeUndefined();
 
       consoleSpy.mockRestore();
     });
@@ -397,10 +412,7 @@ describe("effects", () => {
 
     it("passes empty array for auto-tracked effects with no deps yet", async () => {
       const onRun = vi.fn();
-      const { manager } = setup(
-        { log: { run: () => {} } },
-        { onRun },
-      );
+      const { manager } = setup({ log: { run: () => {} } }, { onRun });
 
       await manager.runEffects(new Set(["count"]));
 
@@ -414,7 +426,9 @@ describe("effects", () => {
 
   describe("onError callback", () => {
     it("fires when an effect throws", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const onError = vi.fn();
       const err = new Error("test error");
       const { manager } = setup(
@@ -437,7 +451,9 @@ describe("effects", () => {
     });
 
     it("fires when a cleanup function throws", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const onError = vi.fn();
       const err = new Error("cleanup error");
       const { manager } = setup(
@@ -499,9 +515,11 @@ describe("effects", () => {
 
     it("prev reflects state at the time of last runEffects call", async () => {
       const prevValues: Array<Record<string, unknown> | null> = [];
-      const runFn = vi.fn((_facts: unknown, prev: Record<string, unknown> | null) => {
-        prevValues.push(prev ? { ...prev } : null);
-      });
+      const runFn = vi.fn(
+        (_facts: unknown, prev: Record<string, unknown> | null) => {
+          prevValues.push(prev ? { ...prev } : null);
+        },
+      );
       const { facts, manager } = setup({
         log: { deps: ["count"], run: runFn },
       });
@@ -562,7 +580,10 @@ describe("effects", () => {
         log: { deps: ["count"], run: oldRun },
       });
 
-      manager.assignDefinition("log", { deps: ["count"], run: newRun } as never);
+      manager.assignDefinition("log", {
+        deps: ["count"],
+        run: newRun,
+      } as never);
 
       await manager.runEffects(new Set(["count"]));
 
@@ -580,7 +601,10 @@ describe("effects", () => {
       await manager.runEffects(new Set(["count"]));
       expect(oldCleanup).not.toHaveBeenCalled();
 
-      manager.assignDefinition("log", { deps: ["count"], run: () => {} } as never);
+      manager.assignDefinition("log", {
+        deps: ["count"],
+        run: () => {},
+      } as never);
 
       expect(oldCleanup).toHaveBeenCalledTimes(1);
     });
@@ -589,7 +613,10 @@ describe("effects", () => {
       const { manager } = setup({});
 
       expect(() =>
-        manager.assignDefinition("nonexistent", { deps: ["count"], run: () => {} } as never),
+        manager.assignDefinition("nonexistent", {
+          deps: ["count"],
+          run: () => {},
+        } as never),
       ).toThrow(/does not exist/);
     });
   });
@@ -654,7 +681,9 @@ describe("effects", () => {
     it("throws for a non-existent effect", async () => {
       const { manager } = setup({});
 
-      await expect(manager.callOne("nonexistent")).rejects.toThrow(/does not exist/);
+      await expect(manager.callOne("nonexistent")).rejects.toThrow(
+        /does not exist/,
+      );
     });
 
     it("runs cleanup before re-executing", async () => {
@@ -755,7 +784,9 @@ describe("effects", () => {
     });
 
     it("cleanup errors after stop are caught and reported", async () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const onError = vi.fn();
       const err = new Error("post-stop cleanup error");
       let resolveEffect: () => void;

@@ -77,7 +77,9 @@ describe("basic evaluation", () => {
 
     expect(reqs.length).toBe(1);
     expect(reqs[0]!.requirement.type).toBe("ACTIVATE_USER");
-    expect((reqs[0]!.requirement as Record<string, unknown>).role).toBe("admin");
+    expect((reqs[0]!.requirement as Record<string, unknown>).role).toBe(
+      "admin",
+    );
   });
 
   it("evaluate with changedKeys only re-evaluates dirty constraints", async () => {
@@ -662,10 +664,7 @@ describe("normalize requirements", () => {
       definitions: {
         multi: {
           when: () => true,
-          require: [
-            { type: "FIRST" },
-            { type: "SECOND" },
-          ],
+          require: [{ type: "FIRST" }, { type: "SECOND" }],
         },
       },
       facts,

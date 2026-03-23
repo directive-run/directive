@@ -507,11 +507,19 @@ function wrapWithNestedWarning(
         return undefined;
       }
       const value = Reflect.get(target, prop);
-      if (typeof prop === "symbol" || typeof value !== "object" || value === null) {
+      if (
+        typeof prop === "symbol" ||
+        typeof value !== "object" ||
+        value === null
+      ) {
         return value;
       }
 
-      return wrapWithNestedWarning(value as object, rootKey, `${path}.${String(prop)}`);
+      return wrapWithNestedWarning(
+        value as object,
+        rootKey,
+        `${path}.${String(prop)}`,
+      );
     },
     set(target, prop, newValue) {
       if (typeof prop !== "symbol") {

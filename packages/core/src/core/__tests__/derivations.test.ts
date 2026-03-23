@@ -8,7 +8,10 @@ import { t } from "../../index.js";
 // ============================================================================
 
 function setup(
-  defs: Record<string, (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown> = {},
+  defs: Record<
+    string,
+    (facts: Record<string, unknown>, derive: Record<string, unknown>) => unknown
+  > = {},
 ) {
   const schema = { count: t.number(), name: t.string() };
   const { store, facts } = createFacts({ schema });
@@ -39,7 +42,9 @@ describe("derivations", () => {
     });
 
     it("get memoizes (does not recompute on second call)", () => {
-      const computeFn = vi.fn((facts: Record<string, unknown>) => (facts.count as number) * 2);
+      const computeFn = vi.fn(
+        (facts: Record<string, unknown>) => (facts.count as number) * 2,
+      );
       const { manager } = setup({ doubled: computeFn });
 
       manager.get("doubled");
@@ -351,7 +356,9 @@ describe("derivations", () => {
     });
 
     it("callOne force-recomputes", () => {
-      const computeFn = vi.fn((facts: Record<string, unknown>) => (facts.count as number) * 2);
+      const computeFn = vi.fn(
+        (facts: Record<string, unknown>) => (facts.count as number) * 2,
+      );
       const { manager } = setup({ doubled: computeFn });
 
       manager.get("doubled");

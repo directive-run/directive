@@ -599,7 +599,8 @@ describe("resolver matching", () => {
     const { manager } = setup({
       custom: {
         requirement: (req): req is typeof req =>
-          req.type === "TASK" && ((req as Record<string, unknown>).priority as number ?? 0) > 5,
+          req.type === "TASK" &&
+          (((req as Record<string, unknown>).priority as number) ?? 0) > 5,
         resolve: resolveFn,
       },
     });
@@ -633,7 +634,9 @@ describe("resolver matching", () => {
     manager.resolve(makeReq("UNKNOWN_TYPE"));
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No resolver found for requirement type "UNKNOWN_TYPE"'),
+      expect.stringContaining(
+        'No resolver found for requirement type "UNKNOWN_TYPE"',
+      ),
     );
 
     warnSpy.mockRestore();

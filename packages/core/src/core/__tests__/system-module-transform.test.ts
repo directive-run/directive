@@ -170,9 +170,7 @@ describe("prefixModuleDefinition", () => {
 
   describe("schema prefixing", () => {
     it("prefixes all fact keys with namespace::key", () => {
-      const result = prefixModuleDefinition(
-        makeOptions({ namespace: "auth" }),
-      );
+      const result = prefixModuleDefinition(makeOptions({ namespace: "auth" }));
 
       expect(result.schema).toEqual({
         "auth::count": { _type: 0 },
@@ -181,9 +179,7 @@ describe("prefixModuleDefinition", () => {
     });
 
     it("uses the correct namespace", () => {
-      const result = prefixModuleDefinition(
-        makeOptions({ namespace: "data" }),
-      );
+      const result = prefixModuleDefinition(makeOptions({ namespace: "data" }));
 
       expect(Object.keys(result.schema)).toEqual(["data::count", "data::name"]);
     });
@@ -191,7 +187,10 @@ describe("prefixModuleDefinition", () => {
     it("preserves schema values", () => {
       const schema: ModuleSchema = {
         facts: {
-          flag: { _type: false, _validate: (v: unknown) => typeof v === "boolean" },
+          flag: {
+            _type: false,
+            _validate: (v: unknown) => typeof v === "boolean",
+          },
         },
       };
       const result = prefixModuleDefinition(
@@ -213,7 +212,9 @@ describe("prefixModuleDefinition", () => {
         facts.name = "hello";
       });
       const mod = makeModule({ init: initFn });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "app" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "app" }),
+      );
 
       // Simulate calling with a flat facts store
       const flatStore: Record<string, unknown> = {};
@@ -229,7 +230,9 @@ describe("prefixModuleDefinition", () => {
         readValue = facts.count;
       });
       const mod = makeModule({ init: initFn });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ns" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "ns" }),
+      );
 
       const flatStore: Record<string, unknown> = { "ns::count": 99 };
       result.init!(flatStore);
@@ -261,9 +264,14 @@ describe("prefixModuleDefinition", () => {
           label: (facts: any) => `${facts.name}-label`,
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "app" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "app" }),
+      );
 
-      expect(Object.keys(result.derive!)).toEqual(["app::doubled", "app::label"]);
+      expect(Object.keys(result.derive!)).toEqual([
+        "app::doubled",
+        "app::label",
+      ]);
     });
 
     it("derivation functions receive proxied facts", () => {
@@ -274,7 +282,9 @@ describe("prefixModuleDefinition", () => {
           label: () => "x" as any,
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const flatFacts = { "m::count": 5 };
       const flatDerive = {};
@@ -291,7 +301,9 @@ describe("prefixModuleDefinition", () => {
           label: (_facts: any, derived: any) => `${derived.doubled}-label`,
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "z" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "z" }),
+      );
 
       const flatFacts = { "z::count": 3 };
       const flatDerive = { "z::doubled": 6 };
@@ -310,7 +322,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const flatFacts = { "m::count": 7, "other::token": "abc" };
       const flatDerive = {};
@@ -329,7 +343,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const flatFacts = { "m::count": 1, "other::token": "xyz" };
       const value = result.derive!["m::label"]!(flatFacts, {});
@@ -347,24 +363,37 @@ describe("prefixModuleDefinition", () => {
       const mod = makeModule({
         schema: fullSchema,
         events: {
-          increment: (facts: any) => { facts.count += 1; },
-          setName: (facts: any, payload: any) => { facts.name = payload.name; },
+          increment: (facts: any) => {
+            facts.count += 1;
+          },
+          setName: (facts: any, payload: any) => {
+            facts.name = payload.name;
+          },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ev" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "ev" }),
+      );
 
-      expect(Object.keys(result.events!)).toEqual(["ev::increment", "ev::setName"]);
+      expect(Object.keys(result.events!)).toEqual([
+        "ev::increment",
+        "ev::setName",
+      ]);
     });
 
     it("event handlers receive proxied facts for writes", () => {
       const mod = makeModule({
         schema: fullSchema,
         events: {
-          increment: (facts: any) => { facts.count += 1; },
+          increment: (facts: any) => {
+            facts.count += 1;
+          },
           setName: () => {},
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ev" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "ev" }),
+      );
 
       const flatStore: Record<string, unknown> = { "ev::count": 10 };
       result.events!["ev::increment"]!(flatStore, {});
@@ -383,7 +412,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "ev" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "ev" }),
+      );
 
       const payload = { name: "test" };
       result.events!["ev::setName"]!({}, payload);
@@ -407,7 +438,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       expect(Object.keys(result.constraints!)).toEqual(["c::check"]);
     });
@@ -427,7 +460,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
       const flatFacts = { "c::count": 10 };
@@ -447,7 +482,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -462,7 +499,9 @@ describe("prefixModuleDefinition", () => {
           check: { when: () => true, require: staticReq },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -479,7 +518,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
       const flatFacts = { "c::name": "hello" };
@@ -499,7 +540,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -521,7 +564,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::second"] as any;
 
@@ -539,7 +584,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -557,7 +604,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -576,7 +625,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -601,7 +652,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const constraint = result.constraints!["m::check"] as any;
       constraint.when({ "m::count": 1, "other::token": "secret" });
@@ -621,10 +674,15 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const constraint = result.constraints!["m::check"] as any;
-      const req = constraint.require({ "m::count": 1, "other::token": "tok123" });
+      const req = constraint.require({
+        "m::count": 1,
+        "other::token": "tok123",
+      });
 
       expect(req).toEqual({ type: "FETCH", id: "tok123" });
     });
@@ -639,7 +697,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -656,7 +716,9 @@ describe("prefixModuleDefinition", () => {
           },
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "c" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "c" }),
+      );
 
       const constraint = result.constraints!["c::check"] as any;
 
@@ -679,7 +741,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       expect(Object.keys(result.resolvers!)).toEqual(["r::fetch"]);
     });
@@ -694,7 +758,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
 
@@ -713,7 +779,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
 
@@ -732,7 +800,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
 
@@ -817,7 +887,10 @@ describe("prefixModuleDefinition", () => {
       const resolver = result.resolvers!["r::fetch"] as any;
       const req = { type: "FETCH", id: "abc" };
 
-      await resolver.resolve(req, { facts: {}, signal: new AbortController().signal });
+      await resolver.resolve(req, {
+        facts: {},
+        signal: new AbortController().signal,
+      });
 
       expect(receivedReq).toBe(req);
     });
@@ -838,7 +911,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
       const flatFacts: Record<string, unknown> = {
@@ -867,13 +942,18 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
       const flatFacts: Record<string, unknown> = { "r::count": 0 };
 
       await resolver.resolveBatch(
-        [{ type: "FETCH", id: "1" }, { type: "FETCH", id: "2" }],
+        [
+          { type: "FETCH", id: "1" },
+          { type: "FETCH", id: "2" },
+        ],
         { facts: flatFacts, signal: new AbortController().signal },
       );
 
@@ -894,7 +974,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "r" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "r" }),
+      );
 
       const resolver = result.resolvers!["r::fetch"] as any;
       const flatFacts: Record<string, unknown> = { "r::count": 0 };
@@ -921,7 +1003,9 @@ describe("prefixModuleDefinition", () => {
           sync: { run: () => {} },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       expect(Object.keys(result.effects!)).toEqual(["e::log", "e::sync"]);
     });
@@ -937,7 +1021,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       const effect = result.effects!["e::log"] as any;
       effect.run({ "e::count": 42 }, undefined);
@@ -956,7 +1042,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       const effect = result.effects!["e::log"] as any;
       effect.run({ "e::count": 10 }, { "e::count": 5 });
@@ -975,7 +1063,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       const effect = result.effects!["e::log"] as any;
       effect.run({ "e::count": 10 }, undefined);
@@ -992,7 +1082,9 @@ describe("prefixModuleDefinition", () => {
           },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       const effect = result.effects!["e::log"] as any;
 
@@ -1005,7 +1097,9 @@ describe("prefixModuleDefinition", () => {
           log: { run: () => {} },
         },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "e" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "e" }),
+      );
 
       const effect = result.effects!["e::log"] as any;
 
@@ -1025,7 +1119,9 @@ describe("prefixModuleDefinition", () => {
         },
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const effect = result.effects!["m::log"] as any;
       effect.run({ "m::count": 1, "other::token": "xyz" }, undefined);
@@ -1046,7 +1142,9 @@ describe("prefixModuleDefinition", () => {
         },
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       const effect = result.effects!["m::log"] as any;
       effect.run(
@@ -1068,7 +1166,9 @@ describe("prefixModuleDefinition", () => {
         schema: fullSchema,
         history: { snapshotEvents: ["increment", "setName"] },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "h" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "h" }),
+      );
 
       expect(result.history.snapshotEvents).toEqual([
         "h::increment",
@@ -1078,7 +1178,9 @@ describe("prefixModuleDefinition", () => {
 
     it("returns undefined snapshotEvents when module has no history config", () => {
       const mod = makeModule();
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "h" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "h" }),
+      );
 
       expect(result.history.snapshotEvents).toBeUndefined();
     });
@@ -1141,7 +1243,9 @@ describe("prefixModuleDefinition", () => {
           label: () => "x" as any,
         } as any,
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       result.derive!["m::doubled"]!({ "m::count": 8 }, {});
 
@@ -1165,7 +1269,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: { other: otherSchema },
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       result.derive!["m::doubled"]!(
         { "m::count": 4, "other::token": "tok" },
@@ -1190,7 +1296,9 @@ describe("prefixModuleDefinition", () => {
         } as any,
         crossModuleDeps: {},
       });
-      const result = prefixModuleDefinition(makeOptions({ mod, namespace: "m" }));
+      const result = prefixModuleDefinition(
+        makeOptions({ mod, namespace: "m" }),
+      );
 
       result.derive!["m::doubled"]!({ "m::count": 3 }, {});
 
@@ -1215,8 +1323,12 @@ describe("prefixModuleDefinition", () => {
           label: (facts: any) => facts.name,
         } as any,
         events: {
-          increment: (facts: any) => { facts.count += 1; },
-          setName: (facts: any, p: any) => { facts.name = p.name; },
+          increment: (facts: any) => {
+            facts.count += 1;
+          },
+          setName: (facts: any, p: any) => {
+            facts.name = p.name;
+          },
         },
         effects: {
           log: { run: () => {}, deps: ["count"] },
@@ -1255,10 +1367,16 @@ describe("prefixModuleDefinition", () => {
       expect(store["app::count"]).toBe(0);
 
       // Derive
-      expect(Object.keys(result.derive!)).toEqual(["app::doubled", "app::label"]);
+      expect(Object.keys(result.derive!)).toEqual([
+        "app::doubled",
+        "app::label",
+      ]);
 
       // Events
-      expect(Object.keys(result.events!)).toEqual(["app::increment", "app::setName"]);
+      expect(Object.keys(result.events!)).toEqual([
+        "app::increment",
+        "app::setName",
+      ]);
 
       // Effects
       expect(Object.keys(result.effects!)).toEqual(["app::log"]);
@@ -1266,7 +1384,9 @@ describe("prefixModuleDefinition", () => {
 
       // Constraints
       expect(Object.keys(result.constraints!)).toEqual(["app::check"]);
-      expect((result.constraints!["app::check"] as any).deps).toEqual(["app::count"]);
+      expect((result.constraints!["app::check"] as any).deps).toEqual([
+        "app::count",
+      ]);
 
       // Resolvers
       expect(Object.keys(result.resolvers!)).toEqual(["app::fetch"]);
