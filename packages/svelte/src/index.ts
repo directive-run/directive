@@ -745,7 +745,14 @@ interface UseDirectiveConfig {
 export function useDirective<M extends ModuleSchema>(
   moduleDef: ModuleDef<M>,
   config?: UseDirectiveConfig,
-) {
+): {
+  system: SingleModuleSystem<M>;
+  facts: Readable<InferFacts<M>>;
+  derived: Readable<InferDerivations<M>>;
+  events: SingleModuleSystem<M>["events"];
+  dispatch: (event: InferEvents<M>) => void;
+  statusPlugin: StatusPlugin | undefined;
+} {
   const allPlugins = [...(config?.plugins ?? [])];
   let statusPlugin: StatusPlugin | undefined;
 
