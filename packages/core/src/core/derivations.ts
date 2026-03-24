@@ -129,6 +129,68 @@ export function createDerivationsManager<
   // biome-ignore lint/style/useConst: Reassigned later in createDerivedProxy()
   let derivedProxy: DerivedValues<S, D>;
 
+  // ---- Shared dependency-map helpers ----
+
+  /** Remove `id` from the dep-set keyed by `dep`. Deletes empty sets. */
+  function removeDepLink(dep: string, id: string): void {
+    const map = states.has(dep) ? derivedToDerivedDeps : factToDerivedDeps;
+    const depSet = map.get(dep);
+    depSet?.delete(id);
+    if (depSet && depSet.size === 0) {
+      map.delete(dep);
+    }
+  }
+
+  /** Add `id` to the dep-set keyed by `dep`, creating the set if needed. */
+  function addDepLink(dep: string, id: string): void {
+    const map = definitions[dep as keyof D]
+      ? derivedToDerivedDeps
+      : factToDerivedDeps;
+    let depSet = map.get(dep);
+    if (!depSet) {
+      depSet = new Set();
+      map.set(dep, depSet);
+    }
+    depSet.add(id);
+  }
+
+  /** Remove `id` from all dependency maps it participates in */
+  function removeOwnDepLinks(id: string): void {
+    const state = states.get(id);
+    if (!state) {
+      return;
+    }
+    for (const dep of state.dependencies) {
+      removeDepLink(dep, id);
+    }
+  }
+
+  /** Invalidate derivations that depend on `id`, then clean up its entry */
+  function invalidateDependentsOf(id: string): void {
+    const dependents = derivedToDerivedDeps.get(id);
+    if (!dependents) {
+      return;
+    }
+
+    invalidationDepth++;
+    try {
+      for (const dependent of dependents) {
+        invalidateDerivation(dependent);
+      }
+    } finally {
+      invalidationDepth--;
+    }
+    derivedToDerivedDeps.delete(id);
+  }
+
+  /** Remove a derivation from all internal maps */
+  function purgeFromMaps(id: string): void {
+    delete (definitions as Record<string, unknown>)[id];
+    states.delete(id);
+    listeners.delete(id);
+    pendingNotifications.delete(id);
+  }
+
   /** Initialize state for a derivation */
   function initState(id: string): DerivationState<unknown> {
     const def = definitions[id as keyof D];
@@ -198,69 +260,56 @@ export function createDerivationsManager<
     }
   }
 
+  /** Check whether two Sets contain the same elements */
+  function setsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) {
+      return false;
+    }
+    for (const dep of b) {
+      if (!a.has(dep)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /** Update dependency tracking for a derivation */
   function updateDependencies(id: string, newDeps: Set<string>): void {
     const state = getState(id);
     const oldDeps = state.dependencies;
 
-    // Short-circuit: skip full remove/add cycle when deps haven't changed
-    if (oldDeps.size === newDeps.size) {
-      let same = true;
-      for (const dep of newDeps) {
-        if (!oldDeps.has(dep)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) {
-        return;
-      }
+    if (setsEqual(oldDeps, newDeps)) {
+      return;
     }
 
-    // Remove old fact dependencies
     for (const dep of oldDeps) {
-      // Check if it's a fact key or a derived key
-      if (states.has(dep)) {
-        const depSet = derivedToDerivedDeps.get(dep);
-        depSet?.delete(id);
-        // Clean up empty Sets to prevent memory leaks
-        if (depSet && depSet.size === 0) {
-          derivedToDerivedDeps.delete(dep);
-        }
-      } else {
-        const depSet = factToDerivedDeps.get(dep);
-        depSet?.delete(id);
-        // Clean up empty Sets to prevent memory leaks
-        if (depSet && depSet.size === 0) {
-          factToDerivedDeps.delete(dep);
-        }
-      }
+      removeDepLink(dep, id);
     }
-
-    // Add new dependencies
     for (const dep of newDeps) {
-      // Check if it's a derivation or a fact
-      if (definitions[dep as keyof D]) {
-        // It's a derivation-to-derivation dependency
-        if (!derivedToDerivedDeps.has(dep)) {
-          derivedToDerivedDeps.set(dep, new Set());
-        }
-        derivedToDerivedDeps.get(dep)!.add(id);
-      } else {
-        // It's a fact dependency
-        if (!factToDerivedDeps.has(dep)) {
-          factToDerivedDeps.set(dep, new Set());
-        }
-        factToDerivedDeps.get(dep)!.add(id);
-      }
+      addDepLink(dep, id);
     }
 
     state.dependencies = newDeps;
   }
 
+  /** Notify all listeners for the given derivation ids */
+  function notifyListeners(ids: string[]): void {
+    for (const id of ids) {
+      const fns = listeners.get(id);
+      if (fns) {
+        for (const listener of fns) {
+          listener();
+        }
+      }
+    }
+  }
+
   /** Flush deferred notifications after all invalidations complete */
   function flushNotifications(): void {
-    if (invalidationDepth > 0 || isFlushing) return;
+    if (invalidationDepth > 0 || isFlushing) {
+      return;
+    }
 
     isFlushing = true;
     try {
@@ -278,18 +327,21 @@ export function createDerivationsManager<
 
         const ids = [...pendingNotifications];
         pendingNotifications.clear();
-
-        for (const id of ids) {
-          const fns = listeners.get(id);
-          if (fns) {
-            for (const listener of fns) {
-              listener();
-            }
-          }
-        }
+        notifyListeners(ids);
       }
     } finally {
       isFlushing = false;
+    }
+  }
+
+  /** Enqueue transitive dependents of `id` into the work queue */
+  function enqueueDependents(id: string, queue: string[]): void {
+    const dependents = derivedToDerivedDeps.get(id);
+    if (!dependents) {
+      return;
+    }
+    for (const dependent of dependents) {
+      queue.push(dependent);
     }
   }
 
@@ -308,11 +360,15 @@ export function createDerivationsManager<
 
     while (queue.length > 0) {
       const id = queue.pop()!;
-      if (visited.has(id)) continue;
+      if (visited.has(id)) {
+        continue;
+      }
       visited.add(id);
 
       const state = states.get(id);
-      if (!state || state.isStale) continue;
+      if (!state || state.isStale) {
+        continue;
+      }
 
       state.isStale = true;
       onInvalidate?.(id);
@@ -323,13 +379,7 @@ export function createDerivationsManager<
       // recompute derivations → updateDependencies → modify dep Sets).
       pendingNotifications.add(id);
 
-      // Queue transitive dependents
-      const dependents = derivedToDerivedDeps.get(id);
-      if (dependents) {
-        for (const dependent of dependents) {
-          queue.push(dependent);
-        }
-      }
+      enqueueDependents(id, queue);
     }
   }
 
@@ -517,45 +567,9 @@ export function createDerivationsManager<
         return;
       }
 
-      // Clean up dependency maps
-      const state = states.get(id);
-      if (state) {
-        for (const dep of state.dependencies) {
-          if (states.has(dep)) {
-            const depSet = derivedToDerivedDeps.get(dep);
-            depSet?.delete(id);
-            if (depSet && depSet.size === 0) {
-              derivedToDerivedDeps.delete(dep);
-            }
-          } else {
-            const depSet = factToDerivedDeps.get(dep);
-            depSet?.delete(id);
-            if (depSet && depSet.size === 0) {
-              factToDerivedDeps.delete(dep);
-            }
-          }
-        }
-      }
-
-      // Invalidate dependents (derivations that depend on this one)
-      const dependents = derivedToDerivedDeps.get(id);
-      if (dependents) {
-        invalidationDepth++;
-        try {
-          for (const dependent of dependents) {
-            invalidateDerivation(dependent);
-          }
-        } finally {
-          invalidationDepth--;
-        }
-        derivedToDerivedDeps.delete(id);
-      }
-
-      // Remove from all maps
-      delete (definitions as Record<string, unknown>)[id];
-      states.delete(id);
-      listeners.delete(id);
-      pendingNotifications.delete(id);
+      removeOwnDepLinks(id);
+      invalidateDependentsOf(id);
+      purgeFromMaps(id);
 
       flushNotifications();
     },
