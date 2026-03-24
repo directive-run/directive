@@ -343,6 +343,26 @@ export function createTraceManager<S extends Schema>(
     }
   }
 
+  /** Push a trace entry to the ring buffer with FIFO eviction */
+  function pushTraceEntry(entry: TraceEntry): void {
+    traceEntries.push(entry);
+    traceById.set(entry.id, entry);
+    if (traceEntries.length > maxRuns) {
+      evictOldestTrace();
+    }
+    currentCacheVersion++;
+  }
+
+  /** Check if a trace entry has any recorded activity */
+  function hasTraceActivity(entry: TraceEntry): boolean {
+    return (
+      entry.factChanges.length > 0 ||
+      entry.constraintsHit.length > 0 ||
+      entry.requirementsAdded.length > 0 ||
+      entry.effectsRun.length > 0
+    );
+  }
+
   const manager: TraceManager = {
     enabled: true,
 
@@ -443,41 +463,27 @@ export function createTraceManager<S extends Schema>(
 
       currentTrace.duration = performance.now() - reconcileStartMs;
 
-      // Skip empty runs
-      const hasActivity =
-        currentTrace.factChanges.length > 0 ||
-        currentTrace.constraintsHit.length > 0 ||
-        currentTrace.requirementsAdded.length > 0 ||
-        currentTrace.effectsRun.length > 0;
-
-      if (hasActivity) {
-        const inflightCount = currentTrace.resolversStarted.length;
-        if (inflightCount === 0) {
-          // No resolvers — finalize immediately
-          currentTrace.status = "settled";
-          currentTrace.causalChain = buildCausalChain(currentTrace);
-          updateTraceStats(currentTrace);
-          traceEntries.push(currentTrace);
-          traceById.set(currentTrace.id, currentTrace);
-          if (traceEntries.length > maxRuns) {
-            evictOldestTrace();
-          }
-          currentCacheVersion++;
-          pluginManager.emitTraceComplete(currentTrace);
-        } else {
-          // Has resolvers — stays pending until they settle
-          currentTrace.status = "pending";
-          traceEntries.push(currentTrace);
-          traceById.set(currentTrace.id, currentTrace);
-          if (traceEntries.length > maxRuns) {
-            evictOldestTrace();
-          }
-          currentCacheVersion++;
-          traceInflightCount.set(currentTrace.id, inflightCount);
-        }
-      } else {
+      if (!hasTraceActivity(currentTrace)) {
         // Empty trace entry — clean up start time
         traceStartMs.delete(currentTrace.id);
+        currentTrace = null;
+
+        return;
+      }
+
+      const inflightCount = currentTrace.resolversStarted.length;
+      if (inflightCount === 0) {
+        // No resolvers — finalize immediately
+        currentTrace.status = "settled";
+        currentTrace.causalChain = buildCausalChain(currentTrace);
+        updateTraceStats(currentTrace);
+        pushTraceEntry(currentTrace);
+        pluginManager.emitTraceComplete(currentTrace);
+      } else {
+        // Has resolvers — stays pending until they settle
+        currentTrace.status = "pending";
+        pushTraceEntry(currentTrace);
+        traceInflightCount.set(currentTrace.id, inflightCount);
       }
 
       currentTrace = null;
