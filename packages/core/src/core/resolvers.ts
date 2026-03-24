@@ -214,7 +214,11 @@ const DEFAULT_BATCH: BatchConfig = {
 };
 
 /**
- * Calculate delay for a retry attempt.
+ * Calculate delay for a retry attempt based on backoff policy.
+ *
+ * @param policy - Retry policy with backoff strategy and delay bounds
+ * @param attempt - Current attempt number (1-based)
+ * @returns Delay in milliseconds, clamped to maxDelay
  */
 function calculateDelay(policy: RetryPolicy, attempt: number): number {
   const { backoff, initialDelay = 100, maxDelay = 30000 } = policy;
@@ -287,7 +291,11 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
  *
  * @internal
  */
-/** Validate resolver definitions in dev mode */
+/**
+ * Validate resolver definitions in dev mode.
+ * Ensures each resolver has resolve() or resolveBatch(), and warns
+ * when batch.enabled is set without a batch handler.
+ */
 function validateDefinitions<S extends Schema>(
   definitions: ResolversDef<S>,
 ): void {
