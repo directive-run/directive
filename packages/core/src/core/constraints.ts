@@ -253,6 +253,17 @@ export function createConstraintsManager<S extends Schema>(
   // Cached topological index map for O(1) lookups during sorting
   let topologicalIndex: Map<string, number> = new Map();
 
+  /** Register a single `after` dependency in the reverse map */
+  function addReverseDep(depId: string, dependentId: string): void {
+    if (!definitions[depId]) {
+      return;
+    }
+    if (!dependsOnMe.has(depId)) {
+      dependsOnMe.set(depId, new Set());
+    }
+    dependsOnMe.get(depId)!.add(dependentId);
+  }
+
   /**
    * Build reverse dependency map for O(1) lookups in markResolved.
    * Maps each constraint ID to the set of constraints that depend on it via `after`.
@@ -264,65 +275,66 @@ export function createConstraintsManager<S extends Schema>(
         continue;
       }
       for (const depId of def.after) {
-        if (!definitions[depId]) {
-          continue;
-        }
-        if (!dependsOnMe.has(depId)) {
-          dependsOnMe.set(depId, new Set());
-        }
-        dependsOnMe.get(depId)!.add(id);
+        addReverseDep(depId, id);
       }
     }
   }
 
   /**
+   * DFS visitor for cycle detection and topological ordering.
+   * Throws on back edges (cycles). Appends to `postOrder` in post-order.
+   */
+  function topoVisit(
+    id: string,
+    path: string[],
+    visited: Set<string>,
+    visiting: Set<string>,
+    postOrder: string[],
+  ): void {
+    if (visited.has(id)) {
+      return;
+    }
+
+    if (visiting.has(id)) {
+      const cycleStart = path.indexOf(id);
+      const cycle = [...path.slice(cycleStart), id].join(" \u2192 ");
+      throw new Error(
+        `[Directive] Constraint cycle detected: ${cycle}. Remove one of the \`after\` dependencies to break the cycle.`,
+      );
+    }
+
+    visiting.add(id);
+    path.push(id);
+
+    const def = definitions[id];
+    if (def?.after) {
+      for (const depId of def.after) {
+        if (definitions[depId]) {
+          topoVisit(depId, path, visited, visiting, postOrder);
+        }
+      }
+    }
+
+    path.pop();
+    visiting.delete(id);
+    visited.add(id);
+    postOrder.push(id);
+  }
+
+  /**
    * Detect cycles in the constraint dependency graph and compute topological order.
    * Uses DFS to find back edges and post-order for topological sort.
-   *
-   * The DFS visits dependencies first (via `after`), so post-order naturally gives us
-   * topological order where dependencies appear before their dependents.
    */
   function detectCyclesAndComputeTopoOrder(): void {
     const visited = new Set<string>();
     const visiting = new Set<string>();
     const postOrder: string[] = [];
 
-    function visit(id: string, path: string[]): void {
-      if (visited.has(id)) return;
-
-      if (visiting.has(id)) {
-        const cycleStart = path.indexOf(id);
-        const cycle = [...path.slice(cycleStart), id].join(" → ");
-        throw new Error(
-          `[Directive] Constraint cycle detected: ${cycle}. Remove one of the \`after\` dependencies to break the cycle.`,
-        );
-      }
-
-      visiting.add(id);
-      path.push(id);
-
-      const def = definitions[id];
-      if (def?.after) {
-        for (const depId of def.after) {
-          // Only check deps that exist in this manager
-          if (definitions[depId]) {
-            visit(depId, path);
-          }
-        }
-      }
-
-      path.pop();
-      visiting.delete(id);
-      visited.add(id);
-      postOrder.push(id);
-    }
-
     for (const id of Object.keys(definitions)) {
-      visit(id, []);
+      topoVisit(id, [], visited, visiting, postOrder);
     }
 
     // Post-order with dependency-first traversal gives us topological order
-    // (dependencies are added before dependents)
     topologicalOrder = postOrder;
 
     // Build index map for O(1) lookups during sorting
@@ -338,19 +350,25 @@ export function createConstraintsManager<S extends Schema>(
   // Build reverse dependency map for O(1) markResolved lookups
   buildReverseDependencyMap();
 
-  // Validate `after` references in dev mode (catch typos early)
-  if (process.env.NODE_ENV !== "production") {
+  /** Warn about `after` references to non-existent constraints */
+  function warnUnknownAfterRefs(): void {
     for (const [id, def] of Object.entries(definitions)) {
-      if (def.after) {
-        for (const depId of def.after) {
-          if (!definitions[depId]) {
-            console.warn(
-              `[Directive] Constraint "${id}" references unknown constraint "${depId}" in \`after\`. This dependency will be ignored. Check for typos or ensure the constraint exists.`,
-            );
-          }
+      if (!def.after) {
+        continue;
+      }
+      for (const depId of def.after) {
+        if (!definitions[depId]) {
+          console.warn(
+            `[Directive] Constraint "${id}" references unknown constraint "${depId}" in \`after\`. This dependency will be ignored. Check for typos or ensure the constraint exists.`,
+          );
         }
       }
     }
+  }
+
+  // Validate `after` references in dev mode (catch typos early)
+  if (process.env.NODE_ENV !== "production") {
+    warnUnknownAfterRefs();
   }
 
   /**
@@ -411,41 +429,71 @@ export function createConstraintsManager<S extends Schema>(
     return states.get(id) ?? initState(id);
   }
 
-  /** Update dependency tracking for a constraint */
-  function updateDependencies(id: string, newDeps: Set<string>): void {
-    const oldDeps = constraintDeps.get(id) ?? new Set();
-
-    // Short-circuit: skip full remove/add cycle when deps haven't changed
-    if (oldDeps.size === newDeps.size && oldDeps.size > 0) {
-      let same = true;
-      for (const dep of newDeps) {
-        if (!oldDeps.has(dep)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) {
-        return;
+  /** Check if two dependency sets are equal (returns false for empty sets) */
+  function depsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size || a.size === 0) {
+      return false;
+    }
+    for (const dep of b) {
+      if (!a.has(dep)) {
+        return false;
       }
     }
 
-    // Remove old dependencies
-    for (const dep of oldDeps) {
+    return true;
+  }
+
+  /** Remove a constraint from the reverse fact-to-constraint map */
+  function removeFromFactMap(id: string, deps: Set<string>): void {
+    for (const dep of deps) {
       const constraints = factToConstraints.get(dep);
-      constraints?.delete(id);
-      if (constraints && constraints.size === 0) {
+      if (!constraints) {
+        continue;
+      }
+      constraints.delete(id);
+      if (constraints.size === 0) {
         factToConstraints.delete(dep);
       }
     }
+  }
 
-    // Add new dependencies
-    for (const dep of newDeps) {
+  /** Add a constraint to the reverse fact-to-constraint map */
+  function addToFactMap(id: string, deps: Set<string>): void {
+    for (const dep of deps) {
       if (!factToConstraints.has(dep)) {
         factToConstraints.set(dep, new Set());
       }
       factToConstraints.get(dep)!.add(id);
     }
+  }
 
+  /** Remove a constraint from all dependency maps */
+  function clearConstraintDeps(id: string): void {
+    const deps = constraintDeps.get(id);
+    if (deps) {
+      removeFromFactMap(id, deps);
+      constraintDeps.delete(id);
+    }
+  }
+
+  /** Remove a constraint from the reverse dependency map (dependsOnMe) */
+  function clearReverseDeps(id: string): void {
+    dependsOnMe.delete(id);
+    for (const depSet of dependsOnMe.values()) {
+      depSet.delete(id);
+    }
+  }
+
+  /** Update dependency tracking for a constraint */
+  function updateDependencies(id: string, newDeps: Set<string>): void {
+    const oldDeps = constraintDeps.get(id) ?? new Set();
+
+    if (depsEqual(oldDeps, newDeps)) {
+      return;
+    }
+
+    removeFromFactMap(id, oldDeps);
+    addToFactMap(id, newDeps);
     constraintDeps.set(id, newDeps);
   }
 
@@ -666,17 +714,15 @@ export function createConstraintsManager<S extends Schema>(
 
   /** Merge additional dependencies into existing constraint deps */
   function mergeDependencies(id: string, additionalDeps: Set<string>): void {
-    if (additionalDeps.size === 0) return;
+    if (additionalDeps.size === 0) {
+      return;
+    }
 
     const existingDeps = constraintDeps.get(id) ?? new Set();
     for (const dep of additionalDeps) {
       existingDeps.add(dep);
-      // Update reverse mapping
-      if (!factToConstraints.has(dep)) {
-        factToConstraints.set(dep, new Set());
-      }
-      factToConstraints.get(dep)!.add(id);
     }
+    addToFactMap(id, additionalDeps);
     constraintDeps.set(id, existingDeps);
   }
 
@@ -717,9 +763,9 @@ export function createConstraintsManager<S extends Schema>(
     initState(id);
   }
 
-  // Dev-mode: warn about async constraints without explicit deps
-  if (process.env.NODE_ENV !== "production") {
-    for (const [id, def] of Object.entries(definitions)) {
+  /** Warn about async constraints without explicit deps (dev mode only) */
+  function warnAsyncWithoutDeps(defs: ConstraintsDef<S>): void {
+    for (const [id, def] of Object.entries(defs)) {
       if (def.async && !def.deps) {
         console.warn(
           `[Directive] Async constraint "${id}" has no \`deps\` declared. Auto-tracking cannot work across async boundaries. Add \`deps: ["key1", "key2"]\` to enable dependency tracking.`,
@@ -728,13 +774,33 @@ export function createConstraintsManager<S extends Schema>(
     }
   }
 
+  // Dev-mode: warn about async constraints without explicit deps
+  if (process.env.NODE_ENV !== "production") {
+    warnAsyncWithoutDeps(definitions);
+  }
+
+  /**
+   * Check if a single `after` dependency is satisfied (resolved, no-fire, disabled, or external).
+   */
+  function isAfterDepSatisfied(depId: string): boolean {
+    // External deps (cross-module) are handled externally
+    if (!definitions[depId]) {
+      return true;
+    }
+    // Disabled deps can't fire
+    if (disabled.has(depId)) {
+      return true;
+    }
+    // Deps that didn't fire (when returned false) don't block
+    if (noFireConstraints.has(depId)) {
+      return true;
+    }
+
+    return resolvedConstraints.has(depId);
+  }
+
   /**
    * Check if a constraint's `after` dependencies are satisfied.
-   * A dependency is satisfied if:
-   * - It has been resolved (resolver completed successfully)
-   * - It didn't fire (when() returned false) - nothing to wait for
-   * - It is disabled - can't fire
-   * - It doesn't exist in this manager (cross-module, handled externally)
    */
   function areAfterDependenciesSatisfied(id: string): boolean {
     const state = states.get(id);
@@ -743,22 +809,277 @@ export function createConstraintsManager<S extends Schema>(
     }
 
     for (const depId of state.after) {
-      // Skip deps that don't exist (cross-module, handled externally)
-      if (!definitions[depId]) continue;
-
-      // Skip disabled deps - they can't fire
-      if (disabled.has(depId)) continue;
-
-      // If dep didn't fire (when returned false), no need to wait
-      if (noFireConstraints.has(depId)) continue;
-
-      // If dep hasn't been resolved yet, we're blocked
-      if (!resolvedConstraints.has(depId)) {
+      if (!isAfterDepSatisfied(depId)) {
         return false;
       }
     }
 
     return true;
+  }
+
+  /** Handle an inactive constraint: update deps and mark as no-fire */
+  function handleInactiveConstraint(id: string): void {
+    const whenDeps = latestWhenDeps.get(id);
+    if (whenDeps !== undefined) {
+      updateDependencies(id, whenDeps);
+    }
+    noFireConstraints.add(id);
+    lastRequirements.set(id, []);
+  }
+
+  /** Update constraint deps atomically from when + require deps */
+  function updateConstraintDeps(
+    id: string,
+    whenDeps: Set<string> | undefined,
+    requireDeps: Set<string>,
+  ): void {
+    if (whenDeps !== undefined) {
+      // Combine when() + require() deps atomically to prevent
+      // require deps from being temporarily lost between updates
+      const combinedDeps = new Set(whenDeps);
+      for (const dep of requireDeps) {
+        combinedDeps.add(dep);
+      }
+      updateDependencies(id, combinedDeps);
+    } else {
+      // Async constraint (no when deps tracked) — merge additively
+      mergeDependencies(id, requireDeps);
+    }
+  }
+
+  /** Emit requirements for an active constraint into the requirement set */
+  function emitConstraintRequirements(
+    id: string,
+    reqs: Requirement[],
+    requirements: RequirementSet,
+  ): void {
+    if (reqs.length === 0) {
+      lastRequirements.set(id, []);
+
+      return;
+    }
+    const keyFn = requirementKeys[id];
+    const reqsWithId = reqs.map((req) =>
+      createRequirementWithId(req, id, keyFn),
+    );
+    for (const reqWithId of reqsWithId) {
+      requirements.add(reqWithId);
+    }
+    lastRequirements.set(id, reqsWithId);
+  }
+
+  /** Add cached requirements into the requirement set */
+  function addCachedRequirements(
+    reqs: RequirementWithId[],
+    requirements: RequirementSet,
+  ): void {
+    for (const req of reqs) {
+      requirements.add(req);
+    }
+  }
+
+  /**
+   * Process a constraint result: handle requirements and track no-fire state.
+   * Extracted from evaluate() to reduce nesting-based cognitive complexity.
+   */
+  function processConstraintResult(
+    id: string,
+    active: boolean,
+    requirements: RequirementSet,
+  ): void {
+    if (disabled.has(id)) {
+      return;
+    }
+
+    if (!active) {
+      handleInactiveConstraint(id);
+
+      return;
+    }
+
+    // Remove from no-fire tracking since it fired
+    noFireConstraints.delete(id);
+
+    const whenDeps = latestWhenDeps.get(id);
+    let reqs: Requirement[];
+    let requireDeps: Set<string>;
+    try {
+      const result = getRequirements(id);
+      reqs = result.requirements;
+      requireDeps = result.deps;
+    } catch (error) {
+      onError?.(id, error);
+      handleInactiveConstraint(id);
+
+      return;
+    }
+
+    updateConstraintDeps(id, whenDeps, requireDeps);
+    emitConstraintRequirements(id, reqs, requirements);
+  }
+
+  /** Partition constraint IDs into blocked and ready based on `after` deps */
+  function partitionByReadiness(
+    constraintIds: string[],
+    requirements: RequirementSet,
+  ): { blocked: string[]; ready: string[] } {
+    const blocked: string[] = [];
+    const ready: string[] = [];
+
+    for (const id of constraintIds) {
+      if (areAfterDependenciesSatisfied(id)) {
+        ready.push(id);
+        continue;
+      }
+      blocked.push(id);
+      const lastReqs = lastRequirements.get(id);
+      if (lastReqs) {
+        addCachedRequirements(lastReqs, requirements);
+      }
+    }
+
+    return { blocked, ready };
+  }
+
+  /** Evaluate sync constraints, returning any that turned out to be async at runtime */
+  function evaluateSyncBatch(
+    syncIds: string[],
+    requirements: RequirementSet,
+  ): Array<{ id: string; promise: Promise<boolean> }> {
+    const unexpectedAsync: Array<{ id: string; promise: Promise<boolean> }> =
+      [];
+
+    for (const id of syncIds) {
+      const result = evaluateSync(id);
+
+      if (result instanceof Promise) {
+        unexpectedAsync.push({ id, promise: result });
+        continue;
+      }
+
+      processConstraintResult(id, result, requirements);
+    }
+
+    return unexpectedAsync;
+  }
+
+  /** Await an array of {id, promise} pairs and process each result */
+  async function awaitAndProcess(
+    pairs: Array<{ id: string; promise: Promise<boolean> }>,
+    requirements: RequirementSet,
+  ): Promise<void> {
+    const results = await Promise.all(
+      pairs.map(async ({ id, promise }) => ({
+        id,
+        active: await promise,
+      })),
+    );
+    for (const { id, active } of results) {
+      processConstraintResult(id, active, requirements);
+    }
+  }
+
+  /**
+   * Evaluate constraints, respecting `after` dependencies.
+   * Returns list of constraints that are still blocked after this pass.
+   */
+  async function evaluateConstraintBatch(
+    constraintIds: string[],
+    requirements: RequirementSet,
+  ): Promise<string[]> {
+    const { blocked, ready } = partitionByReadiness(
+      constraintIds,
+      requirements,
+    );
+
+    if (ready.length === 0) {
+      return blocked;
+    }
+
+    // Separate sync and async constraints from ready-to-evaluate
+    const syncConstraints: string[] = [];
+    const asyncConstraints: string[] = [];
+
+    for (const id of ready) {
+      if (getState(id).isAsync) {
+        asyncConstraints.push(id);
+      } else {
+        syncConstraints.push(id);
+      }
+    }
+
+    // Evaluate sync constraints first (some may turn out async at runtime)
+    const unexpectedAsync = evaluateSyncBatch(syncConstraints, requirements);
+
+    // Handle sync constraints that turned out to be async
+    if (unexpectedAsync.length > 0) {
+      await awaitAndProcess(unexpectedAsync, requirements);
+    }
+
+    // Evaluate async constraints in parallel
+    if (asyncConstraints.length > 0) {
+      const asyncPairs = asyncConstraints.map((id) => ({
+        id,
+        promise: evaluateAsync(id),
+      }));
+      await awaitAndProcess(asyncPairs, requirements);
+    }
+
+    return blocked;
+  }
+
+  /** Collect enabled constraint IDs affected by a set of changed fact keys */
+  function collectAffectedByKeys(
+    changedKeys: Set<string>,
+    into: Set<string>,
+  ): void {
+    for (const key of changedKeys) {
+      const deps = factToConstraints.get(key);
+      if (!deps) {
+        continue;
+      }
+      for (const id of deps) {
+        if (!disabled.has(id)) {
+          into.add(id);
+        }
+      }
+    }
+  }
+
+  /** Collect enabled dirty constraints into a set */
+  function collectDirtyConstraints(into: Set<string>): void {
+    for (const id of dirtyConstraints) {
+      if (!disabled.has(id)) {
+        into.add(id);
+      }
+    }
+    dirtyConstraints.clear();
+  }
+
+  /** Compute the set of affected constraint IDs from changed keys + dirty set */
+  function computeAffectedConstraints(changedKeys: Set<string>): Set<string> {
+    const affected = new Set<string>();
+    collectAffectedByKeys(changedKeys, affected);
+    collectDirtyConstraints(affected);
+
+    return affected;
+  }
+
+  /** Carry forward cached requirements for constraints not being re-evaluated */
+  function carryForwardRequirements(
+    allIds: string[],
+    affected: Set<string>,
+    requirements: RequirementSet,
+  ): void {
+    for (const id of allIds) {
+      if (affected.has(id)) {
+        continue;
+      }
+      const lastReqs = lastRequirements.get(id);
+      if (lastReqs) {
+        addCachedRequirements(lastReqs, requirements);
+      }
+    }
   }
 
   const manager: ConstraintsManager<S> = {
@@ -784,192 +1105,9 @@ export function createConstraintsManager<S extends Schema>(
         constraintsToEvaluate = allConstraintIds;
         hasEvaluated = true;
       } else {
-        // Incremental: only evaluate constraints affected by changed keys
-        const affected = new Set<string>();
-        for (const key of changedKeys) {
-          const dependentConstraints = factToConstraints.get(key);
-          if (dependentConstraints) {
-            for (const id of dependentConstraints) {
-              if (!disabled.has(id)) {
-                affected.add(id);
-              }
-            }
-          }
-        }
-        // Also include any dirty constraints
-        for (const id of dirtyConstraints) {
-          if (!disabled.has(id)) {
-            affected.add(id);
-          }
-        }
-        dirtyConstraints.clear();
+        const affected = computeAffectedConstraints(changedKeys);
         constraintsToEvaluate = [...affected];
-
-        // For constraints NOT being re-evaluated, add their last requirements
-        for (const id of allConstraintIds) {
-          if (!affected.has(id)) {
-            const lastReqs = lastRequirements.get(id);
-            if (lastReqs) {
-              for (const req of lastReqs) {
-                requirements.add(req);
-              }
-            }
-          }
-        }
-      }
-
-      /**
-       * Process a constraint result: handle requirements and track no-fire state
-       */
-      function processConstraintResult(id: string, active: boolean): void {
-        if (disabled.has(id)) return;
-
-        const whenDeps = latestWhenDeps.get(id);
-
-        if (!active) {
-          // when() returned false — update with just when deps (no require deps needed)
-          if (whenDeps !== undefined) {
-            updateDependencies(id, whenDeps);
-          }
-          noFireConstraints.add(id);
-          lastRequirements.set(id, []);
-          return;
-        }
-
-        // Remove from no-fire tracking since it fired
-        noFireConstraints.delete(id);
-
-        let reqs: Requirement[];
-        let requireDeps: Set<string>;
-        try {
-          const result = getRequirements(id);
-          reqs = result.requirements;
-          requireDeps = result.deps;
-        } catch (error) {
-          onError?.(id, error);
-          if (whenDeps !== undefined) {
-            updateDependencies(id, whenDeps);
-          }
-          lastRequirements.set(id, []);
-          return;
-        }
-        // Combine when() + require() deps atomically to prevent
-        // require deps from being temporarily lost between updates
-        if (whenDeps !== undefined) {
-          const combinedDeps = new Set(whenDeps);
-          for (const dep of requireDeps) {
-            combinedDeps.add(dep);
-          }
-          updateDependencies(id, combinedDeps);
-        } else {
-          // Async constraint (no when deps tracked) — merge additively
-          mergeDependencies(id, requireDeps);
-        }
-        if (reqs.length > 0) {
-          const keyFn = requirementKeys[id];
-          const reqsWithId = reqs.map((req) =>
-            createRequirementWithId(req, id, keyFn),
-          );
-          for (const reqWithId of reqsWithId) {
-            requirements.add(reqWithId);
-          }
-          lastRequirements.set(id, reqsWithId);
-        } else {
-          lastRequirements.set(id, []);
-        }
-      }
-
-      /**
-       * Evaluate constraints, respecting `after` dependencies.
-       * Returns list of constraints that are still blocked after this pass.
-       */
-      async function evaluateConstraintBatch(
-        constraintIds: string[],
-      ): Promise<string[]> {
-        // Filter out constraints blocked by `after` dependencies
-        const blockedConstraints: string[] = [];
-        const readyToEvaluate: string[] = [];
-
-        for (const id of constraintIds) {
-          if (areAfterDependenciesSatisfied(id)) {
-            readyToEvaluate.push(id);
-          } else {
-            blockedConstraints.push(id);
-            // Keep last requirements for blocked constraints
-            const lastReqs = lastRequirements.get(id);
-            if (lastReqs) {
-              for (const req of lastReqs) {
-                requirements.add(req);
-              }
-            }
-          }
-        }
-
-        if (readyToEvaluate.length === 0) {
-          return blockedConstraints;
-        }
-
-        // Separate sync and async constraints from ready-to-evaluate
-        const syncConstraints: string[] = [];
-        const asyncConstraints: string[] = [];
-
-        for (const id of readyToEvaluate) {
-          const state = getState(id);
-          if (state.isAsync) {
-            asyncConstraints.push(id);
-          } else {
-            syncConstraints.push(id);
-          }
-        }
-
-        // Evaluate sync constraints first (they're fast)
-        // Some may turn out to be async at runtime - collect those for async evaluation
-        const unexpectedAsync: Array<{
-          id: string;
-          promise: Promise<boolean>;
-        }> = [];
-
-        for (const id of syncConstraints) {
-          const result = evaluateSync(id);
-
-          // Handle runtime-detected async constraints
-          if (result instanceof Promise) {
-            unexpectedAsync.push({ id, promise: result });
-            continue;
-          }
-
-          processConstraintResult(id, result);
-        }
-
-        // Handle any sync constraints that turned out to be async
-        if (unexpectedAsync.length > 0) {
-          const asyncResults = await Promise.all(
-            unexpectedAsync.map(async ({ id, promise }) => ({
-              id,
-              active: await promise,
-            })),
-          );
-
-          for (const { id, active } of asyncResults) {
-            processConstraintResult(id, active);
-          }
-        }
-
-        // Evaluate async constraints in parallel
-        if (asyncConstraints.length > 0) {
-          const asyncResults = await Promise.all(
-            asyncConstraints.map(async (id) => ({
-              id,
-              active: await evaluateAsync(id),
-            })),
-          );
-
-          for (const { id, active } of asyncResults) {
-            processConstraintResult(id, active);
-          }
-        }
-
-        return blockedConstraints;
+        carryForwardRequirements(allConstraintIds, affected, requirements);
       }
 
       // Evaluate constraints in passes until no blocked constraints become unblocked
@@ -978,8 +1116,10 @@ export function createConstraintsManager<S extends Schema>(
 
       while (remainingToEvaluate.length > 0 && maxPasses > 0) {
         const previousRemaining = remainingToEvaluate.length;
-        remainingToEvaluate =
-          await evaluateConstraintBatch(remainingToEvaluate);
+        remainingToEvaluate = await evaluateConstraintBatch(
+          remainingToEvaluate,
+          requirements,
+        );
 
         // If no progress was made (all still blocked), break
         if (remainingToEvaluate.length === previousRemaining) {
@@ -1016,21 +1156,8 @@ export function createConstraintsManager<S extends Schema>(
       sortedConstraintIds = null;
       // Mark as dirty so it gets removed from requirements on next evaluate
       lastRequirements.delete(id);
-
       // Clean up dependency maps for disabled constraint
-      const deps = constraintDeps.get(id);
-      if (deps) {
-        for (const dep of deps) {
-          const constraints = factToConstraints.get(dep);
-          if (constraints) {
-            constraints.delete(id);
-            if (constraints.size === 0) {
-              factToConstraints.delete(dep);
-            }
-          }
-        }
-        constraintDeps.delete(id);
-      }
+      clearConstraintDeps(id);
       latestWhenDeps.delete(id);
     },
 
@@ -1141,26 +1268,9 @@ export function createConstraintsManager<S extends Schema>(
       lastRequirements.delete(id);
       latestWhenDeps.delete(id);
 
-      // Clean dependency maps
-      const deps = constraintDeps.get(id);
-      if (deps) {
-        for (const dep of deps) {
-          const constraints = factToConstraints.get(dep);
-          if (constraints) {
-            constraints.delete(id);
-            if (constraints.size === 0) {
-              factToConstraints.delete(dep);
-            }
-          }
-        }
-        constraintDeps.delete(id);
-      }
-
-      // Clean reverse dependency map
-      dependsOnMe.delete(id);
-      for (const depSet of dependsOnMe.values()) {
-        depSet.delete(id);
-      }
+      // Clean dependency and reverse dependency maps
+      clearConstraintDeps(id);
+      clearReverseDeps(id);
 
       // Invalidate cached sort order
       sortedConstraintIds = null;
