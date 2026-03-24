@@ -55,6 +55,7 @@ export function normalizeError(error: unknown): Error {
 export function stableStringify(value: unknown, maxDepth = 50): string {
   const seen = new WeakSet();
 
+  /** Stringify a primitive value (null, undefined, string, number, boolean, function, symbol). */
   function stringifyPrimitive(val: unknown): string | undefined {
     if (val === null) return "null";
     if (val === undefined) return "undefined";
@@ -68,6 +69,7 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
     return undefined;
   }
 
+  /** Guard against circular references using a seen-set, then delegate to fn. */
   function withCircularGuard(
     obj: object,
     fn: () => string,
@@ -82,12 +84,14 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
     return result;
   }
 
+  /** Stringify an array with circular reference protection. */
   function stringifyArray(val: unknown[], depth: number): string {
     return withCircularGuard(val, () =>
       `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`,
     );
   }
 
+  /** Stringify an object with sorted keys and circular reference protection. */
   function stringifyObject(obj: Record<string, unknown>, depth: number): string {
     return withCircularGuard(obj, () => {
       const keys = Object.keys(obj).sort();
@@ -99,6 +103,7 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
     });
   }
 
+  /** Recursively stringify a value with depth limit and circular detection. */
   function stringify(val: unknown, depth: number): string {
     if (depth > maxDepth) {
       return '"[max depth exceeded]"';
@@ -135,6 +140,7 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
   const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
   const seen = new WeakSet();
 
+  /** Guard against circular references using a seen-set, then delegate to fn. */
   function withCircularGuard(
     objVal: object,
     fn: () => boolean,
@@ -147,6 +153,7 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
     return result;
   }
 
+  /** Check array elements for prototype pollution keys. */
   function checkArray(arr: unknown[], depth: number): boolean {
     for (const item of arr) {
       if (!check(item, depth + 1)) {
@@ -157,6 +164,7 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
     return true;
   }
 
+  /** Check object keys and values for prototype pollution. */
   function checkObject(objVal: Record<string, unknown>, depth: number): boolean {
     for (const key of Object.keys(objVal)) {
       if (dangerousKeys.has(key)) {
@@ -170,6 +178,7 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
     return true;
   }
 
+  /** Recursively check a value tree for dangerous prototype keys. */
   function check(val: unknown, depth: number): boolean {
     if (depth > maxDepth) return false; // Fail safe at max depth - don't assume safety
     if (val === null || val === undefined) return true;
@@ -394,6 +403,7 @@ export function diffSnapshots<T = Record<string, unknown>>(
 ): SnapshotDiff {
   const changes: SnapshotDiffEntry[] = [];
 
+  /** Push a change entry to the diff results. */
   function pushChange(
     path: string,
     oldValue: unknown,
@@ -403,6 +413,7 @@ export function diffSnapshots<T = Record<string, unknown>>(
     changes.push({ path, oldValue, newValue, type });
   }
 
+  /** Handle null/undefined comparison cases. Returns true if fully handled. */
   function compareNullish(
     oldObj: unknown,
     newObj: unknown,
@@ -424,6 +435,7 @@ export function diffSnapshots<T = Record<string, unknown>>(
     return false;
   }
 
+  /** Compare two arrays element by element, recursing into each. */
   function compareArrays(
     oldArr: unknown[],
     newArr: unknown[],
@@ -439,6 +451,7 @@ export function diffSnapshots<T = Record<string, unknown>>(
     }
   }
 
+  /** Compare two objects by key union, detecting added/removed/changed. */
   function compareObjects(
     oldRecord: Record<string, unknown>,
     newRecord: Record<string, unknown>,
@@ -461,6 +474,7 @@ export function diffSnapshots<T = Record<string, unknown>>(
     }
   }
 
+  /** Recursively compare two values and record differences. */
   function compare(oldObj: unknown, newObj: unknown, path: string): void {
     if (compareNullish(oldObj, newObj, path)) {
       return;
