@@ -129,6 +129,20 @@ export function createFetchConstraint<
     },
   };
 
+  /** Set the loading flag on facts */
+  function setLoading(facts: Facts<S>, value: boolean): void {
+    if (loadingKey) {
+      setFact(facts, loadingKey, value as FactValue<S, typeof loadingKey>);
+    }
+  }
+
+  /** Set the error value on facts */
+  function setError(facts: Facts<S>, value: unknown): void {
+    if (errorKey) {
+      setFact(facts, errorKey, value as FactValue<S, typeof errorKey>);
+    }
+  }
+
   const resolvers: ResolversDef<S> = {
     [id]: {
       requirement: forType(requirementType),
@@ -142,12 +156,8 @@ export function createFetchConstraint<
         const { facts } = ctx;
 
         // Set loading state
-        if (loadingKey) {
-          setFact(facts, loadingKey, true as FactValue<S, typeof loadingKey>);
-        }
-        if (errorKey) {
-          setFact(facts, errorKey, null);
-        }
+        setLoading(facts, true);
+        setError(facts, null);
 
         try {
           const data = await fetchFn(facts, ctx.signal);
@@ -158,20 +168,12 @@ export function createFetchConstraint<
             transformedData as FactValue<S, typeof dataKey>,
           );
         } catch (error) {
-          if (errorKey) {
-            setFact(facts, errorKey, error as FactValue<S, typeof errorKey>);
-          }
+          setError(facts, error);
           if (onError) {
             onError(error as TError, facts);
           }
         } finally {
-          if (loadingKey) {
-            setFact(
-              facts,
-              loadingKey,
-              false as FactValue<S, typeof loadingKey>,
-            );
-          }
+          setLoading(facts, false);
         }
       },
     },
@@ -1025,6 +1027,33 @@ export function createAgentConstraint<S extends Schema>(
     },
   };
 
+  /** Set loading flag on facts */
+  function setAgentLoading(facts: Facts<S>, value: boolean): void {
+    if (loadingKey) {
+      setFact(facts, loadingKey, value as FactValue<S, typeof loadingKey>);
+    }
+  }
+
+  /** Set error value on facts */
+  function setAgentError(facts: Facts<S>, value: unknown): void {
+    if (errorKey) {
+      setFact(facts, errorKey, value as FactValue<S, typeof errorKey>);
+    }
+  }
+
+  /** Store a failure result for the given tool request */
+  function storeFailureResult(
+    facts: Facts<S>,
+    toolReq: AgentToolRequest,
+  ): void {
+    setFact(facts, resultKey, {
+      requestId: toolReq.requestId,
+      tool: toolReq.tool,
+      output: null,
+      success: false,
+    } as FactValue<S, typeof resultKey>);
+  }
+
   const resolvers: ResolversDef<S> = {
     [id]: {
       requirement: forType(requirementType),
@@ -1036,40 +1065,25 @@ export function createAgentConstraint<S extends Schema>(
         setFact(facts, requestKey, null);
 
         // Set loading state
-        if (loadingKey) {
-          setFact(facts, loadingKey, true as FactValue<S, typeof loadingKey>);
-        }
-        if (errorKey) {
-          setFact(facts, errorKey, null);
-        }
+        setAgentLoading(facts, true);
+        setAgentError(facts, null);
 
         const tool = toolMap.get(toolReq.tool);
         if (!tool) {
-          const error = `Unknown tool: ${toolReq.tool}. Available: ${[...toolMap.keys()].join(", ")}`;
-          if (errorKey) {
-            setFact(facts, errorKey, error as FactValue<S, typeof errorKey>);
-          }
-          setFact(facts, resultKey, {
-            requestId: toolReq.requestId,
-            tool: toolReq.tool,
-            output: null,
-            success: false,
-          } as FactValue<S, typeof resultKey>);
+          setAgentError(
+            facts,
+            `Unknown tool: ${toolReq.tool}. Available: ${[...toolMap.keys()].join(", ")}`,
+          );
+          storeFailureResult(facts, toolReq);
+
           return;
         }
 
         // Validate input
         if (validateInput && !validateInput(toolReq.tool, toolReq.input)) {
-          const error = `Invalid input for tool: ${toolReq.tool}`;
-          if (errorKey) {
-            setFact(facts, errorKey, error as FactValue<S, typeof errorKey>);
-          }
-          setFact(facts, resultKey, {
-            requestId: toolReq.requestId,
-            tool: toolReq.tool,
-            output: null,
-            success: false,
-          } as FactValue<S, typeof resultKey>);
+          setAgentError(facts, `Invalid input for tool: ${toolReq.tool}`);
+          storeFailureResult(facts, toolReq);
+
           return;
         }
 
@@ -1091,29 +1105,13 @@ export function createAgentConstraint<S extends Schema>(
           };
           setFact(facts, resultKey, result as FactValue<S, typeof resultKey>);
         } catch (error) {
-          if (errorKey) {
-            setFact(
-              facts,
-              errorKey,
-              (error instanceof Error
-                ? error.message
-                : String(error)) as FactValue<S, typeof errorKey>,
-            );
-          }
-          setFact(facts, resultKey, {
-            requestId: toolReq.requestId,
-            tool: toolReq.tool,
-            output: null,
-            success: false,
-          } as FactValue<S, typeof resultKey>);
+          setAgentError(
+            facts,
+            error instanceof Error ? error.message : String(error),
+          );
+          storeFailureResult(facts, toolReq);
         } finally {
-          if (loadingKey) {
-            setFact(
-              facts,
-              loadingKey,
-              false as FactValue<S, typeof loadingKey>,
-            );
-          }
+          setAgentLoading(facts, false);
         }
       },
     },
