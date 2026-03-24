@@ -323,6 +323,67 @@ export function createErrorBoundaryManager(
     return DEFAULT_STRATEGIES[source];
   }
 
+  /** Store error in ring buffer and notify error callbacks */
+  function recordAndNotifyError(directiveError: DirectiveError): void {
+    errors.push(directiveError);
+    if (errors.length > maxErrors) {
+      errors.shift();
+    }
+
+    try {
+      onError?.(directiveError);
+    } catch (e) {
+      console.error("[Directive] Error in onError callback:", e);
+    }
+    try {
+      config.onError?.(directiveError);
+    } catch (e) {
+      console.error("[Directive] Error in config.onError callback:", e);
+    }
+  }
+
+  /** Process retry-later strategy: schedule retry or fall back to skip */
+  function processRetryLater(
+    source: ErrorSource,
+    sourceId: string,
+    context: unknown,
+  ): RecoveryStrategy {
+    const attempt = (retryAttempts.get(sourceId) ?? 0) + 1;
+    retryAttempts.set(sourceId, attempt);
+
+    // FIFO eviction to prevent unbounded growth
+    if (retryAttempts.size > MAX_RETRY_SOURCES) {
+      const oldest = retryAttempts.keys().next().value;
+      if (oldest !== undefined) {
+        retryAttempts.delete(oldest);
+      }
+    }
+
+    const scheduled = retryLaterManager.scheduleRetry(
+      source,
+      sourceId,
+      context,
+      attempt,
+    );
+
+    if (scheduled) {
+      return "retry-later";
+    }
+
+    // Max retries exceeded, fall back to skip
+    retryAttempts.delete(sourceId);
+    if (
+      typeof process !== "undefined" &&
+      process.env?.NODE_ENV !== "production"
+    ) {
+      console.warn(
+        `[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
+      );
+    }
+
+    return "skip";
+  }
+
   const manager: ErrorBoundaryManager = {
     handleError(
       source: ErrorSource,
@@ -332,23 +393,7 @@ export function createErrorBoundaryManager(
     ): RecoveryStrategy {
       const directiveError = toDirectiveError(source, sourceId, error, context);
 
-      // Store error
-      errors.push(directiveError);
-      if (errors.length > maxErrors) {
-        errors.shift();
-      }
-
-      // Notify callbacks (wrapped to prevent bypassing recovery)
-      try {
-        onError?.(directiveError);
-      } catch (e) {
-        console.error("[Directive] Error in onError callback:", e);
-      }
-      try {
-        config.onError?.(directiveError);
-      } catch (e) {
-        console.error("[Directive] Error in config.onError callback:", e);
-      }
+      recordAndNotifyError(directiveError);
 
       // Get recovery strategy
       let strategy = getStrategy(
@@ -359,38 +404,7 @@ export function createErrorBoundaryManager(
 
       // Handle retry-later strategy
       if (strategy === "retry-later") {
-        const attempt = (retryAttempts.get(sourceId) ?? 0) + 1;
-        retryAttempts.set(sourceId, attempt);
-
-        // FIFO eviction to prevent unbounded growth
-        if (retryAttempts.size > MAX_RETRY_SOURCES) {
-          const oldest = retryAttempts.keys().next().value;
-          if (oldest !== undefined) {
-            retryAttempts.delete(oldest);
-          }
-        }
-
-        const scheduled = retryLaterManager.scheduleRetry(
-          source,
-          sourceId,
-          context,
-          attempt,
-        );
-
-        if (!scheduled) {
-          // Max retries exceeded, fall back to skip
-          strategy = "skip";
-          retryAttempts.delete(sourceId);
-
-          if (
-            typeof process !== "undefined" &&
-            process.env?.NODE_ENV !== "production"
-          ) {
-            console.warn(
-              `[Directive] ${source} "${sourceId}" exceeded max retry-later attempts. Skipping.`,
-            );
-          }
-        }
+        strategy = processRetryLater(source, sourceId, context);
       }
 
       // Notify recovery callback
