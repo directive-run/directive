@@ -443,7 +443,7 @@ export function mockResolver<R extends Requirement = Requirement>(
     return new Promise<void>((resolve, reject) => {
       pending.push({
         requirement: req as R,
-        resolve: () => resolve(),
+        resolve: (val?: unknown) => resolve(val as void),
         reject,
       });
     });

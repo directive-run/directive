@@ -376,15 +376,15 @@ export function createHistoryManager<S extends Schema>(
 
         // Validate import data structure to prevent prototype pollution
         if (typeof data !== "object" || data === null) {
-          throw new Error("Invalid history data: expected object");
+          throw new Error("[Directive] Invalid history data: expected object");
         }
         if (data.version !== 1) {
           throw new Error(
-            `Unsupported history export version: ${data.version}`,
+            `[Directive] Unsupported history export version: ${data.version}`,
           );
         }
         if (!Array.isArray(data.snapshots)) {
-          throw new Error("Invalid history data: snapshots must be an array");
+          throw new Error("[Directive] Invalid history data: snapshots must be an array");
         }
         if (typeof data.currentIndex !== "number") {
           throw new Error(
@@ -395,7 +395,7 @@ export function createHistoryManager<S extends Schema>(
         // Validate each snapshot has required properties
         for (const snap of data.snapshots) {
           if (typeof snap !== "object" || snap === null) {
-            throw new Error("Invalid snapshot: expected object");
+            throw new Error("[Directive] Invalid snapshot: expected object");
           }
           if (
             typeof snap.id !== "number" ||
@@ -408,7 +408,7 @@ export function createHistoryManager<S extends Schema>(
           // Deep check for prototype pollution attacks (including nested objects)
           if (!isPrototypeSafe(snap.facts)) {
             throw new Error(
-              "Invalid fact data: potential prototype pollution detected in nested objects",
+              "[Directive] Invalid fact data: potential prototype pollution detected in nested objects",
             );
           }
         }
