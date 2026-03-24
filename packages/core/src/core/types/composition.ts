@@ -225,12 +225,11 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
    */
   zeroConfig?: boolean;
   /**
-   * Enable Plus features: dynamic definitions (register, assign, unregister,
-   * getOriginal, restoreOriginal) and HMAC snapshot signing.
+   * Connect to Directive Cloud for remote traces, dashboards, and team collaboration.
    *
    * @see https://directive.run/pricing
    */
-  plus?: boolean | string;
+  cloud?: boolean | string;
   /**
    * Initial facts to set after module init (namespaced format).
    * Applied after all module `init()` functions but before reconciliation.
@@ -620,12 +619,11 @@ export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
   /** Enable zero-config mode with sensible defaults */
   zeroConfig?: boolean;
   /**
-   * Enable Plus features: dynamic definitions (register, assign, unregister,
-   * getOriginal, restoreOriginal) and HMAC snapshot signing.
+   * Connect to Directive Cloud for remote traces, dashboards, and team collaboration.
    *
    * @see https://directive.run/pricing
    */
-  plus?: boolean | string;
+  cloud?: boolean | string;
   /**
    * Initial facts to set after module init.
    * Applied after module `init()` but before reconciliation.

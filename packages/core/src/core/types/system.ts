@@ -741,13 +741,11 @@ export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
   onAfterModuleInit?: () => void;
   tickMs?: number;
   /**
-   * Enable Plus features: dynamic definitions (register, assign, unregister,
-   * getOriginal, restoreOriginal) and HMAC snapshot signing.
+   * Connect to Directive Cloud for remote traces, dashboards, and team collaboration.
    *
-   * Pass `true` to enable, or a license key string for validated access.
-   * Without this flag, Plus methods throw a descriptive error.
+   * Pass a license key string to authenticate with Directive Cloud.
    *
    * @see https://directive.run/pricing
    */
-  plus?: boolean | string;
+  cloud?: boolean | string;
 }
