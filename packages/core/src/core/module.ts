@@ -133,6 +133,138 @@ export interface ModuleConfigWithDeps<
   };
 }
 
+// ============================================================================
+// Module Validation Helpers (dev-mode only)
+// ============================================================================
+
+/** Validate module ID follows naming conventions */
+function validateModuleId(id: string): void {
+  if (!id || typeof id !== "string") {
+    console.warn("[Directive] Module ID must be a non-empty string");
+
+    return;
+  }
+  if (!/^(__[a-z][a-z0-9_-]*|[a-z][a-z0-9-]*)$/i.test(id)) {
+    console.warn(
+      `[Directive] Module ID "${id}" should follow kebab-case convention (e.g., "my-module")`,
+    );
+  }
+}
+
+/** Warn when keys in `implKeys` are missing from `schemaKeys` and vice versa */
+function validateKeyAlignment(
+  implKeys: Set<string>,
+  schemaKeys: Set<string>,
+  implLabel: string,
+  schemaLabel: string,
+  missingImplMessage: string,
+): void {
+  for (const key of implKeys) {
+    if (!schemaKeys.has(key)) {
+      console.warn(
+        `[Directive] ${implLabel} "${key}" not declared in ${schemaLabel}`,
+      );
+    }
+  }
+  for (const key of schemaKeys) {
+    if (!implKeys.has(key)) {
+      console.warn(
+        `[Directive] ${schemaLabel}["${key}"] ${missingImplMessage}`,
+      );
+    }
+  }
+}
+
+/** Validate history.snapshotEvents reference valid event names */
+function validateSnapshotEvents(
+  snapshotEvents: string[],
+  schemaEvents: Record<string, unknown>,
+): void {
+  if (snapshotEvents.length === 0) {
+    console.warn(
+      "[Directive] history.snapshotEvents is an empty array — no events will create history snapshots. " +
+        "Omit history.snapshotEvents entirely to snapshot all events, or list specific events.",
+    );
+  }
+  const schemaEventKeys = new Set(Object.keys(schemaEvents));
+  for (const eventName of snapshotEvents) {
+    if (!schemaEventKeys.has(eventName)) {
+      console.warn(
+        `[Directive] history.snapshotEvents entry "${eventName}" not declared in schema.events. ` +
+          `Available events: ${[...schemaEventKeys].join(", ") || "(none)"}`,
+      );
+    }
+  }
+}
+
+/** Validate resolvers reference valid requirement types */
+function validateResolverRequirements(
+  resolvers: Record<string, unknown>,
+  requirements: Record<string, unknown>,
+): void {
+  const requirementTypes = new Set(Object.keys(requirements));
+  for (const [resolverName, resolver] of Object.entries(resolvers)) {
+    const resolverDef = resolver as { requirement?: string };
+    if (
+      typeof resolverDef.requirement === "string" &&
+      !requirementTypes.has(resolverDef.requirement)
+    ) {
+      console.warn(
+        `[Directive] Resolver "${resolverName}" references unknown requirement type "${resolverDef.requirement}". ` +
+          `Available types: ${[...requirementTypes].join(", ") || "(none)"}`,
+      );
+    }
+  }
+}
+
+/** Run all dev-mode validations for a module config */
+function validateModuleConfig<M extends ModuleSchema>(
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): void {
+  validateModuleId(id);
+
+  if (!config.schema) {
+    console.warn("[Directive] Module schema is required");
+  } else if (!config.schema.facts) {
+    console.warn("[Directive] Module schema.facts is required");
+  }
+
+  validateKeyAlignment(
+    new Set(Object.keys(config.derive ?? {})),
+    new Set(Object.keys(config.schema?.derivations ?? {})),
+    "Derivation",
+    "schema.derivations",
+    "has no matching implementation in derive",
+  );
+
+  validateKeyAlignment(
+    new Set(Object.keys(config.events ?? {})),
+    new Set(Object.keys(config.schema?.events ?? {})),
+    "Event",
+    "schema.events",
+    "has no matching handler in events",
+  );
+
+  if (config.history?.snapshotEvents) {
+    validateSnapshotEvents(
+      config.history.snapshotEvents as string[],
+      config.schema?.events ?? {},
+    );
+  }
+
+  if (config.resolvers && config.schema?.requirements) {
+    validateResolverRequirements(
+      config.resolvers as Record<string, unknown>,
+      config.schema.requirements,
+    );
+  }
+}
+
+// ============================================================================
+// createModule
+// ============================================================================
+
 /**
  * Create a module definition with full type inference.
  *
@@ -245,104 +377,8 @@ export function createModule<const M extends ModuleSchema>(
   id: string,
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): ModuleDef<M> {
-  // Dev-mode validations
   if (process.env.NODE_ENV !== "production") {
-    if (!id || typeof id !== "string") {
-      console.warn("[Directive] Module ID must be a non-empty string");
-    } else if (!/^(__[a-z][a-z0-9_-]*|[a-z][a-z0-9-]*)$/i.test(id)) {
-      console.warn(
-        `[Directive] Module ID "${id}" should follow kebab-case convention (e.g., "my-module")`,
-      );
-    }
-
-    if (!config.schema) {
-      console.warn("[Directive] Module schema is required");
-    } else {
-      if (!config.schema.facts) {
-        console.warn("[Directive] Module schema.facts is required");
-      }
-      // derivations, events, and requirements default to {} if not provided
-    }
-
-    // Validate derive keys match schema.derivations (if either is provided)
-    const schemaDerivations = config.schema?.derivations ?? {};
-    const deriveImpl = config.derive ?? {};
-    const schemaDerivationKeys = new Set(Object.keys(schemaDerivations));
-    const deriveKeys = new Set(Object.keys(deriveImpl));
-
-    for (const key of deriveKeys) {
-      if (!schemaDerivationKeys.has(key)) {
-        console.warn(
-          `[Directive] Derivation "${key}" not declared in schema.derivations`,
-        );
-      }
-    }
-    for (const key of schemaDerivationKeys) {
-      if (!deriveKeys.has(key)) {
-        console.warn(
-          `[Directive] schema.derivations["${key}"] has no matching implementation in derive`,
-        );
-      }
-    }
-
-    // Validate events keys match schema.events (if either is provided)
-    const schemaEvents = config.schema?.events ?? {};
-    const eventImpl = config.events ?? {};
-    const schemaEventKeys = new Set(Object.keys(schemaEvents));
-    const eventKeys = new Set(Object.keys(eventImpl));
-
-    for (const key of eventKeys) {
-      if (!schemaEventKeys.has(key)) {
-        console.warn(
-          `[Directive] Event "${key}" not declared in schema.events`,
-        );
-      }
-    }
-    for (const key of schemaEventKeys) {
-      if (!eventKeys.has(key)) {
-        console.warn(
-          `[Directive] schema.events["${key}"] has no matching handler in events`,
-        );
-      }
-    }
-
-    // Validate history.snapshotEvents reference valid event names
-    if (config.history?.snapshotEvents) {
-      if (config.history.snapshotEvents.length === 0) {
-        console.warn(
-          "[Directive] history.snapshotEvents is an empty array — no events will create history snapshots. " +
-            "Omit history.snapshotEvents entirely to snapshot all events, or list specific events.",
-        );
-      }
-      const schemaEventKeysForValidation = new Set(
-        Object.keys(config.schema?.events ?? {}),
-      );
-      for (const eventName of config.history.snapshotEvents) {
-        if (!schemaEventKeysForValidation.has(eventName)) {
-          console.warn(
-            `[Directive] history.snapshotEvents entry "${eventName}" not declared in schema.events. ` +
-              `Available events: ${[...schemaEventKeysForValidation].join(", ") || "(none)"}`,
-          );
-        }
-      }
-    }
-
-    // Validate resolvers reference valid requirement types
-    if (config.resolvers && config.schema?.requirements) {
-      const requirementTypes = new Set(Object.keys(config.schema.requirements));
-      for (const [resolverName, resolver] of Object.entries(config.resolvers)) {
-        const resolverDef = resolver as { requirement?: string };
-        if (
-          typeof resolverDef.requirement === "string" &&
-          !requirementTypes.has(resolverDef.requirement)
-        ) {
-          console.warn(
-            `[Directive] Resolver "${resolverName}" references unknown requirement type "${resolverDef.requirement}". ` +
-              `Available types: ${[...requirementTypes].join(", ") || "(none)"}`,
-          );
-        }
-      }
-    }
+    validateModuleConfig(id, config);
   }
 
   // Extract crossModuleDeps if present (for runtime proxy creation)
