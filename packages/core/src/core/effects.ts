@@ -258,6 +258,23 @@ export function createEffectsManager<S extends Schema>(
     return store.toObject();
   }
 
+  /** Reset dep stability so the next run re-tracks via withTracking() */
+  function resetStability(state: EffectState): void {
+    state.depsStable = false;
+    state.stableRunCount = 0;
+  }
+
+  /** Check whether any dependency overlaps with the changed keys */
+  function hasOverlap(deps: Set<string>, changedKeys: Set<string>): boolean {
+    for (const dep of deps) {
+      if (changedKeys.has(dep)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   /** Check if an effect should run based on changed keys */
   function shouldRun(id: string, changedKeys: Set<string>): boolean {
     const state = getState(id);
@@ -267,19 +284,17 @@ export function createEffectsManager<S extends Schema>(
 
     // If effect has tracked deps (explicit or auto-tracked), check if any changed
     if (state.dependencies) {
-      for (const dep of state.dependencies) {
-        if (changedKeys.has(dep)) {
-          // Reset dep stability when a tracked fact changes so the next run
-          // re-tracks via withTracking() and can discover new conditional reads.
-          if (state.depsStable) {
-            state.depsStable = false;
-            state.stableRunCount = 0;
-          }
-
-          return true;
-        }
+      if (!hasOverlap(state.dependencies, changedKeys)) {
+        return false;
       }
-      return false;
+
+      // Reset dep stability when a tracked fact changes so the next run
+      // re-tracks via withTracking() and can discover new conditional reads.
+      if (state.depsStable) {
+        resetStability(state);
+      }
+
+      return true;
     }
 
     // No deps yet (first run or auto-tracked with no reads) = run on any change
@@ -329,10 +344,7 @@ export function createEffectsManager<S extends Schema>(
   ): Promise<void> {
     let effectPromise: unknown;
     store.batch(() => {
-      effectPromise = def.run(
-        facts,
-        previousSnapshot as InferSchema<S> | null,
-      );
+      effectPromise = def.run(facts, previousSnapshot as InferSchema<S> | null);
     });
     if (effectPromise instanceof Promise) {
       const result = await effectPromise;
@@ -342,34 +354,37 @@ export function createEffectsManager<S extends Schema>(
     }
   }
 
+  /** Check whether two dep sets are identical */
+  function areDepsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) {
+      return false;
+    }
+    for (const dep of b) {
+      if (!a.has(dep)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /** Check whether tracked deps match current deps and update stability counters */
   function updateDepStability(
     state: EffectState,
     trackedDeps: Set<string>,
   ): void {
-    if (
-      state.dependencies &&
-      trackedDeps.size === state.dependencies.size
-    ) {
-      let same = true;
-      for (const dep of trackedDeps) {
-        if (!state.dependencies.has(dep)) {
-          same = false;
-          break;
-        }
-      }
-      if (same) {
-        state.stableRunCount++;
-        if (state.stableRunCount >= STABLE_THRESHOLD) {
-          state.depsStable = true;
-        }
-      } else {
-        state.stableRunCount = 0;
-        state.depsStable = false;
-      }
-    } else {
-      state.stableRunCount = 0;
-      state.depsStable = false;
+    const same =
+      state.dependencies && areDepsEqual(state.dependencies, trackedDeps);
+
+    if (!same) {
+      resetStability(state);
+
+      return;
+    }
+
+    state.stableRunCount++;
+    if (state.stableRunCount >= STABLE_THRESHOLD) {
+      state.depsStable = true;
     }
   }
 
@@ -435,8 +450,7 @@ export function createEffectsManager<S extends Schema>(
       console.error(`[Directive] Effect "${id}" threw an error:`, error);
       // Reset dep stability — we don't know what the effect would have read
       if (!state.hasExplicitDeps) {
-        state.stableRunCount = 0;
-        state.depsStable = false;
+        resetStability(state);
       }
     }
   }
@@ -471,8 +485,7 @@ export function createEffectsManager<S extends Schema>(
           if (state.enabled) {
             // Reset stability so runEffect re-tracks deps
             // (runAll bypasses shouldRun where the normal reset lives)
-            state.depsStable = false;
-            state.stableRunCount = 0;
+            resetStability(state);
 
             return runEffect(id);
           }
