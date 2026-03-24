@@ -131,7 +131,11 @@ export function createDerivationsManager<
 
   // ---- Shared dependency-map helpers ----
 
-  /** Remove `id` from the dep-set keyed by `dep`. Deletes empty sets. */
+  /**
+   * Remove `id` from the dep-set keyed by `dep`. Deletes empty sets.
+   * Uses `states.has(dep)` (not `definitions`) because during unregister
+   * the definition may already be deleted while state still exists.
+   */
   function removeDepLink(dep: string, id: string): void {
     const map = states.has(dep) ? derivedToDerivedDeps : factToDerivedDeps;
     const depSet = map.get(dep);
@@ -141,7 +145,11 @@ export function createDerivationsManager<
     }
   }
 
-  /** Add `id` to the dep-set keyed by `dep`, creating the set if needed. */
+  /**
+   * Add `id` to the dep-set keyed by `dep`, creating the set if needed.
+   * Uses `definitions[dep]` (not `states`) because when adding a new link
+   * the definition must exist — this is the forward path during recomputation.
+   */
   function addDepLink(dep: string, id: string): void {
     const map = definitions[dep as keyof D]
       ? derivedToDerivedDeps
