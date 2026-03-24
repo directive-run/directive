@@ -109,48 +109,6 @@ interface EngineState<_S extends Schema> {
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
-  // Plus feature gate — dynamic definitions require plus: true or a license key
-  let isPlus = false;
-
-  if (typeof config.plus === "string") {
-    // License key validation — format check is synchronous, RSA is async
-    const keyStr = config.plus;
-    if (!keyStr.startsWith("dk_live_") || !keyStr.includes(".")) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          "[Directive] Invalid license key format. Plus features disabled.",
-        );
-      }
-    } else {
-      // Optimistic: format is valid, enable Plus immediately
-      isPlus = true;
-      // Background RSA + nonce verification (revokes if tampered/expired)
-      import("../utils/license.js").then(({ validateLicenseKey }) => {
-        validateLicenseKey(keyStr).then((result) => {
-          if (!result.valid) {
-            isPlus = false;
-            if (process.env.NODE_ENV !== "production") {
-              console.warn(
-                `[Directive] License: ${result.reason}. Plus features disabled.`,
-              );
-            }
-          }
-        });
-      });
-    }
-  } else {
-    isPlus = !!config.plus;
-  }
-
-  function requirePlus(method: string): void {
-    if (!isPlus) {
-      throw new Error(
-        `[Directive] ${method}() requires a Plus license. ` +
-          "Pass plus: true to createSystem() or get a license at https://directive.run/pricing",
-      );
-    }
-  }
-
   // Merge all module definitions with collision detection
   // Use Object.create(null) to prevent prototype chain traversal (e.g., "toString" in mergedEvents)
   const mergedSchema = Object.create(null) as S;
@@ -869,16 +827,13 @@ export function createEngine<S extends Schema>(
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       register: (id: string, def: any) => {
-        requirePlus("constraints.register");
         definitions.register("constraint", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       assign: (id: string, def: any) => {
-        requirePlus("constraints.assign");
         definitions.assign("constraint", id, def);
       },
       unregister: (id: string) => {
-        requirePlus("constraints.unregister");
         definitions.unregister("constraint", id);
       },
       call: (id: string, props?: Record<string, unknown>) =>
@@ -894,16 +849,13 @@ export function createEngine<S extends Schema>(
       isEnabled: (id: string) => effectsManager.isEnabled(id),
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       register: (id: string, def: any) => {
-        requirePlus("effects.register");
         definitions.register("effect", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       assign: (id: string, def: any) => {
-        requirePlus("effects.assign");
         definitions.assign("effect", id, def);
       },
       unregister: (id: string) => {
-        requirePlus("effects.unregister");
         definitions.unregister("effect", id);
       },
       call: (id: string) => definitions.call("effect", id) as Promise<void>,
@@ -913,16 +865,13 @@ export function createEngine<S extends Schema>(
     resolvers: {
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       register: (id: string, def: any) => {
-        requirePlus("resolvers.register");
         definitions.register("resolver", id, def);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       assign: (id: string, def: any) => {
-        requirePlus("resolvers.assign");
         definitions.assign("resolver", id, def);
       },
       unregister: (id: string) => {
-        requirePlus("resolvers.unregister");
         definitions.unregister("resolver", id);
       },
       call: (
@@ -1293,7 +1242,6 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): unknown | undefined {
-      requirePlus("getOriginal");
 
       return definitions.getOriginal(type, id);
     },
@@ -1302,7 +1250,6 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): boolean {
-      requirePlus("restoreOriginal");
 
       return definitions.restoreOriginal(type, id);
     },
