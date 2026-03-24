@@ -322,6 +322,95 @@ export function createEffectsManager<S extends Schema>(
     }
   }
 
+  /** Run the effect's `run()` inside a store.batch(), await if needed, and store cleanup */
+  async function runBatchedEffect(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    let effectPromise: unknown;
+    store.batch(() => {
+      effectPromise = def.run(
+        facts,
+        previousSnapshot as InferSchema<S> | null,
+      );
+    });
+    if (effectPromise instanceof Promise) {
+      const result = await effectPromise;
+      storeCleanup(state, result);
+    } else {
+      storeCleanup(state, effectPromise);
+    }
+  }
+
+  /** Check whether tracked deps match current deps and update stability counters */
+  function updateDepStability(
+    state: EffectState,
+    trackedDeps: Set<string>,
+  ): void {
+    if (
+      state.dependencies &&
+      trackedDeps.size === state.dependencies.size
+    ) {
+      let same = true;
+      for (const dep of trackedDeps) {
+        if (!state.dependencies.has(dep)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) {
+        state.stableRunCount++;
+        if (state.stableRunCount >= STABLE_THRESHOLD) {
+          state.depsStable = true;
+        }
+      } else {
+        state.stableRunCount = 0;
+        state.depsStable = false;
+      }
+    } else {
+      state.stableRunCount = 0;
+      state.depsStable = false;
+    }
+  }
+
+  /** Run an auto-tracked effect, re-tracking dependencies each time */
+  async function runAutoTrackedEffect(
+    state: EffectState,
+    def: EffectsDef<S>[string],
+  ): Promise<void> {
+    // Deps have been stable — skip withTracking() overhead
+    if (state.depsStable && state.dependencies) {
+      await runBatchedEffect(state, def);
+
+      return;
+    }
+
+    // Re-track dependencies so conditional reads are picked up
+    let effectPromise: unknown;
+    const trackingResult = withTracking(() => {
+      store.batch(() => {
+        effectPromise = def.run(
+          facts,
+          previousSnapshot as InferSchema<S> | null,
+        );
+      });
+      return effectPromise;
+    });
+    const trackedDeps = trackingResult.deps;
+
+    // If the effect is async, wait for it and capture cleanup
+    let result = trackingResult.value;
+    if (result instanceof Promise) {
+      result = await result;
+    }
+    storeCleanup(state, result);
+
+    updateDepStability(state, trackedDeps);
+
+    // Update tracked dependencies
+    state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
+  }
+
   /** Run a single effect */
   async function runEffect(id: string): Promise<void> {
     const state = getState(id);
@@ -336,87 +425,9 @@ export function createEffectsManager<S extends Schema>(
 
     try {
       if (!state.hasExplicitDeps) {
-        if (state.depsStable && state.dependencies) {
-          // Deps have been stable for STABLE_THRESHOLD runs — skip withTracking()
-          // overhead and just run the effect directly.
-          let effectPromise: unknown;
-          store.batch(() => {
-            effectPromise = def.run(
-              facts,
-              previousSnapshot as InferSchema<S> | null,
-            );
-          });
-          if (effectPromise instanceof Promise) {
-            const result = await effectPromise;
-            storeCleanup(state, result);
-          } else {
-            storeCleanup(state, effectPromise);
-          }
-        } else {
-          // Auto-tracked: re-track dependencies so conditional reads are picked up
-          let effectPromise: unknown;
-          const trackingResult = withTracking(() => {
-            store.batch(() => {
-              effectPromise = def.run(
-                facts,
-                previousSnapshot as InferSchema<S> | null,
-              );
-            });
-            return effectPromise;
-          });
-          const trackedDeps = trackingResult.deps;
-
-          // If the effect is async, wait for it and capture cleanup
-          let result = trackingResult.value;
-          if (result instanceof Promise) {
-            result = await result;
-          }
-          storeCleanup(state, result);
-
-          // Check dep stability: if deps match previous run, increment counter
-          if (
-            state.dependencies &&
-            trackedDeps.size === state.dependencies.size
-          ) {
-            let same = true;
-            for (const dep of trackedDeps) {
-              if (!state.dependencies.has(dep)) {
-                same = false;
-                break;
-              }
-            }
-            if (same) {
-              state.stableRunCount++;
-              if (state.stableRunCount >= STABLE_THRESHOLD) {
-                state.depsStable = true;
-              }
-            } else {
-              state.stableRunCount = 0;
-              state.depsStable = false;
-            }
-          } else {
-            state.stableRunCount = 0;
-            state.depsStable = false;
-          }
-
-          // Update tracked dependencies
-          state.dependencies = trackedDeps.size > 0 ? trackedDeps : null;
-        }
+        await runAutoTrackedEffect(state, def);
       } else {
-        // Has explicit deps, batch synchronous mutations and run
-        let effectPromise: unknown;
-        store.batch(() => {
-          effectPromise = def.run(
-            facts,
-            previousSnapshot as InferSchema<S> | null,
-          );
-        });
-        if (effectPromise instanceof Promise) {
-          const result = await effectPromise;
-          storeCleanup(state, result);
-        } else {
-          storeCleanup(state, effectPromise);
-        }
+        await runBatchedEffect(state, def);
       }
     } catch (error) {
       // Effects are fire-and-forget - errors are reported but don't propagate
