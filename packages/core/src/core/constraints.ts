@@ -260,15 +260,17 @@ export function createConstraintsManager<S extends Schema>(
   function buildReverseDependencyMap(): void {
     dependsOnMe.clear();
     for (const [id, def] of Object.entries(definitions)) {
-      if (def.after) {
-        for (const depId of def.after) {
-          if (definitions[depId]) {
-            if (!dependsOnMe.has(depId)) {
-              dependsOnMe.set(depId, new Set());
-            }
-            dependsOnMe.get(depId)!.add(id);
-          }
+      if (!def.after) {
+        continue;
+      }
+      for (const depId of def.after) {
+        if (!definitions[depId]) {
+          continue;
         }
+        if (!dependsOnMe.has(depId)) {
+          dependsOnMe.set(depId, new Set());
+        }
+        dependsOnMe.get(depId)!.add(id);
       }
     }
   }
@@ -447,6 +449,79 @@ export function createConstraintsManager<S extends Schema>(
     constraintDeps.set(id, newDeps);
   }
 
+  /** Track or evaluate the `when()` predicate, returning the result and recording deps */
+  function evaluateWhenPredicate(
+    id: string,
+    def: ConstraintsDef<S>[string],
+  ): boolean | Promise<boolean> {
+    if (def.deps) {
+      latestWhenDeps.set(id, new Set(def.deps));
+
+      return def.when(facts);
+    }
+
+    // Track dependencies during evaluation
+    const tracked = withTracking(() => def.when(facts));
+    latestWhenDeps.set(id, tracked.deps);
+
+    return tracked.value;
+  }
+
+  /** Update constraint state after a successful when() evaluation */
+  function recordConstraintResult(
+    id: string,
+    state: ConstraintState,
+    result: boolean,
+  ): void {
+    state.lastResult = result;
+    if (result) {
+      state.hitCount++;
+      state.lastActiveAt = Date.now();
+    }
+    state.isEvaluating = false;
+    onEvaluate?.(id, result);
+  }
+
+  /** Record a constraint evaluation error */
+  function recordConstraintError(
+    id: string,
+    state: ConstraintState,
+    error: unknown,
+  ): void {
+    state.error = error instanceof Error ? error : new Error(String(error));
+    state.lastResult = false;
+    state.isEvaluating = false;
+    onError?.(id, error);
+  }
+
+  /** Handle runtime-detected async constraint: mark as async and return wrapped promise */
+  function handleRuntimeAsyncResult(
+    id: string,
+    state: ConstraintState,
+    promise: Promise<boolean>,
+  ): Promise<boolean> {
+    asyncConstraintIds.add(id);
+    state.isAsync = true;
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[Directive] Constraint "${id}" returned a Promise but was not marked as async. Add \`async: true\` to the constraint definition to avoid this warning and improve performance.`,
+      );
+    }
+
+    return promise
+      .then((asyncResult) => {
+        recordConstraintResult(id, state, asyncResult);
+
+        return asyncResult;
+      })
+      .catch((error) => {
+        recordConstraintError(id, state, error);
+
+        return false;
+      });
+  }
+
   /** Evaluate a single sync constraint */
   function evaluateSync(id: string): boolean | Promise<boolean> {
     const def = definitions[id];
@@ -455,71 +530,23 @@ export function createConstraintsManager<S extends Schema>(
     }
 
     const state = getState(id);
-
     state.isEvaluating = true;
     state.error = null;
 
     try {
-      // If explicit deps are provided, skip auto-tracking overhead
-      let result: boolean | Promise<boolean>;
-      if (def.deps) {
-        result = def.when(facts);
-        latestWhenDeps.set(id, new Set(def.deps));
-      } else {
-        // Track dependencies during evaluation
-        const tracked = withTracking(() => def.when(facts));
-        result = tracked.value;
-        // Save when deps — combined with require deps in processConstraintResult
-        latestWhenDeps.set(id, tracked.deps);
-      }
+      const result = evaluateWhenPredicate(id, def);
 
       // Runtime async detection: if this was thought to be sync but returns a Promise
       if (result instanceof Promise) {
-        // Mark as async for future evaluations
-        asyncConstraintIds.add(id);
-        state.isAsync = true;
-
-        if (process.env.NODE_ENV !== "production") {
-          console.warn(
-            `[Directive] Constraint "${id}" returned a Promise but was not marked as async. Add \`async: true\` to the constraint definition to avoid this warning and improve performance.`,
-          );
-        }
-
-        // Return the promise to be handled as async
-        return result
-          .then((asyncResult) => {
-            state.lastResult = asyncResult;
-            if (asyncResult) {
-              state.hitCount++;
-              state.lastActiveAt = Date.now();
-            }
-            state.isEvaluating = false;
-            onEvaluate?.(id, asyncResult);
-            return asyncResult;
-          })
-          .catch((error) => {
-            state.error =
-              error instanceof Error ? error : new Error(String(error));
-            state.lastResult = false;
-            state.isEvaluating = false;
-            onError?.(id, error);
-            return false;
-          });
+        return handleRuntimeAsyncResult(id, state, result);
       }
 
-      state.lastResult = result;
-      if (result) {
-        state.hitCount++;
-        state.lastActiveAt = Date.now();
-      }
-      state.isEvaluating = false;
-      onEvaluate?.(id, result);
+      recordConstraintResult(id, state, result);
+
       return result;
     } catch (error) {
-      state.error = error instanceof Error ? error : new Error(String(error));
-      state.lastResult = false;
-      state.isEvaluating = false;
-      onError?.(id, error);
+      recordConstraintError(id, state, error);
+
       return false;
     }
   }
