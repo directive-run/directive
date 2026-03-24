@@ -147,7 +147,11 @@ describe("forType", () => {
 });
 
 describe("RequirementSet", () => {
-  function makeReq(type: string, props: Record<string, unknown> = {}, constraint = "c1") {
+  function makeReq(
+    type: string,
+    props: Record<string, unknown> = {},
+    constraint = "c1",
+  ) {
     return createRequirementWithId({ type, ...props }, constraint);
   }
 
@@ -163,7 +167,10 @@ describe("RequirementSet", () => {
   it("add - first-wins deduplication (ignores duplicates)", () => {
     const set = new RequirementSet();
     const first = makeReq("FETCH", { userId: 1 }, "c1");
-    const duplicate = createRequirementWithId({ type: "FETCH", userId: 1 }, "c2");
+    const duplicate = createRequirementWithId(
+      { type: "FETCH", userId: 1 },
+      "c2",
+    );
     set.add(first);
     set.add(duplicate);
 

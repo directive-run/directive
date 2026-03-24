@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { t } from "../../index.js";
 import {
   createFacts,
-  createFactsStore,
   createFactsProxy,
+  createFactsStore,
 } from "../../internals.js";
 
 // ============================================================================
@@ -470,6 +470,7 @@ describe("createFactsProxy", () => {
       const { store, facts } = makeProxy();
 
       facts.phase = "red";
+      // biome-ignore lint/performance/noDelete: Testing proxy deleteProperty trap
       delete (facts as Record<string, unknown>).phase;
 
       expect(store.has("phase")).toBe(false);

@@ -74,9 +74,11 @@ export interface WorkerSystemConfig {
   /** Module names to initialize (modules must be registered in worker) */
   moduleNames: string[];
   /** History configuration for snapshot-based state history */
-  history?: boolean | {
-    maxSnapshots?: number;
-  };
+  history?:
+    | boolean
+    | {
+        maxSnapshots?: number;
+      };
 }
 
 // ============================================================================
@@ -559,8 +561,8 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
     },
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: Dynamic module types
   const system = createSystem({
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic module types
     modules: modules as any,
     plugins: [trackingPlugin],
     history: config.history,

@@ -1,7 +1,7 @@
-import { createFacts } from "../facts.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { generateRequirementId, t } from "../../index.js";
 import type { RequirementWithId } from "../../index.js";
+import { createFacts } from "../facts.js";
 import { createResolversManager } from "../resolvers.js";
 
 // ============================================================================

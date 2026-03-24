@@ -470,9 +470,7 @@ export function createHistoryManager<S extends Schema>(
  *
  * @internal
  */
-export function createDisabledHistory<
-  S extends Schema,
->(): HistoryManager<S> {
+export function createDisabledHistory<S extends Schema>(): HistoryManager<S> {
   const noopSnapshot: Snapshot = {
     id: -1,
     timestamp: 0,

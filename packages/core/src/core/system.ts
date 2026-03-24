@@ -819,7 +819,7 @@ function applyZeroConfigDefaults(options: {
   errorBoundary: ErrorBoundaryConfig | undefined;
 } {
   let history: HistoryOption | undefined = options.history;
-  let trace: TraceOption | undefined = options.trace;
+  const trace: TraceOption | undefined = options.trace;
   let errorBoundary: ErrorBoundaryConfig | undefined = options.errorBoundary;
 
   if (options.zeroConfig) {

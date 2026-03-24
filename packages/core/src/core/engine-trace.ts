@@ -73,7 +73,11 @@ export interface TraceManager {
    * @param resolver - The resolver ID
    * @param duration - Resolution time in ms
    */
-  recordResolverComplete(requirementId: string, resolver: string, duration: number): void;
+  recordResolverComplete(
+    requirementId: string,
+    resolver: string,
+    duration: number,
+  ): void;
 
   /**
    * Record a resolver error on its originating trace entry.
@@ -82,7 +86,11 @@ export interface TraceManager {
    * @param resolver - The resolver ID
    * @param error - The error (stringified)
    */
-  recordResolverError(requirementId: string, resolver: string, error: string): void;
+  recordResolverError(
+    requirementId: string,
+    resolver: string,
+    error: string,
+  ): void;
 
   /**
    * Decrement inflight count for the trace associated with a requirement.

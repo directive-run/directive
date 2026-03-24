@@ -48,12 +48,12 @@ import type {
   InferSchema,
   ReconcileResult,
   ResolversDef,
-  TraceEntry,
   Schema,
   System,
   SystemConfig,
   SystemEvent,
   SystemInspection,
+  TraceEntry,
 } from "./types.js";
 
 // ============================================================================
@@ -1242,7 +1242,6 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): unknown | undefined {
-
       return definitions.getOriginal(type, id);
     },
 
@@ -1250,7 +1249,6 @@ export function createEngine<S extends Schema>(
       type: "constraint" | "resolver" | "derivation" | "effect",
       id: string,
     ): boolean {
-
       return definitions.restoreOriginal(type, id);
     },
 

@@ -14,10 +14,10 @@ import type {
   ReconcileResult,
   RecoveryStrategy,
   RequirementWithId,
-  TraceEntry,
   Schema,
   Snapshot,
   System,
+  TraceEntry,
 } from "./types.js";
 import type { DirectiveError } from "./types.js";
 
@@ -133,7 +133,12 @@ export interface PluginManager<_S extends Schema = any> {
 
   // Dynamic definition hooks
   emitDefinitionRegister(type: string, id: string, def: unknown): void;
-  emitDefinitionAssign(type: string, id: string, def: unknown, original: unknown): void;
+  emitDefinitionAssign(
+    type: string,
+    id: string,
+    def: unknown,
+    original: unknown,
+  ): void;
   emitDefinitionUnregister(type: string, id: string): void;
   emitDefinitionCall(type: string, id: string, props?: unknown): void;
 

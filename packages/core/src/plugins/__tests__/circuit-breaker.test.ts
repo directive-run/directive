@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CircuitBreakerOpenError,
-  createCircuitBreaker,
   type CircuitBreaker,
+  CircuitBreakerOpenError,
   type CircuitState,
+  createCircuitBreaker,
 } from "../circuit-breaker.js";
 
 // ============================================================================
@@ -44,15 +44,15 @@ describe("createCircuitBreaker — config validation", () => {
   });
 
   it("throws when failureThreshold is NaN", () => {
-    expect(() => createCircuitBreaker({ failureThreshold: NaN })).toThrow(
-      "failureThreshold must be >= 1",
-    );
+    expect(() =>
+      createCircuitBreaker({ failureThreshold: Number.NaN }),
+    ).toThrow("failureThreshold must be >= 1");
   });
 
   it("throws when failureThreshold is Infinity", () => {
-    expect(() => createCircuitBreaker({ failureThreshold: Infinity })).toThrow(
-      "failureThreshold must be >= 1",
-    );
+    expect(() =>
+      createCircuitBreaker({ failureThreshold: Number.POSITIVE_INFINITY }),
+    ).toThrow("failureThreshold must be >= 1");
   });
 
   it("throws when recoveryTimeMs <= 0", () => {
@@ -62,7 +62,7 @@ describe("createCircuitBreaker — config validation", () => {
   });
 
   it("throws when recoveryTimeMs is NaN", () => {
-    expect(() => createCircuitBreaker({ recoveryTimeMs: NaN })).toThrow(
+    expect(() => createCircuitBreaker({ recoveryTimeMs: Number.NaN })).toThrow(
       "recoveryTimeMs must be > 0",
     );
   });
@@ -75,7 +75,7 @@ describe("createCircuitBreaker — config validation", () => {
 
   it("throws when halfOpenMaxRequests is Infinity", () => {
     expect(() =>
-      createCircuitBreaker({ halfOpenMaxRequests: Infinity }),
+      createCircuitBreaker({ halfOpenMaxRequests: Number.POSITIVE_INFINITY }),
     ).toThrow("halfOpenMaxRequests must be >= 1");
   });
 
@@ -86,7 +86,7 @@ describe("createCircuitBreaker — config validation", () => {
   });
 
   it("throws when failureWindowMs is NaN", () => {
-    expect(() => createCircuitBreaker({ failureWindowMs: NaN })).toThrow(
+    expect(() => createCircuitBreaker({ failureWindowMs: Number.NaN })).toThrow(
       "failureWindowMs must be > 0",
     );
   });
@@ -197,9 +197,7 @@ describe("OPEN state", () => {
     await times(2, () => cb.execute(fail));
     expect(cb.getState()).toBe("OPEN");
 
-    await expect(cb.execute(succeed)).rejects.toThrow(
-      CircuitBreakerOpenError,
-    );
+    await expect(cb.execute(succeed)).rejects.toThrow(CircuitBreakerOpenError);
   });
 
   it("rejected error has correct code property", async () => {
@@ -1139,4 +1137,3 @@ describe("full lifecycle", () => {
     expect(cb.getState()).toBe("OPEN");
   });
 });
-

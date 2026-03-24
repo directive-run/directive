@@ -69,7 +69,7 @@ export interface EffectDef<S extends Schema> {
   run(
     facts: Facts<S>,
     prev: InferSchema<S> | null,
-  // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
+    // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional explicit dependencies for optimization */
   deps?: Array<keyof InferSchema<S>>;

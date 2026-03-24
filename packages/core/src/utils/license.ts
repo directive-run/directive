@@ -145,9 +145,7 @@ async function getPublicKey(): Promise<CryptoKey> {
  * @param key - The license key string
  * @returns Validation result with decoded payload on success
  */
-export async function validateLicenseKey(
-  key: string,
-): Promise<LicenseResult> {
+export async function validateLicenseKey(key: string): Promise<LicenseResult> {
   // Check prefix
   if (!key.startsWith("dk_live_")) {
     return { valid: false, reason: "Invalid key format" };
@@ -225,11 +223,7 @@ export async function validateLicenseKey(
  *
  * @internal
  */
-export function generateNonce(
-  team: string,
-  tier: string,
-  exp: number,
-): string {
+export function generateNonce(team: string, tier: string, exp: number): string {
   const input = `${team}${tier}${exp}`;
   const bytes = new Uint8Array(input.length);
   for (let i = 0; i < input.length; i++) {

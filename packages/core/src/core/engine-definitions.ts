@@ -614,10 +614,7 @@ export function createDefinitionsRegistry<S extends Schema>(
 
     flushDeferred,
 
-    getOriginal(
-      type: DefType,
-      id: string,
-    ): unknown | undefined {
+    getOriginal(type: DefType, id: string): unknown | undefined {
       const typeMap: Record<string, Map<string, unknown>> = {
         constraint: originals.constraints,
         resolver: originals.resolvers,

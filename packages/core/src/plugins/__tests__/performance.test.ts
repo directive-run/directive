@@ -5,14 +5,16 @@ import { performancePlugin } from "../performance.js";
 // Helpers
 // ============================================================================
 
-function createPlugin(
-  options: Parameters<typeof performancePlugin>[0] = {},
-) {
+function createPlugin(options: Parameters<typeof performancePlugin>[0] = {}) {
   return performancePlugin(options);
 }
 
 function mockReq(type: string) {
-  return { requirement: { type }, id: `${type}-1`, fromConstraint: "c1" } as never;
+  return {
+    requirement: { type },
+    id: `${type}-1`,
+    fromConstraint: "c1",
+  } as never;
 }
 
 // ============================================================================
@@ -49,8 +51,12 @@ describe("performancePlugin", () => {
       const after = Date.now();
 
       const snap = plugin.getSnapshot();
-      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeGreaterThanOrEqual(before);
-      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeLessThanOrEqual(after);
+      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeGreaterThanOrEqual(
+        before,
+      );
+      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeLessThanOrEqual(
+        after,
+      );
     });
 
     it("does not record duration for the first constraint in a reconcile cycle", () => {
@@ -153,7 +159,9 @@ describe("performancePlugin", () => {
       const after = Date.now();
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.lastCompletedAt).toBeGreaterThanOrEqual(before);
+      expect(snap.resolvers["r1"]!.lastCompletedAt).toBeGreaterThanOrEqual(
+        before,
+      );
       expect(snap.resolvers["r1"]!.lastCompletedAt).toBeLessThanOrEqual(after);
     });
 

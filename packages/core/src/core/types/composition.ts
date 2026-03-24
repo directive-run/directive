@@ -37,13 +37,13 @@ import type {
   DistributableSnapshot,
   DistributableSnapshotOptions,
   EffectsControl,
-  ResolversControl,
-  TraceEntry,
-  TraceOption,
-  SystemInspection,
-  SystemSnapshot,
   HistoryAPI,
   HistoryOption,
+  ResolversControl,
+  SystemInspection,
+  SystemSnapshot,
+  TraceEntry,
+  TraceOption,
 } from "./system.js";
 
 // ============================================================================

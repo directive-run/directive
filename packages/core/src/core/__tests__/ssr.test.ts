@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 
 // Minimal module for SSR tests

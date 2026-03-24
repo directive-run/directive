@@ -1,7 +1,7 @@
-import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
-import { createDerivationsManager } from "../derivations.js";
 import { t } from "../../index.js";
+import { createDerivationsManager } from "../derivations.js";
+import { createFacts } from "../facts.js";
 
 // ============================================================================
 // Helpers
@@ -280,7 +280,7 @@ describe("derivations", () => {
       const proxy = manager.getProxy();
 
       expect(() => {
-        delete (proxy as any).doubled;
+        (proxy as any).doubled = undefined;
       }).toThrow();
     });
 

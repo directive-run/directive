@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateLicenseKey, generateNonce } from "../license.js";
+import { generateNonce, validateLicenseKey } from "../license.js";
 
 // ============================================================================
 // Test helpers
@@ -71,7 +71,12 @@ describe("validateLicenseKey", () => {
       const nonce = generateNonce("test", "premium", FUTURE_EXP);
       const payload = base64urlEncode(
         new TextEncoder().encode(
-          JSON.stringify({ team: "test", exp: FUTURE_EXP, tier: "premium", nonce }),
+          JSON.stringify({
+            team: "test",
+            exp: FUTURE_EXP,
+            tier: "premium",
+            nonce,
+          }),
         ),
       );
       const result = await validateLicenseKey(`dk_live_${payload}.fakesig`);
@@ -130,7 +135,12 @@ describe("validateLicenseKey", () => {
       const nonce = generateNonce("test", "plus", FUTURE_EXP);
       const payload = base64urlEncode(
         new TextEncoder().encode(
-          JSON.stringify({ team: "test", exp: FUTURE_EXP, tier: "plus", nonce }),
+          JSON.stringify({
+            team: "test",
+            exp: FUTURE_EXP,
+            tier: "plus",
+            nonce,
+          }),
         ),
       );
       // Use a fake signature that won't verify

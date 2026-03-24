@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 
@@ -225,8 +225,10 @@ describe("Single Module Mode", () => {
 
   it("throws when module is not provided", () => {
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input
-      createSystem({ module: undefined as any });
+      createSystem({
+        // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input
+        module: undefined as any,
+      });
     }).toThrow("[Directive] createSystem requires a module");
   });
 });
@@ -237,7 +239,9 @@ describe("Single Module Mode", () => {
 
 describe("Namespaced Module Mode", () => {
   it("namespaces facts by module key", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     expect(system.facts.auth.token).toBe("");
@@ -249,7 +253,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("writes to namespaced facts", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.facts.auth.token = "abc-123";
@@ -262,7 +268,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("reads namespaced derivations", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     expect(system.derive.auth.isLoggedIn).toBe(false);
@@ -275,7 +283,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("dispatches namespaced events", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.events.auth.login({ token: "xyz" });
@@ -290,7 +300,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("events.auth.logout works", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.events.auth.login({ token: "tok" });
@@ -304,14 +316,18 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("_mode is 'namespaced'", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     expect(system._mode).toBe("namespaced");
 
     system.destroy();
   });
 
   it("subscribe with namespaced keys fires on changes", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const listener = vi.fn();
@@ -325,7 +341,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("subscribe with wildcard fires on any key in namespace", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const listener = vi.fn();
@@ -339,7 +357,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("subscribeModule fires on any key in namespace", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const listener = vi.fn();
@@ -353,7 +373,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("read accepts namespace.key format", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.facts.auth.loggedIn = true;
@@ -363,7 +385,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("watch accepts namespace.key format", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const callback = vi.fn();
@@ -377,7 +401,9 @@ describe("Namespaced Module Mode", () => {
   });
 
   it("lifecycle works in namespaced mode", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
 
     expect(system.isRunning).toBe(false);
     system.start();
@@ -426,8 +452,15 @@ describe("Namespaced Module Mode", () => {
 describe("Namespace Validation", () => {
   it("throws when module name contains '::'", () => {
     const badModule = createModule("bad-mod", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
 
     expect(() => {
@@ -515,7 +548,7 @@ describe("Topological Sort", () => {
         initOrder.push("dependent");
         facts.result = 0;
       },
-    // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
+      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const system = createSystem({
@@ -545,8 +578,10 @@ describe("Topological Sort", () => {
           requirements: {},
         },
       },
-      init: (facts: Record<string, unknown>) => { facts.x = 0; },
-    // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
+      init: (facts: Record<string, unknown>) => {
+        facts.x = 0;
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const modB = createModule("mod-b", {
@@ -564,8 +599,10 @@ describe("Topological Sort", () => {
           requirements: {},
         },
       },
-      init: (facts: Record<string, unknown>) => { facts.y = 0; },
-    // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
+      init: (facts: Record<string, unknown>) => {
+        facts.y = 0;
+      },
+      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     expect(() => {
@@ -577,19 +614,35 @@ describe("Topological Sort", () => {
     const initOrder: string[] = [];
 
     const modA = createModule("mod-a", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { initOrder.push("a"); facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        initOrder.push("a");
+        facts.x = 0;
+      },
     });
 
     const modB = createModule("mod-b", {
-      schema: { facts: { y: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { initOrder.push("b"); facts.y = 0; },
+      schema: {
+        facts: { y: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        initOrder.push("b");
+        facts.y = 0;
+      },
     });
 
     const system = createSystem({
       modules: { a: modA, b: modB },
       initOrder: ["b", "a"],
-    // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
+      // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
     } as any);
     system.start();
 
@@ -600,20 +653,34 @@ describe("Topological Sort", () => {
 
   it("throws when explicit initOrder is missing modules", () => {
     const modA = createModule("mod-a", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
 
     const modB = createModule("mod-b", {
-      schema: { facts: { y: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.y = 0; },
+      schema: {
+        facts: { y: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.y = 0;
+      },
     });
 
     expect(() => {
       createSystem({
         modules: { a: modA, b: modB },
         initOrder: ["a"],
-      // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
+        // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
       } as any);
     }).toThrow("initOrder is missing modules");
   });
@@ -732,10 +799,16 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    expect(Reflect.defineProperty(system.facts, "test", { value: 1 })).toBe(false);
-    expect(Reflect.defineProperty(system.derive, "test", { value: 1 })).toBe(false);
+    expect(Reflect.defineProperty(system.facts, "test", { value: 1 })).toBe(
+      false,
+    );
+    expect(Reflect.defineProperty(system.derive, "test", { value: 1 })).toBe(
+      false,
+    );
     // biome-ignore lint/suspicious/noExplicitAny: Testing proxy trap
-    expect(Reflect.defineProperty(system.events as any, "test", { value: 1 })).toBe(false);
+    expect(
+      Reflect.defineProperty(system.events as any, "test", { value: 1 }),
+    ).toBe(false);
 
     system.destroy();
   });
@@ -782,7 +855,9 @@ describe("Proxy Security", () => {
 
 describe("Distributable Snapshot", () => {
   it("getDistributableSnapshot returns facts grouped by namespace", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.facts.auth.token = "snap-token";
@@ -802,7 +877,9 @@ describe("Distributable Snapshot", () => {
   });
 
   it("getDistributableSnapshot includes derivations when requested", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     system.facts.auth.loggedIn = true;
@@ -829,7 +906,9 @@ describe("Distributable Snapshot", () => {
   });
 
   it("watchDistributableSnapshot fires on changes", async () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const callback = vi.fn();
@@ -969,14 +1048,19 @@ describe("InitialFacts & Hydration", () => {
         auth: { token: "initial-token", loggedIn: true },
         data: { count: 10, items: ["a", "b"] },
       },
-    // biome-ignore lint/suspicious/noExplicitAny: Testing initialFacts
+      // biome-ignore lint/suspicious/noExplicitAny: Testing initialFacts
     } as any);
     system.start();
 
-    expect((system.facts.auth as Record<string, unknown>).token).toBe("initial-token");
+    expect((system.facts.auth as Record<string, unknown>).token).toBe(
+      "initial-token",
+    );
     expect((system.facts.auth as Record<string, unknown>).loggedIn).toBe(true);
     expect((system.facts.data as Record<string, unknown>).count).toBe(10);
-    expect((system.facts.data as Record<string, unknown>).items).toEqual(["a", "b"]);
+    expect((system.facts.data as Record<string, unknown>).items).toEqual([
+      "a",
+      "b",
+    ]);
 
     system.destroy();
   });
@@ -995,7 +1079,9 @@ describe("InitialFacts & Hydration", () => {
   });
 
   it("hydrate applies facts before start in namespaced mode", async () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
 
     await system.hydrate(async () => ({
       auth: { token: "hydrated-token" },
@@ -1037,7 +1123,9 @@ describe("Engine Passthrough Methods", () => {
   });
 
   it("batch coalesces mutations", () => {
-    const system = createSystem({ modules: { auth: authModule, data: dataModule } });
+    const system = createSystem({
+      modules: { auth: authModule, data: dataModule },
+    });
     system.start();
 
     const listener = vi.fn();
@@ -1096,7 +1184,9 @@ describe("Cross-Module Dependencies", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.value = 10; },
+      init: (facts) => {
+        facts.value = 10;
+      },
     });
 
     const consumerModule = createModule("consumer", {
@@ -1114,16 +1204,22 @@ describe("Cross-Module Dependencies", () => {
           requirements: {},
         },
       },
-      init: (facts: Record<string, unknown>) => { facts.multiplier = 2; },
+      init: (facts: Record<string, unknown>) => {
+        facts.multiplier = 2;
+      },
       derive: {
         computed: (facts: Record<string, unknown>) => {
-          const baseValue = (facts as Record<string, Record<string, unknown>>).base?.value as number ?? 0;
-          const mult = (facts as Record<string, Record<string, unknown>>).self?.multiplier as number ?? 1;
+          const baseValue =
+            ((facts as Record<string, Record<string, unknown>>).base
+              ?.value as number) ?? 0;
+          const mult =
+            ((facts as Record<string, Record<string, unknown>>).self
+              ?.multiplier as number) ?? 1;
 
           return baseValue * mult;
         },
       },
-    // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
+      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const system = createSystem({
@@ -1153,7 +1249,9 @@ describe("Dynamic Module Registration", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.theme = "dark"; },
+      init: (facts) => {
+        facts.theme = "dark";
+      },
     });
 
     // biome-ignore lint/suspicious/noExplicitAny: Testing registerModule
@@ -1182,8 +1280,15 @@ describe("Dynamic Module Registration", () => {
     system.start();
 
     const newModule = createModule("bad", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
 
     expect(() => {
@@ -1199,8 +1304,15 @@ describe("Dynamic Module Registration", () => {
     system.start();
 
     const newModule = createModule("proto", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
 
     expect(() => {

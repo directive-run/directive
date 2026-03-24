@@ -1,7 +1,7 @@
-import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
-import { createConstraintsManager } from "../constraints.js";
 import { t } from "../../index.js";
+import { createConstraintsManager } from "../constraints.js";
+import { createFacts } from "../facts.js";
 
 // ============================================================================
 // Helpers

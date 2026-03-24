@@ -9,6 +9,7 @@ import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ResolverStatus } from "./resolvers.js";
+import type { BatchConfig, RetryPolicy } from "./resolvers.js";
 import type {
   InferDerivations,
   InferEvents,
@@ -17,7 +18,6 @@ import type {
   InferSchemaType,
   ModuleSchema,
 } from "./schema.js";
-import type { RetryPolicy, BatchConfig } from "./resolvers.js";
 
 // ============================================================================
 // Derive Accessor Types
