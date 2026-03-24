@@ -169,51 +169,71 @@ export function createFactsStore<S extends Schema>(
     return safeStringify(value);
   }
 
-  /** Validate a value against the schema */
-  function validateValue(key: string, value: unknown): void {
-    if (!validate) return;
+  /** Get a human-readable type label for a value */
+  function describeValueType(value: unknown): string {
+    if (value === null) {
+      return "null";
+    }
+    if (Array.isArray(value)) {
+      return "array";
+    }
 
-    const schemaType = schema[key];
-    if (!schemaType) {
-      if (strictKeys) {
-        throw new Error(
-          `[Directive] Unknown fact key: "${key}". Key not defined in schema.`,
-        );
+    return typeof value;
+  }
+
+  /** Validate a value against a Zod schema */
+  function validateZod(
+    key: string,
+    value: unknown,
+    schemaType: ReturnType<
+      typeof isZodSchema extends (v: unknown) => v is infer R ? () => R : never
+    >,
+  ): void {
+    const result = (
+      schemaType as {
+        safeParse: (v: unknown) => {
+          success: boolean;
+          error?: { message?: string; issues?: Array<{ message: string }> };
+        };
       }
-      console.warn(`[Directive] Unknown fact key: "${key}"`);
+    ).safeParse(value);
+    if (result.success) {
       return;
     }
 
-    // Check for Zod schema (robust detection: safeParse + _def + parse)
-    if (isZodSchema(schemaType)) {
-      const result = schemaType.safeParse(value);
-      if (!result.success) {
-        const valueType =
-          value === null
-            ? "null"
-            : Array.isArray(value)
-              ? "array"
-              : typeof value;
-        const valuePreview = formatValueForError(value);
-        // Extract error message safely from Zod error structure
-        const errorMessage =
-          result.error?.message ??
-          result.error?.issues?.[0]?.message ??
-          "Validation failed";
-        const expectedType = getExpectedType(schemaType);
-        throw new Error(
-          `[Directive] Validation failed for "${key}": expected ${expectedType}, got ${valueType} ${valuePreview}. ${errorMessage}`,
-        );
-      }
-      return;
+    const valueType = describeValueType(value);
+    const valuePreview = formatValueForError(value);
+    const errorMessage =
+      result.error?.message ??
+      result.error?.issues?.[0]?.message ??
+      "Validation failed";
+    const expectedType = getExpectedType(schemaType);
+    throw new Error(
+      `[Directive] Validation failed for "${key}": expected ${expectedType}, got ${valueType} ${valuePreview}. ${errorMessage}`,
+    );
+  }
+
+  /** Build the index hint string for array validation failures */
+  function getIndexHint(st: { _lastFailedIndex?: number }): string {
+    if (typeof st._lastFailedIndex === "number" && st._lastFailedIndex >= 0) {
+      const hint = ` (element at index ${st._lastFailedIndex} failed)`;
+      st._lastFailedIndex = -1; // Reset for next validation
+      return hint;
     }
 
-    // Check for our SchemaType (has _validators array)
-    const st = schemaType as {
+    return "";
+  }
+
+  /** Validate a value against our SchemaType validators */
+  function validateSchemaType(
+    key: string,
+    value: unknown,
+    st: {
       _validators?: unknown;
       _typeName?: string;
       _lastFailedIndex?: number;
-    };
+    },
+  ): void {
     const validators = st._validators;
 
     // Ensure validators is an array before iterating
@@ -226,33 +246,54 @@ export function createFactsStore<S extends Schema>(
     for (let i = 0; i < validators.length; i++) {
       const validator = validators[i];
       if (typeof validator !== "function") continue;
+      if (validator(value as never)) continue;
 
-      if (!validator(value as never)) {
-        const valueType =
-          value === null
-            ? "null"
-            : Array.isArray(value)
-              ? "array"
-              : typeof value;
-        const valuePreview = formatValueForError(value);
-
-        // Check for array index failure from schema type
-        let indexHint = "";
-        if (
-          typeof st._lastFailedIndex === "number" &&
-          st._lastFailedIndex >= 0
-        ) {
-          indexHint = ` (element at index ${st._lastFailedIndex} failed)`;
-          st._lastFailedIndex = -1; // Reset for next validation
-        }
-
-        // Include expected type in error message
-        const validatorHint = i === 0 ? "" : ` (validator ${i + 1} failed)`;
-        throw new Error(
-          `[Directive] Validation failed for "${key}": expected ${expectedType}, got ${valueType} ${valuePreview}${validatorHint}${indexHint}`,
-        );
-      }
+      const valueType = describeValueType(value);
+      const valuePreview = formatValueForError(value);
+      const indexHint = getIndexHint(st);
+      const validatorHint = i === 0 ? "" : ` (validator ${i + 1} failed)`;
+      throw new Error(
+        `[Directive] Validation failed for "${key}": expected ${expectedType}, got ${valueType} ${valuePreview}${validatorHint}${indexHint}`,
+      );
     }
+  }
+
+  /** Validate unknown schema key */
+  function validateUnknownKey(key: string): void {
+    if (strictKeys) {
+      throw new Error(
+        `[Directive] Unknown fact key: "${key}". Key not defined in schema.`,
+      );
+    }
+    console.warn(`[Directive] Unknown fact key: "${key}"`);
+  }
+
+  /** Validate a value against the schema */
+  function validateValue(key: string, value: unknown): void {
+    if (!validate) {
+      return;
+    }
+
+    const schemaType = schema[key];
+    if (!schemaType) {
+      validateUnknownKey(key);
+      return;
+    }
+
+    if (isZodSchema(schemaType)) {
+      validateZod(key, value, schemaType);
+      return;
+    }
+
+    validateSchemaType(
+      key,
+      value,
+      schemaType as {
+        _validators?: unknown;
+        _typeName?: string;
+        _lastFailedIndex?: number;
+      },
+    );
   }
 
   /** Notify listeners for a specific key */
@@ -285,34 +326,44 @@ export function createFactsStore<S extends Schema>(
       notifyAll();
 
       // Process any changes that were deferred during notification
-      let iterations = 0;
-      while (pendingNonBatchedChanges.length > 0) {
-        if (++iterations > MAX_NOTIFY_ITERATIONS) {
-          pendingNonBatchedChanges.length = 0;
-          throw new Error(
-            `[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations. ` +
-              "A listener is repeatedly mutating facts that re-trigger notifications.",
-          );
-        }
-
-        const deferred = [...pendingNonBatchedChanges];
-        pendingNonBatchedChanges.length = 0;
-
-        for (const change of deferred) {
-          onChange?.(change.key, change.value, change.prev);
-          notifyKey(change.key);
-        }
-        // Single notifyAll for all deferred changes in this iteration
-        notifyAll();
-      }
+      drainDeferredNotifications(
+        ". A listener is repeatedly mutating facts that re-trigger notifications",
+      );
     } finally {
       isNotifying = false;
     }
   }
 
+  /**
+   * Drain deferred notifications that accumulated during a notification cycle.
+   * Must be called while isNotifying is true.
+   */
+  function drainDeferredNotifications(context: string): void {
+    let iterations = 0;
+    while (pendingNonBatchedChanges.length > 0) {
+      if (++iterations > MAX_NOTIFY_ITERATIONS) {
+        pendingNonBatchedChanges.length = 0;
+        throw new Error(
+          `[Directive] Infinite notification loop detected after ${MAX_NOTIFY_ITERATIONS} iterations${context}.`,
+        );
+      }
+
+      const deferred = [...pendingNonBatchedChanges];
+      pendingNonBatchedChanges.length = 0;
+
+      for (const change of deferred) {
+        onChange?.(change.key, change.value, change.prev);
+        notifyKey(change.key);
+      }
+      notifyAll();
+    }
+  }
+
   /** Flush batched changes and notify */
   function flush(): void {
-    if (batching > 0) return;
+    if (batching > 0) {
+      return;
+    }
 
     // Notify batch callback
     if (onBatch && batchChanges.length > 0) {
@@ -327,26 +378,7 @@ export function createFactsStore<S extends Schema>(
           notifyKey(key);
         }
         notifyAll();
-
-        // Process any changes deferred during flush notification
-        let iterations = 0;
-        while (pendingNonBatchedChanges.length > 0) {
-          if (++iterations > MAX_NOTIFY_ITERATIONS) {
-            pendingNonBatchedChanges.length = 0;
-            throw new Error(
-              `[Directive] Infinite notification loop detected during flush after ${MAX_NOTIFY_ITERATIONS} iterations.`,
-            );
-          }
-
-          const deferred = [...pendingNonBatchedChanges];
-          pendingNonBatchedChanges.length = 0;
-
-          for (const change of deferred) {
-            onChange?.(change.key, change.value, change.prev);
-            notifyKey(change.key);
-          }
-          notifyAll();
-        }
+        drainDeferredNotifications(" during flush");
       } finally {
         isNotifying = false;
       }
