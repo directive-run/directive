@@ -55,46 +55,66 @@ export function normalizeError(error: unknown): Error {
 export function stableStringify(value: unknown, maxDepth = 50): string {
   const seen = new WeakSet();
 
-  function stringify(val: unknown, depth: number): string {
-    if (depth > maxDepth) {
-      return '"[max depth exceeded]"';
-    }
-
+  function stringifyPrimitive(val: unknown): string | undefined {
     if (val === null) return "null";
     if (val === undefined) return "undefined";
 
     const type = typeof val;
-
     if (type === "string") return JSON.stringify(val);
     if (type === "number" || type === "boolean") return String(val);
     if (type === "function") return '"[function]"';
     if (type === "symbol") return '"[symbol]"';
 
-    if (Array.isArray(val)) {
-      // Check for circular reference
-      if (seen.has(val)) {
-        return '"[circular]"';
-      }
-      seen.add(val);
-      const result = `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`;
-      seen.delete(val);
-      return result;
-    }
+    return undefined;
+  }
 
-    if (type === "object") {
-      const obj = val as Record<string, unknown>;
-      // Check for circular reference
-      if (seen.has(obj)) {
-        return '"[circular]"';
-      }
-      seen.add(obj);
+  function withCircularGuard(
+    obj: object,
+    fn: () => string,
+  ): string {
+    if (seen.has(obj)) {
+      return '"[circular]"';
+    }
+    seen.add(obj);
+    const result = fn();
+    seen.delete(obj);
+
+    return result;
+  }
+
+  function stringifyArray(val: unknown[], depth: number): string {
+    return withCircularGuard(val, () =>
+      `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`,
+    );
+  }
+
+  function stringifyObject(obj: Record<string, unknown>, depth: number): string {
+    return withCircularGuard(obj, () => {
       const keys = Object.keys(obj).sort();
       const pairs = keys.map(
         (k) => `${JSON.stringify(k)}:${stringify(obj[k], depth + 1)}`,
       );
-      const result = `{${pairs.join(",")}}`;
-      seen.delete(obj);
-      return result;
+
+      return `{${pairs.join(",")}}`;
+    });
+  }
+
+  function stringify(val: unknown, depth: number): string {
+    if (depth > maxDepth) {
+      return '"[max depth exceeded]"';
+    }
+
+    const primitive = stringifyPrimitive(val);
+    if (primitive !== undefined) {
+      return primitive;
+    }
+
+    if (Array.isArray(val)) {
+      return stringifyArray(val, depth);
+    }
+
+    if (typeof val === "object") {
+      return stringifyObject(val as Record<string, unknown>, depth);
     }
 
     return '"[unknown]"';
@@ -115,6 +135,41 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
   const dangerousKeys = new Set(["__proto__", "constructor", "prototype"]);
   const seen = new WeakSet();
 
+  function withCircularGuard(
+    objVal: object,
+    fn: () => boolean,
+  ): boolean {
+    if (seen.has(objVal)) return true;
+    seen.add(objVal);
+    const result = fn();
+    seen.delete(objVal);
+
+    return result;
+  }
+
+  function checkArray(arr: unknown[], depth: number): boolean {
+    for (const item of arr) {
+      if (!check(item, depth + 1)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function checkObject(objVal: Record<string, unknown>, depth: number): boolean {
+    for (const key of Object.keys(objVal)) {
+      if (dangerousKeys.has(key)) {
+        return false;
+      }
+      if (!check(objVal[key], depth + 1)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   function check(val: unknown, depth: number): boolean {
     if (depth > maxDepth) return false; // Fail safe at max depth - don't assume safety
     if (val === null || val === undefined) return true;
@@ -122,36 +177,11 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
 
     const objVal = val as Record<string, unknown>;
 
-    // Check for circular reference
-    if (seen.has(objVal)) return true;
-    seen.add(objVal);
-
-    // Check array elements
     if (Array.isArray(objVal)) {
-      for (const item of objVal) {
-        if (!check(item, depth + 1)) {
-          seen.delete(objVal);
-          return false;
-        }
-      }
-      seen.delete(objVal);
-      return true;
+      return withCircularGuard(objVal, () => checkArray(objVal, depth));
     }
 
-    // Check object keys and values
-    for (const key of Object.keys(objVal)) {
-      if (dangerousKeys.has(key)) {
-        seen.delete(objVal);
-        return false;
-      }
-      if (!check(objVal[key], depth + 1)) {
-        seen.delete(objVal);
-        return false;
-      }
-    }
-
-    seen.delete(objVal);
-    return true;
+    return withCircularGuard(objVal, () => checkObject(objVal, depth));
   }
 
   return check(obj, 0);
@@ -364,63 +394,56 @@ export function diffSnapshots<T = Record<string, unknown>>(
 ): SnapshotDiff {
   const changes: SnapshotDiffEntry[] = [];
 
-  // Deep compare function
-  function compare(oldObj: unknown, newObj: unknown, path: string): void {
-    // Handle null/undefined
+  function pushChange(
+    path: string,
+    oldValue: unknown,
+    newValue: unknown,
+    type: SnapshotDiffEntry["type"],
+  ): void {
+    changes.push({ path, oldValue, newValue, type });
+  }
+
+  function compareNullish(
+    oldObj: unknown,
+    newObj: unknown,
+    path: string,
+  ): boolean {
     if (oldObj === null || oldObj === undefined) {
       if (newObj !== null && newObj !== undefined) {
-        changes.push({
-          path,
-          oldValue: oldObj,
-          newValue: newObj,
-          type: "added",
-        });
+        pushChange(path, oldObj, newObj, "added");
       }
-      return;
+
+      return true;
     }
     if (newObj === null || newObj === undefined) {
-      changes.push({
-        path,
-        oldValue: oldObj,
-        newValue: newObj,
-        type: "removed",
-      });
-      return;
+      pushChange(path, oldObj, newObj, "removed");
+
+      return true;
     }
 
-    // Handle primitives
-    if (typeof oldObj !== "object" || typeof newObj !== "object") {
-      if (!Object.is(oldObj, newObj)) {
-        changes.push({
-          path,
-          oldValue: oldObj,
-          newValue: newObj,
-          type: "changed",
-        });
-      }
+    return false;
+  }
+
+  function compareArrays(
+    oldArr: unknown[],
+    newArr: unknown[],
+    path: string,
+  ): void {
+    if (oldArr.length !== newArr.length) {
+      pushChange(path, oldArr, newArr, "changed");
+
       return;
     }
-
-    // Handle arrays
-    if (Array.isArray(oldObj) && Array.isArray(newObj)) {
-      if (oldObj.length !== newObj.length) {
-        changes.push({
-          path,
-          oldValue: oldObj,
-          newValue: newObj,
-          type: "changed",
-        });
-        return;
-      }
-      for (let i = 0; i < oldObj.length; i++) {
-        compare(oldObj[i], newObj[i], `${path}[${i}]`);
-      }
-      return;
+    for (let i = 0; i < oldArr.length; i++) {
+      compare(oldArr[i], newArr[i], `${path}[${i}]`);
     }
+  }
 
-    // Handle objects
-    const oldRecord = oldObj as Record<string, unknown>;
-    const newRecord = newObj as Record<string, unknown>;
+  function compareObjects(
+    oldRecord: Record<string, unknown>,
+    newRecord: Record<string, unknown>,
+    path: string,
+  ): void {
     const allKeys = new Set([
       ...Object.keys(oldRecord),
       ...Object.keys(newRecord),
@@ -429,23 +452,42 @@ export function diffSnapshots<T = Record<string, unknown>>(
     for (const key of allKeys) {
       const childPath = path ? `${path}.${key}` : key;
       if (!(key in oldRecord)) {
-        changes.push({
-          path: childPath,
-          oldValue: undefined,
-          newValue: newRecord[key],
-          type: "added",
-        });
+        pushChange(childPath, undefined, newRecord[key], "added");
       } else if (!(key in newRecord)) {
-        changes.push({
-          path: childPath,
-          oldValue: oldRecord[key],
-          newValue: undefined,
-          type: "removed",
-        });
+        pushChange(childPath, oldRecord[key], undefined, "removed");
       } else {
         compare(oldRecord[key], newRecord[key], childPath);
       }
     }
+  }
+
+  function compare(oldObj: unknown, newObj: unknown, path: string): void {
+    if (compareNullish(oldObj, newObj, path)) {
+      return;
+    }
+
+    // Handle primitives
+    if (typeof oldObj !== "object" || typeof newObj !== "object") {
+      if (!Object.is(oldObj, newObj)) {
+        pushChange(path, oldObj, newObj, "changed");
+      }
+
+      return;
+    }
+
+    // Handle arrays
+    if (Array.isArray(oldObj) && Array.isArray(newObj)) {
+      compareArrays(oldObj, newObj, path);
+
+      return;
+    }
+
+    // Handle objects
+    compareObjects(
+      oldObj as Record<string, unknown>,
+      newObj as Record<string, unknown>,
+      path,
+    );
   }
 
   // Compare data
