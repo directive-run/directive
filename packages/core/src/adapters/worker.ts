@@ -173,81 +173,97 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
   let stopResolve: (() => void) | null = null;
   let destroyResolve: (() => void) | null = null;
 
+  // ---- Outbound message handlers ----
+
+  function resolveLifecycle(
+    resolve: (() => void) | null,
+  ): (() => void) | null {
+    resolve?.();
+
+    return null;
+  }
+
+  function resolvePendingRequest(requestId: string, value: unknown): void {
+    const pending = pendingRequests.get(requestId);
+    if (pending) {
+      pending.resolve(value);
+      pendingRequests.delete(requestId);
+    }
+  }
+
+  function handleReady(): void {
+    initResolve = resolveLifecycle(initResolve);
+  }
+
+  function handleStarted(): void {
+    startResolve = resolveLifecycle(startResolve);
+  }
+
+  function handleStopped(): void {
+    stopResolve = resolveLifecycle(stopResolve);
+  }
+
+  function handleDestroyed(): void {
+    destroyResolve = resolveLifecycle(destroyResolve);
+  }
+
+  function handleFactChanged(message: Extract<WorkerOutboundMessage, { type: "FACT_CHANGED" }>): void {
+    onFactChange?.(message.key, message.value, message.prev);
+  }
+
+  function handleDerivationChanged(message: Extract<WorkerOutboundMessage, { type: "DERIVATION_CHANGED" }>): void {
+    onDerivationChange?.(message.key, message.value);
+  }
+
+  function handleRequirementCreated(message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_CREATED" }>): void {
+    onRequirementCreated?.(message.requirement);
+  }
+
+  function handleRequirementMet(message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_MET" }>): void {
+    onRequirementMet?.(message.requirementId, message.resolverId);
+  }
+
+  function handleError(message: Extract<WorkerOutboundMessage, { type: "ERROR" }>): void {
+    onError?.(message.error, message.source);
+  }
+
+  function handleSnapshotResult(message: Extract<WorkerOutboundMessage, { type: "SNAPSHOT_RESULT" }>): void {
+    resolvePendingRequest(message.requestId, message.snapshot);
+  }
+
+  function handleInspectResult(message: Extract<WorkerOutboundMessage, { type: "INSPECT_RESULT" }>): void {
+    resolvePendingRequest(message.requestId, message.inspection);
+  }
+
+  function handleSettleResult(message: Extract<WorkerOutboundMessage, { type: "SETTLE_RESULT" }>): void {
+    const pending = pendingRequests.get(message.requestId);
+    if (pending) {
+      if (message.success) {
+        pending.resolve(undefined);
+      } else {
+        pending.reject(new Error(message.error || "Settle failed"));
+      }
+      pendingRequests.delete(message.requestId);
+    }
+  }
+
   // Handle messages from worker
   worker.onmessage = (event: MessageEvent<WorkerOutboundMessage>) => {
     const message = event.data;
 
     switch (message.type) {
-      case "READY":
-        initResolve?.();
-        initResolve = null;
-        break;
-
-      case "STARTED":
-        startResolve?.();
-        startResolve = null;
-        break;
-
-      case "STOPPED":
-        stopResolve?.();
-        stopResolve = null;
-        break;
-
-      case "DESTROYED":
-        destroyResolve?.();
-        destroyResolve = null;
-        break;
-
-      case "FACT_CHANGED":
-        onFactChange?.(message.key, message.value, message.prev);
-        break;
-
-      case "DERIVATION_CHANGED":
-        onDerivationChange?.(message.key, message.value);
-        break;
-
-      case "REQUIREMENT_CREATED":
-        onRequirementCreated?.(message.requirement);
-        break;
-
-      case "REQUIREMENT_MET":
-        onRequirementMet?.(message.requirementId, message.resolverId);
-        break;
-
-      case "ERROR":
-        onError?.(message.error, message.source);
-        break;
-
-      case "SNAPSHOT_RESULT": {
-        const pending = pendingRequests.get(message.requestId);
-        if (pending) {
-          pending.resolve(message.snapshot);
-          pendingRequests.delete(message.requestId);
-        }
-        break;
-      }
-
-      case "INSPECT_RESULT": {
-        const pending = pendingRequests.get(message.requestId);
-        if (pending) {
-          pending.resolve(message.inspection);
-          pendingRequests.delete(message.requestId);
-        }
-        break;
-      }
-
-      case "SETTLE_RESULT": {
-        const pending = pendingRequests.get(message.requestId);
-        if (pending) {
-          if (message.success) {
-            pending.resolve(undefined);
-          } else {
-            pending.reject(new Error(message.error || "Settle failed"));
-          }
-          pendingRequests.delete(message.requestId);
-        }
-        break;
-      }
+      case "READY": return handleReady();
+      case "STARTED": return handleStarted();
+      case "STOPPED": return handleStopped();
+      case "DESTROYED": return handleDestroyed();
+      case "FACT_CHANGED": return handleFactChanged(message);
+      case "DERIVATION_CHANGED": return handleDerivationChanged(message);
+      case "REQUIREMENT_CREATED": return handleRequirementCreated(message);
+      case "REQUIREMENT_MET": return handleRequirementMet(message);
+      case "ERROR": return handleError(message);
+      case "SNAPSHOT_RESULT": return handleSnapshotResult(message);
+      case "INSPECT_RESULT": return handleInspectResult(message);
+      case "SETTLE_RESULT": return handleSettleResult(message);
     }
   };
 
@@ -393,115 +409,135 @@ export function registerWorkerModule(name: string, module: any): void {
 export function handleWorkerMessages(): void {
   // Dynamic import to avoid issues in non-worker contexts
   // The actual system creation happens when messages are received
-  let system: Awaited<ReturnType<typeof createWorkerSystem>> | null = null;
+  type WorkerSystem = Awaited<ReturnType<typeof createWorkerSystem>>;
+  let system: WorkerSystem | null = null;
+
+  // ---- Inbound message handlers ----
+
+  async function handleInit(
+    message: Extract<WorkerInboundMessage, { type: "INIT" }>,
+  ): Promise<WorkerSystem> {
+    const created = await createWorkerSystem(message.config);
+    postMessage({ type: "READY" } satisfies WorkerOutboundMessage);
+
+    return created;
+  }
+
+  function handleStart(sys: WorkerSystem): void {
+    sys.start();
+    postMessage({ type: "STARTED" } satisfies WorkerOutboundMessage);
+  }
+
+  function handleStop(sys: WorkerSystem): void {
+    sys.stop();
+    postMessage({ type: "STOPPED" } satisfies WorkerOutboundMessage);
+  }
+
+  function handleDestroy(sys: WorkerSystem): void {
+    sys.destroy();
+    postMessage({ type: "DESTROYED" } satisfies WorkerOutboundMessage);
+  }
+
+  function handleGetSnapshot(
+    sys: WorkerSystem,
+    message: Extract<WorkerInboundMessage, { type: "GET_SNAPSHOT" }>,
+  ): void {
+    const snapshot = sys.getSnapshot(message.options);
+    postMessage({
+      type: "SNAPSHOT_RESULT",
+      requestId: message.requestId,
+      snapshot,
+    } satisfies WorkerOutboundMessage);
+  }
+
+  function handleInspect(
+    sys: WorkerSystem,
+    message: Extract<WorkerInboundMessage, { type: "INSPECT" }>,
+  ): void {
+    const inspection = sys.inspect();
+    postMessage({
+      type: "INSPECT_RESULT",
+      requestId: message.requestId,
+      inspection,
+    } satisfies WorkerOutboundMessage);
+  }
+
+  async function handleSettle(
+    sys: WorkerSystem,
+    message: Extract<WorkerInboundMessage, { type: "SETTLE" }>,
+  ): Promise<void> {
+    try {
+      await sys.settle(message.timeout);
+      postMessage({
+        type: "SETTLE_RESULT",
+        requestId: message.requestId,
+        success: true,
+      } satisfies WorkerOutboundMessage);
+    } catch (error) {
+      postMessage({
+        type: "SETTLE_RESULT",
+        requestId: message.requestId,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      } satisfies WorkerOutboundMessage);
+    }
+  }
+
+  // ---- Message dispatch ----
+
+  async function dispatchMessage(
+    message: WorkerInboundMessage,
+  ): Promise<void> {
+    if (message.type === "INIT") {
+      system = await handleInit(message);
+
+      return;
+    }
+
+    if (!system) {
+      return;
+    }
+
+    switch (message.type) {
+      case "START":
+        handleStart(system);
+        break;
+      case "STOP":
+        handleStop(system);
+        break;
+      case "DESTROY":
+        handleDestroy(system);
+        system = null;
+        break;
+      case "SET_FACT":
+        system.setFact(message.key, message.value);
+        break;
+      case "SET_FACTS":
+        system.setFacts(message.facts);
+        break;
+      case "DISPATCH":
+        system.dispatch(message.event);
+        break;
+      case "GET_SNAPSHOT":
+        handleGetSnapshot(system, message);
+        break;
+      case "INSPECT":
+        handleInspect(system, message);
+        break;
+      case "SETTLE":
+        await handleSettle(system, message);
+        break;
+    }
+  }
 
   self.onmessage = async (event: MessageEvent<WorkerInboundMessage>) => {
-    const message = event.data;
-
     try {
-      switch (message.type) {
-        case "INIT": {
-          system = await createWorkerSystem(message.config);
-          postMessage({ type: "READY" } satisfies WorkerOutboundMessage);
-          break;
-        }
-
-        case "START": {
-          if (system) {
-            system.start();
-            postMessage({ type: "STARTED" } satisfies WorkerOutboundMessage);
-          }
-          break;
-        }
-
-        case "STOP": {
-          if (system) {
-            system.stop();
-            postMessage({ type: "STOPPED" } satisfies WorkerOutboundMessage);
-          }
-          break;
-        }
-
-        case "DESTROY": {
-          if (system) {
-            system.destroy();
-            system = null;
-            postMessage({ type: "DESTROYED" } satisfies WorkerOutboundMessage);
-          }
-          break;
-        }
-
-        case "SET_FACT": {
-          if (system) {
-            system.setFact(message.key, message.value);
-          }
-          break;
-        }
-
-        case "SET_FACTS": {
-          if (system) {
-            system.setFacts(message.facts);
-          }
-          break;
-        }
-
-        case "DISPATCH": {
-          if (system) {
-            system.dispatch(message.event);
-          }
-          break;
-        }
-
-        case "GET_SNAPSHOT": {
-          if (system) {
-            const snapshot = system.getSnapshot(message.options);
-            postMessage({
-              type: "SNAPSHOT_RESULT",
-              requestId: message.requestId,
-              snapshot,
-            } satisfies WorkerOutboundMessage);
-          }
-          break;
-        }
-
-        case "INSPECT": {
-          if (system) {
-            const inspection = system.inspect();
-            postMessage({
-              type: "INSPECT_RESULT",
-              requestId: message.requestId,
-              inspection,
-            } satisfies WorkerOutboundMessage);
-          }
-          break;
-        }
-
-        case "SETTLE": {
-          if (system) {
-            try {
-              await system.settle(message.timeout);
-              postMessage({
-                type: "SETTLE_RESULT",
-                requestId: message.requestId,
-                success: true,
-              } satisfies WorkerOutboundMessage);
-            } catch (error) {
-              postMessage({
-                type: "SETTLE_RESULT",
-                requestId: message.requestId,
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              } satisfies WorkerOutboundMessage);
-            }
-          }
-          break;
-        }
-      }
+      await dispatchMessage(event.data);
     } catch (error) {
       postMessage({
         type: "ERROR",
         error: error instanceof Error ? error.message : String(error),
-        source: message.type,
+        source: event.data.type,
       } satisfies WorkerOutboundMessage);
     }
   };
