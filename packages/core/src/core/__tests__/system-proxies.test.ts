@@ -156,6 +156,7 @@ describe("createModuleFactsProxy", () => {
 
   it("supports delete", () => {
     const proxy = createModuleFactsProxy(facts, "auth");
+    // biome-ignore lint/performance/noDelete: Testing proxy deleteProperty trap
     delete proxy.token;
 
     expect(facts["auth::token"]).toBeUndefined();

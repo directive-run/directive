@@ -12,8 +12,10 @@ const schema = { count: t.number(), name: t.string() };
 function setup(
   definitions: Record<
     string,
-    // biome-ignore lint/suspicious/noExplicitAny: Test helper — effect run signatures vary
-    { run: (...args: any[]) => any; deps?: string[] }
+    {
+      run: (...args: any[]) => any;
+      deps?: string[];
+    }
   > = {},
   callbacks: {
     onRun?: (id: string, deps: string[]) => void;
@@ -201,13 +203,11 @@ describe("effects", () => {
     });
 
     it("stores new cleanup after each run", async () => {
-      let cleanupCount = 0;
-      const cleanups: Array<ReturnType<typeof vi.fn>> = [];
+      const cleanups: ReturnType<typeof vi.fn>[] = [];
 
       const runFn = vi.fn(() => {
         const c = vi.fn();
         cleanups.push(c);
-        cleanupCount++;
 
         return c;
       });

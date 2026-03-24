@@ -226,7 +226,6 @@ describe("Single Module Mode", () => {
   it("throws when module is not provided", () => {
     expect(() => {
       createSystem({
-        // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input
         module: undefined as any,
       });
     }).toThrow("[Directive] createSystem requires a module");
@@ -418,7 +417,6 @@ describe("Namespaced Module Mode", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing unknown namespace access
     expect((system.facts as any).nonexistent).toBeUndefined();
 
     system.destroy();
@@ -428,7 +426,6 @@ describe("Namespaced Module Mode", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing unknown namespace access
     expect((system.derive as any).nonexistent).toBeUndefined();
 
     system.destroy();
@@ -438,7 +435,6 @@ describe("Namespaced Module Mode", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing unknown namespace access
     expect((system.events as any).nonexistent).toBeUndefined();
 
     system.destroy();
@@ -477,7 +473,6 @@ describe("Namespace Validation", () => {
         requirements: {},
       },
       init: (facts) => {
-        // biome-ignore lint/suspicious/noExplicitAny: Testing bad key
         (facts as any)["bad::key"] = 0;
       },
     });
@@ -489,14 +484,12 @@ describe("Namespace Validation", () => {
 
   it("throws when modules is an array", () => {
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input
       createSystem({ modules: [authModule, dataModule] as any });
     }).toThrow("expects modules as an object, not an array");
   });
 
   it("throws when a single module is passed to modules: instead of module:", () => {
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing invalid input
       createSystem({ modules: authModule as any });
     }).toThrow("single module was passed to `modules:`");
   });
@@ -548,7 +541,6 @@ describe("Topological Sort", () => {
         initOrder.push("dependent");
         facts.result = 0;
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const system = createSystem({
@@ -581,7 +573,6 @@ describe("Topological Sort", () => {
       init: (facts: Record<string, unknown>) => {
         facts.x = 0;
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const modB = createModule("mod-b", {
@@ -602,7 +593,6 @@ describe("Topological Sort", () => {
       init: (facts: Record<string, unknown>) => {
         facts.y = 0;
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     expect(() => {
@@ -642,7 +632,6 @@ describe("Topological Sort", () => {
     const system = createSystem({
       modules: { a: modA, b: modB },
       initOrder: ["b", "a"],
-      // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
     } as any);
     system.start();
 
@@ -680,7 +669,6 @@ describe("Topological Sort", () => {
       createSystem({
         modules: { a: modA, b: modB },
         initOrder: ["a"],
-        // biome-ignore lint/suspicious/noExplicitAny: Testing initOrder
       } as any);
     }).toThrow("initOrder is missing modules");
   });
@@ -695,7 +683,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const facts = system.facts as any;
     expect(facts.__proto__).toBeUndefined();
     expect(facts.constructor).toBeUndefined();
@@ -708,7 +695,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const authFacts = system.facts.auth as any;
     expect(authFacts.__proto__).toBeUndefined();
     expect(authFacts.constructor).toBeUndefined();
@@ -721,7 +707,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const derive = system.derive as any;
     expect(derive.__proto__).toBeUndefined();
     expect(derive.constructor).toBeUndefined();
@@ -734,7 +719,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const authDerive = system.derive.auth as any;
     expect(authDerive.__proto__).toBeUndefined();
     expect(authDerive.constructor).toBeUndefined();
@@ -747,7 +731,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const events = system.events as any;
     expect(events.__proto__).toBeUndefined();
     expect(events.constructor).toBeUndefined();
@@ -760,7 +743,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing blocked props
     const authEvents = system.events.auth as any;
     expect(authEvents.__proto__).toBeUndefined();
     expect(authEvents.constructor).toBeUndefined();
@@ -774,11 +756,8 @@ describe("Proxy Security", () => {
     system.start();
 
     const sym = Symbol("test");
-    // biome-ignore lint/suspicious/noExplicitAny: Testing symbol access
     expect((system.facts as any)[sym]).toBeUndefined();
-    // biome-ignore lint/suspicious/noExplicitAny: Testing symbol access
     expect((system.derive as any)[sym]).toBeUndefined();
-    // biome-ignore lint/suspicious/noExplicitAny: Testing symbol access
     expect((system.events as any)[sym]).toBeUndefined();
 
     system.destroy();
@@ -805,7 +784,6 @@ describe("Proxy Security", () => {
     expect(Reflect.defineProperty(system.derive, "test", { value: 1 })).toBe(
       false,
     );
-    // biome-ignore lint/suspicious/noExplicitAny: Testing proxy trap
     expect(
       Reflect.defineProperty(system.events as any, "test", { value: 1 }),
     ).toBe(false);
@@ -819,7 +797,6 @@ describe("Proxy Security", () => {
 
     expect(Reflect.setPrototypeOf(system.facts, {})).toBe(false);
     expect(Reflect.setPrototypeOf(system.derive, {})).toBe(false);
-    // biome-ignore lint/suspicious/noExplicitAny: Testing proxy trap
     expect(Reflect.setPrototypeOf(system.events as any, {})).toBe(false);
 
     system.destroy();
@@ -831,7 +808,6 @@ describe("Proxy Security", () => {
 
     expect(Reflect.getPrototypeOf(system.facts)).toBeNull();
     expect(Reflect.getPrototypeOf(system.derive)).toBeNull();
-    // biome-ignore lint/suspicious/noExplicitAny: Testing proxy trap
     expect(Reflect.getPrototypeOf(system.events as any)).toBeNull();
 
     system.destroy();
@@ -841,7 +817,6 @@ describe("Proxy Security", () => {
     const system = createSystem({ module: createSingleModule() });
     system.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing proxy trap
     const result = Reflect.set(system.events as any, "increment", () => {});
     expect(result).toBe(false);
 
@@ -1048,7 +1023,6 @@ describe("InitialFacts & Hydration", () => {
         auth: { token: "initial-token", loggedIn: true },
         data: { count: 10, items: ["a", "b"] },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Testing initialFacts
     } as any);
     system.start();
 
@@ -1219,7 +1193,6 @@ describe("Cross-Module Dependencies", () => {
           return baseValue * mult;
         },
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Testing crossModuleDeps
     } as any);
 
     const system = createSystem({
@@ -1254,10 +1227,8 @@ describe("Dynamic Module Registration", () => {
       },
     });
 
-    // biome-ignore lint/suspicious/noExplicitAny: Testing registerModule
     (system as any).registerModule("settings", newModule);
 
-    // biome-ignore lint/suspicious/noExplicitAny: Accessing dynamic namespace
     expect((system.facts as any).settings.theme).toBe("dark");
 
     system.destroy();
@@ -1268,7 +1239,6 @@ describe("Dynamic Module Registration", () => {
     system.start();
 
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing registerModule
       (system as any).registerModule("auth", authModule);
     }).toThrow('Module namespace "auth" already exists');
 
@@ -1292,7 +1262,6 @@ describe("Dynamic Module Registration", () => {
     });
 
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing registerModule
       (system as any).registerModule("bad::name", newModule);
     }).toThrow('contains the reserved separator "::"');
 
@@ -1316,7 +1285,6 @@ describe("Dynamic Module Registration", () => {
     });
 
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Testing registerModule
       (system as any).registerModule("__proto__", newModule);
     }).toThrow("blocked property");
 
@@ -1348,7 +1316,6 @@ describe("when()", () => {
     system.start();
 
     const promise = system.when(
-      // biome-ignore lint/suspicious/noExplicitAny: Testing when() predicate
       (facts: any) => facts.auth.loggedIn === true,
     );
 
