@@ -77,7 +77,9 @@ describe("createPluginManager", () => {
       const order: string[] = [];
 
       pm.register(makePlugin("first", { onStart: () => order.push("first") }));
-      pm.register(makePlugin("second", { onStart: () => order.push("second") }));
+      pm.register(
+        makePlugin("second", { onStart: () => order.push("second") }),
+      );
       pm.register(makePlugin("third", { onStart: () => order.push("third") }));
 
       pm.emitStart({} as never);

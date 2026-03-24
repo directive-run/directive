@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  prefixModuleDefinition,
   type PrefixModuleOptions,
+  prefixModuleDefinition,
 } from "../system-module-transform.js";
 import type { ModuleDef, ModuleSchema } from "../types.js";
 

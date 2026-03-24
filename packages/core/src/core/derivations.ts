@@ -46,7 +46,10 @@ export interface DerivationsManager<
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
   /** Override an existing derivation function */
-  assignDefinition(id: string, fn: DerivationsDef<S>[keyof DerivationsDef<S>]): void;
+  assignDefinition(
+    id: string,
+    fn: DerivationsDef<S>[keyof DerivationsDef<S>],
+  ): void;
   /** Remove a derivation and clean up its state */
   unregisterDefinition(id: string): void;
   /** Compute a derivation immediately (ignores cache) */
@@ -482,7 +485,10 @@ export function createDerivationsManager<
       }
     },
 
-    assignDefinition(id: string, fn: DerivationsDef<S>[keyof DerivationsDef<S>]): void {
+    assignDefinition(
+      id: string,
+      fn: DerivationsDef<S>[keyof DerivationsDef<S>],
+    ): void {
       if (!definitions[id as keyof D]) {
         throw new Error(
           `[Directive] Cannot assign derivation "${id}" — it does not exist. Use register() to create it.`,

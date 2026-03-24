@@ -32,8 +32,7 @@ function counterModule() {
     },
     derive: {
       doubled: (facts) => (facts.count as number) * 2,
-      summary: (facts, derived) =>
-        `${facts.label}: ${derived.doubled}`,
+      summary: (facts, derived) => `${facts.label}: ${derived.doubled}`,
     },
     events: {
       increment: (facts) => {
@@ -933,9 +932,7 @@ describe("Engine — Security", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      "dangerous key",
-    );
+    expect(() => createSystem({ module: mod })).toThrow("dangerous key");
   });
 
   it("constructor key in schema throws", () => {
@@ -948,9 +945,7 @@ describe("Engine — Security", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      "dangerous key",
-    );
+    expect(() => createSystem({ module: mod })).toThrow("dangerous key");
   });
 
   it("prototype key in schema throws", () => {
@@ -963,9 +958,7 @@ describe("Engine — Security", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      "dangerous key",
-    );
+    expect(() => createSystem({ module: mod })).toThrow("dangerous key");
   });
 
   it("$ prefix keys in schema throw", () => {
@@ -978,9 +971,7 @@ describe("Engine — Security", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      'starting with "$"',
-    );
+    expect(() => createSystem({ module: mod })).toThrow('starting with "$"');
   });
 
   it("BLOCKED_PROPS in events definition throws", () => {
@@ -999,9 +990,7 @@ describe("Engine — Security", () => {
       } as any,
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      "dangerous key",
-    );
+    expect(() => createSystem({ module: mod })).toThrow("dangerous key");
   });
 
   it("BLOCKED_PROPS in dispatch event type is silently ignored", () => {

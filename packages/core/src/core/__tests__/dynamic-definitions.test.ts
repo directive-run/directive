@@ -740,7 +740,7 @@ describe("isDynamic / listDynamic", () => {
 
 describe("Deferred operations during reconciliation", () => {
   it("register from within an effect is deferred and applied after reconciliation", async () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Test — system type varies by overload
+    // biome-ignore lint/suspicious/noExplicitAny: Test — overloaded system type
     let systemRef: any = null;
 
     const module = createModule("deferred", {
@@ -1063,7 +1063,7 @@ describe("Namespaced system dynamic registration", () => {
 
 describe("Concurrent deferred operations", () => {
   it("multiple effects defer different operations in a single reconciliation", async () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Test — system type varies by overload
+    // biome-ignore lint/suspicious/noExplicitAny: Test — overloaded system type
     let systemRef: any = null;
 
     const module = createModule("concurrent-defer", {

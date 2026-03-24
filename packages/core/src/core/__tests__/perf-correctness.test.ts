@@ -1,11 +1,11 @@
-import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
+import { createModule, createSystem, t } from "../../index.js";
+import { createConstraintsManager } from "../constraints.js";
 import { createDerivationsManager } from "../derivations.js";
+import { createEffectsManager } from "../effects.js";
+import { createFacts } from "../facts.js";
 import { createFactsStore } from "../facts.js";
 import { createResolversManager } from "../resolvers.js";
-import { createConstraintsManager } from "../constraints.js";
-import { createEffectsManager } from "../effects.js";
-import { createModule, createSystem, t } from "../../index.js";
 
 // ============================================================================
 // Helpers
@@ -47,7 +47,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
 
     // Build a chain: d0 reads root, d1 reads d0, d2 reads d1, ..., d199 reads d198
     const defs: Record<string, (f: any, d: any) => unknown> = {};
-    defs["d0"] = (f: any) => f.root * 2;
+    defs.d0 = (f: any) => f.root * 2;
     for (let i = 1; i < CHAIN_LENGTH; i++) {
       const depKey = `d${i - 1}`;
       defs[`d${i}`] = (_f: any, d: any) => (d[depKey] ?? 0) + 1;

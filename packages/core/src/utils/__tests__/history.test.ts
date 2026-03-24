@@ -1,19 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  createHistoryManager,
-  createDisabledHistory,
-} from "../history.js";
-import { createFactsStore, createFactsProxy } from "../../core/facts.js";
+import { describe, expect, it, vi } from "vitest";
+import { createFactsProxy, createFactsStore } from "../../core/facts.js";
+import { createDisabledHistory, createHistoryManager } from "../history.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setup(opts: {
-  historyOption?: boolean | { maxSnapshots?: number };
-  onSnapshot?: (s: unknown) => void;
-  onHistoryChange?: (from: number, to: number) => void;
-} = {}) {
+function setup(
+  opts: {
+    historyOption?: boolean | { maxSnapshots?: number };
+    onSnapshot?: (s: unknown) => void;
+    onHistoryChange?: (from: number, to: number) => void;
+  } = {},
+) {
   const schema = { count: { _type: 0 }, name: { _type: "" } } as const;
   // biome-ignore lint/suspicious/noExplicitAny: Test helper — schema types are checked at runtime
   const store = createFactsStore({ schema } as any);
@@ -169,7 +168,12 @@ describe("createHistoryManager", () => {
   it("restore does nothing when disabled", () => {
     const { manager, facts } = setup({ historyOption: false });
     facts.count = 10;
-    const snap = { id: 1, timestamp: 0, facts: { count: 99, name: "x" }, trigger: "t" };
+    const snap = {
+      id: 1,
+      timestamp: 0,
+      facts: { count: 99, name: "x" },
+      trigger: "t",
+    };
     manager.restore(snap);
     expect(facts.count).toBe(10);
   });
@@ -357,8 +361,12 @@ describe("createHistoryManager", () => {
 
     manager.import("not json");
     manager.import(JSON.stringify({ version: 99 }));
-    manager.import(JSON.stringify({ version: 1, snapshots: "nope", currentIndex: 0 }));
-    manager.import(JSON.stringify({ version: 1, snapshots: [], currentIndex: "bad" }));
+    manager.import(
+      JSON.stringify({ version: 1, snapshots: "nope", currentIndex: 0 }),
+    );
+    manager.import(
+      JSON.stringify({ version: 1, snapshots: [], currentIndex: "bad" }),
+    );
     manager.import(
       JSON.stringify({
         version: 1,
@@ -373,7 +381,9 @@ describe("createHistoryManager", () => {
 
   it("import noop when disabled", () => {
     const { manager } = setup({ historyOption: false });
-    manager.import(JSON.stringify({ version: 1, snapshots: [], currentIndex: -1 }));
+    manager.import(
+      JSON.stringify({ version: 1, snapshots: [], currentIndex: -1 }),
+    );
   });
 
   // ---- changesets ---------------------------------------------------------

@@ -1,7 +1,7 @@
-import { createFacts } from "../facts.js";
 import { describe, expect, it, vi } from "vitest";
 import { t } from "../../index.js";
 import { createEffectsManager } from "../effects.js";
+import { createFacts } from "../facts.js";
 
 // ============================================================================
 // Helpers
@@ -10,9 +10,9 @@ import { createEffectsManager } from "../effects.js";
 const schema = { count: t.number(), name: t.string() };
 
 function setup(
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper — effect run signatures vary
   definitions: Record<
     string,
+    // biome-ignore lint/suspicious/noExplicitAny: Test helper — effect run signatures vary
     { run: (...args: any[]) => any; deps?: string[] }
   > = {},
   callbacks: {

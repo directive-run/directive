@@ -212,9 +212,7 @@ export function defaultEquality<T>(a: T, b: T): boolean {
  * Returns null when history is disabled.
  * @internal
  */
-export function buildHistoryState(
-  system: SystemLike,
-): HistoryState | null {
+export function buildHistoryState(system: SystemLike): HistoryState | null {
   const debug = system.history;
   if (!debug) return null;
 

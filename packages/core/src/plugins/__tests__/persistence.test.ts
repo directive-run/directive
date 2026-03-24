@@ -143,7 +143,9 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0]![0].message).toContain("prototype pollution");
+      expect(onError.mock.calls[0]![0].message).toContain(
+        "prototype pollution",
+      );
       // Facts should NOT have been modified
       expect(system.facts.__proto__).not.toHaveProperty("admin");
     });
@@ -165,7 +167,9 @@ describe("persistencePlugin", () => {
       plugin.onInit!(system);
 
       expect(onError).toHaveBeenCalledOnce();
-      expect(onError.mock.calls[0]![0].message).toContain("prototype pollution");
+      expect(onError.mock.calls[0]![0].message).toContain(
+        "prototype pollution",
+      );
     });
 
     it("does not throw when onError is not provided and JSON is invalid", () => {

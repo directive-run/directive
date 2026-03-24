@@ -1,14 +1,14 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SEPARATOR,
-  createModuleFactsProxy,
-  createNamespacedFactsProxy,
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
+  createModuleFactsProxy,
   createNamespacedDeriveProxy,
   createNamespacedEventsProxy,
-  toInternalKey,
+  createNamespacedFactsProxy,
   denormalizeFlatKeys,
+  toInternalKey,
 } from "../system-proxies.js";
 
 // ============================================================================
@@ -354,7 +354,9 @@ describe("createCrossModuleFactsProxy", () => {
     proxy.billing;
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Module "users" accessed undeclared cross-module property "billing"'),
+      expect.stringContaining(
+        'Module "users" accessed undeclared cross-module property "billing"',
+      ),
     );
 
     warnSpy.mockRestore();
@@ -513,10 +515,7 @@ describe("createModuleDeriveProxy", () => {
 
   describe("security hardening", () => {
     assertSecurityHardening(
-      createModuleDeriveProxy(
-        { "d::k": 1 } as Record<string, unknown>,
-        "d",
-      ),
+      createModuleDeriveProxy({ "d::k": 1 } as Record<string, unknown>, "d"),
       { readonly: true },
     );
   });
@@ -908,11 +907,10 @@ describe("ownKeys trap", () => {
   it("returns module names for namespaced facts proxy", () => {
     const facts: Record<string, unknown> = { "a::x": 1, "b::y": 2 };
     const modulesMap = { a: {}, b: {} };
-    const proxy = createNamespacedFactsProxy(
-      facts,
-      modulesMap as any,
-      () => ["a", "b"],
-    );
+    const proxy = createNamespacedFactsProxy(facts, modulesMap as any, () => [
+      "a",
+      "b",
+    ]);
 
     expect(Object.keys(proxy)).toEqual(["a", "b"]);
   });
@@ -948,11 +946,9 @@ describe("cross-proxy interaction", () => {
     const modulesMap = { auth: {} };
 
     const moduleProxy = createModuleFactsProxy(facts, "auth");
-    const nsProxy = createNamespacedFactsProxy(
-      facts,
-      modulesMap as any,
-      () => ["auth"],
-    );
+    const nsProxy = createNamespacedFactsProxy(facts, modulesMap as any, () => [
+      "auth",
+    ]);
 
     moduleProxy.token = "hello";
 
@@ -964,11 +960,10 @@ describe("cross-proxy interaction", () => {
     const modulesMap = { users: {}, auth: {} };
 
     const crossProxy = createCrossModuleFactsProxy(facts, "users", ["auth"]);
-    const nsProxy = createNamespacedFactsProxy(
-      facts,
-      modulesMap as any,
-      () => ["users", "auth"],
-    );
+    const nsProxy = createNamespacedFactsProxy(facts, modulesMap as any, () => [
+      "users",
+      "auth",
+    ]);
 
     crossProxy.self!.count = 5;
 

@@ -731,7 +731,9 @@ export function createTestSystem<Modules extends ModulesMap>(
     assertFactSet(key: string, value?: unknown): void {
       const changes = factsHistory.filter((c) => c.key === key);
       if (changes.length === 0) {
-        throw new Error(`[Directive] Expected fact "${key}" to be set but it was not`);
+        throw new Error(
+          `[Directive] Expected fact "${key}" to be set but it was not`,
+        );
       }
       if (value !== undefined) {
         const hasValue = changes.some((c) => c.newValue === value);

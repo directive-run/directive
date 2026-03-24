@@ -146,7 +146,10 @@ export interface ConstraintsManager<_S extends Schema> {
    * @param props - Optional properties to merge into the requirement.
    * @returns The emitted requirements (if any).
    */
-  callOne(id: string, props?: Record<string, unknown>): Promise<RequirementWithId[]>;
+  callOne(
+    id: string,
+    props?: Record<string, unknown>,
+  ): Promise<RequirementWithId[]>;
 }
 
 /**
@@ -290,7 +293,7 @@ export function createConstraintsManager<S extends Schema>(
         const cycle = [...path.slice(cycleStart), id].join(" → ");
         throw new Error(
           `[Directive] Constraint cycle detected: ${cycle}. ` +
-            "Remove one of the \`after\` dependencies to break the cycle.",
+            "Remove one of the `after` dependencies to break the cycle.",
         );
       }
 
@@ -481,7 +484,7 @@ export function createConstraintsManager<S extends Schema>(
         if (process.env.NODE_ENV !== "production") {
           console.warn(
             `[Directive] Constraint "${id}" returned a Promise but was not marked as async. ` +
-              "Add \`async: true\` to the constraint definition to avoid this warning and improve performance.",
+              "Add `async: true` to the constraint definition to avoid this warning and improve performance.",
           );
         }
 
@@ -1145,7 +1148,10 @@ export function createConstraintsManager<S extends Schema>(
       buildReverseDependencyMap();
     },
 
-    async callOne(id: string, props?: Record<string, unknown>): Promise<RequirementWithId[]> {
+    async callOne(
+      id: string,
+      props?: Record<string, unknown>,
+    ): Promise<RequirementWithId[]> {
       const def = definitions[id];
       if (!def) {
         throw new Error(

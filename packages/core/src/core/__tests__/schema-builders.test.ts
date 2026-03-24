@@ -3,7 +3,10 @@ import { t } from "../../index.js";
 import type { ExtendedSchemaType } from "../../index.js";
 
 /** Helper: run all _validators against a value */
-function validates<T>(schema: { _validators: Array<(v: T) => boolean> }, value: T): boolean {
+function validates<T>(
+  schema: { _validators: Array<(v: T) => boolean> },
+  value: T,
+): boolean {
   return schema._validators.every((fn) => fn(value));
 }
 
@@ -56,7 +59,9 @@ describe("t.string()", () => {
   });
 
   it(".transform() stores a transform function", () => {
-    const schema = t.string().transform((s) => s.toUpperCase()) as ExtendedSchemaType<string>;
+    const schema = t
+      .string()
+      .transform((s) => s.toUpperCase()) as ExtendedSchemaType<string>;
 
     expect(schema._transform!("hello")).toBe("HELLO");
   });
@@ -68,13 +73,20 @@ describe("t.string()", () => {
   });
 
   it(".describe() stores a description", () => {
-    const schema = t.string().describe("A name field") as ExtendedSchemaType<string>;
+    const schema = t
+      .string()
+      .describe("A name field") as ExtendedSchemaType<string>;
 
     expect(schema._description).toBe("A name field");
   });
 
   it(".refine() adds a validator and records the refinement", () => {
-    const schema = t.string().refine((s) => s.startsWith("@"), "must start with @") as ExtendedSchemaType<string>;
+    const schema = t
+      .string()
+      .refine(
+        (s) => s.startsWith("@"),
+        "must start with @",
+      ) as ExtendedSchemaType<string>;
 
     expect(validates(schema, "@user")).toBe(true);
     expect(validates(schema, "user")).toBe(false);
@@ -93,7 +105,9 @@ describe("t.string()", () => {
   it(".optional() accepts undefined and valid strings", () => {
     const schema = t.string().optional();
 
-    expect(validates(schema, undefined as unknown as string | undefined)).toBe(true);
+    expect(validates(schema, undefined as unknown as string | undefined)).toBe(
+      true,
+    );
     expect(validates(schema, "hello" as string | undefined)).toBe(true);
     expect(validates(schema, 42 as unknown as string | undefined)).toBe(false);
   });
@@ -152,19 +166,25 @@ describe("t.number()", () => {
   });
 
   it(".transform() stores a transform function", () => {
-    const schema = t.number().transform((n) => n * 2) as ExtendedSchemaType<number>;
+    const schema = t
+      .number()
+      .transform((n) => n * 2) as ExtendedSchemaType<number>;
 
     expect(schema._transform!(5)).toBe(10);
   });
 
   it(".describe() stores a description", () => {
-    const schema = t.number().describe("Age in years") as ExtendedSchemaType<number>;
+    const schema = t
+      .number()
+      .describe("Age in years") as ExtendedSchemaType<number>;
 
     expect(schema._description).toBe("Age in years");
   });
 
   it(".refine() adds a validator and records the refinement", () => {
-    const schema = t.number().refine((n) => n % 2 === 0, "must be even") as ExtendedSchemaType<number>;
+    const schema = t
+      .number()
+      .refine((n) => n % 2 === 0, "must be even") as ExtendedSchemaType<number>;
 
     expect(validates(schema, 4)).toBe(true);
     expect(validates(schema, 3)).toBe(false);
@@ -200,7 +220,9 @@ describe("t.boolean()", () => {
   });
 
   it(".describe() stores a description", () => {
-    const schema = t.boolean().describe("Is active") as ExtendedSchemaType<boolean>;
+    const schema = t
+      .boolean()
+      .describe("Is active") as ExtendedSchemaType<boolean>;
 
     expect(schema._description).toBe("Is active");
   });
@@ -263,13 +285,17 @@ describe("t.array()", () => {
   });
 
   it(".default() stores a default value", () => {
-    const schema = t.array<string>().default(["a"]) as ExtendedSchemaType<string[]>;
+    const schema = t.array<string>().default(["a"]) as ExtendedSchemaType<
+      string[]
+    >;
 
     expect(schema._default).toEqual(["a"]);
   });
 
   it(".describe() stores a description", () => {
-    const schema = t.array<string>().describe("Tags list") as ExtendedSchemaType<string[]>;
+    const schema = t
+      .array<string>()
+      .describe("Tags list") as ExtendedSchemaType<string[]>;
 
     expect(schema._description).toBe("Tags list");
   });
@@ -316,7 +342,9 @@ describe("t.object()", () => {
     });
 
     expect(validates(schema, { name: "Alice", age: 30 })).toBe(true);
-    expect(validates(schema, { name: "Alice", age: "30" as unknown as number })).toBe(false);
+    expect(
+      validates(schema, { name: "Alice", age: "30" as unknown as number }),
+    ).toBe(false);
   });
 
   it(".nonNull() rejects null and undefined", () => {
@@ -331,18 +359,27 @@ describe("t.object()", () => {
   it(".hasKeys() requires specific keys to be present", () => {
     const schema = t.object<Record<string, unknown>>().hasKeys("id", "name");
 
-    expect(validates(schema, { id: 1, name: "test", extra: true } as Record<string, unknown>)).toBe(true);
+    expect(
+      validates(schema, { id: 1, name: "test", extra: true } as Record<
+        string,
+        unknown
+      >),
+    ).toBe(true);
     expect(validates(schema, { id: 1 } as Record<string, unknown>)).toBe(false);
   });
 
   it(".default() stores a default value", () => {
-    const schema = t.object<{ x: number }>().default({ x: 0 }) as ExtendedSchemaType<{ x: number }>;
+    const schema = t
+      .object<{ x: number }>()
+      .default({ x: 0 }) as ExtendedSchemaType<{ x: number }>;
 
     expect(schema._default).toEqual({ x: 0 });
   });
 
   it(".describe() stores a description", () => {
-    const schema = t.object<{ x: number }>().describe("Position") as ExtendedSchemaType<{ x: number }>;
+    const schema = t
+      .object<{ x: number }>()
+      .describe("Position") as ExtendedSchemaType<{ x: number }>;
 
     expect(schema._description).toBe("Position");
   });
@@ -451,7 +488,9 @@ describe("t.optional()", () => {
   it("rejects values that fail inner validation and are not undefined", () => {
     const schema = t.optional(t.number());
 
-    expect(validates(schema, "nope" as unknown as number | undefined)).toBe(false);
+    expect(validates(schema, "nope" as unknown as number | undefined)).toBe(
+      false,
+    );
   });
 });
 
@@ -495,22 +534,35 @@ describe("t.record()", () => {
   it("accepts an object with all values matching the value type", () => {
     const schema = t.record(t.number());
 
-    expect(validates(schema, { a: 1, b: 2 } as Record<string, number>)).toBe(true);
+    expect(validates(schema, { a: 1, b: 2 } as Record<string, number>)).toBe(
+      true,
+    );
     expect(validates(schema, {} as Record<string, number>)).toBe(true);
   });
 
   it("rejects when any value fails the inner type validation", () => {
     const schema = t.record(t.number());
 
-    expect(validates(schema, { a: 1, b: "two" } as unknown as Record<string, number>)).toBe(false);
+    expect(
+      validates(schema, { a: 1, b: "two" } as unknown as Record<
+        string,
+        number
+      >),
+    ).toBe(false);
   });
 
   it("rejects non-object values", () => {
     const schema = t.record(t.string());
 
-    expect(validates(schema, null as unknown as Record<string, string>)).toBe(false);
-    expect(validates(schema, "str" as unknown as Record<string, string>)).toBe(false);
-    expect(validates(schema, [] as unknown as Record<string, string>)).toBe(false);
+    expect(validates(schema, null as unknown as Record<string, string>)).toBe(
+      false,
+    );
+    expect(validates(schema, "str" as unknown as Record<string, string>)).toBe(
+      false,
+    );
+    expect(validates(schema, [] as unknown as Record<string, string>)).toBe(
+      false,
+    );
   });
 });
 
@@ -522,20 +574,28 @@ describe("t.tuple()", () => {
   it("accepts a tuple with matching element types", () => {
     const schema = t.tuple(t.string(), t.number());
 
-    expect(validates(schema, ["hello", 42] as unknown as [string, number])).toBe(true);
+    expect(
+      validates(schema, ["hello", 42] as unknown as [string, number]),
+    ).toBe(true);
   });
 
   it("rejects a tuple with wrong length", () => {
     const schema = t.tuple(t.string(), t.number());
 
-    expect(validates(schema, ["hello"] as unknown as [string, number])).toBe(false);
-    expect(validates(schema, ["hello", 42, true] as unknown as [string, number])).toBe(false);
+    expect(validates(schema, ["hello"] as unknown as [string, number])).toBe(
+      false,
+    );
+    expect(
+      validates(schema, ["hello", 42, true] as unknown as [string, number]),
+    ).toBe(false);
   });
 
   it("rejects when element types do not match", () => {
     const schema = t.tuple(t.string(), t.number());
 
-    expect(validates(schema, [42, "hello"] as unknown as [string, number])).toBe(false);
+    expect(
+      validates(schema, [42, "hello"] as unknown as [string, number]),
+    ).toBe(false);
   });
 
   it("rejects non-array values", () => {
@@ -593,8 +653,12 @@ describe("t.uuid()", () => {
   it("accepts a valid UUID v4", () => {
     const schema = t.uuid();
 
-    expect(validates(schema, "550e8400-e29b-41d4-a716-446655440000")).toBe(true);
-    expect(validates(schema, "f47ac10b-58cc-4372-a567-0e02b2c3d479")).toBe(true);
+    expect(validates(schema, "550e8400-e29b-41d4-a716-446655440000")).toBe(
+      true,
+    );
+    expect(validates(schema, "f47ac10b-58cc-4372-a567-0e02b2c3d479")).toBe(
+      true,
+    );
   });
 
   it("rejects malformed UUIDs", () => {
@@ -696,7 +760,8 @@ describe("t.bigint()", () => {
 
 describe("chaining and composition", () => {
   it("chaining multiple validators preserves all checks", () => {
-    const schema = t.string()
+    const schema = t
+      .string()
       .validate((s) => s.length >= 3)
       .validate((s) => s.startsWith("a"));
 
@@ -706,7 +771,8 @@ describe("chaining and composition", () => {
   });
 
   it("transform composes with an existing transform", () => {
-    const schema = t.string()
+    const schema = t
+      .string()
       .transform((s) => s.trim())
       .transform((s) => s.toUpperCase()) as ExtendedSchemaType<string>;
 
@@ -714,9 +780,13 @@ describe("chaining and composition", () => {
   });
 
   it("multiple refines accumulate validators and refinement metadata", () => {
-    const schema = t.number()
+    const schema = t
+      .number()
       .refine((n) => n > 0, "must be positive")
-      .refine((n) => n < 100, "must be under 100") as ExtendedSchemaType<number>;
+      .refine(
+        (n) => n < 100,
+        "must be under 100",
+      ) as ExtendedSchemaType<number>;
 
     expect(validates(schema, 50)).toBe(true);
     expect(validates(schema, -1)).toBe(false);

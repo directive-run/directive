@@ -42,7 +42,7 @@ function mockSnapshot(id = 1, trigger = "manual") {
 }
 
 function mockDirectiveError(
-  source: string = "resolver",
+  source = "resolver",
   sourceId = "myResolver",
   message = "something broke",
 ) {
@@ -308,10 +308,11 @@ describe("loggingPlugin", () => {
 
         plugin.onFactSet!("status", "active", "idle");
 
-        expect(logger.debug).toHaveBeenCalledWith(
-          "[Directive] fact.set",
-          { key: "status", value: "active", prev: "idle" },
-        );
+        expect(logger.debug).toHaveBeenCalledWith("[Directive] fact.set", {
+          key: "status",
+          value: "active",
+          prev: "idle",
+        });
       });
 
       it("onFactDelete logs at debug", () => {
@@ -320,10 +321,10 @@ describe("loggingPlugin", () => {
 
         plugin.onFactDelete!("status", "active");
 
-        expect(logger.debug).toHaveBeenCalledWith(
-          "[Directive] fact.delete",
-          { key: "status", prev: "active" },
-        );
+        expect(logger.debug).toHaveBeenCalledWith("[Directive] fact.delete", {
+          key: "status",
+          prev: "active",
+        });
       });
 
       it("onFactsBatch logs at debug with count", () => {
@@ -336,10 +337,10 @@ describe("loggingPlugin", () => {
 
         plugin.onFactsBatch!(changes as never);
 
-        expect(logger.debug).toHaveBeenCalledWith(
-          "[Directive] facts.batch",
-          { count: 2, changes },
-        );
+        expect(logger.debug).toHaveBeenCalledWith("[Directive] facts.batch", {
+          count: 2,
+          changes,
+        });
       });
 
       it("onDerivationCompute logs at debug", () => {
@@ -372,7 +373,9 @@ describe("loggingPlugin", () => {
 
         plugin.onReconcileStart!({} as never);
 
-        expect(logger.debug).toHaveBeenCalledWith("[Directive] reconcile.start");
+        expect(logger.debug).toHaveBeenCalledWith(
+          "[Directive] reconcile.start",
+        );
       });
 
       it("onReconcileEnd logs at debug with counts", () => {
@@ -385,10 +388,12 @@ describe("loggingPlugin", () => {
 
         plugin.onReconcileEnd!(result as never);
 
-        expect(logger.debug).toHaveBeenCalledWith(
-          "[Directive] reconcile.end",
-          { unmet: 1, inflight: 0, completed: 1, canceled: 0 },
-        );
+        expect(logger.debug).toHaveBeenCalledWith("[Directive] reconcile.end", {
+          unmet: 1,
+          inflight: 0,
+          completed: 1,
+          canceled: 0,
+        });
       });
 
       it("onConstraintEvaluate logs at debug", () => {
@@ -444,7 +449,10 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger, level: "debug" });
 
-        plugin.onResolverCancel!("fetchUser", mockRequirement("req-7") as never);
+        plugin.onResolverCancel!(
+          "fetchUser",
+          mockRequirement("req-7") as never,
+        );
 
         expect(logger.debug).toHaveBeenCalledWith(
           "[Directive] resolver.cancel",
@@ -458,10 +466,9 @@ describe("loggingPlugin", () => {
 
         plugin.onEffectRun!("syncToStorage");
 
-        expect(logger.debug).toHaveBeenCalledWith(
-          "[Directive] effect.run",
-          { id: "syncToStorage" },
-        );
+        expect(logger.debug).toHaveBeenCalledWith("[Directive] effect.run", {
+          id: "syncToStorage",
+        });
       });
 
       it("onSnapshot logs at debug", () => {
@@ -513,7 +520,10 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger });
 
-        plugin.onRequirementMet!(mockRequirement("req-9") as never, "fetchUser");
+        plugin.onRequirementMet!(
+          mockRequirement("req-9") as never,
+          "fetchUser",
+        );
 
         expect(logger.info).toHaveBeenCalledWith(
           "[Directive] requirement.met",
@@ -525,7 +535,11 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger });
 
-        plugin.onResolverComplete!("fetchUser", mockRequirement("req-9") as never, 150);
+        plugin.onResolverComplete!(
+          "fetchUser",
+          mockRequirement("req-9") as never,
+          150,
+        );
 
         expect(logger.info).toHaveBeenCalledWith(
           "[Directive] resolver.complete",
@@ -561,7 +575,12 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger });
 
-        plugin.onDefinitionAssign!("resolver", "fetchUser", {} as never, {} as never);
+        plugin.onDefinitionAssign!(
+          "resolver",
+          "fetchUser",
+          {} as never,
+          {} as never,
+        );
 
         expect(logger.info).toHaveBeenCalledWith(
           "[Directive] definition.assign",
@@ -587,25 +606,35 @@ describe("loggingPlugin", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger });
 
-        plugin.onResolverRetry!("fetchUser", mockRequirement("req-3") as never, 2);
-
-        expect(logger.warn).toHaveBeenCalledWith(
-          "[Directive] resolver.retry",
-          { resolver: "fetchUser", requirementId: "req-3", attempt: 2 },
+        plugin.onResolverRetry!(
+          "fetchUser",
+          mockRequirement("req-3") as never,
+          2,
         );
+
+        expect(logger.warn).toHaveBeenCalledWith("[Directive] resolver.retry", {
+          resolver: "fetchUser",
+          requirementId: "req-3",
+          attempt: 2,
+        });
       });
 
       it("onErrorRecovery logs at warn", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger });
-        const error = mockDirectiveError("constraint", "mustAuth", "eval failed");
+        const error = mockDirectiveError(
+          "constraint",
+          "mustAuth",
+          "eval failed",
+        );
 
         plugin.onErrorRecovery!(error as never, "retry" as never);
 
-        expect(logger.warn).toHaveBeenCalledWith(
-          "[Directive] error.recovery",
-          { source: "constraint", sourceId: "mustAuth", strategy: "retry" },
-        );
+        expect(logger.warn).toHaveBeenCalledWith("[Directive] error.recovery", {
+          source: "constraint",
+          sourceId: "mustAuth",
+          strategy: "retry",
+        });
       });
     });
 
@@ -628,7 +657,11 @@ describe("loggingPlugin", () => {
         const plugin = loggingPlugin({ logger });
         const err = new Error("fetch failed");
 
-        plugin.onResolverError!("fetchUser", mockRequirement("req-3") as never, err);
+        plugin.onResolverError!(
+          "fetchUser",
+          mockRequirement("req-3") as never,
+          err,
+        );
 
         expect(logger.error).toHaveBeenCalledWith(
           "[Directive] resolver.error",
@@ -643,10 +676,10 @@ describe("loggingPlugin", () => {
 
         plugin.onEffectError!("sync", err);
 
-        expect(logger.error).toHaveBeenCalledWith(
-          "[Directive] effect.error",
-          { id: "sync", error: err },
-        );
+        expect(logger.error).toHaveBeenCalledWith("[Directive] effect.error", {
+          id: "sync",
+          error: err,
+        });
       });
 
       it("onError logs at error with source details", () => {
@@ -656,10 +689,11 @@ describe("loggingPlugin", () => {
 
         plugin.onError!(error as never);
 
-        expect(logger.error).toHaveBeenCalledWith(
-          "[Directive] error",
-          { source: "resolver", sourceId: "fetchUser", message: "timeout" },
-        );
+        expect(logger.error).toHaveBeenCalledWith("[Directive] error", {
+          source: "resolver",
+          sourceId: "fetchUser",
+          message: "timeout",
+        });
       });
     });
   });
@@ -675,10 +709,11 @@ describe("loggingPlugin", () => {
 
       plugin.onFactSet!("count", 5, 3);
 
-      expect(logger.debug).toHaveBeenCalledWith(
-        "[Directive] fact.set",
-        { key: "count", value: 5, prev: 3 },
-      );
+      expect(logger.debug).toHaveBeenCalledWith("[Directive] fact.set", {
+        key: "count",
+        value: 5,
+        prev: 3,
+      });
     });
 
     it("onFactDelete forwards key and prev", () => {
@@ -687,10 +722,10 @@ describe("loggingPlugin", () => {
 
       plugin.onFactDelete!("token", "abc123");
 
-      expect(logger.debug).toHaveBeenCalledWith(
-        "[Directive] fact.delete",
-        { key: "token", prev: "abc123" },
-      );
+      expect(logger.debug).toHaveBeenCalledWith("[Directive] fact.delete", {
+        key: "token",
+        prev: "abc123",
+      });
     });
 
     it("onReconcileEnd summarizes array lengths", () => {
@@ -705,17 +740,23 @@ describe("loggingPlugin", () => {
 
       plugin.onReconcileEnd!(result as never);
 
-      expect(logger.debug).toHaveBeenCalledWith(
-        "[Directive] reconcile.end",
-        { unmet: 2, inflight: 1, completed: 0, canceled: 1 },
-      );
+      expect(logger.debug).toHaveBeenCalledWith("[Directive] reconcile.end", {
+        unmet: 2,
+        inflight: 1,
+        completed: 0,
+        canceled: 1,
+      });
     });
 
     it("onResolverComplete forwards resolver, requirement id, and duration", () => {
       const logger = createMockLogger();
       const plugin = loggingPlugin({ logger });
 
-      plugin.onResolverComplete!("fetchUser", mockRequirement("req-10") as never, 42);
+      plugin.onResolverComplete!(
+        "fetchUser",
+        mockRequirement("req-10") as never,
+        42,
+      );
 
       expect(logger.info).toHaveBeenCalledWith(
         "[Directive] resolver.complete",
@@ -729,10 +770,11 @@ describe("loggingPlugin", () => {
 
       plugin.onDefinitionCall!("constraint", "mustAuth", { override: true });
 
-      expect(logger.debug).toHaveBeenCalledWith(
-        "[Directive] definition.call",
-        { type: "constraint", id: "mustAuth", props: { override: true } },
-      );
+      expect(logger.debug).toHaveBeenCalledWith("[Directive] definition.call", {
+        type: "constraint",
+        id: "mustAuth",
+        props: { override: true },
+      });
     });
   });
 });

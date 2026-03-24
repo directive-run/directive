@@ -6,7 +6,7 @@ import type { DirectiveError, RecoveryStrategy } from "./errors.js";
 import type { FactChange, FactsSnapshot } from "./facts.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ModuleSchema } from "./schema.js";
-import type { TraceEntry, System } from "./system.js";
+import type { System, TraceEntry } from "./system.js";
 
 // ============================================================================
 // Plugin Hook Types
@@ -301,7 +301,12 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * @param def - The new definition object
    * @param original - The previous definition that was overridden
    */
-  onDefinitionAssign?: (type: string, id: string, def: unknown, original: unknown) => void;
+  onDefinitionAssign?: (
+    type: string,
+    id: string,
+    def: unknown,
+    original: unknown,
+  ) => void;
 
   /**
    * Called when a dynamically registered definition is removed.

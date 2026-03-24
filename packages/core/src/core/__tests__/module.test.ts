@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createModuleFactory } from "../module.js";
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,6 @@ describe("createModule", () => {
     };
     const hooks = { onStart: vi.fn() };
 
-    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types are fine
     const mod = createModule("full", {
       schema: fullSchema,
       init: initFn,
@@ -81,13 +80,16 @@ describe("createModule", () => {
   });
 
   it("passes through history.snapshotEvents", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types
     const mod = createModule("snap", {
       schema: fullSchema,
       derive: { doubled: (f: any) => f.count * 2 },
       events: {
-        increment: (f: any) => { f.count += 1; },
-        setName: (f: any, p: any) => { f.name = p.name; },
+        increment: (f: any) => {
+          f.count += 1;
+        },
+        setName: (f: any, p: any) => {
+          f.name = p.name;
+        },
       },
       history: { snapshotEvents: ["increment"] },
     } as any);
@@ -124,9 +126,7 @@ describe("createModule", () => {
   it("warns on non-kebab-case ID", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     createModule("My Module", { schema: minimalSchema });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("kebab-case"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("kebab-case"));
     warnSpy.mockRestore();
   });
 
@@ -280,14 +280,17 @@ describe("createModuleFactory", () => {
 
   it("factory passes through all config", () => {
     const initFn = vi.fn();
-    // biome-ignore lint/suspicious/noExplicitAny: Test — loose types
     const factory = createModuleFactory({
       schema: fullSchema,
       init: initFn,
       derive: { doubled: (f: any) => f.count * 2 },
       events: {
-        increment: (f: any) => { f.count += 1; },
-        setName: (f: any, p: any) => { f.name = p.name; },
+        increment: (f: any) => {
+          f.count += 1;
+        },
+        setName: (f: any, p: any) => {
+          f.name = p.name;
+        },
       },
     } as any);
 

@@ -185,7 +185,9 @@ describe("Trace", () => {
     const history = system.trace!;
 
     // Find the trace that started the resolver
-    const traceWithResolver = history.find((r) => r.resolversStarted.length > 0);
+    const traceWithResolver = history.find(
+      (r) => r.resolversStarted.length > 0,
+    );
 
     expect(traceWithResolver).toBeDefined();
     expect(traceWithResolver!.resolversCompleted.length).toBeGreaterThanOrEqual(

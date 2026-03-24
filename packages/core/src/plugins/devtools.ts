@@ -57,8 +57,8 @@ import {
   renderStatus,
   setupHistoryButtons,
   updateDerivations,
-  updatePerfSection,
   updateHistoryControls,
+  updatePerfSection,
   upsertTableRow,
 } from "./devtools-panel.js";
 

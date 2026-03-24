@@ -469,10 +469,7 @@ export function createNamespacedEventsProxy(
   }
 
   return createHardenedProxy<
-    Record<
-      string,
-      Record<string, (payload?: Record<string, unknown>) => void>
-    >
+    Record<string, Record<string, (payload?: Record<string, unknown>) => void>>
   >({
     get: (namespace) => {
       if (!Object.hasOwn(modulesMap, namespace)) {
