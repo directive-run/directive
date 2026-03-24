@@ -279,7 +279,7 @@ export function createOTLPExporter(config: OTLPExporterConfig): OTLPExporter {
   try {
     const url = new URL(endpoint);
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("Only http: and https: protocols are supported");
+      throw new Error("[Directive] Only http: and https: protocols are supported");
     }
   } catch (error) {
     throw new Error(
@@ -325,7 +325,7 @@ export function createOTLPExporter(config: OTLPExporterConfig): OTLPExporter {
 
       if (!response.ok) {
         throw new Error(
-          `OTLP export failed: ${response.status} ${response.statusText}`,
+          `[Directive] OTLP export failed: ${response.status} ${response.statusText}`,
         );
       }
     } catch (error) {

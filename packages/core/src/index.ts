@@ -72,7 +72,7 @@ export type {
   AnySystem,
   // Cross-Module Dependencies
   CrossModuleDeps,
-  // Dynamic Definitions (Pro)
+  // Dynamic Definitions
   DynamicConstraintDef,
   DynamicEffectDef,
   DynamicResolverDef,
