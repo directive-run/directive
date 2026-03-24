@@ -549,7 +549,7 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
   };
   /** Additional plugins (tracking plugin is added automatically) */
   // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
-  plugins?: Array<any>;
+  plugins?: any[];
 }
 
 /**

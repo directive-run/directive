@@ -126,6 +126,7 @@ export function createDerivationsManager<
   const MAX_FLUSH_ITERATIONS = 100;
 
   // The proxy for composition (derivations accessing other derivations)
+  // biome-ignore lint/style/useConst: Reassigned later in createDerivedProxy()
   let derivedProxy: DerivedValues<S, D>;
 
   /** Initialize state for a derivation */
@@ -271,9 +272,7 @@ export function createDerivationsManager<
           const remaining = [...pendingNotifications];
           pendingNotifications.clear();
           throw new Error(
-            `[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. ` +
-              `Remaining: ${remaining.join(", ")}. ` +
-              "This usually means a derivation listener is mutating facts that re-trigger the same derivation.",
+            `[Directive] Infinite derivation notification loop detected after ${MAX_FLUSH_ITERATIONS} iterations. Remaining: ${remaining.join(", ")}. This usually means a derivation listener is mutating facts that re-trigger the same derivation.`,
           );
         }
 
@@ -281,7 +280,12 @@ export function createDerivationsManager<
         pendingNotifications.clear();
 
         for (const id of ids) {
-          listeners.get(id)?.forEach((listener) => listener());
+          const fns = listeners.get(id);
+          if (fns) {
+            for (const listener of fns) {
+              listener();
+            }
+          }
         }
       }
     } finally {

@@ -159,8 +159,8 @@ export interface PluginManager<_S extends Schema = any> {
  *
  * @internal
  */
-// biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
 export function createPluginManager<
+  // biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
   S extends Schema = any,
 >(): PluginManager<S> {
   // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema

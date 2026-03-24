@@ -292,8 +292,7 @@ export function createConstraintsManager<S extends Schema>(
         const cycleStart = path.indexOf(id);
         const cycle = [...path.slice(cycleStart), id].join(" → ");
         throw new Error(
-          `[Directive] Constraint cycle detected: ${cycle}. ` +
-            "Remove one of the `after` dependencies to break the cycle.",
+          `[Directive] Constraint cycle detected: ${cycle}. Remove one of the \`after\` dependencies to break the cycle.`,
         );
       }
 
@@ -344,8 +343,7 @@ export function createConstraintsManager<S extends Schema>(
         for (const depId of def.after) {
           if (!definitions[depId]) {
             console.warn(
-              `[Directive] Constraint "${id}" references unknown constraint "${depId}" in \`after\`. ` +
-                "This dependency will be ignored. Check for typos or ensure the constraint exists.",
+              `[Directive] Constraint "${id}" references unknown constraint "${depId}" in \`after\`. This dependency will be ignored. Check for typos or ensure the constraint exists.`,
             );
           }
         }
@@ -483,8 +481,7 @@ export function createConstraintsManager<S extends Schema>(
 
         if (process.env.NODE_ENV !== "production") {
           console.warn(
-            `[Directive] Constraint "${id}" returned a Promise but was not marked as async. ` +
-              "Add `async: true` to the constraint definition to avoid this warning and improve performance.",
+            `[Directive] Constraint "${id}" returned a Promise but was not marked as async. Add \`async: true\` to the constraint definition to avoid this warning and improve performance.`,
           );
         }
 
@@ -603,8 +600,7 @@ export function createConstraintsManager<S extends Schema>(
         constraintId
       ) {
         console.warn(
-          `[Directive] Constraint "${constraintId}" produced ${filtered.length} requirements. ` +
-            "Consider splitting into multiple constraints for better performance.",
+          `[Directive] Constraint "${constraintId}" produced ${filtered.length} requirements. Consider splitting into multiple constraints for better performance.`,
         );
       }
 
@@ -699,9 +695,7 @@ export function createConstraintsManager<S extends Schema>(
     for (const [id, def] of Object.entries(definitions)) {
       if (def.async && !def.deps) {
         console.warn(
-          `[Directive] Async constraint "${id}" has no \`deps\` declared. ` +
-            "Auto-tracking cannot work across async boundaries. " +
-            `Add \`deps: ["key1", "key2"]\` to enable dependency tracking.`,
+          `[Directive] Async constraint "${id}" has no \`deps\` declared. Auto-tracking cannot work across async boundaries. Add \`deps: ["key1", "key2"]\` to enable dependency tracking.`,
         );
       }
     }
