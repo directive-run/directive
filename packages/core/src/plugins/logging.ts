@@ -227,5 +227,18 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
     onDefinitionCall: (type, id, props) => {
       log("debug", "definition.call", { type, id, props });
     },
+
+    onTraceComplete: (entry) => {
+      log("debug", "trace.complete", {
+        id: entry.id,
+        status: entry.status,
+        duration: entry.duration,
+        factChanges: entry.factChanges.length,
+        derivationsRecomputed: entry.derivationsRecomputed.length,
+        constraintsHit: entry.constraintsHit.length,
+        resolversStarted: entry.resolversStarted.length,
+        effectsRun: entry.effectsRun.length,
+      });
+    },
   };
 }

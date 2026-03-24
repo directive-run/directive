@@ -72,6 +72,12 @@ export interface GeminiRunnerOptions {
   timeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature. Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Stop sequences. The model will stop generating when it encounters one. */
+  stopSequences?: string[];
 }
 
 /**
@@ -98,10 +104,28 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
     fetch: fetchFn = globalThis.fetch,
     timeoutMs,
     hooks,
+    temperature,
+    topP,
+    stopSequences,
   } = options;
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createGeminiRunner");
+
+  const genConfig: Record<string, unknown> = {};
+  if (maxOutputTokens != null) {
+    genConfig.maxOutputTokens = maxOutputTokens;
+  }
+  if (temperature != null) {
+    genConfig.temperature = temperature;
+  }
+  if (topP != null) {
+    genConfig.topP = topP;
+  }
+  if (stopSequences != null) {
+    genConfig.stopSequences = stopSequences;
+  }
+  const hasGenConfig = Object.keys(genConfig).length > 0;
 
   return createRunner({
     fetch: fetchFn,
@@ -122,9 +146,7 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
             role: m.role === "assistant" ? "model" : "user",
             parts: [{ text: m.content }],
           })),
-          ...(maxOutputTokens != null
-            ? { generationConfig: { maxOutputTokens } }
-            : {}),
+          ...(hasGenConfig ? { generationConfig: genConfig } : {}),
         }),
         ...(timeoutMs != null
           ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -160,6 +182,12 @@ export interface GeminiStreamingRunnerOptions {
   fetch?: typeof globalThis.fetch;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature. Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Stop sequences. The model will stop generating when it encounters one. */
+  stopSequences?: string[];
 }
 
 /**
@@ -187,10 +215,28 @@ export function createGeminiStreamingRunner(
     baseURL = "https://generativelanguage.googleapis.com/v1beta",
     fetch: fetchFn = globalThis.fetch,
     hooks,
+    temperature,
+    topP,
+    stopSequences,
   } = options;
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createGeminiStreamingRunner");
+
+  const genConfig: Record<string, unknown> = {};
+  if (maxOutputTokens != null) {
+    genConfig.maxOutputTokens = maxOutputTokens;
+  }
+  if (temperature != null) {
+    genConfig.temperature = temperature;
+  }
+  if (topP != null) {
+    genConfig.topP = topP;
+  }
+  if (stopSequences != null) {
+    genConfig.stopSequences = stopSequences;
+  }
+  const hasGenConfig = Object.keys(genConfig).length > 0;
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
@@ -209,9 +255,7 @@ export function createGeminiStreamingRunner(
               ? { systemInstruction: { parts: [{ text: agent.instructions }] } }
               : {}),
             contents: [{ role: "user", parts: [{ text: input }] }],
-            ...(maxOutputTokens != null
-              ? { generationConfig: { maxOutputTokens } }
-              : {}),
+            ...(hasGenConfig ? { generationConfig: genConfig } : {}),
           }),
           signal: callbacks.signal,
         },

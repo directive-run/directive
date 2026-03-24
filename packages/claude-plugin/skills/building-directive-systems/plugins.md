@@ -28,7 +28,7 @@ const system = createSystem({
   module: myModule,
   plugins: [
     devtoolsPlugin(),
-    loggingPlugin({ verbose: true }),
+    loggingPlugin({ level: "debug" }),
     persistencePlugin({
       key: "my-app-state",
       storage: localStorage,
@@ -46,24 +46,26 @@ Logs state changes, requirements, and resolutions to the console.
 ```typescript
 import { loggingPlugin } from "@directive-run/core/plugins";
 
-// Default – logs facts changes and resolver start/complete
+// Default – logs facts changes and resolver start/complete at "info" level
 loggingPlugin()
 
-// Verbose – logs everything including derivation recomputation and constraint evaluation
-loggingPlugin({ verbose: true })
+// Debug level – logs everything including derivation recomputation and constraint evaluation
+loggingPlugin({ level: "debug" })
 
 // Custom filter – only log specific events
 loggingPlugin({
-  filter: (event) => {
-    // Only log resolver events
-    if (event.type === "resolution:start" || event.type === "resolution:complete") {
-      return true;
-    }
+  filter: (event) => event.startsWith("resolver."),
+})
 
-    return false;
-  },
+// Custom logger and prefix
+loggingPlugin({
+  level: "warn",
+  prefix: "[MyApp]",
+  logger: customLogger,
 })
 ```
+
+Options: `level` ("debug" | "info" | "warn" | "error"), `filter` (predicate on event name string), `logger` (Console-compatible object), `prefix` (string, default "[Directive]").
 
 ## devtoolsPlugin
 
@@ -78,7 +80,9 @@ devtoolsPlugin()
 // With options
 devtoolsPlugin({
   name: "My App",        // Name shown in DevTools
-  maxAge: 50,            // Max actions to keep in history
+  maxEvents: 1000,       // Max trace events to retain (default: 1000)
+  trace: true,           // Enable trace logging
+  panel: true,           // Show floating debug panel (dev mode only)
 })
 ```
 
@@ -122,59 +126,56 @@ persistencePlugin({
   exclude: ["tempData", "sessionId"], // Everything except these
 })
 
-// Versioning – handle schema changes
+// With callbacks
 persistencePlugin({
   key: "my-app",
   storage: localStorage,
-  version: 2,
-  migrate: (oldState, oldVersion) => {
-    if (oldVersion === 1) {
-      return {
-        ...oldState,
-        newField: "default",
-      };
-    }
-
-    return oldState;
-  },
+  debounce: 200,                       // Debounce saves (default: 100ms)
+  onRestore: (data) => console.log("Restored:", data),
+  onSave: (data) => console.log("Saved:", data),
+  onError: (err) => console.error("Persistence error:", err),
 })
 ```
 
 ## createCircuitBreaker
 
-Wraps resolvers with circuit breaker pattern for resilience.
+Standalone utility (not a Plugin) that implements the circuit breaker pattern for resilience. Use it inside resolvers to protect against cascading failures from external services.
 
 ```typescript
 import { createCircuitBreaker } from "@directive-run/core/plugins";
 
-const system = createSystem({
-  module: myModule,
-  plugins: [
-    createCircuitBreaker({
-      // How many failures before opening the circuit
-      failureThreshold: 5,
-
-      // How long to wait before trying again (ms)
-      resetTimeout: 30000,
-
-      // Optional: only apply to specific resolver types
-      include: ["FETCH_DATA", "SYNC_REMOTE"],
-
-      // Optional: callback when circuit opens
-      onOpen: (resolverType) => {
-        console.warn(`Circuit opened for ${resolverType}`);
-      },
-
-      // Optional: callback when circuit closes
-      onClose: (resolverType) => {
-        console.log(`Circuit closed for ${resolverType}`);
-      },
-    }),
-  ],
+const breaker = createCircuitBreaker({
+  failureThreshold: 5,         // Failures before opening (default: 5)
+  recoveryTimeMs: 30000,       // Time before HALF_OPEN (default: 30000)
+  halfOpenMaxRequests: 3,      // Requests allowed in HALF_OPEN (default: 3)
+  failureWindowMs: 60000,      // Window for counting failures (default: 60000)
+  name: "api-breaker",         // Name for metrics/errors
+  onStateChange: (from, to) => console.log(`Circuit: ${from} -> ${to}`),
 });
+
+// Use inside a resolver
+resolvers: {
+  fetchData: {
+    requirement: "FETCH_DATA",
+    resolve: async (req, context) => {
+      const result = await breaker.execute(async () => {
+        return await callExternalAPI();
+      });
+      context.facts.data = result;
+    },
+  },
+},
+
+// Wire circuit state into constraints
+constraints: {
+  apiDown: {
+    when: () => breaker.getState() === "OPEN",
+    require: { type: "FALLBACK_RESPONSE" },
+  },
+},
 ```
 
-Circuit breaker states: **Closed** (normal) -> **Open** (failing, rejects immediately) -> **Half-Open** (testing one request).
+Circuit breaker states: **Closed** (normal) -> **Open** (failing, rejects immediately) -> **Half-Open** (testing limited requests).
 
 ## createObservability
 
@@ -212,14 +213,14 @@ const system = createSystem({
 Plugins hook into the system lifecycle. Use these to build custom plugins.
 
 ```typescript
-import type { DirectivePlugin } from "@directive-run/core";
+import type { Plugin, ModuleSchema } from "@directive-run/core";
 
-const myPlugin: DirectivePlugin = {
+const myPlugin: Plugin<ModuleSchema> = {
   name: "my-custom-plugin",
 
   // System lifecycle
   onInit: (system) => {
-    // Called when system is created
+    // Called when system is created (only async hook)
   },
   onStart: (system) => {
     // Called when system.start() is invoked
@@ -227,32 +228,42 @@ const myPlugin: DirectivePlugin = {
   onStop: (system) => {
     // Called when system.stop() is invoked
   },
+  onDestroy: (system) => {
+    // Called when system.destroy() is invoked
+  },
 
-  // State tracking
-  onSnapshot: (snapshot) => {
-    // Called after every fact mutation
-    // snapshot.facts contains current state
-    // snapshot.changedKeys lists what changed
+  // Fact tracking
+  onFactSet: (key, value, prev) => {
+    // Called when a single fact is set
+  },
+  onFactsBatch: (changes) => {
+    // Called after a batch of fact changes completes
   },
 
   // Requirement pipeline
-  onRequirementEmitted: (requirement) => {
+  onRequirementCreated: (requirement) => {
     // Called when a constraint emits a requirement
-    // requirement.type, requirement.id, payload
+    // requirement.type, requirement.id
   },
-  onResolutionStart: (resolution) => {
+  onRequirementMet: (requirement, byResolver) => {
+    // Called when a requirement is fulfilled
+  },
+
+  // Resolver pipeline
+  onResolverStart: (resolverId, requirement) => {
     // Called when a resolver begins executing
-    // resolution.resolverId, resolution.requirement
   },
-  onResolutionComplete: (resolution) => {
-    // Called when a resolver finishes (success or failure)
-    // resolution.resolverId, resolution.duration, resolution.error?
+  onResolverComplete: (resolverId, requirement, duration) => {
+    // Called when a resolver finishes successfully
+  },
+  onResolverError: (resolverId, requirement, error) => {
+    // Called when a resolver fails (after all retries)
   },
 
   // Error handling
-  onError: (error, context) => {
-    // Called on any error in the system
-    // context.source: "resolver" | "constraint" | "effect" | "derivation"
+  onError: (error) => {
+    // Called on any DirectiveError in the system
+    // error.source, error.message, error.context
   },
 };
 
@@ -277,7 +288,7 @@ const system = createSystem({
 const plugins = [];
 if (process.env.NODE_ENV === "development") {
   plugins.push(devtoolsPlugin());
-  plugins.push(loggingPlugin({ verbose: true }));
+  plugins.push(loggingPlugin({ level: "debug" }));
 }
 
 const system = createSystem({
@@ -286,21 +297,20 @@ const system = createSystem({
 });
 ```
 
-### Persistence without versioning
+### Persistence without filtering
 
 ```typescript
-// WRONG – schema changes break existing users
+// WRONG – persists everything including transient state
 persistencePlugin({
   key: "app-state",
   storage: localStorage,
 })
 
-// CORRECT – version and migrate
+// CORRECT – use include/exclude to control what's persisted
 persistencePlugin({
   key: "app-state",
   storage: localStorage,
-  version: 1,
-  migrate: (old, version) => old,
+  include: ["user", "preferences", "settings"],
 })
 ```
 

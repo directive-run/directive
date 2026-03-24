@@ -7,7 +7,7 @@
  * - `@directive-run/core/internals` – Manager factories, engine, tracking, and internal types
  * - `@directive-run/core/plugins` – Logging, devtools, persistence, observability, circuit breaker
  * - `@directive-run/core/testing` – Mock resolvers, fake timers, assertion helpers
- * - `@directive-run/core/migration` – Redux/Zustand/XState migration codemods
+ * - `@directive-run/core/migration` – Redux/Zustand/XState migration scaffolding
  * - `@directive-run/core/adapter-utils` – Shared framework adapter utilities
  * - `@directive-run/core/worker` – Web Worker support
  *

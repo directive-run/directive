@@ -1,11 +1,11 @@
 /**
  * React Adapter - Consolidated hooks for React integration
  *
- * 18 public exports: useFact, useDerived, useDispatch, useDirective,
+ * 19 public exports: useFact, useDerived, useDispatch, useDirective,
  * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
  * useSuspenseRequirement, useEvents, useExplain, useConstraintStatus,
  * useOptimisticUpdate, DirectiveHydrator, useHydratedSystem,
- * useHistory, shallowEqual
+ * useHistory, createTypedHooks, shallowEqual
  *
  * @example
  * ```tsx
@@ -1848,4 +1848,71 @@ export function useHydratedSystem<S extends ModuleSchema>(
   }, [snapshot, config]);
 
   return useDirectiveRef(moduleDef, mergedConfig) as SingleModuleSystem<S>;
+}
+
+// ============================================================================
+// Typed Hooks Factory
+// ============================================================================
+
+/**
+ * Creates pre-typed versions of the core hooks for a specific module schema.
+ * Eliminates the need to pass type parameters on every hook call.
+ *
+ * @example
+ * ```tsx
+ * const { useFact, useDerived, useDispatch, useEvents, useWatch } = createTypedHooks<typeof counterModule.schema>();
+ *
+ * // No type parameters needed — schema is baked in
+ * function Counter({ system }: { system: SingleModuleSystem<CounterSchema> }) {
+ *   const count = useFact(system, "count");
+ *   const doubled = useDerived(system, "doubled");
+ *   const dispatch = useDispatch(system);
+ * }
+ * ```
+ */
+export function createTypedHooks<M extends ModuleSchema>(): {
+  useFact: <K extends keyof InferFacts<M> & string>(
+    system: SingleModuleSystem<M>,
+    factKey: K,
+  ) => InferFacts<M>[K] | undefined;
+  useDerived: <K extends keyof InferDerivations<M> & string>(
+    system: SingleModuleSystem<M>,
+    derivationId: K,
+  ) => InferDerivations<M>[K];
+  useDispatch: (
+    system: SingleModuleSystem<M>,
+  ) => (event: InferEvents<M>) => void;
+  useEvents: (system: SingleModuleSystem<M>) => SingleModuleSystem<M>["events"];
+  useWatch: <K extends string>(
+    system: SingleModuleSystem<M>,
+    key: K,
+    callback: (newValue: unknown, previousValue: unknown) => void,
+  ) => void;
+} {
+  return {
+    useFact: <K extends keyof InferFacts<M> & string>(
+      system: SingleModuleSystem<M>,
+      factKey: K,
+    ) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
+      useFact(system as SingleModuleSystem<any>, factKey) as
+        | InferFacts<M>[K]
+        | undefined,
+    useDerived: <K extends keyof InferDerivations<M> & string>(
+      system: SingleModuleSystem<M>,
+      derivationId: K,
+    ) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
+      useDerived(system as SingleModuleSystem<any>, derivationId) as InferDerivations<M>[K],
+    useDispatch: (system: SingleModuleSystem<M>) =>
+      useDispatch<M>(system),
+    useEvents: (system: SingleModuleSystem<M>) => useEvents<M>(system),
+    useWatch: <K extends string>(
+      system: SingleModuleSystem<M>,
+      key: K,
+      callback: (newValue: unknown, previousValue: unknown) => void,
+    ) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
+      useWatch(system as SingleModuleSystem<any>, key, callback),
+  };
 }

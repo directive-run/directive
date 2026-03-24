@@ -12,10 +12,14 @@
 import { createSystem } from "../core/system.js";
 import type {
   CreateSystemOptionsNamed,
+  CreateSystemOptionsSingle,
+  ModuleDef,
+  ModuleSchema,
   ModulesMap,
   NamespacedSystem,
   Requirement,
   RequirementWithId,
+  SingleModuleSystem,
   SystemInspection,
 } from "../core/types.js";
 
@@ -483,19 +487,8 @@ export interface FactChangeRecord {
 // Test System
 // ============================================================================
 
-/**
- * A Directive system augmented with testing utilities.
- *
- * @remarks
- * Extends {@link NamespacedSystem} with event/resolver/fact tracking, idle
- * waiting, and assertion helpers. Created via {@link createTestSystem}.
- *
- * @typeParam Modules - The modules map that defines the system's schema.
- *
- * @public
- */
-export interface TestSystem<Modules extends ModulesMap>
-  extends NamespacedSystem<Modules> {
+/** Common testing utilities shared by both single-module and namespaced test systems. */
+export interface TestSystemBase {
   /**
    * Wait for all pending operations to complete.
    * @param maxWait - Maximum time to wait in ms (default: 5000)
@@ -534,6 +527,36 @@ export interface TestSystem<Modules extends ModulesMap>
 }
 
 /**
+ * A single-module Directive system augmented with testing utilities.
+ *
+ * @remarks
+ * Extends {@link SingleModuleSystem} with event/resolver/fact tracking, idle
+ * waiting, and assertion helpers. Created via {@link createTestSystem}.
+ *
+ * @typeParam S - The module schema.
+ *
+ * @public
+ */
+export interface TestSystemSingle<S extends ModuleSchema>
+  extends SingleModuleSystem<S>,
+    TestSystemBase {}
+
+/**
+ * A Directive system augmented with testing utilities.
+ *
+ * @remarks
+ * Extends {@link NamespacedSystem} with event/resolver/fact tracking, idle
+ * waiting, and assertion helpers. Created via {@link createTestSystem}.
+ *
+ * @typeParam Modules - The modules map that defines the system's schema.
+ *
+ * @public
+ */
+export interface TestSystem<Modules extends ModulesMap>
+  extends NamespacedSystem<Modules>,
+    TestSystemBase {}
+
+/**
  * Options for {@link createTestSystem}, extending the standard system options
  * with mock resolver injection and automatic tracking.
  *
@@ -553,6 +576,24 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
 }
 
 /**
+ * Options for {@link createTestSystem} with a single module (no namespacing).
+ *
+ * @typeParam S - The module schema.
+ *
+ * @public
+ */
+export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
+  extends Omit<CreateSystemOptionsSingle<S>, "plugins"> {
+  /** Mock resolvers by type */
+  mocks?: {
+    resolvers?: Record<string, MockResolverOptions>;
+  };
+  /** Additional plugins (tracking plugin is added automatically) */
+  // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
+  plugins?: any[];
+}
+
+/**
  * Create a Directive system instrumented for testing.
  *
  * Wraps {@link createSystem} with an automatic tracking plugin that records
@@ -561,20 +602,212 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
  * real resolvers by requirement type.
  *
  * @param options - System configuration with optional mock resolvers and additional plugins.
- * @returns A {@link TestSystem} with assertion helpers, idle waiting, and history tracking.
+ * @returns A {@link TestSystem} or {@link TestSystemSingle} with assertion helpers, idle waiting, and history tracking.
  *
  * @example
  * ```typescript
+ * // Namespaced (multiple modules)
  * const system = createTestSystem({
  *   modules: { counter: counterModule },
  *   mocks: { resolvers: { INCREMENT: { resolve: (req, context) => { context.facts.count++; } } } },
+ * });
+ *
+ * // Single module
+ * const system = createTestSystem({
+ *   module: counterModule,
  * });
  * system.start();
  * ```
  *
  * @public
  */
+export function createTestSystem<S extends ModuleSchema>(
+  options: CreateTestSystemOptionsSingle<S>,
+): TestSystemSingle<S>;
 export function createTestSystem<Modules extends ModulesMap>(
+  options: CreateTestSystemOptions<Modules>,
+): TestSystem<Modules>;
+export function createTestSystem<
+  S extends ModuleSchema,
+  Modules extends ModulesMap,
+>(
+  options:
+    | CreateTestSystemOptionsSingle<S>
+    | CreateTestSystemOptions<Modules>,
+): TestSystemSingle<S> | TestSystem<Modules> {
+  // Single module mode: wrap into namespaced and delegate
+  if ("module" in options) {
+    return createTestSystemSingle(
+      options as CreateTestSystemOptionsSingle<S>,
+    );
+  }
+
+  return createTestSystemNamed(options as CreateTestSystemOptions<Modules>);
+}
+
+function createTestSystemSingle<S extends ModuleSchema>(
+  options: CreateTestSystemOptionsSingle<S>,
+): TestSystemSingle<S> {
+  const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];
+  const resolverCalls = new Map<string, Requirement[]>();
+  const allRequirements: RequirementWithId[] = [];
+  const factsHistory: FactChangeRecord[] = [];
+
+  // Create mock resolvers
+  const mockResolvers: Record<string, MockResolverDef> = {};
+  if (options.mocks?.resolvers) {
+    for (const [type, mockOptions] of Object.entries(options.mocks.resolvers)) {
+      const calls: Requirement[] = [];
+      resolverCalls.set(type, calls);
+      mockResolvers[type] = createMockResolver({ ...mockOptions, calls });
+    }
+  }
+
+  // Create module with mock resolvers
+  // biome-ignore lint/suspicious/noExplicitAny: Mock resolvers have simplified types
+  const moduleWithMocks: ModuleDef<S> = {
+    ...options.module,
+    resolvers: {
+      ...options.module.resolvers,
+      ...mockResolvers,
+    } as any,
+  };
+
+  // Create tracking plugin
+  const trackingPlugin = {
+    name: "__test-tracking__",
+    onFactSet: (fullKey: string, value: unknown, previousValue: unknown) => {
+      factsHistory.push({
+        key: fullKey,
+        fullKey,
+        namespace: undefined,
+        previousValue,
+        newValue: value,
+        timestamp: Date.now(),
+      });
+    },
+    onRequirementCreated: (requirement: RequirementWithId) => {
+      allRequirements.push(requirement);
+    },
+  };
+
+  // Create the underlying single-module system
+  const system = createSystem({
+    ...options,
+    module: moduleWithMocks,
+    plugins: [trackingPlugin, ...(options.plugins ?? [])],
+  // biome-ignore lint/suspicious/noExplicitAny: Internal overload compatibility
+  } as any) as SingleModuleSystem<S>;
+
+  // Wrap dispatch to track events
+  const originalDispatch = system.dispatch.bind(system);
+  // biome-ignore lint/suspicious/noExplicitAny: Event type varies
+  (system as any).dispatch = (event: any) => {
+    eventHistory.push(event);
+    originalDispatch(event);
+  };
+
+  const testSystem: TestSystemSingle<S> = {
+    ...system,
+    eventHistory,
+    resolverCalls,
+
+    get allRequirements() {
+      return allRequirements;
+    },
+
+    getFactsHistory(): FactChangeRecord[] {
+      return [...factsHistory];
+    },
+
+    resetFactsHistory(): void {
+      factsHistory.length = 0;
+    },
+
+    async waitForIdle(maxWait = 5000): Promise<void> {
+      const startTime = Date.now();
+
+      const checkIdle = async (): Promise<void> => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const inspection = system.inspect();
+        if (inspection.inflight.length > 0) {
+          if (Date.now() - startTime > maxWait) {
+            const resolverIds = inspection.inflight
+              .map((r) => r.id)
+              .join(", ");
+            throw new Error(
+              `[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          return checkIdle();
+        }
+      };
+
+      return checkIdle();
+    },
+
+    assertRequirement(type: string): void {
+      const hasRequirement = allRequirements.some(
+        (r) => r.requirement.type === type,
+      );
+      if (!hasRequirement) {
+        throw new Error(
+          `[Directive] Expected requirement of type "${type}" but none found`,
+        );
+      }
+    },
+
+    assertResolverCalled(type: string, times?: number): void {
+      const calls = resolverCalls.get(type) ?? [];
+      if (times !== undefined) {
+        if (calls.length !== times) {
+          throw new Error(
+            `[Directive] Expected resolver "${type}" to be called ${times} times but was called ${calls.length} times`,
+          );
+        }
+      } else if (calls.length === 0) {
+        throw new Error(
+          `[Directive] Expected resolver "${type}" to be called but it was not`,
+        );
+      }
+    },
+
+    assertFactSet(key: string, value?: unknown): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length === 0) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to be set but it was not`,
+        );
+      }
+      if (value !== undefined) {
+        const hasValue = changes.some((c) => c.newValue === value);
+        if (!hasValue) {
+          const actualValues = changes
+            .map((c) => JSON.stringify(c.newValue))
+            .join(", ");
+          throw new Error(
+            `[Directive] Expected fact "${key}" to be set to ${JSON.stringify(value)} but got: ${actualValues}`,
+          );
+        }
+      }
+    },
+
+    assertFactChanges(key: string, times: number): void {
+      const changes = factsHistory.filter((c) => c.key === key);
+      if (changes.length !== times) {
+        throw new Error(
+          `[Directive] Expected fact "${key}" to change ${times} times but it changed ${changes.length} times`,
+        );
+      }
+    },
+  };
+
+  return testSystem;
+}
+
+function createTestSystemNamed<Modules extends ModulesMap>(
   options: CreateTestSystemOptions<Modules>,
 ): TestSystem<Modules> {
   const eventHistory: Array<{ type: string; [key: string]: unknown }> = [];

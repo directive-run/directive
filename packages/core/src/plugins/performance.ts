@@ -246,6 +246,10 @@ export function performancePlugin<M extends ModuleSchema = ModuleSchema>(
         reconcile.maxDurationMs = duration;
     },
 
+    onDestroy() {
+      plugin.reset();
+    },
+
     getSnapshot(): PerformanceSnapshot {
       const constraintsObj: Record<string, ConstraintMetrics> = {};
       for (const [id, m] of constraints) constraintsObj[id] = { ...m };
