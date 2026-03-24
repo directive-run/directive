@@ -184,6 +184,31 @@ const RESERVED_DERIVE_NAMES = new Set([
 ]);
 
 /**
+ * Per-type descriptor used by the dispatch map to collapse the switch
+ * statements in applyRegister, applyAssign, and applyUnregister.
+ */
+interface TypeDescriptor {
+  /** Human-readable label for error messages */
+  label: string;
+  /** The mutable merged definitions map for this type */
+  mergedMap: Record<string, unknown>;
+  /** The manager instance for this type */
+  manager: {
+    registerDefinitions(defs: Record<string, unknown>): void;
+    assignDefinition(id: string, def: unknown): void;
+    unregisterDefinition(id: string): void;
+  };
+  /** Set of dynamically registered IDs */
+  dynamicSet: Set<string>;
+  /** Map of originals for assigned definitions */
+  originalsMap: Map<string, unknown>;
+  /** Whether to call scheduleReconcile after register/assign/unregister */
+  reconciles: boolean;
+  /** Optional extra validation on the ID (e.g. reserved name check) */
+  validateId?: (id: string) => void;
+}
+
+/**
  * Create a definitions registry for dynamic definition management.
  *
  * @remarks
@@ -233,6 +258,56 @@ export function createDefinitionsRegistry<S extends Schema>(
   /** Deferred registrations queue */
   const deferredRegistrations: DeferredOp[] = [];
 
+  /** Validate derivation ID is not a reserved derive method name */
+  function validateDerivationId(id: string): void {
+    if (RESERVED_DERIVE_NAMES.has(id)) {
+      throw new Error(
+        `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
+      );
+    }
+  }
+
+  /** Per-type dispatch map — eliminates switch statements in apply* functions */
+  const typeDescriptors: Record<DefType, TypeDescriptor> = {
+    constraint: {
+      label: "Constraint",
+      mergedMap: mergedConstraints as Record<string, unknown>,
+      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
+      manager: constraintsManager as any,
+      dynamicSet: dynamicIds.constraints,
+      originalsMap: originals.constraints,
+      reconciles: true,
+    },
+    resolver: {
+      label: "Resolver",
+      mergedMap: mergedResolvers as Record<string, unknown>,
+      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
+      manager: resolversManager as any,
+      dynamicSet: dynamicIds.resolvers,
+      originalsMap: originals.resolvers,
+      reconciles: true,
+    },
+    derivation: {
+      label: "Derivation",
+      mergedMap: mergedDerive as Record<string, unknown>,
+      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
+      manager: derivationsManager as any,
+      dynamicSet: dynamicIds.derivations,
+      originalsMap: originals.derivations,
+      reconciles: false,
+      validateId: validateDerivationId,
+    },
+    effect: {
+      label: "Effect",
+      mergedMap: mergedEffects as Record<string, unknown>,
+      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
+      manager: effectsManager as any,
+      dynamicSet: dynamicIds.effects,
+      originalsMap: originals.effects,
+      reconciles: false,
+    },
+  };
+
   /** Validate a definition ID for safety */
   function validateDefId(id: string): void {
     if (typeof id !== "string" || id.length === 0) {
@@ -254,69 +329,22 @@ export function createDefinitionsRegistry<S extends Schema>(
 
   /** Apply a register operation immediately */
   function applyRegister(type: DefType, id: string, def: unknown): void {
-    switch (type) {
-      case "constraint": {
-        if (id in mergedConstraints) {
-          throw new Error(
-            `[Directive] Constraint "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const constraintDef = def as Record<string, unknown>;
-        (mergedConstraints as Record<string, unknown>)[id] = constraintDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        constraintsManager.registerDefinitions({ [id]: constraintDef } as any);
-        dynamicIds.constraints.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        scheduleReconcile();
-        break;
-      }
-      case "resolver": {
-        if (id in mergedResolvers) {
-          throw new Error(
-            `[Directive] Resolver "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const resolverDef = def as Record<string, unknown>;
-        (mergedResolvers as Record<string, unknown>)[id] = resolverDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        resolversManager.registerDefinitions({ [id]: resolverDef } as any);
-        dynamicIds.resolvers.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        scheduleReconcile();
-        break;
-      }
-      case "derivation": {
-        if (RESERVED_DERIVE_NAMES.has(id)) {
-          throw new Error(
-            `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
-          );
-        }
-        if (id in mergedDerive) {
-          throw new Error(
-            `[Directive] Derivation "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        (mergedDerive as Record<string, unknown>)[id] = def;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        derivationsManager.registerDefinitions({ [id]: def } as any);
-        dynamicIds.derivations.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        break;
-      }
-      case "effect": {
-        if (id in mergedEffects) {
-          throw new Error(
-            `[Directive] Effect "${id}" already exists. Use assign() to override.`,
-          );
-        }
-        const effectDef = def as Record<string, unknown>;
-        (mergedEffects as Record<string, unknown>)[id] = effectDef;
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic registration
-        effectsManager.registerDefinitions({ [id]: effectDef } as any);
-        dynamicIds.effects.add(id);
-        pluginManager.emitDefinitionRegister(type, id, def);
-        break;
-      }
+    const desc = typeDescriptors[type];
+    desc.validateId?.(id);
+
+    if (id in desc.mergedMap) {
+      throw new Error(
+        `[Directive] ${desc.label} "${id}" already exists. Use assign() to override.`,
+      );
+    }
+
+    desc.mergedMap[id] = def;
+    desc.manager.registerDefinitions({ [id]: def });
+    desc.dynamicSet.add(id);
+    pluginManager.emitDefinitionRegister(type, id, def);
+
+    if (desc.reconciles) {
+      scheduleReconcile();
     }
   }
 
@@ -326,145 +354,48 @@ export function createDefinitionsRegistry<S extends Schema>(
    * Only on success do we commit the original and update the merged map.
    */
   function applyAssign(type: DefType, id: string, def: unknown): void {
-    switch (type) {
-      case "constraint": {
-        if (!(id in mergedConstraints)) {
-          throw new Error(
-            `[Directive] Constraint "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedConstraints as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        constraintsManager.assignDefinition(id, def as any);
-        originals.constraints.set(id, original);
-        (mergedConstraints as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        scheduleReconcile();
-        break;
-      }
-      case "resolver": {
-        if (!(id in mergedResolvers)) {
-          throw new Error(
-            `[Directive] Resolver "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedResolvers as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        resolversManager.assignDefinition(id, def as any);
-        originals.resolvers.set(id, original);
-        (mergedResolvers as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        scheduleReconcile();
-        break;
-      }
-      case "derivation": {
-        if (RESERVED_DERIVE_NAMES.has(id)) {
-          throw new Error(
-            `[Directive] Derivation ID "${id}" conflicts with a reserved derive method name.`,
-          );
-        }
-        if (!(id in mergedDerive)) {
-          throw new Error(
-            `[Directive] Derivation "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedDerive as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        derivationsManager.assignDefinition(id, def as any);
-        originals.derivations.set(id, original);
-        (mergedDerive as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        break;
-      }
-      case "effect": {
-        if (!(id in mergedEffects)) {
-          throw new Error(
-            `[Directive] Effect "${id}" does not exist. Use register() to create it.`,
-          );
-        }
-        const original = (mergedEffects as Record<string, unknown>)[id];
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic assignment
-        effectsManager.assignDefinition(id, def as any);
-        originals.effects.set(id, original);
-        (mergedEffects as Record<string, unknown>)[id] = def;
-        pluginManager.emitDefinitionAssign(type, id, def, original);
-        break;
-      }
+    const desc = typeDescriptors[type];
+    desc.validateId?.(id);
+
+    if (!(id in desc.mergedMap)) {
+      throw new Error(
+        `[Directive] ${desc.label} "${id}" does not exist. Use register() to create it.`,
+      );
+    }
+
+    const original = desc.mergedMap[id];
+    desc.manager.assignDefinition(id, def);
+    desc.originalsMap.set(id, original);
+    desc.mergedMap[id] = def;
+    pluginManager.emitDefinitionAssign(type, id, def, original);
+
+    if (desc.reconciles) {
+      scheduleReconcile();
     }
   }
 
   /** Apply an unregister operation immediately */
   function applyUnregister(type: DefType, id: string): void {
-    switch (type) {
-      case "constraint": {
-        if (!dynamicIds.constraints.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static constraint "${id}". Only dynamically registered constraints can be removed.`,
-            );
-          }
+    const desc = typeDescriptors[type];
 
-          return;
-        }
-        constraintsManager.unregisterDefinition(id);
-        delete (mergedConstraints as Record<string, unknown>)[id];
-        dynamicIds.constraints.delete(id);
-        originals.constraints.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        scheduleReconcile();
-        break;
+    if (!desc.dynamicSet.has(id)) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          `[Directive] Cannot unregister static ${type} "${id}". Only dynamically registered ${type}s can be removed.`,
+        );
       }
-      case "resolver": {
-        if (!dynamicIds.resolvers.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static resolver "${id}". Only dynamically registered resolvers can be removed.`,
-            );
-          }
 
-          return;
-        }
-        resolversManager.unregisterDefinition(id);
-        delete (mergedResolvers as Record<string, unknown>)[id];
-        dynamicIds.resolvers.delete(id);
-        originals.resolvers.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
-      case "derivation": {
-        if (!dynamicIds.derivations.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static derivation "${id}". Only dynamically registered derivations can be removed.`,
-            );
-          }
+      return;
+    }
 
-          return;
-        }
-        derivationsManager.unregisterDefinition(id);
-        delete (mergedDerive as Record<string, unknown>)[id];
-        dynamicIds.derivations.delete(id);
-        originals.derivations.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
-      case "effect": {
-        if (!dynamicIds.effects.has(id)) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn(
-              `[Directive] Cannot unregister static effect "${id}". Only dynamically registered effects can be removed.`,
-            );
-          }
+    desc.manager.unregisterDefinition(id);
+    delete desc.mergedMap[id];
+    desc.dynamicSet.delete(id);
+    desc.originalsMap.delete(id);
+    pluginManager.emitDefinitionUnregister(type, id);
 
-          return;
-        }
-        effectsManager.unregisterDefinition(id);
-        delete (mergedEffects as Record<string, unknown>)[id];
-        dynamicIds.effects.delete(id);
-        originals.effects.delete(id);
-        pluginManager.emitDefinitionUnregister(type, id);
-        break;
-      }
+    if (desc.reconciles) {
+      scheduleReconcile();
     }
   }
 
