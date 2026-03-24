@@ -53,9 +53,14 @@ import {
  */
 export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
   {
+    "gpt-4.1": { input: 2, output: 8 },
+    "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+    "gpt-4.1-nano": { input: 0.1, output: 0.4 },
     "gpt-4o": { input: 2.5, output: 10 },
     "gpt-4o-mini": { input: 0.15, output: 0.6 },
     "gpt-4-turbo": { input: 10, output: 30 },
+    "o4-mini": { input: 1.1, output: 4.4 },
+    "o3": { input: 10, output: 40 },
     "o3-mini": { input: 1.1, output: 4.4 },
   };
 
@@ -74,6 +79,18 @@ export interface OpenAIRunnerOptions {
   timeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature (0–2). Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Up to 4 sequences where the API will stop generating. */
+  stop?: string | string[];
+  /**
+   * Response format for structured output.
+   * - `"json"` enables JSON mode (`{ type: "json_object" }`)
+   * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
+   */
+  responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
 }
 
 /**
@@ -108,10 +125,19 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
     fetch: fetchFn = globalThis.fetch,
     timeoutMs,
     hooks,
+    temperature,
+    topP,
+    stop,
+    responseFormat,
   } = options;
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createOpenAIRunner");
+
+  const resolvedResponseFormat =
+    responseFormat === "json"
+      ? { type: "json_object" as const }
+      : responseFormat ?? undefined;
 
   return createRunner({
     fetch: fetchFn,
@@ -127,6 +153,12 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         body: JSON.stringify({
           model: agent.model ?? model,
           ...(maxTokens != null ? { max_tokens: maxTokens } : {}),
+          ...(temperature != null ? { temperature } : {}),
+          ...(topP != null ? { top_p: topP } : {}),
+          ...(stop != null ? { stop } : {}),
+          ...(resolvedResponseFormat != null
+            ? { response_format: resolvedResponseFormat }
+            : {}),
           messages: [
             ...(agent.instructions
               ? [{ role: "system", content: agent.instructions }]
@@ -241,6 +273,18 @@ export interface OpenAIStreamingRunnerOptions {
   fetch?: typeof globalThis.fetch;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature (0–2). Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Up to 4 sequences where the API will stop generating. */
+  stop?: string | string[];
+  /**
+   * Response format for structured output.
+   * - `"json"` enables JSON mode (`{ type: "json_object" }`)
+   * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
+   */
+  responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
 }
 
 /**
@@ -268,10 +312,19 @@ export function createOpenAIStreamingRunner(
     baseURL = "https://api.openai.com/v1",
     fetch: fetchFn = globalThis.fetch,
     hooks,
+    temperature,
+    topP,
+    stop,
+    responseFormat,
   } = options;
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createOpenAIStreamingRunner");
+
+  const resolvedResponseFormat =
+    responseFormat === "json"
+      ? { type: "json_object" as const }
+      : responseFormat ?? undefined;
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
@@ -286,6 +339,12 @@ export function createOpenAIStreamingRunner(
         body: JSON.stringify({
           model: agent.model ?? model,
           ...(maxTokens != null ? { max_tokens: maxTokens } : {}),
+          ...(temperature != null ? { temperature } : {}),
+          ...(topP != null ? { top_p: topP } : {}),
+          ...(stop != null ? { stop } : {}),
+          ...(resolvedResponseFormat != null
+            ? { response_format: resolvedResponseFormat }
+            : {}),
           messages: [
             ...(agent.instructions
               ? [{ role: "system", content: agent.instructions }]

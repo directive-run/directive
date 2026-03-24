@@ -2,9 +2,9 @@
  * Vue Adapter - Vue 3 composables for Directive
  *
  * Exports: useFact, useDerived, useDispatch, useSelector,
- * useWatch, useInspect, useRequirementStatus, useEvents, useExplain,
- * useConstraintStatus, useOptimisticUpdate, useDirective, useHistory,
- * createTypedHooks, shallowEqual
+ * useWatch, useInspect, useRequirementStatus, useSuspenseRequirement,
+ * useEvents, useExplain, useConstraintStatus, useOptimisticUpdate,
+ * useDirective, useHistory, createTypedHooks, shallowEqual
  */
 
 import type {
@@ -462,6 +462,160 @@ export function useRequirementStatus(
 }
 
 // ============================================================================
+// useSuspenseRequirement — async setup() Suspense integration
+// ============================================================================
+
+/**
+ * Returns a promise that resolves when a requirement type settles.
+ * Designed for Vue's async `setup()` with `<Suspense>`.
+ *
+ * - If the requirement is loading, the returned promise suspends the component.
+ * - If the requirement has an error, the promise rejects with that error.
+ * - If the requirement is already settled, resolves immediately.
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useSuspenseRequirement } from '@directive-run/vue';
+ *
+ * // In async setup(), this suspends until FETCH_USER settles
+ * const status = await useSuspenseRequirement(statusPlugin, "FETCH_USER");
+ * </script>
+ *
+ * <template>
+ *   <div>Resolved: {{ status.resolvedCount }}</div>
+ * </template>
+ * ```
+ */
+
+/** Single type overload */
+export function useSuspenseRequirement(
+  statusPlugin: StatusPlugin,
+  type: string,
+): Promise<ShallowRef<RequirementTypeStatus>>;
+
+/** Multi-type overload */
+export function useSuspenseRequirement(
+  statusPlugin: StatusPlugin,
+  types: string[],
+): Promise<
+  ShallowRef<Record<string, RequirementTypeStatus>>
+>;
+
+/** Implementation */
+export function useSuspenseRequirement(
+  statusPlugin: StatusPlugin,
+  typeOrTypes: string | string[],
+): Promise<
+  | ShallowRef<RequirementTypeStatus>
+  | ShallowRef<Record<string, RequirementTypeStatus>>
+> {
+  if (Array.isArray(typeOrTypes)) {
+    return _useSuspenseRequirementMulti(statusPlugin, typeOrTypes);
+  }
+
+  return _useSuspenseRequirementSingle(statusPlugin, typeOrTypes);
+}
+
+async function _useSuspenseRequirementSingle(
+  statusPlugin: StatusPlugin,
+  type: string,
+): Promise<ShallowRef<RequirementTypeStatus>> {
+  const initialStatus = statusPlugin.getStatus(type);
+
+  if (initialStatus.hasError && initialStatus.lastError) {
+    throw initialStatus.lastError;
+  }
+
+  // If loading, wait for it to settle
+  if (initialStatus.isLoading) {
+    await new Promise<void>((resolve, reject) => {
+      const unsubscribe = statusPlugin.subscribe(() => {
+        const current = statusPlugin.getStatus(type);
+        if (!current.isLoading) {
+          unsubscribe();
+          if (current.hasError && current.lastError) {
+            reject(current.lastError);
+          } else {
+            resolve();
+          }
+        }
+      });
+      onScopeDispose(unsubscribe);
+    });
+  }
+
+  // Now settled — return a reactive ref that continues tracking
+  const status = shallowRef<RequirementTypeStatus>(
+    statusPlugin.getStatus(type),
+  );
+  const unsubscribe = statusPlugin.subscribe(() => {
+    status.value = statusPlugin.getStatus(type);
+  });
+  onScopeDispose(unsubscribe);
+
+  return status;
+}
+
+async function _useSuspenseRequirementMulti(
+  statusPlugin: StatusPlugin,
+  types: string[],
+): Promise<ShallowRef<Record<string, RequirementTypeStatus>>> {
+  // Check for immediate errors
+  for (const type of types) {
+    const s = statusPlugin.getStatus(type);
+    if (s.hasError && s.lastError) {
+      throw s.lastError;
+    }
+  }
+
+  // If any are loading, wait for all to settle
+  const anyLoading = types.some(
+    (t) => statusPlugin.getStatus(t).isLoading,
+  );
+  if (anyLoading) {
+    await new Promise<void>((resolve, reject) => {
+      const unsubscribe = statusPlugin.subscribe(() => {
+        const allDone = types.every(
+          (t) => !statusPlugin.getStatus(t).isLoading,
+        );
+        if (allDone) {
+          unsubscribe();
+          // Check for errors after settling
+          for (const type of types) {
+            const s = statusPlugin.getStatus(type);
+            if (s.hasError && s.lastError) {
+              reject(s.lastError);
+
+              return;
+            }
+          }
+          resolve();
+        }
+      });
+      onScopeDispose(unsubscribe);
+    });
+  }
+
+  // Now settled — return a reactive ref that continues tracking
+  const getValues = (): Record<string, RequirementTypeStatus> => {
+    const result: Record<string, RequirementTypeStatus> = {};
+    for (const type of types) {
+      result[type] = statusPlugin.getStatus(type);
+    }
+
+    return result;
+  };
+  const status = shallowRef(getValues());
+  const unsubscribe = statusPlugin.subscribe(() => {
+    status.value = getValues();
+  });
+  onScopeDispose(unsubscribe);
+
+  return status;
+}
+
+// ============================================================================
 // useExplain — reactive requirement explanation
 // ============================================================================
 
@@ -683,7 +837,12 @@ export function useDirective<M extends ModuleSchema>(
     initialFacts: config?.initialFacts,
   } as any) as unknown as SingleModuleSystem<M>;
 
-  system.start();
+  // SSR guard: initialize facts for SSR rendering, start reconciliation only in the browser
+  if (typeof window !== "undefined") {
+    system.start();
+  } else {
+    system.initialize();
+  }
 
   onScopeDispose(() => {
     system.destroy();

@@ -54,6 +54,8 @@ export const ANTHROPIC_PRICING: Record<
   { input: number; output: number }
 > = {
   "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
+  "claude-sonnet-4-20250514": { input: 3, output: 15 },
+  "claude-haiku-4-5-20250514": { input: 0.8, output: 4 },
   "claude-haiku-3-5-20241022": { input: 0.8, output: 4 },
   "claude-opus-4-20250514": { input: 15, output: 75 },
 };
@@ -74,6 +76,12 @@ export interface AnthropicRunnerOptions {
   timeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature (0–1). Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Custom stop sequences. The model will stop generating when it encounters one. */
+  stopSequences?: string[];
 }
 
 /**
@@ -106,6 +114,9 @@ export function createAnthropicRunner(
     fetch: fetchFn = globalThis.fetch,
     timeoutMs,
     hooks,
+    temperature,
+    topP,
+    stopSequences,
   } = options;
 
   validateBaseURL(baseURL);
@@ -126,6 +137,9 @@ export function createAnthropicRunner(
         body: JSON.stringify({
           model: agent.model ?? model,
           max_tokens: maxTokens,
+          ...(temperature != null ? { temperature } : {}),
+          ...(topP != null ? { top_p: topP } : {}),
+          ...(stopSequences != null ? { stop_sequences: stopSequences } : {}),
           system: agent.instructions ?? "",
           messages: messages.map((m) => ({
             role: m.role,
@@ -167,6 +181,12 @@ export interface AnthropicStreamingRunnerOptions {
   fetch?: typeof globalThis.fetch;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Sampling temperature (0–1). Higher = more random. */
+  temperature?: number;
+  /** Nucleus sampling: top-P probability mass (0–1). */
+  topP?: number;
+  /** Custom stop sequences. The model will stop generating when it encounters one. */
+  stopSequences?: string[];
 }
 
 /**
@@ -194,6 +214,9 @@ export function createAnthropicStreamingRunner(
     baseURL = "https://api.anthropic.com/v1",
     fetch: fetchFn = globalThis.fetch,
     hooks,
+    temperature,
+    topP,
+    stopSequences,
   } = options;
 
   validateBaseURL(baseURL);
@@ -213,6 +236,9 @@ export function createAnthropicStreamingRunner(
         body: JSON.stringify({
           model: agent.model ?? model,
           max_tokens: maxTokens,
+          ...(temperature != null ? { temperature } : {}),
+          ...(topP != null ? { top_p: topP } : {}),
+          ...(stopSequences != null ? { stop_sequences: stopSequences } : {}),
           system: agent.instructions ?? "",
           messages: [{ role: "user", content: input }],
           stream: true,

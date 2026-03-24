@@ -68,7 +68,7 @@ directive/
 │   ├── traffic-light/
 │   └── data-fetching/
 ├── docs/                      # Documentation
-├── codemods/                  # Migration tools
+├── migration/                 # Migration scaffolding tools
 │   ├── from-redux/
 │   ├── from-zustand/
 │   └── from-xstate/
@@ -89,7 +89,7 @@ directive/
 | Vitest | Testing | Fast, native ESM |
 | Biome | Lint/Format | Faster than ESLint + Prettier |
 | Changesets | Versioning | npm publishing workflow |
-| jscodeshift | Codemods | Migration tooling |
+| jscodeshift | Migration Scaffolding | Migration tooling |
 
 ### 1.3 Naming & Branding
 
@@ -207,11 +207,11 @@ directive/
     - Assertion helpers
     - Snapshot testing support
 
-18. **Migration Codemods**
+18. **Migration Scaffolding**
     - Redux → Directive
     - Zustand → Directive
     - XState → Directive
-    - Automated code transformation
+    - Automated scaffolding generation
 
 ### 2.2 Build Order (Dependency Graph)
 
@@ -260,7 +260,7 @@ Week 7+: Examples & Docs
 ├── Traffic light example
 ├── Data fetching example
 ├── Documentation site
-├── Codemods (stretch goal)
+├── Migration Scaffolding (stretch goal)
 ```
 
 ### 2.3 Estimated Complexity
@@ -625,7 +625,7 @@ class DirectiveError extends Error {
 │   ├── From Redux
 │   ├── From Zustand
 │   ├── From XState
-│   └── Using Codemods
+│   └── Using Migration Scaffolding
 ├── Advanced
 │   ├── Web Workers
 │   ├── Custom Requirement Keys
@@ -655,7 +655,7 @@ class DirectiveError extends Error {
    - Testing utilities
    - TypeScript-first
 6. Comparison Table - vs XState, React Query, Redux, Zustand
-7. Migration - "Coming from Redux/Zustand? We have codemods."
+7. Migration - "Coming from Redux/Zustand? We have migration scaffolding."
 8. Footer CTAs - Docs, GitHub, Discord
 
 ---
@@ -720,7 +720,7 @@ Directive combines features no other library offers together:
 | Plugin architecture | Middleware | Middleware | ❌ | ❌ | ✅ |
 | Error boundaries | ❌ | ❌ | ❌ | ✅ | ✅ |
 | Testing utilities | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Codemods | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Migration Scaffolding | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -732,7 +732,7 @@ All features in this plan
 ### v0.2
 - MCP plugin with validation
 - Browser devtools extension
-- More codemods (Recoil, Jotai)
+- More migration analyzers (Recoil, Jotai)
 - Performance profiler
 
 ### v0.3+

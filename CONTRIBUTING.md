@@ -88,7 +88,7 @@ Packages expose multiple entry points via `exports` in `package.json`:
 @directive-run/core          # Main runtime
 @directive-run/core/plugins  # Built-in plugins (logging, devtools, persistence)
 @directive-run/core/testing  # Test utilities (mock resolvers, assertion helpers)
-@directive-run/core/migration # Codemods (Redux/Zustand/XState → Directive)
+@directive-run/core/migration # Migration Scaffolding (Redux/Zustand/XState → Directive)
 
 @directive-run/ai            # AI agent orchestration
 @directive-run/ai/openai     # OpenAI adapter

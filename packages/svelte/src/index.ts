@@ -774,7 +774,12 @@ export function useDirective<M extends ModuleSchema>(
     initialFacts: config?.initialFacts,
   } as any) as unknown as SingleModuleSystem<M>;
 
-  system.start();
+  // SSR guard: initialize facts for SSR rendering, start reconciliation only in the browser
+  if (typeof window !== "undefined") {
+    system.start();
+  } else {
+    system.initialize();
+  }
 
   onDestroy(() => {
     system.destroy();

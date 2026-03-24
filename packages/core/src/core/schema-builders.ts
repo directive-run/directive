@@ -226,10 +226,94 @@ export const t = {
    * ```
    */
   string<T extends string = string>() {
-    return createChainableType<T>(
-      [(v): v is T => typeof v === "string"],
-      "string",
-    ) as ChainableSchemaType<T>;
+    type ChainableString = ChainableSchemaType<T> & {
+      minLength(n: number): ChainableString;
+      maxLength(n: number): ChainableString;
+      pattern(regex: RegExp): ChainableString;
+    };
+
+    const createChainableString = (
+      validators: Array<(v: T) => boolean>,
+      defaultValue?: T | (() => T),
+      transform?: (value: unknown) => T,
+      description?: string,
+      refinements?: Array<{
+        predicate: (value: T) => boolean;
+        message: string;
+      }>,
+    ): ChainableString => {
+      const chainable = createChainableType<T>(
+        validators,
+        "string",
+        defaultValue,
+        transform,
+        description,
+        refinements,
+      );
+      return {
+        ...chainable,
+        minLength(n: number) {
+          return createChainableString(
+            [...validators, (v) => (v as string).length >= n],
+            defaultValue,
+            transform,
+            description,
+            refinements,
+          );
+        },
+        maxLength(n: number) {
+          return createChainableString(
+            [...validators, (v) => (v as string).length <= n],
+            defaultValue,
+            transform,
+            description,
+            refinements,
+          );
+        },
+        pattern(regex: RegExp) {
+          return createChainableString(
+            [...validators, (v) => regex.test(v as string)],
+            defaultValue,
+            transform,
+            description,
+            refinements,
+          );
+        },
+        default(value: T | (() => T)) {
+          return createChainableString(
+            validators,
+            value,
+            transform,
+            description,
+            refinements,
+          );
+        },
+        describe(desc: string) {
+          return createChainableString(
+            validators,
+            defaultValue,
+            transform,
+            desc,
+            refinements,
+          );
+        },
+        refine(predicate: (value: T) => boolean, message: string) {
+          const newRefinements = [
+            ...(refinements ?? []),
+            { predicate, message },
+          ];
+          return createChainableString(
+            [...validators, predicate],
+            defaultValue,
+            transform,
+            description,
+            newRefinements,
+          );
+        },
+      };
+    };
+
+    return createChainableString([(v): v is T => typeof v === "string"]);
   },
 
   /**
@@ -839,5 +923,31 @@ export const t = {
       [(v): v is bigint => typeof v === "bigint"],
       "bigint",
     );
+  },
+
+  /**
+   * Create an `any` schema type that accepts all values without validation.
+   *
+   * @example
+   * ```typescript
+   * schema: { payload: t.any() }
+   * ```
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Intentional any type for schema builder
+  any() {
+    return createChainableType<any>([], "any");
+  },
+
+  /**
+   * Create an `unknown` schema type that accepts all values without validation.
+   * Prefer `t.unknown()` over `t.any()` for stricter downstream type checking.
+   *
+   * @example
+   * ```typescript
+   * schema: { data: t.unknown() }
+   * ```
+   */
+  unknown() {
+    return createChainableType<unknown>([], "unknown");
   },
 };
