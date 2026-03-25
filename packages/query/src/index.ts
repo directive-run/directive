@@ -13,6 +13,7 @@
 
 export { createQuery } from "./create-query.js";
 export { createMutation } from "./create-mutation.js";
+export { createSubscription } from "./create-subscription.js";
 export { withQueries } from "./with-queries.js";
 export { explainQuery } from "./explain.js";
 
@@ -26,4 +27,9 @@ export type {
   MutationStatus,
   MutationDefinition,
 } from "./types.js";
+export type {
+  SubscriptionOptions,
+  SubscriptionCallbacks,
+  SubscriptionDefinition,
+} from "./create-subscription.js";
 export { createIdleResourceState } from "./types.js";

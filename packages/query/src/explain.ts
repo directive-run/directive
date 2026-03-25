@@ -9,7 +9,7 @@
 
 import type { ResourceState } from "./types.js";
 
-const PREFIX = "$";
+const PREFIX = "_q_";
 
 /**
  * Explain why a query is in its current state.
