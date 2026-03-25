@@ -17,7 +17,7 @@ import type {
 // Internal key helpers
 // ============================================================================
 
-const PREFIX = "$";
+const PREFIX = "_q_";
 
 function mKey(name: string, suffix: string): string {
   return `${PREFIX}${name}_${suffix}`;

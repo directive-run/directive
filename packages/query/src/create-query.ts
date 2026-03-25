@@ -22,7 +22,7 @@ import { createIdleResourceState } from "./types.js";
 // ============================================================================
 
 /** Prefix for internal query facts. Matches Directive's $store/$snapshot convention. */
-const PREFIX = "$";
+const PREFIX = "_q_";
 
 /** Build an internal fact key for a query. */
 function qKey(name: string, suffix: string): string {
