@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import type { ModuleSchema } from "@directive-run/core";
-import { createQuery, withQueries, createIdleResourceState } from "../index.js";
+import { describe, expect, it, vi } from "vitest";
+import { createIdleResourceState, createQuery, withQueries } from "../index.js";
 import type { ResourceState } from "../index.js";
 
 // ============================================================================
@@ -15,7 +15,12 @@ function flushMicrotasks(rounds = 10): Promise<void> {
   );
 }
 
-function createUserQuery(fetcherFn?: (params: { userId: string }, signal: AbortSignal) => Promise<unknown>) {
+function createUserQuery(
+  fetcherFn?: (
+    params: { userId: string },
+    signal: AbortSignal,
+  ) => Promise<unknown>,
+) {
   return createQuery({
     name: "user",
     key: (facts) => {
@@ -26,7 +31,8 @@ function createUserQuery(fetcherFn?: (params: { userId: string }, signal: AbortS
 
       return { userId };
     },
-    fetcher: fetcherFn ?? (async (params) => ({ id: params.userId, name: "John" })),
+    fetcher:
+      fetcherFn ?? (async (params) => ({ id: params.userId, name: "John" })),
     refetchAfter: 30_000,
     tags: ["users"],
   });
@@ -46,7 +52,10 @@ function createTestModule(userQuery: ReturnType<typeof createQuery>) {
         facts.userId = "";
       },
       events: {
-        setUserId: (facts: Record<string, unknown>, { value }: { value: string }) => {
+        setUserId: (
+          facts: Record<string, unknown>,
+          { value }: { value: string },
+        ) => {
           facts.userId = value;
         },
       },
@@ -107,7 +116,10 @@ describe("createQuery", () => {
       system.facts.userId = "42";
       await system.settle();
 
-      const state = system.read("user") as ResourceState<{ id: string; name: string }>;
+      const state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
       expect(state.status).toBe("success");
       expect(state.data).toEqual({ id: "42", name: "John" });
       expect(state.isPending).toBe(false);
@@ -191,7 +203,12 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -212,7 +229,12 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -228,7 +250,11 @@ describe("createQuery", () => {
       const query = createQuery({
         name: "user",
         key: () => ({ id: "1" }),
-        fetcher: async () => ({ user_id: "1", first_name: "John", last_name: "Doe" }),
+        fetcher: async () => ({
+          user_id: "1",
+          first_name: "John",
+          last_name: "Doe",
+        }),
         transform: (raw) => ({
           id: raw.user_id,
           name: `${raw.first_name} ${raw.last_name}`,
@@ -237,14 +263,22 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
       system.start();
       await system.settle();
 
-      const state = system.read("user") as ResourceState<{ id: string; name: string }>;
+      const state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
       expect(state.data).toEqual({ id: "1", name: "John Doe" });
     });
   });
@@ -261,7 +295,12 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -284,7 +323,12 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -305,7 +349,12 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -318,7 +367,10 @@ describe("createQuery", () => {
 
   describe("imperative handles", () => {
     it("refetch triggers a new fetch", async () => {
-      const fetcherFn = vi.fn(async () => ({ id: "1", count: fetcherFn.mock.calls.length }));
+      const fetcherFn = vi.fn(async () => ({
+        id: "1",
+        count: fetcherFn.mock.calls.length,
+      }));
       const query = createUserQuery(fetcherFn);
       const mod = createTestModule(query);
       const system = createSystem({ module: mod });
@@ -343,7 +395,10 @@ describe("createQuery", () => {
       // Set data without fetching
       query.setData(system.facts, { id: "42", name: "Optimistic" });
 
-      const state = system.read("user") as ResourceState<{ id: string; name: string }>;
+      const state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
       expect(state.data).toEqual({ id: "42", name: "Optimistic" });
       expect(state.isSuccess).toBe(true);
     });
@@ -365,6 +420,87 @@ describe("createQuery", () => {
     });
   });
 
+  describe("keepPreviousData", () => {
+    it("shows previous key's data while fetching new key", async () => {
+      let resolveSecond: ((val: unknown) => void) | null = null;
+      const fetcherFn = vi.fn((params: { userId: string }) => {
+        if (params.userId === "2") {
+          return new Promise((r) => {
+            resolveSecond = r;
+          });
+        }
+
+        return Promise.resolve({
+          id: params.userId,
+          name: `User ${params.userId}`,
+        });
+      });
+
+      const query = createQuery({
+        name: "user",
+        key: (facts) => {
+          const userId = facts.userId as string;
+          if (!userId) {
+            return null;
+          }
+
+          return { userId };
+        },
+        fetcher: fetcherFn,
+        keepPreviousData: true,
+      });
+      const mod = createModule(
+        "test",
+        withQueries([query], {
+          schema: {
+            facts: { userId: t.string() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+          init: (facts) => {
+            facts.userId = "";
+          },
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+
+      // Fetch user 1
+      system.facts.userId = "1";
+      await system.settle();
+
+      let state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
+      expect(state.data).toEqual({ id: "1", name: "User 1" });
+      expect(state.isPreviousData).toBe(false);
+
+      // Switch to user 2 — should show user 1's data as placeholder
+      system.facts.userId = "2";
+      await flushMicrotasks(20);
+
+      state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
+      expect(state.data).toEqual({ id: "1", name: "User 1" });
+      expect(state.isPreviousData).toBe(true);
+
+      // Resolve user 2 fetch
+      resolveSecond!({ id: "2", name: "User 2" });
+      await system.settle();
+
+      state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
+      expect(state.data).toEqual({ id: "2", name: "User 2" });
+      expect(state.isPreviousData).toBe(false);
+    });
+  });
+
   describe("initialData", () => {
     it("populates cache with initial data", () => {
       const query = createQuery({
@@ -376,15 +512,58 @@ describe("createQuery", () => {
       const mod = createModule(
         "test",
         withQueries([query], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
       system.start();
 
-      const state = system.read("user") as ResourceState<{ id: string; name: string }>;
+      const state = system.read("user") as ResourceState<{
+        id: string;
+        name: string;
+      }>;
       expect(state.data).toEqual({ id: "1", name: "Initial" });
       expect(state.isSuccess).toBe(true);
+    });
+  });
+
+  describe("suspense config", () => {
+    it("stores suspense flag on the query definition", () => {
+      const query = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: async () => ({ id: "1" }),
+        suspense: true,
+      });
+
+      expect(query.suspense).toBe(true);
+    });
+
+    it("stores throwOnError flag on the query definition", () => {
+      const query = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: async () => ({ id: "1" }),
+        throwOnError: true,
+      });
+
+      expect(query.throwOnError).toBe(true);
+    });
+
+    it("defaults suspense and throwOnError to false", () => {
+      const query = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: async () => ({ id: "1" }),
+      });
+
+      expect(query.suspense).toBe(false);
+      expect(query.throwOnError).toBe(false);
     });
   });
 });

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import type { ModuleSchema } from "@directive-run/core";
+import { describe, expect, it, vi } from "vitest";
 import { createSubscription, withQueries } from "../index.js";
 import type { ResourceState } from "../index.js";
 
@@ -44,7 +44,12 @@ describe("createSubscription", () => {
       const mod = createModule(
         "test",
         withQueries([sub], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -118,7 +123,12 @@ describe("createSubscription", () => {
       const mod = createModule(
         "test",
         withQueries([sub], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -131,7 +141,10 @@ describe("createSubscription", () => {
       capturedCallbacks!.onData({ price: 150.25, ticker: "AAPL" });
       await flushMicrotasks();
 
-      const state = system.read("price") as ResourceState<{ price: number; ticker: string }>;
+      const state = system.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
       expect(state.status).toBe("success");
       expect(state.data).toEqual({ price: 150.25, ticker: "AAPL" });
       expect(state.isSuccess).toBe(true);
@@ -151,7 +164,12 @@ describe("createSubscription", () => {
       const mod = createModule(
         "test",
         withQueries([sub], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -182,7 +200,12 @@ describe("createSubscription", () => {
       const mod = createModule(
         "test",
         withQueries([sub], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -204,7 +227,12 @@ describe("createSubscription", () => {
       const mod = createModule(
         "test",
         withQueries([sub], {
-          schema: { facts: {}, derivations: {}, events: {}, requirements: {} } satisfies ModuleSchema,
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
         }),
       );
       const system = createSystem({ module: mod });
@@ -212,7 +240,10 @@ describe("createSubscription", () => {
 
       sub.setData(system.facts, { price: 100, ticker: "AAPL" });
 
-      const state = system.read("price") as ResourceState<{ price: number; ticker: string }>;
+      const state = system.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
       expect(state.data).toEqual({ price: 100, ticker: "AAPL" });
       expect(state.isSuccess).toBe(true);
     });

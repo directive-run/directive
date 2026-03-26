@@ -10,110 +10,18 @@
  * @module
  */
 
-import type {
-  QueryOptions,
-  QueryDefinition,
-  ResourceState,
-} from "./types.js";
+import {
+  PREFIX,
+  buildKey,
+  replaceEqualDeep,
+  serializeKey,
+} from "./internal.js";
+import type { QueryDefinition, QueryOptions, ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
-
-// ============================================================================
-// Internal key helpers
-// ============================================================================
-
-/** Prefix for internal query facts. Matches Directive's $store/$snapshot convention. */
-const PREFIX = "_q_";
-
-/** Build an internal fact key for a query. */
-function qKey(name: string, suffix: string): string {
-  return `${PREFIX}${name}_${suffix}`;
-}
 
 /** Build the requirement type for a query. */
 function reqType(name: string): string {
   return `QUERY_${name.toUpperCase()}`;
-}
-
-/** Serialize a key object to a stable string for cache identity. */
-function serializeKey(key: Record<string, unknown>): string {
-  return JSON.stringify(
-    Object.keys(key)
-      .sort()
-      .reduce(
-        (acc, k) => {
-          acc[k] = key[k];
-
-          return acc;
-        },
-        {} as Record<string, unknown>,
-      ),
-  );
-}
-
-// ============================================================================
-// Structural sharing (deep equal + reference preservation)
-// ============================================================================
-
-/** Deep equal with reference preservation. Returns old ref if deeply equal. */
-function replaceEqualDeep(oldVal: unknown, newVal: unknown): unknown {
-  if (Object.is(oldVal, newVal)) {
-    return oldVal;
-  }
-
-  if (
-    typeof oldVal !== "object" ||
-    typeof newVal !== "object" ||
-    oldVal === null ||
-    newVal === null
-  ) {
-    return newVal;
-  }
-
-  const oldArr = Array.isArray(oldVal);
-  const newArr = Array.isArray(newVal);
-  if (oldArr !== newArr) {
-    return newVal;
-  }
-
-  if (oldArr && newArr) {
-    const oldA = oldVal as unknown[];
-    const newA = newVal as unknown[];
-    if (oldA.length !== newA.length) {
-      return newVal;
-    }
-    let same = true;
-    const result = new Array(newA.length);
-    for (let i = 0; i < newA.length; i++) {
-      result[i] = replaceEqualDeep(oldA[i], newA[i]);
-      if (result[i] !== oldA[i]) {
-        same = false;
-      }
-    }
-
-    return same ? oldVal : result;
-  }
-
-  const oldObj = oldVal as Record<string, unknown>;
-  const newObj = newVal as Record<string, unknown>;
-  const oldKeys = Object.keys(oldObj);
-  const newKeys = Object.keys(newObj);
-  if (oldKeys.length !== newKeys.length) {
-    return newVal;
-  }
-
-  let same = true;
-  const result: Record<string, unknown> = {};
-  for (const k of newKeys) {
-    if (!(k in oldObj)) {
-      return newVal;
-    }
-    result[k] = replaceEqualDeep(oldObj[k], newObj[k]);
-    if (result[k] !== oldObj[k]) {
-      same = false;
-    }
-  }
-
-  return same ? oldVal : result;
 }
 
 // ============================================================================
@@ -146,25 +54,25 @@ export function createQuery<
   TRaw = TData,
   TError = Error,
   TKey extends Record<string, unknown> = Record<string, unknown>,
->(
-  options: QueryOptions<TData, TRaw, TError, TKey>,
-): QueryDefinition<TData> {
+>(options: QueryOptions<TData, TRaw, TError, TKey>): QueryDefinition<TData> {
   const {
     name,
     key: keyFn,
     fetcher,
     transform,
     refetchAfter = 0,
-    expireAfter: _expireAfter = 300_000,
     enabled,
     dependsOn,
     retry,
     refetchOnWindowFocus = true,
     refetchOnReconnect = true,
     refetchInterval,
-    placeholderData,
+    placeholderData: rawPlaceholderData,
+    keepPreviousData = false,
     initialData,
     initialDataUpdatedAt,
+    suspense = false,
+    throwOnError = false,
     onSuccess,
     onError,
     onSettled,
@@ -172,10 +80,16 @@ export function createQuery<
     tags: _tags,
   } = options;
 
+  // Resolve keepPreviousData → placeholderData
+  const placeholderData =
+    rawPlaceholderData ??
+    (keepPreviousData ? (prev?: TData) => prev : undefined);
+
   // Internal fact keys
-  const stateKey = qKey(name, "state");
-  const keyKey = qKey(name, "key");
-  const triggerKey = qKey(name, "trigger");
+  const stateKey = buildKey(name, "state");
+  const keyKey = buildKey(name, "key");
+  const triggerKey = buildKey(name, "trigger");
+  const prevDataKey = buildKey(name, "prevData");
   const requirementType = reqType(name);
 
   // Normalize retry to RetryPolicy
@@ -194,10 +108,17 @@ export function createQuery<
     }
 
     // Apply placeholder data if pending and no data yet
-    if (state.isPending && state.data === null && placeholderData !== undefined) {
+    if (
+      state.isPending &&
+      state.data === null &&
+      placeholderData !== undefined
+    ) {
+      const prevData = facts[prevDataKey] as TData | undefined;
       const placeholder =
         typeof placeholderData === "function"
-          ? (placeholderData as (prev?: TData) => TData | undefined)(undefined)
+          ? (placeholderData as (prev?: TData) => TData | undefined)(
+              prevData ?? undefined,
+            )
           : placeholderData;
       if (placeholder !== undefined) {
         return { ...state, data: placeholder, isPreviousData: true };
@@ -223,7 +144,7 @@ export function createQuery<
     // Check dependsOn
     if (dependsOn) {
       for (const dep of dependsOn) {
-        const depState = facts[qKey(dep, "state")] as
+        const depState = facts[buildKey(dep, "state")] as
           | ResourceState<unknown>
           | undefined;
         if (!depState || depState.status !== "success") {
@@ -266,12 +187,16 @@ export function createQuery<
 
   const definition: QueryDefinition<TData> = {
     name,
+    tags: _tags,
+    suspense,
+    throwOnError,
 
     schema: {
       facts: {
         [stateKey]: { _type: null as unknown },
         [keyKey]: { _type: "" as unknown },
         [triggerKey]: { _type: 0 as unknown },
+        [prevDataKey]: { _type: null as unknown },
       },
       derivations: {
         [name]: { _type: null as unknown },
@@ -296,6 +221,7 @@ export function createQuery<
       }
       facts[keyKey] = null;
       facts[triggerKey] = 0;
+      facts[prevDataKey] = null;
     },
 
     derive: {
@@ -333,18 +259,32 @@ export function createQuery<
           const serializedKey = req.key as string;
 
           // Update key tracking
+          const prevSerializedKey = facts[keyKey] as string | null;
           facts[keyKey] = serializedKey;
 
           // Clear trigger
           facts[triggerKey] = 0;
 
-          // Set fetching state
+          // Store previous data for keepPreviousData / placeholderData(prev)
           const prevState = facts[stateKey] as ResourceState<TData, TError>;
-          facts[stateKey] = {
-            ...prevState,
-            isFetching: true,
-            isStale: false,
-          };
+          const keyChanged = prevSerializedKey !== serializedKey;
+          if (keyChanged && prevState?.data !== null) {
+            facts[prevDataKey] = prevState.data;
+          }
+
+          // Reset to pending on key change so placeholder logic kicks in
+          if (keyChanged && prevState?.status === "success") {
+            facts[stateKey] = {
+              ...createIdleResourceState<TData, TError>(),
+              isFetching: true,
+            };
+          } else {
+            facts[stateKey] = {
+              ...prevState,
+              isFetching: true,
+              isStale: false,
+            };
+          }
 
           try {
             const rawData = await fetcher(params, signal);
@@ -364,10 +304,7 @@ export function createQuery<
               status: "success",
               isPending: false,
               isFetching: false,
-              isStale:
-                refetchAfter > 0
-                  ? false
-                  : false,
+              isStale: false,
               isSuccess: true,
               isError: false,
               isPreviousData: false,
@@ -375,6 +312,9 @@ export function createQuery<
               failureCount: 0,
               failureReason: null,
             } satisfies ResourceState<TData, TError>;
+
+            // Clear previous data — real data is now available
+            facts[prevDataKey] = null;
 
             onSuccess?.(data);
             onSettled?.(data, null);
@@ -430,6 +370,7 @@ export function createQuery<
                   }
                   const shouldRefetch =
                     refetchOnWindowFocus === "always" ||
+                    refetchAfter === 0 ||
                     (state.dataUpdatedAt !== null &&
                       refetchAfter > 0 &&
                       Date.now() - state.dataUpdatedAt >= refetchAfter);
@@ -451,13 +392,27 @@ export function createQuery<
       ...(refetchOnReconnect
         ? {
             [`${PREFIX}${name}_online`]: {
-              run: () => {
+              run: (facts: Record<string, unknown>) => {
                 if (typeof window === "undefined") {
                   return;
                 }
 
                 const handler = () => {
-                  // Trigger will be picked up on next reconcile
+                  const state = facts[stateKey] as
+                    | ResourceState<TData, TError>
+                    | undefined;
+                  if (!state) {
+                    return;
+                  }
+                  const shouldRefetch =
+                    refetchOnReconnect === "always" ||
+                    refetchAfter === 0 ||
+                    (state.dataUpdatedAt !== null &&
+                      refetchAfter > 0 &&
+                      Date.now() - state.dataUpdatedAt >= refetchAfter);
+                  if (shouldRefetch) {
+                    facts[triggerKey] = Date.now();
+                  }
                 };
 
                 window.addEventListener("online", handler);
@@ -473,21 +428,46 @@ export function createQuery<
         ? {
             [`${PREFIX}${name}_poll`]: {
               run: (facts: Record<string, unknown>) => {
-                const interval =
-                  typeof refetchInterval === "function"
-                    ? refetchInterval(
-                        (facts[stateKey] as ResourceState<TData, TError>)?.data ??
-                          undefined,
-                      )
-                    : refetchInterval;
+                if (typeof refetchInterval === "function") {
+                  // Dynamic interval — use setTimeout chain so interval re-evaluates after each tick
+                  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+                  let stopped = false;
 
-                if (!interval) {
+                  const tick = () => {
+                    if (stopped) {
+                      return;
+                    }
+                    const ms = refetchInterval(
+                      (facts[stateKey] as ResourceState<TData, TError>)?.data ??
+                        undefined,
+                    );
+                    if (!ms) {
+                      return;
+                    }
+                    timeoutId = setTimeout(() => {
+                      facts[triggerKey] = Date.now();
+                      tick();
+                    }, ms as number);
+                  };
+
+                  tick();
+
+                  return () => {
+                    stopped = true;
+                    if (timeoutId) {
+                      clearTimeout(timeoutId);
+                    }
+                  };
+                }
+
+                // Static interval
+                if (!refetchInterval) {
                   return;
                 }
 
                 const timer = setInterval(() => {
                   facts[triggerKey] = Date.now();
-                }, interval as number);
+                }, refetchInterval as number);
 
                 return () => clearInterval(timer);
               },

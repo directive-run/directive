@@ -7,31 +7,23 @@
  * @module
  */
 
+import { PREFIX, buildKey } from "./internal.js";
 import type {
-  MutationOptions,
   MutationDefinition,
+  MutationOptions,
   MutationState,
 } from "./types.js";
-
-// ============================================================================
-// Internal key helpers
-// ============================================================================
-
-const PREFIX = "_q_";
-
-function mKey(name: string, suffix: string): string {
-  return `${PREFIX}${name}_${suffix}`;
-}
 
 function reqType(name: string): string {
   return `MUTATE_${name.toUpperCase()}`;
 }
 
 /** Create a default idle MutationState. */
-function createIdleMutationState<TData, TError = Error>(): MutationState<
+export function createIdleMutationState<
   TData,
-  TError
-> {
+  TError = Error,
+  TVariables = unknown,
+>(): MutationState<TData, TError, TVariables> {
   return {
     status: "idle",
     isPending: false,
@@ -94,9 +86,26 @@ export function createMutation<
     onSettled,
   } = options;
 
-  const stateKey = mKey(name, "state");
-  const varsKey = mKey(name, "vars");
-  const triggerKey = mKey(name, "trigger");
+  // Deferred promises for mutateAsync — supports concurrent calls
+  const pendingPromises = new Map<
+    number,
+    { resolve: (data: TData) => void; reject: (error: unknown) => void }
+  >();
+
+  function settleAll(action: "resolve" | "reject", value: unknown): void {
+    for (const [id, deferred] of pendingPromises) {
+      if (action === "resolve") {
+        deferred.resolve(value as TData);
+      } else {
+        deferred.reject(value);
+      }
+      pendingPromises.delete(id);
+    }
+  }
+
+  const stateKey = buildKey(name, "state");
+  const varsKey = buildKey(name, "vars");
+  const triggerKey = buildKey(name, "trigger");
   const requirementType = reqType(name);
 
   // Normalize retry
@@ -109,9 +118,7 @@ export function createMutation<
   function buildMutationState(
     facts: Record<string, unknown>,
   ): MutationState<TData, TError> {
-    const state = facts[stateKey] as
-      | MutationState<TData, TError>
-      | undefined;
+    const state = facts[stateKey] as MutationState<TData, TError> | undefined;
     if (!state) {
       return createIdleMutationState<TData, TError>();
     }
@@ -184,8 +191,10 @@ export function createMutation<
           if (onMutate) {
             try {
               mutateContext = await onMutate(variables);
-            } catch {
-              // onMutate failure — don't proceed
+            } catch (error) {
+              // onMutate failure — reject pending promises and don't proceed
+              settleAll("reject", error);
+
               return;
             }
           }
@@ -200,7 +209,7 @@ export function createMutation<
             data: null,
             error: null,
             variables,
-          } satisfies MutationState<TData, TError>;
+          } satisfies MutationState<TData, TError, TVariables>;
 
           try {
             const data = await mutator(variables, signal);
@@ -215,7 +224,10 @@ export function createMutation<
               data,
               error: null,
               variables,
-            } satisfies MutationState<TData, TError>;
+            } satisfies MutationState<TData, TError, TVariables>;
+
+            // Resolve deferred mutateAsync promises
+            settleAll("resolve", data);
 
             onSuccess?.(data, variables, mutateContext as TContext);
             onSettled?.(data, null, variables, mutateContext);
@@ -224,17 +236,21 @@ export function createMutation<
             if (invalidateTags && invalidateTags.length > 0) {
               // Tags are stored as a convention: $tags_invalidated fact
               // The tag system reads this in constraint evaluation
-              const currentTags = (facts[`${PREFIX}tags_invalidated`] as string[] | undefined) ?? [];
+              const currentTags =
+                (facts[`${PREFIX}tags_invalidated`] as string[] | undefined) ??
+                [];
               const newTags = invalidateTags.map((tag) =>
                 typeof tag === "string" ? tag : `${tag.type}:${tag.id ?? "*"}`,
               );
-              facts[`${PREFIX}tags_invalidated`] = [
-                ...currentTags,
-                ...newTags,
-              ];
+              facts[`${PREFIX}tags_invalidated`] = [...currentTags, ...newTags];
             }
           } catch (error) {
             if (signal.aborted) {
+              settleAll(
+                "reject",
+                new DOMException("Mutation aborted", "AbortError"),
+              );
+
               return;
             }
 
@@ -249,7 +265,10 @@ export function createMutation<
               data: null,
               error: typedError,
               variables,
-            } satisfies MutationState<TData, TError>;
+            } satisfies MutationState<TData, TError, TVariables>;
+
+            // Reject deferred mutateAsync promises
+            settleAll("reject", typedError);
 
             onError?.(typedError, variables, mutateContext);
             onSettled?.(undefined, typedError, variables, mutateContext);
@@ -267,42 +286,24 @@ export function createMutation<
       facts[triggerKey] = Date.now();
     },
 
-    mutateAsync: async (
+    mutateAsync: (
       facts: Record<string, unknown>,
       variables: TVariables,
     ): Promise<TData> => {
-      facts[varsKey] = variables;
-      facts[triggerKey] = Date.now();
-
-      // Return a promise that resolves when the mutation settles
       return new Promise<TData>((resolve, reject) => {
-        const checkState = () => {
-          const state = facts[stateKey] as MutationState<TData, TError>;
-          if (state.isSuccess && state.data !== null) {
-            resolve(state.data);
-          } else if (state.isError && state.error !== null) {
-            reject(state.error);
-          }
-        };
-
-        // Poll briefly for the result (the resolver runs async via the engine)
-        const interval = setInterval(() => {
-          checkState();
-          const state = facts[stateKey] as MutationState<TData, TError>;
-          if (!state.isPending && !state.isIdle) {
-            clearInterval(interval);
-          }
-        }, 10);
-
-        // Timeout after 30s
-        setTimeout(() => {
-          clearInterval(interval);
-          reject(new Error(`[Directive] Mutation "${name}" timed out`));
-        }, 30_000);
+        const id = Date.now() + Math.random();
+        pendingPromises.set(id, { resolve, reject });
+        facts[varsKey] = variables;
+        facts[triggerKey] = Date.now();
       });
     },
 
     reset: (facts: Record<string, unknown>) => {
+      // Reject any pending mutateAsync promises
+      settleAll(
+        "reject",
+        new Error(`[Directive] Mutation "${name}" was reset`),
+      );
       facts[stateKey] = createIdleMutationState<TData, TError>();
       facts[varsKey] = null;
       facts[triggerKey] = 0;

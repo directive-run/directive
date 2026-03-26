@@ -127,13 +127,6 @@ export interface QueryOptions<
    */
   refetchAfter?: number;
 
-  /**
-   * Duration (ms) after which an unused cache entry is garbage collected.
-   * "Unused" means no component/derivation is reading this query.
-   * @default 300_000 (5 minutes)
-   */
-  expireAfter?: number;
-
   // --- Conditions ---
 
   /**
@@ -157,12 +150,6 @@ export interface QueryOptions<
    */
   retry?: RetryPolicy | number;
 
-  /**
-   * Custom retry delay function. Overrides the RetryPolicy's backoff calculation.
-   * Useful for respecting `Retry-After` headers.
-   */
-  retryDelay?: (attempt: number, error: TError) => number;
-
   // --- Refetch Triggers ---
 
   /**
@@ -179,16 +166,13 @@ export interface QueryOptions<
   refetchOnReconnect?: boolean | "always";
 
   /**
-   * Refetch when the query mounts (constraint first evaluates).
-   * @default true
-   */
-  refetchOnMount?: boolean | "always";
-
-  /**
    * Polling interval (ms). Set to `false` or `0` to disable.
    * Can be a function that returns a dynamic interval based on current data.
    */
-  refetchInterval?: number | false | ((data: TData | undefined) => number | false);
+  refetchInterval?:
+    | number
+    | false
+    | ((data: TData | undefined) => number | false);
 
   // --- Data ---
 
@@ -233,6 +217,14 @@ export interface QueryOptions<
   // --- Advanced ---
 
   /**
+   * Keep the previous key's data visible while fetching the new key's data.
+   * Shorthand for `placeholderData: (prev) => prev`. If both are set,
+   * `placeholderData` takes precedence.
+   * @default false
+   */
+  keepPreviousData?: boolean;
+
+  /**
    * Preserve object references when refetched data is deeply equal to cached data.
    * Prevents unnecessary re-renders in React/Vue/Svelte.
    * @default true
@@ -240,20 +232,21 @@ export interface QueryOptions<
   structuralSharing?: boolean;
 
   /**
-   * Network mode controlling behavior when offline.
-   * - `"online"` — only fetch when online (default)
-   * - `"always"` — fetch regardless of network status
-   * - `"offlineFirst"` — serve cache first, fetch when online
-   * @default "online"
-   */
-  networkMode?: "online" | "always" | "offlineFirst";
-
-  /**
    * Throw errors to the nearest React error boundary instead of
    * storing them in `ResourceState.error`.
    * @default false
    */
   throwOnError?: boolean;
+
+  /**
+   * Enable React Suspense integration. When true, reading the query
+   * derivation throws a Promise while pending (triggering `<Suspense>`
+   * fallback) and throws errors to error boundaries.
+   *
+   * Equivalent to setting `throwOnError: true` + Suspense throw behavior.
+   * @default false
+   */
+  suspense?: boolean;
 }
 
 // ============================================================================
@@ -298,11 +291,7 @@ export interface MutationOptions<
   onMutate?: (variables: TVariables) => Promise<TContext> | TContext;
 
   /** Called on successful mutation. */
-  onSuccess?: (
-    data: TData,
-    variables: TVariables,
-    context: TContext,
-  ) => void;
+  onSuccess?: (data: TData, variables: TVariables, context: TContext) => void;
 
   /** Called on failed mutation. Use `context` from `onMutate` for rollback. */
   onError?: (
@@ -333,7 +322,7 @@ export type MutationStatus = "idle" | "pending" | "success" | "error";
  * @typeParam TData - The mutation response type
  * @typeParam TError - The error type
  */
-export interface MutationState<TData, TError = Error> {
+export interface MutationState<TData, TError = Error, TVariables = unknown> {
   /** Current lifecycle status. */
   status: MutationStatus;
   /** True while the mutator is in-flight. */
@@ -349,7 +338,7 @@ export interface MutationState<TData, TError = Error> {
   /** Error from the last failed mutation. */
   error: TError | null;
   /** Variables from the last mutation call. */
-  variables: unknown;
+  variables: TVariables | null;
 }
 
 // ============================================================================
@@ -366,6 +355,17 @@ export interface QueryDefinition<TData> {
   /** The query name (matches the derivation key). */
   readonly name: string;
 
+  /** Cache invalidation tags for this query. */
+  readonly tags?:
+    | string[]
+    | ((data: TData) => (string | { type: string; id?: string | number })[]);
+
+  /** Whether this query uses React Suspense integration. */
+  readonly suspense: boolean;
+
+  /** Whether this query throws errors to error boundaries. */
+  readonly throwOnError: boolean;
+
   /** Schema fragments to merge into a module. */
   readonly schema: {
     readonly facts: Record<string, unknown>;
@@ -379,10 +379,7 @@ export interface QueryDefinition<TData> {
   readonly init: (facts: Record<string, unknown>) => void;
 
   /** Derivation fragments to merge. */
-  readonly derive: Record<
-    string,
-    (facts: Record<string, unknown>) => unknown
-  >;
+  readonly derive: Record<string, (facts: Record<string, unknown>) => unknown>;
 
   /** Constraint fragments to merge. */
   readonly constraints: Record<string, unknown>;
@@ -401,7 +398,11 @@ export interface QueryDefinition<TData> {
   /** Invalidate this query's cache, triggering refetch on next evaluation. */
   invalidate: (facts: Record<string, unknown>) => void;
 
-  /** Cancel any in-flight fetch for this query. */
+  /**
+   * Prevent re-fire of the current query trigger.
+   * Does not abort an already in-flight fetch — the engine's resolver
+   * cancellation handles that when the key changes.
+   */
   cancel: (facts: Record<string, unknown>) => void;
 
   /** Set cached data directly (for optimistic updates). */
@@ -441,10 +442,7 @@ export interface MutationDefinition<TData, TVariables> {
   readonly init: (facts: Record<string, unknown>) => void;
 
   /** Derivation fragments to merge. */
-  readonly derive: Record<
-    string,
-    (facts: Record<string, unknown>) => unknown
-  >;
+  readonly derive: Record<string, (facts: Record<string, unknown>) => unknown>;
 
   /** Constraint fragments (mutation trigger). */
   readonly constraints: Record<string, unknown>;
