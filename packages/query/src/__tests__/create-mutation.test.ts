@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import type { ModuleSchema } from "@directive-run/core";
-import { createMutation, withQueries } from "../index.js";
+import { describe, expect, it, vi } from "vitest";
+import { createMutation, createQuery, withQueries } from "../index.js";
 import type { MutationState } from "../index.js";
 
 // ============================================================================
@@ -9,7 +9,10 @@ import type { MutationState } from "../index.js";
 // ============================================================================
 
 function createTestMutation(
-  mutatorFn?: (vars: { id: string; name: string }, signal: AbortSignal) => Promise<unknown>,
+  mutatorFn?: (
+    vars: { id: string; name: string },
+    signal: AbortSignal,
+  ) => Promise<unknown>,
   opts?: Partial<Parameters<typeof createMutation>[0]>,
 ) {
   return createMutation({
@@ -19,9 +22,7 @@ function createTestMutation(
   } as Parameters<typeof createMutation>[0]);
 }
 
-function createTestModule(
-  mutation: ReturnType<typeof createMutation>,
-) {
+function createTestModule(mutation: ReturnType<typeof createMutation>) {
   return createModule(
     "test",
     withQueries([mutation], {
@@ -85,7 +86,11 @@ describe("createMutation", () => {
       await system.settle();
 
       expect(mutatorFn).toHaveBeenCalledTimes(1);
-      const state = system.read("updateUser") as MutationState<{ id: string; name: string; updated: boolean }>;
+      const state = system.read("updateUser") as MutationState<{
+        id: string;
+        name: string;
+        updated: boolean;
+      }>;
       expect(state.status).toBe("success");
       expect(state.isSuccess).toBe(true);
       expect(state.data).toEqual({ id: "1", name: "John", updated: true });
@@ -112,7 +117,7 @@ describe("createMutation", () => {
 
   describe("lifecycle callbacks", () => {
     it("calls onMutate before mutation", async () => {
-      const onMutate = vi.fn((vars) => ({ previous: "old" }));
+      const onMutate = vi.fn((_vars) => ({ previous: "old" }));
       const mutation = createMutation({
         name: "updateUser",
         mutator: async (vars: { id: string }) => ({ ...vars }),
@@ -237,6 +242,140 @@ describe("createMutation", () => {
       expect(state.status).toBe("idle");
       expect(state.isIdle).toBe(true);
       expect(state.data).toBeNull();
+    });
+  });
+
+  describe("tag invalidation", () => {
+    it("refetches tagged queries after mutation success", async () => {
+      const fetcherFn = vi.fn(async () => ({ id: "1", name: "John" }));
+      const userQuery = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: fetcherFn,
+        tags: ["users"],
+      });
+
+      const mutation = createMutation({
+        name: "updateUser",
+        mutator: async (vars: { id: string; name: string }) => ({
+          ...vars,
+          updated: true,
+        }),
+        invalidateTags: ["users"],
+      });
+
+      const mod = createModule(
+        "test",
+        withQueries([userQuery, mutation], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await system.settle();
+
+      // First fetch from query
+      expect(fetcherFn).toHaveBeenCalledTimes(1);
+
+      // Run mutation — should trigger refetch of tagged query
+      mutation.mutate(system.facts, { id: "1", name: "Updated" });
+      await system.settle();
+
+      // Query should have refetched due to tag invalidation
+      expect(fetcherFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("matches parameterized tags", async () => {
+      const fetcherFn = vi.fn(async () => ({ id: "1", name: "John" }));
+      const userQuery = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: fetcherFn,
+        tags: ["users:1"],
+      });
+
+      const mutation = createMutation({
+        name: "updateUser",
+        mutator: async () => ({ updated: true }),
+        invalidateTags: ["users"],
+      });
+
+      const mod = createModule(
+        "test",
+        withQueries([userQuery, mutation], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await system.settle();
+
+      expect(fetcherFn).toHaveBeenCalledTimes(1);
+
+      mutation.mutate(system.facts, {});
+      await system.settle();
+
+      // "users" invalidation should match "users:1" tag
+      expect(fetcherFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not refetch unrelated tagged queries", async () => {
+      const userFetcher = vi.fn(async () => ({ id: "1" }));
+      const postsFetcher = vi.fn(async () => []);
+
+      const userQuery = createQuery({
+        name: "user",
+        key: () => ({ id: "1" }),
+        fetcher: userFetcher,
+        tags: ["users"],
+      });
+      const postsQuery = createQuery({
+        name: "posts",
+        key: () => ({ all: true }),
+        fetcher: postsFetcher,
+        tags: ["posts"],
+      });
+
+      const mutation = createMutation({
+        name: "updateUser",
+        mutator: async () => ({ updated: true }),
+        invalidateTags: ["users"],
+      });
+
+      const mod = createModule(
+        "test",
+        withQueries([userQuery, postsQuery, mutation], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await system.settle();
+
+      expect(userFetcher).toHaveBeenCalledTimes(1);
+      expect(postsFetcher).toHaveBeenCalledTimes(1);
+
+      mutation.mutate(system.facts, {});
+      await system.settle();
+
+      // Only user query should refetch
+      expect(userFetcher).toHaveBeenCalledTimes(2);
+      expect(postsFetcher).toHaveBeenCalledTimes(1);
     });
   });
 });

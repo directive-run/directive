@@ -8,6 +8,7 @@
  * @module
  */
 
+import { PREFIX, buildKey, serializeKey } from "./internal.js";
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
@@ -48,7 +49,7 @@ export interface SubscriptionOptions<
   subscribe: (
     params: TKey,
     callbacks: SubscriptionCallbacks<TData>,
-  ) => (() => void) | void;
+  ) => (() => void) | undefined;
 
   /** Additional condition for when the subscription should be active. */
   enabled?: (facts: Record<string, unknown>) => boolean;
@@ -71,16 +72,6 @@ export interface SubscriptionDefinition<TData> {
   readonly resolvers: Record<string, unknown>;
   readonly effects: Record<string, unknown>;
   setData: (facts: Record<string, unknown>, data: TData) => void;
-}
-
-// ============================================================================
-// Internal helpers
-// ============================================================================
-
-const PREFIX = "_q_";
-
-function sKey(name: string, suffix: string): string {
-  return `${PREFIX}${name}_${suffix}`;
 }
 
 // ============================================================================
@@ -108,18 +99,14 @@ function sKey(name: string, suffix: string): string {
 export function createSubscription<
   TData,
   TKey extends Record<string, unknown> = Record<string, unknown>,
->(
-  options: SubscriptionOptions<TData, TKey>,
-): SubscriptionDefinition<TData> {
+>(options: SubscriptionOptions<TData, TKey>): SubscriptionDefinition<TData> {
   const { name, key: keyFn, subscribe, enabled, tags: _tags } = options;
 
-  const stateKey = sKey(name, "state");
-  const keyKey = sKey(name, "key");
+  const stateKey = buildKey(name, "state");
+  const keyKey = buildKey(name, "key");
 
   /** Build ResourceState derivation. */
-  function buildState(
-    facts: Record<string, unknown>,
-  ): ResourceState<TData> {
+  function buildState(facts: Record<string, unknown>): ResourceState<TData> {
     const state = facts[stateKey] as ResourceState<TData> | undefined;
     if (!state) {
       return createIdleResourceState<TData>();
@@ -168,7 +155,7 @@ export function createSubscription<
             return;
           }
 
-          const serializedKey = JSON.stringify(currentKey);
+          const serializedKey = serializeKey(currentKey);
           const prevKey = facts[keyKey] as string | null;
 
           // Key hasn't changed and subscription already active — skip
