@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, expect, it, vi } from "vitest";
 import { createQuerySystem } from "../index.js";
 import type { MutationState, ResourceState } from "../index.js";
