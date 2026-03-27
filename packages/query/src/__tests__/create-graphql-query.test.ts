@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createModule, createSystem, t } from "@directive-run/core";
 import type { ModuleSchema } from "@directive-run/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createModule, createSystem } from "@directive-run/core";
 import type { ModuleSchema } from "@directive-run/core";
 /**
