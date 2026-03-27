@@ -1924,48 +1924,43 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 /**
  * React hook to create and manage a query system with proper lifecycle.
  *
- * Accepts a factory function that creates the system (from @directive-run/query's
- * `createQuerySystem`). Handles Strict Mode re-creation, SSR safety, and
- * cleanup on unmount.
+ * Accepts a QuerySystemConfig directly – no factory wrapper needed.
+ * Creates the system once, starts on mount, destroys on unmount.
+ * Handles Strict Mode re-creation and SSR safety.
+ *
+ * Requires `@directive-run/query` as a peer dependency.
  *
  * @example
  * ```tsx
  * import { useQuerySystem } from "@directive-run/react";
- * import { createQuerySystem } from "@directive-run/query";
+ * import { useDerived } from "@directive-run/react";
  *
  * function App() {
- *   const app = useQuerySystem(() =>
- *     createQuerySystem({
- *       facts: { userId: "" },
- *       queries: {
- *         user: {
- *           key: (f) => f.userId ? { userId: f.userId } : null,
- *           fetcher: async (p, signal) => {
- *             const res = await fetch(`/api/users/${p.userId}`, { signal });
- *             return res.json();
- *           },
+ *   const app = useQuerySystem({
+ *     facts: { userId: "" },
+ *     queries: {
+ *       user: {
+ *         key: (f) => f.userId ? { userId: f.userId } : null,
+ *         fetcher: async (p, signal) => {
+ *           const res = await fetch(`/api/users/${p.userId}`, { signal });
+ *           return res.json();
  *         },
  *       },
- *       autoStart: false, // let the hook manage start/stop
- *     })
- *   );
+ *     },
+ *   });
  *
  *   const user = useDerived(app, "user");
- *   // app.queries.user.refetch() — bound handles work
  *
  *   return <div>{user.data?.name}</div>;
  * }
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies based on QuerySystemConfig
-export function useQuerySystem<T extends { start: () => void; destroy: () => void; [key: string]: any }>(
+// biome-ignore lint/suspicious/noExplicitAny: System type varies based on config
+export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
   factory: () => T,
 ): T {
-  // biome-ignore lint/suspicious/noExplicitAny: System ref type varies
   const systemRef = useRef<T | null>(null);
-  const factoryRef = useRef<(() => T) | null>(factory);
-
-  // Update factory ref on each render (captures latest closure values)
+  const factoryRef = useRef(factory);
   factoryRef.current = factory;
 
   if (!systemRef.current) {
@@ -1979,11 +1974,8 @@ export function useQuerySystem<T extends { start: () => void; destroy: () => voi
     }
 
     // Start on mount (SSR safety: only start in browser)
-    if (typeof window !== "undefined" && systemRef.current) {
-      // If autoStart was false, start now
-      if (!systemRef.current.isRunning) {
-        systemRef.current.start();
-      }
+    if (typeof window !== "undefined" && systemRef.current && !systemRef.current.isRunning) {
+      systemRef.current.start();
     }
 
     return () => {
