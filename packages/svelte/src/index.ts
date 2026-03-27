@@ -922,3 +922,48 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
     return unsubscribe;
   });
 }
+
+// ============================================================================
+// useQuerySystem — Stable query system with lifecycle management
+// ============================================================================
+
+/**
+ * Svelte composable to create and manage a query system with proper lifecycle.
+ *
+ * Accepts a factory function that creates the system.
+ * Handles cleanup on component destroy.
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { useQuerySystem, useDerived } from "@directive-run/svelte";
+ *   import { createQuerySystem } from "@directive-run/query";
+ *
+ *   const app = useQuerySystem(() =>
+ *     createQuerySystem({
+ *       facts: { userId: "" },
+ *       queries: { user: { key: ..., fetcher: ... } },
+ *       autoStart: false,
+ *     })
+ *   );
+ *
+ *   const user = useDerived(app, "user");
+ * </script>
+ * ```
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
+  factory: () => T,
+): T {
+  const system = factory();
+
+  if (typeof window !== "undefined" && !system.isRunning) {
+    system.start();
+  }
+
+  onDestroy(() => {
+    system.destroy();
+  });
+
+  return system;
+}

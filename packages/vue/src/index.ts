@@ -992,3 +992,49 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 
   return value;
 }
+
+// ============================================================================
+// useQuerySystem — Stable query system with lifecycle management
+// ============================================================================
+
+/**
+ * Vue composable to create and manage a query system with proper lifecycle.
+ *
+ * Accepts a factory function that creates the system.
+ * Handles cleanup on scope disposal.
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useQuerySystem, useDerived } from "@directive-run/vue";
+ * import { createQuerySystem } from "@directive-run/query";
+ *
+ * const app = useQuerySystem(() =>
+ *   createQuerySystem({
+ *     facts: { userId: "" },
+ *     queries: { user: { key: ..., fetcher: ... } },
+ *     autoStart: false,
+ *   })
+ * );
+ *
+ * const user = useDerived(app, "user");
+ * </script>
+ * ```
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
+  factory: () => T,
+): T {
+  const system = factory();
+
+  // Start if not already running
+  if (typeof window !== "undefined" && !system.isRunning) {
+    system.start();
+  }
+
+  onScopeDispose(() => {
+    system.destroy();
+  });
+
+  return system;
+}

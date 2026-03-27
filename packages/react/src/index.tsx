@@ -1916,3 +1916,81 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       useWatch(system as SingleModuleSystem<any>, key, callback),
   };
 }
+
+// ============================================================================
+// useQuerySystem — Stable query system with lifecycle management
+// ============================================================================
+
+/**
+ * React hook to create and manage a query system with proper lifecycle.
+ *
+ * Accepts a factory function that creates the system (from @directive-run/query's
+ * `createQuerySystem`). Handles Strict Mode re-creation, SSR safety, and
+ * cleanup on unmount.
+ *
+ * @example
+ * ```tsx
+ * import { useQuerySystem } from "@directive-run/react";
+ * import { createQuerySystem } from "@directive-run/query";
+ *
+ * function App() {
+ *   const app = useQuerySystem(() =>
+ *     createQuerySystem({
+ *       facts: { userId: "" },
+ *       queries: {
+ *         user: {
+ *           key: (f) => f.userId ? { userId: f.userId } : null,
+ *           fetcher: async (p, signal) => {
+ *             const res = await fetch(`/api/users/${p.userId}`, { signal });
+ *             return res.json();
+ *           },
+ *         },
+ *       },
+ *       autoStart: false, // let the hook manage start/stop
+ *     })
+ *   );
+ *
+ *   const user = useDerived(app, "user");
+ *   // app.queries.user.refetch() — bound handles work
+ *
+ *   return <div>{user.data?.name}</div>;
+ * }
+ * ```
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies based on QuerySystemConfig
+export function useQuerySystem<T extends { start: () => void; destroy: () => void; [key: string]: any }>(
+  factory: () => T,
+): T {
+  // biome-ignore lint/suspicious/noExplicitAny: System ref type varies
+  const systemRef = useRef<T | null>(null);
+  const factoryRef = useRef<(() => T) | null>(factory);
+
+  // Update factory ref on each render (captures latest closure values)
+  factoryRef.current = factory;
+
+  if (!systemRef.current) {
+    systemRef.current = factoryRef.current();
+  }
+
+  useEffect(() => {
+    // Strict mode re-mount: system was destroyed in cleanup, recreate
+    if (!systemRef.current && factoryRef.current) {
+      systemRef.current = factoryRef.current();
+    }
+
+    // Start on mount (SSR safety: only start in browser)
+    if (typeof window !== "undefined" && systemRef.current) {
+      // If autoStart was false, start now
+      if (!systemRef.current.isRunning) {
+        systemRef.current.start();
+      }
+    }
+
+    return () => {
+      systemRef.current?.destroy();
+      systemRef.current = null;
+    };
+  }, []);
+
+  return systemRef.current!;
+}

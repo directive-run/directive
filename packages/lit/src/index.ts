@@ -1080,3 +1080,69 @@ export function createNamespacedSelector<Modules extends ModulesMap, R>(
 ): NamespacedSelectorController<Modules, R> {
   return new NamespacedSelectorController(host, system, keys, selector);
 }
+
+// ============================================================================
+// QuerySystemController — Stable query system with Lit lifecycle
+// ============================================================================
+
+/**
+ * Lit reactive controller that creates and manages a query system.
+ * Starts on connect, destroys on disconnect.
+ *
+ * @example
+ * ```typescript
+ * import { LitElement, html } from "lit";
+ * import { QuerySystemController } from "@directive-run/lit";
+ * import { createQuerySystem } from "@directive-run/query";
+ *
+ * class MyApp extends LitElement {
+ *   private app = new QuerySystemController(this, () =>
+ *     createQuerySystem({
+ *       facts: { userId: "" },
+ *       queries: { user: { key: ..., fetcher: ... } },
+ *       autoStart: false,
+ *     })
+ *   );
+ *
+ *   render() {
+ *     const user = this.app.system.read("user");
+ *     return html`<div>${user.data?.name}</div>`;
+ *   }
+ * }
+ * ```
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+export class QuerySystemController<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>
+  implements ReactiveController
+{
+  // biome-ignore lint/suspicious/noExplicitAny: System type varies
+  private _system: T | null = null;
+  private factory: () => T;
+
+  constructor(host: ReactiveControllerHost, factory: () => T) {
+    this.factory = factory;
+    host.addController(this);
+  }
+
+  get system(): T {
+    if (!this._system) {
+      throw new Error(
+        "[Directive] QuerySystemController.system is not available. " +
+          "Access it only in lifecycle methods or after the element is connected.",
+      );
+    }
+    return this._system;
+  }
+
+  hostConnected(): void {
+    this._system = this.factory();
+    if (!this._system.isRunning) {
+      this._system.start();
+    }
+  }
+
+  hostDisconnected(): void {
+    this._system?.destroy();
+    this._system = null;
+  }
+}
