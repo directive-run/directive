@@ -53,6 +53,8 @@ export interface InfiniteQueryOptions<
   enabled?: (facts: Record<string, unknown>) => boolean;
   dependsOn?: string[];
   refetchAfter?: number;
+  /** Duration (ms) after which an idle query's cached data expires. @default 300_000 */
+  expireAfter?: number;
   retry?: RetryPolicy | number;
   tags?: string[];
   onSuccess?: (data: TData[]) => void;
@@ -168,6 +170,7 @@ export function createInfiniteQuery<
     dependsOn,
     retry,
     refetchAfter = 0,
+    expireAfter = 300_000,
     onSuccess,
     onError,
     onSettled,
@@ -189,6 +192,13 @@ export function createInfiniteQuery<
   function buildState(
     facts: Record<string, unknown>,
   ): InfiniteResourceState<TData, TError> {
+    const trigger = facts[triggerKey] as string;
+
+    // Cache expired – return idle state
+    if (trigger === "expired") {
+      return createIdleInfiniteState<TData, TError>();
+    }
+
     const state = facts[stateKey] as
       | InfiniteResourceState<TData, TError>
       | undefined;
@@ -606,7 +616,49 @@ export function createInfiniteQuery<
         : {}),
     },
 
-    effects: {},
+    effects: {
+      // Cache expiration (garbage collection)
+      ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
+        ? {
+            [`${PREFIX}${name}_gc`]: {
+              run: (facts: Record<string, unknown>) => {
+                const state = facts[stateKey] as
+                  | InfiniteResourceState<TData, TError>
+                  | undefined;
+                if (
+                  !state ||
+                  state.status !== "success" ||
+                  !state.dataUpdatedAt
+                ) {
+                  return;
+                }
+
+                const checkInterval = Math.min(expireAfter, 5000);
+                const interval = setInterval(() => {
+                  const currentKeyVal = keyFn(facts);
+                  if (currentKeyVal !== null) {
+                    return;
+                  }
+
+                  const currentState = facts[stateKey] as
+                    | InfiniteResourceState<TData, TError>
+                    | undefined;
+                  if (
+                    currentState?.dataUpdatedAt &&
+                    Date.now() - currentState.dataUpdatedAt >= expireAfter
+                  ) {
+                    facts[triggerKey] = "expired";
+                    facts[keyKey] = null;
+                    clearInterval(interval);
+                  }
+                }, checkInterval);
+
+                return () => clearInterval(interval);
+              },
+            },
+          }
+        : {}),
+    },
 
     // --- Imperative handles ---
 

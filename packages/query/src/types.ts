@@ -127,6 +127,14 @@ export interface QueryOptions<
    */
   refetchAfter?: number;
 
+  /**
+   * Duration (ms) after which an idle query's cached data is removed from facts.
+   * A query is idle when its key returns null (disabled).
+   * Set to `0` or `Infinity` to disable garbage collection.
+   * @default 300_000 (5 minutes)
+   */
+  expireAfter?: number;
+
   // --- Conditions ---
 
   /**

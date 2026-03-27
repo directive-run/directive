@@ -61,6 +61,7 @@ export function createQuery<
     fetcher,
     transform,
     refetchAfter = 0,
+    expireAfter = 300_000,
     enabled,
     dependsOn,
     retry,
@@ -103,6 +104,13 @@ export function createQuery<
     facts: Record<string, unknown>,
   ): ResourceState<TData, TError> {
     const state = facts[stateKey] as ResourceState<TData, TError> | undefined;
+    const trigger = facts[triggerKey] as number;
+
+    // Cache expired — return idle state regardless of stored state
+    if (trigger === -1) {
+      return createIdleResourceState<TData, TError>();
+    }
+
     if (!state) {
       return createIdleResourceState<TData, TError>();
     }
@@ -162,8 +170,8 @@ export function createQuery<
       return true;
     }
 
-    // Manual trigger
-    if (facts[triggerKey]) {
+    // Manual trigger (positive values only; -1 = expired cache signal)
+    if ((facts[triggerKey] as number) > 0) {
       return true;
     }
 
@@ -470,6 +478,57 @@ export function createQuery<
                 }, refetchInterval as number);
 
                 return () => clearInterval(timer);
+              },
+            },
+          }
+        : {}),
+
+      // Cache expiration (garbage collection)
+      // Uses a polling effect that checks if the query has been idle too long.
+      // When it detects expiry, writes triggerKey = -1 which buildResourceState
+      // interprets as "return idle state".
+      ...(expireAfter > 0 && expireAfter !== Number.POSITIVE_INFINITY
+        ? {
+            [`${PREFIX}${name}_gc`]: {
+              run: (facts: Record<string, unknown>) => {
+                // Track state to detect when it has data
+                const state = facts[stateKey] as
+                  | ResourceState<TData, TError>
+                  | undefined;
+                if (
+                  !state ||
+                  state.status !== "success" ||
+                  !state.dataUpdatedAt
+                ) {
+                  return;
+                }
+
+                // Poll periodically to check if data has expired
+                const checkInterval = Math.min(expireAfter, 5000);
+                const interval = setInterval(() => {
+                  // Check if the query key is currently null (idle)
+                  const currentKeyVal = keyFn(facts);
+                  if (currentKeyVal !== null) {
+                    return; // Query is active, skip
+                  }
+
+                  // Check if expiry time has passed
+                  const currentState = facts[stateKey] as
+                    | ResourceState<TData, TError>
+                    | undefined;
+                  if (
+                    currentState?.dataUpdatedAt &&
+                    Date.now() - currentState.dataUpdatedAt >= expireAfter
+                  ) {
+                    // Signal expiration via trigger and clear key
+                    // so reactivation detects a "key change"
+                    facts[triggerKey] = -1;
+                    facts[keyKey] = null;
+                    clearInterval(interval);
+                  }
+                }, checkInterval);
+
+                return () => clearInterval(interval);
               },
             },
           }
