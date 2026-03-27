@@ -57,10 +57,10 @@ const { data, isPending, error } = useDerived(system, "user");
 
 TanStack Query is excellent. Use it if you're happy with it. Directive Query adds things no competitor can:
 
-1. **Causal cache invalidation** — no query keys, no manual invalidation. Change a fact, the query re-fetches.
-2. **`explainQuery("user")`** — "Why did that fetch?" Full causal chain.
-3. **Time-travel through API responses** — cache is facts, facts are snapshotted.
-4. **Constraint composition** — queries depend on queries via auto-tracked facts.
+1. **Causal cache invalidation** – no query keys, no manual invalidation. Change a fact, the query re-fetches.
+2. **`explainQuery("user")`** – "Why did that fetch?" Full causal chain.
+3. **Time-travel through API responses** – cache is facts, facts are snapshotted.
+4. **Constraint composition** – queries depend on queries via auto-tracked facts.
 
 ## Choose Your Path
 
@@ -125,7 +125,7 @@ const app = createQuerySystem({
   autoStart: true, // default
 });
 
-// Bound handles — no passing facts around
+// Bound handles – no passing facts around
 app.queries.user.refetch();
 app.queries.user.invalidate();
 app.queries.user.setData(newData);
@@ -175,6 +175,7 @@ const user = createQuery({
   fetcher: async (params, signal) => api.getUser(params.userId),
   transform: (raw) => normalizeUser(raw),
   refetchAfter: 30_000,
+  expireAfter: 5 * 60_000,
   retry: { attempts: 3, backoff: "exponential" },
   tags: ["users"],
   keepPreviousData: true,
