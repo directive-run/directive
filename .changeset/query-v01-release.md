@@ -1,5 +1,5 @@
 ---
-"@directive-run/query": minor
+"@directive-run/query": patch
 "@directive-run/react": patch
 "@directive-run/vue": patch
 "@directive-run/svelte": patch
@@ -7,7 +7,7 @@
 "@directive-run/lit": patch
 ---
 
-Add @directive-run/query v0.1 – declarative data fetching with causal cache invalidation.
+Add @directive-run/query – declarative data fetching with causal cache invalidation.
 
 New package: createQuery, createMutation, createSubscription, createInfiniteQuery, createBaseQuery, createGraphQLQuery, createGraphQLClient, createQuerySystem, createQueryModule, withQueries, explainQuery. 191 tests across 15 test files.
 
