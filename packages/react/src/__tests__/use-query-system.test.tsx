@@ -1,7 +1,8 @@
+// @ts-nocheck
 // @vitest-environment happy-dom
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { useQuerySystem, useDerived } from "../index";
+import { useQuerySystem } from "../index";
 
 // ============================================================================
 // Mock createQuerySystem — simulates @directive-run/query
