@@ -941,3 +941,49 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 
   return value as Accessor<R>;
 }
+
+// ============================================================================
+// useQuerySystem — Stable query system with lifecycle management
+// ============================================================================
+
+/**
+ * Solid composable to create and manage a query system with proper lifecycle.
+ *
+ * Accepts a factory function that creates the system.
+ * Handles cleanup via onCleanup.
+ *
+ * @example
+ * ```tsx
+ * import { useQuerySystem, useDerived } from "@directive-run/solid";
+ * import { createQuerySystem } from "@directive-run/query";
+ *
+ * function App() {
+ *   const app = useQuerySystem(() =>
+ *     createQuerySystem({
+ *       facts: { userId: "" },
+ *       queries: { user: { key: ..., fetcher: ... } },
+ *       autoStart: false,
+ *     })
+ *   );
+ *
+ *   const user = useDerived(app, "user");
+ *   return <div>{user().data?.name}</div>;
+ * }
+ * ```
+ */
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
+  factory: () => T,
+): T {
+  const system = factory();
+
+  if (typeof window !== "undefined" && !system.isRunning) {
+    system.start();
+  }
+
+  onCleanup(() => {
+    system.destroy();
+  });
+
+  return system;
+}

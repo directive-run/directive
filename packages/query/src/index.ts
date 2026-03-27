@@ -29,6 +29,10 @@ export { createMutation, createIdleMutationState } from "./create-mutation.js";
 export { createSubscription } from "./create-subscription.js";
 export { createInfiniteQuery } from "./create-infinite-query.js";
 export { createBaseQuery } from "./create-base-query.js";
+export {
+  createGraphQLQuery,
+  createGraphQLClient,
+} from "./create-graphql-query.js";
 
 // Composition + debugging
 export { withQueries } from "./with-queries.js";
@@ -61,6 +65,14 @@ export type {
   BaseQueryArgs,
   BaseQueryFetcher,
 } from "./create-base-query.js";
+export type {
+  GraphQLQueryOptions,
+  GraphQLClientOptions,
+  GraphQLError,
+  TypedDocumentNode,
+  ResultOf,
+  VariablesOf,
+} from "./create-graphql-query.js";
 export { createIdleResourceState } from "./types.js";
 
 // Re-export t from core for single-import convenience
