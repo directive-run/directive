@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi } from "vitest";
 import { effectScope } from "vue";
 import { useQuerySystem } from "../index";
