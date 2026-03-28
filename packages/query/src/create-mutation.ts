@@ -87,6 +87,8 @@ export function createMutation<
   } = options;
 
   // Deferred promises for mutateAsync — supports concurrent calls
+  // Capped at 100 to prevent unbounded growth from rapid calls
+  const MAX_PENDING = 100;
   const pendingPromises = new Map<
     number,
     { resolve: (data: TData) => void; reject: (error: unknown) => void }
@@ -291,6 +293,19 @@ export function createMutation<
       variables: TVariables,
     ): Promise<TData> => {
       return new Promise<TData>((resolve, reject) => {
+        // FIFO eviction if at cap
+        if (pendingPromises.size >= MAX_PENDING) {
+          const oldest = pendingPromises.keys().next().value;
+          if (oldest !== undefined) {
+            const evicted = pendingPromises.get(oldest);
+            evicted?.reject(
+              new Error(
+                `[Directive] Mutation "${name}" pending promise evicted (cap: ${MAX_PENDING})`,
+              ),
+            );
+            pendingPromises.delete(oldest);
+          }
+        }
         const id = Date.now() + Math.random();
         pendingPromises.set(id, { resolve, reject });
         facts[varsKey] = variables;
