@@ -51,7 +51,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+          # NPM_CONFIG_PROVENANCE requires a public repo; disabled for private repos
+          NPM_CONFIG_PROVENANCE: false
 
   docs-artifacts:
     name: Publish docs artifacts
