@@ -1,5 +1,19 @@
 # @directive-run/react
 
+## 0.8.4
+
+### Patch Changes
+
+- [`97a780c`](https://github.com/directive-run/directive/commit/97a780c1d6bdf7b647e0118443dbedd6bbf6e6b7) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Post-release bug fixes:
+
+  - Fix useSelector dep-retracking when selector function changes (React adapter)
+  - Fix GraphQL headers function type (removed misleading facts parameter)
+  - Fix expireAfter GC re-run bug (polling now restarts after re-activation cycles)
+  - Cap mutateAsync pendingPromises Map at 100 with FIFO eviction
+  - Harden replaceEqualDeep with Object.create(null) for prototype pollution defense
+  - Document type inference tradeoff in createQuerySystem JSDoc
+  - Add @directive-run/react install note to README
+
 ## 0.8.3
 
 ### Patch Changes
