@@ -144,6 +144,10 @@ export interface BoundInfiniteQueryHandle {
 /**
  * Create a query-based Directive system in one call.
  *
+ * Note: Inline query configs use `any` for generic types (fetcher params, etc.)
+ * for convenience. For full type inference, use `createQuery()` + `withQueries()`
+ * with the advanced path.
+ *
  * @param config - Queries, mutations, subscriptions, facts, and system options
  * @returns A started system with bound imperative handles
  *

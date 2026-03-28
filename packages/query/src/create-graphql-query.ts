@@ -72,9 +72,7 @@ export interface GraphQLQueryOptions<
   endpoint?: string;
 
   /** Additional headers for the GraphQL request. */
-  headers?:
-    | Record<string, string>
-    | ((facts: Record<string, unknown>) => Record<string, string>);
+  headers?: Record<string, string> | (() => Record<string, string>);
 
   /** Transform the raw GraphQL result before caching. */
   transform?: (result: TResult) => TData;
@@ -219,7 +217,7 @@ export function createGraphQLQuery<
     ): Promise<TResult> => {
       // Build headers
       const resolvedHeaders: Record<string, string> =
-        typeof headersFn === "function" ? headersFn({}) : (headersFn ?? {});
+        typeof headersFn === "function" ? headersFn() : (headersFn ?? {});
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -324,14 +322,14 @@ export function createGraphQLClient(clientOptions: GraphQLClientOptions = {}) {
         TVariables,
         TData,
         TError
-      >["headers"] = (facts) => {
+      >["headers"] = () => {
         const clientH =
           typeof defaultHeaders === "function"
             ? defaultHeaders()
             : (defaultHeaders ?? {});
         const queryH =
           typeof options.headers === "function"
-            ? options.headers(facts)
+            ? options.headers()
             : (options.headers ?? {});
 
         return { ...clientH, ...queryH };
