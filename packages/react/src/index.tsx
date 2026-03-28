@@ -476,10 +476,18 @@ export function useSelector(
   const selectorRef = useRef(selector);
   const eqRef = useRef(equalityFn);
   const defaultValueRef = useRef(defaultValue);
+  // Track selector identity changes to force resubscription when deps may shift
+  const prevSelectorRef = useRef(selector);
+  const selectorVersionRef = useRef(0);
+  if (prevSelectorRef.current !== selector) {
+    prevSelectorRef.current = selector;
+    selectorVersionRef.current++;
+  }
   selectorRef.current = selector;
   eqRef.current = equalityFn;
   defaultValueRef.current = defaultValue;
 
+  const selectorVersion = selectorVersionRef.current;
   const trackedFactKeysRef = useRef<string[]>([]);
   const trackedDeriveKeysRef = useRef<string[]>([]);
   const cachedValue = useRef<unknown>(UNINITIALIZED);
@@ -573,7 +581,8 @@ export function useSelector(
         unsubsRef.current = [];
       };
     },
-    [system, runWithTracking],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectorVersion forces resubscription when selector deps change
+    [system, runWithTracking, selectorVersion],
   );
 
   const getSnapshot = useCallback(() => {
