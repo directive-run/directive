@@ -20,6 +20,10 @@ export type {
   BoundMutationHandle,
   BoundSubscriptionHandle,
   BoundInfiniteQueryHandle,
+  TypedQuerySystem,
+  TypedBoundQueryHandle,
+  TypedBoundMutationHandle,
+  TypedBoundSubscriptionHandle,
 } from "./create-query-system.js";
 export { createQueryModule } from "./create-query-module.js";
 

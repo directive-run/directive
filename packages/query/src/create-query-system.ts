@@ -17,16 +17,143 @@ import type {
   TraceOption,
 } from "@directive-run/core";
 import { createInfiniteQuery } from "./create-infinite-query.js";
+import type { InfiniteResourceState } from "./create-infinite-query.js";
 import { createMutation } from "./create-mutation.js";
 import { createQuery } from "./create-query.js";
 import { createSubscription } from "./create-subscription.js";
 import { explainQuery } from "./explain.js";
-import type { QueryOptions } from "./types.js";
-import type { MutationOptions } from "./types.js";
+import type {
+  MutationOptions,
+  MutationState,
+  QueryOptions,
+  ResourceState,
+} from "./types.js";
 import { withQueries } from "./with-queries.js";
 
 // ============================================================================
-// Types
+// Type Inference Utilities
+// ============================================================================
+
+/** Extract TData from an inline query config (via fetcher return or transform). */
+// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
+type InferQueryData<Q> = Q extends { transform: (raw: any) => infer TData }
+  ? TData
+  : // biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
+    Q extends { fetcher: (...args: any[]) => Promise<infer TRaw> }
+    ? TRaw
+    : unknown;
+
+/** Extract TData from a mutation config (via mutator return). */
+// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
+type InferMutationData<M> = M extends {
+  mutator: (...args: any[]) => Promise<infer TData>;
+}
+  ? TData
+  : unknown;
+
+/** Extract TVariables from a mutation config (via mutator first param). */
+// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
+type InferMutationVariables<M> = M extends {
+  mutator: (variables: infer V, ...args: any[]) => any;
+}
+  ? V
+  : unknown;
+
+/** Extract TData from an infinite query config (via fetcher return). */
+// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
+type InferInfiniteData<Q> = Q extends {
+  fetcher: (...args: any[]) => Promise<infer TData>;
+}
+  ? TData
+  : unknown;
+
+// ============================================================================
+// Typed Bound Handles
+// ============================================================================
+
+/** Typed bound query handle. */
+export interface TypedBoundQueryHandle<TData> {
+  refetch(): void;
+  invalidate(): void;
+  cancel(): void;
+  setData(data: TData): void;
+}
+
+/** Typed bound mutation handle. */
+export interface TypedBoundMutationHandle<TData, TVariables> {
+  mutate(variables: TVariables): void;
+  mutateAsync(variables: TVariables): Promise<TData>;
+  reset(): void;
+}
+
+/** Typed bound subscription handle. */
+export interface TypedBoundSubscriptionHandle<TData> {
+  setData(data: TData): void;
+}
+
+// ============================================================================
+// Typed Return Type
+// ============================================================================
+
+/** Fully typed return type of createQuerySystem. */
+export type TypedQuerySystem<
+  TFacts extends Record<string, unknown>,
+  TQueries extends Record<string, unknown>,
+  TMutations extends Record<string, unknown>,
+  TSubscriptions extends Record<string, unknown>,
+  TInfiniteQueries extends Record<string, unknown>,
+> = {
+  readonly facts: TFacts;
+  readonly queries: {
+    [K in keyof TQueries]: TypedBoundQueryHandle<InferQueryData<TQueries[K]>>;
+  };
+  readonly mutations: {
+    [K in keyof TMutations]: TypedBoundMutationHandle<
+      InferMutationData<TMutations[K]>,
+      InferMutationVariables<TMutations[K]>
+    >;
+  };
+  readonly subscriptions: {
+    [K in keyof TSubscriptions]: TypedBoundSubscriptionHandle<unknown>;
+  };
+  readonly infiniteQueries: {
+    [K in keyof TInfiniteQueries]: BoundInfiniteQueryHandle;
+  };
+
+  // Typed read() overloads
+  read<K extends keyof TQueries & string>(
+    key: K,
+  ): ResourceState<InferQueryData<TQueries[K]>>;
+  read<K extends keyof TMutations & string>(
+    key: K,
+  ): MutationState<
+    InferMutationData<TMutations[K]>,
+    Error,
+    InferMutationVariables<TMutations[K]>
+  >;
+  read<K extends keyof TInfiniteQueries & string>(
+    key: K,
+  ): InfiniteResourceState<InferInfiniteData<TInfiniteQueries[K]>>;
+  read(key: string): unknown;
+
+  explain(queryName: string): string;
+
+  // System lifecycle
+  start(): void;
+  stop(): void;
+  destroy(): void;
+  readonly isRunning: boolean;
+  readonly isSettled: boolean;
+  // biome-ignore lint/suspicious/noExplicitAny: System settle signature
+  settle(...args: any[]): Promise<void>;
+  // biome-ignore lint/suspicious/noExplicitAny: System subscribe signature
+  subscribe(ids: string[], listener: () => void): () => void;
+  // biome-ignore lint/suspicious/noExplicitAny: System batch signature
+  batch(fn: () => void): void;
+};
+
+// ============================================================================
+// Legacy Types (backwards compatible)
 // ============================================================================
 
 /**
@@ -170,6 +297,33 @@ export interface BoundInfiniteQueryHandle {
  * app.explain("user");           // causal chain
  * ```
  */
+/** Typed overload — infers TData, TVariables from config. */
+export function createQuerySystem<
+  const TFacts extends Record<string, unknown>,
+  const TQueries extends Record<string, unknown> = {},
+  const TMutations extends Record<string, unknown> = {},
+  const TSubscriptions extends Record<string, unknown> = {},
+  const TInfiniteQueries extends Record<string, unknown> = {},
+>(
+  config: {
+    facts: TFacts;
+    queries?: TQueries;
+    mutations?: TMutations;
+    subscriptions?: TSubscriptions;
+    infiniteQueries?: TInfiniteQueries;
+  } & Omit<
+    QuerySystemConfig,
+    "facts" | "queries" | "mutations" | "subscriptions" | "infiniteQueries"
+  >,
+): TypedQuerySystem<
+  TFacts,
+  TQueries,
+  TMutations,
+  TSubscriptions,
+  TInfiniteQueries
+>;
+
+/** Implementation */
 export function createQuerySystem(config: QuerySystemConfig) {
   const {
     facts: factsInit,
@@ -374,5 +528,6 @@ export function createQuerySystem(config: QuerySystemConfig) {
     system.start();
   }
 
-  return extended;
+  // biome-ignore lint/suspicious/noExplicitAny: Runtime type matches the typed overload
+  return extended as any;
 }
