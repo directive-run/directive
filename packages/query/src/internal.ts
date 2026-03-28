@@ -101,7 +101,7 @@ export function replaceEqualDeep(oldVal: unknown, newVal: unknown): unknown {
   }
 
   let same = true;
-  const result: Record<string, unknown> = {};
+  const result: Record<string, unknown> = Object.create(null);
   for (const k of newKeys) {
     if (!(k in oldObj)) {
       return newVal;

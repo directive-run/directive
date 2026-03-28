@@ -622,34 +622,30 @@ export function createInfiniteQuery<
         ? {
             [`${PREFIX}${name}_gc`]: {
               run: (facts: Record<string, unknown>) => {
-                const state = facts[stateKey] as
-                  | InfiniteResourceState<TData, TError>
-                  | undefined;
-                if (
-                  !state ||
-                  state.status !== "success" ||
-                  !state.dataUpdatedAt
-                ) {
-                  return;
-                }
+                // Read state to track as dependency — re-runs when state changes
+                void facts[stateKey];
 
                 const checkInterval = Math.min(expireAfter, 5000);
                 const interval = setInterval(() => {
+                  const currentState = facts[stateKey] as
+                    | InfiniteResourceState<TData, TError>
+                    | undefined;
+                  if (
+                    !currentState ||
+                    currentState.status !== "success" ||
+                    !currentState.dataUpdatedAt
+                  ) {
+                    return;
+                  }
+
                   const currentKeyVal = keyFn(facts);
                   if (currentKeyVal !== null) {
                     return;
                   }
 
-                  const currentState = facts[stateKey] as
-                    | InfiniteResourceState<TData, TError>
-                    | undefined;
-                  if (
-                    currentState?.dataUpdatedAt &&
-                    Date.now() - currentState.dataUpdatedAt >= expireAfter
-                  ) {
+                  if (Date.now() - currentState.dataUpdatedAt >= expireAfter) {
                     facts[triggerKey] = "expired";
                     facts[keyKey] = null;
-                    clearInterval(interval);
                   }
                 }, checkInterval);
 

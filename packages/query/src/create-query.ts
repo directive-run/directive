@@ -491,40 +491,34 @@ export function createQuery<
         ? {
             [`${PREFIX}${name}_gc`]: {
               run: (facts: Record<string, unknown>) => {
-                // Track state to detect when it has data
-                const state = facts[stateKey] as
-                  | ResourceState<TData, TError>
-                  | undefined;
-                if (
-                  !state ||
-                  state.status !== "success" ||
-                  !state.dataUpdatedAt
-                ) {
-                  return;
-                }
+                // Read state to track it as a dependency — effect re-runs when state changes
+                void facts[stateKey];
 
-                // Poll periodically to check if data has expired
+                // Poll periodically to check if idle data has expired
                 const checkInterval = Math.min(expireAfter, 5000);
                 const interval = setInterval(() => {
-                  // Check if the query key is currently null (idle)
-                  const currentKeyVal = keyFn(facts);
-                  if (currentKeyVal !== null) {
-                    return; // Query is active, skip
-                  }
-
-                  // Check if expiry time has passed
+                  // Only expire if query has success data
                   const currentState = facts[stateKey] as
                     | ResourceState<TData, TError>
                     | undefined;
                   if (
-                    currentState?.dataUpdatedAt &&
-                    Date.now() - currentState.dataUpdatedAt >= expireAfter
+                    !currentState ||
+                    currentState.status !== "success" ||
+                    !currentState.dataUpdatedAt
                   ) {
-                    // Signal expiration via trigger and clear key
-                    // so reactivation detects a "key change"
+                    return;
+                  }
+
+                  // Check if the query key is currently null (idle)
+                  const currentKeyVal = keyFn(facts);
+                  if (currentKeyVal !== null) {
+                    return;
+                  }
+
+                  // Check if expiry time has passed
+                  if (Date.now() - currentState.dataUpdatedAt >= expireAfter) {
                     facts[triggerKey] = -1;
                     facts[keyKey] = null;
-                    clearInterval(interval);
                   }
                 }, checkInterval);
 
