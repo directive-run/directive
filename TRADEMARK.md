@@ -1,6 +1,6 @@
 # Trademark Policy
 
-"Directive," the Directive logo, and "directive.run" are trademarks of Sizls LLC.
+"Directive," the Directive logo, and "directive.run" are trademarks of Sizls ∞ Jason Comes.
 
 ## Permitted Uses
 
@@ -15,7 +15,7 @@ You may use the Directive name and logo to:
 You may not:
 
 - Use "Directive" as part of your product name, company name, or domain name
-- Use the Directive logo in a way that implies endorsement, sponsorship, or affiliation with Sizls LLC
+- Use the Directive logo in a way that implies endorsement, sponsorship, or affiliation with Sizls ∞ Jason Comes
 - Modify the Directive logo or use it as part of another logo
 - Use "Directive" in the name of a fork in a way that causes confusion with the official project
 
@@ -29,4 +29,4 @@ Contact legal@directive.run with questions about permitted uses of the Directive
 
 ---
 
-Sizls LLC
+Sizls ∞ Jason Comes
