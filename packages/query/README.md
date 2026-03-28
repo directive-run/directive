@@ -47,9 +47,10 @@ app.mutations.updateUser.mutate({ id: "42", name: "New" });
 app.explain("user");                          // "why did that fetch?"
 ```
 
-React:
+React (install `@directive-run/react` alongside):
 
 ```tsx
+// npm install @directive-run/react
 const { data, isPending, error } = useDerived(system, "user");
 ```
 
