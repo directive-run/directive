@@ -1,5 +1,11 @@
 # @directive-run/core
 
+## 0.8.3
+
+### Patch Changes
+
+- [`634c825`](https://github.com/directive-run/directive/commit/634c825d6daf22836b07df5713a949f036422222) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fixed resolver facts proxy in multi-module systems to use the same scoped proxy as constraints/derive/effects. Previously, resolvers received a two-level namespace proxy (`facts.moduleName.key`) instead of the flat module-scoped proxy (`facts.key`), causing silent failures when writing facts. Also fixed batch resolver proxy wrapping (`resolveBatch`/`resolveBatchWithResults`) and added recovery for stuck requirements after reconcile max-depth bailout.
+
 ## 0.8.2
 
 ### Patch Changes
