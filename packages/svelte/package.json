@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/svelte",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Svelte stores adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
