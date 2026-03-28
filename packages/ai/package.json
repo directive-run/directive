@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/ai",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "AI guardrails and orchestration for TypeScript. Prompt injection, PII detection, cost tracking, multi-agent patterns. Zero SDK dependencies.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
