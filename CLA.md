@@ -1,8 +1,8 @@
 # Contributor License Agreement
 
-## Directive — Sizls LLC
+## Directive — Sizls ∞ Jason Comes
 
-Thank you for your interest in contributing to Directive. This Contributor License Agreement ("Agreement") documents the rights granted by contributors to Sizls LLC.
+Thank you for your interest in contributing to Directive. This Contributor License Agreement ("Agreement") documents the rights granted by contributors to Sizls ∞ Jason Comes.
 
 By submitting a pull request or otherwise contributing to this project, you agree to the following terms:
 
@@ -14,15 +14,15 @@ By submitting a pull request or otherwise contributing to this project, you agre
 
 ### 2. Grant of Copyright License
 
-You hereby grant to Sizls LLC a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute your Contributions and any derivative works thereof.
+You hereby grant to Sizls ∞ Jason Comes a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense, and distribute your Contributions and any derivative works thereof.
 
 ### 3. Grant of Patent License
 
-You hereby grant to Sizls LLC a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer your Contributions, where such license applies only to those patent claims licensable by you that are necessarily infringed by your Contribution(s) alone or by combination of your Contribution(s) with the Project.
+You hereby grant to Sizls ∞ Jason Comes a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer your Contributions, where such license applies only to those patent claims licensable by you that are necessarily infringed by your Contribution(s) alone or by combination of your Contribution(s) with the Project.
 
 ### 4. Right to Relicense
 
-You acknowledge that Sizls LLC may relicense the Project (including your Contributions) under different license terms, including commercial licenses, provided that the open-source version of the Project remains available under the terms in effect at the time of your Contribution.
+You acknowledge that Sizls ∞ Jason Comes may relicense the Project (including your Contributions) under different license terms, including commercial licenses, provided that the open-source version of the Project remains available under the terms in effect at the time of your Contribution.
 
 ### 5. Representations
 
@@ -35,7 +35,7 @@ You represent that:
 
 ### 6. No Obligation
 
-You understand that the decision to include your Contribution in the Project is at the sole discretion of Sizls LLC. This Agreement does not obligate Sizls LLC to use or include your Contribution.
+You understand that the decision to include your Contribution in the Project is at the sole discretion of Sizls ∞ Jason Comes. This Agreement does not obligate Sizls ∞ Jason Comes to use or include your Contribution.
 
 ### 7. Effective Date
 
@@ -43,5 +43,5 @@ This Agreement is effective upon your first submission of a Contribution to the 
 
 ---
 
-**Sizls LLC**
+**Sizls ∞ Jason Comes**
 directive.run
