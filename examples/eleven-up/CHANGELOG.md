@@ -1,5 +1,14 @@
 # @directive-run/example-eleven-up
 
+## 0.0.14
+
+### Patch Changes
+
+- Updated dependencies [[`97a780c`](https://github.com/directive-run/directive/commit/97a780c1d6bdf7b647e0118443dbedd6bbf6e6b7)]:
+  - @directive-run/react@0.8.4
+  - @directive-run/core@0.8.4
+  - @directive-run/el@0.5.0
+
 ## 0.0.13
 
 ### Patch Changes
