@@ -1,5 +1,7 @@
 # @directive-run/core
 
+## 0.8.4
+
 ## 0.8.3
 
 ### Patch Changes
