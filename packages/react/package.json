@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/react",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "React hooks and components for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
