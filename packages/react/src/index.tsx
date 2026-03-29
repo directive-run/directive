@@ -1935,16 +1935,16 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 /**
  * React hook to create and manage a query system with proper lifecycle.
  *
- * Accepts a QuerySystemConfig directly – no factory wrapper needed.
+ * Accepts either a config object or a factory function:
+ * - Config object: calls `createQuerySystem` from `@directive-run/query` automatically
+ * - Factory function: calls the factory to create the system (for custom setups)
+ *
  * Creates the system once, starts on mount, destroys on unmount.
  * Handles Strict Mode re-creation and SSR safety.
  *
- * Requires `@directive-run/query` as a peer dependency.
- *
  * @example
  * ```tsx
- * import { useQuerySystem } from "@directive-run/react";
- * import { useDerived } from "@directive-run/react";
+ * import { useQuerySystem, useDerived } from "@directive-run/react";
  *
  * function App() {
  *   const app = useQuerySystem({
@@ -1974,7 +1974,31 @@ export function useQuerySystem<
     isRunning?: boolean;
     [key: string]: any;
   },
->(factory: () => T): T {
+>(configOrFactory: (() => T) | Record<string, unknown>): T {
+  // Resolve factory: if config object passed, wrap with createQuerySystem
+  const factory = useMemo(() => {
+    if (typeof configOrFactory === "function") {
+      return configOrFactory as () => T;
+    }
+
+    // Config object — dynamically resolve createQuerySystem
+    return () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { createQuerySystem } = require("@directive-run/query");
+
+        return createQuerySystem(configOrFactory) as T;
+      } catch {
+        throw new Error(
+          "[Directive] useQuerySystem received a config object, but @directive-run/query is not installed. " +
+            "Install it with: pnpm add @directive-run/query\n\n" +
+            "Alternatively, pass a factory function: useQuerySystem(() => createQuerySystem({...}))",
+        );
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const systemRef = useRef<T | null>(null);
   const factoryRef = useRef(factory);
   factoryRef.current = factory;

@@ -10,8 +10,8 @@
  */
 
 import type {
-  TraceOption,
   ErrorBoundaryConfig,
+  HistoryState,
   InferDerivations,
   InferEvents,
   InferFacts,
@@ -24,7 +24,7 @@ import type {
   SingleModuleSystem,
   SystemInspection,
   SystemSnapshot,
-  HistoryState,
+  TraceOption,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -699,12 +699,9 @@ export function useHistory(
   system: SingleModuleSystem<any>,
 ): Readable<HistoryState | null> {
   assertSystem("useHistory", system);
-  return readable<HistoryState | null>(
-    buildHistoryState(system),
-    (set) => {
-      return system.onHistoryChange(() => set(buildHistoryState(system)));
-    },
-  );
+  return readable<HistoryState | null>(buildHistoryState(system), (set) => {
+    return system.onHistoryChange(() => set(buildHistoryState(system)));
+  });
 }
 
 // ============================================================================
@@ -930,31 +927,49 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 /**
  * Svelte composable to create and manage a query system with proper lifecycle.
  *
- * Accepts a factory function that creates the system.
+ * Accepts a config object or a factory function that creates the system.
  * Handles cleanup on component destroy.
  *
  * @example
  * ```svelte
  * <script>
  *   import { useQuerySystem, useDerived } from "@directive-run/svelte";
- *   import { createQuerySystem } from "@directive-run/query";
  *
- *   const app = useQuerySystem(() =>
- *     createQuerySystem({
- *       facts: { userId: "" },
- *       queries: { user: { key: ..., fetcher: ... } },
- *       autoStart: false,
- *     })
- *   );
+ *   const app = useQuerySystem({
+ *     facts: { userId: "" },
+ *     queries: { user: { key: ..., fetcher: ... } },
+ *   });
  *
  *   const user = useDerived(app, "user");
  * </script>
  * ```
  */
 // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
-export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
-  factory: () => T,
-): T {
+export function useQuerySystem<
+  T extends {
+    start: () => void;
+    destroy: () => void;
+    isRunning?: boolean;
+    [key: string]: any;
+  },
+>(configOrFactory: (() => T) | Record<string, unknown>): T {
+  // Resolve factory
+  const factory =
+    typeof configOrFactory === "function"
+      ? configOrFactory
+      : () => {
+          try {
+            const { createQuerySystem } = require("@directive-run/query");
+
+            return createQuerySystem(configOrFactory) as T;
+          } catch {
+            throw new Error(
+              "[Directive] useQuerySystem received a config object, but @directive-run/query is not installed. " +
+                "Install it with: pnpm add @directive-run/query",
+            );
+          }
+        };
+
   const system = factory();
 
   if (typeof window !== "undefined" && !system.isRunning) {
