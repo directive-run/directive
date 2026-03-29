@@ -1,5 +1,21 @@
 # @directive-run/devtools
 
+## 0.8.5
+
+### Patch Changes
+
+- [`3465ed9`](https://github.com/directive-run/directive/commit/3465ed9f70bcd52aebcf3bedb7eb0c01f9c4d676) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add query devtools Timeline, Explain, and data explorer panels
+
+  - Timeline panel with swim-lane fetch bars, constraint trigger dots, and duration labels
+  - Explain panel with causal chain visualization (why did this query fetch?)
+  - Interactive JsonTree data explorer replacing flat JSON preview
+  - Refetch/Invalidate/Reset action buttons per query
+  - Auto-detect query kind (Query/Mutation/Subscription/Infinite)
+  - Summary stats bar, stale badges, search filtering
+  - Full ARIA keyboard navigation on tabs
+  - 74 unit tests covering all exported helpers
+  - StateView tabs brought to ARIA parity
+
 ## 0.8.4
 
 ## 0.8.3
