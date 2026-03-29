@@ -31,9 +31,10 @@
  */
 
 import type {
-  TraceOption,
   DistributableSnapshot,
   ErrorBoundaryConfig,
+  HistoryOption,
+  HistoryState,
   InferDerivations,
   InferEvents,
   InferFacts,
@@ -45,8 +46,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
-  HistoryOption,
-  HistoryState,
+  TraceOption,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -1912,9 +1912,11 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       derivationId: K,
     ) =>
       // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
-      useDerived(system as SingleModuleSystem<any>, derivationId) as InferDerivations<M>[K],
-    useDispatch: (system: SingleModuleSystem<M>) =>
-      useDispatch<M>(system),
+      useDerived(
+        system as SingleModuleSystem<any>,
+        derivationId,
+      ) as InferDerivations<M>[K],
+    useDispatch: (system: SingleModuleSystem<M>) => useDispatch<M>(system),
     useEvents: (system: SingleModuleSystem<M>) => useEvents<M>(system),
     useWatch: <K extends string>(
       system: SingleModuleSystem<M>,
@@ -1965,9 +1967,14 @@ export function createTypedHooks<M extends ModuleSchema>(): {
  * ```
  */
 // biome-ignore lint/suspicious/noExplicitAny: System type varies based on config
-export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
-  factory: () => T,
-): T {
+export function useQuerySystem<
+  T extends {
+    start: () => void;
+    destroy: () => void;
+    isRunning?: boolean;
+    [key: string]: any;
+  },
+>(factory: () => T): T {
   const systemRef = useRef<T | null>(null);
   const factoryRef = useRef(factory);
   factoryRef.current = factory;
@@ -1983,7 +1990,11 @@ export function useQuerySystem<T extends { start: () => void; destroy: () => voi
     }
 
     // Start on mount (SSR safety: only start in browser)
-    if (typeof window !== "undefined" && systemRef.current && !systemRef.current.isRunning) {
+    if (
+      typeof window !== "undefined" &&
+      systemRef.current &&
+      !systemRef.current.isRunning
+    ) {
       systemRef.current.start();
     }
 
@@ -1994,4 +2005,115 @@ export function useQuerySystem<T extends { start: () => void; destroy: () => voi
   }, []);
 
   return systemRef.current!;
+}
+
+// ============================================================================
+// useSuspenseQuery — Suspense + Error Boundary integration for queries
+// ============================================================================
+
+// Cache of pending promises per system+key to ensure stable references across renders
+const suspensePromiseCache = new WeakMap<
+  // biome-ignore lint/suspicious/noExplicitAny: System type varies
+  any,
+  Map<string, { promise: Promise<void>; resolve: () => void }>
+>();
+
+/**
+ * React hook for reading query data with Suspense support.
+ *
+ * Throws a Promise while the query is pending (triggers Suspense fallback).
+ * Throws the error if the query fails (triggers error boundary).
+ * Returns the data directly when available – no isPending/isError checks needed.
+ *
+ * @example
+ * ```tsx
+ * import { useSuspenseQuery } from "@directive-run/react";
+ *
+ * function UserProfile({ system }) {
+ *   const user = useSuspenseQuery(system, "user");
+ *   return <h1>{user.name}</h1>;
+ * }
+ *
+ * <Suspense fallback={<Spinner />}>
+ *   <ErrorBoundary>
+ *     <UserProfile system={system} />
+ *   </ErrorBoundary>
+ * </Suspense>
+ * ```
+ */
+export function useSuspenseQuery<T = unknown>(
+  // biome-ignore lint/suspicious/noExplicitAny: System type varies
+  system: SingleModuleSystem<any>,
+  queryName: string,
+): T {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      return system.subscribe([queryName], onStoreChange);
+    },
+    [system, queryName],
+  );
+
+  const getSnapshot = useCallback(() => {
+    return system.read(queryName);
+  }, [system, queryName]);
+
+  // biome-ignore lint/suspicious/noExplicitAny: ResourceState shape checked at runtime
+  const state = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot,
+  ) as any;
+
+  // Get or create the promise cache for this system
+  if (!suspensePromiseCache.has(system)) {
+    suspensePromiseCache.set(system, new Map());
+  }
+  const cache = suspensePromiseCache.get(system)!;
+
+  // Success – clean up promise cache and return data directly
+  if (state?.status === "success" && state?.data !== null) {
+    if (cache.has(queryName)) {
+      const entry = cache.get(queryName)!;
+      entry.resolve();
+      cache.delete(queryName);
+    }
+
+    return state.data as T;
+  }
+
+  // Error – clean up and throw for error boundary
+  if (state?.status === "error" && state?.error) {
+    if (cache.has(queryName)) {
+      const entry = cache.get(queryName)!;
+      entry.resolve();
+      cache.delete(queryName);
+    }
+
+    throw state.error;
+  }
+
+  // Pending – throw a promise for Suspense
+  if (!cache.has(queryName)) {
+    let resolvePromise: () => void;
+    const promise = new Promise<void>((resolve) => {
+      resolvePromise = resolve;
+    });
+    cache.set(queryName, { promise, resolve: resolvePromise! });
+
+    // Subscribe to resolve the promise when state changes
+    const unsub = system.subscribe([queryName], () => {
+      // biome-ignore lint/suspicious/noExplicitAny: ResourceState checked at runtime
+      const updated = system.read(queryName) as any;
+      if (updated?.status === "success" || updated?.status === "error") {
+        const entry = cache.get(queryName);
+        if (entry) {
+          entry.resolve();
+          cache.delete(queryName);
+        }
+        unsub();
+      }
+    });
+  }
+
+  throw cache.get(queryName)!.promise;
 }
