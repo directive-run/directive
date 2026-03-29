@@ -1,101 +1,51 @@
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { useQuerySystem } from "../index";
 
-// ============================================================================
-// Mock createQuerySystem — simulates @directive-run/query
-// ============================================================================
+// Uses real createQuerySystem from @directive-run/query (workspace devDep)
+// Tests verify hook lifecycle (start, destroy, stable ref), not query behavior
 
-function createMockQuerySystem(opts: {
-  autoStart?: boolean;
-  onDestroy?: () => void;
-} = {}) {
-  let running = false;
-  const system = {
-    isRunning: false,
-    start: vi.fn(() => {
-      running = true;
-      system.isRunning = true;
-    }),
-    destroy: vi.fn(() => {
-      running = false;
-      system.isRunning = false;
-      opts.onDestroy?.();
-    }),
-    facts: { userId: "" },
-    queries: {
-      user: {
-        refetch: vi.fn(),
-        invalidate: vi.fn(),
-        cancel: vi.fn(),
-        setData: vi.fn(),
-      },
+const config = {
+  facts: { userId: "" },
+  queries: {
+    user: {
+      key: (f) => (f.userId ? { userId: f.userId } : null),
+      fetcher: async (p) => ({ id: p.userId, name: "Test" }),
     },
-    mutations: {
-      update: {
-        mutate: vi.fn(),
-        mutateAsync: vi.fn(),
-        reset: vi.fn(),
-      },
-    },
-    explain: vi.fn(() => "Query explanation"),
-  };
-
-  if (opts.autoStart !== false) {
-    system.start();
-  }
-
-  return system;
-}
-
-// ============================================================================
-// useQuerySystem
-// ============================================================================
+  },
+};
 
 describe("useQuerySystem", () => {
-  it("creates system from factory and returns it", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: false });
-    const { result } = renderHook(() => useQuerySystem(() => mockSystem));
+  it("creates system from config and returns it", () => {
+    const { result } = renderHook(() => useQuerySystem(config));
 
-    expect(result.current).toBe(mockSystem);
+    expect(result.current).toBeDefined();
+    expect(result.current).toHaveProperty("facts");
+    expect(result.current).toHaveProperty("start");
+    expect(result.current).toHaveProperty("destroy");
   });
 
-  it("starts system on mount if not already running", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: false });
-    expect(mockSystem.isRunning).toBe(false);
+  it("starts system on mount", () => {
+    const { result } = renderHook(() => useQuerySystem(config));
 
-    renderHook(() => useQuerySystem(() => mockSystem));
-
-    expect(mockSystem.start).toHaveBeenCalled();
-    expect(mockSystem.isRunning).toBe(true);
-  });
-
-  it("does not double-start if already running", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: true });
-    expect(mockSystem.isRunning).toBe(true);
-
-    renderHook(() => useQuerySystem(() => mockSystem));
-
-    // start was called once by createMockQuerySystem, not again by hook
-    expect(mockSystem.start).toHaveBeenCalledTimes(1);
+    expect(result.current.isRunning).toBe(true);
   });
 
   it("destroys system on unmount", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: false });
-    const { unmount } = renderHook(() => useQuerySystem(() => mockSystem));
+    const { result, unmount } = renderHook(() => useQuerySystem(config));
 
-    expect(mockSystem.destroy).not.toHaveBeenCalled();
+    const system = result.current;
+    expect(system.isRunning).toBe(true);
 
     unmount();
 
-    expect(mockSystem.destroy).toHaveBeenCalledTimes(1);
+    expect(system.isRunning).toBe(false);
   });
 
   it("returns stable reference across re-renders", () => {
-    const factory = vi.fn(() => createMockQuerySystem({ autoStart: false }));
-    const { result, rerender } = renderHook(() => useQuerySystem(factory));
+    const { result, rerender } = renderHook(() => useQuerySystem(config));
 
     const firstRef = result.current;
 
@@ -103,32 +53,13 @@ describe("useQuerySystem", () => {
     rerender();
     rerender();
 
-    // Factory called only once — system is stable via useRef
-    expect(factory).toHaveBeenCalledTimes(1);
     expect(result.current).toBe(firstRef);
   });
 
-  it("bound query handles are accessible", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: false });
-    const { result } = renderHook(() => useQuerySystem(() => mockSystem));
+  it("system has facts proxy", () => {
+    const { result } = renderHook(() => useQuerySystem(config));
 
-    expect(result.current.queries.user.refetch).toBeTypeOf("function");
-    expect(result.current.mutations.update.mutate).toBeTypeOf("function");
-    expect(result.current.explain).toBeTypeOf("function");
-  });
-
-  it("bound handles work after mount", () => {
-    const mockSystem = createMockQuerySystem({ autoStart: false });
-    const { result } = renderHook(() => useQuerySystem(() => mockSystem));
-
-    act(() => {
-      result.current.queries.user.refetch();
-    });
-    expect(mockSystem.queries.user.refetch).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      result.current.mutations.update.mutate({ id: "1" });
-    });
-    expect(mockSystem.mutations.update.mutate).toHaveBeenCalledWith({ id: "1" });
+    expect(result.current.facts).toBeDefined();
+    expect(result.current.facts.userId).toBe("");
   });
 });

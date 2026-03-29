@@ -952,25 +952,17 @@ export function useQuerySystem<
     isRunning?: boolean;
     [key: string]: any;
   },
->(configOrFactory: (() => T) | Record<string, unknown>): T {
-  // Resolve factory
-  const factory =
-    typeof configOrFactory === "function"
-      ? configOrFactory
-      : () => {
-          try {
-            const { createQuerySystem } = require("@directive-run/query");
-
-            return createQuerySystem(configOrFactory) as T;
-          } catch {
-            throw new Error(
-              "[Directive] useQuerySystem received a config object, but @directive-run/query is not installed. " +
-                "Install it with: pnpm add @directive-run/query",
-            );
-          }
-        };
-
-  const system = factory();
+>(config: Record<string, unknown>): T {
+  let system: T;
+  try {
+    const { createQuerySystem } = require("@directive-run/query");
+    system = createQuerySystem(config) as T;
+  } catch {
+    throw new Error(
+      "[Directive] @directive-run/query is not installed. " +
+        "Install it with: pnpm add @directive-run/query",
+    );
+  }
 
   if (typeof window !== "undefined" && !system.isRunning) {
     system.start();

@@ -1,65 +1,59 @@
 // @ts-nocheck
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { effectScope } from "vue";
 import { useQuerySystem } from "../index";
 
-function createMockSystem(opts: { autoStart?: boolean } = {}) {
-  const system = {
-    isRunning: false,
-    start: vi.fn(() => {
-      system.isRunning = true;
-    }),
-    destroy: vi.fn(() => {
-      system.isRunning = false;
-    }),
-    queries: { user: { refetch: vi.fn() } },
-    mutations: { update: { mutate: vi.fn() } },
-  };
-  if (opts.autoStart !== false) {
-    system.start();
-  }
+// Uses real createQuerySystem from @directive-run/query (workspace devDep)
+// Tests verify hook lifecycle (start, destroy, stable ref), not query behavior
 
-  return system;
-}
+const config = {
+  facts: { userId: "" },
+  queries: {
+    user: {
+      key: (f) => (f.userId ? { userId: f.userId } : null),
+      fetcher: async (p) => ({ id: p.userId, name: "Test" }),
+    },
+  },
+};
 
 describe("useQuerySystem (Vue)", () => {
-  it("creates the system from factory", () => {
+  it("creates and returns a system from config", () => {
     const scope = effectScope();
-    const mock = createMockSystem({ autoStart: false });
 
-    let result: typeof mock | undefined;
+    let result: unknown;
     scope.run(() => {
-      result = useQuerySystem(() => mock);
+      result = useQuerySystem(config);
     });
 
-    expect(result).toBe(mock);
+    expect(result).toBeDefined();
+    expect(result).toHaveProperty("facts");
+    expect(result).toHaveProperty("start");
+    expect(result).toHaveProperty("destroy");
+    scope.stop();
+  });
+
+  it("starts system on creation", () => {
+    const scope = effectScope();
+
+    let result: any;
+    scope.run(() => {
+      result = useQuerySystem(config);
+    });
+
+    expect(result.isRunning).toBe(true);
     scope.stop();
   });
 
   it("destroys on scope dispose", () => {
     const scope = effectScope();
-    const mock = createMockSystem({ autoStart: false });
 
+    let result: any;
     scope.run(() => {
-      useQuerySystem(() => mock);
+      result = useQuerySystem(config);
     });
 
-    expect(mock.destroy).not.toHaveBeenCalled();
+    expect(result.isRunning).toBe(true);
     scope.stop();
-    expect(mock.destroy).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns bound handles", () => {
-    const scope = effectScope();
-    const mock = createMockSystem({ autoStart: false });
-
-    let result: typeof mock | undefined;
-    scope.run(() => {
-      result = useQuerySystem(() => mock);
-    });
-
-    expect(result!.queries.user.refetch).toBeTypeOf("function");
-    expect(result!.mutations.update.mutate).toBeTypeOf("function");
-    scope.stop();
+    expect(result.isRunning).toBe(false);
   });
 });
