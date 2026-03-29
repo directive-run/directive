@@ -1,5 +1,13 @@
 # @directive-run/example-optimistic-updates
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [[`d7f49ab`](https://github.com/directive-run/directive/commit/d7f49ab70b3f9da49ba98a7acb76e571e4b3c439)]:
+  - @directive-run/core@0.8.6
+  - @directive-run/el@0.5.0
+
 ## 0.0.14
 
 ### Patch Changes
