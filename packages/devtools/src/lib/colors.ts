@@ -28,6 +28,13 @@ export const EVENT_COLORS: Record<DebugEventType, string> = {
   race_cancelled: "#fbbf24", // amber-light
   reroute: "#f472b6", // pink-400
   debate_round: "#c084fc", // purple-400
+  checkpoint_save: "#94a3b8", // slate-400
+  checkpoint_restore: "#cbd5e1", // slate-300
+  task_start: "#2563eb", // blue-600
+  task_complete: "#16a34a", // green-600
+  task_error: "#b91c1c", // red-700
+  task_progress: "#0284c7", // sky-600
+  goal_step: "#7c3aed", // violet-600
 };
 
 /** Color for event type categories */
@@ -60,6 +67,12 @@ export function getEventCategory(type: DebugEventType): string {
     type === "debate_round"
   ) {
     return "State";
+  }
+  if (type.startsWith("checkpoint")) {
+    return "Checkpoint";
+  }
+  if (type.startsWith("task_") || type === "goal_step") {
+    return "Task";
   }
 
   return "Other";

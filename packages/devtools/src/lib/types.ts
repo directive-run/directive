@@ -1,16 +1,38 @@
 /**
- * Shared types for DevTools UI — mirrors the devtools-server protocol.
+ * Shared types for DevTools UI.
  *
- * IMPORTANT: These types must stay in sync with `packages/ai/src/devtools-server.ts`.
- * Any protocol changes there must be reflected here.
+ * Canonical debug/breakpoint/DAG types are imported from `@directive-run/ai`.
+ * DevTools-specific protocol types (ServerMessage, ClientMessage, etc.) are
+ * defined locally.
  */
 
+import type {
+  BreakpointRequest as AiBreakpointRequest,
+  BreakpointState as AiBreakpointState,
+  DagNodeStatus as AiDagNodeStatus,
+  DebugEventBase,
+  DebugEventType as AiDebugEventType,
+} from "@directive-run/ai";
+
 // ============================================================================
-// Debug Event Types (subset of @directive-run/ai types)
+// Re-exports from @directive-run/ai (single source of truth)
 // ============================================================================
 
-/** H16: Single source of truth — union and runtime set derived from one array */
-const DEBUG_EVENT_TYPES = [
+export type DebugEventType = AiDebugEventType;
+export type DagNodeStatus = AiDagNodeStatus;
+export type BreakpointRequest = AiBreakpointRequest;
+export type BreakpointState = AiBreakpointState;
+
+/** Error event types (for quick filtering) */
+export const ERROR_EVENT_TYPES: ReadonlySet<DebugEventType> =
+  new Set<DebugEventType>(["agent_error", "resolver_error"]);
+
+/**
+ * Runtime set of all valid DebugEventType values (for validation at import
+ * boundaries). Kept in sync with the `DebugEventType` union from
+ * `@directive-run/ai`.
+ */
+export const VALID_EVENT_TYPES: ReadonlySet<string> = new Set<DebugEventType>([
   "agent_start",
   "agent_complete",
   "agent_error",
@@ -37,25 +59,27 @@ const DEBUG_EVENT_TYPES = [
   "race_cancelled",
   "reroute",
   "debate_round",
-] as const;
+  "checkpoint_save",
+  "checkpoint_restore",
+  "task_start",
+  "task_complete",
+  "task_error",
+  "task_progress",
+  "goal_step",
+]);
 
-export type DebugEventType = (typeof DEBUG_EVENT_TYPES)[number];
+// ============================================================================
+// Loose DebugEvent (WebSocket envelope)
+// ============================================================================
 
-/** Error event types (for quick filtering) */
-export const ERROR_EVENT_TYPES: ReadonlySet<DebugEventType> =
-  new Set<DebugEventType>(["agent_error", "resolver_error"]);
-
-/** Runtime set of all valid DebugEventType values (for validation at import boundaries) */
-export const VALID_EVENT_TYPES: ReadonlySet<string> = new Set(
-  DEBUG_EVENT_TYPES,
-);
-
-export interface DebugEvent {
-  id: number;
-  type: DebugEventType;
-  timestamp: number;
-  agentId?: string;
-  snapshotId: number | null;
+/**
+ * Loose debug event used by the DevTools UI.
+ *
+ * Extends the canonical `DebugEventBase` from `@directive-run/ai` with an
+ * index signature so WebSocket-received events can carry extra properties
+ * without requiring every field to be known at compile time.
+ */
+export interface DebugEvent extends DebugEventBase {
   [key: string]: unknown;
 }
 
@@ -125,37 +149,6 @@ export function isReroute(e: DebugEvent): e is RerouteEvent {
 // ============================================================================
 
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
-
-// ============================================================================
-// Breakpoint Types
-// ============================================================================
-
-export interface BreakpointRequest {
-  id: string;
-  type: string;
-  agentId: string;
-  input: string;
-  label?: string;
-  requestedAt: number;
-}
-
-export interface BreakpointState {
-  pending: BreakpointRequest[];
-  resolved: string[];
-  cancelled: string[];
-}
-
-// ============================================================================
-// DAG Types
-// ============================================================================
-
-export type DagNodeStatus =
-  | "pending"
-  | "ready"
-  | "running"
-  | "completed"
-  | "error"
-  | "skipped";
 
 // ============================================================================
 // Scratchpad & Derived State Types

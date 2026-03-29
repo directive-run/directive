@@ -53,7 +53,13 @@
   },
   "peerDependencies": {
     "@directive-run/core": "^0.8.0",
+    "@directive-run/query": "^0.1.0",
     "solid-js": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "@directive-run/query": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",

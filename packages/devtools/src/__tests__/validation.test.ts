@@ -256,12 +256,12 @@ describe("isValidServerMessage", () => {
 // ============================================================================
 
 describe("VALID_EVENT_TYPES", () => {
-  it("contains all 26 expected event types", () => {
-    expect(VALID_EVENT_TYPES.size).toBe(26);
+  it("contains all 33 expected event types", () => {
+    expect(VALID_EVENT_TYPES.size).toBe(33);
   });
 
   it("matches the DebugEventType union", () => {
-    // These are the event types from the union type
+    // These are the event types from the union type (imported from @directive-run/ai)
     const expectedTypes: DebugEventType[] = [
       "agent_start",
       "agent_complete",
@@ -289,6 +289,13 @@ describe("VALID_EVENT_TYPES", () => {
       "race_cancelled",
       "reroute",
       "debate_round",
+      "checkpoint_save",
+      "checkpoint_restore",
+      "task_start",
+      "task_complete",
+      "task_error",
+      "task_progress",
+      "goal_step",
     ];
 
     for (const type of expectedTypes) {

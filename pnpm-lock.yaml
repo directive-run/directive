@@ -956,6 +956,9 @@ importers:
         specifier: ^2.15.3
         version: 2.15.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     devDependencies:
+      '@directive-run/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@tailwindcss/postcss':
         specifier: ^4.2.1
         version: 4.2.1

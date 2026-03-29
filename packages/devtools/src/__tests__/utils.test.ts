@@ -118,6 +118,13 @@ describe("EVENT_COLORS", () => {
     "race_cancelled",
     "reroute",
     "debate_round",
+    "checkpoint_save",
+    "checkpoint_restore",
+    "task_start",
+    "task_complete",
+    "task_error",
+    "task_progress",
+    "goal_step",
   ];
 
   it("has an entry for every DebugEventType", () => {

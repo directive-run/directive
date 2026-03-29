@@ -96,6 +96,12 @@ export interface ResolversManager<_S extends Schema> {
    */
   getInflightInfo(): InflightInfo[];
   /**
+   * Get the number of currently in-flight resolvers without allocating an array.
+   *
+   * @returns The count of in-flight resolvers.
+   */
+  getInflightCount(): number;
+  /**
    * Check whether a requirement is currently being resolved.
    *
    * @param requirementId - The unique requirement ID to check.
@@ -1198,6 +1204,10 @@ export function createResolversManager<S extends Schema>(
         resolverId: state.resolverId,
         startedAt: state.startedAt,
       }));
+    },
+
+    getInflightCount(): number {
+      return inflight.size;
     },
 
     isResolving(requirementId: string): boolean {
