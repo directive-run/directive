@@ -56,9 +56,10 @@
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
+    "@directive-run/query": "^0.1.2",
     "@types/node": "^25.2.0",
-    "vue": "^3.4.0",
     "tsup": "^8.3.5",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vue": "^3.4.0"
   }
 }

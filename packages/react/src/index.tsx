@@ -1974,29 +1974,22 @@ export function useQuerySystem<
     isRunning?: boolean;
     [key: string]: any;
   },
->(configOrFactory: (() => T) | Record<string, unknown>): T {
-  // Resolve factory: if config object passed, wrap with createQuerySystem
-  const factory = useMemo(() => {
-    if (typeof configOrFactory === "function") {
-      return configOrFactory as () => T;
-    }
+>(config: Record<string, unknown>): T {
+  const configRef = useRef(config);
 
-    // Config object — dynamically resolve createQuerySystem
+  const factory = useMemo(() => {
     return () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { createQuerySystem } = require("@directive-run/query");
 
-        return createQuerySystem(configOrFactory) as T;
+        return createQuerySystem(configRef.current) as T;
       } catch {
         throw new Error(
-          "[Directive] useQuerySystem received a config object, but @directive-run/query is not installed. " +
-            "Install it with: pnpm add @directive-run/query\n\n" +
-            "Alternatively, pass a factory function: useQuerySystem(() => createQuerySystem({...}))",
+          "[Directive] @directive-run/query is not installed. " +
+            "Install it with: pnpm add @directive-run/query",
         );
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const systemRef = useRef<T | null>(null);
