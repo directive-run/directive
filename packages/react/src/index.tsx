@@ -1932,6 +1932,27 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
+  null;
+
+function getCreateQuerySystem() {
+  if (!_createQuerySystem) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("@directive-run/query");
+      _createQuerySystem = mod.createQuerySystem;
+    } catch {
+      throw new Error(
+        "[Directive] @directive-run/query is not installed. " +
+          "Install it with: pnpm add @directive-run/query",
+      );
+    }
+  }
+
+  return _createQuerySystem!;
+}
+
 /**
  * React hook to create and manage a query system with proper lifecycle.
  *
@@ -1978,17 +1999,10 @@ export function useQuerySystem<
   const configRef = useRef(config);
 
   const factory = useMemo(() => {
-    return () => {
-      try {
-        const { createQuerySystem } = require("@directive-run/query");
+    const createQuerySystem = getCreateQuerySystem();
 
-        return createQuerySystem(configRef.current) as T;
-      } catch {
-        throw new Error(
-          "[Directive] @directive-run/query is not installed. " +
-            "Install it with: pnpm add @directive-run/query",
-        );
-      }
+    return () => {
+      return createQuerySystem(configRef.current) as T;
     };
   }, []);
 

@@ -1,6 +1,7 @@
 {
   "name": "directive-monorepo",
   "private": true,
+  "license": "(MIT OR Apache-2.0)",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm -r build",

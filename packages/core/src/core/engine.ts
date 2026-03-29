@@ -1255,7 +1255,7 @@ export function createEngine<S extends Schema>(
     async settle(maxWait = 5000): Promise<void> {
       /** Check if the system is fully settled */
       const isSettled = (): boolean =>
-        resolversManager.getInflightInfo().length === 0 &&
+        resolversManager.getInflightCount() === 0 &&
         !state.isReconciling &&
         !state.reconcileScheduled &&
         !resolversManager.hasPendingBatches();
@@ -1591,7 +1591,7 @@ export function createEngine<S extends Schema>(
 
     get isSettled(): boolean {
       return (
-        resolversManager.getInflight().length === 0 &&
+        resolversManager.getInflightCount() === 0 &&
         !resolversManager.hasPendingBatches() &&
         !state.isReconciling &&
         !state.reconcileScheduled

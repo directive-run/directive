@@ -47,6 +47,9 @@ packages/knowledge/api-skeleton.md
 packages/knowledge/examples/
 packages/claude-plugin/skills/*/api-skeleton.md
 
+# Reference materials (third-party code, not for redistribution)
+.references/
+
 # Temporary
 tmp/
 temp/

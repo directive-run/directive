@@ -993,6 +993,27 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
+// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
+let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
+  null;
+
+function getCreateQuerySystem() {
+  if (!_createQuerySystem) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require("@directive-run/query");
+      _createQuerySystem = mod.createQuerySystem;
+    } catch {
+      throw new Error(
+        "[Directive] @directive-run/query is not installed. " +
+          "Install it with: pnpm add @directive-run/query",
+      );
+    }
+  }
+
+  return _createQuerySystem!;
+}
+
 /**
  * Vue composable to create and manage a query system with proper lifecycle.
  *
@@ -1022,16 +1043,8 @@ export function useQuerySystem<
     [key: string]: any;
   },
 >(config: Record<string, unknown>): T {
-  let system: T;
-  try {
-    const { createQuerySystem } = require("@directive-run/query");
-    system = createQuerySystem(config) as T;
-  } catch {
-    throw new Error(
-      "[Directive] @directive-run/query is not installed. " +
-        "Install it with: pnpm add @directive-run/query",
-    );
-  }
+  const createQuerySystem = getCreateQuerySystem();
+  const system = createQuerySystem(config) as T;
 
   // Start if not already running
   if (typeof window !== "undefined" && !system.isRunning) {
