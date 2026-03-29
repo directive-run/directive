@@ -8,7 +8,6 @@
  */
 
 import type {
-  TraceOption,
   ErrorBoundaryConfig,
   InferDerivations,
   InferEvents,
@@ -21,6 +20,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
+  TraceOption,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -498,9 +498,7 @@ export function useSuspenseRequirement(
 export function useSuspenseRequirement(
   statusPlugin: StatusPlugin,
   types: string[],
-): Promise<
-  ShallowRef<Record<string, RequirementTypeStatus>>
->;
+): Promise<ShallowRef<Record<string, RequirementTypeStatus>>>;
 
 /** Implementation */
 export function useSuspenseRequirement(
@@ -570,9 +568,7 @@ async function _useSuspenseRequirementMulti(
   }
 
   // If any are loading, wait for all to settle
-  const anyLoading = types.some(
-    (t) => statusPlugin.getStatus(t).isLoading,
-  );
+  const anyLoading = types.some((t) => statusPlugin.getStatus(t).isLoading);
   if (anyLoading) {
     await new Promise<void>((resolve, reject) => {
       const unsubscribe = statusPlugin.subscribe(() => {
@@ -1000,31 +996,49 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 /**
  * Vue composable to create and manage a query system with proper lifecycle.
  *
- * Accepts a factory function that creates the system.
+ * Accepts a config object or a factory function that creates the system.
  * Handles cleanup on scope disposal.
  *
  * @example
  * ```vue
  * <script setup>
  * import { useQuerySystem, useDerived } from "@directive-run/vue";
- * import { createQuerySystem } from "@directive-run/query";
  *
- * const app = useQuerySystem(() =>
- *   createQuerySystem({
- *     facts: { userId: "" },
- *     queries: { user: { key: ..., fetcher: ... } },
- *     autoStart: false,
- *   })
- * );
+ * const app = useQuerySystem({
+ *   facts: { userId: "" },
+ *   queries: { user: { key: ..., fetcher: ... } },
+ * });
  *
  * const user = useDerived(app, "user");
  * </script>
  * ```
  */
 // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
-export function useQuerySystem<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>(
-  factory: () => T,
-): T {
+export function useQuerySystem<
+  T extends {
+    start: () => void;
+    destroy: () => void;
+    isRunning?: boolean;
+    [key: string]: any;
+  },
+>(configOrFactory: (() => T) | Record<string, unknown>): T {
+  // Resolve factory
+  const factory =
+    typeof configOrFactory === "function"
+      ? configOrFactory
+      : () => {
+          try {
+            const { createQuerySystem } = require("@directive-run/query");
+
+            return createQuerySystem(configOrFactory) as T;
+          } catch {
+            throw new Error(
+              "[Directive] useQuerySystem received a config object, but @directive-run/query is not installed. " +
+                "Install it with: pnpm add @directive-run/query",
+            );
+          }
+        };
+
   const system = factory();
 
   // Start if not already running
