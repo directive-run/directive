@@ -1,5 +1,17 @@
 # @directive-run/devtools
 
+## 0.8.6
+
+### Patch Changes
+
+- [`d7f49ab`](https://github.com/directive-run/directive/commit/d7f49ab70b3f9da49ba98a7acb76e571e4b3c439) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Monorepo audit fixes: performance, types, adapters, community infra
+
+  - core: Add `getInflightCount()` to ResolversManager – zero-allocation hot path for `isSettled` and `settle()`
+  - devtools: Unify protocol types with `@directive-run/ai` – 7 new event types (checkpoint, task, goal), shared DebugEventType/BreakpointState
+  - devtools: Interactive JsonTree data explorer, refetch/invalidate/reset action buttons, detectKind fix for subscriptions/infinite queries
+  - adapters: Cache `require("@directive-run/query")` in module-level lazy helper, add as optional peerDependency
+  - adapters: `useQuerySystem` accepts config objects directly (no factory wrapper)
+
 ## 0.8.5
 
 ### Patch Changes

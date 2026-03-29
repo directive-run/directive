@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-dynamic-modules",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "private": true,
   "type": "module",
   "scripts": {
