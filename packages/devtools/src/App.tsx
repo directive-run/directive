@@ -13,13 +13,15 @@ import type { TimeFormat } from "./lib/time-format";
 import type { ConnectionStatus, DevToolsSnapshot } from "./lib/types";
 import { BreakpointView } from "./views/BreakpointView";
 import { CostView } from "./views/CostView";
+import { QueryView } from "./views/QueryView";
 import { StateView } from "./views/StateView";
 
-type View = "timeline" | "dag" | "breakpoints" | "state" | "cost";
+type View = "timeline" | "dag" | "breakpoints" | "state" | "cost" | "queries";
 
 const NAV_ITEMS: { id: View; label: string; icon: string }[] = [
   { id: "timeline", label: "Timeline", icon: "⏱" },
   { id: "dag", label: "DAG", icon: "⬡" },
+  { id: "queries", label: "Queries", icon: "🔍" },
   { id: "cost", label: "Cost", icon: "💰" },
   { id: "breakpoints", label: "Breakpoints", icon: "⏸" },
   { id: "state", label: "State", icon: "📋" },
@@ -505,6 +507,12 @@ export function App() {
                 )}
                 {view === "dag" && (
                   <DagView events={visibleEvents} snapshot={conn.snapshot} />
+                )}
+                {view === "queries" && (
+                  <QueryView
+                    events={visibleEvents}
+                    snapshot={conn.snapshot}
+                  />
                 )}
                 {view === "cost" && <CostView events={visibleEvents} />}
                 {view === "breakpoints" && (
