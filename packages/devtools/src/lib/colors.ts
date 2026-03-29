@@ -92,3 +92,35 @@ export const DAG_NODE_COLORS: Record<DagNodeStatus, string> = {
   error: "#ef4444", // red
   skipped: "#a1a1aa", // zinc-400
 };
+
+// ============================================================================
+// Query View Colors
+// ============================================================================
+
+/** CSS classes for query status badges */
+export const QUERY_STATUS_COLORS: Record<string, string> = {
+  success: "bg-emerald-500/20 text-emerald-400",
+  pending: "bg-amber-500/20 text-amber-400",
+  error: "bg-red-500/20 text-red-400",
+  disabled: "bg-zinc-500/20 text-zinc-400",
+  fetching: "bg-blue-500/20 text-blue-400",
+};
+
+/** Hex colors for query swim-lane labels */
+export const QUERY_LANE_COLORS = [
+  "#3b82f6", // blue
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#f59e0b", // amber
+  "#ec4899", // pink
+  "#10b981", // emerald
+  "#f97316", // orange
+  "#6366f1", // indigo
+] as const;
+
+/** Hex colors for query fetch span bars */
+export const QUERY_SPAN_COLORS: Record<string, string> = {
+  success: "#22c55e", // green
+  error: "#ef4444", // red
+  pending: "#3b82f6", // blue
+};

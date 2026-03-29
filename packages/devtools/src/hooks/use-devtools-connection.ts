@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BLOCKED_KEYS } from "../lib/constants";
 import {
   type BreakpointState,
   type ClientMessage,
@@ -61,8 +62,6 @@ const MAX_EVENTS = 5000;
 const STREAM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_STREAMING_AGENTS = 50;
 const MAX_PENDING_WHILE_PAUSED = 10_000;
-/** Keys that must never be set via dynamic property assignment */
-const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /** Validate that a parsed message has a known ServerMessage type */
 function isValidServerMessage(value: unknown): value is ServerMessage {

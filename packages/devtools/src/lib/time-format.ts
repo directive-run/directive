@@ -38,3 +38,22 @@ export function formatDuration(ms: number): string {
 
   return `${minutes}m ${seconds.toFixed(1)}s`;
 }
+
+/** Format a timestamp as a human-readable relative age string */
+export function formatAge(updatedAt: number | null, now?: number): string {
+  if (!updatedAt) {
+    return "–";
+  }
+  const ms = (now ?? Date.now()) - updatedAt;
+  if (ms < 1000) {
+    return "just now";
+  }
+  if (ms < 60_000) {
+    return `${Math.round(ms / 1000)}s ago`;
+  }
+  if (ms < 3_600_000) {
+    return `${Math.round(ms / 60_000)}m ago`;
+  }
+
+  return `${Math.round(ms / 3_600_000)}h ago`;
+}

@@ -53,6 +53,33 @@ export function StateView({
     }, 600);
   }, [subTab, onRequestScratchpad, onRequestDerived]);
 
+  const handleTabKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const tabIds: SubTab[] = ["scratchpad", "derived"];
+      const currentIdx = tabIds.indexOf(subTab);
+      let nextIdx = currentIdx;
+
+      if (e.key === "ArrowRight") {
+        nextIdx = (currentIdx + 1) % tabIds.length;
+      } else if (e.key === "ArrowLeft") {
+        nextIdx = (currentIdx - 1 + tabIds.length) % tabIds.length;
+      } else if (e.key === "Home") {
+        nextIdx = 0;
+      } else if (e.key === "End") {
+        nextIdx = tabIds.length - 1;
+      } else {
+        return;
+      }
+
+      e.preventDefault();
+      setSubTab(tabIds[nextIdx]!);
+
+      const nextTabEl = document.getElementById(`tab-${tabIds[nextIdx]}`);
+      nextTabEl?.focus();
+    },
+    [subTab],
+  );
+
   return (
     <div className="flex h-full flex-col">
       {/* Sub-tab bar */}
@@ -60,14 +87,17 @@ export function StateView({
         className="flex items-center gap-4 border-b border-zinc-800 px-6 py-2"
         role="tablist"
         aria-label="State view tabs"
+        onKeyDown={handleTabKeyDown}
       >
         <button
+          type="button"
           role="tab"
           id="tab-scratchpad"
           aria-selected={subTab === "scratchpad"}
           aria-controls="panel-scratchpad"
+          tabIndex={subTab === "scratchpad" ? 0 : -1}
           onClick={() => setSubTab("scratchpad")}
-          className={`text-xs font-medium transition-colors ${
+          className={`text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-500/50 ${
             subTab === "scratchpad"
               ? "border-b-2 border-fuchsia-500 pb-1 text-fuchsia-400"
               : "pb-1 text-zinc-500 hover:text-zinc-300"
@@ -81,12 +111,14 @@ export function StateView({
           )}
         </button>
         <button
+          type="button"
           role="tab"
           id="tab-derived"
           aria-selected={subTab === "derived"}
           aria-controls="panel-derived"
+          tabIndex={subTab === "derived" ? 0 : -1}
           onClick={() => setSubTab("derived")}
-          className={`text-xs font-medium transition-colors ${
+          className={`text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
             subTab === "derived"
               ? "border-b-2 border-purple-500 pb-1 text-purple-400"
               : "pb-1 text-zinc-500 hover:text-zinc-300"
@@ -103,6 +135,7 @@ export function StateView({
         {/* I2: Edit & Fork button */}
         {snapshot && onEditSnapshot && (
           <button
+            type="button"
             onClick={onEditSnapshot}
             className="ml-auto rounded border border-amber-500/30 bg-amber-950/20 px-2 py-0.5 text-xs text-amber-400 hover:bg-amber-950/40"
           >
@@ -112,6 +145,7 @@ export function StateView({
 
         {/* Refresh button */}
         <button
+          type="button"
           onClick={handleRefresh}
           disabled={refreshing}
           className={`${!snapshot || !onEditSnapshot ? "ml-auto" : ""} rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-700 disabled:opacity-50`}
