@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/svelte",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Svelte stores adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -40,7 +40,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
