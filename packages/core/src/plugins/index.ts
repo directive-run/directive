@@ -25,20 +25,20 @@ export {
   type EffectMetrics,
   type ReconcileMetrics,
 } from "./performance.js";
-// createObservability + createAgentMetrics moved to observability.alpha.ts
-// Re-evaluating value vs OTel — types still available for otlp-exporter and circuit-breaker
-export type {
-  MetricType,
-  MetricDataPoint,
-  HistogramBucket,
-  AggregatedMetric,
-  TraceSpan,
-  AlertConfig,
-  AlertEvent,
-  ObservabilityConfig,
-  DashboardData,
-  ObservabilityInstance,
-} from "./observability.lab.js";
+export {
+  createObservability,
+  createAgentMetrics,
+  type MetricType,
+  type MetricDataPoint,
+  type HistogramBucket,
+  type AggregatedMetric,
+  type TraceSpan,
+  type AlertConfig,
+  type AlertEvent,
+  type ObservabilityConfig,
+  type DashboardData,
+  type ObservabilityInstance,
+} from "./observability.js";
 export {
   createOTLPExporter,
   type OTLPExporterConfig,

@@ -35,7 +35,7 @@
  * ```
  */
 
-import type { ObservabilityInstance } from "./observability.lab.js";
+import type { ObservabilityInstance } from "./observability.js";
 
 // ============================================================================
 // Types

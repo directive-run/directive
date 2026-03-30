@@ -523,6 +523,8 @@ export function createFactsStore<S extends Schema>(
 // Dev-mode nested mutation warning
 // ============================================================================
 
+const nestedProxyCache = new WeakMap<object, object>();
+
 /**
  * Wrap an object in a Proxy that warns when properties are set.
  * Catches `facts.user.name = "John"` which silently skips reactivity.
@@ -547,11 +549,18 @@ function wrapWithNestedWarning(
         return value;
       }
 
-      return wrapWithNestedWarning(
+      if (nestedProxyCache.has(value as object)) {
+        return nestedProxyCache.get(value as object);
+      }
+
+      const wrapped = wrapWithNestedWarning(
         value as object,
         rootKey,
         `${path}.${String(prop)}`,
       );
+      nestedProxyCache.set(value as object, wrapped);
+
+      return wrapped;
     },
     set(target, prop, newValue) {
       if (typeof prop !== "symbol") {
