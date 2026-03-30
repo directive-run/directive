@@ -43,6 +43,7 @@ function makeQueryEntry(overrides: Record<string, unknown> = {}) {
     isStale: false,
     failureCount: 0,
     cacheKey: '{"userId":"1"}',
+    triggerValue: null,
     ...overrides,
   };
 }
@@ -442,8 +443,8 @@ describe("buildExplainSteps", () => {
     });
     const steps = buildExplainSteps("user", query, []);
 
-    expect(steps[0]?.label).toBe("Waiting for data");
-    expect(steps[0]?.detail).toBe("Currently fetching");
+    expect(steps[0]?.label).toBe("Fetching (first load)");
+    expect(steps[0]?.detail).toBe("Currently fetching initial data");
   });
 
   it("shows error state with failure count", () => {

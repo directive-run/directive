@@ -546,7 +546,20 @@ export function createResolversManager<S extends Schema>(
     return { action: "continue", error: normalizedError };
   }
 
-  /** Invoke a resolver's resolve() function with batching and optional timeout */
+  /**
+   * Invoke a resolver's resolve() function with optional timeout.
+   *
+   * The `store.batch()` here intentionally wraps only the synchronous start of
+   * the async resolver — it coalesces all fact mutations that happen before the
+   * first `await` into a single notification (one `onBatch` callback, one
+   * `scheduleReconcile()`). After the first `await`, the batch has ended and
+   * each subsequent fact mutation triggers its own `onChange` → reconcile cycle.
+   *
+   * This is correct: pre-await mutations typically set up transient state (e.g.
+   * "pending" / "fetching" flags) and should be seen as one atomic change, while
+   * post-await mutations represent real state transitions (e.g. "success" with
+   * fetched data) that the constraint engine must evaluate independently.
+   */
   async function invokeResolve(
     def: ResolversDef<S>[string],
     resolverId: string,
@@ -557,6 +570,7 @@ export function createResolversManager<S extends Schema>(
       return;
     }
 
+    // Batch wraps only the synchronous start — see JSDoc above.
     let resolvePromise!: Promise<void>;
     store.batch(() => {
       resolvePromise = def.resolve!(
@@ -1304,6 +1318,7 @@ export function createResolversManager<S extends Schema>(
       const ctx = createContext(controller.signal);
 
       if (def.resolve) {
+        // Batch wraps only the synchronous start — see invokeResolve JSDoc.
         let resolvePromise!: Promise<void>;
         store.batch(() => {
           resolvePromise = def.resolve!(

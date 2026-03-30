@@ -191,6 +191,18 @@ system.events.addItem({ name: "Widget", price: 9.99 });
 - **Constraint-driven over event-driven** &ndash; instead of chaining events to coordinate async work, declare constraints that the runtime satisfies automatically with retry, batching, and error boundaries.
 - **Framework-agnostic core** &ndash; one state layer, five framework adapters. Move between React, Vue, Svelte, Solid, and Lit without rewriting your state logic.
 
+## Related Blog Posts
+
+- [Introducing Directive](https://directive.run/blog/introducing-directive) – the vision behind constraint-driven state management
+- [Constraint-Driven Architecture](https://directive.run/blog/constraint-driven-architecture) – why declaring "what must be true" beats imperative transitions
+- [Inside Directive's Reconciliation Loop](https://directive.run/blog/inside-the-reconciliation-loop) – deep-dive into the five-phase reconciliation cycle
+- [From Redux to Directive in 10 Minutes](https://directive.run/blog/from-redux-to-directive) – practical migration guide with real auth examples
+- [Why State Machines Aren't Enough](https://directive.run/blog/why-state-machines-arent-enough) – when to use state machines vs. constraint-driven systems
+- [Your Zustand Store Is Secretly an Imperative State Machine](https://directive.run/blog/zustand-imperative-state-machine) – spotting the inflection point where Zustand stops scaling
+- [Stop Writing If-Else Chains for Business Logic](https://directive.run/blog/stop-writing-if-else-chains) – replacing conditional spaghetti with declarative constraints
+- [Feature Flags Without a Feature Flag Service](https://directive.run/blog/feature-flags-without-a-service) – reactive feature flags with constraints and derivations
+- [Directive on the Server](https://directive.run/blog/directive-on-the-server) – snapshots, signed verification, and audit trails on Node.js
+
 ## Documentation
 
 - [Getting Started](https://directive.run/docs/getting-started)

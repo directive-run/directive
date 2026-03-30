@@ -12,31 +12,7 @@ import type {
 } from "./types.js";
 import { AGENT_KEY } from "./types.js";
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const MAX_STRINGIFY_LENGTH = 100_000;
-
-/** Safely stringify output, handling circular references and truncating large values */
-function safeStringify(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    const seen = new WeakSet();
-    const json = JSON.stringify(value, (_key, val) => {
-      if (typeof val === "object" && val !== null) {
-        if (seen.has(val)) return "[Circular]";
-        seen.add(val);
-      }
-      return val;
-    });
-    return json.length > MAX_STRINGIFY_LENGTH
-      ? json.slice(0, MAX_STRINGIFY_LENGTH) + "...[truncated]"
-      : json;
-  } catch {
-    return String(value);
-  }
-}
+import { safeStringify } from "@directive-run/core/internals";
 
 // ============================================================================
 // PII Guardrail

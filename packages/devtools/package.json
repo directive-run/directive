@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@directive-run/ai": "workspace:*",
+    "@directive-run/core": "workspace:*",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",

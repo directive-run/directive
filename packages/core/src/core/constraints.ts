@@ -150,6 +150,21 @@ export interface ConstraintsManager<_S extends Schema> {
     id: string,
     props?: Record<string, unknown>,
   ): Promise<RequirementWithId[]>;
+  /**
+   * Register a custom key function for a requirement type.
+   * Used by the engine to forward resolver `key` functions to the
+   * constraint manager for requirement deduplication.
+   *
+   * @param requirementType - The requirement type string (e.g. `"FETCH_USER"`).
+   * @param keyFn - The key function that produces a deduplication string.
+   */
+  setRequirementKey(requirementType: string, keyFn: RequirementKeyFn): void;
+  /**
+   * Remove a previously registered requirement key function.
+   *
+   * @param requirementType - The requirement type string to remove.
+   */
+  removeRequirementKey(requirementType: string): void;
 }
 
 /**
@@ -162,7 +177,7 @@ export interface CreateConstraintsOptions<S extends Schema> {
   definitions: ConstraintsDef<S>;
   /** Proxy-based facts object used to evaluate `when()` predicates. */
   facts: Facts<S>;
-  /** Custom key functions for requirement deduplication, keyed by constraint ID. */
+  /** Custom key functions for requirement deduplication, keyed by requirement type. */
   requirementKeys?: Record<string, RequirementKeyFn>;
   /** Default timeout in milliseconds for async constraint evaluation (defaults to 5 000). */
   defaultTimeout?: number;
@@ -858,9 +873,8 @@ export function createConstraintsManager<S extends Schema>(
 
       return;
     }
-    const keyFn = requirementKeys[id];
     const reqsWithId = reqs.map((req) =>
-      createRequirementWithId(req, id, keyFn),
+      createRequirementWithId(req, id, requirementKeys[req.type]),
     );
     for (const reqWithId of reqsWithId) {
       requirements.add(reqWithId);
@@ -1315,14 +1329,23 @@ export function createConstraintsManager<S extends Schema>(
         return [];
       }
 
-      const keyFn = requirementKeys[id];
       const result: RequirementWithId[] = [];
       for (const req of reqs) {
         const merged = props ? { ...req, ...props } : req;
-        result.push(createRequirementWithId(merged, id, keyFn));
+        result.push(
+          createRequirementWithId(merged, id, requirementKeys[merged.type]),
+        );
       }
 
       return result;
+    },
+
+    setRequirementKey(requirementType: string, keyFn: RequirementKeyFn): void {
+      requirementKeys[requirementType] = keyFn;
+    },
+
+    removeRequirementKey(requirementType: string): void {
+      delete requirementKeys[requirementType];
     },
   };
 

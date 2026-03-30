@@ -34,14 +34,7 @@ import type { ReflectionEvaluation } from "./reflection.js";
 
 import { extractJsonFromOutput } from "./structured-output.js";
 
-// ============================================================================
-// Internal Helpers
-// ============================================================================
-
-function safeStringify(value: unknown): string {
-  if (typeof value === "string") return value;
-  try { return JSON.stringify(value); } catch { return String(value); }
-}
+import { safeStringify } from "@directive-run/core/internals";
 
 // ============================================================================
 // Agent Selection Helpers

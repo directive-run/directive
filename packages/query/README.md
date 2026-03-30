@@ -255,6 +255,12 @@ interface ResourceState<T> {
 }
 ```
 
+## Related Blog Posts
+
+- [Introducing @directive-run/query](https://directive.run/blog/introducing-directive-query) – causal cache invalidation, bound handles, and `explainQuery`
+- [Data Fetching with Directive](https://directive.run/blog/data-fetching-with-directive) – the complete guide to caching, invalidation, deduplication, and polling
+- [Building a Real-Time Dashboard with Directive](https://directive.run/blog/real-time-dashboard) – multiple async data sources, WebSocket updates, and cross-module derivations
+
 ## License
 
 [MIT OR Apache-2.0](../../LICENSE)

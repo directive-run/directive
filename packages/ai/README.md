@@ -159,6 +159,13 @@ const result = await orchestrator.run(
 // result.output === "This is a mock response."
 ```
 
+## Related Blog Posts
+
+- [Building AI Agents with Directive](https://directive.run/blog/building-ai-agents) – orchestrating agents with approval flows, guardrails, and budget constraints
+- [Declarative AI Guardrails](https://directive.run/blog/declarative-ai-guardrails) – why your agent framework needs a constraint layer
+- [Why AI Loves Directive](https://directive.run/blog/why-ai-loves-directive) – budget enforcement, PII redaction, tool control, and provider resilience
+- [Building an AI Docs Chatbot with Directive](https://directive.run/blog/building-ai-docs-chatbot) – RAG-backed chatbot with streaming, guardrails, and reactive state
+
 ## Documentation
 
 - [AI Guide](https://directive.run/docs/ai)

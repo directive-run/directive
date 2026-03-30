@@ -25,6 +25,8 @@ interface QueryEntry {
   isStale: boolean;
   failureCount: number;
   cacheKey: string | null;
+  /** Trigger fact value – number (timestamp) for manual refetch, 0 for initial */
+  triggerValue: unknown;
 }
 
 interface FetchSpan {
@@ -177,32 +179,7 @@ export function detectKind(
   return "query";
 }
 
-/** @internal Safely stringify data, handling circular refs and BigInt */
-export function safeStringify(data: unknown, maxLen = 500): string {
-  try {
-    const str = JSON.stringify(
-      data,
-      (_key, value) => {
-        if (typeof value === "bigint") {
-          return `${value}n`;
-        }
-
-        return value;
-      },
-      2,
-    );
-    if (!str) {
-      return "[undefined]";
-    }
-    if (str.length <= maxLen) {
-      return str;
-    }
-
-    return `${str.slice(0, maxLen)}\n... (truncated, ${str.length} chars total)`;
-  } catch {
-    return "[unserializable]";
-  }
-}
+export { safeStringify } from "@directive-run/core/internals";
 
 /** @internal Parse events into timeline spans and trigger dots */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: event type branching
@@ -361,8 +338,9 @@ export function buildExplainSteps(
     }
   }
 
-  // If no events, build from current state
+  // If no events, build rich analysis from current state (mirrors explainQuery())
   if (steps.length === 0) {
+    // Status step
     if (query.status === "disabled") {
       steps.push({
         icon: "\u23F8",
@@ -373,26 +351,32 @@ export function buildExplainSteps(
     } else if (query.status === "pending") {
       steps.push({
         icon: "\u23F3",
-        label: "Waiting for data",
+        label: query.isFetching
+          ? "Fetching (first load)"
+          : "Pending (waiting for trigger)",
         detail: query.isFetching
-          ? "Currently fetching"
+          ? "Currently fetching initial data"
           : "Fetch not yet started",
         color: "text-amber-400",
       });
     } else if (query.status === "success") {
       steps.push({
         icon: "\u2713",
-        label: "Data loaded",
-        detail: query.dataUpdatedAt
-          ? `Last updated ${formatAge(query.dataUpdatedAt)}`
-          : "Has cached data",
+        label: query.isFetching
+          ? "Refetching in background"
+          : "Data loaded",
+        detail: query.isFetching
+          ? "Stale-while-revalidate \u2013 showing cached data"
+          : query.dataUpdatedAt
+            ? `Last updated ${formatAge(query.dataUpdatedAt)}`
+            : "Has cached data",
         color: "text-emerald-400",
       });
-      if (query.isStale) {
+      if (query.isStale && !query.isFetching) {
         steps.push({
           icon: "\u23F0",
           label: "Data is stale",
-          detail: "Will refetch on next trigger",
+          detail: "Will refetch on next trigger (focus, reconnect, or interval)",
           color: "text-amber-400",
         });
       }
@@ -413,6 +397,50 @@ export function buildExplainSteps(
       }
     }
 
+    // Trigger reason (from snapshot trigger value)
+    if (query.isFetching || query.status === "pending") {
+      const triggerNum =
+        typeof query.triggerValue === "number" ? query.triggerValue : 0;
+      if (triggerNum > 0) {
+        steps.push({
+          icon: "\u{1F504}",
+          label: "Trigger: manual refetch or invalidation",
+          detail: `Triggered at ${new Date(triggerNum).toLocaleTimeString()}`,
+          color: "text-cyan-400",
+        });
+      } else if (
+        query.status === "pending" &&
+        query.data === null &&
+        !query.isFetching
+      ) {
+        steps.push({
+          icon: "\u23F3",
+          label: "Trigger: awaiting key",
+          detail: "Query key is null or dependencies not ready",
+          color: "text-zinc-400",
+        });
+      } else if (query.status === "pending" && query.data === null) {
+        steps.push({
+          icon: "\u{1F680}",
+          label: "Trigger: initial fetch",
+          detail: "No cached data \u2013 first load",
+          color: "text-blue-400",
+        });
+      }
+    }
+
+    // Data age
+    if (query.dataUpdatedAt) {
+      const ageSec = Math.round((Date.now() - query.dataUpdatedAt) / 1000);
+      steps.push({
+        icon: "\u{1F552}",
+        label: `Data age: ${ageSec}s`,
+        detail: `Fetched at ${new Date(query.dataUpdatedAt).toLocaleTimeString()}`,
+        color: "text-zinc-500",
+      });
+    }
+
+    // Cache key
     if (query.cacheKey) {
       steps.push({
         icon: "\uD83D\uDDDD",
@@ -468,17 +496,13 @@ export function extractQueries(
         kind: detectKind(name, snapshot),
         status,
         data: state.data ?? null,
-        error:
-          state.error instanceof Error
-            ? state.error.message
-            : state.error
-              ? String(state.error)
-              : null,
+        error: state.error ? String(state.error) : null,
         dataUpdatedAt: (state.dataUpdatedAt as number) ?? null,
         isFetching: (state.isFetching as boolean) ?? false,
         isStale: (state.isStale as boolean) ?? false,
         failureCount: (state.failureCount as number) ?? 0,
         cacheKey: (snapshot[`_q_${name}_key`] as string) ?? null,
+        triggerValue: snapshot[`_q_${name}_trigger`] ?? null,
       });
     }
   }
@@ -511,6 +535,7 @@ export function extractQueries(
         isStale: false,
         failureCount: 0,
         cacheKey: null,
+        triggerValue: null,
       });
     }
   }

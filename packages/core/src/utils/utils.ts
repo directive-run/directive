@@ -706,3 +706,39 @@ function timingSafeEqual(a: string, b: string): boolean {
   }
   return result === 0;
 }
+
+/**
+ * Safely stringify any value for display. Handles circular references,
+ * BigInt, throwing toJSON, and optional truncation.
+ *
+ * This is the canonical implementation – all packages should import this
+ * instead of maintaining local copies.
+ */
+export function safeStringify(
+  data: unknown,
+  maxLen = 500,
+): string {
+  try {
+    const str = JSON.stringify(
+      data,
+      (_key, value) => {
+        if (typeof value === "bigint") {
+          return `${value}n`;
+        }
+
+        return value;
+      },
+      2,
+    );
+    if (!str) {
+      return "[undefined]";
+    }
+    if (str.length <= maxLen) {
+      return str;
+    }
+
+    return `${str.slice(0, maxLen)}\n... (truncated, ${str.length} chars total)`;
+  } catch {
+    return "[unserializable]";
+  }
+}
