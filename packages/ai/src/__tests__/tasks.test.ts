@@ -116,7 +116,8 @@ describe("tasks: basic execution", () => {
 
     const result = await orchestrator.run("jsonTask", "input");
 
-    expect(result.output).toBe('{"value":42}');
+    // Core safeStringify pretty-prints with 2-space indent
+    expect(result.output).toBe('{\n  "value": 42\n}');
     expect(result.totalTokens).toBe(0);
   });
 

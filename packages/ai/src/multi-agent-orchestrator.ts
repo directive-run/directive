@@ -160,19 +160,7 @@ import {
   withStructuredOutput,
 } from "./structured-output.js";
 
-// ============================================================================
-/** Safe JSON.stringify that handles circular refs or throwing toJSON */
-function safeStringify(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
+import { safeStringify } from "@directive-run/core/internals";
 
 /** Shallow structural equality for change detection (plain objects, arrays, and primitives) */
 function shallowEqual(a: unknown, b: unknown): boolean {

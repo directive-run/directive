@@ -526,21 +526,24 @@ describe("createLengthGuardrail", () => {
     const guardrail = createLengthGuardrail({ maxCharacters: 10 });
     const result = guardrail(outputData("a".repeat(15)), defaultContext);
 
+    // Core safeStringify JSON-encodes strings (adds surrounding quotes)
+    // "aaa...aaa" (15 a's) -> '"aaa...aaa"' -> 17 chars
     expect(result).toEqual({
       passed: false,
-      reason: "Output too long: 15 characters (max: 10)",
+      reason: "Output too long: 17 characters (max: 10)",
     });
   });
 
   it("blocks on maxTokens exceeded", () => {
     const guardrail = createLengthGuardrail({ maxTokens: 5 });
-    // Default estimator: Math.ceil(text.length / 4)
-    // 24 chars -> 6 tokens -> exceeds 5
+    // Core safeStringify JSON-encodes strings (adds surrounding quotes)
+    // "a".repeat(24) -> '"aaa...aaa"' -> 26 chars
+    // Default estimator: Math.ceil(26 / 4) = 7 tokens -> exceeds 5
     const result = guardrail(outputData("a".repeat(24)), defaultContext);
 
     expect(result).toEqual({
       passed: false,
-      reason: "Output too long: ~6 tokens (max: 5)",
+      reason: "Output too long: ~7 tokens (max: 5)",
     });
   });
 
@@ -566,7 +569,8 @@ describe("createLengthGuardrail", () => {
       defaultContext,
     );
 
-    expect(customEstimator).toHaveBeenCalledWith("one two three four");
+    // Core safeStringify JSON-encodes strings (adds surrounding quotes)
+    expect(customEstimator).toHaveBeenCalledWith('"one two three four"');
     expect(result).toEqual({
       passed: false,
       reason: "Output too long: ~4 tokens (max: 3)",

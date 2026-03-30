@@ -160,3 +160,6 @@ export {
   createConstraintFactory,
   createResolverFactory,
 } from "./core/types.js";
+
+// Shared utilities
+export { safeStringify } from "./utils/utils.js";

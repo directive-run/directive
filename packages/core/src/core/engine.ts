@@ -47,6 +47,7 @@ import type {
   FactsSnapshot,
   InferSchema,
   ReconcileResult,
+  RequirementKeyFn,
   ResolversDef,
   Schema,
   System,
@@ -391,10 +392,24 @@ export function createEngine<S extends Schema>(
     },
   });
 
+  // Extract resolver key functions keyed by requirement type.
+  // Resolvers with a string `requirement` and a `key` function contribute
+  // to requirement deduplication inside the constraints manager.
+  const requirementKeys: Record<string, RequirementKeyFn> = Object.create(null);
+  for (const def of Object.values(mergedResolvers)) {
+    if (
+      def.key &&
+      typeof def.requirement === "string"
+    ) {
+      requirementKeys[def.requirement] = def.key;
+    }
+  }
+
   // Create constraints manager
   const constraintsManager: ConstraintsManager<S> = createConstraintsManager({
     definitions: mergedConstraints,
     facts,
+    requirementKeys,
     onEvaluate: (id, active) =>
       pluginManager.emitConstraintEvaluate(id, active),
     onError: (id, error) => {
@@ -406,6 +421,15 @@ export function createEngine<S extends Schema>(
       }
     },
   });
+
+  /** Sync resolver key functions into the constraints manager */
+  function syncResolverKeys(defs: ResolversDef<S>): void {
+    for (const def of Object.values(defs)) {
+      if (def.key && typeof def.requirement === "string") {
+        constraintsManager.setRequirementKey(def.requirement, def.key);
+      }
+    }
+  }
 
   // Create resolvers manager
   const resolversManager: ResolversManager<S> = createResolversManager({
@@ -866,12 +890,19 @@ export function createEngine<S extends Schema>(
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       register: (id: string, def: any) => {
         definitions.register("resolver", id, def);
+        syncResolverKeys({ [id]: def } as ResolversDef<S>);
       },
       // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       assign: (id: string, def: any) => {
         definitions.assign("resolver", id, def);
+        syncResolverKeys({ [id]: def } as ResolversDef<S>);
       },
       unregister: (id: string) => {
+        // Remove the key function before unregistering
+        const def = mergedResolvers[id];
+        if (def?.key && typeof def.requirement === "string") {
+          constraintsManager.removeRequirementKey(def.requirement);
+        }
         definitions.unregister("resolver", id);
       },
       call: (
@@ -1759,6 +1790,8 @@ export function createEngine<S extends Schema>(
       Object.assign(mergedResolvers, module.resolvers);
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       resolversManager.registerDefinitions(module.resolvers as any);
+      // Sync resolver key functions to the constraints manager
+      syncResolverKeys(module.resolvers as ResolversDef<S>);
     }
 
     // Register new schema keys with the facts store
