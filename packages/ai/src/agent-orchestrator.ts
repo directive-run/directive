@@ -330,7 +330,12 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   cancelBreakpoint(id: string, reason?: string): void;
   /** Get all currently pending breakpoint requests. */
   getPendingBreakpoints(): BreakpointRequest[];
-  /** Dispose of the orchestrator */
+  /** Destroy the orchestrator, releasing all resources. */
+  destroy(): void;
+  /**
+   * Dispose of the orchestrator.
+   * @deprecated Use destroy() instead.
+   */
   dispose(): void;
 }
 
@@ -2134,8 +2139,12 @@ export function createAgentOrchestrator<
       return [...bpState.pending];
     },
 
-    dispose(): void {
+    destroy(): void {
       system.destroy();
+    },
+
+    dispose(): void {
+      orchestrator.destroy();
     },
   };
 

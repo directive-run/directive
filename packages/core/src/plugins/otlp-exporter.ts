@@ -22,7 +22,7 @@
  * ```
  */
 
-import type { AggregatedMetric, TraceSpan } from "./observability.lab.js";
+import type { AggregatedMetric, TraceSpan } from "./observability.js";
 
 // ============================================================================
 // Types

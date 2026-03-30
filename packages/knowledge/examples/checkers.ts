@@ -46,11 +46,10 @@ import {
   createCircuitBreaker,
   createOTLPExporter,
 } from "@directive-run/core/plugins";
-// createObservability is alpha (not in bundle) — direct source import
 import {
   createObservability,
   createAgentMetrics,
-} from "../../../packages/core/src/plugins/observability.lab.js";
+} from "@directive-run/core/plugins";
 import {
   analysisAgent,
   chatAgent,
