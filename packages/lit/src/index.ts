@@ -1166,6 +1166,8 @@ export class QuerySystemController<T extends { start: () => void; destroy: () =>
  */
 export class HydrationController implements ReactiveController {
   private snapshot: Record<string, unknown> | undefined;
+  // biome-ignore lint/suspicious/noExplicitAny: Systems vary by module schema
+  private systems: SingleModuleSystem<any>[] = [];
 
   constructor(host: ReactiveControllerHost, snapshot?: Record<string, unknown>) {
     this.snapshot = snapshot;
@@ -1173,15 +1175,40 @@ export class HydrationController implements ReactiveController {
   }
 
   hostConnected(): void {}
-  hostDisconnected(): void {}
+
+  hostDisconnected(): void {
+    for (const system of this.systems) {
+      system.destroy();
+    }
+    this.systems = [];
+  }
 
   createSystem<S extends ModuleSchema>(
     moduleDef: ModuleDef<S>,
-    config?: { initialFacts?: Record<string, unknown> },
+    config?: {
+      // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
+      plugins?: Plugin<any>[];
+      trace?: TraceOption;
+      errorBoundary?: ErrorBoundaryConfig;
+      tickMs?: number;
+      zeroConfig?: boolean;
+      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
+      initialFacts?: Record<string, any>;
+    },
   ): SingleModuleSystem<S> {
     const mergedFacts = mergeHydrationFacts(this.snapshot, config?.initialFacts);
-    // biome-ignore lint/suspicious/noExplicitAny: Hydration snapshot is untyped at runtime
-    const system = createSystem({ module: moduleDef, initialFacts: mergedFacts as any });
+    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+    const system = createSystem({
+      module: moduleDef,
+      plugins: config?.plugins,
+      trace: config?.trace,
+      errorBoundary: config?.errorBoundary,
+      tickMs: config?.tickMs,
+      zeroConfig: config?.zeroConfig,
+      initialFacts: mergedFacts,
+    } as any) as unknown as SingleModuleSystem<S>;
+
+    this.systems.push(system);
 
     if (typeof window !== "undefined") {
       system.start();

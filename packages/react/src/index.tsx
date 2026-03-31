@@ -62,6 +62,7 @@ import {
   createThrottle,
   defaultEquality,
   depsChanged,
+  mergeHydrationFacts,
   runTrackedSelector,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
@@ -1844,15 +1845,13 @@ export function useHydratedSystem<S extends ModuleSchema>(
 ): SingleModuleSystem<S> {
   const snapshot = useContext(HydrationContext);
 
-  // Merge snapshot data as initial facts if available
+  // Merge snapshot data as initial facts via shared adapter utility
   const mergedConfig = useMemo(() => {
-    if (!snapshot?.data) return config ?? {};
+    const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts);
+
     return {
       ...(config ?? {}),
-      initialFacts: {
-        ...(config?.initialFacts ?? {}),
-        ...snapshot.data,
-      },
+      initialFacts: mergedFacts,
     };
   }, [snapshot, config]);
 
