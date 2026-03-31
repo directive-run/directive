@@ -368,3 +368,14 @@ export {
 } from "./core/types/adapter-utils.js";
 
 export { shallowEqual } from "./utils/utils.js";
+
+/**
+ * Merge a DistributableSnapshot's data into initialFacts for SSR hydration.
+ * Used by all framework adapters' hydration hooks/controllers.
+ */
+export function mergeHydrationFacts(
+  snapshot: { data?: Record<string, unknown> } | undefined | null,
+  initialFacts?: Record<string, unknown>,
+): Record<string, unknown> {
+  return { ...initialFacts, ...(snapshot?.data ?? {}) };
+}

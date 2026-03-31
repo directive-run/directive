@@ -44,6 +44,7 @@ import {
   createThrottle,
   defaultEquality,
   depsChanged,
+  mergeHydrationFacts,
   runTrackedSelector,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
@@ -1144,5 +1145,48 @@ export class QuerySystemController<T extends { start: () => void; destroy: () =>
   hostDisconnected(): void {
     this._system?.destroy();
     this._system = null;
+  }
+}
+
+// ============================================================================
+// SSR Hydration
+// ============================================================================
+
+/**
+ * Lit reactive controller for SSR hydration.
+ * Accepts a DistributableSnapshot and creates a hydrated system.
+ *
+ * @example
+ * ```typescript
+ * class MyElement extends LitElement {
+ *   private hydration = new HydrationController(this, serverSnapshot);
+ *   private system = this.hydration.createSystem(myModule);
+ * }
+ * ```
+ */
+export class HydrationController implements ReactiveController {
+  private snapshot: Record<string, unknown> | undefined;
+
+  constructor(host: ReactiveControllerHost, snapshot?: Record<string, unknown>) {
+    this.snapshot = snapshot;
+    host.addController(this);
+  }
+
+  hostConnected(): void {}
+  hostDisconnected(): void {}
+
+  createSystem<S extends ModuleSchema>(
+    moduleDef: ModuleDef<S>,
+    config?: { initialFacts?: Record<string, unknown> },
+  ): SingleModuleSystem<S> {
+    const mergedFacts = mergeHydrationFacts(this.snapshot, config?.initialFacts);
+    // biome-ignore lint/suspicious/noExplicitAny: Hydration snapshot is untyped at runtime
+    const system = createSystem({ module: moduleDef, initialFacts: mergedFacts as any });
+
+    if (typeof window !== "undefined") {
+      system.start();
+    }
+
+    return system;
   }
 }

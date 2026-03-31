@@ -42,9 +42,10 @@ import {
   depsChanged,
   pickFacts,
   runTrackedSelector,
+  mergeHydrationFacts,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
-import { onDestroy } from "svelte";
+import { getContext, onDestroy, setContext } from "svelte";
 import { type Readable, readable } from "svelte/store";
 
 // Re-export for convenience
@@ -709,7 +710,7 @@ export function useHistory(
 // ============================================================================
 
 /** Configuration for useDirective */
-interface UseDirectiveConfig {
+export interface UseDirectiveConfig {
   // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
   trace?: TraceOption;
@@ -986,4 +987,52 @@ export function useQuerySystem<
   });
 
   return system;
+}
+
+// ============================================================================
+// SSR Hydration
+// ============================================================================
+
+/** @internal Context key for SSR hydration snapshot */
+const HYDRATION_KEY = Symbol("directive-hydration");
+
+/**
+ * Provide a DistributableSnapshot for child components to hydrate from.
+ * Call this in your layout or parent component (e.g., SvelteKit +layout.svelte).
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { setHydrationSnapshot } from "@directive-run/svelte";
+ *   export let data; // from SvelteKit load()
+ *   setHydrationSnapshot(data.snapshot);
+ * </script>
+ * <slot />
+ * ```
+ */
+export function setHydrationSnapshot(snapshot: Record<string, unknown>): void {
+  setContext(HYDRATION_KEY, snapshot);
+}
+
+/**
+ * Create a system hydrated from a server snapshot.
+ * Must be called in a component that is a descendant of one that called `setHydrationSnapshot`.
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { useHydratedSystem, useDerived } from "@directive-run/svelte";
+ *   const system = useHydratedSystem(myModule);
+ *   const count = useDerived(system, "count");
+ * </script>
+ * ```
+ */
+export function useHydratedSystem<S extends ModuleSchema>(
+  moduleDef: ModuleDef<S>,
+  config?: UseDirectiveConfig,
+): SingleModuleSystem<S> {
+  const snapshot = getContext<Record<string, unknown> | undefined>(HYDRATION_KEY);
+  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
+
+  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts }).system;
 }
