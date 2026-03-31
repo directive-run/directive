@@ -372,10 +372,30 @@ export { shallowEqual } from "./utils/utils.js";
 /**
  * Merge a DistributableSnapshot's data into initialFacts for SSR hydration.
  * Used by all framework adapters' hydration hooks/controllers.
+ *
+ * Accepts both shapes:
+ * - DistributableSnapshot (`{ data: Record<string, unknown> }`) — used by React's DirectiveHydrator
+ * - Plain `Record<string, unknown>` — used by Lit/Vue/Svelte/Solid adapters
  */
 export function mergeHydrationFacts(
-  snapshot: { data?: Record<string, unknown> } | undefined | null,
+  snapshot:
+    | { data?: Record<string, unknown> }
+    | Record<string, unknown>
+    | undefined
+    | null,
   initialFacts?: Record<string, unknown>,
 ): Record<string, unknown> {
-  return { ...initialFacts, ...(snapshot?.data ?? {}) };
+  if (!snapshot) {
+    return { ...initialFacts };
+  }
+
+  // If snapshot has a .data property that is a non-null object, treat as DistributableSnapshot
+  const data =
+    "data" in snapshot &&
+    typeof snapshot.data === "object" &&
+    snapshot.data !== null
+      ? (snapshot.data as Record<string, unknown>)
+      : (snapshot as Record<string, unknown>);
+
+  return { ...initialFacts, ...data };
 }
