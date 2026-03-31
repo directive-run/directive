@@ -1074,8 +1074,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@directive-run/query':
-        specifier: ^0.1.2
-        version: 0.1.2(@directive-run/core@packages+core)
+        specifier: workspace:*
+        version: link:../query
       '@testing-library/react':
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1110,8 +1110,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@directive-run/query':
-        specifier: ^0.1.2
-        version: 0.1.2(@directive-run/core@packages+core)
+        specifier: workspace:*
+        version: link:../query
       '@types/node':
         specifier: ^25.2.0
         version: 25.2.0
@@ -1131,8 +1131,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@directive-run/query':
-        specifier: ^0.1.2
-        version: 0.1.2(@directive-run/core@packages+core)
+        specifier: workspace:*
+        version: link:../query
       '@types/node':
         specifier: ^25.2.0
         version: 25.2.0
@@ -1164,8 +1164,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       '@directive-run/query':
-        specifier: ^0.1.2
-        version: 0.1.2(@directive-run/core@packages+core)
+        specifier: workspace:*
+        version: link:../query
       '@types/node':
         specifier: ^25.2.0
         version: 25.2.0
@@ -1405,12 +1405,6 @@ packages:
 
   '@clack/prompts@0.10.1':
     resolution: {integrity: sha512-Q0T02vx8ZM9XSv9/Yde0jTmmBQufZhPJfYAg2XrrrxWWaZgq1rr8nU8Hv710BQ1dhoP8rtY7YUdpGej2Qza/cw==}
-
-  '@directive-run/query@0.1.2':
-    resolution: {integrity: sha512-2WtoicQzAz4VnY4DmylwOT66lU1Iv1xl8dNj47o6JJdF/qrM/B54vB+CfQNdrW8XxrvRk9OOUUqsIuGfXSuKYQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@directive-run/core': ^0.8.0
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -4458,10 +4452,6 @@ snapshots:
       '@clack/core': 0.4.2
       picocolors: 1.1.1
       sisteransi: 1.0.5
-
-  '@directive-run/query@0.1.2(@directive-run/core@packages+core)':
-    dependencies:
-      '@directive-run/core': link:packages/core
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
