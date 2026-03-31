@@ -15,7 +15,6 @@ import type {
   DerivationsDef,
   DerivedValues,
   Facts,
-  FactsStore,
   Schema,
 } from "./types.js";
 
@@ -63,7 +62,6 @@ export interface CreateDerivationsOptions<
 > {
   definitions: D;
   facts: Facts<S>;
-  store: FactsStore<S>;
   /** Callback when a derivation is computed */
   onCompute?: (
     id: string,
@@ -99,15 +97,7 @@ export function createDerivationsManager<
   S extends Schema,
   D extends DerivationsDef<S>,
 >(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D> {
-  const {
-    definitions,
-    facts,
-    store: _store,
-    onCompute,
-    onInvalidate,
-    onError,
-  } = options;
-  // Note: _store is kept for API compatibility but invalidation is handled by the engine calling invalidate()
+  const { definitions, facts, onCompute, onInvalidate, onError } = options;
 
   // Internal state for each derivation
   const states = new Map<string, DerivationState<unknown>>();

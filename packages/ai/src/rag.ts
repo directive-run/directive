@@ -51,8 +51,8 @@ export interface RAGStorage {
   ): Promise<Array<RAGChunk & { similarity: number }>>;
   /** Reload storage (clear cache, re-read from source) */
   reload?(): Promise<void>;
-  /** Dispose of resources */
-  dispose?(): void;
+  /** Destroy and release resources */
+  destroy?(): void;
 }
 
 export interface RAGEnricherConfig {
@@ -314,7 +314,7 @@ export function createJSONFileStore(options: JSONFileStoreOptions): RAGStorage {
       cachedAt = 0;
       await load();
     },
-    dispose() {
+    destroy() {
       cached = null;
       cachedAt = 0;
     },

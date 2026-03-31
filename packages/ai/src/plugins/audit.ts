@@ -210,8 +210,8 @@ export interface AuditInstance {
   prune(): number;
   /** Get audit statistics */
   getStats(): AuditStats;
-  /** Dispose of the instance (clears timers, flushes exports) */
-  dispose(): Promise<void>;
+  /** Destroy the instance (clears timers, flushes exports) */
+  destroy(): Promise<void>;
   /** Create a plugin for a directive system */
   createPlugin<M extends ModuleSchema>(): Plugin<M>;
   /** Add a custom audit entry */
@@ -696,7 +696,7 @@ export function createAuditTrail(
       };
     },
 
-    async dispose(): Promise<void> {
+    async destroy(): Promise<void> {
       // Clear export timer
       if (exportTimer) {
         clearInterval(exportTimer);

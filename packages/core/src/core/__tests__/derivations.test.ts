@@ -21,7 +21,7 @@ function setup(
   const manager = createDerivationsManager({
     definitions: defs as any,
     facts: facts as any,
-    store: store as any,
+
   });
 
   return { store, facts, manager };
@@ -215,7 +215,7 @@ describe("derivations", () => {
   describe("flush guard", () => {
     it("flushNotifications terminates after MAX_FLUSH_ITERATIONS (100)", () => {
       const schema = { count: t.number() };
-      const { store, facts } = createFacts({ schema });
+      const { facts } = createFacts({ schema });
       facts.count = 0;
 
       let iteration = 0;
@@ -225,7 +225,7 @@ describe("derivations", () => {
           looping: (f: any) => f.count,
         } as any,
         facts: facts as any,
-        store: store as any,
+    
       });
 
       manager.get("looping");
@@ -426,7 +426,7 @@ describe("derivations", () => {
     it("onCompute fires with id, value, deps", () => {
       const onCompute = vi.fn();
       const schema = { count: t.number() };
-      const { store, facts } = createFacts({ schema });
+      const { facts } = createFacts({ schema });
       facts.count = 5;
 
       const manager = createDerivationsManager({
@@ -434,7 +434,7 @@ describe("derivations", () => {
           doubled: (f: any) => (f.count as number) * 2,
         } as any,
         facts: facts as any,
-        store: store as any,
+    
         onCompute,
       });
 
@@ -452,7 +452,7 @@ describe("derivations", () => {
     it("onError fires when derivation throws", () => {
       const onError = vi.fn();
       const schema = { count: t.number() };
-      const { store, facts } = createFacts({ schema });
+      const { facts } = createFacts({ schema });
       facts.count = 0;
 
       const manager = createDerivationsManager({
@@ -462,7 +462,7 @@ describe("derivations", () => {
           },
         } as any,
         facts: facts as any,
-        store: store as any,
+    
         onError,
       });
 

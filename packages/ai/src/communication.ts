@@ -214,8 +214,8 @@ export interface MessageBus {
   getPending(agentId: string): TypedAgentMessage[];
   /** Clear all messages and data */
   clear(): void;
-  /** Dispose of the message bus, clearing all data and subscriptions */
-  dispose(): void;
+  /** Destroy the message bus, clearing all data and subscriptions */
+  destroy(): void;
 }
 
 // ============================================================================
@@ -490,7 +490,7 @@ export function createMessageBus(config: MessageBusConfig = {}): MessageBus {
       pendingMessages.clear();
     },
 
-    dispose(): void {
+    destroy(): void {
       messageHistory.length = 0;
       messageIndex.clear();
       pendingMessages.clear();
@@ -579,8 +579,8 @@ export interface AgentNetwork {
   ): Subscription;
   /** Get the message bus */
   getBus(): MessageBus;
-  /** Dispose of the network, clearing pending waiters and timers */
-  dispose(): void;
+  /** Destroy the network, clearing pending waiters and timers */
+  destroy(): void;
 }
 
 // ============================================================================
@@ -924,7 +924,7 @@ export function createAgentNetwork(config: AgentNetworkConfig): AgentNetwork {
       return bus;
     },
 
-    dispose(): void {
+    destroy(): void {
       // Clear all pending response waiters and their timers
       for (const [, waiter] of responseWaiters) {
         clearTimeout(waiter.timer);
@@ -1017,8 +1017,8 @@ export function createResponder(network: AgentNetwork, agentId: string) {
       handlers.delete(action);
     },
 
-    /** Dispose of this responder, unsubscribing from network */
-    dispose(): void {
+    /** Destroy this responder, unsubscribing from network */
+    destroy(): void {
       subscription.unsubscribe();
       handlers.clear();
     },
@@ -1114,8 +1114,8 @@ export function createDelegator(network: AgentNetwork, agentId: string) {
       delegationHandler = null;
     },
 
-    /** Dispose of this delegator, unsubscribing from network */
-    dispose(): void {
+    /** Destroy this delegator, unsubscribing from network */
+    destroy(): void {
       subscription.unsubscribe();
       delegationHandler = null;
     },
@@ -1203,8 +1203,8 @@ export function createPubSub(network: AgentNetwork, agentId: string) {
       } as Partial<UpdateMessage>);
     },
 
-    /** Dispose of this pub/sub, unsubscribing from network and clearing handlers */
-    dispose(): void {
+    /** Destroy this pub/sub, unsubscribing from network and clearing handlers */
+    destroy(): void {
       subscription.unsubscribe();
       topicHandlers.clear();
     },

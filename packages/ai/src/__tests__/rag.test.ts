@@ -456,7 +456,7 @@ describe("createJSONFileStore", () => {
     vi.doUnmock("node:fs");
   });
 
-  it("dispose() clears cache", async () => {
+  it("destroy() clears cache", async () => {
     const mockReadFile = vi.fn(async () => JSON.stringify(sampleChunks));
     vi.doMock("node:fs", () => ({
       promises: { readFile: mockReadFile },
@@ -468,8 +468,8 @@ describe("createJSONFileStore", () => {
     await store.getChunks();
     expect(mockReadFile).toHaveBeenCalledTimes(1);
 
-    // Dispose and reload — should trigger a fresh read
-    store.dispose!();
+    // Destroy and reload — should trigger a fresh read
+    store.destroy!();
     await store.getChunks();
     expect(mockReadFile).toHaveBeenCalledTimes(2);
 

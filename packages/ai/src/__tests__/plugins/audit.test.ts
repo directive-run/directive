@@ -478,10 +478,10 @@ describe("getStats", () => {
 });
 
 // ============================================================================
-// dispose
+// destroy
 // ============================================================================
 
-describe("dispose", () => {
+describe("destroy", () => {
   it("clears export timer", async () => {
     const exporter = vi.fn().mockResolvedValue(undefined);
     const audit = createAuditTrail({
@@ -489,15 +489,15 @@ describe("dispose", () => {
       exportInterval: 100,
     });
 
-    await audit.dispose();
+    await audit.destroy();
 
-    // After dispose, the timer should be cleared. Adding an entry and waiting
+    // After destroy, the timer should be cleared. Adding an entry and waiting
     // should not trigger the exporter again (timer was cleared).
     exporter.mockClear();
     await new Promise((r) => setTimeout(r, 150));
 
-    // The exporter should NOT have been called by the interval after dispose
-    // (it may have been called once during dispose to flush)
+    // The exporter should NOT have been called by the interval after destroy
+    // (it may have been called once during destroy to flush)
     expect(exporter.mock.calls.length).toBeLessThanOrEqual(0);
   });
 
@@ -509,7 +509,7 @@ describe("dispose", () => {
     });
 
     await audit.addEntry("agent.run.start", { flushed: true });
-    await audit.dispose();
+    await audit.destroy();
 
     expect(exporter).toHaveBeenCalledOnce();
     expect(exporter.mock.calls[0]![0]).toHaveLength(1);

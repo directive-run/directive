@@ -635,21 +635,21 @@ export function createTestEmbedder(dimensions = 128): EmbedderFn {
   };
 }
 
-/** Batched embedder instance with dispose capability */
+/** Batched embedder instance with destroy capability */
 export interface BatchedEmbedder {
   /** Embed a single text (batched internally) */
   embed: EmbedderFn;
   /** Flush any pending batch immediately */
   flush(): Promise<void>;
-  /** Dispose of the embedder, clearing timers and rejecting pending requests */
-  dispose(): void;
+  /** Destroy the embedder, clearing timers and rejecting pending requests */
+  destroy(): void;
 }
 
 /**
  * Create a batched embedder that groups multiple texts into single API calls.
  *
  * **BREAKING CHANGE:** Previously returned `EmbedderFn` directly. Now returns
- * a `BatchedEmbedder` object with `embed`, `flush`, and `dispose` methods.
+ * a `BatchedEmbedder` object with `embed`, `flush`, and `destroy` methods.
  *
  * To migrate: `const embed = createBatchedEmbedder(...)` becomes
  * `const { embed } = createBatchedEmbedder(...)`.
@@ -672,7 +672,7 @@ export interface BatchedEmbedder {
  * const embedding = await batchedEmbedder.embed("Hello world");
  *
  * // Clean up when done
- * batchedEmbedder.dispose();
+ * batchedEmbedder.destroy();
  * ```
  */
 export function createBatchedEmbedder(config: {
@@ -694,7 +694,7 @@ export function createBatchedEmbedder(config: {
     reject: (error: Error) => void;
   }> = [];
   let batchTimer: ReturnType<typeof setTimeout> | null = null;
-  let isDisposed = false;
+  let isDestroyed = false;
 
   async function flushBatch(): Promise<void> {
     if (pendingBatch.length === 0) return;
@@ -731,8 +731,8 @@ export function createBatchedEmbedder(config: {
 
   return {
     async embed(text: string): Promise<Embedding> {
-      if (isDisposed) {
-        throw new Error("BatchedEmbedder has been disposed");
+      if (isDestroyed) {
+        throw new Error("BatchedEmbedder has been destroyed");
       }
 
       return new Promise((resolve, reject) => {
@@ -750,8 +750,8 @@ export function createBatchedEmbedder(config: {
       await flushBatch();
     },
 
-    dispose(): void {
-      isDisposed = true;
+    destroy(): void {
+      isDestroyed = true;
 
       // Clear timer
       if (batchTimer) {
@@ -762,7 +762,7 @@ export function createBatchedEmbedder(config: {
       // Reject pending requests
       const batch = pendingBatch;
       pendingBatch = [];
-      const err = new Error("BatchedEmbedder disposed");
+      const err = new Error("BatchedEmbedder destroyed");
       for (const item of batch) {
         item.reject(err);
       }

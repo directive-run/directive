@@ -607,12 +607,12 @@ describe("createBatchedEmbedder", () => {
     expect(result).toEqual([1, 0]);
   });
 
-  it("dispose() rejects pending requests", async () => {
+  it("destroy() rejects pending requests", async () => {
     const embedBatch = vi.fn(async (texts: string[]) =>
       texts.map(() => [1]),
     );
 
-    const { embed, dispose } = createBatchedEmbedder({
+    const { embed, destroy } = createBatchedEmbedder({
       batchSize: 100,
       embedBatch,
       maxWaitMs: 60000,
@@ -620,20 +620,20 @@ describe("createBatchedEmbedder", () => {
 
     const p = embed("pending");
 
-    dispose();
+    destroy();
 
-    await expect(p).rejects.toThrowError(/disposed/i);
+    await expect(p).rejects.toThrowError(/destroyed/i);
     expect(embedBatch).not.toHaveBeenCalled();
   });
 
-  it("throws on embed after dispose", async () => {
-    const { embed, dispose } = createBatchedEmbedder({
+  it("throws on embed after destroy", async () => {
+    const { embed, destroy } = createBatchedEmbedder({
       embedBatch: async (texts) => texts.map(() => [1]),
     });
 
-    dispose();
+    destroy();
 
-    await expect(embed("after dispose")).rejects.toThrowError(/disposed/i);
+    await expect(embed("after destroy")).rejects.toThrowError(/destroyed/i);
   });
 
   it("throws on batchSize < 1", () => {

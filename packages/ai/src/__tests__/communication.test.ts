@@ -363,7 +363,7 @@ describe("createMessageBus", () => {
   });
 
   // --------------------------------------------------------------------------
-  // clear / dispose
+  // clear / destroy
   // --------------------------------------------------------------------------
 
   it("clear() removes history and pending but keeps subscriptions", async () => {
@@ -388,7 +388,7 @@ describe("createMessageBus", () => {
     expect(received).toHaveLength(1);
   });
 
-  it("dispose() clears everything including subscriptions", async () => {
+  it("destroy() clears everything including subscriptions", async () => {
     const bus = createMessageBus();
     const received: TypedAgentMessage[] = [];
 
@@ -398,10 +398,10 @@ describe("createMessageBus", () => {
 
     expect(received).toHaveLength(1);
 
-    bus.dispose();
+    bus.destroy();
 
     expect(bus.getHistory()).toHaveLength(0);
-    // After dispose, new publishes to the same agent won't deliver (sub cleared)
+    // After destroy, new publishes to the same agent won't deliver (sub cleared)
     publishInform(bus, "a", "agent");
     await tick();
 
@@ -421,7 +421,7 @@ describe("createAgentNetwork", () => {
   });
 
   afterEach(() => {
-    bus.dispose();
+    bus.destroy();
   });
 
   // --------------------------------------------------------------------------
@@ -641,15 +641,15 @@ describe("createAgentNetwork", () => {
   });
 
   // --------------------------------------------------------------------------
-  // dispose()
+  // destroy()
   // --------------------------------------------------------------------------
 
-  it("dispose() cleans up waiters and agents", () => {
+  it("destroy() cleans up waiters and agents", () => {
     const network = createAgentNetwork({ bus });
     network.register("a", { capabilities: [] });
     network.register("b", { capabilities: [] });
 
-    network.dispose();
+    network.destroy();
 
     expect(network.getAgents()).toHaveLength(0);
   });
@@ -678,8 +678,8 @@ describe("createResponder", () => {
     expect(response.success).toBe(true);
     expect(response.result).toBe("Hello, World!");
 
-    responder.dispose();
-    bus.dispose();
+    responder.destroy();
+    bus.destroy();
   });
 
   it("responds with error for unknown action", async () => {
@@ -693,8 +693,8 @@ describe("createResponder", () => {
     expect(response.success).toBe(false);
     expect(response.error).toContain("Unknown action");
 
-    responder.dispose();
-    bus.dispose();
+    responder.destroy();
+    bus.destroy();
   });
 
   it("responds with error when handler throws", async () => {
@@ -711,8 +711,8 @@ describe("createResponder", () => {
     expect(response.success).toBe(false);
     expect(response.error).toBe("handler crashed");
 
-    responder.dispose();
-    bus.dispose();
+    responder.destroy();
+    bus.destroy();
   });
 });
 
@@ -742,8 +742,8 @@ describe("createDelegator", () => {
     });
     expect(result.metrics).toBeDefined();
 
-    delegator.dispose();
-    bus.dispose();
+    delegator.destroy();
+    bus.destroy();
   });
 
   it("returns error when delegation handler throws", async () => {
@@ -760,8 +760,8 @@ describe("createDelegator", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("task failed");
 
-    delegator.dispose();
-    bus.dispose();
+    delegator.destroy();
+    bus.destroy();
   });
 
   it("offDelegation removes the handler", async () => {
@@ -783,8 +783,8 @@ describe("createDelegator", () => {
 
       await expect(promise).rejects.toThrow("Delegation timeout");
 
-      delegator.dispose();
-      bus.dispose();
+      delegator.destroy();
+      bus.destroy();
     } finally {
       vi.useRealTimers();
     }

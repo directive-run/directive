@@ -100,7 +100,7 @@ export interface CheckersAI {
     cacheStats: CacheStats;
     busMessageCount: number;
   };
-  dispose(): void;
+  destroy(): void;
   /** Escape hatch for dashboard rendering */
   readonly observability: ReturnType<typeof createObservability> | null;
 }
@@ -561,7 +561,7 @@ export function createCheckersAI(): CheckersAI {
     };
   }
 
-  function dispose(): void {
+  function destroy(): void {
     clearInterval(otlpInterval);
     // Flush OTLP one final time
     try {
@@ -571,9 +571,9 @@ export function createCheckersAI(): CheckersAI {
     } catch {
       // Best-effort flush on dispose
     }
-    orchestrator.dispose();
-    multi.dispose();
-    obs.dispose();
+    orchestrator.destroy();
+    multi.destroy();
+    obs.destroy();
   }
 
   return {

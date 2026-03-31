@@ -598,16 +598,16 @@ describe("waitForIdle", () => {
 });
 
 // ============================================================================
-// Dispose
+// Destroy
 // ============================================================================
 
-describe("dispose", () => {
-  it("disposes without error", async () => {
+describe("destroy", () => {
+  it("destroys without error", async () => {
     const runner = createMockRunner();
     const orchestrator = createAgentOrchestrator({ runner });
 
     await orchestrator.run(mockAgent(), "Hello");
 
-    expect(() => orchestrator.dispose()).not.toThrow();
+    expect(() => orchestrator.destroy()).not.toThrow();
   });
 });
