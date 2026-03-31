@@ -38,11 +38,18 @@ import {
   createThrottle,
   defaultEquality,
   depsChanged,
+  mergeHydrationFacts,
   pickFacts,
   runTrackedSelector,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
-import { type Accessor, createSignal, onCleanup } from "solid-js";
+import {
+  type Accessor,
+  createContext,
+  createSignal,
+  onCleanup,
+  useContext,
+} from "solid-js";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -1009,4 +1016,38 @@ export function useQuerySystem<
   });
 
   return system;
+}
+
+// ============================================================================
+// SSR Hydration
+// ============================================================================
+
+/** Context for SSR hydration snapshot */
+const HydrationContext = createContext<Record<string, unknown> | undefined>();
+
+/**
+ * Solid component that provides a DistributableSnapshot to child components.
+ * Uses `HydrationContext.Provider` under the hood — pass `value` as the snapshot.
+ *
+ * @example
+ * ```tsx
+ * <DirectiveHydrator value={snapshot}>
+ *   <App />
+ * </DirectiveHydrator>
+ * ```
+ */
+export const DirectiveHydrator = HydrationContext.Provider;
+
+/**
+ * Create a system hydrated from a server snapshot.
+ * Must be used inside a `<DirectiveHydrator>` ancestor.
+ */
+export function useHydratedSystem<S extends ModuleSchema>(
+  moduleDef: ModuleDef<S>,
+  config?: UseDirectiveConfig,
+): SingleModuleSystem<S> {
+  const snapshot = useContext(HydrationContext);
+  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
+
+  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts }).system;
 }

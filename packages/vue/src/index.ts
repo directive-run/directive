@@ -36,16 +36,21 @@ import {
   createThrottle,
   defaultEquality,
   depsChanged,
+  mergeHydrationFacts,
   pickFacts,
   runTrackedSelector,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
 import {
   type ComputedRef,
+  type InjectionKey,
   type Ref,
   type ShallowRef,
   computed,
+  defineComponent,
+  inject,
   onScopeDispose,
+  provide,
   ref,
   shallowRef,
 } from "vue";
@@ -1054,6 +1059,62 @@ export function useQuerySystem<
   onScopeDispose(() => {
     system.destroy();
   });
+
+  return system;
+}
+
+// ============================================================================
+// SSR Hydration
+// ============================================================================
+
+/** @internal Injection key for SSR hydration snapshot */
+const HYDRATION_KEY: InjectionKey<Record<string, unknown>> = Symbol("directive-hydration");
+
+/**
+ * Vue component that provides a DistributableSnapshot to child components.
+ * Use with `useHydratedSystem` for SSR hydration in Nuxt or Vue SSR apps.
+ *
+ * @example
+ * ```vue
+ * <template>
+ *   <DirectiveHydrator :snapshot="snapshot">
+ *     <App />
+ *   </DirectiveHydrator>
+ * </template>
+ * ```
+ */
+export const DirectiveHydrator = defineComponent({
+  name: "DirectiveHydrator",
+  props: {
+    snapshot: { type: Object, required: true },
+  },
+  setup(props, { slots }) {
+    provide(HYDRATION_KEY, props.snapshot as Record<string, unknown>);
+
+    return () => slots.default?.();
+  },
+});
+
+/**
+ * Vue composable that creates a system hydrated from a server snapshot.
+ * Must be used inside a `<DirectiveHydrator>` ancestor.
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useHydratedSystem, useDerived } from "@directive-run/vue";
+ * const system = useHydratedSystem(myModule);
+ * const count = useDerived(system, "count");
+ * </script>
+ * ```
+ */
+export function useHydratedSystem<S extends ModuleSchema>(
+  moduleDef: ModuleDef<S>,
+  config?: UseDirectiveConfig,
+): SingleModuleSystem<S> {
+  const snapshot = inject(HYDRATION_KEY, undefined);
+  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
+  const { system } = useDirective(moduleDef, { ...config, initialFacts: mergedFacts });
 
   return system;
 }
