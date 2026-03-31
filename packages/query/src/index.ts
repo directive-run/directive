@@ -79,5 +79,12 @@ export type {
 } from "./create-graphql-query.js";
 export { createIdleResourceState } from "./types.js";
 
+// Persistence
+export { persistQueryCache } from "./persist.js";
+export type {
+  PersistQueryCacheOptions,
+  QueryCacheStorage,
+} from "./persist.js";
+
 // Re-export t from core for single-import convenience
 export { t } from "@directive-run/core";
