@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/devtools",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "license": "UNLICENSED",
   "description": "Visual DevTools for Directive AI orchestration — timeline, DAG, health, breakpoints. Proprietary — not covered by the project's MIT/Apache-2.0 license.",
