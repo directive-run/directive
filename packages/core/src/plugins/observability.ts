@@ -30,7 +30,7 @@
  * const dashboard = observability.getDashboard();
  *
  * // Clean up when done
- * await observability.dispose();
+ * await observability.destroy();
  * ```
  */
 
@@ -237,7 +237,7 @@ export interface ObservabilityInstance {
   /** Clear all data and reset statistics */
   clear(): void;
   /** Dispose of the instance, clearing timers and flushing data */
-  dispose(): Promise<void>;
+  destroy(): Promise<void>;
   /** Get health status for status pages */
   getHealthStatus(): {
     healthy: boolean;
@@ -731,7 +731,7 @@ export function createObservability(
       alertCooldowns.clear();
     },
 
-    async dispose() {
+    async destroy() {
       // Clear the export timer
       if (exportTimer) {
         clearInterval(exportTimer);
@@ -748,7 +748,7 @@ export function createObservability(
         }
       } catch (error) {
         console.error(
-          "[Directive Observability] Error flushing data during dispose:",
+          "[Directive Observability] Error flushing data during destroy:",
           error,
         );
       }
