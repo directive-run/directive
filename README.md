@@ -3,7 +3,7 @@
 **The constraint-driven runtime for TypeScript.** Declare what must be true. The runtime makes it happen.
 
 [![npm](https://img.shields.io/npm/v/@directive-run/core)](https://www.npmjs.com/package/@directive-run/core)
-[![tests](https://img.shields.io/badge/tests-3%2C744-brightgreen)](#)
+[![tests](https://img.shields.io/badge/tests-4%2C023-brightgreen)](#)
 [![zero deps](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![license](https://img.shields.io/npm/l/@directive-run/core)](./LICENSE)
 
@@ -171,7 +171,7 @@ function UserProfile({ system }) {
 | AI guardrails + orchestration | | | | Yes |
 | Retry, batching, error boundaries | Manual | Manual | Manual | Built-in |
 | Time-travel debugging | Extension | | Partial | Built-in |
-| Framework-agnostic (5 adapters) | React only | React only | Any | Any |
+| Framework-agnostic (6 adapters) | React only | React only | Any | Any |
 | Zero runtime dependencies | | Yes | | Yes |
 | `explain()` &ndash; why does this state exist? | | | | Yes |
 
