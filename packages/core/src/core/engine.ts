@@ -329,7 +329,6 @@ export function createEngine<S extends Schema>(
   > = createDerivationsManager({
     definitions: mergedDerive,
     facts,
-    store,
     onCompute: (id, value, oldValue, deps) => {
       pluginManager.emitDerivationCompute(id, value, deps);
       if (traceManager.currentTrace) {

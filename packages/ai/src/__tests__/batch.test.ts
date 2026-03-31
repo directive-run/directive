@@ -52,7 +52,7 @@ describe("createBatchQueue", () => {
     const result = await promise;
 
     expect(result.output).toBe("echo:hello");
-    await queue.dispose();
+    await queue.destroy();
   });
 
   it("flushes when batch is full", async () => {
@@ -69,7 +69,7 @@ describe("createBatchQueue", () => {
     expect(r1.output).toBe("echo:a");
     expect(r2.output).toBe("echo:b");
     expect(inner).toHaveBeenCalledTimes(2);
-    await queue.dispose();
+    await queue.destroy();
   });
 
   it("flushes on timer when batch is not full", async () => {
@@ -84,7 +84,7 @@ describe("createBatchQueue", () => {
 
     expect(result.output).toBe("echo:hello");
     expect(queue.pending).toBe(0);
-    await queue.dispose();
+    await queue.destroy();
   });
 
   it("manual flush processes pending calls", async () => {
@@ -103,7 +103,7 @@ describe("createBatchQueue", () => {
 
     expect(r1.output).toBe("echo:a");
     expect(r2.output).toBe("echo:b");
-    await queue.dispose();
+    await queue.destroy();
   });
 
   it("respects concurrency limit", async () => {
@@ -135,7 +135,7 @@ describe("createBatchQueue", () => {
 
     expect(maxConcurrent).toBeLessThanOrEqual(2);
     expect(inner).toHaveBeenCalledTimes(5);
-    await queue.dispose();
+    await queue.destroy();
   });
 
   it("individual call errors are delivered to that call's promise", async () => {
@@ -165,10 +165,10 @@ describe("createBatchQueue", () => {
     const r3 = await p3;
     expect(r3.output).toBe("hello");
 
-    await queue.dispose();
+    await queue.destroy();
   });
 
-  it("dispose flushes remaining calls", async () => {
+  it("destroy flushes remaining calls", async () => {
     vi.useRealTimers();
     const inner = makeRunner();
     const queue = createBatchQueue(inner, {
@@ -177,23 +177,23 @@ describe("createBatchQueue", () => {
     });
 
     const promise = queue.submit(mockAgent(), "hello");
-    await queue.dispose();
+    await queue.destroy();
 
     const result = await promise;
     expect(result.output).toBe("echo:hello");
   });
 
-  it("rejects submissions after dispose", async () => {
+  it("rejects submissions after destroy", async () => {
     vi.useRealTimers();
     const inner = makeRunner();
     const queue = createBatchQueue(inner, {
       maxBatchSize: 100,
       maxWaitMs: 100,
     });
-    await queue.dispose();
+    await queue.destroy();
 
     await expect(queue.submit(mockAgent(), "hello")).rejects.toThrow(
-      "disposed",
+      "destroyed",
     );
   });
 
@@ -213,7 +213,7 @@ describe("createBatchQueue", () => {
 
     await queue.flush();
     expect(queue.pending).toBe(0);
-    await queue.dispose();
+    await queue.destroy();
   });
 });
 
@@ -269,6 +269,6 @@ describe("createBatchQueue config validation", () => {
     const inner = makeRunner();
     // Should not throw — 0 is valid (immediate flush on timer)
     const queue = createBatchQueue(inner, { maxWaitMs: 0 });
-    await queue.dispose();
+    await queue.destroy();
   });
 });

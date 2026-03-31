@@ -202,8 +202,7 @@ const ALLOWED_PATTERN_TYPES = new Set([
  * @remarks
  * Returns the data structure with all function fields set to `undefined`.
  * Supply callbacks via the optional `overrides` parameter to re-attach
- * runtime behavior. Handles legacy field migrations (`agent` to `handler`,
- * `agents` to `handlers`, `converge` to `goal`).
+ * runtime behavior.
  *
  * @param json - The serialized pattern from {@link patternToJSON} or persisted storage.
  * @param overrides - Optional partial pattern to re-attach function callbacks (e.g. `merge`, `extract`).
@@ -225,48 +224,19 @@ export function patternFromJSON<T = unknown>(
   json: SerializedPattern,
   overrides?: Partial<ExecutionPattern<T>>,
 ): ExecutionPattern<T> {
-  // Migration shim: accept legacy "converge" serialized patterns (shallow copy to avoid mutating input)
-  const normalized =
-    json &&
-    typeof json === "object" &&
-    (json as Record<string, unknown>).type === "converge"
-      ? ({ ...json, type: "goal" as const } as SerializedPattern)
-      : json;
   if (
-    !normalized ||
-    typeof normalized !== "object" ||
-    !ALLOWED_PATTERN_TYPES.has((normalized as SerializedPattern).type)
+    !json ||
+    typeof json !== "object" ||
+    !ALLOWED_PATTERN_TYPES.has((json as SerializedPattern).type)
   ) {
     throw new Error(
       `[Directive] patternFromJSON: invalid or unknown pattern type "${(json as Record<string, unknown>)?.type}"`,
     );
   }
   const safe: Record<string, unknown> = Object.create(null);
-  for (const [k, v] of Object.entries(normalized)) {
+  for (const [k, v] of Object.entries(json)) {
     if (k !== "__proto__" && k !== "constructor" && k !== "prototype") {
       safe[k] = v;
-    }
-  }
-
-  // Migration shim: accept legacy `agent`/`agents` fields from persisted patterns
-  const raw = safe as Record<string, unknown>;
-  if (!raw.handler && raw.agent && typeof raw.agent === "string") {
-    raw.handler = raw.agent;
-    delete raw.agent;
-  }
-  if (!raw.handlers && raw.agents && Array.isArray(raw.agents)) {
-    raw.handlers = raw.agents;
-    delete raw.agents;
-  }
-  // Migrate DAG/goal node `agent` → `handler`
-  if (raw.nodes && typeof raw.nodes === "object") {
-    for (const node of Object.values(
-      raw.nodes as Record<string, Record<string, unknown>>,
-    )) {
-      if (!node.handler && node.agent && typeof node.agent === "string") {
-        node.handler = node.agent;
-        delete node.agent;
-      }
     }
   }
 

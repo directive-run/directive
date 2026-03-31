@@ -737,16 +737,16 @@ export function createMultiAgentOrchestrator(
   // ---- Mutable State (tracked via System facts + local) ----
   let globalTokenCount = 0;
   let globalStatus: "idle" | "paused" = "idle";
-  let disposed = false;
+  let destroyed = false;
   // Tracks in-flight runAgent calls (incremented synchronously before any await)
   // so waitForIdle knows when runs have been dispatched but not yet started
   let pendingRuns = 0;
   // Reflection score history — updated after each runReflectPattern call
   let lastReflectionHistory: ReflectIterationRecord[] | null = null;
 
-  function assertNotDisposed(): void {
-    if (disposed) {
-      throw new Error("[Directive MultiAgent] Orchestrator has been disposed");
+  function assertNotDestroyed(): void {
+    if (destroyed) {
+      throw new Error("[Directive MultiAgent] Orchestrator has been destroyed");
     }
   }
 
@@ -1650,7 +1650,7 @@ export function createMultiAgentOrchestrator(
               timestamp: Date.now(),
             });
           } catch {
-            // non-fatal: system might be disposed
+            // non-fatal: system might be destroyed
           }
 
           return {
@@ -1762,7 +1762,7 @@ export function createMultiAgentOrchestrator(
     input: string,
     opts?: MultiAgentRunCallOptions,
   ): Promise<RunResult<T>> {
-    assertNotDisposed();
+    assertNotDestroyed();
 
     if (opts?.signal?.aborted) {
       throw new Error(
@@ -2495,7 +2495,7 @@ export function createMultiAgentOrchestrator(
     input: string,
     options: { signal?: AbortSignal } = {},
   ): OrchestratorStreamResult<T> {
-    assertNotDisposed();
+    assertNotDestroyed();
 
     // Task streaming: run task, emit single chunk + done
     const taskReg = tasks[agentId];
@@ -5612,7 +5612,7 @@ export function createMultiAgentOrchestrator(
     runAgentStream: runAgentStreamImpl,
 
     async runPattern<T>(patternId: string, input: string): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       const pattern = patterns[patternId];
       if (!pattern) {
@@ -5730,7 +5730,7 @@ export function createMultiAgentOrchestrator(
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
       options?: { minSuccess?: number; timeout?: number },
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
       const inputArray = Array.isArray(inputs)
         ? inputs
         : agentIds.map(() => inputs);
@@ -5793,7 +5793,7 @@ export function createMultiAgentOrchestrator(
         transform?: (output: unknown, agentId: string, index: number) => string;
       },
     ): Promise<RunResult<T>[]> {
-      assertNotDisposed();
+      assertNotDestroyed();
       const results: RunResult<unknown>[] = [];
       let currentInput = initialInput;
 
@@ -5823,7 +5823,7 @@ export function createMultiAgentOrchestrator(
       input: string,
       context?: Record<string, unknown>,
     ): Promise<RunResult<unknown>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (!agents[fromAgent]) {
         const available = Object.keys(agents).join(", ") || "(none)";
@@ -5957,7 +5957,7 @@ export function createMultiAgentOrchestrator(
     },
 
     approve(requestId: string): void {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       // O(1) lookup via reverse index
       const agentId = approvalRequestIndex.get(requestId);
@@ -5991,7 +5991,7 @@ export function createMultiAgentOrchestrator(
     },
 
     reject(requestId: string, reason?: string): void {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       // O(1) lookup via reverse index
       const agentId = approvalRequestIndex.get(requestId);
@@ -6035,7 +6035,7 @@ export function createMultiAgentOrchestrator(
     },
 
     pause(): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       globalStatus = "paused";
       if (debug) {
         console.debug("[Directive MultiAgent] Orchestrator paused");
@@ -6043,7 +6043,7 @@ export function createMultiAgentOrchestrator(
     },
 
     resume(): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       if (globalStatus === "paused") {
         globalStatus = "idle";
         if (debug) {
@@ -6138,7 +6138,7 @@ export function createMultiAgentOrchestrator(
     },
 
     registerAgent(agentId: string, registration: AgentRegistration): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       if (RESERVED_IDS.has(agentId)) {
         throw new Error(
           `[Directive MultiAgent] Agent ID "${agentId}" is reserved and cannot be used`,
@@ -6249,7 +6249,7 @@ export function createMultiAgentOrchestrator(
     },
 
     unregisterAgent(agentId: string): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       if (!agents[agentId]) {
         throw new Error(
           `[Directive MultiAgent] Agent "${agentId}" is not registered`,
@@ -6350,7 +6350,7 @@ export function createMultiAgentOrchestrator(
     },
 
     registerTask(taskId: string, registration: TaskRegistration): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       if (RESERVED_IDS.has(taskId)) {
         throw new Error(
           `[Directive MultiAgent] Task ID "${taskId}" is reserved and cannot be used`,
@@ -6427,7 +6427,7 @@ export function createMultiAgentOrchestrator(
     },
 
     unregisterTask(taskId: string): void {
-      assertNotDisposed();
+      assertNotDestroyed();
       if (!tasks[taskId]) {
         throw new Error(
           `[Directive MultiAgent] Task "${taskId}" is not registered`,
@@ -6498,7 +6498,7 @@ export function createMultiAgentOrchestrator(
     },
 
     reset() {
-      assertNotDisposed();
+      assertNotDestroyed();
       for (const agentId of Object.keys(agents)) {
         const maxConcurrent = agents[agentId]?.maxConcurrent ?? 1;
         agentStates[agentId] = {
@@ -6592,7 +6592,7 @@ export function createMultiAgentOrchestrator(
     // ---- Checkpoint Methods ----
 
     async checkpoint(opts?: { label?: string }): Promise<Checkpoint> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       // Ensure no agents or tasks are running
       for (const [id, s] of Object.entries(agentStates)) {
@@ -6663,7 +6663,7 @@ export function createMultiAgentOrchestrator(
     },
 
     restore(cp: Checkpoint, opts?: { restoreTimeline?: boolean }): void {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (!validateCheckpoint(cp)) {
         throw new Error("[Directive MultiAgent] Invalid checkpoint data");
@@ -6762,7 +6762,7 @@ export function createMultiAgentOrchestrator(
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
       opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
     ): MultiplexedStreamResult<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       const inputArray = Array.isArray(inputs)
         ? inputs
@@ -6879,7 +6879,7 @@ export function createMultiAgentOrchestrator(
         signal?: AbortSignal;
       },
     ): Promise<RaceResult<T>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       const pattern: RacePattern<T> = {
         type: "race",
@@ -6920,7 +6920,7 @@ export function createMultiAgentOrchestrator(
       history: ReflectIterationRecord[];
       exhausted: boolean;
     }> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       const pattern: ReflectPattern<T> = {
         type: "reflect",
@@ -6970,7 +6970,7 @@ export function createMultiAgentOrchestrator(
         timeout?: number;
       },
     ): Promise<DebateResult<T>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       return runDebateInternal<T>(
         {
@@ -7007,7 +7007,7 @@ export function createMultiAgentOrchestrator(
         checkpoint?: PatternCheckpointConfig;
       },
     ): Promise<GoalResult<T>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       return runGoalInternal<T>(
         {
@@ -7034,29 +7034,21 @@ export function createMultiAgentOrchestrator(
       checkpointState: GoalCheckpointState,
       pattern: GoalPattern<T>,
     ): Promise<GoalResult<T>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
         checkpointState.version !== 1 ||
-        (checkpointState.type !== "goal" &&
-          (checkpointState as unknown as Record<string, unknown>).type !==
-            "converge")
+        checkpointState.type !== "goal"
       ) {
         throw new Error("[Directive MultiAgent] Invalid goal checkpoint state");
       }
-      // Migration shim: accept legacy "converge" checkpoint states (shallow copy to avoid mutating input)
-      const normalizedState =
-        (checkpointState as unknown as Record<string, unknown>).type ===
-        "converge"
-          ? { ...checkpointState, type: "goal" as const }
-          : checkpointState;
 
       return runGoalInternal<T>(
         pattern,
         {}, // initialInput ignored when resumeFrom is provided
-        normalizedState.patternId,
-        normalizedState,
+        checkpointState.patternId,
+        checkpointState,
       );
     },
 
@@ -7064,7 +7056,7 @@ export function createMultiAgentOrchestrator(
       checkpointState: SequentialCheckpointState,
       pattern: SequentialPattern<T>,
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
@@ -7089,7 +7081,7 @@ export function createMultiAgentOrchestrator(
       pattern: SupervisorPattern<T>,
       options?: { input?: string },
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
@@ -7116,7 +7108,7 @@ export function createMultiAgentOrchestrator(
       pattern: ReflectPattern<T>,
       options?: { input?: string },
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
@@ -7142,7 +7134,7 @@ export function createMultiAgentOrchestrator(
       checkpointState: DebateCheckpointState,
       pattern: DebatePattern<T>,
     ): Promise<DebateResult<T>> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
@@ -7167,7 +7159,7 @@ export function createMultiAgentOrchestrator(
       pattern: DagPattern<T>,
       options?: { input?: string },
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (
         !checkpointState ||
@@ -7192,7 +7184,7 @@ export function createMultiAgentOrchestrator(
       pattern: ExecutionPattern,
       options?: { input?: string },
     ): Promise<T> {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (!checkpointStore) {
         throw new Error(
@@ -7229,7 +7221,6 @@ export function createMultiAgentOrchestrator(
           "debate",
           "dag",
           "goal",
-          "converge",
         ]);
         if (!validTypes.has(parsed.type)) {
           throw new Error(`Unknown checkpoint pattern type: ${parsed.type}`);
@@ -7316,7 +7307,7 @@ export function createMultiAgentOrchestrator(
       id: string,
       modifications?: BreakpointModifications,
     ): void {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (modifications) {
         breakpointModifications.set(id, modifications);
@@ -7354,7 +7345,7 @@ export function createMultiAgentOrchestrator(
     },
 
     cancelBreakpoint(id: string, reason?: string): void {
-      assertNotDisposed();
+      assertNotDestroyed();
 
       if (reason) {
         breakpointCancelReasons.set(id, reason);
@@ -7406,22 +7397,18 @@ export function createMultiAgentOrchestrator(
     },
 
     destroy() {
-      if (disposed) {
+      if (destroyed) {
         return;
       }
-      // Reset before marking as disposed (reset() calls assertNotDisposed())
+      // Reset before marking as destroyed (reset() calls assertNotDestroyed())
       orchestrator.reset();
       // Clear callback references to allow garbage collection
       scratchpadChangeCallbacks.clear();
       scratchpadKeyCallbacks.clear();
       derivedChangeCallbacks.clear();
       idleWaiters.clear();
-      disposed = true;
+      destroyed = true;
       system.destroy();
-    },
-
-    dispose() {
-      orchestrator.destroy();
     },
   };
 

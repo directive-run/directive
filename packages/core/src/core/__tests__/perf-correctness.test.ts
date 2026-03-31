@@ -28,7 +28,7 @@ function setupDerivations(
   const manager = createDerivationsManager({
     definitions: defs as any,
     facts: facts as any,
-    store: store as any,
+
   });
 
   return { store, facts, manager };
@@ -42,7 +42,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
   it("handles 200+ chained derivations without stack overflow", () => {
     const CHAIN_LENGTH = 200;
     const schema: Record<string, unknown> = { root: t.number() };
-    const { store, facts } = createFacts({ schema });
+    const { facts } = createFacts({ schema });
     (facts as Record<string, unknown>).root = 0;
 
     // Build a chain: d0 reads root, d1 reads d0, d2 reads d1, ..., d199 reads d198
@@ -56,7 +56,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
     const manager = createDerivationsManager({
       definitions: defs as any,
       facts: facts as any,
-      store: store as any,
+  
     });
 
     // Force computation of the entire chain (establishes dependency tracking)
@@ -124,7 +124,7 @@ describe("P0-1: iterative invalidateDerivation", () => {
   it("diamond invalidation via onInvalidate fires exactly once per node", () => {
     const onInvalidate = vi.fn();
     const schema = { count: t.number() };
-    const { store, facts } = createFacts({ schema });
+    const { facts } = createFacts({ schema });
     (facts as Record<string, unknown>).count = 0;
 
     const manager = createDerivationsManager({
@@ -134,7 +134,6 @@ describe("P0-1: iterative invalidateDerivation", () => {
         bottom: (_f: any, d: any) => (d.left ?? 0) + (d.right ?? 0),
       } as any,
       facts: facts as any,
-      store: store as any,
       onInvalidate,
     });
 

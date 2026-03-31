@@ -771,9 +771,4 @@ export interface MultiAgentOrchestrator {
   readonly scratchpad: Scratchpad | null;
   /** Destroy the orchestrator, resetting all state and releasing resources. */
   destroy(): void;
-  /**
-   * Dispose of the orchestrator, resetting all state.
-   * @deprecated Use destroy() instead.
-   */
-  dispose(): void;
 }

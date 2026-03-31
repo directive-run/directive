@@ -28,7 +28,7 @@
  * await queue.flush();
  *
  * // Clean up (flushes remaining calls)
- * await queue.dispose();
+ * await queue.destroy();
  * ```
  */
 
@@ -58,8 +58,8 @@ export interface BatchQueue {
   flush(): Promise<void>;
   /** Get the number of pending calls. */
   readonly pending: number;
-  /** Dispose the queue, flushing remaining calls. */
-  dispose(): Promise<void>;
+  /** Destroy the queue, flushing remaining calls. */
+  destroy(): Promise<void>;
 }
 
 // ============================================================================
@@ -97,7 +97,7 @@ interface QueuedCall {
  * ]);
  *
  * // Clean up
- * await queue.dispose();
+ * await queue.destroy();
  * ```
  */
 export function createBatchQueue(
@@ -125,7 +125,7 @@ export function createBatchQueue(
 
   const queue: QueuedCall[] = [];
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
-  let disposed = false;
+  let destroyed = false;
   let flushPromise: Promise<void> | null = null;
 
   function scheduleFlush(): void {
@@ -206,9 +206,9 @@ export function createBatchQueue(
       input: string,
       options?: RunOptions,
     ): Promise<RunResult<T>> {
-      if (disposed) {
+      if (destroyed) {
         return Promise.reject(
-          new Error("[Directive] BatchQueue has been disposed."),
+          new Error("[Directive] BatchQueue has been destroyed."),
         );
       }
 
@@ -241,11 +241,11 @@ export function createBatchQueue(
       return queue.length;
     },
 
-    async dispose(): Promise<void> {
-      if (disposed) {
+    async destroy(): Promise<void> {
+      if (destroyed) {
         return;
       }
-      disposed = true;
+      destroyed = true;
       cancelTimer();
       // Flush remaining calls
       if (queue.length > 0) {
