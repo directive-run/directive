@@ -1,5 +1,20 @@
 # @directive-run/vue
 
+## 0.8.7
+
+### Patch Changes
+
+- [`627b7a7`](https://github.com/directive-run/directive/commit/627b7a7349fe2be0f3aca5bc54127aafba4863e0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - SSR hydration for all adapters, query cache persistence, audit fixes
+
+  - core: Add `mergeHydrationFacts` shared utility, cache `wrapWithNestedWarning` proxies, wire resolver key to engine, ship observability from .lab, add `getInflightCount()`, consolidate `safeStringify`
+  - react: `useHydratedSystem` uses shared `mergeHydrationFacts`
+  - vue: Add `DirectiveHydrator` component + `useHydratedSystem` composable
+  - svelte: Add `setHydrationSnapshot` + `useHydratedSystem`
+  - solid: Add `DirectiveHydrator` + `useHydratedSystem`
+  - lit: Add `HydrationController` with lifecycle management
+  - ai: Split orchestrator (8.7K -> 7.4K LOC), rename `dispose()` to `destroy()`, enable bundle splitting (246KB -> 109KB), remove legacy shims
+  - query: Add `persistQueryCache` plugin for offline cache persistence
+
 ## 0.8.6
 
 ### Patch Changes
