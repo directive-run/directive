@@ -246,8 +246,10 @@ export function createDerivationsManager<
       // Update dependency tracking
       updateDependencies(id, deps);
 
-      // Notify callback
-      onCompute?.(id, value, oldValue, [...deps]);
+      // Notify callback (guard avoids [...deps] allocation when no listener)
+      if (onCompute) {
+        onCompute(id, value, oldValue, [...deps]);
+      }
 
       return value;
     } catch (error) {
