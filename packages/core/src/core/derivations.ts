@@ -99,6 +99,9 @@ export function createDerivationsManager<
 >(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D> {
   const { definitions, facts, onCompute, onInvalidate, onError } = options;
 
+  /** Consecutive identical dep sets before skipping withTracking() */
+  const STABLE_THRESHOLD = 3;
+
   // Internal state for each derivation
   const states = new Map<string, DerivationState<unknown>>();
   const listeners = new Map<string, Set<() => void>>();
@@ -254,7 +257,7 @@ export function createDerivationsManager<
         // Check dep stability
         if (state.dependencies.size > 0 && setsEqual(deps, state.dependencies)) {
           state.stableRunCount++;
-          if (state.stableRunCount >= 3) {
+          if (state.stableRunCount >= STABLE_THRESHOLD) {
             state.depsStable = true;
           }
         } else {
@@ -519,6 +522,8 @@ export function createDerivationsManager<
         for (const state of states.values()) {
           if (!state.isStale) {
             state.isStale = true;
+            state.depsStable = false;
+            state.stableRunCount = 0;
             pendingNotifications.add(state.id);
           }
         }
@@ -582,6 +587,8 @@ export function createDerivationsManager<
       const state = states.get(id);
       if (state) {
         state.isStale = true;
+        state.depsStable = false;
+        state.stableRunCount = 0;
         pendingNotifications.add(id);
       }
 
