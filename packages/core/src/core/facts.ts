@@ -622,6 +622,17 @@ export function createFactsProxy<S extends Schema>(
 
   const proxy = new Proxy({} as Facts<S>, {
     get(_, prop: string | symbol) {
+      // Fast path: symbols (React probes $$typeof, Symbol.toPrimitive, etc.)
+      if (typeof prop === "symbol") {
+        return undefined;
+      }
+
+      // Fast path: prototype pollution guard
+      if (BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
+
+      // Internal accessors (rare in hot loops)
       if (prop === "$store") {
         return store;
       }
@@ -629,16 +640,7 @@ export function createFactsProxy<S extends Schema>(
         return snapshot;
       }
 
-      // Special properties
-      if (typeof prop === "symbol") {
-        return undefined;
-      }
-
-      // Prototype pollution protection
-      if (BLOCKED_PROPS.has(prop)) {
-        return undefined;
-      }
-
+      // Happy path: read from store
       const value = store.get(prop as keyof InferSchema<S>);
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
