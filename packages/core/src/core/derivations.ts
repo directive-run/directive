@@ -203,6 +203,8 @@ export function createDerivationsManager<
       dependencies: new Set(),
       isStale: true,
       isComputing: false,
+      stableRunCount: 0,
+      depsStable: false,
     };
 
     states.set(id, state);
@@ -236,8 +238,29 @@ export function createDerivationsManager<
       // Capture old value before recomputation
       const oldValue = state.cachedValue;
 
-      // Compute with tracking
-      const { value, deps } = withTracking(() => def(facts, derivedProxy));
+      let value: unknown;
+      let deps: Set<string>;
+
+      if (state.depsStable && state.dependencies.size > 0) {
+        // Fast path: deps are stable — skip withTracking() overhead
+        value = def(facts, derivedProxy);
+        deps = state.dependencies;
+      } else {
+        // Full tracking path
+        const tracked = withTracking(() => def(facts, derivedProxy));
+        value = tracked.value;
+        deps = tracked.deps;
+
+        // Check dep stability
+        if (state.dependencies.size > 0 && setsEqual(deps, state.dependencies)) {
+          state.stableRunCount++;
+          if (state.stableRunCount >= 3) {
+            state.depsStable = true;
+          }
+        } else {
+          state.stableRunCount = 0;
+        }
+      }
 
       // Update state
       state.cachedValue = value;
@@ -371,6 +394,9 @@ export function createDerivationsManager<
       }
 
       state.isStale = true;
+      // Reset dep stability so next recompute re-tracks via withTracking()
+      state.depsStable = false;
+      state.stableRunCount = 0;
       onInvalidate?.(id);
 
       // Defer listener notification until all invalidations complete.
