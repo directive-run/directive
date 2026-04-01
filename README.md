@@ -3,7 +3,7 @@
 **The constraint-driven runtime for TypeScript.** Declare what must be true. The runtime makes it happen.
 
 [![npm](https://img.shields.io/npm/v/@directive-run/core)](https://www.npmjs.com/package/@directive-run/core)
-[![tests](https://img.shields.io/badge/tests-4%2C023-brightgreen)](#)
+[![tests](https://img.shields.io/badge/tests-4%2C037-brightgreen)](#)
 [![zero deps](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![license](https://img.shields.io/npm/l/@directive-run/core)](./LICENSE)
 
