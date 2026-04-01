@@ -106,69 +106,65 @@ describe("Fact Mutations – Batch", () => {
 // ============================================================================
 
 describe("Derivations", () => {
-  bench("simple derivation (1 fact)", () => {
-    const mod = createModule("bench", {
-      schema: {
-        facts: { count: t.number() },
-        derivations: { doubled: t.number() },
-        events: {},
-        requirements: {},
-      },
-      init: (f) => {
-        f.count = 5;
-      },
-      derive: {
-        doubled: (f) => (f.count as number) * 2,
-      },
-    });
-    const sys = createSystem({ module: mod });
-    sys.start();
-    void sys.read("doubled");
-    sys.destroy();
+  // Pre-create systems — measure derivation read, not system creation
+  const simpleMod = createModule("bench-d1", {
+    schema: {
+      facts: { count: t.number() },
+      derivations: { doubled: t.number() },
+      events: {},
+      requirements: {},
+    },
+    init: (f) => { f.count = 5; },
+    derive: { doubled: (f) => (f.count as number) * 2 },
+  });
+  const simpleSys = createSystem({ module: simpleMod });
+  simpleSys.start();
+
+  bench("simple derivation (read after invalidate)", () => {
+    simpleSys.facts.count = (simpleSys.facts.count as number) + 1;
+    void simpleSys.read("doubled");
   });
 
-  bench("10 chained derivations", () => {
-    const derive = buildDerivations(10);
-    const mod = createModule("bench", {
-      schema: {
-        facts: { f0: { _type: 0 as unknown } },
-        derivations: Object.fromEntries(
-          Object.keys(derive).map((k) => [k, { _type: 0 as unknown }]),
-        ),
-        events: {},
-        requirements: {},
-      },
-      init: (f) => {
-        f.f0 = 1;
-      },
-      derive,
-    });
-    const sys = createSystem({ module: mod });
-    sys.start();
-    void sys.read("d9");
-    sys.destroy();
+  const derive10 = buildDerivations(10);
+  const mod10 = createModule("bench-d10", {
+    schema: {
+      facts: { f0: { _type: 0 as unknown } },
+      derivations: Object.fromEntries(
+        Object.keys(derive10).map((k) => [k, { _type: 0 as unknown }]),
+      ),
+      events: {},
+      requirements: {},
+    },
+    init: (f) => { f.f0 = 1; },
+    derive: derive10,
+  });
+  const sys10 = createSystem({ module: mod10 });
+  sys10.start();
+
+  bench("10 chained derivations (read after invalidate)", () => {
+    sys10.facts.f0 = (sys10.facts.f0 as number) + 1;
+    void sys10.read("d9");
   });
 
-  bench("50 chained derivations", () => {
-    const derive = buildDerivations(50);
-    const mod = createModule("bench", {
-      schema: {
-        facts: { f0: { _type: 0 as unknown } },
-        derivations: Object.fromEntries(
-          Object.keys(derive).map((k) => [k, { _type: 0 as unknown }]),
-        ),
-        events: {},
-        requirements: {},
-      },
-      init: (f) => {
-        f.f0 = 1;
-      },
-      derive,
-    });
-    const sys = createSystem({ module: mod });
-    sys.start();
-    void sys.read("d49");
-    sys.destroy();
+  const derive50 = buildDerivations(50);
+  const mod50 = createModule("bench-d50", {
+    schema: {
+      facts: { f0: { _type: 0 as unknown } },
+      derivations: Object.fromEntries(
+        Object.keys(derive50).map((k) => [k, { _type: 0 as unknown }]),
+      ),
+      events: {},
+      requirements: {},
+    },
+    init: (f) => { f.f0 = 1; },
+    derive: derive50,
+  });
+  const sys50 = createSystem({ module: mod50 });
+  sys50.start();
+
+  bench("50 chained derivations (read after invalidate)", () => {
+    sys50.facts.f0 = (sys50.facts.f0 as number) + 1;
+    void sys50.read("d49");
   });
 });
 
