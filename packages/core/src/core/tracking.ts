@@ -124,7 +124,12 @@ export function withoutTracking<T>(fn: () => T): T {
  * @internal
  */
 export function trackAccess(key: string): void {
-  getCurrentTracker().track(key);
+  // Fast path: skip when no tracking context is active (99% of calls)
+  const len = trackingStack.length;
+  if (len === 0) {
+    return;
+  }
+  trackingStack[len - 1]!.track(key);
 }
 
 /**
