@@ -661,10 +661,8 @@ export function createEngine<S extends Schema>(
       state.changedKeys.clear();
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
-      // Use sync path when no async constraints exist to avoid Promise overhead
-      const currentRequirements = constraintsManager.hasAsyncConstraints
-        ? await constraintsManager.evaluate(keysForConstraints)
-        : constraintsManager.evaluateSync(keysForConstraints);
+      const currentRequirements =
+        await constraintsManager.evaluate(keysForConstraints);
       const currentSet = new RequirementSet();
       for (const req of currentRequirements) {
         currentSet.add(req);
