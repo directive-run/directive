@@ -1294,7 +1294,7 @@ export function createEngine<S extends Schema>(
       if (resolversManager.hasPendingBatches()) {
         resolversManager.processBatches();
       }
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
 
       if (isSettled()) {
         return;
@@ -1346,12 +1346,12 @@ export function createEngine<S extends Schema>(
             resolversManager.processBatches();
           }
           // Yield a microtask to let pending reconciles complete
-          setTimeout(() => {
+          queueMicrotask(() => {
             if (!done && isSettled()) {
               cleanup();
               resolve();
             }
-          }, 0);
+          });
         });
       });
     },
