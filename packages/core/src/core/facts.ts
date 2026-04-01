@@ -18,6 +18,12 @@ import type {
   Schema,
 } from "./types.js";
 
+/** Hoisted dev-mode flag — avoids per-access process.env check in proxy get trap */
+const __DEV__ =
+  typeof process !== "undefined"
+    ? process.env.NODE_ENV !== "production"
+    : true;
+
 /** Safely stringify a value for error messages */
 function safeStringify(value: unknown, maxLength = 100): string {
   try {
@@ -637,7 +643,7 @@ export function createFactsProxy<S extends Schema>(
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
       if (
-        process.env.NODE_ENV !== "production" &&
+        __DEV__ &&
         value !== null &&
         typeof value === "object"
       ) {
