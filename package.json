@@ -8,6 +8,7 @@
     "dev": "pnpm -r dev",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
+    "bench": "vitest bench",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "pnpm -r typecheck",
