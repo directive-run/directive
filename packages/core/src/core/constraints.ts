@@ -53,6 +53,13 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]>;
   /**
+   * Synchronous evaluation — only valid when `hasAsyncConstraints` is false.
+   * Avoids Promise/await overhead for systems with all-sync constraints.
+   */
+  evaluateSync(changedKeys?: Set<string>): RequirementWithId[];
+  /** True if any registered constraint has `async: true` */
+  hasAsyncConstraints: boolean;
+  /**
    * Get the current state of a constraint by its definition ID.
    *
    * @param id - The constraint definition ID.
@@ -1096,33 +1103,74 @@ export function createConstraintsManager<S extends Schema>(
     }
   }
 
+  // Track if any async constraints exist
+  let _hasAsyncConstraints = Object.values(definitions).some(
+    (d: Record<string, unknown>) => d.async === true,
+  );
+
+  /** Sync-only constraint batch evaluation (no async constraints allowed) */
+  function evaluateConstraintBatchSync(
+    constraintIds: string[],
+    requirements: RequirementSet,
+  ): string[] {
+    const { blocked, ready } = partitionByReadiness(constraintIds, requirements);
+    if (ready.length === 0) {
+      return blocked;
+    }
+    evaluateSyncBatch(ready, requirements);
+
+    return blocked;
+  }
+
+  /** Core evaluation logic shared by sync and async paths */
+  function evaluateCore(changedKeys?: Set<string>): {
+    constraintsToEvaluate: string[];
+    requirements: RequirementSet;
+    allConstraintIds: string[];
+  } {
+    const requirements = new RequirementSet();
+    noFireConstraints.clear();
+
+    const allConstraintIds = getSortedConstraintIds().filter(
+      (id) => !disabled.has(id),
+    );
+
+    let constraintsToEvaluate: string[];
+    if (!hasEvaluated || !changedKeys || changedKeys.size === 0) {
+      constraintsToEvaluate = allConstraintIds;
+      hasEvaluated = true;
+    } else {
+      const affected = computeAffectedConstraints(changedKeys);
+      constraintsToEvaluate = [...affected];
+      carryForwardRequirements(allConstraintIds, affected, requirements);
+    }
+
+    return { constraintsToEvaluate, requirements, allConstraintIds };
+  }
+
   const manager: ConstraintsManager<S> = {
-    async evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]> {
-      const requirements = new RequirementSet();
+    hasAsyncConstraints: _hasAsyncConstraints,
 
-      // Note: resolvedConstraints persists across reconcile cycles intentionally.
-      // `after` ordering means "wait until dependency's resolver has completed",
-      // and that completion happens in a different cycle than the evaluation.
-      // noFireConstraints is re-populated during each evaluation pass.
-      noFireConstraints.clear();
+    evaluateSync(changedKeys?: Set<string>): RequirementWithId[] {
+      const { constraintsToEvaluate, requirements } = evaluateCore(changedKeys);
 
-      // Get all enabled constraints (use cached sort order)
-      const allConstraintIds = getSortedConstraintIds().filter(
-        (id) => !disabled.has(id),
-      );
+      let remaining = constraintsToEvaluate;
+      let maxPasses = constraintsToEvaluate.length + 1;
 
-      // Determine which constraints to evaluate
-      let constraintsToEvaluate: string[];
-
-      if (!hasEvaluated || !changedKeys || changedKeys.size === 0) {
-        // First evaluation or no specific changes: evaluate all
-        constraintsToEvaluate = allConstraintIds;
-        hasEvaluated = true;
-      } else {
-        const affected = computeAffectedConstraints(changedKeys);
-        constraintsToEvaluate = [...affected];
-        carryForwardRequirements(allConstraintIds, affected, requirements);
+      while (remaining.length > 0 && maxPasses > 0) {
+        const prev = remaining.length;
+        remaining = evaluateConstraintBatchSync(remaining, requirements);
+        if (remaining.length === prev) {
+          break;
+        }
+        maxPasses--;
       }
+
+      return requirements.all();
+    },
+
+    async evaluate(changedKeys?: Set<string>): Promise<RequirementWithId[]> {
+      const { constraintsToEvaluate, requirements } = evaluateCore(changedKeys);
 
       // Evaluate constraints in passes until no blocked constraints become unblocked
       let remainingToEvaluate = constraintsToEvaluate;
