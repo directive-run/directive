@@ -277,6 +277,75 @@ describe("Constraints", () => {
 });
 
 // ============================================================================
+// 3b. Sync vs Async Resolvers
+// ============================================================================
+
+describe("Sync vs Async Resolvers", () => {
+  bench("sync resolver (no Promise)", async () => {
+    const mod = createModule("bench", {
+      schema: {
+        facts: { ready: t.boolean(), result: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { DO_IT: {} },
+      },
+      init: (f) => { f.ready = false; f.result = ""; },
+      constraints: {
+        go: {
+          when: (f) => f.ready === true && f.result === "",
+          require: { type: "DO_IT" },
+        },
+      },
+      resolvers: {
+        doIt: {
+          requirement: "DO_IT",
+          // Sync resolver — returns undefined, not a Promise
+          resolve: (_req: unknown, ctx: { facts: Record<string, unknown> }) => {
+            ctx.facts.result = "done";
+          },
+        },
+      },
+    });
+    const sys = createSystem({ module: mod });
+    sys.start();
+    sys.facts.ready = true;
+    await sys.settle(1000);
+    sys.destroy();
+  });
+
+  bench("async resolver (returns Promise)", async () => {
+    const mod = createModule("bench", {
+      schema: {
+        facts: { ready: t.boolean(), result: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { DO_IT: {} },
+      },
+      init: (f) => { f.ready = false; f.result = ""; },
+      constraints: {
+        go: {
+          when: (f) => f.ready === true && f.result === "",
+          require: { type: "DO_IT" },
+        },
+      },
+      resolvers: {
+        doIt: {
+          requirement: "DO_IT",
+          resolve: async (_req, ctx) => {
+            ctx.facts.result = "done";
+          },
+        },
+      },
+    });
+    const sys = createSystem({ module: mod });
+    sys.start();
+    sys.facts.ready = true;
+    await sys.settle(1000);
+    sys.destroy();
+  });
+});
+
+// ============================================================================
 // 4. Full Reconciliation Cycle
 // ============================================================================
 
