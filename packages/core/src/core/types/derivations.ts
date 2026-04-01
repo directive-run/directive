@@ -76,4 +76,8 @@ export interface DerivationState<T> {
   dependencies: Set<string>;
   isStale: boolean;
   isComputing: boolean;
+  /** Consecutive runs producing the same deps (auto-tracked only) */
+  stableRunCount: number;
+  /** Once true, skip withTracking() overhead until a tracked fact mutates */
+  depsStable: boolean;
 }
