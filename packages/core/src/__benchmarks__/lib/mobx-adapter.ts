@@ -1,4 +1,4 @@
-import { makeAutoObservable, computed } from "mobx";
+import { makeAutoObservable } from "mobx";
 import type { BenchAdapter } from "./types";
 
 class CounterStore {
