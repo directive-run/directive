@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/claude-plugin",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "private": true,
   "description": "Claude Code plugin for Directive — coding guidance via skills.",
   "license": "(MIT OR Apache-2.0)",
