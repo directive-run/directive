@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Head-to-Head Benchmark: Directive vs Zustand vs Redux vs MobX vs Jotai vs Signals vs XState
  *

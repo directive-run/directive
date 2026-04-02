@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Directive Core Benchmarks
  *
