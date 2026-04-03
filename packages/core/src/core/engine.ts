@@ -654,11 +654,9 @@ export function createEngine<S extends Schema>(
       // Run effects for changed keys
       await effectsManager.runEffects(state.changedKeys);
 
-      // Copy changed keys for constraint evaluation before clearing
-      const keysForConstraints = new Set(state.changedKeys);
-
-      // Clear changed keys
-      state.changedKeys.clear();
+      // Swap changed keys — avoids copying the Set
+      const keysForConstraints = state.changedKeys;
+      state.changedKeys = new Set();
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
       const currentRequirements =
