@@ -198,6 +198,7 @@ export function createPluginManager<
   // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
   function broadcast<K extends keyof Plugin<any>>(hook: K) {
     return (...args: unknown[]) => {
+      if (plugins.length === 0) return;
       for (const plugin of plugins) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
         safeCall(() => (plugin as any)[hook]?.(...args));
