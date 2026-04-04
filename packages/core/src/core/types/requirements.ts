@@ -3,6 +3,7 @@
  */
 
 import type { Facts } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type { Schema, SchemaType } from "./schema.js";
 
 // ============================================================================
@@ -121,6 +122,8 @@ export interface ConstraintDef<
    * bypass auto-tracking overhead.
    */
   deps?: string[];
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /** Map of constraint definitions (generic) */

@@ -115,6 +115,7 @@ describe("prefixModuleDefinition", () => {
         "hooks",
         "id",
         "init",
+        "meta",
         "requirements",
         "resolvers",
         "schema",
@@ -288,7 +289,7 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "m::count": 5 };
       const flatDerive = {};
-      const value = result.derive!["m::doubled"]!(flatFacts, flatDerive);
+      const value = (result.derive!["m::doubled"] as Function)(flatFacts, flatDerive);
 
       expect(value).toBe(10);
     });
@@ -307,7 +308,7 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "z::count": 3 };
       const flatDerive = { "z::doubled": 6 };
-      const value = result.derive!["z::label"]!(flatFacts, flatDerive);
+      const value = (result.derive!["z::label"] as Function)(flatFacts, flatDerive);
 
       expect(value).toBe("6-label");
     });
@@ -328,7 +329,7 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "m::count": 7, "other::token": "abc" };
       const flatDerive = {};
-      const value = result.derive!["m::doubled"]!(flatFacts, flatDerive);
+      const value = (result.derive!["m::doubled"] as Function)(flatFacts, flatDerive);
 
       expect(value).toBe(14);
     });
@@ -348,7 +349,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const flatFacts = { "m::count": 1, "other::token": "xyz" };
-      const value = result.derive!["m::label"]!(flatFacts, {});
+      const value = (result.derive!["m::label"] as Function)(flatFacts, {});
 
       expect(value).toBe("token:xyz");
     });
@@ -1247,7 +1248,7 @@ describe("prefixModuleDefinition", () => {
         makeOptions({ mod, namespace: "m" }),
       );
 
-      result.derive!["m::doubled"]!({ "m::count": 8 }, {});
+      (result.derive!["m::doubled"] as Function)({ "m::count": 8 }, {});
 
       expect(readSelf).toBe(8);
     });
@@ -1273,7 +1274,7 @@ describe("prefixModuleDefinition", () => {
         makeOptions({ mod, namespace: "m" }),
       );
 
-      result.derive!["m::doubled"]!(
+      (result.derive!["m::doubled"] as Function)(
         { "m::count": 4, "other::token": "tok" },
         {},
       );
@@ -1300,7 +1301,7 @@ describe("prefixModuleDefinition", () => {
         makeOptions({ mod, namespace: "m" }),
       );
 
-      result.derive!["m::doubled"]!({ "m::count": 3 }, {});
+      (result.derive!["m::doubled"] as Function)({ "m::count": 3 }, {});
 
       expect(readCount).toBe(3);
     });

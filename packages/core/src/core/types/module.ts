@@ -9,6 +9,7 @@ import type {
 import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { Facts, FactsSnapshot } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -81,7 +82,9 @@ export type TypedDerivationFn<
  * Each derivation key must match schema.derivations and return the declared type.
  */
 export type TypedDerivationsDef<M extends ModuleSchema> = {
-  [K in keyof GetDerivationsSchema<M>]: TypedDerivationFn<M, K>;
+  [K in keyof GetDerivationsSchema<M>]:
+    | TypedDerivationFn<M, K>
+    | { compute: TypedDerivationFn<M, K>; meta?: DefinitionMeta };
 };
 
 // ============================================================================
@@ -149,6 +152,8 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
    * Required for async constraints to enable dependency tracking.
    */
   deps?: string[];
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /**
@@ -205,6 +210,8 @@ export interface CrossModuleConstraintDef<
    * Required for async constraints to enable dependency tracking.
    */
   deps?: string[];
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /**
@@ -235,6 +242,8 @@ export interface CrossModuleEffectDef<
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional dependency keys to filter when effect runs */
   deps?: string[];
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /**
@@ -269,7 +278,9 @@ export type CrossModuleDerivationsDef<
   M extends ModuleSchema,
   Deps extends CrossModuleDeps,
 > = {
-  [K in keyof GetDerivationsSchema<M>]: CrossModuleDerivationFn<M, Deps, K>;
+  [K in keyof GetDerivationsSchema<M>]:
+    | CrossModuleDerivationFn<M, Deps, K>
+    | { compute: CrossModuleDerivationFn<M, Deps, K>; meta?: DefinitionMeta };
 };
 
 // ============================================================================
@@ -328,6 +339,8 @@ export interface TypedResolverDef<
     reqs: ExtractRequirement<M, T>[],
     ctx: TypedResolverContext<M>,
   ) => Promise<BatchResolveResults>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /**
@@ -365,6 +378,8 @@ export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
   constraints?: TypedConstraintsDef<M>;
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
   /**
    * History configuration for this module.
    * Controls which events create snapshots for undo/redo.

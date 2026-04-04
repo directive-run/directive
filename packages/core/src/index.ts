@@ -53,6 +53,7 @@ export type {
   SystemConfig,
   SystemInspection,
   SystemSnapshot,
+  MetaAccessor,
   // Trace
   TraceEntry,
   TraceOption,
@@ -76,6 +77,9 @@ export type {
   DynamicConstraintDef,
   DynamicEffectDef,
   DynamicResolverDef,
+  // Definition Meta
+  DefinitionMeta,
+  DerivationDefWithMeta,
   // Distributable Snapshots
   DistributableSnapshot,
   DistributableSnapshotOptions,

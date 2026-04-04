@@ -39,6 +39,7 @@ import type {
   EffectsControl,
   HistoryAPI,
   HistoryOption,
+  MetaAccessor,
   ResolversControl,
   SystemInspection,
   SystemSnapshot,
@@ -282,6 +283,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly effects: EffectsControl;
   /** Runtime control for resolvers (dynamic CRUD) */
   readonly resolvers: ResolversControl;
+  /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
+  readonly meta: MetaAccessor;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
@@ -652,6 +655,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly effects: EffectsControl<S>;
   /** Runtime control for resolvers (register/assign/unregister/call) */
   readonly resolvers: ResolversControl<S>;
+  /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
+  readonly meta: MetaAccessor;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 

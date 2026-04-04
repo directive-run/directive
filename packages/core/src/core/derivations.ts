@@ -14,9 +14,11 @@ import type {
   DerivationState,
   DerivationsDef,
   DerivedValues,
+  DefinitionMeta,
   Facts,
   Schema,
 } from "./types.js";
+import { freezeMeta, isDerivationWithMeta } from "./types/meta.js";
 
 // ============================================================================
 // Derivations Manager
@@ -53,6 +55,8 @@ export interface DerivationsManager<
   unregisterDefinition(id: string): void;
   /** Compute a derivation immediately (ignores cache) */
   callOne(id: string): unknown;
+  /** Get metadata for a derivation (if provided via object form) */
+  getMeta(id: string): DefinitionMeta | undefined;
 }
 
 /** Options for creating a derivations manager */
@@ -101,6 +105,21 @@ export function createDerivationsManager<
 
   /** Consecutive identical dep sets before skipping withTracking() */
   const STABLE_THRESHOLD = 3;
+
+  // Meta storage for derivations using object form { compute, meta }
+  const derivationMeta = new Map<string, DefinitionMeta>();
+
+  // Unwrap any { compute, meta } object-form definitions at construction time.
+  // After this, definitions[id] is always a bare function.
+  for (const [key, raw] of Object.entries(definitions)) {
+    if (isDerivationWithMeta(raw)) {
+      (definitions as Record<string, unknown>)[key] = raw.compute;
+      const frozen = freezeMeta(raw.meta);
+      if (frozen) {
+        derivationMeta.set(key, frozen);
+      }
+    }
+  }
 
   // Internal state for each derivation
   const states = new Map<string, DerivationState<unknown>>();
@@ -190,6 +209,7 @@ export function createDerivationsManager<
     states.delete(id);
     listeners.delete(id);
     pendingNotifications.delete(id);
+    derivationMeta.delete(id);
   }
 
   /** Initialize state for a derivation */
@@ -564,8 +584,16 @@ export function createDerivationsManager<
     },
 
     registerDefinitions(newDefs: DerivationsDef<S>): void {
-      for (const [key, fn] of Object.entries(newDefs)) {
-        (definitions as Record<string, unknown>)[key] = fn;
+      for (const [key, raw] of Object.entries(newDefs)) {
+        if (isDerivationWithMeta(raw)) {
+          (definitions as Record<string, unknown>)[key] = raw.compute;
+          const frozen = freezeMeta(raw.meta);
+          if (frozen) {
+            derivationMeta.set(key, frozen);
+          }
+        } else {
+          (definitions as Record<string, unknown>)[key] = raw;
+        }
         initState(key);
       }
     },
@@ -580,8 +608,18 @@ export function createDerivationsManager<
         );
       }
 
-      // Replace definition
-      (definitions as Record<string, unknown>)[id] = fn;
+      // Unwrap object form if needed
+      if (isDerivationWithMeta(fn)) {
+        (definitions as Record<string, unknown>)[id] = fn.compute;
+        const frozen = freezeMeta(fn.meta);
+        if (frozen) {
+          derivationMeta.set(id, frozen);
+        } else {
+          derivationMeta.delete(id);
+        }
+      } else {
+        (definitions as Record<string, unknown>)[id] = fn;
+      }
 
       // Mark stale so it recomputes with the new function
       const state = states.get(id);
@@ -603,8 +641,13 @@ export function createDerivationsManager<
       removeOwnDepLinks(id);
       invalidateDependentsOf(id);
       purgeFromMaps(id);
+      derivationMeta.delete(id);
 
       flushNotifications();
+    },
+
+    getMeta(id: string): DefinitionMeta | undefined {
+      return derivationMeta.get(id);
     },
 
     callOne(id: string): unknown {

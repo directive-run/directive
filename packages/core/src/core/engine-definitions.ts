@@ -21,6 +21,7 @@ import type {
   ResolversDef,
   Schema,
 } from "./types.js";
+import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 
 // ============================================================================
 // Types
@@ -338,6 +339,15 @@ export function createDefinitionsRegistry<S extends Schema>(
       );
     }
 
+    // Freeze meta on non-derivation definitions (derivations freeze in their manager)
+    if (type !== "derivation") {
+      const d = def as { meta?: unknown };
+      if (d.meta)
+        d.meta = freezeMeta(
+          d.meta as DefinitionMeta,
+        )!;
+    }
+
     desc.mergedMap[id] = def;
     desc.manager.registerDefinitions({ [id]: def });
     desc.dynamicSet.add(id);
@@ -361,6 +371,15 @@ export function createDefinitionsRegistry<S extends Schema>(
       throw new Error(
         `[Directive] ${desc.label} "${id}" does not exist. Use register() to create it.`,
       );
+    }
+
+    // Freeze meta on non-derivation definitions (derivations freeze in their manager)
+    if (type !== "derivation") {
+      const d = def as { meta?: unknown };
+      if (d.meta)
+        d.meta = freezeMeta(
+          d.meta as DefinitionMeta,
+        )!;
     }
 
     const original = desc.mergedMap[id];

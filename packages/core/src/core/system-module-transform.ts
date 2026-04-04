@@ -15,6 +15,7 @@ import {
   createModuleFactsProxy,
 } from "./system-proxies.js";
 import type { ModuleDef, ModuleSchema } from "./types.js";
+import { isDerivationWithMeta } from "./types/meta.js";
 
 /**
  * The flat engine module format produced by prefixModuleDefinition.
@@ -27,14 +28,13 @@ export interface FlatModuleDefinition {
   schema: Record<string, unknown>;
   requirements: Record<string, unknown>;
   init: ((facts: Record<string, unknown>) => void) | undefined;
-  derive:
-    | Record<string, (facts: unknown, derive: unknown) => unknown>
-    | undefined;
+  derive: Record<string, unknown> | undefined;
   events: Record<string, (facts: unknown, event: unknown) => void> | undefined;
   effects: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
   resolvers: Record<string, unknown> | undefined;
   hooks: ModuleDef<ModuleSchema>["hooks"];
+  meta?: ModuleDef<ModuleSchema>["meta"];
   history: { snapshotEvents?: string[] };
 }
 
@@ -115,15 +115,18 @@ function prefixDerive(
   namespace: string,
   hasCrossModuleDeps: boolean,
   depNamespaces: string[],
-): Record<string, (facts: unknown, derive: unknown) => unknown> | undefined {
+): Record<string, unknown> | undefined {
   if (!mod.derive) {
     return undefined;
   }
 
-  const result: Record<string, (facts: unknown, derive: unknown) => unknown> =
-    {};
-  for (const [key, fn] of Object.entries(mod.derive)) {
-    result[prefixKey(namespace, key)] = (facts: unknown, derive: unknown) => {
+  const result: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(mod.derive)) {
+    const isObj = isDerivationWithMeta(raw);
+    const fn = isObj ? raw.compute : raw;
+    const meta = isObj ? raw.meta : undefined;
+
+    const wrapper = (facts: unknown, derive: unknown) => {
       const factsProxy = createScopedFactsProxy(
         facts as Record<string, unknown>,
         namespace,
@@ -137,6 +140,11 @@ function prefixDerive(
       // biome-ignore lint/suspicious/noExplicitAny: Derive function type coercion
       return (fn as any)(factsProxy, deriveProxy);
     };
+
+    // Pass through as { compute, meta } so derivationsManager can unwrap
+    result[prefixKey(namespace, key)] = meta
+      ? { compute: wrapper, meta }
+      : wrapper;
   }
 
   return nonEmpty(result);
@@ -413,6 +421,7 @@ export function prefixModuleDefinition(
       depNamespaces,
     ),
     hooks: mod.hooks,
+    meta: mod.meta,
     history: prefixHistory(mod, namespace, snapshotModulesSet),
   };
 }

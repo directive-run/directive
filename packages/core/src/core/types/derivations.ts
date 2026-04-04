@@ -3,6 +3,7 @@
  */
 
 import type { Facts } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type { InferDerivations, ModuleSchema, Schema } from "./schema.js";
 
 // ============================================================================
@@ -29,7 +30,37 @@ export interface DerivationDef<
   (facts: Facts<S>, derived: DerivedValues<S, D>): T;
 }
 
-/** Map of derivation definitions. */
+/**
+ * Derivation definition with metadata (object form).
+ * Use this when you want to attach debugging metadata to a derivation.
+ *
+ * @example
+ * ```typescript
+ * derive: {
+ *   displayName: {
+ *     compute: (facts) => `${facts.firstName} ${facts.lastName}`,
+ *     meta: { label: "Display Name", description: "Full name for UI" },
+ *   },
+ * },
+ * ```
+ */
+export interface DerivationDefWithMeta<
+  S extends Schema,
+  T,
+  D extends DerivationsDef<S>,
+> {
+  compute: DerivationDef<S, T, D>;
+  meta?: DefinitionMeta;
+}
+
+/** Derivation definition: function form or object form with meta. */
+export type DerivationDefOrMeta<
+  S extends Schema,
+  T,
+  D extends DerivationsDef<S>,
+> = DerivationDef<S, T, D> | DerivationDefWithMeta<S, T, D>;
+
+/** Map of derivation definitions (internal — always bare functions after unwrap). */
 export type DerivationsDef<S extends Schema> = Record<
   string,
   DerivationDef<S, unknown, DerivationsDef<S>>

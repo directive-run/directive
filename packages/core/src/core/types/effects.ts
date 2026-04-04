@@ -3,6 +3,7 @@
  */
 
 import type { Facts } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type { InferSchema, Schema } from "./schema.js";
 
 // ============================================================================
@@ -73,6 +74,8 @@ export interface EffectDef<S extends Schema> {
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional explicit dependencies for optimization */
   deps?: Array<keyof InferSchema<S>>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /** Map of effect definitions */
