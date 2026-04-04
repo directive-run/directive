@@ -397,7 +397,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const flatStore: Record<string, unknown> = { "ev::count": 10 };
-      result.events!["ev::increment"]!(flatStore, {});
+      (result.events!["ev::increment"] as Function)(flatStore, {});
 
       expect(flatStore["ev::count"]).toBe(11);
     });
@@ -418,7 +418,7 @@ describe("prefixModuleDefinition", () => {
       );
 
       const payload = { name: "test" };
-      result.events!["ev::setName"]!({}, payload);
+      (result.events!["ev::setName"] as Function)({}, payload);
 
       expect(receivedPayload).toBe(payload);
     });

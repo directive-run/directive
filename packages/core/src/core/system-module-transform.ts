@@ -29,7 +29,7 @@ export interface FlatModuleDefinition {
   requirements: Record<string, unknown>;
   init: ((facts: Record<string, unknown>) => void) | undefined;
   derive: Record<string, unknown> | undefined;
-  events: Record<string, (facts: unknown, event: unknown) => void> | undefined;
+  events: Record<string, unknown> | undefined;
   effects: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
   resolvers: Record<string, unknown> | undefined;
@@ -154,14 +154,24 @@ function prefixDerive(
 function prefixEventHandlers(
   mod: ModuleDef<ModuleSchema>,
   namespace: string,
-): Record<string, (facts: unknown, event: unknown) => void> | undefined {
+): Record<string, unknown> | undefined {
   if (!mod.events) {
     return undefined;
   }
 
-  const result: Record<string, (facts: unknown, event: unknown) => void> = {};
-  for (const [key, handler] of Object.entries(mod.events)) {
-    result[prefixKey(namespace, key)] = (facts: unknown, event: unknown) => {
+  const result: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(mod.events)) {
+    // Unwrap { handler, meta } form
+    const isObj =
+      typeof raw === "object" && raw !== null && "handler" in raw;
+    const handler = isObj
+      ? (raw as { handler: Function }).handler
+      : raw;
+    const meta = isObj
+      ? (raw as { meta?: unknown }).meta
+      : undefined;
+
+    const wrapper = (facts: unknown, event: unknown) => {
       const moduleFactsProxy = createModuleFactsProxy(
         facts as Record<string, unknown>,
         namespace,
@@ -169,6 +179,11 @@ function prefixEventHandlers(
       // biome-ignore lint/suspicious/noExplicitAny: Event handler type coercion
       (handler as any)(moduleFactsProxy, event);
     };
+
+    // Pass through as { handler, meta } so engine can extract meta
+    result[prefixKey(namespace, key)] = meta
+      ? { handler: wrapper, meta }
+      : wrapper;
   }
 
   return nonEmpty(result);

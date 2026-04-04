@@ -892,6 +892,132 @@ describe("DefinitionMeta", () => {
   });
 
   // ============================================================================
+  // Event meta
+  // ============================================================================
+
+  describe("event meta", () => {
+    it("event meta accessible via system.meta.event()", () => {
+      const mod = createModule("ev-meta", {
+        schema: {
+          facts: { count: t.number() },
+          derivations: {},
+          requirements: {},
+          events: { increment: {} },
+        },
+        init: (f) => {
+          f.count = 0;
+        },
+        events: {
+          increment: {
+            handler: (facts) => {
+              facts.count += 1;
+            },
+            meta: { label: "Increment Counter", category: "ui" },
+          },
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      expect(sys.meta.event("increment")?.label).toBe("Increment Counter");
+      expect(sys.meta.event("increment")?.category).toBe("ui");
+      expect(sys.meta.event("nonexistent")).toBeUndefined();
+
+      sys.destroy();
+    });
+
+    it("event meta flows through inspect()", () => {
+      const mod = createModule("ev-inspect", {
+        schema: {
+          facts: { x: t.number() },
+          derivations: {},
+          requirements: {},
+          events: { doIt: {}, plain: {} },
+        },
+        init: (f) => {
+          f.x = 0;
+        },
+        events: {
+          doIt: {
+            handler: (facts) => {
+              facts.x = 1;
+            },
+            meta: { label: "Do It" },
+          },
+          plain: (facts) => {
+            facts.x = 2;
+          },
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      const inspection = sys.inspect();
+      const doIt = inspection.events.find((e) => e.name === "doIt");
+      const plain = inspection.events.find((e) => e.name === "plain");
+
+      expect(doIt?.meta?.label).toBe("Do It");
+      expect(plain?.meta).toBeUndefined();
+
+      sys.destroy();
+    });
+
+    it("function-form events still work (backward compat)", () => {
+      const mod = createModule("ev-compat", {
+        schema: {
+          facts: { count: t.number() },
+          derivations: {},
+          requirements: {},
+          events: { inc: {} },
+        },
+        init: (f) => {
+          f.count = 0;
+        },
+        events: {
+          inc: (facts) => {
+            facts.count += 1;
+          },
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      sys.events.inc();
+      expect(sys.facts.count).toBe(1);
+
+      sys.destroy();
+    });
+
+    it("event meta works in namespaced systems", () => {
+      const mod = createModule("ns-ev", {
+        schema: {
+          facts: { x: t.number() },
+          derivations: {},
+          requirements: {},
+          events: { go: {} },
+        },
+        init: (f) => {
+          f.x = 0;
+        },
+        events: {
+          go: {
+            handler: (facts) => {
+              facts.x = 1;
+            },
+            meta: { label: "Go Event" },
+          },
+        },
+      });
+      const sys = createSystem({ modules: { ns: mod } });
+      sys.start();
+
+      expect(sys.meta.event("ns::go")?.label).toBe("Go Event");
+
+      sys.destroy();
+    });
+  });
+
+  // ============================================================================
   // Export check
   // ============================================================================
 

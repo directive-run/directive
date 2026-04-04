@@ -110,7 +110,9 @@ export type TypedEventHandlerFn<
  * Each event key must match schema.events with the correct payload type.
  */
 export type TypedEventsDef<M extends ModuleSchema> = {
-  [K in keyof GetEventsSchema<M>]: TypedEventHandlerFn<M, K>;
+  [K in keyof GetEventsSchema<M>]:
+    | TypedEventHandlerFn<M, K>
+    | { handler: TypedEventHandlerFn<M, K>; meta?: DefinitionMeta };
 };
 
 // ============================================================================
