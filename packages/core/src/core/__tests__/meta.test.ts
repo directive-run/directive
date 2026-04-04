@@ -843,6 +843,35 @@ describe("DefinitionMeta", () => {
       sys.destroy();
     });
 
+    it("fact meta survives chain order: meta before type-specific", () => {
+      // t.string().meta({...}).minLength(3) — meta should NOT be lost
+      // Runtime: specialized .meta() overrides base and returns ChainableString
+      const nameField = t.string().meta({ label: "Name" }) as ReturnType<typeof t.string> & { minLength(n: number): unknown };
+      const countField = t.number().meta({ label: "Count" }) as ReturnType<typeof t.number> & { min(n: number): unknown };
+      const mod = createModule("chain-order", {
+        schema: {
+          facts: {
+            name: nameField.minLength(1) as ReturnType<typeof t.string>,
+            count: countField.min(0) as ReturnType<typeof t.number>,
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.name = "a";
+          f.count = 0;
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      expect(sys.meta.fact("name")?.label).toBe("Name");
+      expect(sys.meta.fact("count")?.label).toBe("Count");
+
+      sys.destroy();
+    });
+
     it("fact meta chains with other builders", () => {
       const mod = createModule("chain-meta", {
         schema: {

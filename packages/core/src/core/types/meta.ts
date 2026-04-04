@@ -7,7 +7,7 @@
 // ============================================================================
 
 /**
- * Optional metadata for constraint, resolver, effect, and derivation definitions.
+ * Optional metadata for module, fact, event, constraint, resolver, effect, and derivation definitions.
  *
  * Meta is purely informational — it is never read during the reconciliation
  * hot path. It surfaces in `system.inspect()`, `system.explain()`, and the

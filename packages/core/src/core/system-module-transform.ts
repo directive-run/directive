@@ -163,7 +163,7 @@ function prefixEventHandlers(
   for (const [key, raw] of Object.entries(mod.events)) {
     // Unwrap { handler, meta } form
     const isObj =
-      typeof raw === "object" && raw !== null && "handler" in raw;
+      typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler");
     const handler = isObj
       ? (raw as { handler: Function }).handler
       : raw;
