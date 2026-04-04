@@ -106,6 +106,14 @@ export function formatSystemMeta(inspection: SystemInspection): string {
     sections.push(`### Resolvers\n${resolverEntries.join("\n")}`);
   }
 
+  // Events (only those with meta)
+  const eventEntries = inspection.events
+    .map((e) => formatEntry(e.name, e.meta))
+    .filter(Boolean);
+  if (eventEntries.length > 0) {
+    sections.push(`### Events\n${eventEntries.join("\n")}`);
+  }
+
   // Facts with annotations (only those with meta)
   const factEntries = inspection.facts
     .map((f) => formatEntry(f.key, f.meta))
