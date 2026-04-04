@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-shopping-cart",
-  "version": "0.0.19",
+  "version": "0.0.20",
   "private": true,
   "type": "module",
   "scripts": {

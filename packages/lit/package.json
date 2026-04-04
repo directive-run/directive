@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/lit",
-  "version": "0.8.9",
+  "version": "1.0.0",
   "description": "Lit web components adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -51,7 +51,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^0.8.0",
+    "@directive-run/core": "^1.0.0",
     "lit": ">=3"
   },
   "devDependencies": {

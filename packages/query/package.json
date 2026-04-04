@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/query",
-  "version": "0.1.3",
+  "version": "1.0.0",
   "description": "Declarative data fetching for Directive. Constraint-driven queries with causal cache invalidation.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -52,7 +52,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^0.8.0"
+    "@directive-run/core": "^1.0.0"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",

@@ -1,5 +1,12 @@
 # @directive-run/el
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`a6a23b2`](https://github.com/directive-run/directive/commit/a6a23b2e52377a07bbbde52a89dcffcc3db2f826)]:
+  - @directive-run/core@1.0.0
+
 ## 0.5.0
 
 ### Minor Changes
@@ -7,6 +14,7 @@
 - [`f15a4bf`](https://github.com/directive-run/directive/commit/f15a4bf653c0d8616227b7de678efb36563c57b0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - New package: `@directive-run/el` — vanilla DOM adapter for Directive.
 
   **Features**
+
   - `el()` — typed element creation with full tag-to-element type inference
   - `bind()` — subscribe an element to system state with automatic cleanup
   - `bindText()` — shorthand for text content binding
