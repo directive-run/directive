@@ -54,6 +54,7 @@ export type {
   SystemInspection,
   SystemSnapshot,
   MetaAccessor,
+  MetaMatch,
   // Trace
   TraceEntry,
   TraceOption,

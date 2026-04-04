@@ -128,6 +128,7 @@ export type {
   DeriveAccessor,
   EventsAccessor,
   MetaAccessor,
+  MetaMatch,
   FactKeys,
   FactReturnType,
   DerivationKeys,

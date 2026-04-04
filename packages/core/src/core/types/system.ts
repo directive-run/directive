@@ -579,6 +579,13 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   meta?: DefinitionMeta;
 }
 
+/** Result from bulk meta queries (byCategory, byTag). */
+export interface MetaMatch {
+  type: "module" | "fact" | "event" | "constraint" | "resolver" | "effect" | "derivation";
+  id: string;
+  meta: DefinitionMeta;
+}
+
 /** O(1) accessor for definition metadata. */
 export interface MetaAccessor {
   /** Get metadata for a module by ID. */
@@ -595,6 +602,10 @@ export interface MetaAccessor {
   effect(id: string): DefinitionMeta | undefined;
   /** Get metadata for a derivation by ID. */
   derivation(id: string): DefinitionMeta | undefined;
+  /** Find all definitions matching a category across all types. */
+  byCategory(category: string): MetaMatch[];
+  /** Find all definitions matching a tag across all types. */
+  byTag(tag: string): MetaMatch[];
 }
 
 export interface System<M extends ModuleSchema = ModuleSchema> {

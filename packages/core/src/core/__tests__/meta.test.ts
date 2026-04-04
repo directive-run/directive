@@ -1169,6 +1169,115 @@ describe("DefinitionMeta", () => {
   });
 
   // ============================================================================
+  // Bulk queries: byCategory, byTag
+  // ============================================================================
+
+  describe("bulk queries", () => {
+    it("byCategory returns matching definitions across all types", () => {
+      const mod = createModule("bulk", {
+        schema: {
+          facts: {
+            token: t.string().meta({ label: "Token", category: "auth" }),
+            count: t.number(),
+          },
+          derivations: {},
+          requirements: { LOGIN: {} },
+          events: {},
+        },
+        init: (f) => {
+          f.token = "";
+          f.count = 0;
+        },
+        meta: { label: "Auth Module", category: "auth" },
+        constraints: {
+          needsLogin: {
+            when: () => false,
+            require: null,
+            meta: { label: "Needs Login", category: "auth" },
+          },
+        },
+        resolvers: {
+          login: {
+            requirement: "LOGIN",
+            resolve: async () => {},
+            meta: { label: "Login", category: "auth" },
+          },
+        },
+        effects: {
+          log: {
+            run: () => {},
+            meta: { label: "Logger", category: "logging" },
+          },
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      const authResults = sys.meta.byCategory("auth");
+      expect(authResults.length).toBe(4); // module, fact, constraint, resolver
+      expect(authResults.map((r) => r.type).sort()).toEqual([
+        "constraint",
+        "fact",
+        "module",
+        "resolver",
+      ]);
+
+      const loggingResults = sys.meta.byCategory("logging");
+      expect(loggingResults.length).toBe(1);
+      expect(loggingResults[0]!.type).toBe("effect");
+
+      expect(sys.meta.byCategory("nonexistent")).toEqual([]);
+
+      sys.destroy();
+    });
+
+    it("byTag returns matching definitions across all types", () => {
+      const mod = createModule("tags", {
+        schema: {
+          facts: {
+            email: t.string().meta({ label: "Email", tags: ["pii", "contact"] }),
+            name: t.string().meta({ label: "Name", tags: ["pii"] }),
+            count: t.number(),
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.email = "";
+          f.name = "";
+          f.count = 0;
+        },
+        constraints: {
+          check: {
+            when: () => false,
+            require: null,
+            meta: { tags: ["critical"] },
+          },
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      const piiResults = sys.meta.byTag("pii");
+      expect(piiResults.length).toBe(2); // email, name
+      expect(piiResults.every((r) => r.type === "fact")).toBe(true);
+
+      const contactResults = sys.meta.byTag("contact");
+      expect(contactResults.length).toBe(1);
+      expect(contactResults[0]!.id).toBe("email");
+
+      const criticalResults = sys.meta.byTag("critical");
+      expect(criticalResults.length).toBe(1);
+      expect(criticalResults[0]!.type).toBe("constraint");
+
+      expect(sys.meta.byTag("nonexistent")).toEqual([]);
+
+      sys.destroy();
+    });
+  });
+
+  // ============================================================================
   // Export check
   // ============================================================================
 
