@@ -306,6 +306,7 @@ export function createEngine<S extends Schema>(
   const traceManager = createTraceManager({
     traceConfig: config.trace,
     pluginManager,
+    resolverMetaLookup: (id) => mergedResolvers[id]?.meta,
   });
   const traceEnabled = traceManager.enabled;
 

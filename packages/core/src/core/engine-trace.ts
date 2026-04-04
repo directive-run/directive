@@ -134,6 +134,8 @@ export interface CreateTraceManagerOptions<S extends Schema> {
   traceConfig: boolean | { maxRuns?: number } | undefined;
   /** Plugin manager for emitting trace lifecycle events */
   pluginManager: PluginManager<S>;
+  /** Optional callback to resolve meta for a resolver ID (for trace enrichment) */
+  resolverMetaLookup?: (resolverId: string) => import("./types/meta.js").DefinitionMeta | undefined;
 }
 
 /**
@@ -153,7 +155,7 @@ export interface CreateTraceManagerOptions<S extends Schema> {
 export function createTraceManager<S extends Schema>(
   options: CreateTraceManagerOptions<S>,
 ): TraceManager {
-  const { traceConfig, pluginManager } = options;
+  const { traceConfig, pluginManager, resolverMetaLookup } = options;
   const enabled =
     traceConfig === true ||
     (typeof traceConfig === "object" && traceConfig !== null);
@@ -429,6 +431,7 @@ export function createTraceManager<S extends Schema>(
             resolver,
             requirementId,
             duration,
+            meta: resolverMetaLookup?.(resolver),
           });
         }
       }
@@ -447,6 +450,7 @@ export function createTraceManager<S extends Schema>(
             resolver,
             requirementId,
             error,
+            meta: resolverMetaLookup?.(resolver),
           });
         }
       }

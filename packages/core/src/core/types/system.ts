@@ -446,10 +446,18 @@ export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
    */
   register(
     id: string,
-    fn: (
-      facts: Readonly<InferSchema<M["facts"]>>,
-      derived: Readonly<InferDerivations<M>>,
-    ) => unknown,
+    fn:
+      | ((
+          facts: Readonly<InferSchema<M["facts"]>>,
+          derived: Readonly<InferDerivations<M>>,
+        ) => unknown)
+      | {
+          compute: (
+            facts: Readonly<InferSchema<M["facts"]>>,
+            derived: Readonly<InferDerivations<M>>,
+          ) => unknown;
+          meta?: DefinitionMeta;
+        },
   ): void;
   /**
    * Override an existing derivation (static or dynamic).
@@ -458,10 +466,18 @@ export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
    */
   assign(
     id: string,
-    fn: (
-      facts: Readonly<InferSchema<M["facts"]>>,
-      derived: Readonly<InferDerivations<M>>,
-    ) => unknown,
+    fn:
+      | ((
+          facts: Readonly<InferSchema<M["facts"]>>,
+          derived: Readonly<InferDerivations<M>>,
+        ) => unknown)
+      | {
+          compute: (
+            facts: Readonly<InferSchema<M["facts"]>>,
+            derived: Readonly<InferDerivations<M>>,
+          ) => unknown;
+          meta?: DefinitionMeta;
+        },
   ): void;
   /**
    * Remove a dynamically registered derivation.

@@ -217,15 +217,21 @@ export function updateDependencyGraph(
   }
 
   const factNodes = layoutColumn(
-    factKeys.map((k) => ({ id: k, label: truncate(k, FLOW.labelMaxChars) })),
+    factKeys.map((k) => {
+      const fMeta = inspection.facts.find((f) => f.key === k);
+      return { id: k, label: truncate(fMeta?.meta?.label ?? k, FLOW.labelMaxChars) };
+    }),
   );
   const derivNodes = layoutColumn(
-    derivKeys.map((k) => ({ id: k, label: truncate(k, FLOW.labelMaxChars) })),
+    derivKeys.map((k) => {
+      const dMeta = inspection.derivations.find((d) => d.id === k);
+      return { id: k, label: truncate(dMeta?.meta?.label ?? k, FLOW.labelMaxChars) };
+    }),
   );
   const constraintNodes = layoutColumn(
     allConstraints.map((c) => ({
       id: c.id,
-      label: truncate(c.id, FLOW.labelMaxChars),
+      label: truncate(c.meta?.label ?? c.id, FLOW.labelMaxChars),
       active: c.active,
       priority: c.priority,
     })),
@@ -239,7 +245,10 @@ export function updateDependencyGraph(
     })),
   );
   const resolverNodeArr = layoutColumn(
-    resolverIds.map((id) => ({ id, label: truncate(id, FLOW.labelMaxChars) })),
+    resolverIds.map((id) => {
+      const rDef = inspection.resolverDefs.find((r) => r.id === id);
+      return { id, label: truncate(rDef?.meta?.label ?? id, FLOW.labelMaxChars) };
+    }),
   );
 
   const maxRows = Math.max(
@@ -287,8 +296,14 @@ export function updateDependencyGraph(
     color: string,
     dimmed: boolean,
     pulsing: boolean,
+    tooltip?: string,
   ) {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    if (tooltip) {
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = tooltip;
+      g.appendChild(title);
+    }
     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     rect.setAttribute("x", String(x));
     rect.setAttribute("y", String(cy - 6));
@@ -345,50 +360,37 @@ export function updateDependencyGraph(
   const constraintPositions = new Map<string, { midX: number; midY: number }>();
   const reqPositions = new Map<string, { midX: number; midY: number }>();
 
-  // Draw fact nodes
+  // Draw fact nodes (with meta tooltips)
   for (const f of factNodes) {
     const pulsing = depGraph.recentlyChangedFacts.has(f.id);
+    const fMeta = inspection.facts.find((ff) => ff.key === f.id)?.meta;
     const pos = drawNode(
-      0,
-      colX[0],
-      f.y,
-      f.id,
-      f.label,
-      S.text,
-      false,
-      pulsing,
+      0, colX[0], f.y, f.id, f.label, S.text, false, pulsing,
+      fMeta?.description,
     );
     factPositions.set(f.id, pos);
   }
 
-  // Draw derivation nodes
+  // Draw derivation nodes (with meta tooltips)
   for (const d of derivNodes) {
     const pulsing = depGraph.recentlyComputedDerivations.has(d.id);
+    const dMeta = inspection.derivations.find((dd) => dd.id === d.id)?.meta;
     const pos = drawNode(
-      1,
-      colX[1],
-      d.y,
-      d.id,
-      d.label,
-      S.accent,
-      false,
-      pulsing,
+      1, colX[1], d.y, d.id, d.label, S.accent, false, pulsing,
+      dMeta?.description,
     );
     derivPositions.set(d.id, pos);
   }
 
-  // Draw constraint nodes (show ALL, dim inactive)
+  // Draw constraint nodes (show ALL, dim inactive, with meta tooltips)
   for (const c of constraintNodes) {
     const pulsing = depGraph.recentlyActiveConstraints.has(c.id);
+    const cMeta = allConstraints.find((cc) => cc.id === c.id)?.meta;
     const pos = drawNode(
-      2,
-      colX[2],
-      c.y,
-      c.id,
-      c.label,
-      c.active ? S.yellow : S.muted,
-      !c.active,
-      pulsing,
+      2, colX[2], c.y, c.id, c.label,
+      cMeta?.color ?? (c.active ? S.yellow : S.muted),
+      !c.active, pulsing,
+      cMeta?.description,
     );
     constraintPositions.set(c.id, pos);
   }
@@ -409,18 +411,15 @@ export function updateDependencyGraph(
     reqPositions.set(r.id, pos);
   }
 
-  // Draw resolver nodes (show ALL, dim idle)
+  // Draw resolver nodes (show ALL, dim idle, with meta tooltips + colors)
   for (const r of resolverNodeArr) {
     const isActive = inflightReqs.some((f) => f.resolverId === r.id);
+    const rMeta = inspection.resolverDefs.find((rd) => rd.id === r.id)?.meta;
     drawNode(
-      4,
-      colX[4],
-      r.y,
-      r.id,
-      r.label,
-      isActive ? S.green : S.muted,
-      !isActive,
-      false,
+      4, colX[4], r.y, r.id, r.label,
+      rMeta?.color ?? (isActive ? S.green : S.muted),
+      !isActive, false,
+      rMeta?.description,
     );
   }
 
