@@ -645,6 +645,9 @@ export {
   type GoalExplanationStep,
 } from "./goal-utils.js";
 
+// Meta Context (system introspection for LLM consumption)
+export { formatSystemMeta, toAIContext } from "./meta-context.js";
+
 // MCP (Model Context Protocol)
 export {
   createMCPAdapter,

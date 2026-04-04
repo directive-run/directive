@@ -473,6 +473,13 @@ export interface MultiAgentOrchestratorOptions {
   derive?: Record<string, CrossAgentDerivationFn>;
   /** Shared scratchpad configuration */
   scratchpad?: { init: Record<string, unknown> };
+  /**
+   * Include system meta in agent instructions for structured LLM reasoning.
+   * When true, constraint labels, resolver descriptions, fact annotations,
+   * and module metadata are injected into each agent's system prompt.
+   * @default false
+   */
+  metaContext?: boolean;
 }
 
 /** Multi-agent state in facts */
