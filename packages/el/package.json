@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/el",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Vanilla DOM adapter for Directive. Typed element creation + reactive bindings + JSX runtime.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -69,7 +69,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^0.8.0",
+    "@directive-run/core": "^1.0.0",
     "htm": ">=3"
   },
   "peerDependenciesMeta": {
