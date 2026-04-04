@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/solid",
-  "version": "0.8.9",
+  "version": "1.0.0",
   "description": "Solid.js signals adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -52,8 +52,8 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^0.8.0",
-    "@directive-run/query": "^0.1.0",
+    "@directive-run/core": "^1.0.0",
+    "@directive-run/query": "^1.0.0",
     "solid-js": ">=1"
   },
   "peerDependenciesMeta": {

@@ -1,5 +1,12 @@
 # @directive-run/cli
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.0.0
+
 ## 0.8.9
 
 ### Patch Changes
