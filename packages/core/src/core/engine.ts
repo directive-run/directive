@@ -120,8 +120,9 @@ export function createEngine<S extends Schema>(
   const mergedConstraints: ConstraintsDef<S> = Object.create(null);
   const mergedResolvers: ResolversDef<S> = Object.create(null);
 
-  // Module metadata (frozen at registration)
+  // Module and event metadata (frozen at registration)
   const moduleMeta = new Map<string, DefinitionMeta>();
+  const eventMeta = new Map<string, DefinitionMeta>();
 
   // Track which module defined each key for collision detection
   const schemaOwners = new Map<string, string>();
@@ -189,7 +190,20 @@ export function createEngine<S extends Schema>(
     checkCollisions(module.events, "event");
 
     Object.assign(mergedSchema, module.schema);
-    if (module.events) Object.assign(mergedEvents, module.events);
+    if (module.events) {
+      // Unwrap { handler, meta } event forms before merging
+      for (const [key, raw] of Object.entries(module.events)) {
+        if (typeof raw === "object" && raw !== null && "handler" in raw) {
+          const obj = raw as { handler: Function; meta?: DefinitionMeta };
+          (module.events as Record<string, unknown>)[key] = obj.handler;
+          if (obj.meta) {
+            const frozen = freezeMeta(obj.meta);
+            if (frozen) eventMeta.set(key, frozen);
+          }
+        }
+      }
+      Object.assign(mergedEvents, module.events);
+    }
     if (module.derive) Object.assign(mergedDerive, module.derive);
     if (module.effects) Object.assign(mergedEffects, module.effects);
     if (module.constraints)
@@ -941,6 +955,9 @@ export function createEngine<S extends Schema>(
         const schemaType = mergedSchema[key as keyof S];
         return (schemaType as { _meta?: DefinitionMeta } | undefined)?._meta;
       },
+      event(name: string): DefinitionMeta | undefined {
+        return eventMeta.get(name);
+      },
       constraint(id: string): DefinitionMeta | undefined {
         return mergedConstraints[id]?.meta;
       },
@@ -1222,6 +1239,10 @@ export function createEngine<S extends Schema>(
         facts: Object.keys(mergedSchema).map((key) => ({
           key,
           meta: (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta } | undefined)?._meta,
+        })),
+        events: Object.keys(mergedEvents).map((name) => ({
+          name,
+          meta: eventMeta.get(name),
         })),
         constraints: constraintsManager.getAllStates().map((s) => ({
           id: s.id,
@@ -1834,7 +1855,19 @@ export function createEngine<S extends Schema>(
 
     // Merge into existing engine state
     Object.assign(mergedSchema, module.schema);
-    if (module.events) Object.assign(mergedEvents, module.events);
+    if (module.events) {
+      for (const [key, raw] of Object.entries(module.events)) {
+        if (typeof raw === "object" && raw !== null && "handler" in raw) {
+          const obj = raw as { handler: Function; meta?: DefinitionMeta };
+          (module.events as Record<string, unknown>)[key] = obj.handler;
+          if (obj.meta) {
+            const frozen = freezeMeta(obj.meta);
+            if (frozen) eventMeta.set(key, frozen);
+          }
+        }
+      }
+      Object.assign(mergedEvents, module.events);
+    }
     if (module.derive) {
       Object.assign(mergedDerive, module.derive);
       // Register new derivations with the derivations manager

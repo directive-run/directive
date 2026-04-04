@@ -226,6 +226,8 @@ export interface SystemInspection {
   inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
   /** All fact/schema field keys with optional metadata */
   facts: Array<{ key: string; meta?: DefinitionMeta }>;
+  /** All event names with optional metadata */
+  events: Array<{ name: string; meta?: DefinitionMeta }>;
   constraints: Array<{
     id: string;
     active: boolean;
@@ -562,6 +564,8 @@ export interface MetaAccessor {
   module(id: string): DefinitionMeta | undefined;
   /** Get metadata for a fact/schema field by key. */
   fact(key: string): DefinitionMeta | undefined;
+  /** Get metadata for an event by name. */
+  event(name: string): DefinitionMeta | undefined;
   /** Get metadata for a constraint by ID. */
   constraint(id: string): DefinitionMeta | undefined;
   /** Get metadata for a resolver by ID. */
