@@ -1232,7 +1232,7 @@ describe("DefinitionMeta", () => {
         // Effect that reads derivation — triggers recompute during reconcile
         effects: {
           readDoubled: {
-            run: (facts, _prev) => {
+            run: (_facts, _prev) => {
               // Read derivation to trigger recompute tracking in trace
             },
           },
