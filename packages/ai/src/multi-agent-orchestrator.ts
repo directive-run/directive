@@ -55,6 +55,7 @@ import {
   normalizeGuardrail,
 } from "./guardrail-utils.js";
 import { type HealthMonitor, createHealthMonitor } from "./health-monitor.js";
+import { formatSystemMeta } from "./meta-context.js";
 import {
   convertOrchestratorConstraints,
   getAgentState,
@@ -1930,6 +1931,17 @@ export function createMultiAgentOrchestrator(
               (agent.instructions ?? "") +
               "\n\nConversation context:\n" +
               contextStr,
+          };
+        }
+      }
+
+      // Inject system meta context if enabled
+      if (options.metaContext) {
+        const metaStr = formatSystemMeta(system.inspect());
+        if (metaStr) {
+          agent = {
+            ...agent,
+            instructions: (agent.instructions ?? "") + "\n\n" + metaStr,
           };
         }
       }

@@ -22,6 +22,7 @@ import {
 } from "@directive-run/core/adapter-utils";
 import type { CircuitBreaker } from "@directive-run/core/plugins";
 import type { AgentMemory } from "./memory.js";
+import { formatSystemMeta } from "./meta-context.js";
 import type { StreamChunk as StreamChunkBase } from "./streaming.js";
 
 import type {
@@ -232,6 +233,13 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
    * @default 300000 (5 minutes)
    */
   breakpointTimeoutMs?: number;
+  /**
+   * Include system meta in agent instructions for structured LLM reasoning.
+   * When true, constraint labels, resolver descriptions, fact annotations,
+   * and module metadata are injected into the agent's system prompt.
+   * @default false
+   */
+  metaContext?: boolean;
 }
 
 /** Streaming run result from orchestrator */
@@ -775,6 +783,17 @@ export function createAgentOrchestrator<
             (agent.instructions ?? "") +
             "\n\nConversation context:\n" +
             contextStr,
+        };
+      }
+    }
+
+    // Inject system meta context if enabled
+    if (options.metaContext) {
+      const metaStr = formatSystemMeta(system.inspect());
+      if (metaStr) {
+        agent = {
+          ...agent,
+          instructions: (agent.instructions ?? "") + "\n\n" + metaStr,
         };
       }
     }
