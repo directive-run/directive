@@ -224,6 +224,8 @@ export interface TraceEntry {
 export interface SystemInspection {
   unmet: RequirementWithId[];
   inflight: Array<{ id: string; resolverId: string; startedAt: number }>;
+  /** All fact/schema field keys with optional metadata */
+  facts: Array<{ key: string; meta?: DefinitionMeta }>;
   constraints: Array<{
     id: string;
     active: boolean;
@@ -558,6 +560,8 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
 export interface MetaAccessor {
   /** Get metadata for a module by ID. */
   module(id: string): DefinitionMeta | undefined;
+  /** Get metadata for a fact/schema field by key. */
+  fact(key: string): DefinitionMeta | undefined;
   /** Get metadata for a constraint by ID. */
   constraint(id: string): DefinitionMeta | undefined;
   /** Get metadata for a resolver by ID. */
