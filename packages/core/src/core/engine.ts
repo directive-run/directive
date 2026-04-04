@@ -54,6 +54,7 @@ import type {
   SystemConfig,
   SystemEvent,
   SystemInspection,
+  MetaMatch,
   TraceEntry,
 } from "./types.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
@@ -888,6 +889,37 @@ export function createEngine<S extends Schema>(
     dispatchEvent: dispatchEventByName,
   });
 
+  /** Collect all definitions with meta across all types (for byCategory/byTag). */
+  function collectAllMeta(): MetaMatch[] {
+    const results: MetaMatch[] = [];
+    for (const [id, meta] of moduleMeta) {
+      results.push({ type: "module", id, meta });
+    }
+    for (const key of Object.keys(mergedSchema)) {
+      const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })?._meta;
+      if (meta) results.push({ type: "fact", id: key, meta });
+    }
+    for (const [name, meta] of eventMeta) {
+      results.push({ type: "event", id: name, meta });
+    }
+    for (const [id, def] of Object.entries(mergedConstraints)) {
+      if (def.meta) results.push({ type: "constraint", id, meta: def.meta });
+    }
+    for (const [id, def] of Object.entries(mergedResolvers)) {
+      if (def.meta) results.push({ type: "resolver", id, meta: def.meta });
+    }
+    for (const [id, def] of Object.entries(mergedEffects)) {
+      const meta = (def as { meta?: DefinitionMeta }).meta;
+      if (meta) results.push({ type: "effect", id, meta });
+    }
+    for (const id of Object.keys(mergedDerive)) {
+      const meta = derivationsManager.getMeta(id as keyof DerivationsDef<S>);
+      if (meta) results.push({ type: "derivation", id, meta });
+    }
+
+    return results;
+  }
+
   // Create the system interface
   // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
   const system: System<any> = {
@@ -991,6 +1023,16 @@ export function createEngine<S extends Schema>(
       },
       derivation(id: string): DefinitionMeta | undefined {
         return derivationsManager.getMeta(id as keyof DerivationsDef<S>);
+      },
+      byCategory(category: string): MetaMatch[] {
+        return collectAllMeta().filter(
+          (m) => m.meta.category === category,
+        );
+      },
+      byTag(tag: string): MetaMatch[] {
+        return collectAllMeta().filter(
+          (m) => m.meta.tags?.includes(tag),
+        );
       },
     },
 

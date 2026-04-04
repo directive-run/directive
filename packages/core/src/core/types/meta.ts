@@ -13,6 +13,10 @@
  * hot path. It surfaces in `system.inspect()`, `system.explain()`, and the
  * devtools plugin to provide human-readable context for debugging.
  *
+ * **Note:** Meta values are string literals that survive minification and ship
+ * in production bundles. Avoid putting internal API paths or sensitive business
+ * logic in meta fields.
+ *
  * @example
  * ```typescript
  * constraints: {

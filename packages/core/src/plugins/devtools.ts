@@ -718,8 +718,10 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
     },
 
     onConstraintEvaluate: (id, active) => {
-      addEvent("constraint.evaluate", { id, active });
-      recordEvent("constraint.evaluate", { id, active });
+      const label = state.system?.meta?.constraint(id)?.label;
+      const payload = label ? { id, active, label } : { id, active };
+      addEvent("constraint.evaluate", payload);
+      recordEvent("constraint.evaluate", payload);
       if (active) {
         depGraph.activeConstraints.add(id);
         depGraph.recentlyActiveConstraints.add(id);
@@ -762,8 +764,13 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
     },
 
     onResolverStart: (resolver, req) => {
-      addEvent("resolver.start", { resolver, requirementId: req.id });
-      recordEvent("resolver.start", { resolver, requirementId: req.id });
+      const label = state.system?.meta?.resolver(resolver)?.label;
+      const basePayload = { resolver, requirementId: req.id };
+      const payload = label
+        ? { ...basePayload, label }
+        : basePayload;
+      addEvent("resolver.start", payload);
+      recordEvent("resolver.start", payload);
       // Track timeline
       timeline.inflight.set(resolver, performance.now());
       if (panel && state.system) {
@@ -773,10 +780,12 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
     },
 
     onResolverComplete: (resolver, req, duration) => {
+      const label = state.system?.meta?.resolver(resolver)?.label;
       addEvent("resolver.complete", {
         resolver,
         requirementId: req.id,
         duration,
+        ...(label ? { label } : {}),
       });
       recordEvent("resolver.complete", {
         resolver,
@@ -880,8 +889,10 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
     },
 
     onEffectRun: (id) => {
-      addEvent("effect.run", { id });
-      recordEvent("effect.run", { id });
+      const label = state.system?.meta?.effect(id)?.label;
+      const payload = label ? { id, label } : { id };
+      addEvent("effect.run", payload);
+      recordEvent("effect.run", payload);
       perf.effectRunCount++;
       panelEvent("effect.run", { id });
     },
