@@ -365,6 +365,14 @@ describe("DefinitionMeta", () => {
       expect(meta!.label).toBe("original");
     });
 
+    it("frozen meta tags array cannot be mutated", () => {
+      const meta = freezeMeta({ label: "test", tags: ["a", "b"] });
+      expect(meta!.tags).toEqual(["a", "b"]);
+      expect(() => {
+        (meta!.tags as string[]).push("injected");
+      }).toThrow();
+    });
+
     it("isDerivationWithMeta rejects prototype chain compute", () => {
       const obj = Object.create({ compute: () => 42 });
       expect(isDerivationWithMeta(obj)).toBe(false);

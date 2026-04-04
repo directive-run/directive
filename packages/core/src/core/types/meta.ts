@@ -53,7 +53,13 @@ export function freezeMeta(
     return undefined;
   }
 
-  return Object.freeze(Object.assign(Object.create(null), meta));
+  const frozen = Object.assign(Object.create(null), meta);
+  // Deep-freeze tags array so meta.tags.push() throws
+  if (Array.isArray(frozen.tags)) {
+    Object.freeze(frozen.tags);
+  }
+
+  return Object.freeze(frozen);
 }
 
 /**
