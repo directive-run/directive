@@ -937,6 +937,10 @@ export function createEngine<S extends Schema>(
       module(id: string): DefinitionMeta | undefined {
         return moduleMeta.get(id);
       },
+      fact(key: string): DefinitionMeta | undefined {
+        const schemaType = mergedSchema[key as keyof S];
+        return (schemaType as { _meta?: DefinitionMeta } | undefined)?._meta;
+      },
       constraint(id: string): DefinitionMeta | undefined {
         return mergedConstraints[id]?.meta;
       },
@@ -1215,6 +1219,10 @@ export function createEngine<S extends Schema>(
       return {
         unmet: state.previousRequirements.all(),
         inflight: resolversManager.getInflightInfo(),
+        facts: Object.keys(mergedSchema).map((key) => ({
+          key,
+          meta: (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta } | undefined)?._meta,
+        })),
         constraints: constraintsManager.getAllStates().map((s) => ({
           id: s.id,
           active: s.lastResult ?? false,

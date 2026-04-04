@@ -31,6 +31,8 @@ export interface ExtendedSchemaType<T> extends SchemaType<T> {
   }>;
   /** Mutable - set by array validators to indicate which element failed */
   _lastFailedIndex?: number;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  readonly _meta?: import("./types/meta.js").DefinitionMeta;
 }
 
 /** Create a schema type builder with optional type name */
@@ -41,6 +43,7 @@ function createSchemaType<T>(
   transform?: (value: unknown) => T,
   description?: string,
   refinements?: Array<{ predicate: (value: T) => boolean; message: string }>,
+  meta?: import("./types/meta.js").DefinitionMeta,
 ): ExtendedSchemaType<T> {
   return {
     _type: undefined as unknown as T,
@@ -50,6 +53,7 @@ function createSchemaType<T>(
     _transform: transform,
     _description: description,
     _refinements: refinements,
+    _meta: meta,
     validate(fn: (value: T) => boolean) {
       return createSchemaType(
         [...validators, fn],
@@ -58,6 +62,7 @@ function createSchemaType<T>(
         transform,
         description,
         refinements,
+        meta,
       );
     },
   };
@@ -75,6 +80,10 @@ export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ): ChainableSchemaType<T>;
   nullable(): ChainableSchemaType<T | null>;
   optional(): ChainableSchemaType<T | undefined>;
+  /** Attach metadata for debugging and devtools. */
+  meta(
+    meta: import("./types/meta.js").DefinitionMeta,
+  ): ChainableSchemaType<T>;
 }
 
 /** Create a chainable schema type with common methods */
@@ -85,6 +94,7 @@ function createChainableType<T>(
   transform?: (value: unknown) => T,
   description?: string,
   refinements?: Array<{ predicate: (value: T) => boolean; message: string }>,
+  fieldMeta?: import("./types/meta.js").DefinitionMeta,
 ): ChainableSchemaType<T> {
   const base = createSchemaType<T>(
     validators,
@@ -93,6 +103,7 @@ function createChainableType<T>(
     transform,
     description,
     refinements,
+    fieldMeta,
   );
   return {
     ...base,
@@ -104,6 +115,7 @@ function createChainableType<T>(
         transform,
         description,
         refinements,
+        fieldMeta,
       );
     },
     transform<U>(fn: (value: T) => U) {
@@ -117,6 +129,8 @@ function createChainableType<T>(
         undefined,
         newTransform as (v: unknown) => U,
         description,
+        undefined,
+        fieldMeta,
       );
     },
     brand<B extends string>() {
@@ -130,6 +144,7 @@ function createChainableType<T>(
           predicate: (value: Branded<T, B>) => boolean;
           message: string;
         }>,
+        fieldMeta,
       );
     },
     describe(desc: string) {
@@ -140,6 +155,7 @@ function createChainableType<T>(
         transform,
         desc,
         refinements,
+        fieldMeta,
       );
     },
     refine(predicate: (value: T) => boolean, message: string) {
@@ -151,6 +167,7 @@ function createChainableType<T>(
         transform,
         description,
         newRefinements,
+        fieldMeta,
       );
     },
     nullable() {
@@ -163,6 +180,8 @@ function createChainableType<T>(
         defaultValue as (T | null) | (() => T | null),
         transform as (value: unknown) => T | null,
         description,
+        undefined,
+        fieldMeta,
       );
     },
     optional() {
@@ -175,6 +194,19 @@ function createChainableType<T>(
         defaultValue as (T | undefined) | (() => T | undefined),
         transform as (value: unknown) => T | undefined,
         description,
+        undefined,
+        fieldMeta,
+      );
+    },
+    meta(m: import("./types/meta.js").DefinitionMeta) {
+      return createChainableType(
+        validators,
+        typeName,
+        defaultValue,
+        transform,
+        description,
+        refinements,
+        m,
       );
     },
   };

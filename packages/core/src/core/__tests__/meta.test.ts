@@ -779,6 +779,119 @@ describe("DefinitionMeta", () => {
   });
 
   // ============================================================================
+  // Fact/schema field meta
+  // ============================================================================
+
+  describe("fact meta", () => {
+    it("fact meta accessible via system.meta.fact()", () => {
+      const mod = createModule("field-meta", {
+        schema: {
+          facts: {
+            score: t.number().meta({ label: "Player Score", category: "data" }),
+            name: t.string().meta({ label: "Username", tags: ["pii"] }),
+            plain: t.number(), // no meta
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.score = 0;
+          f.name = "";
+          f.plain = 0;
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      expect(sys.meta.fact("score")?.label).toBe("Player Score");
+      expect(sys.meta.fact("score")?.category).toBe("data");
+      expect(sys.meta.fact("name")?.label).toBe("Username");
+      expect(sys.meta.fact("name")?.tags).toEqual(["pii"]);
+      expect(sys.meta.fact("plain")).toBeUndefined();
+      expect(sys.meta.fact("nonexistent")).toBeUndefined();
+
+      sys.destroy();
+    });
+
+    it("fact meta flows through inspect()", () => {
+      const mod = createModule("inspect-facts", {
+        schema: {
+          facts: {
+            score: t.number().meta({ label: "Score" }),
+            plain: t.number(),
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.score = 0;
+          f.plain = 0;
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      const inspection = sys.inspect();
+      const scoreFact = inspection.facts.find((f) => f.key === "score");
+      const plainFact = inspection.facts.find((f) => f.key === "plain");
+
+      expect(scoreFact?.meta?.label).toBe("Score");
+      expect(plainFact?.meta).toBeUndefined();
+
+      sys.destroy();
+    });
+
+    it("fact meta chains with other builders", () => {
+      const mod = createModule("chain-meta", {
+        schema: {
+          facts: {
+            email: t
+              .string()
+              .meta({ label: "Email Address", category: "pii" })
+              .nullable(),
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.email = null;
+        },
+      });
+      const sys = createSystem({ module: mod });
+      sys.start();
+
+      expect(sys.meta.fact("email")?.label).toBe("Email Address");
+
+      sys.destroy();
+    });
+
+    it("fact meta works in namespaced systems", () => {
+      const mod = createModule("ns", {
+        schema: {
+          facts: {
+            count: t.number().meta({ label: "Counter" }),
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.count = 0;
+        },
+      });
+      const sys = createSystem({ modules: { ns: mod } });
+      sys.start();
+
+      expect(sys.meta.fact("ns::count")?.label).toBe("Counter");
+
+      sys.destroy();
+    });
+  });
+
+  // ============================================================================
   // Export check
   // ============================================================================
 
