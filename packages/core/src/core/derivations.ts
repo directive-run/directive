@@ -641,7 +641,6 @@ export function createDerivationsManager<
       removeOwnDepLinks(id);
       invalidateDependentsOf(id);
       purgeFromMaps(id);
-      derivationMeta.delete(id);
 
       flushNotifications();
     },

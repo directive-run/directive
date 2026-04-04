@@ -262,6 +262,7 @@ export const t = {
       minLength(n: number): ChainableString;
       maxLength(n: number): ChainableString;
       pattern(regex: RegExp): ChainableString;
+      meta(m: import("./types/meta.js").DefinitionMeta): ChainableString;
     };
 
     const createChainableString = (
@@ -273,6 +274,7 @@ export const t = {
         predicate: (value: T) => boolean;
         message: string;
       }>,
+      fm?: import("./types/meta.js").DefinitionMeta,
     ): ChainableString => {
       const chainable = createChainableType<T>(
         validators,
@@ -281,52 +283,36 @@ export const t = {
         transform,
         description,
         refinements,
+        fm,
       );
       return {
         ...chainable,
         minLength(n: number) {
           return createChainableString(
             [...validators, (v) => (v as string).length >= n],
-            defaultValue,
-            transform,
-            description,
-            refinements,
+            defaultValue, transform, description, refinements, fm,
           );
         },
         maxLength(n: number) {
           return createChainableString(
             [...validators, (v) => (v as string).length <= n],
-            defaultValue,
-            transform,
-            description,
-            refinements,
+            defaultValue, transform, description, refinements, fm,
           );
         },
         pattern(regex: RegExp) {
           return createChainableString(
             [...validators, (v) => regex.test(v as string)],
-            defaultValue,
-            transform,
-            description,
-            refinements,
+            defaultValue, transform, description, refinements, fm,
           );
         },
         default(value: T | (() => T)) {
           return createChainableString(
-            validators,
-            value,
-            transform,
-            description,
-            refinements,
+            validators, value, transform, description, refinements, fm,
           );
         },
         describe(desc: string) {
           return createChainableString(
-            validators,
-            defaultValue,
-            transform,
-            desc,
-            refinements,
+            validators, defaultValue, transform, desc, refinements, fm,
           );
         },
         refine(predicate: (value: T) => boolean, message: string) {
@@ -336,10 +322,12 @@ export const t = {
           ];
           return createChainableString(
             [...validators, predicate],
-            defaultValue,
-            transform,
-            description,
-            newRefinements,
+            defaultValue, transform, description, newRefinements, fm,
+          );
+        },
+        meta(m: import("./types/meta.js").DefinitionMeta) {
+          return createChainableString(
+            validators, defaultValue, transform, description, refinements, m,
           );
         },
       };
@@ -373,6 +361,7 @@ export const t = {
     type ChainableNumber = ChainableSchemaType<number> & {
       min(n: number): ChainableNumber;
       max(n: number): ChainableNumber;
+      meta(m: import("./types/meta.js").DefinitionMeta): ChainableNumber;
     };
 
     const createChainableNumber = (
@@ -384,51 +373,33 @@ export const t = {
         predicate: (value: number) => boolean;
         message: string;
       }>,
+      fm?: import("./types/meta.js").DefinitionMeta,
     ): ChainableNumber => {
       const chainable = createChainableType<number>(
-        validators,
-        "number",
-        defaultValue,
-        transform,
-        description,
-        refinements,
+        validators, "number", defaultValue, transform, description, refinements, fm,
       );
       return {
         ...chainable,
         min(n: number) {
           return createChainableNumber(
             [...validators, (v) => v >= n],
-            defaultValue,
-            transform,
-            description,
-            refinements,
+            defaultValue, transform, description, refinements, fm,
           );
         },
         max(n: number) {
           return createChainableNumber(
             [...validators, (v) => v <= n],
-            defaultValue,
-            transform,
-            description,
-            refinements,
+            defaultValue, transform, description, refinements, fm,
           );
         },
         default(value: number | (() => number)) {
           return createChainableNumber(
-            validators,
-            value,
-            transform,
-            description,
-            refinements,
+            validators, value, transform, description, refinements, fm,
           );
         },
         describe(desc: string) {
           return createChainableNumber(
-            validators,
-            defaultValue,
-            transform,
-            desc,
-            refinements,
+            validators, defaultValue, transform, desc, refinements, fm,
           );
         },
         refine(predicate: (value: number) => boolean, message: string) {
@@ -438,10 +409,12 @@ export const t = {
           ];
           return createChainableNumber(
             [...validators, predicate],
-            defaultValue,
-            transform,
-            description,
-            newRefinements,
+            defaultValue, transform, description, newRefinements, fm,
+          );
+        },
+        meta(m: import("./types/meta.js").DefinitionMeta) {
+          return createChainableNumber(
+            validators, defaultValue, transform, description, refinements, m,
           );
         },
       };
@@ -479,6 +452,7 @@ export const t = {
       nonEmpty(): ChainableArray;
       maxLength(n: number): ChainableArray;
       minLength(n: number): ChainableArray;
+      meta(m: import("./types/meta.js").DefinitionMeta): ChainableArray;
       _lastFailedIndex?: number;
     };
 
@@ -488,6 +462,7 @@ export const t = {
       defaultValue?: T[] | (() => T[]),
       description?: string,
       indexRef?: { value: number },
+      fm?: import("./types/meta.js").DefinitionMeta,
     ): ChainableArray => {
       const chainable = createChainableType<T[]>(
         validators,
@@ -495,6 +470,8 @@ export const t = {
         defaultValue,
         undefined,
         description,
+        undefined,
+        fm,
       );
       // Use ref for storing failed index (shared with validator closure)
       const ref = indexRef ?? { value: -1 };
@@ -507,71 +484,51 @@ export const t = {
           ref.value = v;
         },
         of(et: SchemaType<T>) {
-          // Create a new ref for this chain
           const newRef = { value: -1 };
           return createChainableArray(
-            [
-              ...validators,
-              (v) => {
-                for (let i = 0; i < v.length; i++) {
-                  const item = v[i];
-                  if (!et._validators.every((validator) => validator(item))) {
-                    newRef.value = i;
-                    return false;
-                  }
+            [...validators, (v) => {
+              for (let i = 0; i < v.length; i++) {
+                if (!et._validators.every((validator) => validator(v[i]))) {
+                  newRef.value = i;
+                  return false;
                 }
-                return true;
-              },
-            ],
-            et,
-            defaultValue,
-            description,
-            newRef,
+              }
+              return true;
+            }],
+            et, defaultValue, description, newRef, fm,
           );
         },
         nonEmpty() {
           return createChainableArray(
             [...validators, (v) => v.length > 0],
-            elementType,
-            defaultValue,
-            description,
-            ref,
+            elementType, defaultValue, description, ref, fm,
           );
         },
         maxLength(n: number) {
           return createChainableArray(
             [...validators, (v) => v.length <= n],
-            elementType,
-            defaultValue,
-            description,
-            ref,
+            elementType, defaultValue, description, ref, fm,
           );
         },
         minLength(n: number) {
           return createChainableArray(
             [...validators, (v) => v.length >= n],
-            elementType,
-            defaultValue,
-            description,
-            ref,
+            elementType, defaultValue, description, ref, fm,
           );
         },
         default(value: T[] | (() => T[])) {
           return createChainableArray(
-            validators,
-            elementType,
-            value,
-            description,
-            ref,
+            validators, elementType, value, description, ref, fm,
           );
         },
         describe(desc: string) {
           return createChainableArray(
-            validators,
-            elementType,
-            defaultValue,
-            desc,
-            ref,
+            validators, elementType, defaultValue, desc, ref, fm,
+          );
+        },
+        meta(m: import("./types/meta.js").DefinitionMeta) {
+          return createChainableArray(
+            validators, elementType, defaultValue, description, ref, m,
           );
         },
       };
@@ -593,66 +550,55 @@ export const t = {
       shape(schema: { [K in keyof T]?: SchemaType<T[K]> }): ChainableObject;
       nonNull(): ChainableObject;
       hasKeys(...keys: string[]): ChainableObject;
+      meta(m: import("./types/meta.js").DefinitionMeta): ChainableObject;
     };
 
     const createChainableObject = (
       validators: Array<(v: T) => boolean>,
       defaultValue?: T | (() => T),
       description?: string,
+      fm?: import("./types/meta.js").DefinitionMeta,
     ): ChainableObject => {
       const chainable = createChainableType<T>(
-        validators,
-        "object",
-        defaultValue,
-        undefined,
-        description,
+        validators, "object", defaultValue, undefined, description, undefined, fm,
       );
       return {
         ...chainable,
         shape(shapeSchema: { [K in keyof T]?: SchemaType<T[K]> }) {
           return createChainableObject(
-            [
-              ...validators,
-              (v) => {
-                for (const [key, schemaType] of Object.entries(shapeSchema)) {
-                  const value = (v as Record<string, unknown>)[key];
-                  const schemaT = schemaType as SchemaType<unknown>;
-                  if (
-                    schemaT &&
-                    !schemaT._validators.every((validator) => validator(value))
-                  ) {
-                    return false;
-                  }
+            [...validators, (v) => {
+              for (const [key, schemaType] of Object.entries(shapeSchema)) {
+                const value = (v as Record<string, unknown>)[key];
+                const schemaT = schemaType as SchemaType<unknown>;
+                if (schemaT && !schemaT._validators.every((validator) => validator(value))) {
+                  return false;
                 }
-                return true;
-              },
-            ],
-            defaultValue,
-            description,
+              }
+              return true;
+            }],
+            defaultValue, description, fm,
           );
         },
         nonNull() {
           return createChainableObject(
             [...validators, (v) => v !== null && v !== undefined],
-            defaultValue,
-            description,
+            defaultValue, description, fm,
           );
         },
         hasKeys(...keys: string[]) {
           return createChainableObject(
-            [
-              ...validators,
-              (v) => keys.every((k) => k in (v as Record<string, unknown>)),
-            ],
-            defaultValue,
-            description,
+            [...validators, (v) => keys.every((k) => k in (v as Record<string, unknown>))],
+            defaultValue, description, fm,
           );
         },
         default(value: T | (() => T)) {
-          return createChainableObject(validators, value, description);
+          return createChainableObject(validators, value, description, fm);
         },
         describe(desc: string) {
-          return createChainableObject(validators, defaultValue, desc);
+          return createChainableObject(validators, defaultValue, desc, fm);
+        },
+        meta(m: import("./types/meta.js").DefinitionMeta) {
+          return createChainableObject(validators, defaultValue, description, m);
         },
       };
     };

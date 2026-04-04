@@ -193,7 +193,7 @@ export function createEngine<S extends Schema>(
     if (module.events) {
       // Unwrap { handler, meta } event forms before merging
       for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null && "handler" in raw) {
+        if (typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler")) {
           const obj = raw as { handler: Function; meta?: DefinitionMeta };
           (module.events as Record<string, unknown>)[key] = obj.handler;
           if (obj.meta) {
@@ -225,6 +225,11 @@ export function createEngine<S extends Schema>(
   for (const def of Object.values(mergedEffects)) {
     const d = def as { meta?: DefinitionMeta };
     if (d.meta) d.meta = freezeMeta(d.meta)!;
+  }
+  // Freeze fact/schema field _meta
+  for (const schemaType of Object.values(mergedSchema)) {
+    const st = schemaType as { _meta?: DefinitionMeta };
+    if (st._meta) st._meta = freezeMeta(st._meta)!;
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -1110,6 +1115,9 @@ export function createEngine<S extends Schema>(
       traceManager.destroy();
       // Clean up dynamic definition state
       definitions.destroy();
+      // Clean up meta Maps
+      moduleMeta.clear();
+      eventMeta.clear();
       pluginManager.emitDestroy(system);
     },
 
@@ -1871,9 +1879,14 @@ export function createEngine<S extends Schema>(
 
     // Merge into existing engine state
     Object.assign(mergedSchema, module.schema);
+    // Freeze fact/schema field _meta for new module
+    for (const schemaType of Object.values(module.schema as Record<string, unknown>)) {
+      const st = schemaType as { _meta?: DefinitionMeta };
+      if (st._meta) st._meta = freezeMeta(st._meta)!;
+    }
     if (module.events) {
       for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null && "handler" in raw) {
+        if (typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler")) {
           const obj = raw as { handler: Function; meta?: DefinitionMeta };
           (module.events as Record<string, unknown>)[key] = obj.handler;
           if (obj.meta) {
