@@ -169,16 +169,27 @@ export interface TraceEntry {
   status: "pending" | "settled";
 
   /** Facts that changed, triggering this run */
-  factChanges: Array<{ key: string; oldValue: unknown; newValue: unknown }>;
+  factChanges: Array<{
+    key: string;
+    oldValue: unknown;
+    newValue: unknown;
+    meta?: DefinitionMeta;
+  }>;
   /** Derivations recomputed during this run, with tracked dependencies and values */
   derivationsRecomputed: Array<{
     id: string;
     deps: string[];
     oldValue: unknown;
     newValue: unknown;
+    meta?: DefinitionMeta;
   }>;
   /** Constraints that evaluated to active, with tracked dependencies */
-  constraintsHit: Array<{ id: string; priority: number; deps: string[] }>;
+  constraintsHit: Array<{
+    id: string;
+    priority: number;
+    deps: string[];
+    meta?: DefinitionMeta;
+  }>;
   /** Requirements added from constraint diff */
   requirementsAdded: Array<{
     id: string;
@@ -192,23 +203,33 @@ export interface TraceEntry {
     fromConstraint: string;
   }>;
   /** Resolvers started for new requirements */
-  resolversStarted: Array<{ resolver: string; requirementId: string }>;
+  resolversStarted: Array<{
+    resolver: string;
+    requirementId: string;
+    meta?: DefinitionMeta;
+  }>;
   /** Resolvers that completed (async — populated after reconcile) */
   resolversCompleted: Array<{
     resolver: string;
     requirementId: string;
     duration: number;
+    meta?: DefinitionMeta;
   }>;
   /** Resolvers that errored (async — populated after reconcile) */
   resolversErrored: Array<{
     resolver: string;
     requirementId: string;
     error: string;
+    meta?: DefinitionMeta;
   }>;
   /** Effects that ran, with their triggering fact keys */
-  effectsRun: Array<{ id: string; triggeredBy: string[] }>;
+  effectsRun: Array<{
+    id: string;
+    triggeredBy: string[];
+    meta?: DefinitionMeta;
+  }>;
   /** Effect errors */
-  effectErrors: Array<{ id: string; error: string }>;
+  effectErrors: Array<{ id: string; error: string; meta?: DefinitionMeta }>;
 
   /** Human-readable causal chain summary (populated when run settles) */
   causalChain?: string;

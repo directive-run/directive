@@ -371,6 +371,7 @@ export function createEngine<S extends Schema>(
           deps: deps ? [...deps] : [],
           oldValue,
           newValue: value,
+          meta: derivationsManager.getMeta(id as keyof DerivationsDef<S>),
         });
       }
     },
@@ -400,6 +401,8 @@ export function createEngine<S extends Schema>(
         traceManager.currentTrace.effectsRun.push({
           id,
           triggeredBy: deps,
+          meta: (mergedEffects[id] as { meta?: DefinitionMeta } | undefined)
+            ?.meta,
         });
       }
     },
@@ -411,6 +414,8 @@ export function createEngine<S extends Schema>(
         traceManager.currentTrace.effectErrors.push({
           id,
           error: String(error),
+          meta: (mergedEffects[id] as { meta?: DefinitionMeta } | undefined)
+            ?.meta,
         });
       }
 
@@ -661,6 +666,14 @@ export function createEngine<S extends Schema>(
     const reconcileStartMs = traceEnabled ? traceManager.startRun() : 0;
     const currentTrace = traceManager.currentTrace;
 
+    // Enrich fact changes with schema meta (after startRun drains pending changes)
+    if (currentTrace) {
+      for (const fc of currentTrace.factChanges) {
+        const schemaType = mergedSchema[fc.key as keyof S];
+        fc.meta = (schemaType as { _meta?: DefinitionMeta } | undefined)?._meta;
+      }
+    }
+
     try {
       // Take snapshot before reconciliation (respects snapshotEvents filtering)
       if (state.changedKeys.size > 0) {
@@ -713,6 +726,7 @@ export function createEngine<S extends Schema>(
               id: cId,
               priority: cState.priority,
               deps: cDeps ? [...cDeps] : [],
+              meta: mergedConstraints[cId]?.meta,
             });
           }
         }
@@ -756,9 +770,11 @@ export function createEngine<S extends Schema>(
         const inflightById = new Map(inflightNow.map((i) => [i.id, i]));
         for (const req of added) {
           const info = inflightById.get(req.id);
+          const resolverId = info?.resolverId ?? "unknown";
           currentTrace.resolversStarted.push({
-            resolver: info?.resolverId ?? "unknown",
+            resolver: resolverId,
             requirementId: req.id,
+            meta: mergedResolvers[resolverId]?.meta,
           });
           // Track attribution for async completion
           traceManager.attributeResolverStart(req.id);
