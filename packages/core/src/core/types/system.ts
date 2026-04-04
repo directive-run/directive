@@ -5,6 +5,7 @@
 import type { ErrorBoundaryConfig } from "./errors.js";
 import type { EventsAccessorFromSchema, SystemEvent } from "./events.js";
 import type { Facts } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
 import type { RequirementWithId } from "./requirements.js";
@@ -230,10 +231,17 @@ export interface SystemInspection {
     priority: number;
     hitCount: number;
     lastActiveAt: number | null;
+    meta?: DefinitionMeta;
   }>;
   resolvers: Record<string, ResolverStatus>;
   /** All defined resolver names and their requirement types */
-  resolverDefs: Array<{ id: string; requirement: string }>;
+  resolverDefs: Array<{ id: string; requirement: string; meta?: DefinitionMeta }>;
+  /** All defined effect names with optional metadata */
+  effects: Array<{ id: string; meta?: DefinitionMeta }>;
+  /** All defined derivation names with optional metadata */
+  derivations: Array<{ id: string; meta?: DefinitionMeta }>;
+  /** All registered modules with optional metadata */
+  modules: Array<{ id: string; meta?: DefinitionMeta }>;
   /** Whether trace is enabled on this system */
   traceEnabled: boolean;
   /** Per-run trace entries (only present if trace is enabled) */
@@ -507,6 +515,7 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   timeout?: number;
   after?: string[];
   deps?: string[];
+  meta?: DefinitionMeta;
 }
 
 /** Effect definition for dynamic registration — typed facts */
@@ -516,6 +525,7 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
     prev: InferSchema<M["facts"]> | null,
   ) => void | (() => void) | Promise<void | (() => void)>;
   deps?: Array<string & keyof InferSchema<M["facts"]>>;
+  meta?: DefinitionMeta;
 }
 
 /** Resolver definition for dynamic registration — typed context.facts, relaxed requirement */
@@ -541,6 +551,21 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
       snapshot: () => InferSchema<M["facts"]>;
     },
   ) => Promise<void>;
+  meta?: DefinitionMeta;
+}
+
+/** O(1) accessor for definition metadata. */
+export interface MetaAccessor {
+  /** Get metadata for a module by ID. */
+  module(id: string): DefinitionMeta | undefined;
+  /** Get metadata for a constraint by ID. */
+  constraint(id: string): DefinitionMeta | undefined;
+  /** Get metadata for a resolver by ID. */
+  resolver(id: string): DefinitionMeta | undefined;
+  /** Get metadata for an effect by ID. */
+  effect(id: string): DefinitionMeta | undefined;
+  /** Get metadata for a derivation by ID. */
+  derivation(id: string): DefinitionMeta | undefined;
 }
 
 export interface System<M extends ModuleSchema = ModuleSchema> {
@@ -551,6 +576,8 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly constraints: ConstraintsControl<M>;
   readonly effects: EffectsControl<M>;
   readonly resolvers: ResolversControl<M>;
+  /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
+  readonly meta: MetaAccessor;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 

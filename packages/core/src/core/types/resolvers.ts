@@ -3,6 +3,7 @@
  */
 
 import type { Facts, FactsSnapshot } from "./facts.js";
+import type { DefinitionMeta } from "./meta.js";
 import type {
   InferRequirementPayload,
   InferRequirementsFromSchema,
@@ -128,6 +129,8 @@ export interface ResolverDef<
     reqs: R[],
     ctx: ResolverContext<S>,
   ) => Promise<BatchResolveResults>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
 }
 
 /**

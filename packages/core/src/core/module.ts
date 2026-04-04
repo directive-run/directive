@@ -9,6 +9,7 @@ import type {
   CrossModuleDeps,
   CrossModuleDerivationsDef,
   CrossModuleEffectsDef,
+  DefinitionMeta,
   EffectsDef,
   Facts,
   ModuleDef,
@@ -38,6 +39,8 @@ export interface ModuleConfig<M extends ModuleSchema> {
   constraints?: TypedConstraintsDef<M>;
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
   /** History configuration — controls which events create snapshots for undo/redo. */
   history?: {
     /** Events that create history snapshots. Omit to snapshot all events. */
@@ -121,6 +124,8 @@ export interface ModuleConfigWithDeps<
   /** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;
+  /** Optional metadata for debugging and devtools (never read on hot path). */
+  meta?: DefinitionMeta;
   /** History configuration — controls which events create snapshots for undo/redo. */
   history?: {
     /** Events that create history snapshots. Omit to snapshot all events. */
@@ -396,6 +401,7 @@ export function createModule<const M extends ModuleSchema>(
     constraints: config.constraints as TypedConstraintsDef<M> | undefined,
     resolvers: config.resolvers,
     hooks: config.hooks,
+    meta: config.meta,
     history: config.history,
     // Store crossModuleDeps for runtime proxy creation
     crossModuleDeps: crossModuleDeps as CrossModuleDeps | undefined,

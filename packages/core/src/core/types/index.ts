@@ -34,11 +34,17 @@ export type { RequirementsSchema } from "./requirements.js";
 // Facts types
 export type { Facts, FactsSnapshot, FactsStore, FactChange } from "./facts.js";
 
+// Meta types
+export type { DefinitionMeta } from "./meta.js";
+export { freezeMeta, isDerivationWithMeta } from "./meta.js";
+
 // Derivation types
 export type {
   TrackingContext,
   DerivationDef,
   DerivationsDef,
+  DerivationDefWithMeta,
+  DerivationDefOrMeta,
   DerivedValues,
   DerivationState,
 } from "./derivations.js";
@@ -121,6 +127,7 @@ export type {
   // Accessors
   DeriveAccessor,
   EventsAccessor,
+  MetaAccessor,
   FactKeys,
   FactReturnType,
   DerivationKeys,

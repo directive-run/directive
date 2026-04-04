@@ -861,6 +861,11 @@ function bindEnginePassthroughs(
       enumerable: true,
       configurable: true,
     },
+    meta: {
+      value: engine.meta,
+      enumerable: true,
+      configurable: true,
+    },
     isRunning: {
       get() {
         return engine.isRunning;
@@ -1034,6 +1039,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         constraints: mod.constraints,
         resolvers: mod.resolvers,
         hooks: mod.hooks,
+        meta: mod.meta,
         history: mod.history,
       },
       // biome-ignore lint/suspicious/noExplicitAny: Module format

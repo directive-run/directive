@@ -56,6 +56,7 @@ import type {
   SystemInspection,
   TraceEntry,
 } from "./types.js";
+import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 
 // ============================================================================
 // Engine Implementation
@@ -118,6 +119,9 @@ export function createEngine<S extends Schema>(
   const mergedEffects: EffectsDef<S> = Object.create(null);
   const mergedConstraints: ConstraintsDef<S> = Object.create(null);
   const mergedResolvers: ResolversDef<S> = Object.create(null);
+
+  // Module metadata (frozen at registration)
+  const moduleMeta = new Map<string, DefinitionMeta>();
 
   // Track which module defined each key for collision detection
   const schemaOwners = new Map<string, string>();
@@ -191,6 +195,22 @@ export function createEngine<S extends Schema>(
     if (module.constraints)
       Object.assign(mergedConstraints, module.constraints);
     if (module.resolvers) Object.assign(mergedResolvers, module.resolvers);
+    if (module.meta) {
+      const frozen = freezeMeta(module.meta);
+      if (frozen) moduleMeta.set(module.id, frozen);
+    }
+  }
+
+  // Freeze meta on all non-derivation definitions (derivations freeze in their manager)
+  for (const def of Object.values(mergedConstraints)) {
+    if (def.meta) def.meta = freezeMeta(def.meta)!;
+  }
+  for (const def of Object.values(mergedResolvers)) {
+    if (def.meta) def.meta = freezeMeta(def.meta)!;
+  }
+  for (const def of Object.values(mergedEffects)) {
+    const d = def as { meta?: DefinitionMeta };
+    if (d.meta) d.meta = freezeMeta(d.meta)!;
   }
 
   // Build snapshotEventNames: Set<string> | null
@@ -396,10 +416,7 @@ export function createEngine<S extends Schema>(
   // to requirement deduplication inside the constraints manager.
   const requirementKeys: Record<string, RequirementKeyFn> = Object.create(null);
   for (const def of Object.values(mergedResolvers)) {
-    if (
-      def.key &&
-      typeof def.requirement === "string"
-    ) {
+    if (def.key && typeof def.requirement === "string") {
       requirementKeys[def.requirement] = def.key;
     }
   }
@@ -916,6 +933,25 @@ export function createEngine<S extends Schema>(
       return traceManager.getEntries();
     },
 
+    meta: {
+      module(id: string): DefinitionMeta | undefined {
+        return moduleMeta.get(id);
+      },
+      constraint(id: string): DefinitionMeta | undefined {
+        return mergedConstraints[id]?.meta;
+      },
+      resolver(id: string): DefinitionMeta | undefined {
+        return mergedResolvers[id]?.meta;
+      },
+      effect(id: string): DefinitionMeta | undefined {
+        return (mergedEffects[id] as { meta?: DefinitionMeta } | undefined)
+          ?.meta;
+      },
+      derivation(id: string): DefinitionMeta | undefined {
+        return derivationsManager.getMeta(id as keyof DerivationsDef<S>);
+      },
+    },
+
     initialize(): void {
       if (state.isInitialized) return;
       state.isInitializing = true;
@@ -1186,6 +1222,7 @@ export function createEngine<S extends Schema>(
           priority: s.priority,
           hitCount: s.hitCount,
           lastActiveAt: s.lastActiveAt,
+          meta: mergedConstraints[s.id]?.meta,
         })),
         resolvers: Object.fromEntries(
           resolversManager
@@ -1198,6 +1235,20 @@ export function createEngine<S extends Schema>(
             typeof def.requirement === "string"
               ? def.requirement
               : "(predicate)",
+          meta: def.meta,
+        })),
+        effects: Object.entries(mergedEffects).map(([id, def]) => ({
+          id,
+          meta: (def as { meta?: DefinitionMeta })
+            .meta,
+        })),
+        derivations: Object.keys(mergedDerive).map((id) => ({
+          id,
+          meta: derivationsManager.getMeta(id as keyof DerivationsDef<S>),
+        })),
+        modules: config.modules.map((m) => ({
+          id: m.id,
+          meta: moduleMeta.get(m.id),
         })),
         traceEnabled,
         ...(traceEnabled
@@ -1234,13 +1285,20 @@ export function createEngine<S extends Schema>(
         }
       }
 
+      const constraintDef = mergedConstraints[req.fromConstraint];
+      const constraintLabel = constraintDef?.meta?.label ?? req.fromConstraint;
+
       const lines: string[] = [
         `Requirement "${req.requirement.type}" (id: ${req.id})`,
-        `├─ Produced by constraint: ${req.fromConstraint}`,
+        `├─ Produced by constraint: ${constraintLabel}`,
         `├─ Constraint priority: ${constraintState?.priority ?? 0}`,
         `├─ Constraint active: ${constraintState?.lastResult ?? "unknown"}`,
         `├─ Resolver status: ${resolverStatus.state}`,
       ];
+
+      if (constraintDef?.meta?.description) {
+        lines.push(`├─ Description: ${constraintDef.meta.description}`);
+      }
 
       // Add requirement details
       const reqDetails = Object.entries(req.requirement)
@@ -1688,6 +1746,7 @@ export function createEngine<S extends Schema>(
       onStop?: (s: unknown) => void;
       onError?: (e: unknown, ctx: unknown) => void;
     };
+    meta?: DefinitionMeta;
     history?: { snapshotEvents?: string[] };
   }): void {
     // Guard: cannot register during reconciliation (would corrupt iteration state)
@@ -1776,16 +1835,28 @@ export function createEngine<S extends Schema>(
       );
     }
     if (module.effects) {
+      for (const def of Object.values(module.effects)) {
+        const d = def as { meta?: DefinitionMeta };
+        if (d.meta) d.meta = freezeMeta(d.meta)!;
+      }
       Object.assign(mergedEffects, module.effects);
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       effectsManager.registerDefinitions(module.effects as any);
     }
     if (module.constraints) {
+      for (const def of Object.values(module.constraints)) {
+        const d = def as { meta?: DefinitionMeta };
+        if (d.meta) d.meta = freezeMeta(d.meta)!;
+      }
       Object.assign(mergedConstraints, module.constraints);
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       constraintsManager.registerDefinitions(module.constraints as any);
     }
     if (module.resolvers) {
+      for (const def of Object.values(module.resolvers)) {
+        const d = def as { meta?: DefinitionMeta };
+        if (d.meta) d.meta = freezeMeta(d.meta)!;
+      }
       Object.assign(mergedResolvers, module.resolvers);
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       resolversManager.registerDefinitions(module.resolvers as any);
@@ -1796,6 +1867,12 @@ export function createEngine<S extends Schema>(
     // Register new schema keys with the facts store
     // biome-ignore lint/suspicious/noExplicitAny: Internal dynamic method
     (store as any).registerKeys(module.schema as Record<string, unknown>);
+
+    // Store module meta (frozen)
+    if (module.meta) {
+      const frozen = freezeMeta(module.meta);
+      if (frozen) moduleMeta.set(module.id, frozen);
+    }
 
     // Track the new module in config.modules for hooks
     config.modules.push(module as (typeof config.modules)[number]);
