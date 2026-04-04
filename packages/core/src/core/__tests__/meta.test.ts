@@ -1018,6 +1018,128 @@ describe("DefinitionMeta", () => {
   });
 
   // ============================================================================
+  // Trace enrichment
+  // ============================================================================
+
+  describe("trace enrichment", () => {
+    it("trace entries include meta on constraintsHit", async () => {
+      const mod = createModule("trace-c", {
+        schema: {
+          facts: { x: t.number() },
+          derivations: {},
+          requirements: { DO: {} },
+          events: {},
+        },
+        init: (f) => {
+          f.x = 0;
+        },
+        constraints: {
+          check: {
+            when: (facts) => facts.x > 0,
+            require: { type: "DO" },
+            meta: { label: "Positive Check" },
+          },
+        },
+        resolvers: {
+          doIt: {
+            requirement: "DO",
+            resolve: async () => {},
+          },
+        },
+      });
+      const sys = createSystem({ module: mod, trace: true });
+      sys.start();
+
+      sys.facts.x = 5;
+      await sys.settle();
+
+      const trace = sys.trace;
+      expect(trace).not.toBeNull();
+      const entry = trace!.find(
+        (t) => t.constraintsHit.length > 0,
+      );
+      expect(entry).toBeDefined();
+      const hit = entry!.constraintsHit.find((c) => c.id === "check");
+      expect(hit?.meta?.label).toBe("Positive Check");
+
+      sys.destroy();
+    });
+
+    it("trace entries include meta on factChanges", async () => {
+      const mod = createModule("trace-f", {
+        schema: {
+          facts: {
+            score: t.number().meta({ label: "Score" }),
+          },
+          derivations: {},
+          requirements: {},
+          events: {},
+        },
+        init: (f) => {
+          f.score = 0;
+        },
+      });
+      const sys = createSystem({ module: mod, trace: true });
+      sys.start();
+
+      sys.facts.score = 42;
+      await sys.settle();
+
+      const trace = sys.trace;
+      expect(trace).not.toBeNull();
+      const entry = trace!.find((t) =>
+        t.factChanges.some((fc) => fc.key === "score"),
+      );
+      expect(entry).toBeDefined();
+      const fc = entry!.factChanges.find((fc) => fc.key === "score");
+      expect(fc?.meta?.label).toBe("Score");
+
+      sys.destroy();
+    });
+
+    it("trace entries include meta on resolversStarted", async () => {
+      const mod = createModule("trace-r", {
+        schema: {
+          facts: { x: t.number() },
+          derivations: {},
+          requirements: { ACT: {} },
+          events: {},
+        },
+        init: (f) => {
+          f.x = 0;
+        },
+        constraints: {
+          check: {
+            when: (facts) => facts.x > 0,
+            require: { type: "ACT" },
+          },
+        },
+        resolvers: {
+          act: {
+            requirement: "ACT",
+            resolve: async () => {},
+            meta: { label: "Actor" },
+          },
+        },
+      });
+      const sys = createSystem({ module: mod, trace: true });
+      sys.start();
+
+      sys.facts.x = 1;
+      await sys.settle();
+
+      const trace = sys.trace;
+      expect(trace).not.toBeNull();
+      const entry = trace!.find((t) => t.resolversStarted.length > 0);
+      expect(entry).toBeDefined();
+      const rs = entry!.resolversStarted.find((r) => r.resolver === "act");
+      expect(rs?.meta?.label).toBe("Actor");
+
+      sys.destroy();
+    });
+  });
+
+  // ============================================================================
   // Export check
   // ============================================================================
 
