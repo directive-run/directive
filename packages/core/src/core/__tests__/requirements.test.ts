@@ -282,11 +282,11 @@ describe("RequirementSet", () => {
     const r = makeReq("FETCH", { userId: 1 });
     next.add(r);
 
-    const { added, removed, unchanged } = next.diff(prev);
+    const { added, removed } = next.diff(prev);
 
     expect(added).toEqual([r]);
     expect(removed).toEqual([]);
-    expect(unchanged).toEqual([]);
+    // unchanged removed for perf — only added/removed used by engine
   });
 
   it("diff - finds removed requirements", () => {
@@ -295,30 +295,28 @@ describe("RequirementSet", () => {
     const r = makeReq("FETCH", { userId: 1 });
     prev.add(r);
 
-    const { added, removed, unchanged } = next.diff(prev);
+    const { added, removed } = next.diff(prev);
 
     expect(added).toEqual([]);
     expect(removed).toEqual([r]);
-    expect(unchanged).toEqual([]);
+    // unchanged removed for perf — only added/removed used by engine
   });
 
-  it("diff - finds unchanged requirements", () => {
+  it("diff - handles same requirements as no adds/removes", () => {
     const prev = new RequirementSet();
     const next = new RequirementSet();
     const r = makeReq("FETCH", { userId: 1 });
     prev.add(r);
-    // Same ID, different object — still counts as unchanged
     const rNext = createRequirementWithId({ type: "FETCH", userId: 1 }, "c1");
     next.add(rNext);
 
-    const { added, removed, unchanged } = next.diff(prev);
+    const { added, removed } = next.diff(prev);
 
     expect(added).toEqual([]);
     expect(removed).toEqual([]);
-    expect(unchanged).toEqual([rNext]);
   });
 
-  it("diff - handles mixed added/removed/unchanged", () => {
+  it("diff - handles mixed added/removed", () => {
     const prev = new RequirementSet();
     const next = new RequirementSet();
 
@@ -333,10 +331,9 @@ describe("RequirementSet", () => {
     next.add(keptNext);
     next.add(fresh);
 
-    const { added, removed, unchanged } = next.diff(prev);
+    const { added, removed } = next.diff(prev);
 
     expect(added).toEqual([fresh]);
     expect(removed).toEqual([old]);
-    expect(unchanged).toEqual([keptNext]);
   });
 });

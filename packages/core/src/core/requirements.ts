@@ -315,18 +315,14 @@ export class RequirementSet {
   diff(other: RequirementSet): {
     added: RequirementWithId[];
     removed: RequirementWithId[];
-    unchanged: RequirementWithId[];
   } {
     const added: RequirementWithId[] = [];
     const removed: RequirementWithId[] = [];
-    const unchanged: RequirementWithId[] = [];
 
     // Find added (in this but not in other)
     for (const req of this.map.values()) {
       if (!other.has(req.id)) {
         added.push(req);
-      } else {
-        unchanged.push(req);
       }
     }
 
@@ -337,6 +333,6 @@ export class RequirementSet {
       }
     }
 
-    return { added, removed, unchanged };
+    return { added, removed };
   }
 }
