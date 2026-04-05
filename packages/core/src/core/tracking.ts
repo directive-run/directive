@@ -7,27 +7,22 @@
 
 import type { TrackingContext } from "./types.js";
 
-/** Stack of active tracking contexts */
-const trackingStack: TrackingContext[] = [];
+/** Stack of active dependency sets (bare Sets for zero-allocation hot path) */
+const depStack: Set<string>[] = [];
 
-/** Create a new tracking context */
-function createTrackingContext(): TrackingContext {
-  const dependencies = new Set<string>();
+/** Pool of reusable Sets to avoid GC pressure */
+const setPool: Set<string>[] = [];
 
-  return {
-    get isTracking() {
-      return true;
-    },
-    track(key: string) {
-      dependencies.add(key);
-    },
-    getDependencies() {
-      return dependencies;
-    },
-  };
+function acquireSet(): Set<string> {
+  return setPool.pop() ?? new Set<string>();
 }
 
-/** Null tracking context when not tracking */
+function releaseSet(s: Set<string>): void {
+  s.clear();
+  if (setPool.length < 8) setPool.push(s);
+}
+
+/** Null tracking context when not tracking (for getCurrentTracker compat) */
 const nullContext: TrackingContext = {
   isTracking: false,
   track() {},
@@ -45,7 +40,18 @@ const nullContext: TrackingContext = {
  * @internal
  */
 export function getCurrentTracker(): TrackingContext {
-  return trackingStack[trackingStack.length - 1] ?? nullContext;
+  const len = depStack.length;
+  if (len === 0) return nullContext;
+  const deps = depStack[len - 1]!;
+  return {
+    isTracking: true,
+    track(key: string) {
+      deps.add(key);
+    },
+    getDependencies() {
+      return deps;
+    },
+  };
 }
 
 /**
@@ -56,7 +62,7 @@ export function getCurrentTracker(): TrackingContext {
  * @internal
  */
 export function isTracking(): boolean {
-  return trackingStack.length > 0;
+  return depStack.length > 0;
 }
 
 /**
@@ -74,14 +80,16 @@ export function isTracking(): boolean {
  * @internal
  */
 export function withTracking<T>(fn: () => T): { value: T; deps: Set<string> } {
-  const context = createTrackingContext();
-  trackingStack.push(context);
+  const deps = acquireSet();
+  depStack.push(deps);
 
   try {
     const value = fn();
-    return { value, deps: context.getDependencies() };
+    // Return deps directly — caller owns the Set now (not pooled back)
+    return { value, deps };
   } finally {
-    trackingStack.pop();
+    depStack.pop();
+    // Don't release — deps is returned to caller (derivation stores it)
   }
 }
 
@@ -101,14 +109,14 @@ export function withTracking<T>(fn: () => T): { value: T; deps: Set<string> } {
  */
 export function withoutTracking<T>(fn: () => T): T {
   // Temporarily clear the stack
-  const saved = trackingStack.splice(0, trackingStack.length);
+  const saved = depStack.splice(0, depStack.length);
 
   try {
     return fn();
   } finally {
     // Restore the stack (loop avoids spread overflow with deep stacks)
     for (const ctx of saved) {
-      trackingStack.push(ctx);
+      depStack.push(ctx);
     }
   }
 }
@@ -125,11 +133,11 @@ export function withoutTracking<T>(fn: () => T): T {
  */
 export function trackAccess(key: string): void {
   // Fast path: skip when no tracking context is active (99% of calls)
-  const len = trackingStack.length;
+  const len = depStack.length;
   if (len === 0) {
     return;
   }
-  trackingStack[len - 1]!.track(key);
+  depStack[len - 1]!.add(key);
 }
 
 /**
