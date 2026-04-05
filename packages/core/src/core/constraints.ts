@@ -1107,9 +1107,11 @@ export function createConstraintsManager<S extends Schema>(
       noFireConstraints.clear();
 
       // Get all enabled constraints (use cached sort order)
-      const allConstraintIds = getSortedConstraintIds().filter(
-        (id) => !disabled.has(id),
-      );
+      const sorted = getSortedConstraintIds();
+      const allConstraintIds =
+        disabled.size === 0
+          ? sorted
+          : sorted.filter((id) => !disabled.has(id));
 
       // Determine which constraints to evaluate
       let constraintsToEvaluate: string[];
