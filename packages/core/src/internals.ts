@@ -55,7 +55,7 @@ export { createEngine } from "./core/engine.js";
 // ============================================================================
 
 export {
-  getCurrentTracker,
+  getCurrentDeps,
   isTracking,
   withTracking,
   withoutTracking,

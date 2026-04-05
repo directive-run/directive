@@ -40,7 +40,6 @@ export { freezeMeta, isDerivationWithMeta } from "./meta.js";
 
 // Derivation types
 export type {
-  TrackingContext,
   DerivationDef,
   DerivationsDef,
   DerivationDefWithMeta,

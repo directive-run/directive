@@ -7,17 +7,6 @@ import type { DefinitionMeta } from "./meta.js";
 import type { InferDerivations, ModuleSchema, Schema } from "./schema.js";
 
 // ============================================================================
-// Tracking Types
-// ============================================================================
-
-/** Tracking context for auto-dependency detection */
-export interface TrackingContext {
-  readonly isTracking: boolean;
-  track(key: string): void;
-  getDependencies(): Set<string>;
-}
-
-// ============================================================================
 // Derivation Types (internal engine use)
 // ============================================================================
 
