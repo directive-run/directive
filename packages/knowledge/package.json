@@ -42,11 +42,13 @@
     "core",
     "ai",
     "examples",
-    "api-skeleton.md"
+    "api-skeleton.md",
+    "sitemap.md"
   ],
   "scripts": {
-    "build": "tsx scripts/generate-api-skeleton.ts && tsx scripts/extract-examples.ts && tsup",
+    "build": "tsx scripts/generate-api-skeleton.ts && tsx scripts/generate-sitemap.ts && tsx scripts/extract-examples.ts && tsup",
     "generate": "tsx scripts/generate-api-skeleton.ts",
+    "generate-sitemap": "tsx scripts/generate-sitemap.ts",
     "extract-examples": "tsx scripts/extract-examples.ts",
     "validate": "tsx scripts/validate-knowledge.ts",
     "test": "tsx scripts/validate-knowledge.ts && vitest run",
