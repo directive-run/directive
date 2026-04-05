@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  getCurrentTracker,
+  getCurrentDeps,
   isTracking,
   trackAccess,
   withTracking,
@@ -121,21 +121,18 @@ describe("tracking", () => {
     });
   });
 
-  describe("getCurrentTracker", () => {
-    it("returns null context when not tracking", () => {
-      const tracker = getCurrentTracker();
-
-      expect(tracker.isTracking).toBe(false);
-      expect(tracker.getDependencies()).toEqual(new Set());
+  describe("getCurrentDeps", () => {
+    it("returns null when not tracking", () => {
+      expect(getCurrentDeps()).toBeNull();
     });
 
-    it("returns real context inside withTracking", () => {
+    it("returns the active dependency Set inside withTracking", () => {
       withTracking(() => {
-        const tracker = getCurrentTracker();
+        const deps = getCurrentDeps();
 
-        expect(tracker.isTracking).toBe(true);
-        tracker.track("manual");
-        expect(tracker.getDependencies()).toContain("manual");
+        expect(deps).not.toBeNull();
+        deps!.add("manual");
+        expect(deps).toContain("manual");
       });
     });
   });
