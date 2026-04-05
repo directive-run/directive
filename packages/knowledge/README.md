@@ -13,8 +13,9 @@ This package is the **source of truth** for all Directive coding knowledge used 
 |-----------|-------|-------------|
 | `core/` | 13 | Core Directive knowledge (modules, constraints, resolvers, etc.) |
 | `ai/` | 12 | AI orchestrator knowledge (agents, streaming, guardrails, etc.) |
-| `examples/` | 32 | Extracted examples (auto-generated, DOM wiring stripped) |
+| `examples/` | 37 | Extracted examples (auto-generated, DOM wiring stripped) |
 | `api-skeleton.md` | 1 | Auto-generated API reference skeleton |
+| `sitemap.md` | 1 | Auto-generated docs site sitemap (125+ pages) |
 
 ## Programmatic API
 
