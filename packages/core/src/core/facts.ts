@@ -412,7 +412,7 @@ export function createFactsStore<S extends Schema>(
       key: K,
       value: InferSchema<S>[K],
     ): void {
-      validateValue(key as string, value);
+      if (__DEV__) validateValue(key as string, value);
 
       const prev = map.get(key as string);
 
