@@ -1,5 +1,18 @@
 # @directive-run/core
 
+## 1.0.1
+
+### Patch Changes
+
+- [`2c922f9`](https://github.com/directive-run/directive/commit/2c922f955e61a438bc9afa89f8e2d8c841ca77d0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Performance optimizations: +36-95% faster derivations, +8-17% faster reconcile
+
+  - Gate `validateValue` behind `__DEV__` — skip schema validation in production builds (+7-11% writes)
+  - Eliminate TrackingContext object allocation — bare Set<string> dep stack (+50-112% derivation compute)
+  - Skip plugin emit callbacks when no plugins registered (+14-16% reconcile)
+  - Remove unused `unchanged` array from RequirementSet.diff() (+8-17% reconcile)
+  - Short-circuit disabled constraint filter when disabled.size === 0
+  - Remove TrackingContext interface (pre-launch cleanup — replaced with getCurrentDeps)
+
 ## 1.0.0
 
 ### Minor Changes

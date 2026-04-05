@@ -1,5 +1,7 @@
 # @directive-run/claude-plugin
 
+## 1.0.1
+
 ## 1.0.0
 
 ## 0.8.9
