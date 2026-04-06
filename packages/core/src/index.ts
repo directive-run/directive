@@ -55,7 +55,7 @@ export type {
   SystemSnapshot,
   MetaAccessor,
   MetaMatch,
-  DirectiveObservationEvent,
+  ObservationEvent,
   // Trace
   TraceEntry,
   TraceOption,
