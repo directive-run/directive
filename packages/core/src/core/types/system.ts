@@ -629,7 +629,7 @@ export interface MetaAccessor {
 // ============================================================================
 
 /** Typed events emitted by system.observe(). */
-export type DirectiveObservationEvent =
+export type ObservationEvent =
   | { type: "fact.change"; key: string; prev: unknown; next: unknown }
   | { type: "constraint.evaluate"; id: string; active: boolean }
   | { type: "constraint.error"; id: string; error: unknown }
@@ -672,7 +672,7 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * });
    * ```
    */
-  observe(observer: (event: DirectiveObservationEvent) => void): () => void;
+  observe(observer: (event: ObservationEvent) => void): () => void;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 

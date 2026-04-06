@@ -1046,7 +1046,7 @@ export function createEngine<S extends Schema>(
     },
 
     observe(
-      observer: (event: import("./types/system.js").DirectiveObservationEvent) => void,
+      observer: (event: import("./types/system.js").ObservationEvent) => void,
     ): () => void {
       const name = `__observer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const plugin = {
