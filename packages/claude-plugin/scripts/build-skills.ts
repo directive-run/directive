@@ -37,7 +37,7 @@ interface SkillConfig {
 const SKILL_MAP: SkillConfig[] = [
   {
     name: "getting-started-with-directive",
-    knowledgeFiles: ["api-skeleton", "core-patterns"],
+    knowledgeFiles: ["api-skeleton", "core-patterns", "sitemap"],
     examples: ["counter"],
   },
   {

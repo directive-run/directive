@@ -177,9 +177,49 @@ inspection.inflight;
 // Unmet requirements (no matching resolver)
 inspection.unmet;
 
-// Explain why a requirement exists
+// Explain why a requirement exists (uses meta.label + meta.description)
 const explanation = system.explain("req-123");
 ```
+
+## Definition Meta
+
+Attach optional metadata to any definition for debugging, devtools, and AI context:
+
+```typescript
+// On constraints, resolvers, effects — meta field
+constraints: {
+  needsAuth: {
+    when: (f) => !f.user,
+    require: { type: "LOGIN" },
+    meta: { label: "Requires Auth", category: "auth", tags: ["critical"] },
+  },
+},
+
+// On derivations — { compute, meta } object form
+derive: {
+  displayName: {
+    compute: (f) => `${f.first} ${f.last}`,
+    meta: { label: "Display Name" },
+  },
+},
+
+// On facts — chainable .meta()
+schema: { facts: { email: t.string().meta({ label: "Email", tags: ["pii"] }) } },
+
+// On modules
+meta: { label: "Auth Module", category: "auth" },
+
+// O(1) accessor
+system.meta.constraint("needsAuth")?.label;  // "Requires Auth"
+system.meta.fact("email")?.tags;             // ["pii"]
+system.meta.module("auth")?.label;           // "Auth Module"
+
+// Bulk queries
+system.meta.byCategory("auth");  // MetaMatch[] — all auth definitions
+system.meta.byTag("pii");        // MetaMatch[] — all PII-tagged fields
+```
+
+Meta is frozen at registration (Object.create(null) + Object.freeze). Zero hot-path cost. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
 
 ## Lifecycle
 

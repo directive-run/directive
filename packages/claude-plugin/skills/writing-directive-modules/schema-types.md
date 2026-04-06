@@ -18,8 +18,11 @@ What kind of value?
 ├── Union → t.union(t.string(), t.number())
 ├── Map/Set → t.object<Map<K,V>>() or t.object<Set<T>>()
 ├── Date → t.object<Date>() or t.number() for timestamps
-└── Unknown/any → t.object<unknown>()
+├── Unknown/any → t.object<unknown>()
+└── Any type + metadata → t.string().meta({ label: "Email", tags: ["pii"] })
 ```
+
+All builders support `.meta({ label, description, category, color, tags })` for devtools/AI annotations. Chains with other methods: `t.string().meta({...}).nullable()`.
 
 ## Primitive Types
 
