@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/vue",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Vue composition API adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
