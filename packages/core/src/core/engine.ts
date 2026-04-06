@@ -1045,6 +1045,56 @@ export function createEngine<S extends Schema>(
       },
     },
 
+    observe(
+      observer: (event: import("./types/system.js").DirectiveObservationEvent) => void,
+    ): () => void {
+      const name = `__observer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const plugin = {
+        name,
+        onInit: () => observer({ type: "system.init" }),
+        onStart: () => observer({ type: "system.start" }),
+        onStop: () => observer({ type: "system.stop" }),
+        onDestroy: () => observer({ type: "system.destroy" }),
+        onFactSet: (key: string, value: unknown, prev: unknown) =>
+          observer({ type: "fact.change", key, prev, next: value }),
+        onConstraintEvaluate: (id: string, active: boolean) =>
+          observer({ type: "constraint.evaluate", id, active }),
+        onConstraintError: (id: string, error: unknown) =>
+          observer({ type: "constraint.error", id, error }),
+        onRequirementCreated: (req: { id: string; requirement: { type: string } }) =>
+          observer({ type: "requirement.created", id: req.id, requirementType: req.requirement.type }),
+        onRequirementMet: (req: { id: string }, byResolver: string) =>
+          observer({ type: "requirement.met", id: req.id, byResolver }),
+        onRequirementCanceled: (req: { id: string }) =>
+          observer({ type: "requirement.canceled", id: req.id }),
+        onResolverStart: (resolver: string, req: { id: string }) =>
+          observer({ type: "resolver.start", resolver, requirementId: req.id }),
+        onResolverComplete: (resolver: string, req: { id: string }, duration: number) =>
+          observer({ type: "resolver.complete", resolver, requirementId: req.id, duration }),
+        onResolverError: (resolver: string, req: { id: string }, error: unknown) =>
+          observer({ type: "resolver.error", resolver, requirementId: req.id, error }),
+        onEffectRun: (id: string) =>
+          observer({ type: "effect.run", id }),
+        onEffectError: (id: string, error: unknown) =>
+          observer({ type: "effect.error", id, error }),
+        onDerivationCompute: (id: string, value: unknown) =>
+          observer({ type: "derivation.compute", id, value }),
+        onReconcileStart: () =>
+          observer({ type: "reconcile.start" }),
+        onReconcileEnd: (result: unknown) => {
+          const r = result as { unmet?: unknown[]; inflight?: unknown[] };
+          observer({
+            type: "reconcile.end",
+            added: Array.isArray(r.unmet) ? r.unmet.length : 0,
+            removed: 0,
+          });
+        },
+      };
+      pluginManager.register(plugin);
+
+      return () => pluginManager.unregister(name);
+    },
+
     initialize(): void {
       if (state.isInitialized) return;
       state.isInitializing = true;

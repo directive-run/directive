@@ -624,6 +624,31 @@ export interface MetaAccessor {
   byTag(tag: string): MetaMatch[];
 }
 
+// ============================================================================
+// Observation Protocol
+// ============================================================================
+
+/** Typed events emitted by system.observe(). */
+export type DirectiveObservationEvent =
+  | { type: "fact.change"; key: string; prev: unknown; next: unknown }
+  | { type: "constraint.evaluate"; id: string; active: boolean }
+  | { type: "constraint.error"; id: string; error: unknown }
+  | { type: "requirement.created"; id: string; requirementType: string }
+  | { type: "requirement.met"; id: string; byResolver: string }
+  | { type: "requirement.canceled"; id: string }
+  | { type: "resolver.start"; resolver: string; requirementId: string }
+  | { type: "resolver.complete"; resolver: string; requirementId: string; duration: number }
+  | { type: "resolver.error"; resolver: string; requirementId: string; error: unknown }
+  | { type: "effect.run"; id: string }
+  | { type: "effect.error"; id: string; error: unknown }
+  | { type: "derivation.compute"; id: string; value: unknown }
+  | { type: "reconcile.start" }
+  | { type: "reconcile.end"; added: number; removed: number }
+  | { type: "system.init" }
+  | { type: "system.start" }
+  | { type: "system.stop" }
+  | { type: "system.destroy" };
+
 export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly facts: Facts<M["facts"]>;
   readonly history: HistoryAPI | null;
@@ -634,6 +659,20 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   readonly resolvers: ResolversControl<M>;
   /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
   readonly meta: MetaAccessor;
+  /**
+   * Observe all lifecycle events as a typed stream.
+   * Returns an unsubscribe function.
+   *
+   * @example
+   * ```typescript
+   * const unsub = system.observe((event) => {
+   *   if (event.type === "resolver.complete") {
+   *     console.log(event.resolver, event.duration);
+   *   }
+   * });
+   * ```
+   */
+  observe(observer: (event: DirectiveObservationEvent) => void): () => void;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
