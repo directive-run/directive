@@ -905,6 +905,7 @@ function bindEnginePassthroughs(
   system.explain = engine.explain.bind(engine);
   system.getSnapshot = engine.getSnapshot.bind(engine);
   system.restore = engine.restore.bind(engine);
+  system.observe = engine.observe.bind(engine);
 
   // Direct engine passthroughs — only bind if not already defined
   // (namespaced systems override these with key-translating versions)
