@@ -1,5 +1,22 @@
 # @directive-run/core
 
+## 1.1.0
+
+### Minor Changes
+
+- [`8ae20b1`](https://github.com/directive-run/directive/commit/8ae20b1f0d9e06bfbc01a3ff79f7c47ee6aba241) Thanks [@jasoncomes](https://github.com/jasoncomes)! - XState-inspired improvements: React context provider, observation protocol, coverage testing
+
+  **React (`@directive-run/react`):**
+
+  - `createDirectiveContext(system)` — returns `{ Provider, useFact, useDerived, useEvents, useDispatch, useSelector, useWatch, useInspect, useExplain, useHistory, useSystem }`. Eliminates prop-drilling. Provider accepts `system` override for testing.
+
+  **Core (`@directive-run/core`):**
+
+  - `system.observe(observer)` — typed inspection protocol with 18 event types (`ObservationEvent`). Enables browser extensions, third-party tools, and inspection-based test assertions. Implemented as internal plugin — zero overhead when no observers.
+  - `createCoverageTracker(system)` — run test scenarios, get coverage report showing which constraints/resolvers/effects/derivations were exercised and which were missed. Something XState can't do.
+  - `createTestObserver(system)` — collect all observation events during tests, filter by type for assertions.
+  - `CLAUDE.md` — AI contributor guide with architecture, key files, conventions.
+
 ## 1.0.1
 
 ### Patch Changes
