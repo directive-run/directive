@@ -1090,3 +1090,182 @@ function getDynamicCheck(
       return system.effects.isDynamic(id);
   }
 }
+
+// ============================================================================
+// Constraint Coverage
+// ============================================================================
+
+/** Coverage report for a Directive system. */
+export interface CoverageReport {
+  /** Constraints that evaluated to true at least once. */
+  constraintsHit: Set<string>;
+  /** Constraints that never evaluated to true. */
+  constraintsMissed: Set<string>;
+  /** Resolvers that started at least once. */
+  resolversRun: Set<string>;
+  /** Resolvers that never started. */
+  resolversMissed: Set<string>;
+  /** Effects that ran at least once. */
+  effectsRun: Set<string>;
+  /** Derivations that recomputed at least once. */
+  derivationsComputed: Set<string>;
+  /** Coverage percentage (constraintsHit / total constraints). */
+  constraintCoverage: number;
+  /** Coverage percentage (resolversRun / total resolvers). */
+  resolverCoverage: number;
+}
+
+/**
+ * Track which constraints, resolvers, effects, and derivations are exercised
+ * during a test scenario. Returns a coverage report after the scenario runs.
+ *
+ * @example
+ * ```typescript
+ * const { run, report } = createCoverageTracker(system);
+ *
+ * await run(async () => {
+ *   system.facts.userId = 123;
+ *   await system.settle();
+ *   system.facts.userId = 0;
+ *   await system.settle();
+ * });
+ *
+ * const coverage = report();
+ * expect(coverage.constraintCoverage).toBe(1); // All constraints hit
+ * expect(coverage.constraintsMissed.size).toBe(0);
+ * ```
+ */
+export function createCoverageTracker(
+  // biome-ignore lint/suspicious/noExplicitAny: Works with any system type
+  system: SingleModuleSystem<any> | NamespacedSystem<any>,
+): {
+  /** Run a test scenario while tracking coverage. */
+  run: (scenario: () => Promise<void> | void) => Promise<void>;
+  /** Get the coverage report. */
+  report: () => CoverageReport;
+} {
+  const constraintsHit = new Set<string>();
+  const resolversRun = new Set<string>();
+  const effectsRun = new Set<string>();
+  const derivationsComputed = new Set<string>();
+
+  let unsub: (() => void) | null = null;
+
+  return {
+    async run(scenario) {
+      unsub = system.observe((event) => {
+        switch (event.type) {
+          case "constraint.evaluate":
+            if (event.active) constraintsHit.add(event.id);
+            break;
+          case "resolver.start":
+            resolversRun.add(event.resolver);
+            break;
+          case "effect.run":
+            effectsRun.add(event.id);
+            break;
+          case "derivation.compute":
+            derivationsComputed.add(event.id);
+            break;
+        }
+      });
+
+      try {
+        await scenario();
+      } finally {
+        unsub?.();
+        unsub = null;
+      }
+    },
+
+    report(): CoverageReport {
+      const inspection = system.inspect();
+
+      const allConstraints = new Set(inspection.constraints.map((c) => c.id));
+      const allResolvers = new Set(
+        inspection.resolverDefs.map((r) => r.id),
+      );
+
+      const constraintsMissed = new Set<string>();
+      for (const id of allConstraints) {
+        if (!constraintsHit.has(id)) constraintsMissed.add(id);
+      }
+
+      const resolversMissed = new Set<string>();
+      for (const id of allResolvers) {
+        if (!resolversRun.has(id)) resolversMissed.add(id);
+      }
+
+      return {
+        constraintsHit,
+        constraintsMissed,
+        resolversRun,
+        resolversMissed,
+        effectsRun,
+        derivationsComputed,
+        constraintCoverage:
+          allConstraints.size === 0
+            ? 1
+            : constraintsHit.size / allConstraints.size,
+        resolverCoverage:
+          allResolvers.size === 0
+            ? 1
+            : resolversRun.size / allResolvers.size,
+      };
+    },
+  };
+}
+
+// ============================================================================
+// Test Observer
+// ============================================================================
+
+/**
+ * Create a test observer that collects all observation events.
+ * Useful for assertion-based testing of system behavior.
+ *
+ * @example
+ * ```typescript
+ * const observer = createTestObserver(system);
+ *
+ * system.facts.count = 5;
+ * await system.settle();
+ *
+ * expect(observer.events.filter(e => e.type === "constraint.evaluate")).toHaveLength(1);
+ * expect(observer.ofType("resolver.complete")).toHaveLength(1);
+ *
+ * observer.clear();
+ * observer.dispose();
+ * ```
+ */
+export function createTestObserver(
+  // biome-ignore lint/suspicious/noExplicitAny: Works with any system type
+  system: SingleModuleSystem<any> | NamespacedSystem<any>,
+): {
+  /** All collected events. */
+  events: import("../core/types/system.js").ObservationEvent[];
+  /** Filter events by type. */
+  ofType: <T extends import("../core/types/system.js").ObservationEvent["type"]>(
+    type: T,
+  ) => Extract<import("../core/types/system.js").ObservationEvent, { type: T }>[];
+  /** Clear collected events. */
+  clear: () => void;
+  /** Stop observing. */
+  dispose: () => void;
+} {
+  const events: import("../core/types/system.js").ObservationEvent[] = [];
+  const unsub = system.observe((event) => events.push(event));
+
+  return {
+    events,
+    ofType(type) {
+      return events.filter((e) => e.type === type) as any;
+    },
+    clear() {
+      events.length = 0;
+    },
+    dispose() {
+      unsub();
+    },
+  };
+}
