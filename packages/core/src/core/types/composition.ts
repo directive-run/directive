@@ -40,6 +40,7 @@ import type {
   HistoryAPI,
   HistoryOption,
   MetaAccessor,
+  ObservationEvent,
   ResolversControl,
   SystemInspection,
   SystemSnapshot,
@@ -285,6 +286,8 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly resolvers: ResolversControl;
   /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
   readonly meta: MetaAccessor;
+  /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
+  observe(observer: (event: ObservationEvent) => void): () => void;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
@@ -657,6 +660,8 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly resolvers: ResolversControl<S>;
   /** O(1) metadata queries for constraints, resolvers, effects, derivations. */
   readonly meta: MetaAccessor;
+  /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
+  observe(observer: (event: ObservationEvent) => void): () => void;
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
