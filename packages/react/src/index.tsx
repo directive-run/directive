@@ -2158,6 +2158,12 @@ export function useSuspenseQuery<T = unknown>(
  * Returns a Provider component and context-bound hooks that automatically
  * use the system from context — no need to pass `system` to every hook.
  *
+ * **Note:** The returned hooks (e.g., `Counter.useFact("count")`) follow React
+ * hook rules but eslint-plugin-react-hooks may not recognize them as hooks since
+ * they're object methods. This is the same pattern used by XState's
+ * `createActorContext`. Suppress with `// eslint-disable-next-line react-hooks/rules-of-hooks`
+ * if your linter flags it.
+ *
  * @example
  * ```tsx
  * const Counter = createDirectiveContext(counterSystem);
@@ -2208,6 +2214,8 @@ export function createDirectiveContext<M extends ModuleSchema>(
       </Ctx.Provider>
     );
   }
+
+  Provider.displayName = "DirectiveProvider";
 
   return {
     /** Wrap your component tree to provide the system via context. */
