@@ -2147,3 +2147,119 @@ export function useSuspenseQuery<T = unknown>(
 
   throw cache.get(queryName)!.promise;
 }
+
+// ============================================================================
+// createDirectiveContext — React Context provider pattern
+// ============================================================================
+
+/**
+ * Create a React context for a Directive system, eliminating prop-drilling.
+ *
+ * Returns a Provider component and context-bound hooks that automatically
+ * use the system from context — no need to pass `system` to every hook.
+ *
+ * @example
+ * ```tsx
+ * const Counter = createDirectiveContext(counterSystem);
+ *
+ * function App() {
+ *   return (
+ *     <Counter.Provider>
+ *       <Display />
+ *     </Counter.Provider>
+ *   );
+ * }
+ *
+ * function Display() {
+ *   const count = Counter.useFact("count");
+ *   const doubled = Counter.useDerived("doubled");
+ *   const events = Counter.useEvents();
+ *   return <button onClick={() => events.increment()}>{count} ({doubled})</button>;
+ * }
+ * ```
+ */
+export function createDirectiveContext<M extends ModuleSchema>(
+  system: SingleModuleSystem<M>,
+) {
+  const Ctx = createContext<SingleModuleSystem<M> | null>(null);
+
+  function useSystem(): SingleModuleSystem<M> {
+    const sys = useContext(Ctx);
+    if (!sys) {
+      throw new Error(
+        "[Directive] useSystem called outside of <Provider>. Wrap your component tree with the Provider from createDirectiveContext().",
+      );
+    }
+
+    return sys;
+  }
+
+  function Provider({
+    children,
+    system: overrideSystem,
+  }: {
+    children: ReactNode;
+    /** Override the system for testing or conditional logic. */
+    system?: SingleModuleSystem<M>;
+  }) {
+    return (
+      <Ctx.Provider value={overrideSystem ?? system}>
+        {children}
+      </Ctx.Provider>
+    );
+  }
+
+  return {
+    /** Wrap your component tree to provide the system via context. */
+    Provider,
+
+    /** Get the underlying system instance from context. */
+    useSystem,
+
+    /** Read a fact value (reactive — re-renders on change). */
+    useFact: <K extends keyof InferFacts<M> & string>(factKey: K) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
+      useFact(useSystem() as SingleModuleSystem<any>, factKey) as
+        | InferFacts<M>[K]
+        | undefined,
+
+    /** Read a derived value (reactive — re-renders on change). */
+    useDerived: <K extends keyof InferDerivations<M> & string>(
+      derivationId: K,
+    ) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
+      useDerived(
+        useSystem() as SingleModuleSystem<any>,
+        derivationId,
+      ) as InferDerivations<M>[K],
+
+    /** Get the typed events accessor. */
+    useEvents: () => useEvents<M>(useSystem()),
+
+    /** Get a dispatch function for raw events. */
+    useDispatch: () => useDispatch<M>(useSystem()),
+
+    /** Run a selector with auto-tracked dependencies. */
+    useSelector: <R,>(
+      selector: (state: InferSelectorState<M>) => R,
+      equalityFn?: (a: R, b: R) => boolean,
+    ) =>
+      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
+      useSelector(useSystem() as any, selector as any, equalityFn) as R,
+
+    /** Watch a key and call a callback on change. */
+    useWatch: <K extends string>(
+      key: K,
+      callback: (newValue: unknown, previousValue: unknown) => void,
+    ) => useWatch(useSystem(), key, callback),
+
+    /** Get the current inspection state. */
+    useInspect: () => useInspect(useSystem()),
+
+    /** Explain a requirement. */
+    useExplain: (requirementId: string) => useExplain(useSystem(), requirementId),
+
+    /** Get history state. */
+    useHistory: () => useHistory(useSystem()),
+  };
+}
