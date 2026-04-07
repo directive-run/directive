@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { render, screen, act } from "@testing-library/react";
-import React from "react";
 import { createDirectiveContext } from "../index";
 
 const counterModule = createModule("ctx-test", {
