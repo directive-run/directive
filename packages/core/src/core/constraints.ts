@@ -8,6 +8,7 @@
  * - Error isolation
  */
 
+import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
@@ -382,7 +383,7 @@ export function createConstraintsManager<S extends Schema>(
   }
 
   // Validate `after` references in dev mode (catch typos early)
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     warnUnknownAfterRefs();
   }
 
@@ -566,7 +567,7 @@ export function createConstraintsManager<S extends Schema>(
     asyncConstraintIds.add(id);
     state.isAsync = true;
 
-    if (process.env.NODE_ENV !== "production") {
+    if (isDevelopment) {
       console.warn(
         `[Directive] Constraint "${id}" returned a Promise but was not marked as async. Add \`async: true\` to the constraint definition to avoid this warning and improve performance.`,
       );
@@ -685,7 +686,7 @@ export function createConstraintsManager<S extends Schema>(
 
       // Warn in dev mode if constraint produces many requirements
       if (
-        process.env.NODE_ENV !== "production" &&
+        isDevelopment &&
         filtered.length > MAX_REQUIREMENTS_WARNING_THRESHOLD &&
         constraintId
       ) {
@@ -790,7 +791,7 @@ export function createConstraintsManager<S extends Schema>(
   }
 
   // Dev-mode: warn about async constraints without explicit deps
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     warnAsyncWithoutDeps(definitions);
   }
 

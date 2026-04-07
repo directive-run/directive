@@ -9,6 +9,7 @@
  * 5. Derivations are invalidated and recomputed
  */
 
+import isDevelopment from "#is-development";
 import {
   type HistoryManager,
   createDisabledHistory,
@@ -264,7 +265,7 @@ export function createEngine<S extends Schema>(
   let shouldTakeSnapshot = false;
 
   // Dev-mode: Warn if a fact and derivation share the same name
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     const derivationNames = new Set(Object.keys(mergedDerive));
     for (const key of Object.keys(mergedSchema)) {
       if (derivationNames.has(key)) {
@@ -641,7 +642,7 @@ export function createEngine<S extends Schema>(
         // Error is caught inside reconcile, so no need to handle here
         reconcile().catch((error) => {
           // Only log unexpected errors (reconcile handles its own errors)
-          if (process.env.NODE_ENV !== "production") {
+          if (isDevelopment) {
             console.error("[Directive] Unexpected error in reconcile:", error);
           }
         });
@@ -655,7 +656,7 @@ export function createEngine<S extends Schema>(
 
     reconcileDepth++;
     if (reconcileDepth > MAX_RECONCILE_DEPTH) {
-      if (process.env.NODE_ENV !== "production") {
+      if (isDevelopment) {
         console.warn(
           `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. ` +
             "This usually means resolvers are creating circular requirement chains. " +
@@ -875,7 +876,7 @@ export function createEngine<S extends Schema>(
       } finally {
         dispatchDepth--;
       }
-    } else if (process.env.NODE_ENV !== "production") {
+    } else if (isDevelopment) {
       console.warn(
         `[Directive] Unknown event type "${eventName}". ` +
           "No handler is registered for this event. " +
@@ -1242,7 +1243,7 @@ export function createEngine<S extends Schema>(
           derivationIds.push(id);
         } else if (id in mergedSchema) {
           factKeys.push(id);
-        } else if (process.env.NODE_ENV !== "production") {
+        } else if (isDevelopment) {
           console.warn(`[Directive] subscribe: unknown key "${id}"`);
         }
       }
@@ -1298,7 +1299,7 @@ export function createEngine<S extends Schema>(
       }
 
       // Fact path
-      if (process.env.NODE_ENV !== "production") {
+      if (isDevelopment) {
         if (!(id in mergedSchema)) {
           console.warn(`[Directive] watch: unknown key "${id}"`);
         }
@@ -1614,7 +1615,7 @@ export function createEngine<S extends Schema>(
         );
 
         // Warn about unknown derivation keys in dev mode
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           const unknown = includeDerivations.filter(
             (k) => !allDerivationSet.has(k),
           );
@@ -1642,7 +1643,7 @@ export function createEngine<S extends Schema>(
           data[key] = derivationsManager.get(key as keyof DerivationsDef<S>);
         } catch (error) {
           // Skip derivations that error during computation
-          if (process.env.NODE_ENV !== "production") {
+          if (isDevelopment) {
             console.warn(
               `[Directive] getDistributableSnapshot: Skipping derivation "${key}" due to error:`,
               error,
@@ -1657,7 +1658,7 @@ export function createEngine<S extends Schema>(
         const allFactKeys = Object.keys(factsSnapshot);
 
         // Warn about unknown fact keys in dev mode
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           const unknown = includeFacts.filter((k) => !(k in factsSnapshot));
           if (unknown.length > 0) {
             console.warn(
@@ -1744,7 +1745,7 @@ export function createEngine<S extends Schema>(
 
       if (derivationKeys.length === 0) {
         // Nothing to watch, return no-op unsubscribe
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.warn(
             "[Directive] watchDistributableSnapshot: No derivations to watch. " +
               "Callback will never be called.",
@@ -1951,7 +1952,7 @@ export function createEngine<S extends Schema>(
       }
     }
     // Fact/derivation name collision check (dev-only warning)
-    if (process.env.NODE_ENV !== "production" && module.derive) {
+    if (isDevelopment && module.derive) {
       const existingFactKeys = new Set(Object.keys(mergedSchema));
       for (const key of Object.keys(module.derive)) {
         if (existingFactKeys.has(key)) {

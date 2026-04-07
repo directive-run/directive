@@ -8,6 +8,7 @@
  * @internal
  */
 
+import isDevelopment from "#is-development";
 import { BLOCKED_PROPS } from "./tracking.js";
 import type { ModulesMap } from "./types.js";
 
@@ -333,7 +334,7 @@ export function createCrossModuleFactsProxy(
       }
 
       // Dev-mode warning for undeclared cross-module access
-      if (process.env.NODE_ENV !== "production") {
+      if (isDevelopment) {
         console.warn(
           `[Directive] Module "${selfNamespace}" accessed undeclared cross-module property "${key}". ` +
             `Add it to crossModuleDeps or use "facts.self.${key}" for own module facts.`,

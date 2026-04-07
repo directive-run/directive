@@ -8,6 +8,7 @@
  * @internal
  */
 
+import isDevelopment from "#is-development";
 import type { ConstraintsManager } from "./constraints.js";
 import type { DerivationsManager } from "./derivations.js";
 import type { EffectsManager } from "./effects.js";
@@ -398,7 +399,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     const desc = typeDescriptors[type];
 
     if (!desc.dynamicSet.has(id)) {
-      if (process.env.NODE_ENV !== "production") {
+      if (isDevelopment) {
         console.warn(
           `[Directive] Cannot unregister static ${type} "${id}". Only dynamically registered ${type}s can be removed.`,
         );
@@ -439,7 +440,7 @@ export function createDefinitionsRegistry<S extends Schema>(
             break;
         }
       } catch (error) {
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.error(
             `[Directive] Error in deferred ${op.op} for ${op.type} "${op.id}":`,
             error,

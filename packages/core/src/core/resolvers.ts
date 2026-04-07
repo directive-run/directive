@@ -9,6 +9,7 @@
  * - Cancellation via AbortController
  */
 
+import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
 import type {
   BatchConfig,
@@ -305,7 +306,7 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
 function validateDefinitions<S extends Schema>(
   definitions: ResolversDef<S>,
 ): void {
-  if (process.env.NODE_ENV === "production") {
+  if (!isDevelopment) {
     return;
   }
 
@@ -1077,7 +1078,7 @@ export function createResolversManager<S extends Schema>(
       // Find resolver
       const resolverId = findResolver(req.requirement);
       if (!resolverId) {
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.warn(
             `[Directive] No resolver found for requirement type "${req.requirement.type}" (id: ${req.id})`,
           );
