@@ -221,6 +221,28 @@ system.meta.byTag("pii");        // MetaMatch[] — all PII-tagged fields
 
 Meta is frozen at registration (Object.create(null) + Object.freeze). Zero hot-path cost. See [Definition Meta docs](https://directive.run/docs/advanced/meta).
 
+## Observation Protocol
+
+Typed event stream for all lifecycle events — enables browser extensions, third-party tools, and test assertions:
+
+```typescript
+import type { ObservationEvent } from "@directive-run/core";
+
+const unsub = system.observe((event: ObservationEvent) => {
+  if (event.type === "constraint.evaluate") console.log(event.id, event.active);
+  if (event.type === "resolver.complete") console.log(event.resolver, event.duration);
+  if (event.type === "fact.change") console.log(event.key, event.prev, "→", event.next);
+});
+
+// 18 event types: fact.change, constraint.evaluate/error, requirement.created/met/canceled,
+// resolver.start/complete/error, effect.run/error, derivation.compute,
+// reconcile.start/end, system.init/start/stop/destroy
+
+unsub(); // Stop observing
+```
+
+Zero overhead when no observers. Implemented as an internal plugin.
+
 ## Lifecycle
 
 ```typescript

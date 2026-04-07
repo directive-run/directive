@@ -182,6 +182,38 @@ const count = useSelector(system, (s) => s.facts.count);
 const events = useEvent(system);
 ```
 
+## createDirectiveContext
+
+Eliminates prop-drilling by providing the system via React context:
+
+```typescript
+import { createDirectiveContext } from "@directive-run/react";
+
+const Counter = createDirectiveContext(counterSystem);
+
+function App() {
+  return (
+    <Counter.Provider>
+      <Display />
+    </Counter.Provider>
+  );
+}
+
+function Display() {
+  const count = Counter.useFact("count");       // No system arg needed
+  const doubled = Counter.useDerived("doubled");
+  const events = Counter.useEvents();
+  return <button onClick={() => events.increment()}>{count}</button>;
+}
+```
+
+Returns: `{ Provider, useSystem, useFact, useDerived, useEvents, useDispatch, useSelector, useWatch, useInspect, useExplain, useHistory }`.
+
+Provider accepts `system` prop override for testing:
+```tsx
+<Counter.Provider system={testSystem}><ComponentUnderTest /></Counter.Provider>
+```
+
 ## Common Mistakes
 
 ### Creating the system inside a component without useSystem

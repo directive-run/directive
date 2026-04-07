@@ -215,6 +215,47 @@ it("processes intermediate state", async () => {
 });
 ```
 
+## Coverage Tracking
+
+Track which constraints, resolvers, effects, and derivations are exercised:
+
+```typescript
+import { createCoverageTracker } from "@directive-run/core/testing";
+
+const { run, report } = createCoverageTracker(system);
+
+await run(async () => {
+  system.facts.userId = 123;
+  await system.settle();
+});
+
+const coverage = report();
+// coverage.constraintCoverage — 0-1 (percentage hit)
+// coverage.resolverCoverage — 0-1
+// coverage.effectCoverage — 0-1
+// coverage.derivationCoverage — 0-1
+// coverage.constraintsMissed — Set<string> of IDs never triggered
+```
+
+## Test Observer
+
+Collect observation events for assertion-based testing:
+
+```typescript
+import { createTestObserver } from "@directive-run/core/testing";
+
+const observer = createTestObserver(system);
+
+system.facts.count = 5;
+await system.settle();
+
+const evals = observer.ofType("constraint.evaluate");
+expect(evals).toHaveLength(1);
+
+observer.clear();   // Reset
+observer.dispose();  // Stop observing
+```
+
 ## Common Mistakes
 
 ### Testing real resolvers instead of mocking
