@@ -50,6 +50,7 @@ import {
   onCleanup,
   useContext,
 } from "solid-js";
+import isDevelopment from "#is-development";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -85,10 +86,7 @@ export function useFact(
   keyOrKeys: string | string[],
 ): Accessor<unknown> {
   assertSystem("useFact", system);
-  if (
-    process.env.NODE_ENV !== "production" &&
-    typeof keyOrKeys === "function"
-  ) {
+  if (isDevelopment && typeof keyOrKeys === "function") {
     console.error(
       "[Directive] useFact() received a function. Did you mean useSelector()? " +
         "useFact() takes a string key or array of keys, not a selector function.",
@@ -109,7 +107,7 @@ function _useFactSingle(
   system: SingleModuleSystem<any>,
   factKey: string,
 ): Accessor<unknown> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!system.facts.$store.has(factKey)) {
       console.warn(
         `[Directive] useFact("${factKey}") — fact not found in store. ` +
@@ -173,7 +171,7 @@ export function useDerived(
   idOrIds: string | string[],
 ): Accessor<unknown> {
   assertSystem("useDerived", system);
-  if (process.env.NODE_ENV !== "production" && typeof idOrIds === "function") {
+  if (isDevelopment && typeof idOrIds === "function") {
     console.error(
       "[Directive] useDerived() received a function. Did you mean useSelector()? " +
         "useDerived() takes a string key or array of keys, not a selector function.",
@@ -194,7 +192,7 @@ function _useDerivedSingle(
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): Accessor<unknown> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     const initialValue = system.read(derivationId);
     if (initialValue === undefined) {
       console.warn(

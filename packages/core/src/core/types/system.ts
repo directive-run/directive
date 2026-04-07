@@ -643,7 +643,7 @@ export type ObservationEvent =
   | { type: "effect.error"; id: string; error: unknown }
   | { type: "derivation.compute"; id: string; value: unknown }
   | { type: "reconcile.start" }
-  | { type: "reconcile.end"; added: number; removed: number }
+  | { type: "reconcile.end"; resolversCompleted: number; resolversCanceled: number }
   | { type: "system.init" }
   | { type: "system.start" }
   | { type: "system.stop" }

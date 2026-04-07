@@ -77,6 +77,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import isDevelopment from "#is-development";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -116,7 +117,7 @@ export function useFact(
 ): unknown {
   assertSystem("useFact", system);
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     typeof keyOrKeys === "function"
   ) {
     console.error(
@@ -139,7 +140,7 @@ function _useSingleFact(
   system: SingleModuleSystem<any>,
   factKey: string,
 ): unknown {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!(factKey in system.facts.$store.toObject())) {
       console.warn(
         `[Directive] useFact("${factKey}") — fact not found in store. ` +
@@ -236,7 +237,7 @@ export function useDerived(
 ): unknown {
   assertSystem("useDerived", system);
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     typeof keyOrKeys === "function"
   ) {
     console.error(
@@ -259,7 +260,7 @@ function _useSingleDerived(
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): unknown {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!(derivationId in system.derive)) {
       console.warn(
         `[Directive] useDerived("${derivationId}") — derivation not found. ` +
@@ -464,7 +465,7 @@ export function useSelector(
   }
 
   // Dev-mode warning: null system without a default value
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!system && !hasDefault) {
       console.error(
         "[Directive] useSelector() received a null/undefined system without a default value. " +

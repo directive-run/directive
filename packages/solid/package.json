@@ -1,6 +1,12 @@
 {
   "name": "@directive-run/solid",
   "version": "1.1.1",
+  "imports": {
+    "#is-development": {
+      "production": "./src/dev-false.ts",
+      "default": "./src/dev-true.ts"
+    }
+  },
   "description": "Solid.js signals adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

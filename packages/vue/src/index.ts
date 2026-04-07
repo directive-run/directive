@@ -54,6 +54,7 @@ import {
   ref,
   shallowRef,
 } from "vue";
+import isDevelopment from "#is-development";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -87,7 +88,7 @@ export function useFact(
 ): Ref<unknown> | ShallowRef<unknown> {
   assertSystem("useFact", system);
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     typeof keyOrKeys === "function"
   ) {
     console.error(
@@ -110,7 +111,7 @@ function _useFactSingle(
   system: SingleModuleSystem<any>,
   factKey: string,
 ): Ref<unknown> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!system.facts.$store.has(factKey)) {
       console.warn(
         `[Directive] useFact("${factKey}") — fact not found in store. ` +
@@ -171,7 +172,7 @@ export function useDerived(
   idOrIds: string | string[],
 ): Ref<unknown> | ShallowRef<unknown> {
   assertSystem("useDerived", system);
-  if (process.env.NODE_ENV !== "production" && typeof idOrIds === "function") {
+  if (isDevelopment && typeof idOrIds === "function") {
     console.error(
       "[Directive] useDerived() received a function. Did you mean useSelector()? " +
         "useDerived() takes a string key or array of keys, not a selector function.",
@@ -192,7 +193,7 @@ function _useDerivedSingle(
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): Ref<unknown> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     const initialValue = system.read(derivationId);
     if (initialValue === undefined) {
       console.warn(

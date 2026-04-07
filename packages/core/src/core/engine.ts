@@ -282,8 +282,19 @@ export function createEngine<S extends Schema>(
   for (const plugin of config.plugins ?? []) {
     pluginManager.register(plugin);
   }
-  // Live check — observe() registers plugins dynamically, so this must not be cached
-  const hasPlugins = () => pluginManager.getPlugins().length > 0;
+  // Cached plugin check — updated on register/unregister for O(1) hot-path access
+  let _hasPlugins = pluginManager.getPlugins().length > 0;
+  const _origRegister = pluginManager.register.bind(pluginManager);
+  const _origUnregister = pluginManager.unregister.bind(pluginManager);
+  pluginManager.register = (plugin) => {
+    _origRegister(plugin);
+    _hasPlugins = true;
+  };
+  pluginManager.unregister = (name) => {
+    _origUnregister(name);
+    _hasPlugins = pluginManager.getPlugins().length > 0;
+  };
+  const hasPlugins = () => _hasPlugins;
 
   // Create error boundary
   const errorBoundary: ErrorBoundaryManager = createErrorBoundaryManager({
@@ -1050,6 +1061,19 @@ export function createEngine<S extends Schema>(
     observe(
       observer: (event: import("./types/system.js").ObservationEvent) => void,
     ): () => void {
+      // Cap observers to prevent memory leaks from fast-remounting components
+      const observerCount = pluginManager
+        .getPlugins()
+        .filter((p) => p.name.startsWith("__observer_")).length;
+      if (observerCount >= 100) {
+        if (isDevelopment) {
+          console.warn(
+            "[Directive] Maximum observer limit (100) reached. Call the unsubscribe function returned by observe() to clean up.",
+          );
+        }
+
+        return () => {};
+      }
       const name = `__observer_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const plugin = {
         name,
@@ -1084,14 +1108,17 @@ export function createEngine<S extends Schema>(
         onReconcileStart: () =>
           observer({ type: "reconcile.start" }),
         onReconcileEnd: (result: unknown) => {
-          const r = result as { unmet?: unknown[]; inflight?: unknown[] };
+          const r = result as {
+            completed?: unknown[];
+            canceled?: unknown[];
+          };
           observer({
             type: "reconcile.end",
-            added: Array.isArray((r as { completed?: unknown[] }).completed)
-              ? (r as { completed: unknown[] }).completed.length
+            resolversCompleted: Array.isArray(r.completed)
+              ? r.completed.length
               : 0,
-            removed: Array.isArray((r as { canceled?: unknown[] }).canceled)
-              ? (r as { canceled: unknown[] }).canceled.length
+            resolversCanceled: Array.isArray(r.canceled)
+              ? r.canceled.length
               : 0,
           });
         },

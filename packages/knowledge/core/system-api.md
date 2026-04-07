@@ -150,29 +150,35 @@ const total = system.read("cart.totalPrice");
 ```typescript
 const inspection = system.inspect();
 
-// Full fact snapshot
-inspection.facts;
-// { count: 5, phase: "done", user: { id: "1", name: "Alice" } }
+// Unmet requirements
+inspection.unmet;
+// [{ id: "req-1", requirement: { type: "FETCH_USER" }, fromConstraint: "needsUser" }]
 
-// Derivation values
-inspection.derivations;
-// { isLoading: false, displayName: "Alice" }
-
-// Active requirements
-inspection.requirements;
-// [{ id: "req-1", type: "FETCH_USER", userId: "1" }]
-
-// Constraint definitions and state
-inspection.constraintDefs;
-// [{ id: "fetchWhenAuth", priority: 0, disabled: false }]
-
-// Resolver statuses
-inspection.resolvers;
-// { fetchUser: { state: "success", duration: 150 } }
-
-// Currently inflight resolvers
+// Inflight resolvers
 inspection.inflight;
 // [{ id: "req-2", resolverId: "fetchData", startedAt: 1709000000 }]
+
+// Facts with meta
+inspection.facts;
+// [{ key: "userId", meta: { label: "User ID" } }, { key: "count" }]
+
+// Constraints with state + meta
+inspection.constraints;
+// [{ id: "needsUser", active: true, disabled: false, priority: 0, hitCount: 3, meta: { label: "..." } }]
+
+// Resolver definitions + meta
+inspection.resolverDefs;
+// [{ id: "fetchUser", requirement: "FETCH_USER", meta: { label: "..." } }]
+
+// Resolver statuses (inflight only)
+inspection.resolvers;
+// { "req-1": { state: "running" } }
+
+// Effects, derivations, modules — all with optional meta
+inspection.effects;     // [{ id: "log", meta: { ... } }]
+inspection.derivations; // [{ id: "doubled", meta: { ... } }]
+inspection.modules;     // [{ id: "auth", meta: { ... } }]
+inspection.events;      // [{ name: "increment", meta: { ... } }]
 
 // Unmet requirements (no matching resolver)
 inspection.unmet;

@@ -1,6 +1,12 @@
 {
   "name": "@directive-run/lit",
   "version": "1.1.1",
+  "imports": {
+    "#is-development": {
+      "production": "./src/dev-false.ts",
+      "default": "./src/dev-true.ts"
+    }
+  },
   "description": "Lit web components adapter for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

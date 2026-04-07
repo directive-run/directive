@@ -49,6 +49,7 @@ import {
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
+import isDevelopment from "#is-development";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -129,7 +130,7 @@ export class DerivedController<T> extends DirectiveController {
     this.keys = this.isMulti ? (key as string[]) : [key as string];
     this.value = this.getValues();
 
-    if (process.env.NODE_ENV !== "production") {
+    if (isDevelopment) {
       if (!this.isMulti && this.value === undefined) {
         console.warn(
           `[Directive] DerivedController("${this.keys[0]}") returned undefined. ` +
@@ -176,7 +177,7 @@ export class FactController<T> extends DirectiveController {
     this.factKey = factKey;
     this.value = system.facts.$store.get(factKey) as T | undefined;
 
-    if (process.env.NODE_ENV !== "production") {
+    if (isDevelopment) {
       if (!system.facts.$store.has(factKey)) {
         console.warn(
           `[Directive] FactController("${factKey}") — fact not found in store. ` +

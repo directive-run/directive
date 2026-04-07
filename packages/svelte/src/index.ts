@@ -47,6 +47,7 @@ import {
 } from "@directive-run/core/adapter-utils";
 import { getContext, onDestroy, setContext } from "svelte";
 import { type Readable, readable } from "svelte/store";
+import isDevelopment from "#is-development";
 
 // Re-export for convenience
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
@@ -67,7 +68,7 @@ export function createDerivedStore<T>(
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): Readable<T> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     const initialValue = system.read(derivationId);
     if (initialValue === undefined) {
       console.warn(
@@ -117,7 +118,7 @@ export function createFactStore<T>(
   system: SingleModuleSystem<any>,
   factKey: string,
 ): Readable<T | undefined> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     if (!system.facts.$store.has(factKey)) {
       console.warn(
         `[Directive] createFactStore("${factKey}") — fact not found in store. ` +
@@ -183,10 +184,7 @@ export function useFact(
   keyOrKeys: string | string[],
 ): Readable<unknown> {
   assertSystem("useFact", system);
-  if (
-    process.env.NODE_ENV !== "production" &&
-    typeof keyOrKeys === "function"
-  ) {
+  if (isDevelopment && typeof keyOrKeys === "function") {
     console.error(
       "[Directive] useFact() received a function. Did you mean useSelector()? " +
         "useFact() takes a string key or array of keys, not a selector function.",
@@ -250,7 +248,7 @@ export function useDerived(
   idOrIds: string | string[],
 ): Readable<unknown> {
   assertSystem("useDerived", system);
-  if (process.env.NODE_ENV !== "production" && typeof idOrIds === "function") {
+  if (isDevelopment && typeof idOrIds === "function") {
     console.error(
       "[Directive] useDerived() received a function. Did you mean useSelector()? " +
         "useDerived() takes a string key or array of keys, not a selector function.",
