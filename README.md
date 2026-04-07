@@ -3,7 +3,7 @@
 **The constraint-driven runtime for TypeScript.** Declare what must be true. The runtime makes it happen.
 
 [![npm](https://img.shields.io/npm/v/@directive-run/core)](https://www.npmjs.com/package/@directive-run/core)
-[![tests](https://img.shields.io/badge/tests-4%2C037-brightgreen)](#)
+[![tests](https://img.shields.io/badge/tests-4%2C100%2B-brightgreen)](#)
 [![zero deps](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![license](https://img.shields.io/npm/l/@directive-run/core)](./LICENSE)
 
@@ -13,6 +13,12 @@
 - **5 Framework Adapters** &ndash; React, Vue, Svelte, Solid, Lit from a single state layer
 - **Zero Runtime Dependencies** &ndash; nothing to audit, nothing to break
 - **Time-Travel Debugging** &ndash; snapshot, rewind, replay, export/import system state
+
+---
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="Directive Architecture — Constraint-Driven Reconciliation" width="720">
+</p>
 
 ---
 
