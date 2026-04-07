@@ -1,97 +1,74 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 280" fill="none">
-  <style>
-    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
-    .label { font-size: 13px; fill: #e4e4e7; font-weight: 600; }
-    .sublabel { font-size: 10px; fill: #a1a1aa; }
-    .arrow { stroke: #52525b; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
-    .arrow-active { stroke: #f59e0b; stroke-width: 2; fill: none; marker-end: url(#arrowhead-active); }
-    .box { rx: 8; ry: 8; stroke-width: 1.5; }
-    .box-fact { fill: #18181b; stroke: #3f3f46; }
-    .box-derive { fill: #18181b; stroke: #6366f1; }
-    .box-constraint { fill: #18181b; stroke: #f59e0b; }
-    .box-requirement { fill: #18181b; stroke: #ef4444; }
-    .box-resolver { fill: #18181b; stroke: #22c55e; }
-    .box-effect { fill: #18181b; stroke: #8b5cf6; }
-    .cycle-label { font-size: 11px; fill: #71717a; font-style: italic; }
-  </style>
-
   <defs>
-    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
       <polygon points="0 0, 8 3, 0 6" fill="#52525b"/>
     </marker>
-    <marker id="arrowhead-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+    <marker id="aha" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
       <polygon points="0 0, 8 3, 0 6" fill="#f59e0b"/>
     </marker>
   </defs>
 
-  <!-- Background -->
   <rect width="720" height="280" fill="#09090b" rx="12"/>
 
-  <!-- Title -->
-  <text x="360" y="28" text-anchor="middle" class="label" style="font-size: 15px; fill: #fafafa;">Constraint-Driven Reconciliation</text>
+  <text x="360" y="28" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="600" fill="#fafafa">Constraint-Driven Reconciliation</text>
 
   <!-- Facts -->
-  <rect x="20" y="60" width="100" height="50" class="box box-fact"/>
-  <text x="70" y="82" text-anchor="middle" class="label">Facts</text>
-  <text x="70" y="97" text-anchor="middle" class="sublabel">Reactive state</text>
+  <rect x="20" y="60" width="100" height="50" rx="8" fill="#18181b" stroke="#3f3f46" stroke-width="1.5"/>
+  <text x="70" y="82" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#e4e4e7">Facts</text>
+  <text x="70" y="97" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">Reactive state</text>
 
-  <!-- Arrow: Facts → Derivations -->
-  <line x1="120" y1="85" x2="155" y2="85" class="arrow"/>
+  <line x1="120" y1="85" x2="155" y2="85" stroke="#52525b" stroke-width="1.5" marker-end="url(#ah)"/>
 
   <!-- Derivations -->
-  <rect x="160" y="60" width="110" height="50" class="box box-derive"/>
-  <text x="215" y="82" text-anchor="middle" class="label">Derivations</text>
-  <text x="215" y="97" text-anchor="middle" class="sublabel">Auto-tracked</text>
+  <rect x="160" y="60" width="110" height="50" rx="8" fill="#18181b" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="215" y="82" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#e4e4e7">Derivations</text>
+  <text x="215" y="97" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">Auto-tracked</text>
 
-  <!-- Arrow: Facts → Constraints -->
-  <line x1="70" y1="110" x2="70" y2="155" class="arrow-active"/>
+  <line x1="70" y1="110" x2="70" y2="155" stroke="#f59e0b" stroke-width="2" marker-end="url(#aha)"/>
 
   <!-- Constraints -->
-  <rect x="20" y="160" width="110" height="50" class="box box-constraint"/>
-  <text x="75" y="182" text-anchor="middle" class="label" style="fill: #f59e0b;">Constraints</text>
-  <text x="75" y="197" text-anchor="middle" class="sublabel">when(facts) → require</text>
+  <rect x="20" y="160" width="110" height="50" rx="8" fill="#18181b" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="75" y="182" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#f59e0b">Constraints</text>
+  <text x="75" y="197" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">when(facts) → require</text>
 
-  <!-- Arrow: Constraints → Requirements -->
-  <line x1="130" y1="185" x2="175" y2="185" class="arrow-active"/>
+  <line x1="130" y1="185" x2="175" y2="185" stroke="#f59e0b" stroke-width="2" marker-end="url(#aha)"/>
 
   <!-- Requirements -->
-  <rect x="180" y="160" width="120" height="50" class="box box-requirement"/>
-  <text x="240" y="182" text-anchor="middle" class="label" style="fill: #ef4444;">Requirements</text>
-  <text x="240" y="197" text-anchor="middle" class="sublabel">What needs to happen</text>
+  <rect x="180" y="160" width="120" height="50" rx="8" fill="#18181b" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="240" y="182" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#ef4444">Requirements</text>
+  <text x="240" y="197" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">What needs to happen</text>
 
-  <!-- Arrow: Requirements → Resolvers -->
-  <line x1="300" y1="185" x2="345" y2="185" class="arrow-active"/>
+  <line x1="300" y1="185" x2="345" y2="185" stroke="#f59e0b" stroke-width="2" marker-end="url(#aha)"/>
 
   <!-- Resolvers -->
-  <rect x="350" y="160" width="110" height="50" class="box box-resolver"/>
-  <text x="405" y="182" text-anchor="middle" class="label" style="fill: #22c55e;">Resolvers</text>
-  <text x="405" y="197" text-anchor="middle" class="sublabel">retry · batch · cancel</text>
+  <rect x="350" y="160" width="110" height="50" rx="8" fill="#18181b" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="405" y="182" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#22c55e">Resolvers</text>
+  <text x="405" y="197" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">retry · batch · cancel</text>
 
-  <!-- Arrow: Resolvers → Facts (cycle back) -->
-  <path d="M 460 185 L 510 185 L 510 50 L 70 50 L 70 60" class="arrow-active"/>
-  <text x="510" y="120" class="cycle-label" text-anchor="middle" transform="rotate(-90, 520, 120)">mutate facts</text>
+  <!-- Cycle back arrow -->
+  <path d="M 460 185 L 510 185 L 510 50 L 70 50 L 70 60" stroke="#f59e0b" stroke-width="2" fill="none" marker-end="url(#aha)"/>
+  <text x="530" y="125" font-family="system-ui, sans-serif" font-size="10" fill="#71717a" font-style="italic" transform="rotate(-90, 520, 120)">mutate facts</text>
 
   <!-- Effects -->
-  <rect x="350" y="60" width="100" height="50" class="box box-effect"/>
-  <text x="400" y="82" text-anchor="middle" class="label" style="fill: #8b5cf6;">Effects</text>
-  <text x="400" y="97" text-anchor="middle" class="sublabel">Side effects</text>
+  <rect x="350" y="60" width="100" height="50" rx="8" fill="#18181b" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="400" y="82" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#8b5cf6">Effects</text>
+  <text x="400" y="97" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">Side effects</text>
 
-  <!-- Arrow: Facts → Effects -->
-  <line x1="270" y1="85" x2="350" y2="85" class="arrow"/>
+  <line x1="270" y1="85" x2="350" y2="85" stroke="#52525b" stroke-width="1.5" marker-end="url(#ah)"/>
 
-  <!-- Meta box -->
-  <rect x="540" y="60" width="160" height="90" class="box" style="fill: #18181b; stroke: #525252; stroke-dasharray: 4 2;"/>
-  <text x="620" y="82" text-anchor="middle" class="label" style="fill: #a1a1aa; font-size: 11px;">DefinitionMeta</text>
-  <text x="620" y="100" text-anchor="middle" class="sublabel">label · description</text>
-  <text x="620" y="115" text-anchor="middle" class="sublabel">category · tags · color</text>
-  <text x="620" y="135" text-anchor="middle" class="sublabel" style="fill: #71717a;">system.meta · inspect()</text>
+  <!-- Meta -->
+  <rect x="540" y="60" width="160" height="90" rx="8" fill="#18181b" stroke="#525252" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="620" y="82" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#a1a1aa">DefinitionMeta</text>
+  <text x="620" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">label · description</text>
+  <text x="620" y="115" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">category · tags · color</text>
+  <text x="620" y="135" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#71717a">system.meta · inspect()</text>
 
-  <!-- inspect / explain -->
-  <rect x="540" y="170" width="160" height="50" class="box" style="fill: #18181b; stroke: #525252; stroke-dasharray: 4 2;"/>
-  <text x="620" y="190" text-anchor="middle" class="label" style="fill: #a1a1aa; font-size: 11px;">Observability</text>
-  <text x="620" y="207" text-anchor="middle" class="sublabel">inspect() · explain() · observe()</text>
+  <!-- Observability -->
+  <rect x="540" y="170" width="160" height="50" rx="8" fill="#18181b" stroke="#525252" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="620" y="190" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#a1a1aa">Observability</text>
+  <text x="620" y="207" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">inspect · explain · observe</text>
 
-  <!-- Cycle label -->
-  <text x="240" y="248" text-anchor="middle" class="cycle-label">One reconciliation cycle: facts change → constraints evaluate → resolvers execute → facts change again</text>
-  <text x="240" y="265" text-anchor="middle" class="sublabel">Zero hot-path meta cost · 19K reconcile cycles/sec · 2.7M derivation computes/sec</text>
+  <!-- Bottom labels -->
+  <text x="240" y="248" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#71717a" font-style="italic">Facts change → constraints evaluate → resolvers execute → facts change again</text>
+  <text x="240" y="265" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#a1a1aa">Zero hot-path meta cost · 19K reconcile cycles/sec · 2.7M derivation computes/sec</text>
 </svg>

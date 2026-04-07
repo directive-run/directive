@@ -282,7 +282,8 @@ export function createEngine<S extends Schema>(
   for (const plugin of config.plugins ?? []) {
     pluginManager.register(plugin);
   }
-  const hasPlugins = pluginManager.getPlugins().length > 0;
+  // Live check — observe() registers plugins dynamically, so this must not be cached
+  const hasPlugins = () => pluginManager.getPlugins().length > 0;
 
   // Create error boundary
   const errorBoundary: ErrorBoundaryManager = createErrorBoundaryManager({
@@ -373,7 +374,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedDerive,
     facts,
     onCompute: (id, value, oldValue, deps) => {
-      if (hasPlugins) pluginManager.emitDerivationCompute(id, value, deps);
+      if (hasPlugins()) pluginManager.emitDerivationCompute(id, value, deps);
       if (traceManager.currentTrace) {
         traceManager.currentTrace.derivationsRecomputed.push({
           id,
@@ -384,9 +385,9 @@ export function createEngine<S extends Schema>(
         });
       }
     },
-    onInvalidate: hasPlugins
-      ? (id) => pluginManager.emitDerivationInvalidate(id)
-      : undefined,
+    onInvalidate: (id) => {
+      if (hasPlugins()) pluginManager.emitDerivationInvalidate(id);
+    },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("derivation", id, error);
 
@@ -407,7 +408,7 @@ export function createEngine<S extends Schema>(
     facts,
     store,
     onRun: (id, deps) => {
-      if (hasPlugins) pluginManager.emitEffectRun(id);
+      if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
         traceManager.currentTrace.effectsRun.push({
           id,
@@ -419,7 +420,7 @@ export function createEngine<S extends Schema>(
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("effect", id, error);
-      if (hasPlugins) pluginManager.emitEffectError(id, error);
+      if (hasPlugins()) pluginManager.emitEffectError(id, error);
 
       if (traceManager.currentTrace) {
         traceManager.currentTrace.effectErrors.push({
@@ -456,12 +457,12 @@ export function createEngine<S extends Schema>(
     definitions: mergedConstraints,
     facts,
     requirementKeys,
-    onEvaluate: hasPlugins
-      ? (id, active) => pluginManager.emitConstraintEvaluate(id, active)
-      : undefined,
+    onEvaluate: (id, active) => {
+      if (hasPlugins()) pluginManager.emitConstraintEvaluate(id, active);
+    },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("constraint", id, error);
-      if (hasPlugins) pluginManager.emitConstraintError(id, error);
+      if (hasPlugins()) pluginManager.emitConstraintError(id, error);
 
       if (strategy === "disable") {
         constraintsManager.disable(id);
@@ -483,12 +484,12 @@ export function createEngine<S extends Schema>(
     definitions: mergedResolvers,
     facts,
     store,
-    onStart: hasPlugins
-      ? (resolver, req) => pluginManager.emitResolverStart(resolver, req)
-      : undefined,
+    onStart: (resolver, req) => {
+      if (hasPlugins()) pluginManager.emitResolverStart(resolver, req);
+    },
     onComplete: (resolver, req, duration) => {
       errorBoundary.clearRetryAttempts(resolver);
-      if (hasPlugins) {
+      if (hasPlugins()) {
         pluginManager.emitResolverComplete(resolver, req, duration);
         pluginManager.emitRequirementMet(req, resolver);
       }
@@ -507,7 +508,7 @@ export function createEngine<S extends Schema>(
         error,
         req,
       );
-      if (hasPlugins) pluginManager.emitResolverError(resolver, req, error);
+      if (hasPlugins()) pluginManager.emitResolverError(resolver, req, error);
 
       if (strategy === "disable") {
         constraintsManager.disable(req.fromConstraint);
