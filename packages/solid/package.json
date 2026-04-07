@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/solid",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "imports": {
     "#is-development": {
       "production": "./src/dev-false.ts",
