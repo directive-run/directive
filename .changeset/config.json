@@ -16,7 +16,6 @@
       "@directive-run/ai",
       "@directive-run/cli",
       "@directive-run/knowledge",
-      "@directive-run/devtools",
       "@directive-run/claude-plugin"
     ]
   ],

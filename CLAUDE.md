@@ -17,7 +17,6 @@ packages/
 ├── lit/        — Lit controllers
 ├── el/         — Vanilla DOM (el(), JSX, htm)
 ├── query/      — Data fetching layer
-├── devtools/   — Devtools panel (PROPRIETARY — not MIT/Apache-2.0)
 ├── cli/        — CLI tool (directive init, rules generation)
 ├── knowledge/  — Knowledge files for AI assistants
 └── claude-plugin/ — Claude Code plugin
