@@ -3,8 +3,8 @@
   "version": "1.1.0",
   "imports": {
     "#is-development": {
-      "development": "./src/dev-true.ts",
-      "default": "./src/dev-false.ts"
+      "production": "./src/dev-false.ts",
+      "default": "./src/dev-true.ts"
     }
   },
   "description": "The constraint-driven runtime for TypeScript. Declare what must be true — the runtime makes it happen.",
