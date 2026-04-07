@@ -160,7 +160,7 @@ describe("createCoverageTracker", () => {
     const sys = createSystem({ module: mod });
     sys.start();
 
-    const { run, report } = createCoverageTracker(sys);
+    const { report } = createCoverageTracker(sys);
 
     // Don't even need to run a scenario
     const coverage = report();
