@@ -17,12 +17,7 @@ import type {
   InferSchema,
   Schema,
 } from "./types.js";
-
-/** Hoisted dev-mode flag — avoids per-access process.env check in proxy get trap */
-const __DEV__ =
-  typeof process !== "undefined"
-    ? process.env.NODE_ENV !== "production"
-    : true;
+import isDevelopment from "#is-development";
 
 /** Safely stringify a value for error messages */
 function safeStringify(value: unknown, maxLength = 100): string {
@@ -97,10 +92,10 @@ export function createFactsStore<S extends Schema>(
   const isTypeAssertionSchema = schemaKeys.length === 0;
 
   // Default strictKeys to false for type assertion schemas (they have no runtime keys)
-  const validate = options.validate ?? process.env.NODE_ENV !== "production";
+  const validate = options.validate ?? isDevelopment;
   const strictKeys =
     options.strictKeys ??
-    (process.env.NODE_ENV !== "production" && !isTypeAssertionSchema);
+    (isDevelopment && !isTypeAssertionSchema);
   const redactErrors = options.redactErrors ?? false;
 
   const map = new Map<string, unknown>();
@@ -412,7 +407,7 @@ export function createFactsStore<S extends Schema>(
       key: K,
       value: InferSchema<S>[K],
     ): void {
-      if (__DEV__) validateValue(key as string, value);
+      if (isDevelopment) validateValue(key as string, value);
 
       const prev = map.get(key as string);
 
@@ -645,7 +640,7 @@ export function createFactsProxy<S extends Schema>(
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
       if (
-        __DEV__ &&
+        isDevelopment &&
         value !== null &&
         typeof value === "object"
       ) {

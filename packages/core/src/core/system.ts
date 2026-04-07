@@ -16,6 +16,7 @@
  * ```
  */
 
+import isDevelopment from "#is-development";
 import { isPrototypeSafe } from "../utils/utils.js";
 import { createEngine } from "./engine.js";
 import { prefixModuleDefinition } from "./system-module-transform.js";
@@ -239,7 +240,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   }
 
   // Dev-mode: Validate crossModuleDeps reference existing modules
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     for (const [namespace, mod] of Object.entries(modulesMap)) {
       if (mod.crossModuleDeps) {
         for (const depNamespace of Object.keys(mod.crossModuleDeps)) {
@@ -261,7 +262,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   }
 
   // Dev-mode: Validate snapshotModules references existing modules
-  if (process.env.NODE_ENV !== "production" && historyConfig?.snapshotModules) {
+  if (isDevelopment && historyConfig?.snapshotModules) {
     for (const name of historyConfig.snapshotModules) {
       if (!moduleNamespaces.has(name)) {
         console.warn(
@@ -352,7 +353,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
   // Dev-mode warning: tickMs set without tick event handler
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     options.tickMs &&
     options.tickMs > 0
   ) {
@@ -386,7 +387,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     for (const [namespace, facts] of Object.entries(namespacedFacts)) {
       // Skip blocked property names
       if (BLOCKED_PROPS.has(namespace)) {
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.warn(
             `[Directive] initialFacts/hydrate contains blocked namespace "${namespace}". Skipping.`,
           );
@@ -395,7 +396,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       }
 
       if (!moduleNamespaces.has(namespace)) {
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.warn(
             `[Directive] initialFacts/hydrate contains unknown namespace "${namespace}". ` +
               `Available modules: ${[...moduleNamespaces].join(", ")}`,
@@ -584,7 +585,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
           const keys = namespaceKeysMap.get(ns);
           if (keys) {
             internalIds.push(...keys);
-          } else if (process.env.NODE_ENV !== "production") {
+          } else if (isDevelopment) {
             console.warn(
               `[Directive] subscribe wildcard "${id}" — namespace "${ns}" not found.`,
             );
@@ -606,7 +607,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     subscribeModule(namespace: string, listener: () => void): () => void {
       const keys = namespaceKeysMap.get(namespace);
       if (!keys || keys.length === 0) {
-        if (process.env.NODE_ENV !== "production") {
+        if (isDevelopment) {
           console.warn(
             `[Directive] subscribeModule("${namespace}") — namespace not found. ` +
               `Available: ${[...namespaceKeysMap.keys()].join(", ")}`,
@@ -823,7 +824,7 @@ function applyZeroConfigDefaults(options: {
   let errorBoundary: ErrorBoundaryConfig | undefined = options.errorBoundary;
 
   if (options.zeroConfig) {
-    const isDev = process.env.NODE_ENV !== "production";
+    const isDev = isDevelopment;
 
     history = history ?? isDev;
 
@@ -933,7 +934,7 @@ function warnIfNotStarted(
   system: any,
 ): void {
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     process.env.NODE_ENV !== "test"
   ) {
     setTimeout(() => {
@@ -984,7 +985,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   }
 
   // Dev-mode warnings
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     // Warn if crossModuleDeps is defined (ignored in single module mode)
     if (mod.crossModuleDeps && Object.keys(mod.crossModuleDeps).length > 0) {
       console.warn(
@@ -1062,7 +1063,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       // Apply hydrated facts (takes precedence)
       if (hydratedFacts) {
         if (!isPrototypeSafe(hydratedFacts)) {
-          if (process.env.NODE_ENV !== "production") {
+          if (isDevelopment) {
             console.warn(
               "[Directive] hydrate() data contains potentially dangerous keys. Skipping.",
             );

@@ -4,6 +4,7 @@
  * Modules group related facts, constraints, resolvers, effects, and derivations.
  */
 
+import isDevelopment from "#is-development";
 import type {
   CrossModuleConstraintsDef,
   CrossModuleDeps,
@@ -382,7 +383,7 @@ export function createModule<const M extends ModuleSchema>(
   id: string,
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): ModuleDef<M> {
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopment) {
     validateModuleConfig(id, config);
   }
 

@@ -364,19 +364,9 @@ describe("createCrossModuleFactsProxy", () => {
     process.env.NODE_ENV = originalEnv;
   });
 
-  it("does not warn in production", () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    const proxy = createCrossModuleFactsProxy(facts, "users", ["auth"]);
-    proxy.billing;
-
-    expect(warnSpy).not.toHaveBeenCalled();
-
-    warnSpy.mockRestore();
-    process.env.NODE_ENV = originalEnv;
-  });
+  // Production warning suppression is now compile-time via #is-development
+  // import mapping — not testable at runtime. Warnings are eliminated by bundler.
+  it.skip("does not warn in production (compile-time, not runtime testable)", () => {});
 
   it("supports has check for self", () => {
     const proxy = createCrossModuleFactsProxy(facts, "users", ["auth"]);

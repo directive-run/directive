@@ -7,6 +7,7 @@
  * This module has no dependency on the facts store or tracking system.
  */
 
+import isDevelopment from "#is-development";
 import type { SchemaType } from "./types.js";
 
 // ============================================================================
@@ -619,7 +620,7 @@ export const t = {
    * ```
    */
   enum<T extends string>(...values: T[]) {
-    if (process.env.NODE_ENV !== "production" && values.length === 0) {
+    if (isDevelopment && values.length === 0) {
       console.warn(
         "[Directive] t.enum() called with no values - this will reject all strings",
       );
@@ -722,7 +723,7 @@ export const t = {
    * ```
    */
   union<T extends SchemaType<unknown>[]>(...types: T) {
-    if (process.env.NODE_ENV !== "production" && types.length === 0) {
+    if (isDevelopment && types.length === 0) {
       console.warn(
         "[Directive] t.union() called with no types - this will reject all values",
       );
@@ -785,7 +786,7 @@ export const t = {
    * ```
    */
   tuple<T extends SchemaType<unknown>[]>(...types: T) {
-    if (process.env.NODE_ENV !== "production" && types.length === 0) {
+    if (isDevelopment && types.length === 0) {
       console.warn(
         "[Directive] t.tuple() called with no types - this will only accept empty arrays",
       );
