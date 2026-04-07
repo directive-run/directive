@@ -1,5 +1,13 @@
 # @directive-run/example-pagination
 
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies [[`0561920`](https://github.com/directive-run/directive/commit/0561920b8096a69253f7a02ba5184842943bd2f8)]:
+  - @directive-run/core@1.1.1
+  - @directive-run/el@1.0.0
+
 ## 0.0.22
 
 ### Patch Changes
