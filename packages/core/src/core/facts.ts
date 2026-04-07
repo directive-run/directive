@@ -35,7 +35,7 @@ function safeStringify(value: unknown, maxLength = 100): string {
 /** Options for creating a facts store */
 export interface CreateFactsStoreOptions<S extends Schema> {
   schema: S;
-  /** Validate values against schema (default: process.env.NODE_ENV !== 'production') */
+  /** Validate values against schema (default: true in development, false in production) */
   validate?: boolean;
   /** Throw on unknown schema keys (default: true in dev mode) */
   strictKeys?: boolean;

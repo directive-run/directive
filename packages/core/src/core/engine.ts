@@ -1087,8 +1087,12 @@ export function createEngine<S extends Schema>(
           const r = result as { unmet?: unknown[]; inflight?: unknown[] };
           observer({
             type: "reconcile.end",
-            added: Array.isArray(r.unmet) ? r.unmet.length : 0,
-            removed: 0,
+            added: Array.isArray((r as { completed?: unknown[] }).completed)
+              ? (r as { completed: unknown[] }).completed.length
+              : 0,
+            removed: Array.isArray((r as { canceled?: unknown[] }).canceled)
+              ? (r as { canceled: unknown[] }).canceled.length
+              : 0,
           });
         },
       };
