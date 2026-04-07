@@ -1113,6 +1113,10 @@ export interface CoverageReport {
   constraintCoverage: number;
   /** Coverage percentage (resolversRun / total resolvers). */
   resolverCoverage: number;
+  /** Coverage percentage (effectsRun / total effects). */
+  effectCoverage: number;
+  /** Coverage percentage (derivationsComputed / total derivations). */
+  derivationCoverage: number;
 }
 
 /**
@@ -1211,6 +1215,14 @@ export function createCoverageTracker(
           allResolvers.size === 0
             ? 1
             : resolversRun.size / allResolvers.size,
+        effectCoverage:
+          inspection.effects.length === 0
+            ? 1
+            : effectsRun.size / inspection.effects.length,
+        derivationCoverage:
+          inspection.derivations.length === 0
+            ? 1
+            : derivationsComputed.size / inspection.derivations.length,
       };
     },
   };

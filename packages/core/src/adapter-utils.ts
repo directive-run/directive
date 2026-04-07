@@ -5,6 +5,7 @@
  * @internal
  */
 
+import isDevelopment from "#is-development";
 import { withTracking } from "./core/tracking.js";
 import type {
   HistoryAPI,
@@ -195,7 +196,7 @@ export function createThrottle<T extends (...args: unknown[]) => void>(
  * @internal
  */
 export function assertSystem(hookName: string, system: unknown): void {
-  if (process.env.NODE_ENV !== "production" && system == null) {
+  if (isDevelopment && system == null) {
     throw new Error(
       `[Directive] ${hookName}() requires a system instance as the first argument. Received ${system}.`,
     );
