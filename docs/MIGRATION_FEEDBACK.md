@@ -501,3 +501,84 @@ The most-bitten limitations after 43 cycles:
 | Item 1 (flushAsync export) | every test harness | High (1× barrier per dev) |
 | Item 3 (proxy serializer) | every test | Medium (debug-hidden) |
 | Item 4 (`t.timer()`) | 8× cycles (timer machines) | Medium (per-cycle ceremony) |
+
+---
+
+## Item 24 — Map-in-fact silently breaks reactivity (B-Cycle-52)
+
+Sibling to Item 20 (Date-in-fact), Item 32 (Set-in-fact). Discovered
+during turnMachine port:
+
+```ts
+// XState shape
+submissions: Map<string, TurnSubmission>  // ❌ proxy doesn't trap mutations
+
+// Workaround
+submissions: Record<string, TurnSubmissionFact>  // ✓ JSON-friendly
+```
+
+The Map appeared to work but `submissions.set(userId, sub)` mutations
+weren't observed by Directive's reactive system. Same root cause
+as Item 20 — non-JSON-roundtrippable values break the proxy. The
+**JSON-fact rule** is now confirmed across 4 distinct shapes:
+- Date instances (4 cycles: C4, C16, C46, C48)
+- Set<T> (1 cycle: C32)
+- Map<K, V> (1 cycle: C52)
+- File objects in optimistic message uploads (1 cycle: C44 spaceMessage)
+
+**Proposal escalation:** Item 20's "runtime warning on non-JSON
+fact assignment" should also auto-detect Map and Set instances
+specifically. Most-bitten limitation by far.
+
+---
+
+## Item 25 — Parent-event mechanism (`sendParent`) requires callback-shaped workaround (B-Cycle-31, C44, C51, C52)
+
+`turnMachine` had 10+ different `sendParent({...})` calls. XState
+spawns child machines that emit events to parents. Directive has
+no equivalent: the workaround is a callback dep per parent event.
+
+```ts
+deps: {
+  onSubmissionComplete?: (input) => void;
+  onRevealed?: (input) => void;
+  onCompleted?: (input) => void;
+  onTimedOut?: (input) => void;
+  onError?: (input) => void;
+  onTimeWarning?: (input) => void;
+  onHapticFeedback?: (input) => void;
+  // ...10+ callbacks
+}
+```
+
+This works but bloats the deps interface. Cycles 31 (formAdapter),
+44 (fireXyz callbacks for spawnChild fire-and-forget), 51 (onCallMade),
+52 (7 callbacks). 4 cycles confirmed.
+
+**Proposal:** ship a peer-module declaration (already proposed in
+Item 22). Then parent module declares `peers: { turn: createTurnModule(...) }`
+and child can `ctx.peers.parent.dispatch({type: 'TURN_COMPLETED', ...})`.
+Removes the per-event callback ceremony.
+
+This is the highest-leverage missing primitive for the realtime
+cluster (W9). Without it, the spawn-child shape pays scaffolding
+~50 LOC per parent-child pair.
+
+---
+
+## Updated quick-win ranking (post-Cycle-52, near-final)
+
+| Issue | Frequency | Severity |
+|---|---|---|
+| Item 20 (JSON-fact warning, expanded) | 7× cycles | **P0 most-bitten** |
+| Item 22 + 25 (peer/spawn-child idiom) | 5× cycles + W9 | **P0 for realtime** |
+| Item 23 (same-constraint re-fire) | 1× + risk on chains | P0 silent stall |
+| Item 17 (`t.mutator` helper) | 12× cycles | High verbosity |
+| Item 1 (flushAsync export) | every test harness | High onboarding |
+| Item 4 (`t.timer()` declarative) | 10× cycles | Medium ceremony |
+| Item 18 (`useTickWhile` React hook) | 8× cycles consumer-side | Medium DX |
+| Item 3 (proxy serializer for vitest) | every test | Medium debug-hidden |
+
+The 8 highest-leverage items if implemented would shave ~30%
+of the LOC ceremony from a typical port and eliminate 3 of 4
+silent-failure modes (Items 20, 23, 25).
