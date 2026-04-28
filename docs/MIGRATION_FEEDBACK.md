@@ -432,3 +432,72 @@ The 10×-occurrence patterns (`t.mutator` + JSON-fact warning)
 are now the single biggest leverage points. A `t.mutator()`
 helper alone would shave ~50-80 LOC × 10 cycles = ~500-800 LOC
 of mutator scaffolding from this codebase.
+
+---
+
+## Item 23 — Same-constraint re-fire is suppressed within a flushAsync window (B-Cycle-43)
+
+**Important correction to Cycle-5 catalog claim** ("Chained
+constraint→resolver pipelines fire in same flushAsync window").
+That claim only holds when chains transition through *different*
+constraints. Same-constraint re-fire is suppressed.
+
+**Reproduced in B-Cycle-43 authModule:**
+
+The MFA flow needs:
+1. Constraint X fires resolver R.
+2. R writes `pendingAction = { kind: 'createMfaChallenge', ... }`
+   and `status = 'creatingMfaChallenge'`.
+3. The same constraint X's `when` clause is now true again with
+   different pending action.
+
+But Directive does NOT re-fire R in the same window. 5/16 tests
+failed with status stuck at `creatingMfaChallenge`. Splitting
+into two constraints with two requirement types (`EXECUTE_ACTION`
++ `EXECUTE_MFA`) fixed it immediately.
+
+**Why this matters for migrations:**
+- The discriminated `pendingAction` pattern (Item 17) is built
+  on the assumption that chained transitions through the same
+  constraint work. They don't.
+- Workaround: split MFA-style chains into separate constraints.
+  Pays an extra ~15-20 LOC per cycle that uses chained mutations.
+- C36 (tournament) has a `matchComplete` → `advancingPlayers`
+  chain that *appeared* to work — likely because the user
+  dispatches `MATCH_COMPLETE_DONE` between, breaking the
+  same-constraint chain.
+
+**Proposal (ranked):**
+1. Document the constraint-dedup behavior in "chained pipelines"
+   guide — add a section "Same-constraint re-fire is NOT supported."
+2. Optionally: provide a `ctx.requeue()` API inside the resolver
+   so a resolver can explicitly request itself to be re-evaluated
+   if facts have changed.
+3. Long-term: model "transitions" as their own primitive separate
+   from constraints.
+
+This is a P0/P1 limitation — undocumented, easy to hit, hard to
+debug (the test failure looked like the constraint's `when` was
+returning false, but it was actually returning true and being
+ignored).
+
+**Affected cycles going back:** any with chained mutations through
+one constraint. Likely C30 (templateCreation save→reload), C40
+(spacesAdmin mutation→loading), and others — they "work" by
+dispatching the next event from the user side, not via resolver-
+chained transition.
+
+---
+
+## Updated quick-win ranking (post-Cycle-43)
+
+The most-bitten limitations after 43 cycles:
+
+| Issue | Frequency | Severity |
+|---|---|---|
+| Item 20 (JSON-fact warning) | 4× cycles | High (silent breakage) |
+| Item 17 (`t.mutator` helper) | 10× cycles | Medium (verbosity tax) |
+| Item 23 (same-constraint re-fire) | NEW | High (silent stall) |
+| Item 1 (flushAsync export) | every test harness | High (1× barrier per dev) |
+| Item 3 (proxy serializer) | every test | Medium (debug-hidden) |
+| Item 4 (`t.timer()`) | 8× cycles (timer machines) | Medium (per-cycle ceremony) |
