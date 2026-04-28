@@ -202,7 +202,45 @@ hatch.
 | Document derivation-deps composition | doc only | every multi-derivation module |
 | Introduce `t.timer()` or scheduler resolver | medium | every timer-using machine (3+ so far, more coming) |
 | `ModuleHooks.onResolverError` | small | every multi-resolver machine |
+| Document "deps inside derivations are not reactive" | doc only | C34 winValidation (canContest reading nowMs) |
 
 The two highest-leverage items by far are #1 (flushAsync export +
 testing docs) and #3 (proxy/serializer fix) — together they would
 have saved 4+ hours of debug time across the migration so far.
+
+---
+
+## Item 16 — Derivations reading external state (e.g. clock) aren't reactive (B-Cycle-34)
+
+In `winValidationModule`, `canContest` derivation reads `deps.nowMs()`
+inside its body:
+
+```ts
+canContest: (f) =>
+  isContestActive(f.contestPeriodEndsAtMs, deps.nowMs()) &&
+  !f.contests.some((c) => c.contestedBy === f.currentUserId),
+```
+
+When the test ticks the clock forward (a fake `nowMs` impl), the
+derivation does NOT recompute — Directive's reactive system tracks
+fact dependencies, not closure-captured values. So `canContest`
+returns stale `true` even though the contest period should now be
+expired.
+
+This is a real-world footgun: any derivation that reads a `Date.now()`
+or random number or globalThis state will silently go stale.
+
+**Workarounds today:**
+- Promote the time to a fact: `clockMs: t.number()`. Consumer ticks
+  it explicitly via an event. Derivation depends on the fact.
+- Make the derivation impure (use `nowMs` only on read paths through
+  a getter, not memoized).
+- Don't use derivations for time-dependent values; compute on read.
+
+**Proposal:** runtime warning when a derivation closure reads from
+non-`facts` non-`derivations` arguments. Probably impossible to
+detect statically; could be a doc-only "derivation purity" rule.
+
+**Affected:** any time/clock/random derivation. Likely to bite
+realtime cluster cycles (45-54) heavily — those have polling/poll-
+through behavior.
