@@ -244,3 +244,191 @@ detect statically; could be a doc-only "derivation purity" rule.
 **Affected:** any time/clock/random derivation. Likely to bite
 realtime cluster cycles (45-54) heavily — those have polling/poll-
 through behavior.
+
+---
+
+## Item 17 — Discriminated `pendingAction` is the de-facto pattern but unclaimed (B-Cycles 23, 24, 26, 30, 33, 36, 37, 38, 40, 41)
+
+**The pattern that emerged organically in 10 cycles:**
+
+```ts
+type PendingAction =
+  | { kind: 'create'; data: Form }
+  | { kind: 'delete'; id: string }
+  | { kind: 'verify'; id: string };
+
+facts: { pendingAction: t.object<PendingAction>().nullable(), status: ... }
+constraint: when: f.status === 'mutating' && f.pendingAction !== null
+resolver: switch (action.kind) { ... }
+events: (f, payload) => { f.pendingAction = {kind, ...payload}; f.status = 'mutating'; }
+```
+
+Replaces N separate states + N separate resolvers. 10 cycles
+converged on it independently. It works, but:
+
+1. There's no first-class API for it — every cycle re-derives it.
+2. Tests have to re-derive `isVerifying`-style booleans as
+   derivations (`status === 'mutating' && pendingAction?.kind === 'verify'`).
+3. The constraint `when` always reads `f.pendingAction !== null`
+   in addition to the status — duplicate gate.
+4. Cycles where mutations have non-symmetric outcomes (C34, C39)
+   abandon the pattern and pay a verbosity tax instead.
+
+**Proposal:** ship a higher-level helper:
+```ts
+mutator: t.mutator<PendingAction>({
+  kinds: { create: { args: { data: t.object<Form>() } }, delete: ... },
+  resolve: { create: async (args, ctx) => ..., ... }
+})
+```
+The schema generates the pendingAction fact + constraint +
+discriminated resolver + per-kind boolean derivations
+(`isCreating`, `isDeleting`). 10× of these in the surveyed
+codebase = a real abstraction worth promoting.
+
+---
+
+## Item 18 — `setInterval` / recurring-tick wiring has no canonical pattern (B-Cycles 5, 26, 27, 34, 35, 39)
+
+**Recurring shape:** consumer wires `setInterval(() => sys.events.TICK(), 1000)`
+while in some status, clears it on status change. Each cycle
+re-implements the same React useEffect:
+
+```ts
+useEffect(() => {
+  if (!sys.derive.isPending) return;
+  const id = setInterval(() => sys.events.TICK(), 5000);
+  return () => clearInterval(id);
+}, [sys.derive.isPending]);
+```
+
+This becomes 6+ near-identical hook copies across the consumer
+surface. Module is cleanly testable but the consumer pays.
+
+**Proposal (ranked):**
+1. `@directive-run/react` ships a `useTickWhile(sys, derivation, eventName, intervalMs)` hook.
+2. A scheduler-resolver primitive (already proposed in Item 4) that
+   takes a periodic source and emits events to a dispatcher.
+
+---
+
+## Item 19 — Optimistic update + rollback has a manual snapshot ceremony (B-Cycle-41)
+
+`friendsManagementMachine` had 5 mutations that each:
+1. Snapshot 3 facts (`friends`, `pendingRequests`, `sentRequests`)
+   into a `previousState` object.
+2. Apply optimistic mutation.
+3. Resolver on success: clear `previousState`.
+4. Resolver on failure: restore from `previousState`.
+
+The XState equivalent had a per-mutation `optimisticX` action +
+`rollbackOptimisticUpdate` action. Directive collapses to
+1 fact + 1 resolver, but the snapshot ceremony in the event
+handler is verbose:
+
+```ts
+f.previousState = {
+  friends: f.friends,
+  pendingRequests: f.pendingRequests,
+  sentRequests: f.sentRequests,
+};
+f.friends = ...optimisticMutation;
+```
+
+3-fact snapshots are easy; 5+ fact snapshots get tedious. And if
+a fact is added later, every snapshot site needs updating.
+
+**Proposal:** ship `system.transaction()` or
+`ctx.snapshot(['friends', 'pendingRequests', 'sentRequests'])` →
+returns a restore function. Resolvers on failure call
+`restore()`; on success let it fall out of scope. Removes the
+3-fact-tuple boilerplate and makes "which facts are part of the
+optimistic update" a single declaration.
+
+---
+
+## Item 20 — `Set` and `Map` proxies break silently (B-Cycle-32)
+
+`gameCreationMachine` had `expandedSections: Set<string>` in its
+context. Directive proxy doesn't trap Set methods (`add`, `delete`,
+`has`) — they appear to work but the reactive system doesn't
+register the change. Switching to `string[]` with
+`includes`/filter restored reactivity.
+
+Same as Item 2 (Date) but for collections. The unifying claim:
+**facts must be JSON-round-trippable.** Date, Set, Map, regex,
+class instances all break the proxy invisibly.
+
+**Proposal:** runtime warning at `init` time when a non-JSON-
+plain value is assigned to a fact. Either:
+- Throw with a docs link explaining the JSON-roundtrip rule.
+- Auto-coerce Set→array, Map→object, Date→ms with a deprecation log.
+
+Confirmed across 4 cycles: C4 (Date), C16 (Date), C32 (Set),
+C34 (Date again). This is the most-frequent-cycle limitation.
+
+---
+
+## Item 21 — `t.string<UnionType>()` lost on payload union types (B-Cycle-25, C28)
+
+```ts
+events: {
+  UPDATE_FIELD: {
+    field: t.string<keyof FormData>(),
+    value: t.unknown(),
+  },
+}
+```
+
+`t.unknown()` was needed because `value` can be `string | number |
+boolean`. There's no `t.union<string | number | boolean>()` shown
+anywhere in docs, so cycles fell back to `unknown` and lost type
+safety. The downstream event handler has to cast.
+
+**Proposal:** ship `t.union<string | number | boolean>()` or
+document the pattern for "polymorphic event payload."
+
+---
+
+## Item 22 — No first-class "spawn child module" idiom (B-Cycle-31)
+
+`scheduleGameMachine` spawned a child `formMachine` via
+`spawnChild`. The Directive port ducked it via a `formAdapter`
+dep — consumer wires the form externally. Works, but:
+
+1. There's no Directive idiom for "this module owns a sub-module's
+   lifecycle."
+2. Cross-module event passing requires the adapter shape, not a
+   declared peer.
+
+**Proposal:** define a `peers: { form: createFormModule(...) }`
+schema entry; the parent module's events can dispatch to the peer
+via `ctx.peers.form.send(...)`. This is in the master plan as a
+Wave-0 toolchain item but hasn't shipped.
+
+Will become critical for realtime cluster (Wave 9) — `hostGameMachine`
+spawns 4 children, `partyLobbyMachine` spawns 1+. Without this
+the verbosity tax compounds.
+
+---
+
+## Updated quick-win ranking (post-session 24-41)
+
+| Win | Effort | Cycles affected so far |
+|---|---|---|
+| Export `flushAsync` from testing helpers | 5 LOC + doc | every test harness |
+| Runtime warn on non-JSON fact values (Date/Set/Map/class) | 30 LOC | C4, C16, C32, C34 (4× — most frequent) |
+| Fix proxy serialization for vitest format | unknown | every test |
+| `t.mutator<DiscriminatedUnion>()` higher-level helper | medium | C23, C24, C26, C30, C33, C36-C38, C40, C41 (10×) |
+| Lead with `t.string<'a' \| 'b'>()` in docs | doc only | every status fact |
+| Document derivation-deps composition | doc only | every multi-derivation module |
+| Introduce `t.timer()` or scheduler resolver | medium | C2, C5, C8, C26, C27, C34, C35, C39 |
+| `useTickWhile()` hook in @directive-run/react | small | C5, C26, C27, C34, C35, C39 |
+| `ctx.snapshot()` for optimistic-update ceremony | small | C41 + heavy social cycles ahead |
+| Peer-module declaration for spawned children | medium | C31 + ALL realtime cluster (W9) |
+| `ModuleHooks.onResolverError` | small | every multi-resolver machine |
+
+The 10×-occurrence patterns (`t.mutator` + JSON-fact warning)
+are now the single biggest leverage points. A `t.mutator()`
+helper alone would shave ~50-80 LOC × 10 cycles = ~500-800 LOC
+of mutator scaffolding from this codebase.
