@@ -40,7 +40,12 @@ field-report lives in [`posts/migrating-55-machines.md`](./posts/migrating-55-ma
 
 ## RFCs
 
-- [`rfcs/0001-t-timer.md`](./rfcs/0001-t-timer.md) — `t.timer({ms})` declarative timer primitive (synthesizes feedback items #4, #15, #16, #18). Status: Draft. Awaits AE-review-loop + concrete prototype.
+- [`rfcs/0001-t-timer.md`](./rfcs/0001-t-timer.md) — `t.timer({ms})` declarative timer primitive (synthesizes feedback items #4, #15, #16, #18). **Status: v0.1 SHIPPED 2026-04-29** as helper layer (`SignalClock`, `realClock`/`virtualClock`, `TimerFactState`, `timerOps()`); v0.2 engine-integrated schema deferred.
+- [`rfcs/0002-unregister-and-multi-instance.md`](./rfcs/0002-unregister-and-multi-instance.md) — `system.unregisterModule()` + multi-instance module spawning (closes feedback Item 26). Status: Draft. Awaits AE-review-loop + concrete prototype before implementation.
+
+## Innovation backlog
+
+- [`IDEAS.md`](./IDEAS.md) — Game-changer ideas surfaced during AE-review-loop rounds. R1.A scaffold (`directive replay` from prod error JSON) shipped in `@directive-run/timeline@0.2.0`; R1.B-E queued.
 
 ## Field reports
 

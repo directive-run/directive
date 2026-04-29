@@ -11,7 +11,9 @@ unlocks next.
 
 ## R1.A — `directive replay <prod-error-id>` → auto-derived vitest from a serialized timeline frame stream
 
-**[BUILD CANDIDATE — 2 days]**
+**[v0.1 SCAFFOLD SHIPPED 2026-04-29 — `@directive-run/timeline@0.2.0`]**
+
+**Status:** v0.1 scaffold shipped in commit `b63f4a94`. `serializeTimeline()` + `deserializeTimeline()` + `replayTimeline()` round-trip a recorded timeline through JSON and re-dispatch its `MUTATE`-shaped frames against a fresh system. v0.2 (auto-derived vitest source codegen + determinism gate + mock-stub generation from recorded resolver pairs) deferred — the value-layer is the foundation.
 
 **Pitch:** Ship a `serializeTimeline()` + `replayTimeline()` pair plus a
 `directive replay` CLI command. A user's prod error handler dumps the
@@ -191,7 +193,7 @@ primitive.
 
 | Rank | Idea | Days | Viral | Compound | Tag |
 |---|---|---|---|---|---|
-| 1 | **R1.A** — `directive replay` from prod error | 2 | Max | Max | **BUILD CANDIDATE** |
+| 1 | **R1.A** — `directive replay` from prod error | 2 | Max | Max | **v0.1 SCAFFOLD SHIPPED** (timeline@0.2.0) |
 | 2 | **R1.B** — Causal-graph vitest matchers | 2 | High | High | strong follow-on |
 | 3 | **R1.C** — `cancellable()` mutator + timer | 2 | High | Med-High | killer for type-ahead |
 | 4 | **R1.D** — Live timeline devtools scrubber | 7 | Max | High | Phase 5 pulled forward |
