@@ -709,19 +709,19 @@ location.
 | 25 | Cross-module dispatch ergonomics | docs/composition/cross-module-events.md |
 | 26 | "Porting from XState's spawnChild" | docs/migrating-from-xstate.md |
 
-## HELPER PACKAGES — opinionated abstractions, ship as optional
+## HELPER PACKAGES — SHIPPED 2026-04-29
 
-| # | Item | Package | Pre-req |
+| # | Item | Package | Status |
 |---|---|---|---|
-| 17 | `t.mutator<DiscriminatedUnion>()` | `@directive-run/mutator` | #23 (`ctx.requeue`) must land first; mutator chains stall otherwise |
-| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic` | resolver-scope ONLY, not system-wide tx (Risk-flagged footgun) |
+| 17 | `t.mutator<DiscriminatedUnion>()` | `@directive-run/mutator@0.1.0` | **SHIPPED.** Six-fragment spread API (`facts`/`events`/`requirements`/`eventHandlers`/`constraints`/`resolvers`); `mutate(kind, payload)` typed dispatch helper; `'pending' \| 'running' \| 'failed'` status union; proto-pollution-guarded handler lookup; truncated error capture. Pre-req `ctx.requeue` shipped (Item #23). Hardened through R1+R2 AE review. |
+| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic@0.1.0` | **SHIPPED.** `createSnapshot(facts, keys)` + `withOptimistic<F>(keys)(handler)` curried HOC. Atomic capture (R2 fix); throws typed `OptimisticCloneError` on non-cloneable shape rather than silently mis-restoring. Resolver-scope only — NOT a system-wide tx. |
 
-## RFC — needs design pass before shipping
+## RFC — design / partial-ship
 
-| # | Item | Open question |
+| # | Item | Status |
 |---|---|---|
-| 4 | `t.timer({ms})` declarative timer | Clock-source contract: SignalClock injection vs Date.now? Determinism under replay/dehydrate is non-negotiable. **Domain Expert flagged as the killer differentiator** — would make `vi.useFakeTimers` (#15), `useTickWhile` (#18), and clock-in-derivation (#16) all evaporate. |
-| 26 | `unregisterModule()` + multi-instance | Cancellation semantics for in-flight resolvers; identity for N-of-same-schema (atomFamily-style) |
+| 4 | `t.timer({ms})` declarative timer | **v0.1 SHIPPED 2026-04-29.** RFC 0001 drafted; v0.1 ships the value layer (`SignalClock` interface, `realClock`/`virtualClock`/`defaultClock` factories, `TimerFactState` + pure transition helpers + `timerOps()` bundle). Engine-integrated `t.timer({ms})` schema constructor remains the v0.2 deliverable. v0.1 already obviates `vi.useFakeTimers` for module-side timer logic (use `virtualClock` + `advanceBy`); `useTickWhile` (#18) is now consumer-side polish only; clock-in-derivation (#16) is correct via `clock.now()` capture at module-factory time. |
+| 26 | `unregisterModule()` + multi-instance | Open. Cancellation semantics for in-flight resolvers; identity for N-of-same-schema (atomFamily-style). |
 
 ## REJECT — would compromise framework design
 

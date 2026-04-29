@@ -149,9 +149,16 @@ function fullTestName(task: ReporterTask): string {
   // `task.suite` parent chain (vitest 1.4+); each ancestor whose name
   // is non-empty contributes to the prefix. The root file-suite has
   // an empty name; we skip it.
+  //
+  // The Set guard defends against any future vitest topology that
+  // produces a circular parent chain (none today, but the duck-shape
+  // contract makes no guarantee). Without it, a cycle would hang the
+  // reporter and starve the rest of the test report. (R2 sec m-R2-1.)
   const segments: string[] = [];
+  const seen = new Set<ReporterTask>();
   let cursor: ReporterTask | undefined = task;
-  while (cursor !== undefined) {
+  while (cursor !== undefined && !seen.has(cursor)) {
+    seen.add(cursor);
     if (cursor.name !== undefined && cursor.name !== "") {
       segments.unshift(cursor.name);
     }

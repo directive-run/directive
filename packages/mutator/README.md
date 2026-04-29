@@ -83,9 +83,9 @@ sys.start();
 sys.events.MUTATE(mutate<FormMutations>('submit', { values }));
 ```
 
-The `mutate(type, payload?)` helper is a typed payload constructor. The
-type parameter restricts the payload shape — passing a wrong-shape
-payload is a compile error.
+The `mutate(kind, payload?)` helper is a typed payload constructor.
+The `kind` argument restricts the payload shape — passing a
+wrong-shape payload is a compile error.
 
 ## Anatomy
 
@@ -115,8 +115,9 @@ sys.events.MUTATE({ kind, payload, status: 'pending', error: null })
     → looks up handler by kind
     → calls handler({ payload, facts, deps, requeue })
     → on success: pendingMutation = null
-    → on throw: pendingMutation.error = message, status stays 'running'
-                (constraint stops firing — no infinite retry)
+    → on throw: pendingMutation.status = 'failed' + .error = message
+                (constraint stops firing — no infinite retry; UI can
+                 disambiguate "still running" from "stopped on error")
 ```
 
 > `kind` (not `type`) discriminates the mutation variant. Directive's

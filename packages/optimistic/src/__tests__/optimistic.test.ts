@@ -156,6 +156,39 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     }
   });
 
+  it("R2 sec C-R2-2: snapshot is atomic — failed key throws BEFORE returning restore", () => {
+    // 'b' contains a non-cloneable function; 'a' and 'c' are fine.
+    const facts: { a: number; b: { fn: () => void }; c: string } = {
+      a: 1,
+      b: { fn: () => {} },
+      c: "original",
+    };
+    // The throw happens during snapshot construction; no restore
+    // closure is returned, and the caller never has a chance to
+    // accidentally overwrite a/c with undefined.
+    expect(() => createSnapshot(facts, ["a", "b", "c"])).toThrow(
+      OptimisticCloneError,
+    );
+    // Live facts are untouched by the failed snapshot attempt.
+    expect(facts.a).toBe(1);
+    expect(facts.c).toBe("original");
+  });
+
+  it("R2 sec C-R2-2: input keys array can be mutated after capture without affecting restore", () => {
+    type F = { x: number; y: number };
+    const facts: F = { x: 1, y: 2 };
+    const keys: (keyof F)[] = ["x"];
+    const restore = createSnapshot(facts, keys);
+    // Mutate the input array — should not affect the captured key set.
+    keys.push("y");
+    facts.x = 100;
+    facts.y = 200;
+    restore();
+    // Only 'x' was captured, so only 'x' is restored.
+    expect(facts.x).toBe(1);
+    expect(facts.y).toBe(200);
+  });
+
   it("R1: structuredClone handles cycles natively — no false positives", () => {
     type Node = { name: string; child?: Node };
     const node: Node = { name: "a" };

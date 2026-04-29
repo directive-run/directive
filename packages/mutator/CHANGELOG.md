@@ -9,12 +9,13 @@ Initial release.
   (facts / events / requirements / eventHandlers / constraints /
   resolvers) wiring a discriminated `pendingMutation` lifecycle into a
   Directive module.
-- `mutate(type, payload?)` — typed payload constructor for `MUTATE`
+- `mutate(kind, payload?)` — typed payload constructor for `MUTATE`
   dispatches.
 - Single-flight concurrency model: new mutations overwrite in-flight ones
   via the `pendingMutation` fact.
 - Error capture: thrown handlers surface on `pendingMutation.error`
-  with `status: 'running'` (constraint stops firing — no infinite retry).
+  with `status: 'failed'` (a distinct status from `'running'` so the
+  UI can disambiguate; the constraint stops firing).
 - Built on `@directive-run/core@^1.2.0` (requires `ctx.requeue` for
   handler-cascade chains).
 

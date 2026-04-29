@@ -122,7 +122,7 @@ The seven P0 fixes that landed in `@directive-run/core@1.2.0` came directly from
 Plus three new packages built on those fixes:
 
 - **`@directive-run/mutator@0.1.0`** — six fragment-spreads collapse the 12-instance `pendingAction` ceremony into a typed handler map. Estimated downstream cleanup: ~600 LOC.
-- **`@directive-run/optimistic@0.1.0`** — `withOptimistic([keys], handler)` HOC for snapshot + automatic rollback on throw. Composes with the mutator for full optimistic-UI flows.
+- **`@directive-run/optimistic@0.1.0`** — `withOptimistic<F>([keys])(handler)` HOC for snapshot + automatic rollback on throw. Composes with the mutator for full optimistic-UI flows.
 - **`@directive-run/timeline@0.1.0`** — the Sherlock pick. A vitest reporter that, on test failure, prints the entire causal chain that got the system into the failing state. Built on Directive's existing `system.observe(observer)` API; no core changes needed. When `expect(facts.status).toBe('ready')` fails, you don't get "expected 'loading' to be 'ready'" — you get every fact change, constraint evaluation, requirement lifecycle, and resolver run, timestamped, in the order they happened.
 
 And one design RFC, the largest piece of futures work surfaced by the migration:

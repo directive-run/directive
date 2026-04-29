@@ -67,16 +67,44 @@ export type PendingMutation<M extends MutationMap> = {
 const MAX_ERROR_LEN = 500;
 
 /**
- * Truncate an error string to {@link MAX_ERROR_LEN} chars. The bound is
- * intentionally conservative: thrown error messages may echo
- * user-controlled input (`throw new Error(\`failed: ${untrustedInput}\`)`),
- * and consumers may render `pendingMutation.error` directly. Plaintext
- * rendering is the only supported path; this cap further limits the
- * blast radius.
+ * Coerce a thrown value to a bounded plaintext string for storage on
+ * `pendingMutation.error`. Defends against:
+ *   - non-Error throws (`throw "string"`, `throw 42`, `throw {}`)
+ *   - Errors with non-string `.message` (overridden numeric / Symbol /
+ *     buffer); naive `.length` / `.slice` would `TypeError` otherwise
+ *   - extremely long messages with attacker-influenced input
+ *
+ * Returns at most {@link MAX_ERROR_LEN} characters of plaintext.
+ * Plaintext rendering is still the only supported path on the
+ * consumer side; this is defense in depth, not an XSS sanitizer.
+ *
+ * (R2 sec M-R2-1.)
  */
-function truncateError(message: string): string {
-  if (message.length <= MAX_ERROR_LEN) return message;
-  return `${message.slice(0, MAX_ERROR_LEN - 1)}…`;
+function truncateError(input: unknown): string {
+  let str: string;
+  if (input instanceof Error) {
+    // Coerce a non-string `.message` defensively — never trust the
+    // shape on the wire.
+    str =
+      typeof input.message === "string"
+        ? input.message
+        : safeStringCoerce(input.message);
+  } else if (typeof input === "string") {
+    str = input;
+  } else {
+    str = safeStringCoerce(input);
+  }
+  if (str.length <= MAX_ERROR_LEN) return str;
+  return `${str.slice(0, MAX_ERROR_LEN - 1)}…`;
+}
+
+/** String() may throw for some Symbols + objects with hostile toString. */
+function safeStringCoerce(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return "[mutator: unstringifiable error]";
+  }
 }
 
 /**
@@ -189,9 +217,12 @@ export interface MutatorFragments<M extends MutationMap, F> {
  *   cancel: {};
  * };
  *
- * const formMutator = defineMutator<FormMutations, FormDeps>({
- *   submit: async ({ payload, facts, deps }) => {
- *     facts.values = await deps.submit(payload.values);
+ * // The second generic is the FACTS type (not deps). Deps are
+ * // captured in closure from the surrounding scope, not passed in
+ * // through the handler ctx.
+ * const formMutator = defineMutator<FormMutations, FormFacts>({
+ *   submit: async ({ payload, facts }) => {
+ *     facts.values = await deps.submit(payload.values); // deps closes over outer scope
  *   },
  *   cancel: ({ facts }) => { facts.values = []; },
  * });
@@ -231,7 +262,7 @@ export interface MutatorFragments<M extends MutationMap, F> {
  *
  * ```ts
  * export function createFormModule(deps: FormDeps) {
- *   const mut = defineMutator<FormMutations, FormDeps>({
+ *   const mut = defineMutator<FormMutations, FormFacts>({
  *     submit: async ({ payload, facts }) => {
  *       facts.values = await deps.submit(payload.values);
  *     },
@@ -367,9 +398,10 @@ export function defineMutator<
             // 'failed' is a distinct status (Sec M6 / Arch C2) — UI can
             // disambiguate "still in flight" from "stopped on error".
             status: "failed",
-            error: truncateError(
-              err instanceof Error ? err.message : String(err),
-            ),
+            // truncateError handles the unknown shape safely — non-Error
+            // throws, non-string Error.message, hostile toString. (R2
+            // sec M-R2-1.)
+            error: truncateError(err),
           };
         }
       },
@@ -389,7 +421,7 @@ export function defineMutator<
 
 /**
  * Helper for typed dispatch. Lets the caller construct a mutation payload
- * with full type narrowing — the `type` field auto-restricts the
+ * with full type narrowing — the `kind` field auto-restricts the
  * `payload` shape.
  *
  * @example

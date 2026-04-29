@@ -260,6 +260,62 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
+  it("R2 sec M-R2-1: non-Error throws are coerced safely", async () => {
+    const sys = buildSystem({
+      submit: async () => {
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw "string-only thrown value";
+      },
+    });
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+    const pending = sys.facts.pendingMutation as { error: string } | null;
+    expect(typeof pending?.error).toBe("string");
+    expect(pending?.error).toContain("string-only thrown value");
+    sys.destroy();
+  });
+
+  it("R2 sec M-R2-1: Error with non-string .message does not crash truncateError", async () => {
+    const sys = buildSystem({
+      submit: async () => {
+        const e = new Error();
+        // Hostile override — would TypeError on naive .length / .slice
+        Object.defineProperty(e, "message", {
+          value: 12345 as unknown as string,
+        });
+        throw e;
+      },
+    });
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+    const pending = sys.facts.pendingMutation as {
+      error: string;
+      status: string;
+    } | null;
+    expect(pending?.status).toBe("failed");
+    expect(typeof pending?.error).toBe("string");
+    expect(pending?.error).toContain("12345");
+    sys.destroy();
+  });
+
+  it("R2 sec M-R2-1: object thrown values coerce without crash", async () => {
+    const sys = buildSystem({
+      submit: async () => {
+        // eslint-disable-next-line @typescript-eslint/no-throw-literal
+        throw { code: 500, custom: "field" };
+      },
+    });
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+    const pending = sys.facts.pendingMutation as {
+      error: string;
+      status: string;
+    } | null;
+    expect(pending?.status).toBe("failed");
+    expect(typeof pending?.error).toBe("string");
+    sys.destroy();
+  });
+
   it("R1: explicit 'failed' status is in the type union", () => {
     // Type-level check — TS would catch removing 'failed' from the union.
     const failed: "pending" | "running" | "failed" = "failed";

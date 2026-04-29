@@ -293,7 +293,7 @@ const KIND_COLORS: Record<string, keyof typeof ANSI> = {
  * `createSystem` and is missed by any subscriber registered later, so
  * it does not appear here:
  * ```
- * Timeline 'load-chain' — 13 frames over 23ms
+ * Timeline 'load-chain' — 11 frames over 23ms
  *   [+0.1ms] system.start
  *   [+0.1ms] reconcile.start
  *   [+0.2ms] fact.change status: 'idle' → 'loading'

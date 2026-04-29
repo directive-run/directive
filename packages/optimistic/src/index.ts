@@ -39,22 +39,33 @@
  * }
  * ```
  *
- * The snapshot uses structural cloning (`structuredClone` in modern
- * runtimes, JSON-roundtrip fallback elsewhere). This matches Directive's
- * JSON-roundtrippable-fact contract — if your fact violates that
- * contract, the snapshot will silently mis-restore. See
- * `@directive-run/core@1.2.0`'s dev-mode JSON-fact warning.
+ * The snapshot uses {@link structuredClone} (Node 17+, modern
+ * browsers — Directive's documented engine baseline). On clone
+ * failure (function, DOM node, non-cloneable shape), throws a typed
+ * {@link OptimisticCloneError} with the offending key — the loud-fail
+ * contract means rollback never silently mis-restores. Convert at the
+ * boundary (e.g. `Date → number`, `BigInt → string`) before assigning
+ * to facts.
  */
 export function createSnapshot<F extends Record<string, unknown>, K extends keyof F>(
   facts: F,
   keys: readonly K[],
 ): () => void {
+  // Atomic capture: build the snapshot into a local first; only after
+  // every key clones successfully do we expose the restore closure.
+  // If any single clone throws, the partial snapshot is discarded and
+  // the throw propagates — the caller never gets a restore() that
+  // would overwrite un-snapshotted facts with `undefined`. (R2 sec
+  // C-R2-2.)
   const snapshot = {} as Pick<F, K>;
   for (const key of keys) {
     snapshot[key] = clone(facts[key], key) as F[K];
   }
+  // Freeze the captured key list so the restore closure cannot be
+  // tricked by mutating the input array post-construction.
+  const capturedKeys: readonly K[] = [...keys];
   return () => {
-    for (const key of keys) {
+    for (const key of capturedKeys) {
       facts[key] = clone(snapshot[key], key) as F[K];
     }
   };

@@ -202,6 +202,11 @@ export function registerRepeat(
   ms: number,
 ): TimerFactState {
   if (state.startedAtMs === null) return state;
+  // Defensible-illegal: registerRepeat from a paused state would
+  // otherwise advance startedAtMs while leaving status === 'paused',
+  // producing an inconsistent state (logically running by clock math
+  // but reads as paused). No-op instead. (R2 sec m-R2-2.)
+  if (state.status === "paused") return state;
   // Reset pausedDurationMs on each repeat so accumulated pause time
   // from prior intervals does not double-count into the next
   // interval's elapsed math. Without this reset, every repeat after a

@@ -112,16 +112,19 @@ The wrapper:
 ## Cloning semantics
 
 Snapshots are **deep-cloned** via `structuredClone` (Node 17+, modern
-browsers) with a JSON-roundtrip fallback. This matches Directive's
-JSON-roundtrippable-fact contract — all reactive facts MUST be
-JSON-roundtrippable, so JSON cloning is sufficient.
+browsers — Directive's documented engine baseline). There is **no**
+JSON-roundtrip fallback: that path silently dropped functions,
+symbols, undefined values, and was the exact silent-corruption hole
+optimistic rollback exists to prevent. structuredClone covers what
+the JSON-roundtrip-fact contract allows, so falling back to JSON
+adds zero recoverable cases and one corruption surface.
 
-If a fact contains a `BigInt`, function, circular reference (in
-JSON-fallback environments), or other non-cloneable shape, the snapshot
-**throws** an `OptimisticCloneError` with the offending key — making
-the violation loud rather than silently corrupting the rolled-back
-state. Convert at the boundary (e.g. `Date → number`, `BigInt → string`)
-before assigning to facts.
+If a fact contains a function, DOM node, non-cloneable instance, or
+some other shape `structuredClone` rejects, the snapshot **throws**
+an `OptimisticCloneError` with the offending key — making the
+violation loud rather than silently corrupting the rolled-back
+state. Convert at the boundary (e.g. `Date → number`,
+`BigInt → string`) before assigning to facts.
 
 ```ts
 import { OptimisticCloneError } from '@directive-run/optimistic';

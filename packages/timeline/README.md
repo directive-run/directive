@@ -20,7 +20,7 @@ trace inline with the failure. Now you see:
 ```
 ──────── Directive timeline for FAIL ────────
 load completes → ready
-Timeline 'load completes → ready' — 13 frames over 23ms
+Timeline 'load completes → ready' — 8 frames over 23ms
   [+0.1ms]    system.start
   [+0.1ms]    reconcile.start
   [+0.2ms]    fact.change status: "idle" → "loading"
