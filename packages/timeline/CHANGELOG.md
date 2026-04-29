@@ -8,8 +8,8 @@ Initial release. The Sherlock pick from MIGRATION_FEEDBACK item #1+#3+#7.
 - `recordTimeline(system, { id })` — subscribe to a Directive system's
   `observe()` stream and capture every lifecycle event as a timestamped
   frame in a named timeline.
-- `getTimeline(id)` / `clearTimeline(id)` / `clearAllTimelines()` —
-  registry access.
+- `getTimeline(id)` / `clearTimeline(id)` / `clearAllTimelines()` /
+  `setRegistryCap(n)` — registry access + bounded retention.
 - `withTimeline(id, system, fn)` — convenience wrapper that
   auto-stops on block resolve / throw.
 - `formatTimeline(timeline, opts?)` — render a multi-line, optionally
@@ -18,6 +18,13 @@ Initial release. The Sherlock pick from MIGRATION_FEEDBACK item #1+#3+#7.
 - `TimelineReporter` (from `@directive-run/timeline/reporter`) — Vitest
   reporter that, on test failure, looks up the timeline by the test's
   full name and prints it inline with the failure.
+- **R1.A scaffold:** `serializeTimeline()` + `deserializeTimeline()` +
+  `replayTimeline()` — JSON-roundtrip a recorded timeline and replay
+  its dispatched events against a fresh system. Today reconstructs
+  `MUTATE` dispatches from `@directive-run/mutator`-shaped
+  `pendingMutation` fact.change frames; the dispatchable-frame set
+  expands as core emits first-class `event.dispatch` observation
+  events. v0.2 will add codegen for vitest source files.
 
 ### Built on
 - `@directive-run/core`'s shipped `system.observe(observer)` API +

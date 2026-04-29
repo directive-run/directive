@@ -462,3 +462,196 @@ function defaultUseColor(): boolean {
 export function _getRegistry(): ReadonlyMap<string, Timeline> {
   return registry;
 }
+
+// ============================================================================
+// Serialization + replay (R1.A — directive replay v0.1)
+// ============================================================================
+
+/**
+ * Serialized timeline format. JSON-roundtrippable; suitable for posting
+ * to a bug tracker, attaching to a Sentry event, or piping through a
+ * CLI. Frame `event` objects are already JSON-safe per the
+ * `ObservationEvent` contract.
+ */
+export interface SerializedTimeline {
+  /** Schema version. Bumped on incompatible changes to the wire format. */
+  version: 1;
+  /** Identifier (test name, error ID, etc) carried for round-trip. */
+  id: string;
+  /** Wall-clock ms when recording started. */
+  startedAtMs: number;
+  /** Captured frames — `event.type` carries the discriminator. */
+  frames: TimelineFrame[];
+}
+
+/**
+ * Convert a recorded {@link Timeline} to its JSON-safe serialized form.
+ * The result can be `JSON.stringify`'d directly.
+ *
+ * @example
+ * ```ts
+ * const t = recordTimeline(sys, { id: 'bug-123' });
+ * sys.start();
+ * // ... reproduce bug ...
+ * const json = JSON.stringify(serializeTimeline(t));
+ * await fetch('/bugs', { method: 'POST', body: json });
+ * ```
+ */
+export function serializeTimeline(timeline: Timeline): SerializedTimeline {
+  return {
+    version: 1,
+    id: timeline.id,
+    startedAtMs: timeline.startedAtMs,
+    frames: timeline.frames.map((f) => ({ ts: f.ts, event: f.event })),
+  };
+}
+
+/**
+ * Parse a serialized timeline back into the in-memory shape suitable for
+ * {@link replayTimeline} or {@link formatTimeline}. Validates the
+ * version + structural shape; throws on mismatch.
+ */
+export function deserializeTimeline(input: unknown): SerializedTimeline {
+  if (typeof input !== "object" || input === null) {
+    throw new TypeError("[timeline] deserialize: expected object input");
+  }
+  const obj = input as Record<string, unknown>;
+  if (obj.version !== 1) {
+    throw new Error(
+      `[timeline] deserialize: unsupported version ${String(obj.version)} (expected 1)`,
+    );
+  }
+  if (typeof obj.id !== "string") {
+    throw new TypeError("[timeline] deserialize: id must be a string");
+  }
+  if (typeof obj.startedAtMs !== "number") {
+    throw new TypeError("[timeline] deserialize: startedAtMs must be a number");
+  }
+  if (!Array.isArray(obj.frames)) {
+    throw new TypeError("[timeline] deserialize: frames must be an array");
+  }
+  return {
+    version: 1,
+    id: obj.id,
+    startedAtMs: obj.startedAtMs,
+    frames: obj.frames as TimelineFrame[],
+  };
+}
+
+/**
+ * Replay options. The minimum-viable surface is "no options" — replay
+ * dispatches every recorded event through the supplied system. Future
+ * additions: payload-substitution hooks, frame filters, dry-run mode.
+ */
+export interface ReplayOptions {
+  /**
+   * If true, skip frames whose event type doesn't have a corresponding
+   * dispatchable surface (e.g. `system.init`, `reconcile.start`,
+   * `derivation.compute` — all of these are caused-by-effect, not
+   * dispatchable). Default: true. Set false for diagnostic replays
+   * that just want to walk the event stream without re-executing.
+   */
+  dispatchable?: boolean;
+}
+
+/**
+ * Minimal subset of System needed for replay — needs `dispatch` for
+ * value events, NOT the typed `events.X` accessor. Replay treats
+ * `fact.change` as a forward-write only when the consumer wires a
+ * dispatch source for it (covered by the dispatchable filter).
+ */
+export interface ReplayableSystem {
+  dispatch(event: { type: string; [key: string]: unknown }): void;
+}
+
+/**
+ * Replay a serialized timeline against a fresh system.
+ *
+ * v0.1 scope (deliberately narrow):
+ *
+ *   - Walks frames in order. For each frame whose event type maps to a
+ *     dispatchable surface, calls `system.dispatch(...)` with a
+ *     reconstructed event payload.
+ *   - "Dispatchable" today means events that originated from
+ *     `sys.events.X(payload)` calls — recorded in the timeline as a
+ *     dedicated `event.dispatch` ObservationEvent (planned). Until
+ *     core emits `event.dispatch` events, this is a forward-compatible
+ *     stub: `replayTimeline` reads MUTATE events from
+ *     `@directive-run/mutator` shapes (where the mutator-specific
+ *     event-handler reconstructs the dispatch from `pendingMutation`
+ *     fact.change frames).
+ *   - The system itself must be set up with the same module shape as
+ *     the original recording. The replay does NOT reconstruct the
+ *     system — that's the consumer's responsibility (test fixture).
+ *
+ * v0.2 scope (deferred):
+ *
+ *   - Auto-skip frames whose event types are causally derived
+ *     (constraint.evaluate, derivation.compute, requirement.created)
+ *     so replay only re-fires the original CAUSES.
+ *   - Determinism gate: assert the replay's observed frame stream
+ *     matches the input frames byte-for-byte.
+ *   - Codegen: emit a vitest source file that drives this replay loop.
+ *
+ * @example
+ * ```ts
+ * const json = JSON.parse(prodErrorReportText);
+ * const timeline = deserializeTimeline(json);
+ * const sys = createSystem({ module: createSameModuleAsProd() });
+ * sys.start();
+ * await replayTimeline(timeline, sys);
+ * // Now the test's assertions can run against the replayed system.
+ * ```
+ */
+export async function replayTimeline(
+  timeline: SerializedTimeline,
+  system: ReplayableSystem,
+  opts: ReplayOptions = {},
+): Promise<void> {
+  const dispatchableOnly = opts.dispatchable ?? true;
+  for (const frame of timeline.frames) {
+    if (!isDispatchable(frame.event)) {
+      if (dispatchableOnly) continue;
+    }
+    const dispatched = reconstructDispatch(frame.event);
+    if (dispatched !== null) {
+      system.dispatch(dispatched);
+    }
+  }
+}
+
+/**
+ * Decide whether a recorded frame represents an event that can be
+ * re-dispatched on a fresh system. Today this returns `true` only for
+ * fact.change frames where the change pattern matches a known
+ * dispatch-driven shape (notably mutator's `pendingMutation` writes
+ * carrying `kind`/`payload`/`status`). The set will expand once core
+ * adds first-class `event.dispatch` recording.
+ */
+function isDispatchable(event: ObservationEvent): boolean {
+  if (event.type !== "fact.change") return false;
+  if (event.key !== "pendingMutation") return false;
+  const next = event.next;
+  if (next === null || typeof next !== "object") return false;
+  const maybeMutation = next as { kind?: unknown; status?: unknown };
+  return (
+    typeof maybeMutation.kind === "string" &&
+    maybeMutation.status === "pending"
+  );
+}
+
+/**
+ * Reconstruct a `dispatch`-shaped event from a recorded fact.change
+ * frame. Returns null if the frame can't be cleanly mapped — the
+ * caller's loop skips it.
+ */
+function reconstructDispatch(
+  event: ObservationEvent,
+): { type: string; [key: string]: unknown } | null {
+  if (event.type !== "fact.change") return null;
+  if (event.key !== "pendingMutation") return null;
+  const next = event.next as Record<string, unknown> | null;
+  if (next === null) return null;
+  // Mutator's MUTATE event payload IS the pendingMutation fact value.
+  return { type: "MUTATE", ...next };
+}

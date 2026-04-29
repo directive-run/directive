@@ -5,9 +5,12 @@ import { flushAsync } from "@directive-run/core/testing";
 import {
   clearAllTimelines,
   clearTimeline,
+  deserializeTimeline,
   formatTimeline,
   getTimeline,
   recordTimeline,
+  replayTimeline,
+  serializeTimeline,
   setRegistryCap,
   withTimeline,
 } from "../index.js";
@@ -277,5 +280,145 @@ describe("@directive-run/timeline", () => {
     expect(() => setRegistryCap(-1)).toThrow();
     expect(() => setRegistryCap(Number.NaN)).toThrow();
     expect(() => setRegistryCap(Number.POSITIVE_INFINITY)).toThrow();
+  });
+
+  it("R1.A serialize/deserialize round-trips via JSON", () => {
+    const sys = createSystem({
+      module: buildCounter({ loadInitial: async () => 7 }),
+    });
+    const t1 = recordTimeline(sys, { id: "serialize-rt" });
+    sys.start();
+    sys.events.LOAD();
+    // Don't await flush — keep this sync to avoid timing nondeterminism.
+    sys.events.INC();
+    sys.events.INC();
+
+    const serialized = serializeTimeline(t1);
+    const json = JSON.stringify(serialized);
+    const parsed = deserializeTimeline(JSON.parse(json));
+    expect(parsed.version).toBe(1);
+    expect(parsed.id).toBe("serialize-rt");
+    expect(parsed.startedAtMs).toBe(t1.startedAtMs);
+    expect(parsed.frames.length).toBe(t1.frames.length);
+    sys.destroy();
+  });
+
+  it("R1.A deserialize rejects invalid input", () => {
+    expect(() => deserializeTimeline(null)).toThrow(/expected object/);
+    expect(() =>
+      deserializeTimeline({ version: 99, id: "x", startedAtMs: 0, frames: [] }),
+    ).toThrow(/unsupported version/);
+    expect(() =>
+      deserializeTimeline({ version: 1, id: 123, startedAtMs: 0, frames: [] }),
+    ).toThrow(/id must be a string/);
+    expect(() =>
+      deserializeTimeline({ version: 1, id: "x", startedAtMs: 0, frames: "no" }),
+    ).toThrow(/frames must be an array/);
+  });
+
+  it("R1.A replayTimeline re-dispatches recorded MUTATE-shaped fact changes", async () => {
+    // Build a synthetic timeline frame stream that looks like what
+    // @directive-run/mutator would emit: a fact.change on
+    // pendingMutation transitioning null → { kind, payload, status:
+    // 'pending', error: null }.
+    const synthetic = {
+      version: 1 as const,
+      id: "synthetic-replay",
+      startedAtMs: 0,
+      frames: [
+        {
+          ts: 1,
+          event: {
+            type: "fact.change" as const,
+            key: "pendingMutation",
+            prev: null,
+            next: {
+              kind: "increment",
+              payload: { by: 5 },
+              status: "pending",
+              error: null,
+            },
+          },
+        },
+      ],
+    };
+
+    const dispatched: Array<{ type: string; [key: string]: unknown }> = [];
+    const stubSystem = {
+      dispatch: (e: { type: string; [key: string]: unknown }) => {
+        dispatched.push(e);
+      },
+    };
+
+    await replayTimeline(synthetic, stubSystem);
+
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]?.type).toBe("MUTATE");
+    expect(dispatched[0]?.kind).toBe("increment");
+    expect(dispatched[0]?.payload).toEqual({ by: 5 });
+  });
+
+  it("R1.A replayTimeline skips non-dispatchable frames by default", async () => {
+    const synthetic = {
+      version: 1 as const,
+      id: "synthetic-skip",
+      startedAtMs: 0,
+      frames: [
+        // system.start has no dispatch surface — should skip
+        { ts: 0, event: { type: "system.start" as const } },
+        // reconcile.start — internal lifecycle, skip
+        { ts: 1, event: { type: "reconcile.start" as const } },
+        // resolver.complete — caused by, not dispatched
+        {
+          ts: 2,
+          event: {
+            type: "resolver.complete" as const,
+            resolver: "x",
+            requirementId: "r1",
+            duration: 5,
+          },
+        },
+      ],
+    };
+
+    const dispatched: unknown[] = [];
+    await replayTimeline(synthetic, { dispatch: (e) => dispatched.push(e) });
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("R1.A replayTimeline { dispatchable: false } walks every frame", async () => {
+    const synthetic = {
+      version: 1 as const,
+      id: "synthetic-walk",
+      startedAtMs: 0,
+      frames: [
+        { ts: 0, event: { type: "system.start" as const } },
+        {
+          ts: 1,
+          event: {
+            type: "fact.change" as const,
+            key: "pendingMutation",
+            prev: null,
+            next: {
+              kind: "x",
+              payload: {},
+              status: "pending",
+              error: null,
+            },
+          },
+        },
+      ],
+    };
+
+    const dispatched: unknown[] = [];
+    await replayTimeline(
+      synthetic,
+      { dispatch: (e) => dispatched.push(e) },
+      { dispatchable: false },
+    );
+    // Even with dispatchable: false, system.start has no
+    // reconstructed dispatch payload (returns null), so only the
+    // pendingMutation frame produces a dispatch.
+    expect(dispatched).toHaveLength(1);
   });
 });

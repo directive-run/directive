@@ -187,10 +187,55 @@ you suspect it's not exercising what you expect).
   not the at-event state. For the strict at-event view, use
   `JSON.parse(JSON.stringify(value))` snapshots in your handlers.
 
+## `directive replay` (R1.A scaffold)
+
+Recorded timelines are **JSON-serializable** — paste a frame stream into
+a CLI, get a re-dispatched system back. This is the BUILD CANDIDATE
+from the innovation review and the substrate for the
+"prod-error → vitest replay" feature.
+
+```ts
+import {
+  serializeTimeline,
+  deserializeTimeline,
+  replayTimeline,
+} from '@directive-run/timeline';
+
+// Production: dump the last N seconds of timeline alongside the error.
+const json = JSON.stringify(serializeTimeline(timeline));
+await fetch('/bug-reports', { method: 'POST', body: json });
+
+// Local repro: parse the JSON, build a fresh system with the SAME
+// module shape, replay the recorded events.
+const incoming = deserializeTimeline(JSON.parse(prodErrorJson));
+const sys = createSystem({ module: createSameModuleAsProd() });
+sys.start();
+await replayTimeline(incoming, sys);
+// Now your test's expect() assertions can run against the replayed system.
+```
+
+**v0.1 scope (deliberately narrow):**
+- Walks frames in order.
+- Today reconstructs `MUTATE` dispatches from
+  `@directive-run/mutator`-shaped `pendingMutation` fact.change frames.
+  Other dispatch sources land when core emits first-class `event.dispatch`
+  observation events.
+- Skips non-dispatchable frames (`system.start`, `reconcile.start`,
+  `derivation.compute`, ...) by default — opt out with
+  `{ dispatchable: false }` for diagnostic walks.
+
+**v0.2 scope (deferred):**
+- Auto-derived vitest source codegen — `directive replay <id>.json` →
+  `<id>.test.ts` with full setup + assertions.
+- Determinism gate — assert replay's observed frame stream matches the
+  input byte-for-byte.
+- Mock-stub generation from recorded `resolver.start` /
+  `resolver.complete` pairs (deps closure → `vi.mock(...)`).
+
 ## Roadmap
 
-v0.1 ships the recorder + formatter + vitest reporter. Future versions
-explore:
+v0.1 ships the recorder + formatter + vitest reporter + serialize/replay
+scaffold. Future versions explore:
 
 - **v0.2** — interactive scrubbing: pipe failures into a CLI prompt
   with `n`/`p` to step forward/back through frames, showing the facts
