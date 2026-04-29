@@ -204,6 +204,13 @@ export interface CreateResolversOptions<S extends Schema> {
   onCancel?: (resolver: string, req: RequirementWithId) => void;
   /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
   onResolutionComplete?: () => void;
+  /**
+   * Called when a resolver invokes `ctx.requeue()` for one of its owning
+   * requirements. The engine uses this to drop the requirement from its
+   * `previousRequirements` set so the next reconcile diff treats it as a
+   * fresh addition and re-dispatches the resolver.
+   */
+  onRequeue?: (requirementId: string) => void;
 }
 
 /** Default retry policy */
@@ -350,6 +357,7 @@ export function createResolversManager<S extends Schema>(
     onRetry,
     onCancel,
     onResolutionComplete,
+    onRequeue,
   } = options;
 
   validateDefinitions(definitions);
@@ -487,12 +495,30 @@ export function createResolversManager<S extends Schema>(
     return null;
   }
 
-  /** Create resolver context */
-  function createContext(signal: AbortSignal): ResolverContext<S> {
+  /**
+   * Create resolver context.
+   *
+   * @param signal - The AbortSignal for this resolver invocation.
+   * @param requirementIds - The requirement ID(s) this context belongs to.
+   *   For single resolvers, a one-element array. For batch resolvers, every
+   *   requirement in the batch — calling `ctx.requeue()` requeues all of them.
+   *   For out-of-band invocations (e.g. `callOne`) pass an empty array; the
+   *   `requeue()` call will be a safe no-op.
+   */
+  function createContext(
+    signal: AbortSignal,
+    requirementIds: readonly string[],
+  ): ResolverContext<S> {
     return {
       facts,
       signal,
       snapshot: () => facts.$snapshot() as FactsSnapshot<S>,
+      requeue: () => {
+        if (!onRequeue) return;
+        for (const id of requirementIds) {
+          onRequeue(id);
+        }
+      },
     };
   }
 
@@ -576,7 +602,7 @@ export function createResolversManager<S extends Schema>(
     store.batch(() => {
       resolvePromise = def.resolve!(
         req.requirement as Parameters<NonNullable<typeof def.resolve>>[0],
-        createContext(signal),
+        createContext(signal, [req.id]),
       ) as Promise<void>;
     });
 
@@ -865,7 +891,10 @@ export function createResolversManager<S extends Schema>(
     startedAt: number,
     attempt: number,
   ): Promise<"done" | "retry"> {
-    const ctx = createContext(signal);
+    const ctx = createContext(
+      signal,
+      requirements.map((r) => r.id),
+    );
     const reqPayloads = requirements.map((r) => r.requirement);
 
     if (def.resolveBatchWithResults) {
@@ -1316,7 +1345,10 @@ export function createResolversManager<S extends Schema>(
       }
 
       const controller = new AbortController();
-      const ctx = createContext(controller.signal);
+      // callOne is an out-of-band manual invocation — there is no engine
+      // requirement ID to attribute requeue() to, so pass an empty array
+      // (requeue() becomes a safe no-op).
+      const ctx = createContext(controller.signal, []);
 
       if (def.resolve) {
         // Batch wraps only the synchronous start — see invokeResolve JSDoc.

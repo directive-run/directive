@@ -74,6 +74,44 @@ export interface ResolverContext<S extends Schema = Schema> {
   readonly signal: AbortSignal;
   /** Returns a read-only snapshot of the current facts state, useful for before/after comparisons inside resolvers. */
   readonly snapshot: () => FactsSnapshot<S>;
+  /**
+   * Mark this resolver's owning requirement(s) as eligible for re-evaluation
+   * in the next reconciliation pass — even if the constraint that produced
+   * them re-emits the same requirement ID.
+   *
+   * **Default behavior (no requeue):** When a resolver writes facts that
+   * cause its owning constraint's `when` to re-evaluate to true with the
+   * same requirement ID, Directive's diff logic recognizes the requirement
+   * as unchanged and does NOT re-fire the resolver. This is intentional:
+   * it prevents accidental infinite loops from resolvers that mutate facts
+   * read by their own constraint.
+   *
+   * **When to use `requeue()`:** Explicit chained pipelines where the
+   * resolver knowingly wants to be re-invoked with its updated facts (e.g.
+   * a multi-step state machine where each step writes the next pendingAction
+   * and requires the constraint to re-fire). Calling `requeue()` opts out of
+   * the suppression for *this* invocation only — the next reconcile will
+   * treat the still-emitted requirement as freshly added.
+   *
+   * **When NOT to use it:** Most resolvers. Prefer separate constraints
+   * keyed on different `when` predicates, or split mutation kinds so each
+   * step produces a distinct requirement ID.
+   *
+   * @example
+   * ```typescript
+   * resolve: async (req, ctx) => {
+   *   if (ctx.facts.pendingAction?.kind === "first") {
+   *     await doFirst();
+   *     ctx.facts.pendingAction = { kind: "second" };
+   *     ctx.requeue(); // re-fire the same constraint with updated state
+   *     return;
+   *   }
+   *   await doSecond();
+   *   ctx.facts.status = "done";
+   * }
+   * ```
+   */
+  readonly requeue: () => void;
 }
 
 // ============================================================================

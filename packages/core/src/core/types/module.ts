@@ -320,6 +320,32 @@ export interface TypedResolverContext<M extends ModuleSchema> {
   readonly signal: AbortSignal;
   /** Returns a read-only snapshot of the current facts state, useful for before/after comparisons inside resolvers. */
   readonly snapshot: () => FactsSnapshot<M["facts"]>;
+  /**
+   * Mark this resolver's owning requirement(s) as eligible for re-evaluation
+   * in the next reconciliation pass — even if the constraint that produced
+   * them re-emits the same requirement ID.
+   *
+   * See {@link ResolverContext.requeue} for full semantics and guidance on
+   * when (and when not) to use this. The default behavior — silently
+   * suppressing same-constraint re-fires — is intentional and prevents
+   * accidental loops; `requeue()` is the explicit opt-in for chained
+   * pipelines.
+   *
+   * @example
+   * ```typescript
+   * resolve: async (req, ctx) => {
+   *   if (ctx.facts.pendingAction?.kind === "first") {
+   *     await doFirst();
+   *     ctx.facts.pendingAction = { kind: "second" };
+   *     ctx.requeue();
+   *     return;
+   *   }
+   *   await doSecond();
+   *   ctx.facts.status = "done";
+   * }
+   * ```
+   */
+  readonly requeue: () => void;
 }
 
 /**

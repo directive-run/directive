@@ -500,6 +500,15 @@ export function createEngine<S extends Schema>(
     }
   }
 
+  /**
+   * Requirement IDs that resolvers requested to be re-fired via
+   * `ctx.requeue()`. The engine removes these IDs from
+   * `state.previousRequirements` AFTER each reconcile commits its next
+   * snapshot, so the following diff treats them as fresh and dispatches
+   * the resolver again. See {@link ResolverContext.requeue}.
+   */
+  const pendingRequeueIds = new Set<string>();
+
   // Create resolvers manager
   const resolversManager: ResolversManager<S> = createResolversManager({
     definitions: mergedResolvers,
@@ -598,6 +607,23 @@ export function createEngine<S extends Schema>(
       // After a resolver completes, schedule another reconcile
       notifySettlementChange();
       scheduleReconcile();
+    },
+    onRequeue: (requirementId: string) => {
+      // ctx.requeue() opt-in: the resolver explicitly wants its owning
+      // requirement re-evaluated even if the constraint re-emits the same
+      // requirement ID. Track the request — the reconciler will drop the
+      // ID from `previousRequirements` AFTER it commits the next snapshot
+      // so the diff sees it as freshly added and re-dispatches the
+      // resolver. Does NOT lift the default suppression — only this one
+      // requirement's next pass is bypassed.
+      //
+      // Why deferred: ctx.requeue() may be called synchronously inside a
+      // resolver that was just dispatched mid-reconcile. At that moment
+      // `previousRequirements` has not yet been replaced with the current
+      // set (that happens later in the same reconcile pass). Removing
+      // eagerly would either no-op against an empty/stale snapshot or
+      // be overwritten when the reconciler commits.
+      pendingRequeueIds.add(requirementId);
     },
   });
 
@@ -845,6 +871,24 @@ export function createEngine<S extends Schema>(
 
       // Update previous requirements
       state.previousRequirements = currentSet;
+
+      // Apply ctx.requeue() requests AFTER snapshotting the new previous
+      // set. Resolvers may have called requeue() synchronously during this
+      // reconcile pass (their resolve dispatch happened just above) or
+      // asynchronously between reconciles. Either way, dropping these IDs
+      // here guarantees the NEXT reconcile diff treats them as fresh.
+      // If the constraint no longer fires next pass, the ID simply won't
+      // be in currentSet — there's no infinite-loop risk.
+      if (pendingRequeueIds.size > 0) {
+        for (const reqId of pendingRequeueIds) {
+          state.previousRequirements.remove(reqId);
+        }
+        pendingRequeueIds.clear();
+        // Schedule a follow-up reconcile so the next diff sees the
+        // re-emitted requirement as added. Without this, the system
+        // could go quiescent if no other fact change is pending.
+        scheduleReconcile();
+      }
 
       // Build reconcile result (only if plugins are listening)
       const inflightInfo = resolversManager.getInflightInfo();
@@ -1286,6 +1330,8 @@ export function createEngine<S extends Schema>(
       // Clean up meta Maps
       moduleMeta.clear();
       eventMeta.clear();
+      // Drop any pending ctx.requeue() requests
+      pendingRequeueIds.clear();
       pluginManager.emitDestroy(system);
     },
 
