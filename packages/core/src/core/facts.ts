@@ -9,7 +9,13 @@
  * - Schema validation in development mode
  */
 
-import { BLOCKED_PROPS, trackAccess, withoutTracking } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  detectNonJsonValueType,
+  trackAccess,
+  warnNonJsonFactAssignment,
+  withoutTracking,
+} from "./tracking.js";
 import type {
   Facts,
   FactsSnapshot,
@@ -681,6 +687,18 @@ export function createFactsProxy<S extends Schema>(
       // Prototype pollution protection
       if (BLOCKED_PROPS.has(prop)) {
         return false;
+      }
+
+      // Dev-mode: warn (once per path/type) when assigning non-JSON values
+      // that break reactivity. Date/Set/Map/File/class-instance mutations
+      // are not tracked. Per Architecture + Risk reviewers we WARN ONLY
+      // (no auto-coerce) — coercion would change equality semantics for
+      // users relying on identity / iteration order.
+      if (isDevelopment) {
+        const nonJsonType = detectNonJsonValueType(value);
+        if (nonJsonType) {
+          warnNonJsonFactAssignment(prop, nonJsonType);
+        }
       }
 
       // Validation is handled by store.set() when validate option is enabled

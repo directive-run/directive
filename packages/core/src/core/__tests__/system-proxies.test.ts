@@ -1024,3 +1024,50 @@ describe("hardened proxy util.inspect.custom hook", () => {
     expect(() => inspect(proxy)).not.toThrow();
   });
 });
+
+// ============================================================================
+// Non-JSON fact assignment warning via system-namespaced proxy (Item 20)
+// ============================================================================
+
+describe("createModuleFactsProxy non-JSON warning (item 20)", () => {
+  it("warns with namespaced path when assigning Date via module proxy", () => {
+    const facts: Record<string, unknown> = {};
+    const proxy = createModuleFactsProxy(facts, "system20auth");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    proxy.dateField = new Date();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain(
+      'Fact "system20auth.dateField"',
+    );
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("Date instance");
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT warn for plain objects via module proxy", () => {
+    const facts: Record<string, unknown> = {};
+    const proxy = createModuleFactsProxy(facts, "system20plain");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    proxy.objField = { a: 1 };
+    proxy.arrField = [1, 2, 3];
+    proxy.strField = "hi";
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("dedupes warnings per namespaced path", () => {
+    const facts: Record<string, unknown> = {};
+    const proxy = createModuleFactsProxy(facts, "system20dedupe");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 50; i++) {
+      proxy.repeatField = new Map([[String(i), i]]);
+    }
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+});

@@ -1285,3 +1285,182 @@ describe("createFactsProxy inspection hook (MIGRATION_FEEDBACK item 3)", () => {
     expect(target).toEqual({ a: 7 });
   });
 });
+
+// ============================================================================
+// Non-JSON fact assignment warning (Item 20 — runtime warn)
+// ============================================================================
+
+describe("non-JSON fact assignment warning (MIGRATION_FEEDBACK item 20)", () => {
+  // Tests use unique fact-key names so the (path, valueType) dedupe cache
+  // does not bleed across cases. The cache is process-lifetime; resetting
+  // it between tests would require exporting an internal handle.
+
+  it("warns when assigning a Date instance", () => {
+    const { facts } = createFacts({
+      schema: { dateField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).dateField = new Date();
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('Fact "dateField"');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("Date instance");
+    expect(warnSpy.mock.calls[0]?.[0]).toContain(".getTime()");
+    warnSpy.mockRestore();
+  });
+
+  it("warns when assigning a Set instance", () => {
+    const { facts } = createFacts({
+      schema: { setField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).setField = new Set([1, 2]);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('Fact "setField"');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("Set instance");
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("[...set]");
+    warnSpy.mockRestore();
+  });
+
+  it("warns when assigning a Map instance", () => {
+    const { facts } = createFacts({
+      schema: { mapField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).mapField = new Map([
+      ["a", 1],
+    ]);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('Fact "mapField"');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("Map instance");
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("Object.fromEntries(map)");
+    warnSpy.mockRestore();
+  });
+
+  it("warns when assigning a class instance", () => {
+    class MyThing {
+      constructor(public x: number) {}
+    }
+    const { facts } = createFacts({
+      schema: { classField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).classField = new MyThing(1);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('Fact "classField"');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain("ClassInstance");
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT warn for plain objects", () => {
+    const { facts } = createFacts({
+      schema: { plainObj: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).plainObj = {
+      a: 1,
+      b: { c: 2 },
+    };
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT warn for arrays", () => {
+    const { facts } = createFacts({
+      schema: { arrField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).arrField = [1, 2, 3];
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT warn for primitives or null", () => {
+    const { facts } = createFacts({
+      schema: {
+        strField: t.unknown(),
+        numField: t.unknown(),
+        boolField: t.unknown(),
+        nullField: t.unknown(),
+      },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const f = facts as unknown as Record<string, unknown>;
+    f.strField = "hello";
+    f.numField = 42;
+    f.boolField = true;
+    f.nullField = null;
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("dedupes warnings — assigning Date 100 times produces 1 warning", () => {
+    const { facts } = createFacts({
+      schema: { dedupeDate: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 100; i++) {
+      (facts as unknown as Record<string, unknown>).dedupeDate = new Date(i);
+    }
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  it("warns once per (path, valueType) combo — different types still warn", () => {
+    const { facts } = createFacts({
+      schema: {
+        polyField1: t.unknown(),
+        polyField2: t.unknown(),
+      },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const f = facts as unknown as Record<string, unknown>;
+    f.polyField1 = new Date();
+    f.polyField1 = new Date(); // dedupe — same path/type
+    f.polyField2 = new Set(); // different path → new warn
+    f.polyField1 = new Set(); // same path, NEW type → new warn
+
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+    warnSpy.mockRestore();
+  });
+
+  it("includes the docs link in the warning", () => {
+    const { facts } = createFacts({
+      schema: { docsLinkField: t.unknown() },
+      validate: false,
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    (facts as unknown as Record<string, unknown>).docsLinkField = new Date();
+
+    expect(warnSpy.mock.calls[0]?.[0]).toContain(
+      "https://directive.run/docs/facts#json-rule",
+    );
+    warnSpy.mockRestore();
+  });
+});

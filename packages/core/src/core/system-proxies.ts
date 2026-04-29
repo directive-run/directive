@@ -9,7 +9,11 @@
  */
 
 import isDevelopment from "#is-development";
-import { BLOCKED_PROPS } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  detectNonJsonValueType,
+  warnNonJsonFactAssignment,
+} from "./tracking.js";
 import type { ModulesMap } from "./types.js";
 
 /**
@@ -264,6 +268,15 @@ export function createModuleFactsProxy(
       return facts[`${namespace}${SEPARATOR}${prop}`];
     },
     set: (prop, value) => {
+      // Dev-mode: warn (once per path/type) when assigning non-JSON values
+      // that break reactivity. See `warnNonJsonFactAssignment` in tracking.ts.
+      if (isDevelopment) {
+        const nonJsonType = detectNonJsonValueType(value);
+        if (nonJsonType) {
+          warnNonJsonFactAssignment(`${namespace}.${prop}`, nonJsonType);
+        }
+      }
+
       facts[`${namespace}${SEPARATOR}${prop}`] = value;
 
       return true;
