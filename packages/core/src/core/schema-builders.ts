@@ -713,21 +713,44 @@ export const t = {
   /**
    * Create a union schema type.
    *
+   * **Two forms:**
+   * - `t.union(t.string(), t.number())` — variadic schema args; the runtime
+   *   validator checks that the value matches at least one inner schema.
+   * - `t.union<string | number | boolean>()` — generic-only form with no
+   *   schema args; the runtime validator accepts ANY value (mirrors
+   *   {@link unknown} plus generic narrowing). Use this for polymorphic
+   *   payloads where the union is too dynamic to enumerate as inner schemas
+   *   (e.g. an `UPDATE_FIELD` event whose `value` may be `string | number |
+   *   boolean | Date`).
+   *
+   * Chainable methods (`.validate`, `.transform`, `.default`, `.describe`,
+   * `.refine`, `.optional`, `.nullable`) work the same for both forms.
+   *
    * @example
    * ```typescript
-   * // String or number
+   * // Variadic — runtime validation against inner schemas
    * schema: { value: t.union(t.string(), t.number()) }
    *
-   * // Multiple types
-   * schema: { data: t.union(t.string(), t.number(), t.boolean()) }
+   * // Generic-only — type-only narrowing, runtime accepts any value
+   * schema: {
+   *   payload: t.union<string | number | boolean>(),
+   * }
+   *
+   * // Add a custom predicate via .validate when you still want a runtime check
+   * schema: {
+   *   strict: t.union<string | number>().validate(
+   *     (v) => typeof v === "string" || typeof v === "number",
+   *   ),
+   * }
    * ```
    */
-  union<T extends SchemaType<unknown>[]>(...types: T) {
-    if (isDevelopment && types.length === 0) {
-      console.warn(
-        "[Directive] t.union() called with no types - this will reject all values",
-      );
+  union: (<T extends SchemaType<unknown>[]>(...types: T) => {
+    // Generic-only form: no schema args means "type-only union", accept all values.
+    // No dev warning here — empty args is now a first-class generic narrowing form.
+    if (types.length === 0) {
+      return createChainableType<unknown>([], "union");
     }
+
     type UnionType = T[number] extends SchemaType<infer U> ? U : never;
     const typeNames = types.map(
       (schemaType) =>
@@ -742,6 +765,28 @@ export const t = {
       ],
       typeNames.join(" | "),
     );
+  }) as {
+    /**
+     * Generic-only form: `t.union<string | number | boolean>()`.
+     *
+     * No schema args — the runtime validator accepts ANY value. Generic
+     * parameter T narrows the inferred type for downstream consumers
+     * (derivations, event handlers, etc.) but is not enforced at runtime.
+     * Mirrors {@link t.unknown} plus generic narrowing.
+     *
+     * Use this for polymorphic payloads where the union is too dynamic to
+     * enumerate as inner schemas (e.g. an `UPDATE_FIELD` event whose `value`
+     * may be `string | number | boolean | Date`).
+     */
+    <T = unknown>(): ChainableSchemaType<T>;
+    /**
+     * Variadic form: `t.union(t.string(), t.number())`.
+     *
+     * Inner schemas are checked at runtime — value must match at least one.
+     */
+    <T extends SchemaType<unknown>[]>(
+      ...types: T
+    ): ChainableSchemaType<T[number] extends SchemaType<infer U> ? U : never>;
   },
 
   /**

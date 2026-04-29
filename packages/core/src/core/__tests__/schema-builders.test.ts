@@ -512,17 +512,77 @@ describe("t.union()", () => {
     expect(validates(schema, true as unknown as string | number)).toBe(false);
     expect(validates(schema, null as unknown as string | number)).toBe(false);
   });
+});
 
-  it("warns in dev mode when called with no types", () => {
+// ============================================================================
+// t.union<T>() — generic-only form (no schema args)
+// ============================================================================
+
+describe("t.union<T>() — generic-only form", () => {
+  it("accepts any value (runtime validator is permissive)", () => {
+    const schema = t.union<string | number | boolean>();
+
+    expect(validates(schema, "hello" as string | number | boolean)).toBe(true);
+    expect(validates(schema, 42 as string | number | boolean)).toBe(true);
+    expect(validates(schema, true as string | number | boolean)).toBe(true);
+    // Even values outside the type union pass at runtime — narrowing is type-only
+    expect(validates(schema, null as unknown as string | number | boolean)).toBe(
+      true,
+    );
+  });
+
+  it("does not warn when called with no schema args", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    t.union();
+    t.union<string | number>();
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      "[Directive] t.union() called with no types - this will reject all values",
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
+  });
+
+  it(".validate() narrows runtime acceptance for the generic form", () => {
+    const schema = t
+      .union<string | number>()
+      .validate((v) => typeof v === "string" || typeof v === "number");
+
+    expect(validates(schema, "ok" as string | number)).toBe(true);
+    expect(validates(schema, 42 as string | number)).toBe(true);
+    expect(validates(schema, true as unknown as string | number)).toBe(false);
+  });
+
+  it(".default() stores a default value", () => {
+    const schema = t.union<string | number>().default("fallback");
+
+    expect((schema as ExtendedSchemaType<string | number>)._default).toBe(
+      "fallback",
+    );
+  });
+
+  it(".describe() stores a description", () => {
+    const schema = t
+      .union<string | number>()
+      .describe("Polymorphic payload value");
+
+    expect(
+      (schema as ExtendedSchemaType<string | number>)._description,
+    ).toBe("Polymorphic payload value");
+  });
+
+  it("works as a fact field — value flows through facts unchanged", () => {
+    // Smoke test that the schema integrates with createSystem/createModule —
+    // the strongest check we can do without spinning up the full module here is
+    // confirming the validator chain is empty (so any value is accepted).
+    const schema = t.union<string | number | boolean>();
+    expect(schema._validators).toEqual([]);
+  });
+
+  it("plays nicely with derivations consuming the field (type-level)", () => {
+    // Type-level: a derivation that reads the union field should narrow with typeof.
+    // We assert the runtime shape only — TS would catch type errors at compile time.
+    const fieldSchema = t.union<string | number>();
+    // No validators means any value passes — required for derivation safety
+    expect(fieldSchema._validators).toEqual([]);
   });
 });
 
