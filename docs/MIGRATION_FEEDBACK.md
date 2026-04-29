@@ -671,3 +671,130 @@ For features that may or may not exist (e.g., a tournament bracket that only som
 - The 7 callback-deps in C52 turnModule (onSubmissionComplete, onRevealed, etc.) ARE the right pattern for parent-event communication when child is a sibling module and parent reads child via crossModuleDeps. Mostly fine; could simplify to system.dispatch in places.
 
 **This re-analysis means W9's remaining 3 ports should be done as multi-module systems, not standalone modules with callback ceremony.**
+
+---
+
+# AE-Reviewed Verdict Matrix (post-cycle-55, 5-reviewer consensus)
+
+5 parallel AE reviews (Architecture, DX, Domain Expert, Innovation, Risk)
+read this entire feedback doc and converged on the per-item verdicts below.
+Each item carries a final ship/defer/reject decision and a target landing
+location.
+
+## P0 SHIP — strictly additive, no BC risk, ship first
+
+| # | Item | Where | LOC | Why P0 |
+|---|---|---|---|---|
+| 1 | Export `flushAsync` | core/testing | ~5 | Every test, every dev, every project |
+| 3 | Vitest pretty-format crash | core (proxy) | ~15 | First-test crash for fresh devs; use `Symbol.for('nodejs.util.inspect.custom')` NOT `toJSON` (BC risk) |
+| 11 | `ModuleHooks.onResolverError` | core | ~20 | Centralizes error routing; opt-in default-undefined |
+| 18 | `useTickWhile` React hook | @directive-run/react | ~15 | 8× cycles consumer-side, no core impact |
+| 20 | JSON-fact runtime warning | core | ~30 | Highest-leverage (8× silent breakage). WARN not coerce. |
+| 21 | `t.union<a\|b\|c>()` | core (schema-builders) | ~10 | Trivial; fills real type-safety gap |
+| 23 | Same-constraint re-fire docs + `ctx.requeue()` | core + docs | ~25 | P0 silent stall. DO NOT lift suppression — ship explicit opt-in only |
+
+## SHIP DOCS — pure documentation, no code change
+
+| # | Item | Doc target |
+|---|---|---|
+| 5 | Bless `status`-as-event-bus pattern | docs/patterns/internal-events.md |
+| 7 | Chained-pipeline assertion guide | docs/testing/chained-pipelines.md |
+| 8 | Lead with `t.string<Union>()` | top-of-getting-started rewrite |
+| 9 | Derivation-of-derivation composition | docs/derivations.md (top-of-docs per Domain Expert) |
+| 12 | `server-only` vitest aliasing | docs/testing/next-integration.md |
+| 13 | Helper-scope proxy contract | docs/api/facts.md |
+| 14 | `events.X()` vs `dispatch()` canonical | docs/api/events.md (canonicalize one) |
+| 15 | `vi.useFakeTimers()` escape hatch | docs/testing/fake-timers.md |
+| 16 | Derivation purity rule | docs/derivations.md (purity section) |
+| 25 | Cross-module dispatch ergonomics | docs/composition/cross-module-events.md |
+| 26 | "Porting from XState's spawnChild" | docs/migrating-from-xstate.md |
+
+## HELPER PACKAGES — opinionated abstractions, ship as optional
+
+| # | Item | Package | Pre-req |
+|---|---|---|---|
+| 17 | `t.mutator<DiscriminatedUnion>()` | `@directive-run/mutator` | #23 (`ctx.requeue`) must land first; mutator chains stall otherwise |
+| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic` | resolver-scope ONLY, not system-wide tx (Risk-flagged footgun) |
+
+## RFC — needs design pass before shipping
+
+| # | Item | Open question |
+|---|---|---|
+| 4 | `t.timer({ms})` declarative timer | Clock-source contract: SignalClock injection vs Date.now? Determinism under replay/dehydrate is non-negotiable. **Domain Expert flagged as the killer differentiator** — would make `vi.useFakeTimers` (#15), `useTickWhile` (#18), and clock-in-derivation (#16) all evaporate. |
+| 26 | `unregisterModule()` + multi-instance | Cancellation semantics for in-flight resolvers; identity for N-of-same-schema (atomFamily-style) |
+
+## REJECT — would compromise framework design
+
+| # | Item | Why reject |
+|---|---|---|
+| 2 | Magic `t.date()` schema base type | Legitimizes non-JSON facts; opens slippery slope to `t.set()`/`t.map()`. JSON-roundtrip is the design contract. Use #20 warn instead. |
+| 5 | `module.fire('INTERNAL_EVENT')` API | Creates hidden second event channel parallel to dispatch. `status` discriminator is the right shape. |
+| 22 | First-class peer/spawn-child API | Per Item 26 re-analysis: `createSystem({ modules })` + `crossModuleDeps` IS the idiom. Shipping a `peers:` API would duplicate composition. |
+
+## SUBSUMED / INVESTIGATE
+
+| # | Item | Status |
+|---|---|---|
+| 2 | Date corruption | Subsumed → #20 |
+| 6 | Discriminated payload binding | Subsumed → #17 (helper) |
+| 10 | `nullable()` equality oddity | Investigate; likely same root as #3 |
+| 24 | Map-in-fact | Subsumed → #20 |
+
+---
+
+## Game-Changer Picks (Innovation Review)
+
+The Innovation reviewer found 3 items that, if reframed, become viral-demo
+material rather than incremental fixes:
+
+1. **Time-travel Test REPL** (reframe #1+#3+#7) — Vitest reporter that
+   auto-opens a scrubbable causal-graph timeline on every test failure.
+   Built on Directive's existing causal cache. **The lead.** No other state
+   library has this. ETA: 1 week prototype.
+
+2. **`t.mutator<>` with built-in optimistic + rollback** (reframe #17) —
+   RTK Query's `createApi` energy. 80 lines of optimistic boilerplate
+   collapse to 8. ETA: 2 weeks polished.
+
+3. **Static analysis for silent stalls** (reframe #23) — IDE catches
+   re-fire deadlocks at build time. ETA: 1 month (real flow analysis).
+
+---
+
+## What Minglingo Updates AFTER Each Directive Ship
+
+**Are existing 682 tests at risk?** No. They use workarounds for current
+gaps (local `flushAsync`, `dateMs` instead of Date, callback-deps instead
+of `sendParent`). Future ships would simplify them, not break them.
+
+| Directive ships | Minglingo cleanup | LOC saved |
+|---|---|---|
+| #1 (flushAsync) | Replace 55 local impls with one import | ~275 |
+| #20 (JSON warn) | No rework — workarounds stay correct | 0 |
+| #17 (mutator helper) | 12 modules collapse `pendingAction` ceremony | ~600 |
+| #18 (useTickWhile) | ~6 React hooks consolidate | consumer-side |
+| #23 (ctx.requeue) | C43 authModule MFA can re-merge constraints | ~30 |
+| **Total** | | **~900 LOC removable, 0 test changes** |
+
+---
+
+## Track Sequence
+
+**Track A** — Directive ships (~1 week per phase, sequential):
+- Phase 1: 7 P0 items
+- Phase 2: 11 docs items
+- Phase 3: Helper packages (mutator + optimistic)
+- Phase 4: `t.timer()` RFC → implementation
+- Phase 5: Time-travel REPL (the Sherlock)
+
+**Track B** — Minglingo rollout (parallel, 2-4 weeks):
+- Wire `MINGLINGO_DIRECTIVE_<X>` feature flags
+- Migrate React surfaces (`useMachine` → `@directive-run/react`)
+- Per-module 7-day soaks
+- Monitor production divergence
+
+**Track C** — Migration retrospective (parallel, ~1 week):
+- Per-cycle pattern catalog → docs/migrating-from-xstate.md
+- Promote derivation-composition (#9) to top-of-docs
+- Publish the 26-item learnings as a blog post
+
