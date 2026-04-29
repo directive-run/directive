@@ -582,3 +582,92 @@ cluster (W9). Without it, the spawn-child shape pays scaffolding
 The 8 highest-leverage items if implemented would shave ~30%
 of the LOC ceremony from a typical port and eliminate 3 of 4
 silent-failure modes (Items 20, 23, 25).
+
+---
+
+## Item 26 — Spawning model: corrected analysis (post-Cycle-52 review)
+
+This entry **corrects and supersedes** Items 22 and 25 in part.
+After investigating Directive's actual multi-module APIs, the
+"spawn" gap is narrower than initially logged.
+
+### What Directive HAS for module composition
+
+1. **Namespaced multi-module systems** — `createSystem({ modules: { auth: authModule, data: dataModule } })`. Each module gets its own namespace; facts/derivations/events accessible via `system.facts.auth.*`, `system.events.data.*`. Composes declaratively.
+
+2. **`crossModuleDeps`** — A module can declare typed dependencies on other modules' schemas:
+   ```ts
+   createModule('data', {
+     crossModuleDeps: { auth: authSchema },
+     constraints: {
+       loadIfAuthed: {
+         when: (facts) => facts.auth.isAuthenticated,  // ✅ typed
+         require: { type: 'LOAD' },
+       },
+     },
+   });
+   ```
+   At runtime: `facts.self.*` for own module, `facts.{depName}.*` for deps.
+
+3. **`registerModule()` at runtime** — Both single-module and namespaced systems support adding new modules into a RUNNING system. Perfect for lazy-loaded features:
+   ```ts
+   system.registerModule('chat', chatModule);
+   ```
+
+4. **Union events** — Cross-module dispatch works via `system.dispatch({ type: 'auth::LOGIN', ... })`. Each module's events are routed to that module.
+
+5. **Init order strategies** — `initOrder: 'auto'` topologically sorts by `crossModuleDeps`; `'declaration'` uses object key order; or pass an explicit string array.
+
+### What Directive does NOT have for spawning
+
+The XState patterns that DON'T have a 1:1 Directive equivalent:
+
+1. **N instances of the same module** — Each namespace is unique. You can't have `turn-1`, `turn-2`, `turn-3` of the same `turnModule` schema running simultaneously without explicit registration of each as a separate namespace. XState's `spawn(turnFactory, {input})` per child has no direct map.
+
+2. **`unregisterModule()` / lifecycle teardown** — `registerModule` exists; the inverse does NOT. Once registered, a module cannot be removed. Memory grows monotonically.
+
+3. **`sendParent` with payload** — Cross-module dispatch via `system.dispatch` works, but a *child module's resolver* dispatching upward to a *specific named parent* is not idiomatic. The recommended pattern is for the consumer to read child facts and dispatch parent events from the React component.
+
+### Practical port strategies
+
+For the W9 realtime cluster (3 remaining machines):
+
+**Strategy A — Multi-module composition (preferred for 1:N child sets):**
+```ts
+const system = createSystem({
+  modules: {
+    host: createHostGameModule(deps),
+    calling: createCallingModule(deps),
+    turn: createTurnModule(deps),
+    battle: createBattleRoyaleModule(deps),
+    tournament: createTournamentModule(deps),
+  },
+});
+// Cross-reads via crossModuleDeps; events via system.dispatch.
+```
+This is the right shape for `hostGameMachine` (parent) + 4 children. No callback-dep ceremony. ALL of my Cycles 35/36/37/49/51/52 should have been ports of CHILDREN that compose into a parent system, not standalone modules with callback deps.
+
+**Strategy B — Single-instance reset for ephemeral children:**
+For `turnBasedGame` spawning a fresh `turnMachine` per turn: keep ONE `turn` namespace; reset facts on turn change instead of spawning a new namespace. The lifecycle is "1 module, N reset cycles" rather than "N module instances."
+
+**Strategy C — Dynamic registration for lazy/optional features:**
+For features that may or may not exist (e.g., a tournament bracket that only some games have), use `system.registerModule('tournament', mod)` when needed. Memory leak caveat: never use this for short-lived features.
+
+### Revised Item 22 + 25 status
+
+- **Item 22 (spawn-child idiom)**: NOT a missing feature. The idiom is `createSystem({ modules: ... })` + `crossModuleDeps`. The gap is in DOCS — there's no "porting from XState's spawnChild" guide. **Downgrade severity: P2 docs gap, not P0 missing primitive.**
+- **Item 25 (sendParent → callback workaround)**: PARTIAL gap. Cross-module dispatch works but isn't ergonomic for "child fires named event at named parent." The callback-dep pattern is a valid workaround, just less elegant than XState's `sendParent`. **Downgrade severity: P2 ergonomics, not P0 missing primitive.**
+
+### Real remaining gaps (the actual spawn limitations)
+
+1. **No `unregisterModule()`** — registered modules persist for system lifetime. Real limitation for any code path that wants to "kill a child."
+2. **No multi-instance same-namespace** — can't run 5 instances of `turnModule` concurrently, each with its own facts. Workaround: re-design as a list-of-turns in a single module.
+3. **Cross-module event ergonomics** — sending a typed event from module A's resolver to module B's event handler is verbose compared to sendParent. Could be solved with a `ctx.system.dispatch` helper that's typed.
+
+### Migration policy (for cycles 53-55)
+
+- Before porting `turnBasedGameMachine`: audit whether the parent-child relationship should be modeled as multi-module composition (turnBasedGame = system orchestrating turn module + others) or as a single module with reset semantics. The right answer is multi-module composition.
+- The 4 callback-deps in C44 spaceModule (fireToggleFavorite/firePresenceHeartbeat/fireRemovePresence/fireFetchLeaderboard) are PROBABLY fine since they're fire-and-forget IO, not child-state ports. Keep as deps.
+- The 7 callback-deps in C52 turnModule (onSubmissionComplete, onRevealed, etc.) ARE the right pattern for parent-event communication when child is a sibling module and parent reads child via crossModuleDeps. Mostly fine; could simplify to system.dispatch in places.
+
+**This re-analysis means W9's remaining 3 ports should be done as multi-module systems, not standalone modules with callback ceremony.**
