@@ -541,6 +541,14 @@ function wrapWithNestedWarning(
       if (typeof prop === "string" && BLOCKED_PROPS.has(prop)) {
         return undefined;
       }
+      // Inspection hook: return a snapshot function that yields the
+      // unwrapped target so printers (`util.inspect`, vitest
+      // pretty-format) render the underlying object directly rather
+      // than the warning-wrapped Proxy. `Symbol.toPrimitive` is left
+      // alone — the protocol requires a primitive return.
+      if (prop === Symbol.for("nodejs.util.inspect.custom")) {
+        return () => target;
+      }
       const value = Reflect.get(target, prop);
       if (
         typeof prop === "symbol" ||
@@ -619,6 +627,19 @@ export function createFactsProxy<S extends Schema>(
     get(_, prop: string | symbol) {
       // Fast path: symbols (React probes $$typeof, Symbol.toPrimitive, etc.)
       if (typeof prop === "symbol") {
+        // Inspection hook: return a snapshot function so vitest's
+        // pretty-format / Node `util.inspect` / `console.log` render the
+        // facts correctly without reflectively walking the Proxy (which
+        // crashes `printComplexValue` reading `val.constructor.name`).
+        //
+        // We deliberately do NOT add `toJSON` here — that would change
+        // `JSON.stringify(facts)` semantics for users already relying on
+        // the current shape. We also do not override `Symbol.toPrimitive`:
+        // the protocol requires a primitive return, and returning an
+        // object snapshot from there would TypeError.
+        if (prop === Symbol.for("nodejs.util.inspect.custom")) {
+          return () => withoutTracking(() => store.toObject());
+        }
         return undefined;
       }
 

@@ -1190,3 +1190,98 @@ describe("nested mutation detection (dev mode)", () => {
     );
   });
 });
+
+// ============================================================================
+// Inspection hook (Item 3 — Vitest pretty-format crash on proxied facts)
+// ============================================================================
+
+describe("createFactsProxy inspection hook (MIGRATION_FEEDBACK item 3)", () => {
+  const inspectSym = Symbol.for("nodejs.util.inspect.custom");
+
+  it("exposes util.inspect.custom returning a snapshot of facts", () => {
+    const { facts } = createFacts({
+      schema: {
+        complexObj: t.object<{ a: number; nested: { b: number } }>(),
+        flag: t.boolean(),
+      },
+      validate: false,
+    });
+    facts.complexObj = { a: 1, nested: { b: 2 } };
+    facts.flag = true;
+
+    // The custom-inspect hook should be a function (per Node protocol) that,
+    // when called, returns a plain-object snapshot — not a live proxy.
+    const inspect = (facts as unknown as Record<symbol, unknown>)[inspectSym];
+    expect(typeof inspect).toBe("function");
+    const snap = (inspect as () => unknown)();
+    expect(snap).toEqual({
+      complexObj: { a: 1, nested: { b: 2 } },
+      flag: true,
+    });
+  });
+
+  it("toEqual on an object-valued fact does not crash pretty-format", () => {
+    // Reproduces MIGRATION_FEEDBACK item 3: vitest pretty-format used to
+    // crash with `Cannot read properties of undefined (reading 'name')`
+    // when reflecting on the facts proxy. With the inspect-custom hook
+    // wired up, this comparison renders cleanly (and passes).
+    const { facts } = createFacts({
+      schema: {
+        complexObj: t.object<{ a: number; nested: { b: number } }>(),
+      },
+      validate: false,
+    });
+    facts.complexObj = { a: 1, nested: { b: 2 } };
+
+    expect(facts.complexObj).toEqual({ a: 1, nested: { b: 2 } });
+  });
+
+  it("util.inspect on the facts proxy does not throw", async () => {
+    // Node's util.inspect (used by console.log) probes for the custom hook;
+    // even when its proxy-target reflection short-circuits the hook (a
+    // node quirk for proxies whose target lacks the symbol as an own
+    // property), inspection must complete without crashing.
+    const { inspect } = await import("node:util");
+    const { facts } = createFacts({
+      schema: { count: t.number(), label: t.string() },
+      validate: false,
+    });
+    facts.count = 42;
+    facts.label = "ok";
+
+    expect(() => inspect(facts)).not.toThrow();
+  });
+
+  it("does NOT add toJSON (preserves JSON.stringify semantics)", () => {
+    // Per Risk reviewer: must not change JSON.stringify(facts) shape.
+    const { facts } = createFacts({
+      schema: { x: t.number() },
+      validate: false,
+    });
+    facts.x = 1;
+
+    // The proxy should not expose a toJSON method. We don't pin the exact
+    // JSON output (proxy ownKeys may evolve) — we just guarantee toJSON is
+    // absent so we haven't quietly rewritten serialization for users.
+    expect(
+      (facts as unknown as Record<string, unknown>).toJSON,
+    ).toBeUndefined();
+  });
+
+  it("nested-warning proxy in dev exposes util.inspect.custom hook", () => {
+    // When dev mode wraps an object value in `wrapWithNestedWarning`, the
+    // wrapper itself also needs the inspection hook so console.log on a
+    // single fact (not the root) renders cleanly.
+    const { facts } = createFacts({
+      schema: { obj: t.object<{ a: number }>() },
+      validate: false,
+    });
+    facts.obj = { a: 7 };
+
+    const wrapper = facts.obj as unknown as Record<symbol, unknown>;
+    const inspectFn = wrapper[inspectSym];
+    expect(typeof inspectFn).toBe("function");
+    const target = (inspectFn as () => unknown)();
+    expect(target).toEqual({ a: 7 });
+  });
+});

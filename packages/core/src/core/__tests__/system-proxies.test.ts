@@ -33,11 +33,18 @@ function assertSecurityHardening(
   proxy: Record<string, unknown>,
   options: { readonly: boolean } = { readonly: false },
 ) {
-  // Symbol access → undefined
+  // Symbol access → undefined (except util.inspect.custom hook)
   it("returns undefined for symbol access", () => {
     expect((proxy as any)[Symbol("x")]).toBeUndefined();
     expect((proxy as any)[Symbol.iterator]).toBeUndefined();
     expect((proxy as any)[Symbol.toPrimitive]).toBeUndefined();
+  });
+
+  // Inspection hook (util.inspect.custom) returns a snapshot function so
+  // pretty-format / console.log don't trap on the proxy reflectively.
+  it("returns a snapshot function for util.inspect.custom", () => {
+    const inspectSym = Symbol.for("nodejs.util.inspect.custom");
+    expect(typeof (proxy as any)[inspectSym]).toBe("function");
   });
 
   // BLOCKED_PROPS → undefined on get
@@ -960,5 +967,60 @@ describe("cross-proxy interaction", () => {
 
     expect(nsProxy.users!.count).toBe(5);
     expect(facts["users::count"]).toBe(5);
+  });
+});
+
+// ============================================================================
+// Inspection hook on hardened proxies (Item 3 — pretty-format crash)
+// ============================================================================
+
+describe("hardened proxy util.inspect.custom hook", () => {
+  const inspectSym = Symbol.for("nodejs.util.inspect.custom");
+
+  it("module facts proxy renders snapshot via util.inspect.custom", () => {
+    const facts: Record<string, unknown> = {
+      "auth::token": "abc",
+      "auth::role": "admin",
+    };
+    const proxy = createModuleFactsProxy(facts, "auth");
+
+    const inspect = (proxy as unknown as Record<symbol, unknown>)[inspectSym];
+    // No ownKeys configured on createModuleFactsProxy → snapshot is empty
+    // but the function exists and does not throw on access.
+    expect(typeof inspect).toBe("function");
+    expect((inspect as () => unknown)()).toEqual({});
+  });
+
+  it("namespaced facts proxy snapshot enumerates module namespaces", () => {
+    const facts: Record<string, unknown> = { "auth::token": "abc" };
+    const modulesMap = { auth: {} };
+    const proxy = createNamespacedFactsProxy(
+      facts,
+      modulesMap as any,
+      () => ["auth"],
+    );
+
+    const inspect = (proxy as unknown as Record<symbol, unknown>)[inspectSym];
+    expect(typeof inspect).toBe("function");
+    const snap = (inspect as () => unknown)() as Record<string, unknown>;
+    // Snapshot delegates: top-level key is the namespace, value is the
+    // per-module proxy (we don't deep-snapshot inner proxies — printers
+    // handle that recursively).
+    expect(Object.keys(snap)).toEqual(["auth"]);
+  });
+
+  it("node:util inspect on namespaced proxy does not throw", async () => {
+    const { inspect } = await import("node:util");
+    const facts: Record<string, unknown> = { "auth::token": "abc" };
+    const modulesMap = { auth: {} };
+    const proxy = createNamespacedFactsProxy(
+      facts,
+      modulesMap as any,
+      () => ["auth"],
+    );
+
+    // Just ensure inspection completes without crashing — exact format
+    // is not asserted (varies by node version).
+    expect(() => inspect(proxy)).not.toThrow();
   });
 });

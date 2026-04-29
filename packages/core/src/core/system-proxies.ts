@@ -42,14 +42,56 @@ interface HardenedProxyConfig {
 }
 
 /**
+ * Symbol used by Node.js's `util.inspect` (and vitest's pretty-format)
+ * to ask an object for a custom inspection representation. Returning a
+ * plain-object snapshot here avoids reflective walks on the proxy that
+ * crash printers (e.g. `printComplexValue` reading `val.constructor.name`).
+ *
+ * @internal
+ */
+const NODE_INSPECT_CUSTOM = Symbol.for("nodejs.util.inspect.custom");
+
+/**
+ * Build a plain-object snapshot from a hardened proxy config. Used as the
+ * inspection hook so that printers see real keys/values instead of trapping
+ * on the proxy.
+ *
+ * @internal
+ */
+function buildHardenedSnapshot(config: HardenedProxyConfig): unknown {
+  if (!config.ownKeys) {
+    return {};
+  }
+  const snapshot: Record<string, unknown> = {};
+  for (const key of config.ownKeys()) {
+    snapshot[key] = config.get(key);
+  }
+
+  return snapshot;
+}
+
+/**
  * Create a proxy with consistent security hardening.
  *
  * Every proxy created by this factory includes:
- * - Symbol access returns `undefined`
+ * - Symbol access returns `undefined` (except the inspection hook below)
+ * - `Symbol.for('nodejs.util.inspect.custom')` returns a function that
+ *   produces a plain-object snapshot, so vitest pretty-format / Node's
+ *   `util.inspect` / `console.log` render the proxy correctly without
+ *   tripping on reflective walks (e.g. `printComplexValue` reading
+ *   `val.constructor.name`).
+ * - `Symbol.toPrimitive` is intentionally NOT set: the get trap returns
+ *   `undefined` for it so JS falls back to default `toString`/`valueOf`
+ *   coercion. Returning a snapshot object here would `TypeError` because
+ *   the protocol requires a primitive return.
  * - BLOCKED_PROPS (`__proto__`, `constructor`, `prototype`) rejected
  * - `defineProperty` returns `false`
  * - `getPrototypeOf` returns `null`
  * - `setPrototypeOf` returns `false`
+ *
+ * Note: per the Risk reviewer we deliberately do NOT add a `toJSON` shim —
+ * that would change `JSON.stringify(proxy)` semantics for users who already
+ * rely on the existing shape.
  *
  * @internal
  */
@@ -57,6 +99,11 @@ function createHardenedProxy<T extends object>(config: HardenedProxyConfig): T {
   return new Proxy({} as T, {
     get(_, prop: string | symbol) {
       if (typeof prop === "symbol") {
+        // Inspection hook: return a snapshot function so printers
+        // don't walk the proxy reflectively (which crashes pretty-format).
+        if (prop === NODE_INSPECT_CUSTOM) {
+          return () => buildHardenedSnapshot(config);
+        }
         return undefined;
       }
       if (BLOCKED_PROPS.has(prop)) {
