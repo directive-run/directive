@@ -214,6 +214,44 @@ function createChainableType<T>(
 }
 
 /**
+ * Two-form union schema constructor.
+ *
+ * Hoisted out of the `t` object literal because the overload-cast pattern
+ * (`(impl) as { ovl1; ovl2 }`) inside an object literal triggers a TS
+ * declaration-emit "implicitly has type any" cycle. Annotating the const
+ * with the explicit overload type breaks the cycle so DTS can emit `t`'s
+ * shape without recursing through the runtime expression.
+ *
+ * @internal
+ */
+type UnionFn = {
+  <T = unknown>(): ChainableSchemaType<T>;
+  <T extends SchemaType<unknown>[]>(
+    ...types: T
+  ): ChainableSchemaType<T[number] extends SchemaType<infer U> ? U : never>;
+};
+
+const unionImpl: UnionFn = (<T extends SchemaType<unknown>[]>(...types: T) => {
+  if (types.length === 0) {
+    return createChainableType<unknown>([], "union");
+  }
+  type UnionType = T[number] extends SchemaType<infer U> ? U : never;
+  const typeNames = types.map(
+    (schemaType) =>
+      (schemaType as ExtendedSchemaType<unknown>)._typeName ?? "unknown",
+  );
+  return createChainableType<UnionType>(
+    [
+      (v): v is UnionType =>
+        types.some((schemaType) =>
+          schemaType._validators.every((fn) => fn(v)),
+        ),
+    ],
+    typeNames.join(" | "),
+  );
+}) as UnionFn;
+
+/**
  * Schema type builders for defining fact types.
  *
  * @remarks
@@ -744,50 +782,7 @@ export const t = {
    * }
    * ```
    */
-  union: (<T extends SchemaType<unknown>[]>(...types: T) => {
-    // Generic-only form: no schema args means "type-only union", accept all values.
-    // No dev warning here — empty args is now a first-class generic narrowing form.
-    if (types.length === 0) {
-      return createChainableType<unknown>([], "union");
-    }
-
-    type UnionType = T[number] extends SchemaType<infer U> ? U : never;
-    const typeNames = types.map(
-      (schemaType) =>
-        (schemaType as ExtendedSchemaType<unknown>)._typeName ?? "unknown",
-    );
-    return createChainableType<UnionType>(
-      [
-        (v): v is UnionType =>
-          types.some((schemaType) =>
-            schemaType._validators.every((fn) => fn(v)),
-          ),
-      ],
-      typeNames.join(" | "),
-    );
-  }) as {
-    /**
-     * Generic-only form: `t.union<string | number | boolean>()`.
-     *
-     * No schema args — the runtime validator accepts ANY value. Generic
-     * parameter T narrows the inferred type for downstream consumers
-     * (derivations, event handlers, etc.) but is not enforced at runtime.
-     * Mirrors {@link t.unknown} plus generic narrowing.
-     *
-     * Use this for polymorphic payloads where the union is too dynamic to
-     * enumerate as inner schemas (e.g. an `UPDATE_FIELD` event whose `value`
-     * may be `string | number | boolean | Date`).
-     */
-    <T = unknown>(): ChainableSchemaType<T>;
-    /**
-     * Variadic form: `t.union(t.string(), t.number())`.
-     *
-     * Inner schemas are checked at runtime — value must match at least one.
-     */
-    <T extends SchemaType<unknown>[]>(
-      ...types: T
-    ): ChainableSchemaType<T[number] extends SchemaType<infer U> ? U : never>;
-  },
+  union: unionImpl,
 
   /**
    * Create a record schema type for dynamic key-value maps.
