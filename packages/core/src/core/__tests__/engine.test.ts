@@ -243,6 +243,146 @@ describe("Engine — Lifecycle", () => {
 
     system.destroy();
   });
+
+  it("fires onResolverError hook when a resolver throws after retries", async () => {
+    const onResolverError = vi.fn();
+
+    const mod = createModule("resolver-fail", {
+      schema: {
+        facts: { count: t.number(), result: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { COMPUTE: { input: t.number() } },
+      },
+      init: (facts) => {
+        facts.count = 0;
+        facts.result = "";
+      },
+      constraints: {
+        compute: {
+          when: (facts) => facts.count > 0 && facts.result === "",
+          require: (facts) => ({ type: "COMPUTE", input: facts.count }),
+        },
+      },
+      resolvers: {
+        compute: {
+          requirement: "COMPUTE",
+          resolve: async () => {
+            throw new Error("resolver boom");
+          },
+        },
+      },
+      hooks: { onResolverError },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    system.facts.count = 1;
+    await flush();
+
+    expect(onResolverError).toHaveBeenCalledTimes(1);
+    const [error, requirement, ctx] = onResolverError.mock.calls[0]!;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("resolver boom");
+    expect(requirement).toMatchObject({ type: "COMPUTE", input: 1 });
+    expect(ctx.facts.count).toBe(1);
+
+    system.destroy();
+  });
+
+  it("does not fire onResolverError when resolver succeeds", async () => {
+    const onResolverError = vi.fn();
+
+    const mod = createModule("resolver-ok", {
+      schema: {
+        facts: { count: t.number(), result: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { COMPUTE: { input: t.number() } },
+      },
+      init: (facts) => {
+        facts.count = 0;
+        facts.result = "";
+      },
+      constraints: {
+        compute: {
+          when: (facts) => facts.count > 0 && facts.result === "",
+          require: (facts) => ({ type: "COMPUTE", input: facts.count }),
+        },
+      },
+      resolvers: {
+        compute: {
+          requirement: "COMPUTE",
+          resolve: async (req, ctx) => {
+            ctx.facts.result = `ok:${req.input}`;
+          },
+        },
+      },
+      hooks: { onResolverError },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    system.facts.count = 7;
+    await flush();
+
+    expect(system.facts.result).toBe("ok:7");
+    expect(onResolverError).not.toHaveBeenCalled();
+
+    system.destroy();
+  });
+
+  it("isolates errors thrown from inside onResolverError", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    const mod = createModule("resolver-fail-bad-hook", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: {},
+        requirements: { COMPUTE: { input: t.number() } },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      constraints: {
+        compute: {
+          when: (facts) => facts.count > 0,
+          require: (facts) => ({ type: "COMPUTE", input: facts.count }),
+        },
+      },
+      resolvers: {
+        compute: {
+          requirement: "COMPUTE",
+          resolve: async () => {
+            throw new Error("resolver boom");
+          },
+        },
+      },
+      hooks: {
+        onResolverError: () => {
+          throw new Error("hook boom");
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    system.facts.count = 1;
+    await flush();
+
+    // Engine still works after a hook failure
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    const calledMessages = consoleErrorSpy.mock.calls
+      .map((args) => String(args[0]))
+      .join(" ");
+    expect(calledMessages).toContain("onResolverError");
+
+    system.destroy();
+    consoleErrorSpy.mockRestore();
+  });
 });
 
 // ============================================================================

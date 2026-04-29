@@ -129,6 +129,10 @@ export function createEngine<S extends Schema>(
   // Track which module defined each key for collision detection
   const schemaOwners = new Map<string, string>();
   const definitionOwners = new Map<string, string>();
+  // Track resolver-id → owning module def, used to fire module-level resolver hooks
+  // (e.g. ModuleHooks.onResolverError) without re-walking config.modules per error.
+  // biome-ignore lint/suspicious/noExplicitAny: Module schema varies; only hooks shape matters here
+  const resolverIdToModule = new Map<string, (typeof config.modules)[number]>();
 
   for (const module of config.modules) {
     // Security: Validate module definitions for dangerous keys
@@ -210,7 +214,13 @@ export function createEngine<S extends Schema>(
     if (module.effects) Object.assign(mergedEffects, module.effects);
     if (module.constraints)
       Object.assign(mergedConstraints, module.constraints);
-    if (module.resolvers) Object.assign(mergedResolvers, module.resolvers);
+    if (module.resolvers) {
+      Object.assign(mergedResolvers, module.resolvers);
+      // Track resolver ownership for module-level hooks (e.g. onResolverError)
+      for (const resolverId of Object.keys(module.resolvers)) {
+        resolverIdToModule.set(resolverId, module);
+      }
+    }
     if (module.meta) {
       const frozen = freezeMeta(module.meta);
       if (frozen) moduleMeta.set(module.id, frozen);
@@ -548,6 +558,30 @@ export function createEngine<S extends Schema>(
       if (traceEnabled) {
         traceManager.recordResolverError(req.id, resolver, String(error));
         traceManager.decrementInflight(req.id);
+      }
+
+      // Fire the module-level onResolverError hook (opt-in side channel).
+      // Runs AFTER the engine's error handling so the hook never affects retry
+      // strategy — it's purely an observer. Errors thrown by the hook are
+      // isolated so a buggy hook can't break the engine or starve other modules.
+      const ownerModule = resolverIdToModule.get(resolver);
+      const hook = ownerModule?.hooks?.onResolverError;
+      if (hook) {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        try {
+          hook(normalizedError, req.requirement, {
+            // biome-ignore lint/suspicious/noExplicitAny: Hook receives owning module's facts shape
+            facts: facts as any,
+          });
+        } catch (hookError) {
+          // Isolate hook failures so they don't break the engine
+          // biome-ignore lint/suspicious/noConsole: Engine error path needs visibility
+          console.error(
+            `[Directive] onResolverError hook for module "${ownerModule?.id}" threw:`,
+            hookError,
+          );
+        }
       }
     },
     onRetry: (resolver, req, attempt) =>
@@ -2062,6 +2096,13 @@ export function createEngine<S extends Schema>(
         if (d.meta) d.meta = freezeMeta(d.meta)!;
       }
       Object.assign(mergedResolvers, module.resolvers);
+      // Track resolver ownership for module-level hooks (e.g. onResolverError)
+      for (const resolverId of Object.keys(module.resolvers)) {
+        resolverIdToModule.set(
+          resolverId,
+          module as (typeof config.modules)[number],
+        );
+      }
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       resolversManager.registerDefinitions(module.resolvers as any);
       // Sync resolver key functions to the constraints manager

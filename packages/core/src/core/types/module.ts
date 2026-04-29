@@ -33,7 +33,7 @@ import type { System } from "./system.js";
 // ============================================================================
 
 /** Lifecycle hooks for modules */
-export interface ModuleHooks<_M extends ModuleSchema> {
+export interface ModuleHooks<M extends ModuleSchema> {
   // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
   onInit?: (system: System<any>) => void;
   // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
@@ -41,6 +41,29 @@ export interface ModuleHooks<_M extends ModuleSchema> {
   // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
   onStop?: (system: System<any>) => void;
   onError?: (error: DirectiveError, context: unknown) => void;
+  /**
+   * Called when a resolver owned by this module throws after all retries
+   * have been exhausted. The hook fires *after* the engine's internal error
+   * handling (error boundary, plugin notification, retry decision) so it is
+   * a side-channel observer — not a recovery mechanism.
+   *
+   * Use it to forward resolver failures into module-local error sinks
+   * (logging, telemetry, user-facing toast machines) without coupling those
+   * sinks to the engine's plugin system.
+   *
+   * **Failure isolation:** Errors thrown from inside `onResolverError` are
+   * caught by the engine and logged via `console.error`; they do not abort
+   * the engine or other modules' hooks.
+   *
+   * @param error - The error the resolver threw (already normalized to `Error`).
+   * @param requirement - The requirement object that the failing resolver was handling.
+   * @param ctx - Hook context, including a typed snapshot of this module's facts.
+   */
+  onResolverError?: (
+    error: Error,
+    requirement: { type: string; [key: string]: unknown },
+    ctx: { facts: Facts<M["facts"]> },
+  ) => void;
 }
 
 // ============================================================================

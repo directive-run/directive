@@ -333,6 +333,15 @@ function validateModuleConfig<M extends ModuleSchema>(
  *       },
  *     },
  *   },
+ *   hooks: {
+ *     // Optional: observe resolver failures owned by this module.
+ *     // Fires AFTER retries are exhausted and the engine has handled the error
+ *     // (error boundary, plugin emit, retry decision). Use it as a side-channel
+ *     // observer for module-local logging/telemetry — not for recovery.
+ *     onResolverError: (error, requirement, ctx) => {
+ *       console.warn(`[traffic-light] resolver failed for ${requirement.type}`, error);
+ *     },
+ *   },
  * });
  * ```
  *
