@@ -1,0 +1,63 @@
+{
+  "name": "@directive-run/optimistic",
+  "version": "0.1.0",
+  "description": "Resolver-scope optimistic update + automatic rollback for Directive.",
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/optimistic"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "optimistic",
+    "rollback",
+    "snapshot",
+    "state-management"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "^1.2.0"
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
+  }
+}
