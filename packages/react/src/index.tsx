@@ -1,11 +1,11 @@
 /**
  * React Adapter - Consolidated hooks for React integration
  *
- * 19 public exports: useFact, useDerived, useDispatch, useDirective,
- * useDirectiveRef, useSelector, useWatch, useInspect, useRequirementStatus,
- * useSuspenseRequirement, useEvents, useExplain, useConstraintStatus,
- * useOptimisticUpdate, DirectiveHydrator, useHydratedSystem,
- * useHistory, createTypedHooks, shallowEqual
+ * 20 public exports: useFact, useDerived, useDispatch, useDirective,
+ * useDirectiveRef, useSelector, useWatch, useTickWhile, useInspect,
+ * useRequirementStatus, useSuspenseRequirement, useEvents, useExplain,
+ * useConstraintStatus, useOptimisticUpdate, DirectiveHydrator,
+ * useHydratedSystem, useHistory, createTypedHooks, shallowEqual
  *
  * @example
  * ```tsx
@@ -741,6 +741,91 @@ export function useWatch(
       callbackRef.current(newValue, prevValue);
     });
   }, [system, key]);
+}
+
+// ============================================================================
+// useTickWhile — interval-driven event dispatch gated by predicate
+// ============================================================================
+
+/**
+ * Fires a system event on a recurring interval while a predicate returns true.
+ *
+ * Replaces the verbatim `setInterval(() => sys.events.TICK(), ms)` /
+ * `clearInterval` pattern that appears across components driving status-gated
+ * polling, animation, or timer flows. The hook subscribes to all fact and
+ * settled-state changes so the predicate is re-evaluated whenever the system
+ * mutates; when it flips to true, an interval starts; when it flips to false,
+ * the interval is cleared. Cleans up on unmount.
+ *
+ * @example
+ * ```tsx
+ * useTickWhile(
+ *   system,
+ *   (sys) => sys.facts.status === "running",
+ *   "TICK",
+ *   1000,
+ * );
+ * ```
+ */
+export function useTickWhile<S extends ModuleSchema>(
+  system: SingleModuleSystem<S>,
+  predicate: (system: SingleModuleSystem<S>) => boolean,
+  eventName: keyof S["events"] & string,
+  intervalMs: number,
+): void {
+  assertSystem("useTickWhile", system);
+
+  const predicateRef = useRef(predicate);
+  predicateRef.current = predicate;
+
+  // Track latest active state via a useState + subscription. We need React to
+  // re-render the hook (or rather re-run the effect) whenever the predicate's
+  // result flips, so we cache the result and broadcast change to listeners.
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const unsubFacts = system.facts.$store.subscribeAll(onStoreChange);
+      const unsubSettled = system.onSettledChange(onStoreChange);
+      return () => {
+        unsubFacts();
+        unsubSettled();
+      };
+    },
+    [system],
+  );
+
+  const getSnapshot = useCallback(() => {
+    return predicateRef.current(system);
+  }, [system]);
+
+  const active = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+  useEffect(() => {
+    if (!active) return;
+    if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] useTickWhile() received non-positive intervalMs: ${intervalMs}. ` +
+            `Interval will not fire.`,
+        );
+      }
+      return;
+    }
+
+    const id = setInterval(() => {
+      // biome-ignore lint/suspicious/noExplicitAny: Dynamic event dispatch
+      const evts = system.events as Record<string, (...args: any[]) => void>;
+      const fn = evts[eventName as string];
+      if (typeof fn === "function") {
+        fn();
+      } else if (isDevelopment) {
+        console.warn(
+          `[Directive] useTickWhile() — event "${String(eventName)}" not found on system.events.`,
+        );
+      }
+    }, intervalMs);
+
+    return () => clearInterval(id);
+  }, [active, system, eventName, intervalMs]);
 }
 
 // ============================================================================
@@ -2261,6 +2346,13 @@ export function createDirectiveContext<M extends ModuleSchema>(
       key: K,
       callback: (newValue: unknown, previousValue: unknown) => void,
     ) => useWatch(useSystem(), key, callback),
+
+    /** Fire a system event on an interval while a predicate returns true. */
+    useTickWhile: (
+      predicate: (system: SingleModuleSystem<M>) => boolean,
+      eventName: keyof M["events"] & string,
+      intervalMs: number,
+    ) => useTickWhile<M>(useSystem(), predicate, eventName, intervalMs),
 
     /** Get the current inspection state. */
     useInspect: () => useInspect(useSystem()),
