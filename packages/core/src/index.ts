@@ -216,6 +216,33 @@ export {
 } from "./utils/utils.js";
 
 // ============================================================================
+// Clock + Timer (RFC 0001 v0.1)
+// ============================================================================
+
+export {
+  type SignalClock,
+  realClock,
+  virtualClock,
+  defaultClock,
+} from "./core/clock.js";
+
+export {
+  type TimerFactState,
+  type TimerFactOpts,
+  initialTimerState,
+  elapsedMs,
+  remainingMs,
+  startTimer,
+  pauseTimer,
+  resumeTimer,
+  resetTimer,
+  completeTimer,
+  registerRepeat,
+  tickTimer,
+  timerOps,
+} from "./core/timer.js";
+
+// ============================================================================
 // Lower-level APIs — use "@directive-run/core/internals" for these
 // ============================================================================
 // Manager factories, engine, tracking, and internal types are available at:

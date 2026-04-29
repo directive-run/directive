@@ -737,7 +737,7 @@ location.
 |---|---|---|
 | 2 | Date corruption | Subsumed → #20 |
 | 6 | Discriminated payload binding | Subsumed → #17 (helper) |
-| 10 | `nullable()` equality oddity | Investigate; likely same root as #3 |
+| 10 | `nullable()` equality oddity | **CLOSED 2026-04-29** — investigation reproduction (`packages/core/src/core/__tests__/nullable-equality.test.ts`, 7 tests covering direct equality, derivation reads, nullable objects/arrays, rapid set/clear cycles, multi-fact composition, init paths) all pass. Item 10 was either a B-Cycle-9 developer-side bug or got incidentally fixed by another P0 ship. No framework change required. |
 | 24 | Map-in-fact | Subsumed → #20 |
 
 ---
