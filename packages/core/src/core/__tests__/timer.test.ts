@@ -210,3 +210,68 @@ describe("timerOps integration with virtualClock", () => {
     expect(ops.elapsedMs(s, c.now())).toBe(1_000);
   });
 });
+
+describe("R1 sec C4: elapsedMs clamps at 0 on clock skew", () => {
+  it("returns 0 not negative when nowMs < startedAtMs", () => {
+    const s = startTimer(initialTimerState(), 1_000);
+    expect(elapsedMs(s, 500)).toBe(0); // clock stepped back
+    expect(elapsedMs(s, 0)).toBe(0);
+    expect(elapsedMs(s, 999)).toBe(0);
+  });
+
+  it("remainingMs caps at totalMs (never inflates)", () => {
+    const s = startTimer(initialTimerState(), 1_000);
+    // Clock skewed back: elapsed clamps to 0 → remaining = totalMs
+    expect(remainingMs(s, 500, 1_000)).toBe(1_000);
+  });
+
+  it("tickTimer does not report 'complete' under clock skew", () => {
+    const s = startTimer(initialTimerState(), 1_000);
+    // Without clamp, elapsed=−500, elapsed >= 1000 = false (correct
+    // outcome accidentally) BUT subsequent assignment of negative
+    // elapsed could still corrupt state. With clamp, elapsed=0,
+    // tick is no-op as expected.
+    expect(tickTimer(s, 500, { ms: 1_000 }).kind).toBe("no-op");
+  });
+});
+
+describe("R1 sec M1: pausedDurationMs clamps on clock skew", () => {
+  it("resumeTimer does not accumulate negative pause duration", () => {
+    let s = startTimer(initialTimerState(), 0);
+    s = pauseTimer(s, 100);
+    // Clock skewed back: nowMs < pausedAtMs at resume.
+    s = resumeTimer(s, 50);
+    expect(s.pausedDurationMs).toBe(0); // clamped, not -50
+  });
+
+  it("repeated pause/resume across skew never goes negative", () => {
+    let s = startTimer(initialTimerState(), 0);
+    s = pauseTimer(s, 200);
+    s = resumeTimer(s, 100); // skew back
+    s = pauseTimer(s, 150);
+    s = resumeTimer(s, 50); // skew back again
+    expect(s.pausedDurationMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("R1 sec M9: registerRepeat resets pausedDurationMs", () => {
+  it("repeat after pause/resume does not double-count prior pause", () => {
+    const c = virtualClock(0);
+    const ops = timerOps({ ms: 1_000, mode: "repeat" });
+    let s = ops.start(ops.initial(), c.now());
+    // 500ms in, pause for 2_000ms, resume.
+    c.advanceBy?.(500);
+    s = ops.pause(s, c.now());
+    c.advanceBy?.(2_000);
+    s = ops.resume(s, c.now());
+    expect(s.pausedDurationMs).toBe(2_000);
+    // Run to next repeat boundary.
+    c.advanceBy?.(500); // total elapsed since resume = 500; +500 pre-pause = 1000
+    expect(ops.tick(s, c.now()).kind).toBe("repeat");
+    s = ops.registerRepeat(s);
+    // After repeat, pausedDurationMs should reset to 0 — the next
+    // interval's elapsed math starts fresh.
+    expect(s.pausedDurationMs).toBe(0);
+    expect(s.repeats).toBe(1);
+  });
+});

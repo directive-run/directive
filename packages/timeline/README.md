@@ -20,8 +20,7 @@ trace inline with the failure. Now you see:
 ```
 ──────── Directive timeline for FAIL ────────
 load completes → ready
-Timeline 'load completes → ready' — 14 frames over 23ms
-  [+0.0ms]    system.init
+Timeline 'load completes → ready' — 13 frames over 23ms
   [+0.1ms]    system.start
   [+0.1ms]    reconcile.start
   [+0.2ms]    fact.change status: "idle" → "loading"
@@ -34,6 +33,14 @@ Timeline 'load completes → ready' — 14 frames over 23ms
 
 Now the failure isn't a riddle. The resolver threw, the status fact
 never advanced, the test correctly observed status="loading."
+
+> **Frame-capture note.** `system.init` fires synchronously inside
+> `createSystem(...)` — *before* you call `recordTimeline(sys, ...)`,
+> so it is missed by any subscriber registered later. To include it,
+> call `recordTimeline()` first against a stub-observable, or accept
+> that captured frames begin at the next observable event (typically
+> `system.start`). This is a Directive engine ordering, not a timeline
+> bug.
 
 ## Quick start
 

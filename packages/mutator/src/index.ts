@@ -47,14 +47,37 @@ export type PendingMutation<M extends MutationMap> = {
     kind: K;
     payload: M[K];
     /**
-     * `pending` — queued, constraint hasn't fired yet
-     * `running` — handler is in flight
+     * `pending` — queued, constraint hasn't fired yet.
+     * `running` — handler is in flight.
+     * `failed` — handler threw; constraint stops firing. Caller can
+     *            inspect `error` and dispatch a fresh MUTATE to retry.
      */
-    status: "pending" | "running";
-    /** Error from the previous run, if any. Cleared on next dispatch. */
+    status: "pending" | "running" | "failed";
+    /**
+     * Error message from the previous run, if any. Plaintext only —
+     * NEVER render this directly via `dangerouslySetInnerHTML` or
+     * markdown. Truncated to 500 chars to bound XSS surface from
+     * thrown messages that may echo user input.
+     */
     error: string | null;
   };
 }[keyof M];
+
+/** Maximum length of a captured error message — bounded to limit XSS surface. */
+const MAX_ERROR_LEN = 500;
+
+/**
+ * Truncate an error string to {@link MAX_ERROR_LEN} chars. The bound is
+ * intentionally conservative: thrown error messages may echo
+ * user-controlled input (`throw new Error(\`failed: ${untrustedInput}\`)`),
+ * and consumers may render `pendingMutation.error` directly. Plaintext
+ * rendering is the only supported path; this cap further limits the
+ * blast radius.
+ */
+function truncateError(message: string): string {
+  if (message.length <= MAX_ERROR_LEN) return message;
+  return `${message.slice(0, MAX_ERROR_LEN - 1)}…`;
+}
 
 /**
  * Handler context passed to each variant handler.
@@ -189,8 +212,13 @@ export interface MutatorFragments<M extends MutationMap, F> {
  * });
  *
  * // Usage:
+ * sys.events.MUTATE(mutate<FormMutations>('submit', { values: ... }));
+ *
+ * // Or, if constructing the payload manually, the discriminator is
+ * // `kind` (NOT `type` — `type` collides with Directive's event-name
+ * // dispatch convention):
  * sys.events.MUTATE({
- *   type: 'submit',
+ *   kind: 'submit',
  *   payload: { values: ... },
  *   status: 'pending',
  *   error: null,
@@ -275,19 +303,37 @@ export function defineMutator<
         const pending = factsRef.pendingMutation;
         if (pending === null) return;
 
-        // Mark in-flight so concurrent constraint evaluations don't double-fire.
+        // Stamp the in-flight transition with the running status. The
+        // status itself is the supersession marker: only this resolver
+        // ever writes 'running'; the eventHandler always writes
+        // 'pending'. So if a fresh MUTATE arrives mid-flight, the
+        // post-handler check sees status: 'pending' instead of
+        // 'running' and knows to leave the new dispatch alone.
+        // (Sec M5 / DX M2.)
         factsRef.pendingMutation = { ...pending, status: "running" };
 
-        const handler = (handlers as Record<string, unknown>)[
-          pending.kind as string
-        ];
+        // Prototype-pollution defense: only accept handlers OWNED by
+        // the user-provided map. Without this, dispatching with kind:
+        // 'constructor' / 'toString' / '__proto__' would resolve via
+        // the prototype chain and either crash or invoke an inherited
+        // function with arbitrary payload. (Sec C1.)
+        const ownsHandler = Object.prototype.hasOwnProperty.call(
+          handlers,
+          pending.kind as PropertyKey,
+        );
+        const handler = ownsHandler
+          ? (handlers as Record<string, unknown>)[pending.kind as string]
+          : undefined;
+
         if (typeof handler !== "function") {
           factsRef.pendingMutation = {
             ...pending,
-            status: "pending",
-            error: `[mutator] no handler registered for variant: ${String(
-              pending.kind,
-            )}`,
+            status: "failed",
+            error: truncateError(
+              `[mutator] no handler registered for variant: ${String(
+                pending.kind,
+              )}`,
+            ),
           };
           return;
         }
@@ -302,16 +348,28 @@ export function defineMutator<
           await (handler as (c: typeof handlerCtx) => Promise<void> | void)(
             handlerCtx,
           );
-          // Success: clear the fact so the constraint stops firing.
-          factsRef.pendingMutation = null;
+          // Success: clear the fact ONLY if this resolver's `running`
+          // marker is still live (status === 'running'). If a fresh
+          // MUTATE arrived mid-flight via the eventHandler, the fact
+          // now has status: 'pending' — leave it alone so the next
+          // constraint fire picks it up. (Sec M5 / DX M2.)
+          if (factsRef.pendingMutation?.status === "running") {
+            factsRef.pendingMutation = null;
+          }
         } catch (err) {
-          // Failure: surface the error on the fact, leave status='running'
-          // so the constraint stops firing. Caller may dispatch a new
-          // MUTATE to retry.
+          // Failure: only stamp the error if our running marker is
+          // still live. If a fresh MUTATE arrived mid-flight, the new
+          // dispatch wins; the failed mutation's error is dropped on
+          // the floor (caller wanted to move on anyway). (Sec M5.)
+          if (factsRef.pendingMutation?.status !== "running") return;
           factsRef.pendingMutation = {
             ...pending,
-            status: "running",
-            error: err instanceof Error ? err.message : String(err),
+            // 'failed' is a distinct status (Sec M6 / Arch C2) — UI can
+            // disambiguate "still in flight" from "stopped on error".
+            status: "failed",
+            error: truncateError(
+              err instanceof Error ? err.message : String(err),
+            ),
           };
         }
       },

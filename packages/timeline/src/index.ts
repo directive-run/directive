@@ -63,8 +63,52 @@ export interface ObservableSystem {
  * Global timeline registry. Keyed by user-supplied name. Vitest reporter
  * uses the test's full name as the key by convention; explicit users can
  * pick anything.
+ *
+ * Bounded to {@link DEFAULT_REGISTRY_CAP} entries; insertion past the cap
+ * evicts the oldest entry (LRU by insertion order). Without this, long
+ * test runs that record per-test without `afterEach(clearAllTimelines)`
+ * would retain every ObservationEvent for the entire suite. (R1 sec M3.)
  */
 const registry = new Map<string, Timeline>();
+
+/**
+ * Maximum number of timelines retained simultaneously. Tunable via
+ * {@link setRegistryCap}. Older timelines are evicted in insertion order
+ * when the cap is exceeded.
+ */
+const DEFAULT_REGISTRY_CAP = 500;
+let registryCap = DEFAULT_REGISTRY_CAP;
+
+/**
+ * Adjust the registry's retention cap. The default of 500 covers most
+ * test suites; raise it for runs that intentionally retain large
+ * numbers of timelines (e.g. for batch analysis), or lower it under
+ * memory pressure.
+ */
+export function setRegistryCap(cap: number): void {
+  if (!Number.isFinite(cap) || cap < 1) {
+    throw new Error("[timeline] registry cap must be a positive integer");
+  }
+  registryCap = Math.floor(cap);
+  // Evict immediately if we're already over the new cap.
+  while (registry.size > registryCap) {
+    const oldestKey = registry.keys().next().value;
+    if (oldestKey === undefined) break;
+    const oldest = registry.get(oldestKey);
+    if (oldest !== undefined) oldest.stop();
+    registry.delete(oldestKey);
+  }
+}
+
+function evictIfOverCap(): void {
+  while (registry.size > registryCap) {
+    const oldestKey = registry.keys().next().value;
+    if (oldestKey === undefined) break;
+    const oldest = registry.get(oldestKey);
+    if (oldest !== undefined) oldest.stop();
+    registry.delete(oldestKey);
+  }
+}
 
 /**
  * Start recording lifecycle events from a Directive system into a named
@@ -126,6 +170,7 @@ export function recordTimeline(
   };
 
   registry.set(opts.id, timeline);
+  evictIfOverCap();
   return timeline;
 }
 
@@ -243,9 +288,12 @@ const KIND_COLORS: Record<string, keyof typeof ANSI> = {
  * string. Designed for CLI output (test failure dumps).
  *
  * @example
+ * Sample output for a recording started AFTER `createSystem()` but
+ * BEFORE `sys.start()` — `system.init` fires synchronously inside
+ * `createSystem` and is missed by any subscriber registered later, so
+ * it does not appear here:
  * ```
- * Timeline 'load-chain' — 14 frames over 23ms
- *   [+0.0ms] system.init
+ * Timeline 'load-chain' — 13 frames over 23ms
  *   [+0.1ms] system.start
  *   [+0.1ms] reconcile.start
  *   [+0.2ms] fact.change status: 'idle' → 'loading'

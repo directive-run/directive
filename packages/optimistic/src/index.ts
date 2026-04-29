@@ -51,11 +51,11 @@ export function createSnapshot<F extends Record<string, unknown>, K extends keyo
 ): () => void {
   const snapshot = {} as Pick<F, K>;
   for (const key of keys) {
-    snapshot[key] = clone(facts[key]) as F[K];
+    snapshot[key] = clone(facts[key], key) as F[K];
   }
   return () => {
     for (const key of keys) {
-      facts[key] = clone(snapshot[key]) as F[K];
+      facts[key] = clone(snapshot[key], key) as F[K];
     }
   };
 }
@@ -66,64 +66,98 @@ export function createSnapshot<F extends Record<string, unknown>, K extends keyo
  * uncaught throw, the listed keys are restored to their pre-handler
  * values, then the throw propagates.
  *
- * Designed to compose with `@directive-run/mutator`'s handler shape, but
- * works with any async function that takes a context object containing
- * `facts`.
+ * **Two-arg form (recommended for inference):**
  *
- * @example
  * ```ts
  * import { defineMutator } from '@directive-run/mutator';
  * import { withOptimistic } from '@directive-run/optimistic';
  *
  * const mut = defineMutator<FormMutations, FormFacts>({
- *   submit: withOptimistic(['values'], async ({ payload, facts }) => {
+ *   submit: withOptimistic<FormFacts>(['values'])(async ({ payload, facts }) => {
  *     facts.values = optimisticGuess(payload);
  *     facts.values = await deps.submit(payload); // throws on network err
  *   }),
- *   cancel: ({ facts }) => { facts.values = []; },
  * });
  * ```
  *
- * If the inner handler throws:
- *   1. `facts.values` is restored from the snapshot.
+ * The curried form lets TypeScript infer the handler's payload + ctx
+ * shape without you spelling out `<F, K, Ctx>` explicitly. The keys
+ * array is type-checked against `keyof F` — typos like `'valuess'`
+ * become compile errors.
+ *
+ * On uncaught throw:
+ *   1. The listed keys are restored from the pre-handler snapshot.
  *   2. The throw propagates upward (the mutator captures it on
  *      `pendingMutation.error`).
  */
-export function withOptimistic<
-  F extends Record<string, unknown>,
-  K extends keyof F,
-  Ctx extends { facts: F },
->(
-  keys: readonly K[],
+export function withOptimistic<F extends Record<string, unknown>>(
+  keys: readonly (keyof F)[],
+): <Ctx extends { facts: F }>(
   handler: (ctx: Ctx) => Promise<void> | void,
-): (ctx: Ctx) => Promise<void> {
-  return async (ctx: Ctx) => {
-    const restore = createSnapshot(ctx.facts, keys);
-    try {
-      await handler(ctx);
-    } catch (err) {
-      restore();
-      throw err;
-    }
+) => (ctx: Ctx) => Promise<void> {
+  return <Ctx extends { facts: F }>(
+    handler: (ctx: Ctx) => Promise<void> | void,
+  ) => {
+    return async (ctx: Ctx) => {
+      const restore = createSnapshot(ctx.facts, keys);
+      try {
+        await handler(ctx);
+      } catch (err) {
+        restore();
+        throw err;
+      }
+    };
   };
 }
 
 /**
- * Best-effort structural clone. Uses `structuredClone` when available
- * (Node 17+, modern browsers); falls back to JSON roundtrip otherwise.
+ * Thrown when a fact value cannot be cloned for snapshotting. This
+ * surfaces as a real error rather than a silent corruption — Directive's
+ * fact contract is JSON-roundtrippable, and shapes outside that contract
+ * (functions, DOM nodes, BigInt, circular refs, class instances with
+ * non-cloneable properties) cannot be safely snapshotted.
+ */
+export class OptimisticCloneError extends Error {
+  override readonly name = "OptimisticCloneError";
+  constructor(public readonly key: PropertyKey, cause?: unknown) {
+    super(
+      `[optimistic] Failed to snapshot fact key "${String(key)}": value is not JSON-roundtrippable. ` +
+        `Convert at the boundary (e.g. Date → number, Set/Map → array/object, BigInt → string) before assigning to facts.`,
+    );
+    if (cause !== undefined) {
+      (this as Error & { cause?: unknown }).cause = cause;
+    }
+  }
+}
+
+/**
+ * Structural clone matching Directive's JSON-roundtrip fact contract.
+ *
+ * Uses {@link structuredClone} (Node 17+, modern browsers — Directive's
+ * documented engine baseline). NO JSON-roundtrip fallback: the JSON
+ * path silently drops functions, symbols, and undefined values, which
+ * is exactly the silent corruption optimistic rollback exists to
+ * prevent. If `structuredClone` throws (function, DOM node, non-cloneable
+ * shape), we re-throw a typed {@link OptimisticCloneError} so the
+ * caller sees a loud failure with the offending key.
  *
  * @internal
  */
-function clone<T>(value: T): T {
+function clone<T>(value: T, key: PropertyKey): T {
   if (value === null || value === undefined) return value;
   if (typeof value !== "object") return value;
-  if (typeof structuredClone === "function") {
-    try {
-      return structuredClone(value);
-    } catch {
-      // structuredClone may throw on non-cloneable shapes (functions, DOM
-      // nodes, etc.). Fall through to JSON roundtrip.
-    }
+  if (typeof structuredClone !== "function") {
+    throw new OptimisticCloneError(
+      key,
+      new Error(
+        "structuredClone is required (Node 17+ / modern browsers). " +
+          "Polyfill structuredClone or upgrade your runtime.",
+      ),
+    );
   }
-  return JSON.parse(JSON.stringify(value)) as T;
+  try {
+    return structuredClone(value);
+  } catch (cause) {
+    throw new OptimisticCloneError(key, cause);
+  }
 }

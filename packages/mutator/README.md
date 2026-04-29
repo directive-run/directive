@@ -7,6 +7,13 @@
 npm install @directive-run/mutator
 ```
 
+> **Naming heads-up:** the mutation discriminator is named **`kind`**,
+> not `type`. Directive's event dispatcher reserves `payload.type` for
+> its own event-name routing — `type` here would collide with `MUTATE`
+> and route the dispatch to a non-existent event handler. Use `kind`
+> everywhere; the typed `mutate(kind, payload)` constructor builds the
+> right shape for you.
+
 ## What it solves
 
 Across the 55-cycle Minglingo XState→Directive migration, **12 modules**
@@ -118,8 +125,18 @@ sys.events.MUTATE({ kind, payload, status: 'pending', error: null })
 > nonexistent event handler. `kind` keeps the two namespaces separate.
 
 A failed mutation leaves `pendingMutation` non-null with `status:
-'running'`. Read `pendingMutation.error` to surface to the UI; dispatch
-a fresh `MUTATE` to retry (which overwrites the failed fact and re-fires).
+'failed'` (a distinct status from `'running'`, so the UI can
+disambiguate "still working" from "stopped on error"). Read
+`pendingMutation.error` to surface to the UI; dispatch a fresh `MUTATE`
+to retry (which overwrites the failed fact and re-fires).
+
+**XSS warning.** `pendingMutation.error` is a plaintext `string` that
+may echo handler-thrown messages, which in turn may have interpolated
+user-controlled input. Render it via `{error}` in JSX (default-escaped)
+or `textContent` — **never** via `dangerouslySetInnerHTML`, markdown
+rendering, or any other HTML-evaluating sink. The runtime truncates
+captured errors to 500 characters as a defense in depth, but that does
+not sanitize content; only escape on render.
 
 ## Concurrency
 

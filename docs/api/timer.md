@@ -22,7 +22,8 @@ import { realClock, virtualClock, defaultClock } from '@directive-run/core';
 
 const clock = realClock();        // production
 const test = virtualClock(0);     // tests; advanceBy() to step time
-const auto = defaultClock();      // virtual under VITEST, real otherwise
+const auto = defaultClock();      // alias for realClock — auto-detect
+                                  // was removed (footgun under vitest)
 ```
 
 The interface:

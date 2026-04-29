@@ -87,10 +87,21 @@ export function initialTimerState(): TimerFactState {
  */
 export function elapsedMs(state: TimerFactState, nowMs: number): number {
   if (state.startedAtMs === null) return 0;
+  // Clamp at 0 — a clock step-back (NTP correction, virtual-clock
+  // re-entrancy, replay seeded from older snapshot) would otherwise
+  // produce negative elapsed values that:
+  //   - make tickTimer never report 'complete' (because `elapsed >= ms`
+  //     stays false past the deadline)
+  //   - make remainingMs report values > the configured ms total
+  //   - silently wrap into pausedDurationMs accumulation downstream
+  // (R1 sec C4.)
   if (state.status === "paused" && state.pausedAtMs !== null) {
-    return state.pausedAtMs - state.startedAtMs - state.pausedDurationMs;
+    return Math.max(
+      0,
+      state.pausedAtMs - state.startedAtMs - state.pausedDurationMs,
+    );
   }
-  return nowMs - state.startedAtMs - state.pausedDurationMs;
+  return Math.max(0, nowMs - state.startedAtMs - state.pausedDurationMs);
 }
 
 /**
@@ -152,7 +163,11 @@ export function resumeTimer(
 ): TimerFactState {
   if (state.status !== "paused") return state;
   if (state.pausedAtMs === null) return state;
-  const pausedFor = nowMs - state.pausedAtMs;
+  // Clamp pausedFor at 0 — clock step-back between pause and resume
+  // would otherwise produce a negative pausedDurationMs accumulation,
+  // which propagates into elapsedMs (returns inflated values), which
+  // prematurely completes countdowns. (R1 sec M1.)
+  const pausedFor = Math.max(0, nowMs - state.pausedAtMs);
   return {
     ...state,
     pausedDurationMs: state.pausedDurationMs + pausedFor,
@@ -187,9 +202,16 @@ export function registerRepeat(
   ms: number,
 ): TimerFactState {
   if (state.startedAtMs === null) return state;
+  // Reset pausedDurationMs on each repeat so accumulated pause time
+  // from prior intervals does not double-count into the next
+  // interval's elapsed math. Without this reset, every repeat after a
+  // pause would arithmetic-drift the next deadline by the cumulative
+  // pause window. (R1 sec M9.)
   return {
     ...state,
     startedAtMs: state.startedAtMs + ms,
+    pausedDurationMs: 0,
+    pausedAtMs: null,
     repeats: state.repeats + 1,
   };
 }
@@ -232,9 +254,14 @@ export function tickTimer(
  *
  * @example
  * ```ts
- * import { createSystem, t } from '@directive-run/core';
- * import { timerOps, initialTimerState } from '@directive-run/core/timer';
- * import { realClock } from '@directive-run/core/clock';
+ * import {
+ *   createSystem,
+ *   t,
+ *   realClock,
+ *   timerOps,
+ *   initialTimerState,
+ *   type TimerFactState,
+ * } from '@directive-run/core';
  *
  * const clock = realClock();
  * const ops = timerOps({ ms: 60_000, mode: 'down' });

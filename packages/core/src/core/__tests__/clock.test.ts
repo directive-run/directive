@@ -115,15 +115,41 @@ describe("virtualClock", () => {
 });
 
 describe("defaultClock", () => {
-  it("returns a clock", () => {
+  it("returns a real clock — auto-detection removed (R1 sec M8)", () => {
     const c = defaultClock();
     expect(typeof c.now).toBe("function");
     expect(typeof c.setTimeout).toBe("function");
+    // No advanceBy on real clock — auto-virtual-under-vitest was a
+    // footgun.
+    expect(c.advanceBy).toBeUndefined();
   });
 
-  it("under VITEST it returns a virtual clock", () => {
-    // VITEST=true is the default in this test environment
-    const c = defaultClock();
+  it("explicit virtualClock is the only path to virtual time", () => {
+    const c = virtualClock(0);
     expect(typeof c.advanceBy).toBe("function");
+  });
+});
+
+describe("virtualClock — R1 sec C3 re-entrancy guard", () => {
+  it("a callback that schedules into the past does NOT pull nowMs backward", () => {
+    const c = virtualClock(0);
+    const observations: number[] = [];
+
+    c.setTimeout(() => {
+      observations.push(c.now());
+      // Schedule another callback "in the past" — without the
+      // Math.max clamp this would set nowMs back to 50.
+      c.setTimeout(() => {
+        observations.push(c.now());
+      }, -100);
+    }, 100);
+
+    c.advanceBy?.(200);
+
+    // First obs: 100 (when the first cb fired). Second obs MUST be
+    // >= 100 (monotonic) — never less.
+    expect(observations[0]).toBe(100);
+    expect(observations[1]).toBeGreaterThanOrEqual(100);
+    expect(c.now()).toBeGreaterThanOrEqual(200);
   });
 });

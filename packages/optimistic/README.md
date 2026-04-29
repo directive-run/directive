@@ -29,11 +29,18 @@ With this package:
 ```ts
 import { withOptimistic } from '@directive-run/optimistic';
 
-submit: withOptimistic(['values'], async ({ payload, facts }) => {
+interface FormFacts { values: FormValues; /* ... */ }
+
+submit: withOptimistic<FormFacts>(['values'])(async ({ payload, facts }) => {
   facts.values = optimisticGuess(payload);
   facts.values = await deps.submit(payload);
 }),
 ```
+
+The single-arg outer call (`withOptimistic<F>(keys)`) is what makes
+the keys array type-check against `keyof F` — a typo like
+`['valuess']` becomes a compile error. The inner call accepts your
+mutator handler unchanged.
 
 If the inner handler throws, `facts.values` snaps back to its
 pre-handler value and the throw propagates upward.
@@ -74,20 +81,24 @@ try {
 captured snapshot back. Useful if your handler has multiple
 mid-execution decision points.
 
-### `withOptimistic(keys, handler) → wrappedHandler`
+### `withOptimistic<F>(keys)(handler) → wrappedHandler`
 
 Higher-order helper that wraps a handler with snapshot + automatic
-rollback. Designed to compose with `@directive-run/mutator`:
+rollback. The two-call signature lets TypeScript infer the keys array
+against `keyof F` — typos are compile errors. Composes with
+`@directive-run/mutator`:
 
 ```ts
 import { defineMutator } from '@directive-run/mutator';
 import { withOptimistic } from '@directive-run/optimistic';
 
 const mut = defineMutator<FormMutations, FormFacts>({
-  submit: withOptimistic(['values'], async ({ payload, facts }) => {
-    facts.values = optimisticGuess(payload);
-    facts.values = await deps.submit(payload);
-  }),
+  submit: withOptimistic<FormFacts>(['values'])(
+    async ({ payload, facts }) => {
+      facts.values = optimisticGuess(payload);
+      facts.values = await deps.submit(payload);
+    },
+  ),
   cancel: ({ facts }) => { facts.values = []; },
 });
 ```
@@ -103,12 +114,27 @@ The wrapper:
 Snapshots are **deep-cloned** via `structuredClone` (Node 17+, modern
 browsers) with a JSON-roundtrip fallback. This matches Directive's
 JSON-roundtrippable-fact contract — all reactive facts MUST be
-JSON-roundtrippable, so JSON cloning is sufficient and safe.
+JSON-roundtrippable, so JSON cloning is sufficient.
 
-If your fact contains a `Date`, `Set`, `Map`, `File`, or class instance,
-you're already violating the JSON-fact contract (see
-`@directive-run/core@1.2.0`'s dev-mode warning). The snapshot will
-silently mis-restore. Convert at the boundary instead.
+If a fact contains a `BigInt`, function, circular reference (in
+JSON-fallback environments), or other non-cloneable shape, the snapshot
+**throws** an `OptimisticCloneError` with the offending key — making
+the violation loud rather than silently corrupting the rolled-back
+state. Convert at the boundary (e.g. `Date → number`, `BigInt → string`)
+before assigning to facts.
+
+```ts
+import { OptimisticCloneError } from '@directive-run/optimistic';
+
+try {
+  const restore = createSnapshot(facts, ['weirdField']);
+  // ...
+} catch (err) {
+  if (err instanceof OptimisticCloneError) {
+    // err.key is the fact key that couldn't be cloned
+  }
+}
+```
 
 ## Composition with mutator
 

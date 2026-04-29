@@ -97,31 +97,43 @@ export function virtualClock(initialMs = 0): SignalClock {
           );
         if (ready.length === 0) break;
         const next = ready[0]!;
-        // Advance "now" to the callback's deadline before firing — so
-        // callbacks that read clock.now() see the right time.
-        nowMs = next.deadlineMs;
+        // Advance "now" monotonically — never let a callback that
+        // schedules another callback in the past pull `nowMs`
+        // backward. Without this clamp, `setTimeout(cb2, -5)` from
+        // inside a callback would make `clock.now()` return a smaller
+        // value mid-advance, breaking elapsedMs (negative results)
+        // and replay determinism. (R1 sec C3.)
+        nowMs = Math.max(nowMs, next.deadlineMs);
         next.canceled = true;
         next.cb();
       }
       // Final advance — even if no callbacks fired in [nowMs, targetMs],
       // wall clock still moves forward.
-      nowMs = targetMs;
+      nowMs = Math.max(nowMs, targetMs);
     },
   };
 }
 
 /**
- * Auto-detect: `virtualClock()` under Vitest, `realClock()` everywhere
- * else. Consumers passing an explicit clock to `createSystem({ clock })`
- * always override this.
+ * Returns `realClock()` always.
+ *
+ * Earlier drafts auto-detected vitest (`process.env.VITEST === 'true'`)
+ * and returned a `virtualClock()` in that environment. AE review
+ * flagged this as a footgun: tests that legitimately need real time
+ * (sleep-based debounce checks, real-`setTimeout`-bound integration
+ * fixtures) silently received a virtual clock that never advanced
+ * unless the test author called `advanceBy()`, producing apparent
+ * deadlocks indistinguishable from genuine bugs. Auto-detection is
+ * therefore opt-in.
+ *
+ * Use {@link virtualClock} explicitly in tests:
+ *
+ * ```ts
+ * const clock = virtualClock(0);
+ * const sys = createSystem({ module, clock });
+ * clock.advanceBy(1_000);
+ * ```
  */
 export function defaultClock(): SignalClock {
-  if (
-    typeof process !== "undefined" &&
-    process.env !== undefined &&
-    process.env.VITEST === "true"
-  ) {
-    return virtualClock(Date.now());
-  }
   return realClock();
 }

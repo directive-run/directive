@@ -8,6 +8,7 @@ import {
   formatTimeline,
   getTimeline,
   recordTimeline,
+  setRegistryCap,
   withTimeline,
 } from "../index.js";
 
@@ -245,5 +246,36 @@ describe("@directive-run/timeline", () => {
 
   it("formatTimeline handles undefined input", () => {
     expect(formatTimeline(undefined)).toBe("(no timeline)");
+  });
+
+  it("R1 sec M3: registry evicts oldest entries past the cap", () => {
+    setRegistryCap(3);
+    try {
+      const systems: ReturnType<typeof createSystem>[] = [];
+      for (let i = 0; i < 5; i++) {
+        const sys = createSystem({
+          module: buildCounter({ loadInitial: async () => i }),
+        });
+        sys.start();
+        recordTimeline(sys, { id: `cap-${i}` });
+        systems.push(sys);
+      }
+      // First two should be evicted; last three retained.
+      expect(getTimeline("cap-0")).toBeUndefined();
+      expect(getTimeline("cap-1")).toBeUndefined();
+      expect(getTimeline("cap-2")).toBeDefined();
+      expect(getTimeline("cap-3")).toBeDefined();
+      expect(getTimeline("cap-4")).toBeDefined();
+      systems.forEach((s) => s.destroy());
+    } finally {
+      setRegistryCap(500);
+    }
+  });
+
+  it("R1 sec M3: setRegistryCap rejects invalid values", () => {
+    expect(() => setRegistryCap(0)).toThrow();
+    expect(() => setRegistryCap(-1)).toThrow();
+    expect(() => setRegistryCap(Number.NaN)).toThrow();
+    expect(() => setRegistryCap(Number.POSITIVE_INFINITY)).toThrow();
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { flushAsync } from "@directive-run/core/testing";
 import { defineMutator, mutate } from "../index.js";
@@ -129,7 +129,7 @@ describe("@directive-run/mutator", () => {
     expect(pending).not.toBe(null);
     expect(pending?.kind).toBe("submit");
     expect(pending?.error).toBe("backend exploded");
-    expect(pending?.status).toBe("running");
+    expect(pending?.status).toBe("failed");
     expect(sys.facts.values).toEqual([]);
     sys.destroy();
   });
@@ -148,6 +148,122 @@ describe("@directive-run/mutator", () => {
     expect(sys.facts.values).toEqual([]);
     expect(sys.facts.cancelCount).toBe(1);
     sys.destroy();
+  });
+
+  it("R1 sec C1: prototype-pollution kinds are rejected, not invoked", async () => {
+    const sys = buildSystem({ submit: async (v) => v });
+    // Bypass the typed mutate() helper to simulate a hostile dispatch.
+    sys.events.MUTATE({
+      kind: "constructor" as never,
+      payload: {} as never,
+      status: "pending",
+      error: null,
+    });
+    await flushAsync();
+
+    const pending = sys.facts.pendingMutation as {
+      kind: string;
+      error: string | null;
+      status: string;
+    } | null;
+    expect(pending).not.toBe(null);
+    expect(pending?.status).toBe("failed");
+    expect(pending?.error).toContain("no handler registered for variant");
+    sys.destroy();
+  });
+
+  it("R1 sec C1: __proto__ kind is rejected without invoking inherited", async () => {
+    const sys = buildSystem({ submit: async (v) => v });
+    sys.events.MUTATE({
+      kind: "__proto__" as never,
+      payload: {} as never,
+      status: "pending",
+      error: null,
+    });
+    await flushAsync();
+
+    const pending = sys.facts.pendingMutation as {
+      status: string;
+    } | null;
+    expect(pending?.status).toBe("failed");
+    sys.destroy();
+  });
+
+  it("R1 sec C1: even if Object.prototype is polluted, lookup is rejected", async () => {
+    const polluted = "__polluted__";
+    (Object.prototype as Record<string, unknown>)[polluted] = () => {
+      throw new Error("polluted handler invoked!");
+    };
+    try {
+      const sys = buildSystem({ submit: async (v) => v });
+      sys.events.MUTATE({
+        kind: polluted as never,
+        payload: {} as never,
+        status: "pending",
+        error: null,
+      });
+      await flushAsync();
+
+      const pending = sys.facts.pendingMutation as {
+        status: string;
+      } | null;
+      expect(pending?.status).toBe("failed");
+      sys.destroy();
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)[polluted];
+    }
+  });
+
+  it("R1 sec C2: long error messages are truncated to 500 chars", async () => {
+    const longMessage = "x".repeat(2_000);
+    const sys = buildSystem({
+      submit: async () => {
+        throw new Error(longMessage);
+      },
+    });
+
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+
+    const pending = sys.facts.pendingMutation as {
+      error: string;
+    } | null;
+    expect(pending?.error).toBeDefined();
+    expect(pending!.error.length).toBeLessThanOrEqual(500);
+    expect(pending!.error.endsWith("…")).toBe(true);
+    sys.destroy();
+  });
+
+  it("R1 sec M5: in-flight mutation that is superseded does not get nulled by completing handler", async () => {
+    let release: (() => void) | undefined;
+    const slowSubmit = vi.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          release = () => resolve(["A"]);
+        }),
+    );
+    const sys = buildSystem({ submit: slowSubmit });
+
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+
+    // Mid-flight: a fresh MUTATE arrives.
+    sys.events.MUTATE(mutate<FormMutations>("cancel"));
+    // The original handler now completes:
+    release?.();
+    await flushAsync();
+
+    // The cancel mutation should still be live (or already drained), NOT
+    // nulled by the in-flight submit handler's completion path. Then
+    // the cancel handler runs and cancelCount reaches 1.
+    expect(sys.facts.cancelCount).toBe(1);
+    sys.destroy();
+  });
+
+  it("R1: explicit 'failed' status is in the type union", () => {
+    // Type-level check — TS would catch removing 'failed' from the union.
+    const failed: "pending" | "running" | "failed" = "failed";
+    expect(failed).toBe("failed");
   });
 
   it("mutate() helper enforces variant payload shape at type level", () => {

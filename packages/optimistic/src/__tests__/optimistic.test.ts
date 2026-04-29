@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { createSnapshot, withOptimistic } from "../index.js";
+import { createSnapshot, OptimisticCloneError, withOptimistic } from "../index.js";
 
 describe("@directive-run/optimistic — createSnapshot", () => {
   it("captures + restores plain values", () => {
@@ -62,45 +62,39 @@ describe("@directive-run/optimistic — createSnapshot", () => {
 
 describe("@directive-run/optimistic — withOptimistic", () => {
   it("runs the handler when no error is thrown", async () => {
-    const facts = { values: ["a"] };
-    const wrapped = withOptimistic<typeof facts, "values", { facts: typeof facts }>(
-      ["values"],
-      async ({ facts }) => {
-        facts.values = ["b", "c"];
-      },
-    );
+    type F = { values: string[] };
+    const facts: F = { values: ["a"] };
+    const wrapped = withOptimistic<F>(["values"])(async ({ facts }) => {
+      facts.values = ["b", "c"];
+    });
     await wrapped({ facts });
     expect(facts.values).toEqual(["b", "c"]);
   });
 
   it("rolls back on throw, then propagates", async () => {
-    const facts = { values: ["a"] };
-    const wrapped = withOptimistic<typeof facts, "values", { facts: typeof facts }>(
-      ["values"],
-      async ({ facts }) => {
-        facts.values = ["optimistic"];
-        throw new Error("network exploded");
-      },
-    );
+    type F = { values: string[] };
+    const facts: F = { values: ["a"] };
+    const wrapped = withOptimistic<F>(["values"])(async ({ facts }) => {
+      facts.values = ["optimistic"];
+      throw new Error("network exploded");
+    });
 
     await expect(wrapped({ facts })).rejects.toThrow("network exploded");
     expect(facts.values).toEqual(["a"]);
   });
 
   it("rolls back even if the throw happens mid-resolve", async () => {
-    const facts = { values: ["original"], pending: false };
-    const wrapped = withOptimistic<
-      typeof facts,
-      "values" | "pending",
-      { facts: typeof facts }
-    >(["values", "pending"], async ({ facts }) => {
-      facts.pending = true;
-      facts.values = ["optimistic"];
-      // Simulate awaited work that fails:
-      await new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("500")), 0),
-      );
-    });
+    type F = { values: string[]; pending: boolean };
+    const facts: F = { values: ["original"], pending: false };
+    const wrapped = withOptimistic<F>(["values", "pending"])(
+      async ({ facts }) => {
+        facts.pending = true;
+        facts.values = ["optimistic"];
+        await new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error("500")), 0),
+        );
+      },
+    );
 
     await expect(wrapped({ facts })).rejects.toThrow("500");
     expect(facts.values).toEqual(["original"]);
@@ -108,18 +102,65 @@ describe("@directive-run/optimistic — withOptimistic", () => {
   });
 
   it("only rolls back listed keys", async () => {
-    const facts = { a: 1, b: 2 };
-    const wrapped = withOptimistic<typeof facts, "a", { facts: typeof facts }>(
-      ["a"],
-      async ({ facts }) => {
-        facts.a = 100;
-        facts.b = 200;
-        throw new Error("boom");
-      },
-    );
+    type F = { a: number; b: number };
+    const facts: F = { a: 1, b: 2 };
+    const wrapped = withOptimistic<F>(["a"])(async ({ facts }) => {
+      facts.a = 100;
+      facts.b = 200;
+      throw new Error("boom");
+    });
 
     await expect(wrapped({ facts })).rejects.toThrow("boom");
     expect(facts.a).toBe(1); // restored
     expect(facts.b).toBe(200); // not in keys list, stays mutated
+  });
+
+  it("R1: typo in keys array is a compile error (typecheck)", () => {
+    type F = { values: string[]; count: number };
+    // @ts-expect-error — 'valuess' is not a key of F
+    withOptimistic<F>(["valuess"])(async ({ facts }) => {
+      facts.values = [];
+    });
+    // The runtime test is unreachable; this suite exists so a future
+    // refactor that breaks the constraint will cause tsc to flag the
+    // test file (and CI to fail).
+    expect(true).toBe(true);
+  });
+
+  it("R1 sec/M2: createSnapshot throws OptimisticCloneError on object containing a function", () => {
+    // Functions cannot survive structuredClone — DataCloneError. We
+    // re-throw as a typed OptimisticCloneError with the offending key,
+    // so the violation is loud rather than silent (the original JSON
+    // fallback would drop the function and silently corrupt rollback).
+    const facts: { config: { name: string; onSubmit: () => void } } = {
+      config: { name: "form", onSubmit: () => {} },
+    };
+    expect(() => createSnapshot(facts, ["config"])).toThrow(
+      /not JSON-roundtrippable/,
+    );
+    expect(() => createSnapshot(facts, ["config"])).toThrow(
+      OptimisticCloneError,
+    );
+  });
+
+  it("R1 sec/M2: OptimisticCloneError carries the offending key + cause", () => {
+    const facts = { x: { fn: () => {} } };
+    try {
+      createSnapshot(facts, ["x"]);
+      expect.fail("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OptimisticCloneError);
+      const e = err as OptimisticCloneError;
+      expect(e.key).toBe("x");
+      expect(e.cause).toBeDefined();
+    }
+  });
+
+  it("R1: structuredClone handles cycles natively — no false positives", () => {
+    type Node = { name: string; child?: Node };
+    const node: Node = { name: "a" };
+    node.child = node; // cycle — structuredClone preserves
+    const facts = { node };
+    expect(() => createSnapshot(facts, ["node"])).not.toThrow();
   });
 });

@@ -56,6 +56,14 @@ interface ReporterTask {
   type?: string;
   result?: { state?: string; errors?: unknown[] };
   tasks?: ReporterTask[];
+  /**
+   * Vitest 1.4+ exposes a parent-suite pointer; older versions don't.
+   * The reporter prefers this when available to reconstruct the full
+   * hierarchical name (`describe > nested > test`) — the same string
+   * that `expect.getState().currentTestName` returns in the test body,
+   * which is the documented `recordTimeline` id source.
+   */
+  suite?: ReporterTask;
 }
 
 export interface TimelineReporterOptions extends FormatOptions {
@@ -89,20 +97,14 @@ export class TimelineReporter {
 
     for (const test of failing) {
       const name = fullTestName(test);
-      // Try the full name, then just the leaf name, then any timeline
-      // whose ID is contained in the full name. Most explicit lookup
-      // wins; fuzzy fallback covers users who passed a shorter ID.
+      // Try the full hierarchical name first (matches
+      // `expect.getState().currentTestName`), then the leaf name. We
+      // do NOT fall back to substring matching — that produced
+      // cross-test contamination in R1 (substring match between
+      // unrelated tests with similar names).
       let timeline = registry.get(name);
-      if (timeline === undefined && test.name !== undefined) {
+      if (timeline === undefined && test.name !== undefined && test.name !== name) {
         timeline = registry.get(test.name);
-      }
-      if (timeline === undefined) {
-        for (const [id, t] of registry.entries()) {
-          if (name.includes(id) || (test.name !== undefined && test.name === id)) {
-            timeline = t;
-            break;
-          }
-        }
       }
       if (timeline === undefined) continue;
 
@@ -141,12 +143,22 @@ function walkTasks(tasks: ReporterTask[], out: ReporterTask[]): void {
 }
 
 function fullTestName(task: ReporterTask): string {
-  // Vitest doesn't reliably expose the "full" hierarchical name on the
-  // task itself, but `currentTestName` from inside the test usually
-  // reads like "describe > nested > test name". For the reporter, we
-  // approximate with the task's `name` since walking back up to ancestor
-  // suites would require parent pointers (not present in 1.x).
-  return task.name ?? "(unnamed test)";
+  // Reconstruct the same `"describe > nested > test"` shape that
+  // `expect.getState().currentTestName` exposes inside the test body —
+  // which is the documented `recordTimeline()` id source. Walks the
+  // `task.suite` parent chain (vitest 1.4+); each ancestor whose name
+  // is non-empty contributes to the prefix. The root file-suite has
+  // an empty name; we skip it.
+  const segments: string[] = [];
+  let cursor: ReporterTask | undefined = task;
+  while (cursor !== undefined) {
+    if (cursor.name !== undefined && cursor.name !== "") {
+      segments.unshift(cursor.name);
+    }
+    cursor = cursor.suite;
+  }
+  if (segments.length === 0) return task.name ?? "(unnamed test)";
+  return segments.join(" > ");
 }
 
 function state(task: ReporterTask): string {
