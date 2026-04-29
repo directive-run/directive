@@ -55,6 +55,48 @@ export async function flushMicrotasks(): Promise<void> {
 }
 
 /**
+ * Drain a full constraint → resolver → effect pipeline, including macrotasks.
+ *
+ * Performs a 3-pass / 2-`setTimeout(0)` sequence that empties microtask queues
+ * twice across two macrotask boundaries. Use this when a single
+ * {@link flushMicrotasks} pass is not enough to reach quiescence — typically
+ * when constraints schedule resolvers that schedule further constraints, or
+ * when test code uses `queueMicrotask` / `Promise.resolve()` chains that
+ * cross a `setTimeout(..., 0)` boundary inside the engine.
+ *
+ * @remarks
+ * **When to use which:**
+ * - {@link flushMicrotasks}: Fast path for a single microtask drain (e.g.
+ *   waiting for one Promise chain to settle).
+ * - `flushAsync`: Heavier pass for full constraint+resolver pipelines where
+ *   reconciliation may emit follow-up requirements, retries, or batched
+ *   resolver flushes that span a macrotask.
+ *
+ * The exact shape (3 microtask rounds → setTimeout 0 → 3 microtask rounds →
+ * setTimeout 0 → 3 microtask rounds) was extracted from a helper duplicated
+ * across 50+ migration tests; centralizing it here keeps the drain semantics
+ * consistent and lets the engine evolve without fan-out edits.
+ *
+ * @returns A promise that resolves after the full drain completes.
+ *
+ * @example
+ * ```typescript
+ * system.facts.userId = 1; // triggers constraint → resolver chain
+ * await flushAsync();      // drains constraint + resolver + follow-up effects
+ * expect(system.facts.user).toEqual({ id: 1, ... });
+ * ```
+ *
+ * @public
+ */
+export async function flushAsync(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
+/**
  * Wait for the system to settle with fake timers enabled.
  *
  * Repeatedly advances fake timers in discrete steps while flushing microtasks,
