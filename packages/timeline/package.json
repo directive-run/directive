@@ -1,0 +1,76 @@
+{
+  "name": "@directive-run/timeline",
+  "version": "0.1.0",
+  "description": "Time-travel test REPL for Directive. Auto-renders the causal-graph timeline of any failing test.",
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/timeline"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "time-travel",
+    "test-debugging",
+    "vitest",
+    "causal-graph",
+    "state-management"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./reporter": {
+      "types": "./dist/reporter.d.ts",
+      "require": "./dist/reporter.cjs",
+      "import": "./dist/reporter.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "^1.2.0",
+    "vitest": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
+  }
+}
