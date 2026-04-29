@@ -83,12 +83,17 @@ const MAX_ERROR_LEN = 500;
 function truncateError(input: unknown): string {
   let str: string;
   if (input instanceof Error) {
-    // Coerce a non-string `.message` defensively — never trust the
-    // shape on the wire.
-    str =
-      typeof input.message === "string"
-        ? input.message
-        : safeStringCoerce(input.message);
+    // Reading `.message` is wrapped in try/catch because a maliciously
+    // constructed Error subclass may install a throwing getter on
+    // `message`. Without this guard the throw escapes truncateError →
+    // escapes the resolver's catch → propagates uncaught. (R4 backlog.)
+    let raw: unknown;
+    try {
+      raw = input.message;
+    } catch {
+      raw = "[mutator: error.message getter threw]";
+    }
+    str = typeof raw === "string" ? raw : safeStringCoerce(raw);
   } else if (typeof input === "string") {
     str = input;
   } else {

@@ -298,6 +298,30 @@ describe("@directive-run/mutator", () => {
     sys.destroy();
   });
 
+  it("R4 backlog: Error subclass with throwing message getter does not escape", async () => {
+    class HostileError extends Error {
+      override get message(): string {
+        throw new Error("getter is hostile");
+      }
+    }
+    const sys = buildSystem({
+      submit: async () => {
+        throw new HostileError();
+      },
+    });
+    sys.events.MUTATE(mutate<FormMutations>("submit", { values: ["a"] }));
+    await flushAsync();
+    const pending = sys.facts.pendingMutation as {
+      error: string;
+      status: string;
+    } | null;
+    // The throw was contained; status is 'failed' with the
+    // sentinel error message rather than crashing the resolver.
+    expect(pending?.status).toBe("failed");
+    expect(pending?.error).toContain("getter threw");
+    sys.destroy();
+  });
+
   it("R2 sec M-R2-1: object thrown values coerce without crash", async () => {
     const sys = buildSystem({
       submit: async () => {
