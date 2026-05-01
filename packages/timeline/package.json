@@ -43,6 +43,11 @@
       "types": "./dist/reporter.d.ts",
       "require": "./dist/reporter.cjs",
       "import": "./dist/reporter.js"
+    },
+    "./matchers": {
+      "types": "./dist/matchers.d.ts",
+      "require": "./dist/matchers.cjs",
+      "import": "./dist/matchers.js"
     }
   },
   "files": [

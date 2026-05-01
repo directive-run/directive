@@ -18,6 +18,13 @@ Initial release. The Sherlock pick from MIGRATION_FEEDBACK item #1+#3+#7.
 - `TimelineReporter` (from `@directive-run/timeline/reporter`) — Vitest
   reporter that, on test failure, looks up the timeline by the test's
   full name and prints it inline with the failure.
+- **R1.B causal-graph matchers** (`./matchers` subpath): five vitest
+  matchers — `toReachInMs`, `toFireConstraint`, `toMutate`,
+  `toResolveWithinMs`, `toCascade` — that assert against the recorded
+  `ObservationEvent` stream. `import '@directive-run/timeline/matchers'`
+  registers them globally; `registerMatchers(expect)` is the explicit
+  alternative. Each operates on the same frame stream `formatTimeline`
+  renders and `replayTimeline` re-dispatches. 14 new tests.
 - **R1.A scaffold:** `serializeTimeline()` + `deserializeTimeline()` +
   `replayTimeline()` — JSON-roundtrip a recorded timeline and replay
   its dispatched events against a fresh system. Today reconstructs

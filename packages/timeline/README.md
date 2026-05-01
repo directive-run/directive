@@ -187,6 +187,48 @@ you suspect it's not exercising what you expect).
   not the at-event state. For the strict at-event view, use
   `JSON.parse(JSON.stringify(value))` snapshots in your handlers.
 
+## Causal-graph vitest matchers (R1.B)
+
+Five matchers for asserting against the *causal chain* a Directive
+system produced — not just final state. Subpath import:
+
+```ts
+// vitest.setup.ts
+import '@directive-run/timeline/matchers';
+```
+
+Or explicit registration:
+
+```ts
+import { expect } from 'vitest';
+import { registerMatchers } from '@directive-run/timeline/matchers';
+registerMatchers(expect);
+```
+
+Then in tests:
+
+```ts
+import { recordTimeline } from '@directive-run/timeline';
+
+it('completes in under 50ms with no cascade', async () => {
+  const t = recordTimeline(sys, { id: 'fast' });
+  sys.start();
+  sys.events.LOAD();
+  await flushAsync();
+
+  expect(t).toReachInMs('status', 'ready', 50);     // fact reached value
+  expect(t).toFireConstraint('load');                // fired ≥1 time
+  expect(t).toFireConstraint('load', { times: 1 }); // exactly N
+  expect(t).toResolveWithinMs('initialLoader', 50); // resolver budget
+  expect(t).toMutate('submit');                      // mutator dispatch
+  expect(t).not.toCascade();                         // ≥2 constraints same cycle
+});
+```
+
+Each matcher operates on the recorded `ObservationEvent` stream — the
+same data the formatter renders and `replayTimeline` re-dispatches. No
+other state library has assertion-against-causal-graph for free.
+
 ## `directive replay` (R1.A scaffold)
 
 Recorded timelines are **JSON-serializable** — paste a frame stream into

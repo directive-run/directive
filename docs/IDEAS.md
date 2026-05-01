@@ -62,7 +62,15 @@ pain.
 
 ## R1.B — `expect(timeline).toReachIn(N).ms('status', 'ready')` causal-graph vitest matchers
 
-**[2 days]**
+**[v0.1 SHIPPED 2026-05-01 — `@directive-run/timeline/matchers` subpath]**
+
+Five matchers landed: `toReachInMs`, `toFireConstraint`, `toMutate`,
+`toResolveWithinMs`, `toCascade`. Surface name shifted from the
+fluent `.toReachIn(N).ms(...)` builder to flat
+`.toReachInMs(key, value, ms)` for cleaner vitest `expect.extend`
+ergonomics. v0.2 (richer caused-by edge tracking for `toCascade`,
+`thenReach` chaining) deferred — the v0.1 surface covers the
+high-value assertions from the AE-review-loop pitch.
 
 **Pitch:** A `@directive-run/timeline/matchers` vitest extension. Instead
 of `expect(sys.facts.x).toBe(y)` (state at a point), assert *causal*
@@ -194,7 +202,7 @@ primitive.
 | Rank | Idea | Days | Viral | Compound | Tag |
 |---|---|---|---|---|---|
 | 1 | **R1.A** — `directive replay` from prod error | 2 | Max | Max | **v0.1 SCAFFOLD SHIPPED** (timeline@0.2.0) |
-| 2 | **R1.B** — Causal-graph vitest matchers | 2 | High | High | strong follow-on |
+| 2 | **R1.B** — Causal-graph vitest matchers | 2 | High | High | **v0.1 SHIPPED** (timeline/matchers) |
 | 3 | **R1.C** — `cancellable()` mutator + timer | 2 | High | Med-High | killer for type-ahead |
 | 4 | **R1.D** — Live timeline devtools scrubber | 7 | Max | High | Phase 5 pulled forward |
 | 5 | **R1.E** — `.invariant()` runtime-checked transitions | 7 | Med-High | High | risky scope creep |
