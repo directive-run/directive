@@ -1044,3 +1044,406 @@ export async function bisectTimeline(
     nonDeterministic: false,
   };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Diff (R2.C) — semantic causal-graph diff between two timelines
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Per-id count delta between two timelines, used for several
+ * categories on {@link TimelineDiff}. Identifies a category bucket
+ * (constraint id, mutation kind, resolver name) and reports how many
+ * times the matching event appeared on each side.
+ */
+export interface CountDelta {
+  /** Category-specific identifier (constraint id / mutation kind / resolver name). */
+  id: string;
+  /** Occurrences on the "a" timeline. */
+  aCount: number;
+  /** Occurrences on the "b" timeline. */
+  bCount: number;
+  /** `bCount - aCount`. Positive = more in b; negative = more in a. */
+  delta: number;
+}
+
+/**
+ * Resolver-run delta — three count axes per resolver name.
+ */
+export interface ResolverRunDelta {
+  /** Resolver name. */
+  resolver: string;
+  aStarts: number;
+  bStarts: number;
+  aCompletes: number;
+  bCompletes: number;
+  aErrors: number;
+  bErrors: number;
+}
+
+/**
+ * One error that appeared on one side but not the other (or differs
+ * structurally between sides). v0.1 reports new errors only — error
+ * shape differences across both sides count as "new on b" if the
+ * frame index differs, since pinpointing a structural change inside
+ * the same error string is matcher-territory.
+ */
+export interface ErrorDelta {
+  /** Which timeline carried the error. */
+  side: "a" | "b";
+  /** Event type. */
+  kind: "constraint.error" | "resolver.error" | "effect.error";
+  /** Identifier (constraint id, resolver name, effect id). */
+  id: string;
+  /** Raw error value as recorded. */
+  error: unknown;
+  /** 0-based frame index in the originating timeline. */
+  frameIndex: number;
+}
+
+/**
+ * Result of {@link diffTimelines}. Pure data — no formatting, no
+ * sorting opinions baked in beyond category-level conventions
+ * documented per field.
+ */
+export interface TimelineDiff {
+  /** `b.frames.length - a.frames.length`. */
+  frameCountDelta: number;
+  /** Frame counts. */
+  aFrameCount: number;
+  bFrameCount: number;
+  /**
+   * Per-constraint evaluation count delta. Includes only constraints
+   * whose count differs between sides (delta !== 0). Sorted by
+   * descending |delta| for at-a-glance readability.
+   */
+  constraintFires: CountDelta[];
+  /**
+   * Per-mutation-kind dispatch count delta. Mutations are surfaced
+   * via fact.change frames carrying `pendingMutation` writes —
+   * matches `replayTimeline`'s dispatchable filter. Includes only
+   * differing kinds.
+   */
+  mutations: CountDelta[];
+  /** Per-resolver run delta. Includes only resolvers whose any-axis count differs. */
+  resolverRuns: ResolverRunDelta[];
+  /**
+   * Errors that appeared on only one side of the diff. Two errors
+   * with the same `(kind, id)` tuple at corresponding frame positions
+   * are NOT reported — that's a "same shape" outcome. v0.1 surfaces
+   * pure additions/removals only.
+   */
+  newErrors: ErrorDelta[];
+  /**
+   * True when no category surfaced any difference. Useful as a fast
+   * "are these timelines semantically identical" check (much cheaper
+   * than a JSON deep-compare on the frames).
+   */
+  identical: boolean;
+}
+
+/**
+ * Pull a discriminator field off an event. Used to bucket frames by
+ * (event.type, secondary key). Returns null if the type doesn't carry
+ * that secondary key.
+ */
+function eventBucketKey(
+  ev: ObservationEvent,
+):
+  | { kind: "constraint"; id: string }
+  | { kind: "mutation"; mutationKind: string }
+  | { kind: "resolver-start"; resolver: string }
+  | { kind: "resolver-complete"; resolver: string }
+  | { kind: "resolver-error"; resolver: string; error: unknown }
+  | { kind: "constraint-error"; id: string; error: unknown }
+  | { kind: "effect-error"; id: string; error: unknown }
+  | null {
+  switch (ev.type) {
+    case "constraint.evaluate":
+      return { kind: "constraint", id: (ev as { id: string }).id };
+    case "fact.change": {
+      // Mutation-shaped fact.change: pendingMutation transitioning to a
+      // pending dispatch. Mirrors isDispatchable() so the diff stays
+      // aligned with replay semantics.
+      const e = ev as {
+        key: string;
+        next: unknown;
+      };
+      if (e.key !== "pendingMutation") return null;
+      const next = e.next as Record<string, unknown> | null;
+      if (next === null) return null;
+      const k = next.kind;
+      if (typeof k !== "string") return null;
+      if (next.status !== "pending") return null;
+      return { kind: "mutation", mutationKind: k };
+    }
+    case "resolver.start":
+      return {
+        kind: "resolver-start",
+        resolver: (ev as { resolver: string }).resolver,
+      };
+    case "resolver.complete":
+      return {
+        kind: "resolver-complete",
+        resolver: (ev as { resolver: string }).resolver,
+      };
+    case "resolver.error":
+      return {
+        kind: "resolver-error",
+        resolver: (ev as { resolver: string }).resolver,
+        error: (ev as { error: unknown }).error,
+      };
+    case "constraint.error":
+      return {
+        kind: "constraint-error",
+        id: (ev as { id: string }).id,
+        error: (ev as { error: unknown }).error,
+      };
+    case "effect.error":
+      return {
+        kind: "effect-error",
+        id: (ev as { id: string }).id,
+        error: (ev as { error: unknown }).error,
+      };
+    default:
+      return null;
+  }
+}
+
+interface BucketedCounts {
+  constraintFires: Map<string, number>;
+  mutations: Map<string, number>;
+  resolverStarts: Map<string, number>;
+  resolverCompletes: Map<string, number>;
+  resolverErrors: Map<string, number>;
+  errors: ErrorDelta[];
+}
+
+function bucketCounts(
+  side: "a" | "b",
+  frames: TimelineFrame[],
+): BucketedCounts {
+  const out: BucketedCounts = {
+    constraintFires: new Map(),
+    mutations: new Map(),
+    resolverStarts: new Map(),
+    resolverCompletes: new Map(),
+    resolverErrors: new Map(),
+    errors: [],
+  };
+  frames.forEach((frame, i) => {
+    const bucket = eventBucketKey(frame.event);
+    if (bucket === null) return;
+    switch (bucket.kind) {
+      case "constraint":
+        out.constraintFires.set(
+          bucket.id,
+          (out.constraintFires.get(bucket.id) ?? 0) + 1,
+        );
+        break;
+      case "mutation":
+        out.mutations.set(
+          bucket.mutationKind,
+          (out.mutations.get(bucket.mutationKind) ?? 0) + 1,
+        );
+        break;
+      case "resolver-start":
+        out.resolverStarts.set(
+          bucket.resolver,
+          (out.resolverStarts.get(bucket.resolver) ?? 0) + 1,
+        );
+        break;
+      case "resolver-complete":
+        out.resolverCompletes.set(
+          bucket.resolver,
+          (out.resolverCompletes.get(bucket.resolver) ?? 0) + 1,
+        );
+        break;
+      case "resolver-error":
+        out.resolverErrors.set(
+          bucket.resolver,
+          (out.resolverErrors.get(bucket.resolver) ?? 0) + 1,
+        );
+        out.errors.push({
+          side,
+          kind: "resolver.error",
+          id: bucket.resolver,
+          error: bucket.error,
+          frameIndex: i,
+        });
+        break;
+      case "constraint-error":
+        out.errors.push({
+          side,
+          kind: "constraint.error",
+          id: bucket.id,
+          error: bucket.error,
+          frameIndex: i,
+        });
+        break;
+      case "effect-error":
+        out.errors.push({
+          side,
+          kind: "effect.error",
+          id: bucket.id,
+          error: bucket.error,
+          frameIndex: i,
+        });
+        break;
+    }
+  });
+  return out;
+}
+
+/**
+ * Build a {@link CountDelta} list from two same-keyed maps. Includes
+ * only entries with a non-zero delta. Sorted by descending |delta| so
+ * the biggest divergences surface first.
+ */
+function deltaListFromMaps(
+  aMap: Map<string, number>,
+  bMap: Map<string, number>,
+): CountDelta[] {
+  const ids = new Set<string>([...aMap.keys(), ...bMap.keys()]);
+  const out: CountDelta[] = [];
+  for (const id of ids) {
+    const aCount = aMap.get(id) ?? 0;
+    const bCount = bMap.get(id) ?? 0;
+    if (aCount === bCount) continue;
+    out.push({ id, aCount, bCount, delta: bCount - aCount });
+  }
+  out.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta));
+  return out;
+}
+
+/**
+ * Diff two serialized timelines as a structured causal-graph report.
+ *
+ * The diff vocabulary mirrors {@link "@directive-run/timeline/matchers"}'s
+ * matcher surface inverted into reporters:
+ *
+ *   - `toFireConstraint(id, count)` ←→ `constraintFires` deltas
+ *   - `toMutate(kind)`              ←→ `mutations` deltas
+ *   - `toResolveWithinMs(resolver)` ←→ `resolverRuns` deltas
+ *   - constraint/resolver/effect errors → `newErrors`
+ *
+ * For each category, only entries that DIFFER between sides are
+ * included — categories where both timelines look identical are
+ * elided so the output is focused.
+ *
+ * @example
+ * ```ts
+ * const a = deserializeTimeline(JSON.parse(goodJson));
+ * const b = deserializeTimeline(JSON.parse(badJson));
+ * const diff = diffTimelines(a, b);
+ *
+ * if (diff.identical) {
+ *   console.log("timelines are semantically identical");
+ * } else {
+ *   for (const c of diff.constraintFires) {
+ *     console.log(`constraint '${c.id}': ${c.aCount} → ${c.bCount} (${c.delta > 0 ? '+' : ''}${c.delta})`);
+ *   }
+ * }
+ * ```
+ *
+ * v0.2 considerations (deferred):
+ *   - Cascade-edge diff: `(constraint, resolver)` edge tuples that
+ *     appear in b but not a.
+ *   - Mermaid sequence diagram emitter for the IDE/PR-review surface.
+ *   - Ordered diff: pinpoint the FIRST frame where divergence appears
+ *     (interaction with R2.A bisect — they share the prefix-replay
+ *     primitive).
+ */
+export function diffTimelines(
+  a: SerializedTimeline,
+  b: SerializedTimeline,
+): TimelineDiff {
+  const ab = bucketCounts("a", a.frames);
+  const bb = bucketCounts("b", b.frames);
+
+  const constraintFires = deltaListFromMaps(
+    ab.constraintFires,
+    bb.constraintFires,
+  );
+  const mutations = deltaListFromMaps(ab.mutations, bb.mutations);
+
+  // Resolver runs: combine three count maps per resolver into one row.
+  const resolverNames = new Set<string>([
+    ...ab.resolverStarts.keys(),
+    ...bb.resolverStarts.keys(),
+    ...ab.resolverCompletes.keys(),
+    ...bb.resolverCompletes.keys(),
+    ...ab.resolverErrors.keys(),
+    ...bb.resolverErrors.keys(),
+  ]);
+  const resolverRuns: ResolverRunDelta[] = [];
+  for (const name of resolverNames) {
+    const aStarts = ab.resolverStarts.get(name) ?? 0;
+    const bStarts = bb.resolverStarts.get(name) ?? 0;
+    const aCompletes = ab.resolverCompletes.get(name) ?? 0;
+    const bCompletes = bb.resolverCompletes.get(name) ?? 0;
+    const aErrors = ab.resolverErrors.get(name) ?? 0;
+    const bErrors = bb.resolverErrors.get(name) ?? 0;
+    if (
+      aStarts === bStarts &&
+      aCompletes === bCompletes &&
+      aErrors === bErrors
+    ) {
+      continue;
+    }
+    resolverRuns.push({
+      resolver: name,
+      aStarts,
+      bStarts,
+      aCompletes,
+      bCompletes,
+      aErrors,
+      bErrors,
+    });
+  }
+  resolverRuns.sort((x, y) => x.resolver.localeCompare(y.resolver));
+
+  // Errors: surface entries on each side that have no structural twin
+  // on the other side. v0.1 keys on (kind, id, errorJson, frameIndex);
+  // structurally-identical errors at the same index are elided.
+  const errorKey = (e: ErrorDelta): string =>
+    `${e.kind}::${e.id}::${e.frameIndex}::${safeStringify(e.error)}`;
+  const aKeys = new Set(ab.errors.map(errorKey));
+  const bKeys = new Set(bb.errors.map(errorKey));
+  const newErrors: ErrorDelta[] = [
+    ...ab.errors.filter((e) => !bKeys.has(errorKey(e))),
+    ...bb.errors.filter((e) => !aKeys.has(errorKey(e))),
+  ];
+
+  const identical =
+    a.frames.length === b.frames.length &&
+    constraintFires.length === 0 &&
+    mutations.length === 0 &&
+    resolverRuns.length === 0 &&
+    newErrors.length === 0;
+
+  return {
+    frameCountDelta: b.frames.length - a.frames.length,
+    aFrameCount: a.frames.length,
+    bFrameCount: b.frames.length,
+    constraintFires,
+    mutations,
+    resolverRuns,
+    newErrors,
+    identical,
+  };
+}
+
+/**
+ * Stringify a value defensively — used for diffing error shapes where
+ * the value may include circular refs, BigInts, or non-JSON-able
+ * payloads. Falls back to a typeof-only marker.
+ */
+function safeStringify(v: unknown): string {
+  try {
+    return JSON.stringify(v, (_k, val) =>
+      typeof val === "bigint" ? val.toString() + "n" : val,
+    );
+  } catch {
+    return `[unstringifiable ${typeof v}]`;
+  }
+}

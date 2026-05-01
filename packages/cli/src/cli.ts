@@ -13,6 +13,7 @@ import { doctorCommand } from "./commands/doctor.js";
 import { examplesListCommand, examplesCopyCommand } from "./commands/examples.js";
 import { replayCommand } from "./commands/replay.js";
 import { bisectCommand } from "./commands/bisect.js";
+import { timelineDiffCommand } from "./commands/timeline-diff.js";
 
 const HELP = `
 ${CLI_NAME} — CLI tools for Directive
@@ -36,6 +37,8 @@ Commands:
                                 (paired with @directive-run/timeline)
   bisect <timeline.json>        Binary-search a timeline for the first
                                 frame that triggers a failing assertion
+  timeline diff <a> <b>         Semantic causal-graph diff between two
+                                serialized timelines
 
 Options:
   --help, -h                    Show this help message
@@ -199,6 +202,20 @@ async function main() {
 
     case "bisect": {
       await bisectCommand(args.slice(1));
+      break;
+    }
+
+    case "timeline": {
+      const subcommand = args[1];
+      if (subcommand === "diff") {
+        await timelineDiffCommand(args.slice(2));
+      } else {
+        console.error(
+          `Unknown subcommand: ${subcommand ?? "(none)"}\n` +
+            `Usage: ${CLI_NAME} timeline diff <a.json> <b.json>`,
+        );
+        process.exit(1);
+      }
       break;
     }
 

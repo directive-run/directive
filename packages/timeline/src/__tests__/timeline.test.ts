@@ -14,6 +14,7 @@ import {
   setRegistryCap,
   withTimeline,
   bisectTimeline,
+  diffTimelines,
   type SerializedTimeline,
   type ReplayableSystem,
 } from "../index.js";
@@ -646,5 +647,285 @@ describe("R2.A bisectTimeline", () => {
       (sys) => (sys as { facts: { count: number } }).facts.count === 0,
     );
     expect(result.noFailureFound).toBe(true);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// R2.C — diffTimelines
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a serialized timeline from a description list. Each item
+ * compiles to a single TimelineFrame.
+ */
+function makeTimeline(
+  id: string,
+  items: Array<
+    | { kind: "constraint"; cid: string }
+    | { kind: "mutation"; mut: string }
+    | { kind: "resolver-start"; res: string }
+    | { kind: "resolver-complete"; res: string; ms?: number }
+    | { kind: "resolver-error"; res: string; error: unknown }
+    | { kind: "constraint-error"; cid: string; error: unknown }
+    | { kind: "system.start" }
+  >,
+): SerializedTimeline {
+  return {
+    version: 1,
+    id,
+    startedAtMs: 0,
+    frames: items.map((item, i) => {
+      const ts = i + 1;
+      switch (item.kind) {
+        case "constraint":
+          return {
+            ts,
+            event: {
+              type: "constraint.evaluate" as const,
+              id: item.cid,
+              active: true,
+            },
+          };
+        case "mutation":
+          return {
+            ts,
+            event: {
+              type: "fact.change" as const,
+              key: "pendingMutation",
+              prev: null,
+              next: {
+                kind: item.mut,
+                payload: {},
+                status: "pending",
+                error: null,
+              },
+            },
+          };
+        case "resolver-start":
+          return {
+            ts,
+            event: {
+              type: "resolver.start" as const,
+              resolver: item.res,
+              requirementId: `req-${i}`,
+            },
+          };
+        case "resolver-complete":
+          return {
+            ts,
+            event: {
+              type: "resolver.complete" as const,
+              resolver: item.res,
+              requirementId: `req-${i}`,
+              duration: item.ms ?? 1,
+            },
+          };
+        case "resolver-error":
+          return {
+            ts,
+            event: {
+              type: "resolver.error" as const,
+              resolver: item.res,
+              requirementId: `req-${i}`,
+              error: item.error,
+            },
+          };
+        case "constraint-error":
+          return {
+            ts,
+            event: {
+              type: "constraint.error" as const,
+              id: item.cid,
+              error: item.error,
+            },
+          };
+        case "system.start":
+          return { ts, event: { type: "system.start" as const } };
+      }
+    }),
+  };
+}
+
+describe("R2.C diffTimelines", () => {
+  it("reports identical=true for two byte-equal timelines", () => {
+    const a = makeTimeline("a", [
+      { kind: "constraint", cid: "loadOnLoading" },
+      { kind: "resolver-start", res: "initialLoader" },
+      { kind: "resolver-complete", res: "initialLoader", ms: 5 },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "constraint", cid: "loadOnLoading" },
+      { kind: "resolver-start", res: "initialLoader" },
+      { kind: "resolver-complete", res: "initialLoader", ms: 5 },
+    ]);
+    const diff = diffTimelines(a, b);
+    expect(diff.identical).toBe(true);
+    expect(diff.frameCountDelta).toBe(0);
+    expect(diff.constraintFires).toHaveLength(0);
+    expect(diff.mutations).toHaveLength(0);
+    expect(diff.resolverRuns).toHaveLength(0);
+    expect(diff.newErrors).toHaveLength(0);
+  });
+
+  it("captures constraint-fire deltas with sign", () => {
+    const a = makeTimeline("a", [
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+    ]);
+    const diff = diffTimelines(a, b);
+    expect(diff.identical).toBe(false);
+    expect(diff.constraintFires).toEqual([
+      { id: "x", aCount: 2, bCount: 5, delta: 3 },
+    ]);
+  });
+
+  it("sorts constraintFires by descending |delta|", () => {
+    const a = makeTimeline("a", [
+      { kind: "constraint", cid: "small" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "big" },
+      { kind: "constraint", cid: "small" },
+      { kind: "constraint", cid: "small" },
+      { kind: "constraint", cid: "small" },
+    ]);
+    const diff = diffTimelines(a, b);
+    // big: 2 → 9 (delta 7), small: 1 → 3 (delta 2)
+    expect(diff.constraintFires.map((c) => c.id)).toEqual(["big", "small"]);
+  });
+
+  it("captures mutation-kind deltas", () => {
+    const a = makeTimeline("a", [
+      { kind: "mutation", mut: "submit" },
+      { kind: "mutation", mut: "submit" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "mutation", mut: "submit" },
+      { kind: "mutation", mut: "submit" },
+      { kind: "mutation", mut: "submit" },
+      { kind: "mutation", mut: "cancel" },
+    ]);
+    const diff = diffTimelines(a, b);
+    expect(diff.mutations.find((m) => m.id === "submit")).toEqual({
+      id: "submit",
+      aCount: 2,
+      bCount: 3,
+      delta: 1,
+    });
+    expect(diff.mutations.find((m) => m.id === "cancel")).toEqual({
+      id: "cancel",
+      aCount: 0,
+      bCount: 1,
+      delta: 1,
+    });
+  });
+
+  it("rolls up resolver runs by name with three count axes", () => {
+    const a = makeTimeline("a", [
+      { kind: "resolver-start", res: "loader" },
+      { kind: "resolver-complete", res: "loader" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "resolver-start", res: "loader" },
+      { kind: "resolver-complete", res: "loader" },
+      { kind: "resolver-start", res: "loader" },
+      { kind: "resolver-error", res: "loader", error: "timeout" },
+    ]);
+    const diff = diffTimelines(a, b);
+    expect(diff.resolverRuns).toHaveLength(1);
+    expect(diff.resolverRuns[0]).toEqual({
+      resolver: "loader",
+      aStarts: 1,
+      bStarts: 2,
+      aCompletes: 1,
+      bCompletes: 1,
+      aErrors: 0,
+      bErrors: 1,
+    });
+  });
+
+  it("surfaces newErrors from each side without duplication", () => {
+    const a = makeTimeline("a", [
+      { kind: "system.start" },
+      { kind: "constraint-error", cid: "x", error: "boom-a" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "system.start" },
+      { kind: "constraint-error", cid: "x", error: "boom-b" },
+    ]);
+    const diff = diffTimelines(a, b);
+    // Both errors are at frame index 1 with kind=constraint.error and id=x,
+    // but the error VALUE differs — both surface as "new".
+    expect(diff.newErrors).toHaveLength(2);
+    expect(diff.newErrors.find((e) => e.side === "a")?.error).toBe("boom-a");
+    expect(diff.newErrors.find((e) => e.side === "b")?.error).toBe("boom-b");
+  });
+
+  it("ignores non-bucketed frames (system lifecycle, derivations) in count categories", () => {
+    const a = makeTimeline("a", [
+      { kind: "system.start" },
+      { kind: "system.start" },
+      { kind: "constraint", cid: "x" },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "system.start" },
+      { kind: "constraint", cid: "x" },
+    ]);
+    const diff = diffTimelines(a, b);
+    // Frame counts differ but constraint counts don't.
+    expect(diff.frameCountDelta).toBe(-1);
+    expect(diff.constraintFires).toHaveLength(0);
+    expect(diff.identical).toBe(false); // frame-count differs
+  });
+
+  it("safeStringify-protects unstringifiable error values from crashing the diff", () => {
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+    const a = makeTimeline("a", [
+      { kind: "resolver-error", res: "x", error: circular },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "resolver-error", res: "x", error: "different" },
+    ]);
+    // Should not throw on the circular ref.
+    expect(() => diffTimelines(a, b)).not.toThrow();
+    const diff = diffTimelines(a, b);
+    expect(diff.newErrors.length).toBe(2);
+  });
+
+  it("exact-equal errors at the same frame index are elided as 'same shape'", () => {
+    const a = makeTimeline("a", [
+      { kind: "resolver-error", res: "x", error: { code: "E_TIMEOUT" } },
+    ]);
+    const b = makeTimeline("b", [
+      { kind: "resolver-error", res: "x", error: { code: "E_TIMEOUT" } },
+    ]);
+    const diff = diffTimelines(a, b);
+    expect(diff.newErrors).toHaveLength(0);
+  });
+
+  it("handles two empty timelines as identical", () => {
+    const a = makeTimeline("a", []);
+    const b = makeTimeline("b", []);
+    const diff = diffTimelines(a, b);
+    expect(diff.identical).toBe(true);
+    expect(diff.frameCountDelta).toBe(0);
   });
 });

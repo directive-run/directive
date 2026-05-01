@@ -248,7 +248,8 @@ Wrap `cancellable()` with `recordReplayable()`. Cancellation cause + the origina
 
 ### R2.C — `directive timeline diff <a.json> <b.json>` — semantic causal-graph diff
 
-**[2 days]**
+**[SHIPPED — count-based v0.1, see `.changeset/r2c-timeline-diff.md`]**
+**[2 days]** *(original tag, kept for context)*
 
 Not a textual JSON diff — a causal one. "Run B fired constraint `pendingMutation` 3 extra times Run A didn't. Run B has a new cascade edge." Output is structured + a Mermaid sequence diagram.
 
