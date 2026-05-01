@@ -237,7 +237,8 @@ Two serialized timelines, one passing, one failing. CLI binary-searches the fram
 
 ### R2.B — `recordReplayable()` HOC: prod cancellable mutations auto-emit supersession-aware replay frames
 
-**[1 day — quick win]**
+**[SHIPPED — see `.changeset/r2b-recordReplayable.md`]**
+**[1 day — quick win]** *(original tag, kept for context)*
 
 Wrap `cancellable()` with `recordReplayable()`. Cancellation cause + the original payload that would have completed gets pinned into the timeline's serialized frame stream as a `cancel.reason` annotation. Replay reproduces the cancellation race exactly.
 

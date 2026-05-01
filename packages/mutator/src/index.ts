@@ -693,3 +693,141 @@ function defaultSetTimeout(cb: () => void, ms: number): () => void {
   const handle = globalThis.setTimeout(cb, ms);
   return () => globalThis.clearTimeout(handle);
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// recordReplayable — R2.B
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Structured event surfaced to {@link RecordReplayableOptions.onCancel}
+ * the moment a wrapped invocation's signal aborts. Carries enough
+ * information for the caller to pin the cancellation into the timeline
+ * (e.g. by writing onto a facts array) so a later replay can
+ * reconstruct the cancellation race exactly.
+ *
+ * @typeParam F — caller's facts type (passed through unchanged from the handler context).
+ * @typeParam P — caller's payload type for THIS handler.
+ */
+export interface CancelEvent<F, P> {
+  /** Whether this cancel was driven by a new dispatch superseding the old, or by the timeout firing. */
+  kind: CancelReason["kind"];
+  /** When `kind === 'timeout'`, the original `timeoutMs` that fired. Undefined for `'superseded'`. */
+  afterMs?: number;
+  /** The payload of the dispatch that was cancelled — i.e. the work that did NOT complete. */
+  payload: P;
+  /**
+   * Per-handler monotonic counter, incremented once at the start of
+   * every invocation. Useful for timeline diff: cancel of seq=4 is the
+   * 4th dispatch this handler ever saw. The counter is closure-scoped
+   * to a single `recordReplayable()` call — separate HOCs do NOT share
+   * the counter.
+   */
+  dispatchSeq: number;
+  /** Live facts reference, mirroring {@link CancellableHandlerContext.facts}. */
+  facts: F;
+}
+
+/**
+ * Options for {@link recordReplayable}. Strict superset of
+ * {@link CancellableOptions} — every field on `CancellableOptions`
+ * passes through unchanged to the underlying {@link cancellable} call.
+ */
+export interface RecordReplayableOptions<F, P> extends CancellableOptions {
+  /**
+   * Synchronous callback invoked the moment a wrapped invocation's
+   * AbortController fires `abort()`. Runs BEFORE the handler's pending
+   * await rejects with AbortError, so the callback sees the freshest
+   * possible state.
+   *
+   * Use this to pin the cancellation into a place that survives in the
+   * timeline (typically a facts field — `facts.cancellations.push(info)`).
+   * Without that, a replay re-dispatches the same MUTATE events but has
+   * no record of which ones were superseded vs which completed.
+   *
+   * Throws inside `onCancel` are caught and swallowed — the abort path
+   * must remain robust. If you need to fail loudly, log to your own
+   * sink before re-throwing.
+   */
+  onCancel?: (info: CancelEvent<F, P>) => void;
+}
+
+/**
+ * `cancellable()` plus structured cancel-event recording. Wrap your
+ * handler with `recordReplayable()` instead of `cancellable()` when you
+ * want every supersession + timeout to leave a machine-readable trail
+ * in the timeline (rather than only the indirect `pendingMutation`
+ * fact.change with a stringified error).
+ *
+ * Pairs with {@link "@directive-run/timeline".bisectTimeline} (R2.A) and
+ * `replayTimeline` (R1.A): with the cancel events recorded, a replay
+ * report can answer "which dispatches were cancelled and why" without
+ * pattern-matching error strings.
+ *
+ * @example Pin cancel events into facts so the timeline carries them:
+ * ```ts
+ * import { defineMutator, recordReplayable } from '@directive-run/mutator';
+ *
+ * const search = recordReplayable<MyFacts, { q: string }>(
+ *   {
+ *     supersedeOn: 'self',
+ *     timeoutMs: 3_000,
+ *     onCancel: ({ facts, kind, payload, dispatchSeq }) => {
+ *       facts.cancellations.push({ kind, queryAtCancel: payload.q, seq: dispatchSeq });
+ *     },
+ *   },
+ *   async ({ payload, facts, signal }) => {
+ *     const res = await fetch(`/q?${payload.q}`, { signal });
+ *     facts.results = await res.json();
+ *   },
+ * );
+ * ```
+ *
+ * Implementation note: `recordReplayable()` is `cancellable(opts,
+ * innerHandler)` where `innerHandler` adds an `addEventListener('abort')`
+ * around the user's handler. This means timeout / supersession
+ * semantics are EXACTLY those of `cancellable()` — the HOC is purely
+ * additive.
+ */
+export function recordReplayable<F, P>(
+  opts: RecordReplayableOptions<F, P>,
+  handler: (ctx: CancellableHandlerContext<F, P>) => Promise<void> | void,
+): (ctx: { facts: F; payload: P; requeue: () => void }) => Promise<void> {
+  let dispatchSeq = 0;
+
+  const wrappedHandler = async (
+    ctx: CancellableHandlerContext<F, P>,
+  ): Promise<void> => {
+    const seq = ++dispatchSeq;
+    const onAbort = (): void => {
+      // Only fire onCancel for our typed CancelError reasons; if the
+      // signal was aborted via some other path (caller's own
+      // controller, etc), let it pass silently.
+      const reason = ctx.signal.reason;
+      if (!(reason instanceof CancelError)) return;
+      const info: CancelEvent<F, P> = {
+        kind: reason.kind,
+        afterMs:
+          reason instanceof TimeoutCancelError ? reason.afterMs : undefined,
+        payload: ctx.payload,
+        dispatchSeq: seq,
+        facts: ctx.facts,
+      };
+      try {
+        opts.onCancel?.(info);
+      } catch {
+        // Callback errors must NOT bubble up the abort path. The user's
+        // handler is still about to receive AbortError — we don't want
+        // to mask that with an onCancel-side throw, and we don't want
+        // to crash the controller in the middle of cleanup.
+      }
+    };
+    ctx.signal.addEventListener("abort", onAbort, { once: true });
+    try {
+      await handler(ctx);
+    } finally {
+      ctx.signal.removeEventListener("abort", onAbort);
+    }
+  };
+
+  return cancellable<F, P>(opts, wrappedHandler);
+}
