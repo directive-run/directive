@@ -254,7 +254,7 @@ describe("@directive-run/timeline", () => {
   it("R1 sec M3: registry evicts oldest entries past the cap", () => {
     setRegistryCap(3);
     try {
-      const systems: ReturnType<typeof createSystem>[] = [];
+      const systems: { destroy: () => void }[] = [];
       for (let i = 0; i < 5; i++) {
         const sys = createSystem({
           module: buildCounter({ loadInitial: async () => i }),

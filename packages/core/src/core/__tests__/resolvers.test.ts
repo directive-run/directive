@@ -373,7 +373,9 @@ describe("retry jitter", () => {
    * and capture the actual delay between attempts.
    */
   async function captureRetryDelay(
-    retry: Parameters<typeof setup>[0][string]["retry"],
+    retry: NonNullable<
+      NonNullable<Parameters<typeof setup>[0]>[string]
+    >["retry"],
     randomValue: number,
   ): Promise<number> {
     vi.spyOn(Math, "random").mockReturnValue(randomValue);

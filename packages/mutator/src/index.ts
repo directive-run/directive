@@ -435,20 +435,26 @@ export function defineMutator<
  * sys.events.MUTATE(mutate<FormMutations>('cancel'));
  * ```
  */
-export function mutate<M extends MutationMap, K extends keyof M & string>(
-  kind: K,
-  payload: M[K],
+// Single type parameter (M) so callers can specialize with
+// `mutate<FormMutations>(...)` without TypeScript demanding the
+// inferred K. TS's strict type-argument rules treat <M, K> as
+// "supply both or supply neither" — single-arg call sites failed
+// with "Expected 2 type arguments, but got 1." Single-M form sidesteps
+// that while keeping payload typing tight via the `kind` lookup.
+export function mutate<M extends MutationMap>(
+  kind: keyof M & string,
+  payload: M[typeof kind],
 ): PendingMutation<M>;
-export function mutate<M extends MutationMap, K extends keyof M & string>(
-  kind: K,
+export function mutate<M extends MutationMap>(
+  kind: keyof M & string,
 ): PendingMutation<M>;
-export function mutate<M extends MutationMap, K extends keyof M & string>(
-  kind: K,
-  payload?: M[K],
+export function mutate<M extends MutationMap>(
+  kind: keyof M & string,
+  payload?: M[typeof kind],
 ): PendingMutation<M> {
   return {
     kind,
-    payload: (payload ?? {}) as M[K],
+    payload: (payload ?? {}) as M[typeof kind],
     status: "pending",
     error: null,
   } as PendingMutation<M>;

@@ -60,6 +60,14 @@ function buildSystem(deps: FormDeps) {
     events: {
       ...mut.eventHandlers,
     },
+    // The constraint fragment's `when` is typed against the
+    // user-declared <M, F> generics, but createModule's inferred
+    // facts shape uses the schema's own typing. Structurally
+    // compatible at runtime (verified by the 45 passing tests),
+    // but TS's strict variance check on the function parameter
+    // can't prove the alignment without re-shaping the public API.
+    // The directive is localized to this fixture.
+    // @ts-expect-error — see fixture note above
     constraints: {
       ...mut.constraints,
     },

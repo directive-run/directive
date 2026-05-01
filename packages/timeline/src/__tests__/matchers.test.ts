@@ -64,6 +64,7 @@ describe("R1.B matchers — toReachInMs", () => {
     sys.events.LOAD();
     await flushAsync();
 
+    // @ts-expect-error — matchers register at runtime; consumers add their own type augmentation (see matchers.ts header)
     expect(t1).toReachInMs("status", "ready", 1_000);
     sys.destroy();
   });
@@ -92,6 +93,7 @@ describe("R1.B matchers — toReachInMs", () => {
     sys.start();
     // Don't load — status never becomes 'ready'.
 
+    // @ts-expect-error — matchers register at runtime; see matchers.ts
     expect(t1).not.toReachInMs("status", "ready", 1_000);
     sys.destroy();
   });
@@ -108,6 +110,7 @@ describe("R1.B matchers — toFireConstraint", () => {
     sys.events.LOAD();
     await flushAsync();
 
+    // @ts-expect-error — matchers register at runtime; see matchers.ts
     expect(t1).toFireConstraint("load");
     sys.destroy();
   });
@@ -156,6 +159,7 @@ describe("R1.B matchers — toResolveWithinMs", () => {
     await flushAsync();
 
     // initialLoader is synchronous-ish; should easily fit in 5_000ms
+    // @ts-expect-error — matchers register at runtime; see matchers.ts
     expect(t1).toResolveWithinMs("initialLoader", 5_000);
     sys.destroy();
   });

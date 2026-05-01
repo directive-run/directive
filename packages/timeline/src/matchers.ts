@@ -290,25 +290,31 @@ function toCascade(this: unknown, received: Timeline): MatcherResult {
  * import '@directive-run/timeline/matchers';
  * ```
  */
-declare global {
-  // biome-ignore lint/style/noNamespace: vitest convention
-  namespace Vi {
-    interface Assertion {
-      toReachInMs(factKey: string, expectedValue: unknown, withinMs: number): void;
-      toFireConstraint(constraintId: string, opts?: FireConstraintOpts): void;
-      toMutate(kind: string): void;
-      toResolveWithinMs(resolverName: string, withinMs: number): void;
-      toCascade(): void;
-    }
-    interface AsymmetricMatchersContaining {
-      toReachInMs(factKey: string, expectedValue: unknown, withinMs: number): void;
-      toFireConstraint(constraintId: string, opts?: FireConstraintOpts): void;
-      toMutate(kind: string): void;
-      toResolveWithinMs(resolverName: string, withinMs: number): void;
-      toCascade(): void;
-    }
-  }
-}
+// Type augmentation for vitest's `expect()` is not exported by this
+// module — vitest's `Assertion` interface has a generic-parameter
+// shape that varies across versions, and getting a stable
+// declare-module augmentation that compiles against 1.x / 2.x / 3.x
+// without breakage is its own design problem. Runtime registration
+// works; consumers who want typed `.toReachInMs()` etc. on
+// `expect(timeline)` can add a local declaration:
+//
+// ```ts
+// // vitest-matchers.d.ts in your project
+// import 'vitest';
+// declare module 'vitest' {
+//   interface Assertion<T = unknown> {
+//     toReachInMs(key: string, value: unknown, ms: number): void;
+//     toFireConstraint(id: string, opts?: { times?: number; min?: number; max?: number }): void;
+//     toMutate(kind: string): void;
+//     toResolveWithinMs(name: string, ms: number): void;
+//     toCascade(): void;
+//   }
+// }
+// ```
+//
+// The direct API (`matchers.toReachInMs(timeline, ...)`) is fully
+// typed and recommended when type safety matters. Runtime semantics
+// are identical.
 
 interface ExpectExtendShape {
   extend(matchers: Record<string, (...args: unknown[]) => MatcherResult>): void;
