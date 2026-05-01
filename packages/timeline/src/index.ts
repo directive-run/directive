@@ -751,3 +751,296 @@ function reconstructDispatch(
   // every replayed event to an arbitrary handler.
   return { ...next, type: "MUTATE" };
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Bisect (R2.A) — git-bisect for timelines
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Async or sync factory that produces a fresh, started system suitable
+ * for replay. Bisect calls this once per midpoint to get a hermetic
+ * system; the previous midpoint's state must not leak into the next.
+ *
+ * The factory is responsible for `start()` — bisect will not call it.
+ * If your factory returns a system already in started state (the
+ * common pattern with `createSystem({ ... })` followed by `sys.start()`),
+ * pass a closure that builds it fresh each time:
+ *
+ * @example
+ * ```ts
+ * const factory = () => {
+ *   const sys = createSystem({ module: counterModule });
+ *   sys.start();
+ *   return sys;
+ * };
+ * ```
+ */
+export type BisectSystemFactory = () =>
+  | ReplayableSystem
+  | Promise<ReplayableSystem>;
+
+/**
+ * Oracle that decides pass/fail for a given replayed system. Return
+ * `true` if the system is in a "good" state, `false` if "bad". May be
+ * async (most matcher-based oracles are not, but resolver assertions
+ * sometimes are).
+ *
+ * The oracle MUST be deterministic — bisection's correctness depends on
+ * the same prefix length always producing the same verdict.
+ *
+ * Receives `unknown` rather than {@link ReplayableSystem} because the
+ * caller's factory typically produces a richer System shape (with
+ * `facts`, `inspect`, etc.) and the oracle needs access to those — the
+ * narrow `ReplayableSystem` only exposes `dispatch`.
+ */
+export type BisectAssertion = (
+  system: unknown,
+) => boolean | Promise<boolean>;
+
+/**
+ * Tunables for {@link bisectTimeline}. All fields are optional — sane
+ * defaults keep the v0.1 surface tiny.
+ */
+export interface BisectOptions {
+  /**
+   * Per-replay frame cap, forwarded to {@link replayTimeline}. Defaults
+   * to {@link DEFAULT_MAX_REPLAY_FRAMES}. Bisect ignores truncation
+   * here because each midpoint replays a *prefix*, not the full
+   * timeline — truncation should never fire under normal use.
+   */
+  maxFrames?: number;
+  /**
+   * If true (default), bisect runs the full-timeline replay TWICE
+   * before searching and refuses to bisect if the two runs produce
+   * different oracle verdicts. Non-deterministic timelines silently
+   * mislead bisection — the midpoint search picks an arbitrary
+   * direction at each step. R2.A's pre-mortem identified this as the
+   * #1 failure mode.
+   *
+   * Disable only if you know the timeline is deterministic but the
+   * oracle has unrelated nondeterminism you've measured to be
+   * tolerable.
+   */
+  determinismCheck?: boolean;
+  /**
+   * Mirrors {@link ReplayOptions.dispatchableOnly}. Defaults to true.
+   */
+  dispatchableOnly?: boolean;
+}
+
+/**
+ * Outcome of {@link bisectTimeline}.
+ */
+export interface BisectResult {
+  /**
+   * 0-based index into `timeline.frames` of the first frame whose
+   * inclusion in the replay prefix flips the assertion from passing
+   * to failing.
+   *
+   * Undefined when {@link BisectResult.noFailureFound} is true OR when
+   * the assertion already fails on the empty prefix
+   * ({@link BisectResult.failsOnEmptyReplay} is true).
+   */
+  firstFailingFrameIndex?: number;
+  /**
+   * The frame at {@link BisectResult.firstFailingFrameIndex}, copied
+   * for convenience so callers don't have to re-index. Undefined in
+   * the same cases as the index.
+   */
+  firstFailingFrame?: TimelineFrame;
+  /**
+   * Number of midpoints evaluated. O(log N) where N = frame count.
+   */
+  iterations: number;
+  /**
+   * True when the assertion passes even after replaying every frame —
+   * there's nothing to bisect. The caller probably has the wrong
+   * `bad.json` or the wrong assertion.
+   */
+  noFailureFound: boolean;
+  /**
+   * True when the assertion fails on a system with ZERO frames
+   * replayed (i.e. the freshly-started system). Indicates the bug is
+   * in initialization, not in any specific frame. Bisect cannot
+   * narrow further.
+   */
+  failsOnEmptyReplay: boolean;
+  /**
+   * True when the {@link BisectOptions.determinismCheck} ran and
+   * detected mismatched oracle verdicts across two full-timeline
+   * replays. When set, the bisect was not performed and all *Index
+   * fields are undefined.
+   */
+  nonDeterministic: boolean;
+}
+
+/**
+ * Replay the first `prefixLen` frames of `timeline` against a fresh
+ * system from `factory`, then evaluate `assertion`. Internal helper —
+ * exported for tests, not part of the public API contract.
+ *
+ * @internal
+ */
+async function _bisectStep(
+  timeline: SerializedTimeline,
+  prefixLen: number,
+  factory: BisectSystemFactory,
+  assertion: BisectAssertion,
+  replayOpts: ReplayOptions,
+): Promise<boolean> {
+  const sys = await factory();
+  const prefix: SerializedTimeline = {
+    version: 1,
+    id: timeline.id,
+    startedAtMs: timeline.startedAtMs,
+    frames: timeline.frames.slice(0, prefixLen),
+  };
+  await replayTimeline(prefix, sys, replayOpts);
+  // Oracle receives the rich system from the factory, not the narrow
+  // ReplayableSystem — production oracles need `facts`, `inspect`,
+  // etc., none of which live on ReplayableSystem.
+  return assertion(sys);
+}
+
+/**
+ * Binary-search a timeline for the smallest prefix whose replay flips
+ * a user-supplied assertion from passing to failing — git-bisect, but
+ * over recorded ObservationEvent frames instead of git commits.
+ *
+ * @example
+ * ```ts
+ * const json = JSON.parse(prodCrashReport.timelineJson);
+ * const bad = deserializeTimeline(json);
+ * const result = await bisectTimeline(
+ *   bad,
+ *   () => {
+ *     const sys = createSystem({ module: counterModule });
+ *     sys.start();
+ *     return sys;
+ *   },
+ *   (sys) => (sys as any).facts.score >= 0,
+ * );
+ * console.log(`first failing frame: #${result.firstFailingFrameIndex}`);
+ * ```
+ *
+ * Algorithm (assertion convention: `true` = pass, `false` = fail):
+ *
+ *   1. Optional determinism gate — replay the full timeline twice; if
+ *      the assertion verdict differs, return early with
+ *      `nonDeterministic: true`.
+ *   2. Probe the empty prefix (`[]`). If the assertion already fails,
+ *      the bug is in initialization — `failsOnEmptyReplay: true`.
+ *   3. Probe the full prefix. If the assertion passes, there's
+ *      nothing to bisect — `noFailureFound: true`.
+ *   4. Binary search [lo=0, hi=frames.length]. Invariant: assertion
+ *      passes at lo, fails at hi. Each midpoint replays from a fresh
+ *      system. Continue until hi - lo === 1.
+ *   5. Return frame index `lo` (the smallest prefix that triggers
+ *      failure has length `hi`; the trigger frame is at index `lo`).
+ *
+ * Cost: O(log N) replays, each replaying up to N frames, so the
+ * worst-case work is O(N log N). For a 10k-frame timeline that's ~14
+ * replays of ~5k frames each — fast in practice.
+ */
+export async function bisectTimeline(
+  timeline: SerializedTimeline,
+  factory: BisectSystemFactory,
+  assertion: BisectAssertion,
+  opts: BisectOptions = {},
+): Promise<BisectResult> {
+  const determinismCheck = opts.determinismCheck ?? true;
+  const replayOpts: ReplayOptions = {
+    maxFrames: opts.maxFrames,
+    dispatchableOnly: opts.dispatchableOnly,
+  };
+  const N = timeline.frames.length;
+
+  let iterations = 0;
+
+  // Step 1: determinism gate.
+  if (determinismCheck) {
+    const v1 = await _bisectStep(timeline, N, factory, assertion, replayOpts);
+    const v2 = await _bisectStep(timeline, N, factory, assertion, replayOpts);
+    iterations += 2;
+    if (v1 !== v2) {
+      return {
+        iterations,
+        noFailureFound: false,
+        failsOnEmptyReplay: false,
+        nonDeterministic: true,
+      };
+    }
+    // v1 is now the canonical full-replay verdict; reuse below.
+    if (v1 === true) {
+      return {
+        iterations,
+        noFailureFound: true,
+        failsOnEmptyReplay: false,
+        nonDeterministic: false,
+      };
+    }
+  } else {
+    const fullPasses = await _bisectStep(
+      timeline,
+      N,
+      factory,
+      assertion,
+      replayOpts,
+    );
+    iterations += 1;
+    if (fullPasses) {
+      return {
+        iterations,
+        noFailureFound: true,
+        failsOnEmptyReplay: false,
+        nonDeterministic: false,
+      };
+    }
+  }
+
+  // Step 2: empty-prefix probe.
+  const emptyPasses = await _bisectStep(
+    timeline,
+    0,
+    factory,
+    assertion,
+    replayOpts,
+  );
+  iterations += 1;
+  if (!emptyPasses) {
+    return {
+      iterations,
+      noFailureFound: false,
+      failsOnEmptyReplay: true,
+      nonDeterministic: false,
+    };
+  }
+
+  // Step 3: binary search. Invariant: assertion passes at lo, fails at hi.
+  let lo = 0;
+  let hi = N;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >>> 1;
+    const passes = await _bisectStep(
+      timeline,
+      mid,
+      factory,
+      assertion,
+      replayOpts,
+    );
+    iterations += 1;
+    if (passes) lo = mid;
+    else hi = mid;
+  }
+
+  // The smallest failing prefix has length `hi` (== lo + 1). The
+  // frame whose inclusion flips the verdict is at index `lo` (0-based).
+  return {
+    firstFailingFrameIndex: lo,
+    firstFailingFrame: timeline.frames[lo],
+    iterations,
+    noFailureFound: false,
+    failsOnEmptyReplay: false,
+    nonDeterministic: false,
+  };
+}

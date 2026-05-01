@@ -81,3 +81,90 @@ function isSystem(obj: unknown): boolean {
     "facts" in sys
   );
 }
+
+/**
+ * Loads a Directive system *factory* from a user's TypeScript file.
+ *
+ * Where {@link loadSystem} returns a one-shot started system instance,
+ * `loadSystemFactory()` returns a callable that produces a fresh,
+ * started system on every invocation. This is the contract that
+ * `directive bisect` needs — each midpoint replay must start from the
+ * same hermetic initial state, so we re-instantiate per attempt.
+ *
+ * Lookup order (first match wins):
+ *   1. Named export `createSystem` (function).
+ *   2. Named export `systemFactory` (function).
+ *   3. Default export, if it's a function.
+ *
+ * The factory may return either a System directly or a Promise<System>.
+ * Whatever it returns must satisfy {@link isSystem}'s duck-type
+ * (`inspect`/`start`/`stop`/`facts`). The factory is responsible for
+ * calling `start()` itself — the bisect runner does NOT call start.
+ *
+ * @example
+ * ```ts
+ * // User's bisect-system.ts:
+ * import { createSystem as makeSys } from "@directive-run/core";
+ * import { counterModule } from "./modules/counter";
+ *
+ * export function createSystem() {
+ *   const sys = makeSys({ module: counterModule });
+ *   sys.start();
+ *   return sys;
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function loadSystemFactory(filePath: string): Promise<() => Promise<any>> {
+  const resolved = resolve(filePath);
+
+  if (!existsSync(resolved)) {
+    throw new Error(`File not found: ${resolved}`);
+  }
+
+  let mod: Record<string, unknown>;
+  try {
+    mod = (await import(resolved)) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error(
+      `Failed to load ${pc.dim(filePath)}: ${err instanceof Error ? err.message : String(err)}\n\n` +
+        `Make sure the file is valid TypeScript and tsx is installed:\n` +
+        `  ${pc.cyan("npm install -D tsx")}`,
+    );
+  }
+
+  const candidates: Array<[string, unknown]> = [
+    ["createSystem", mod.createSystem],
+    ["systemFactory", mod.systemFactory],
+    ["default", mod.default],
+  ];
+
+  for (const [name, candidate] of candidates) {
+    if (typeof candidate === "function") {
+      // Wrap so we always return a Promise and validate the result
+      // shape after each call (catches "factory exists but returns
+      // junk" — common when the user forgets to call sys.start()).
+      return async () => {
+        const result = await Promise.resolve(
+          (candidate as () => unknown)(),
+        );
+        if (!isSystem(result)) {
+          throw new Error(
+            `Factory '${name}' from ${pc.dim(filePath)} returned a value that is not a started Directive system.\n` +
+              `Expected an object with inspect/start/stop/facts. The factory must call sys.start() before returning.`,
+          );
+        }
+        return result;
+      };
+    }
+  }
+
+  throw new Error(
+    `No system factory found in ${pc.dim(filePath)}\n` +
+      `Bisect needs to instantiate a fresh system per midpoint replay. Export one of:\n\n` +
+      `  ${pc.cyan("export function createSystem()")} { ... return sys; }\n` +
+      `  ${pc.cyan("export const systemFactory")} = () => { ... return sys; };\n` +
+      `  ${pc.cyan("export default")} () => { ... return sys; };\n\n` +
+      `The factory MUST call sys.start() and return the started system.`,
+  );
+}

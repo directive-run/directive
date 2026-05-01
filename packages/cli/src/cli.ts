@@ -12,6 +12,7 @@ import { graphCommand } from "./commands/graph.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { examplesListCommand, examplesCopyCommand } from "./commands/examples.js";
 import { replayCommand } from "./commands/replay.js";
+import { bisectCommand } from "./commands/bisect.js";
 
 const HELP = `
 ${CLI_NAME} — CLI tools for Directive
@@ -33,6 +34,8 @@ Commands:
   examples copy <name>          Extract example to project
   replay <timeline.json>        Replay a serialized Directive timeline
                                 (paired with @directive-run/timeline)
+  bisect <timeline.json>        Binary-search a timeline for the first
+                                frame that triggers a failing assertion
 
 Options:
   --help, -h                    Show this help message
@@ -191,6 +194,11 @@ async function main() {
 
     case "replay": {
       await replayCommand(args.slice(1));
+      break;
+    }
+
+    case "bisect": {
+      await bisectCommand(args.slice(1));
       break;
     }
 

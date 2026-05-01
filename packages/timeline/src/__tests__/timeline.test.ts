@@ -13,6 +13,9 @@ import {
   serializeTimeline,
   setRegistryCap,
   withTimeline,
+  bisectTimeline,
+  type SerializedTimeline,
+  type ReplayableSystem,
 } from "../index.js";
 
 interface CounterDeps {
@@ -420,5 +423,228 @@ describe("@directive-run/timeline", () => {
     // reconstructed dispatch payload (returns null), so only the
     // pendingMutation frame produces a dispatch.
     expect(dispatched).toHaveLength(1);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// R2.A — bisectTimeline
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build a synthetic timeline with N MUTATE-shaped frames each carrying
+ * `{ kind: 'inc', payload: { by: 1 } }`. Index 0..N-1 in the resulting
+ * frames array maps 1:1 to the mutator dispatch ordering.
+ */
+function makeIncTimeline(N: number, idSuffix = ""): SerializedTimeline {
+  return {
+    version: 1,
+    id: `bisect-fixture-${N}${idSuffix}`,
+    startedAtMs: 0,
+    frames: Array.from({ length: N }, (_, i) => ({
+      ts: i + 1,
+      event: {
+        type: "fact.change" as const,
+        key: "pendingMutation",
+        prev: null,
+        next: {
+          kind: "inc",
+          payload: { by: 1, seq: i },
+          status: "pending",
+          error: null,
+        },
+      },
+    })),
+  };
+}
+
+/**
+ * Stub system that counts MUTATE dispatches. Used as the
+ * "ReplayableSystem" with synthetic facts the assertion can read.
+ */
+function makeCountingSystem(): ReplayableSystem & {
+  dispatchCount: number;
+  facts: { count: number };
+} {
+  let dispatchCount = 0;
+  const sys = {
+    dispatchCount: 0,
+    facts: { count: 0 },
+    dispatch(e: { type: string; [key: string]: unknown }) {
+      if (e.type === "MUTATE" && (e as { kind?: unknown }).kind === "inc") {
+        dispatchCount++;
+        sys.dispatchCount = dispatchCount;
+        sys.facts.count = dispatchCount;
+      }
+    },
+  };
+  return sys;
+}
+
+describe("R2.A bisectTimeline", () => {
+  it("locates the first failing frame in a 16-frame synthetic timeline", async () => {
+    // Threshold: assertion fails as soon as count > 7. 8th increment
+    // (frame index 7) is the trigger.
+    const tl = makeIncTimeline(16);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      (sys) => (sys as { facts: { count: number } }).facts.count <= 7,
+    );
+
+    expect(result.firstFailingFrameIndex).toBe(7);
+    expect(result.firstFailingFrame?.event.type).toBe("fact.change");
+    expect(result.noFailureFound).toBe(false);
+    expect(result.failsOnEmptyReplay).toBe(false);
+    expect(result.nonDeterministic).toBe(false);
+    // Determinism gate (2 full replays) + empty probe + log2(16) = 4 search
+    // iterations = 7 total.
+    expect(result.iterations).toBeLessThanOrEqual(8);
+  });
+
+  it("locates frame 0 when the first frame is itself the trigger", async () => {
+    const tl = makeIncTimeline(8);
+    // Assertion fails the moment ANY increment happens.
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      (sys) => (sys as { facts: { count: number } }).facts.count === 0,
+    );
+    expect(result.firstFailingFrameIndex).toBe(0);
+    expect(result.failsOnEmptyReplay).toBe(false);
+  });
+
+  it("reports noFailureFound when the assertion passes for the full timeline", async () => {
+    const tl = makeIncTimeline(8);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      // Always passes.
+      () => true,
+    );
+    expect(result.noFailureFound).toBe(true);
+    expect(result.firstFailingFrameIndex).toBeUndefined();
+    expect(result.firstFailingFrame).toBeUndefined();
+  });
+
+  it("reports failsOnEmptyReplay when the assertion fails everywhere — including the empty prefix", async () => {
+    // Oracle that always fails: full replay fails (so we don't hit the
+    // noFailureFound branch) AND empty replay fails (so we hit the
+    // failsOnEmptyReplay branch). This represents "the bug exists in
+    // the system's initial state, not in any specific frame."
+    const tl = makeIncTimeline(8);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      () => false,
+    );
+    expect(result.failsOnEmptyReplay).toBe(true);
+    expect(result.firstFailingFrameIndex).toBeUndefined();
+  });
+
+  it("detects non-deterministic oracles and refuses to bisect", async () => {
+    const tl = makeIncTimeline(8);
+    let oracleCalls = 0;
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      // Flips verdict between full-timeline replays.
+      () => {
+        oracleCalls++;
+        return oracleCalls % 2 === 0;
+      },
+    );
+    expect(result.nonDeterministic).toBe(true);
+    expect(result.firstFailingFrameIndex).toBeUndefined();
+  });
+
+  it("performs at most 2 + 1 + ceil(log2(N)) replays", async () => {
+    // 1024 frames → log2 = 10. With determinism gate (+2) and empty
+    // probe (+1), max iterations = 13.
+    const tl = makeIncTimeline(1024);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      (sys) => (sys as { facts: { count: number } }).facts.count <= 511,
+    );
+    expect(result.firstFailingFrameIndex).toBe(511);
+    expect(result.iterations).toBeLessThanOrEqual(13);
+  });
+
+  it("uses a fresh system per iteration — leaked state would corrupt the search", async () => {
+    // If bisect reused the same system across midpoints, dispatches
+    // would accumulate and the verdict at every prefix would be
+    // "fail," collapsing the search to the first frame.
+    const tl = makeIncTimeline(32);
+    const factoryCalls: number[] = [];
+    let nextId = 0;
+    const result = await bisectTimeline(
+      tl,
+      () => {
+        const id = nextId++;
+        factoryCalls.push(id);
+        return makeCountingSystem();
+      },
+      (sys) => (sys as { facts: { count: number } }).facts.count <= 15,
+    );
+    // 16th increment is the trigger.
+    expect(result.firstFailingFrameIndex).toBe(15);
+    // Every iteration calls the factory.
+    expect(factoryCalls.length).toBe(result.iterations);
+  });
+
+  it("supports async factories and async assertions", async () => {
+    const tl = makeIncTimeline(16);
+    const result = await bisectTimeline(
+      tl,
+      async () => {
+        await Promise.resolve();
+        return makeCountingSystem();
+      },
+      async (sys) => {
+        await Promise.resolve();
+        return (sys as { facts: { count: number } }).facts.count <= 7;
+      },
+    );
+    expect(result.firstFailingFrameIndex).toBe(7);
+  });
+
+  it("can disable determinism check for trusted timelines", async () => {
+    const tl = makeIncTimeline(16);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      (sys) => (sys as { facts: { count: number } }).facts.count <= 3,
+      { determinismCheck: false },
+    );
+    expect(result.firstFailingFrameIndex).toBe(3);
+    // Skipping determinism saves one full-timeline replay.
+    expect(result.iterations).toBeLessThanOrEqual(7);
+  });
+
+  it("handles the trivial 1-frame timeline", async () => {
+    const tl = makeIncTimeline(1);
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      (sys) => (sys as { facts: { count: number } }).facts.count === 0,
+    );
+    expect(result.firstFailingFrameIndex).toBe(0);
+  });
+
+  it("handles a 0-frame timeline as 'no failure to find'", async () => {
+    const tl: SerializedTimeline = {
+      version: 1,
+      id: "empty",
+      startedAtMs: 0,
+      frames: [],
+    };
+    const result = await bisectTimeline(
+      tl,
+      () => makeCountingSystem(),
+      // System never sees any dispatch — count stays 0 — assertion
+      // passes — full-replay branch returns noFailureFound.
+      (sys) => (sys as { facts: { count: number } }).facts.count === 0,
+    );
+    expect(result.noFailureFound).toBe(true);
   });
 });

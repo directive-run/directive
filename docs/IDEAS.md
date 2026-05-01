@@ -224,7 +224,8 @@ The substrate compounds. Five new candidates emerged from the post-ship innovati
 
 ### R2.A — `directive bisect <good.json> <bad.json>` — git-bisect for timelines
 
-**[BUILD CANDIDATE — 2 days]**
+**[SHIPPED — single-timeline v0.1, see `.changeset/r2a-bisect.md`]**
+**[BUILD CANDIDATE — 2 days]** *(original tag, kept for context)*
 
 Two serialized timelines, one passing, one failing. CLI binary-searches the frame delta, replays each midpoint, runs your matchers, prints "frame #47 (`MUTATE submit`) is the first divergence."
 
