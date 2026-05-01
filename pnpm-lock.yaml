@@ -931,6 +931,9 @@ importers:
       '@directive-run/core':
         specifier: workspace:*
         version: link:../core
+      '@directive-run/timeline':
+        specifier: workspace:*
+        version: link:../timeline
       '@types/node':
         specifier: ^25.2.0
         version: 25.2.0

@@ -11,6 +11,7 @@ import { explainCommand } from "./commands/explain.js";
 import { graphCommand } from "./commands/graph.js";
 import { doctorCommand } from "./commands/doctor.js";
 import { examplesListCommand, examplesCopyCommand } from "./commands/examples.js";
+import { replayCommand } from "./commands/replay.js";
 
 const HELP = `
 ${CLI_NAME} — CLI tools for Directive
@@ -30,6 +31,8 @@ Commands:
   ai-rules check                Validate rules are current (CI)
   examples list                 Browse available examples
   examples copy <name>          Extract example to project
+  replay <timeline.json>        Replay a serialized Directive timeline
+                                (paired with @directive-run/timeline)
 
 Options:
   --help, -h                    Show this help message
@@ -183,6 +186,11 @@ async function main() {
         );
         process.exit(1);
       }
+      break;
+    }
+
+    case "replay": {
+      await replayCommand(args.slice(1));
       break;
     }
 

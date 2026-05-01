@@ -65,10 +65,19 @@
   "devDependencies": {
     "@directive-run/core": "workspace:*",
     "@directive-run/ai": "workspace:*",
+    "@directive-run/timeline": "workspace:*",
     "@types/node": "^25.2.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@directive-run/timeline": "^0.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@directive-run/timeline": {
+      "optional": true
+    }
   }
 }
