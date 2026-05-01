@@ -54,6 +54,35 @@ jobs:
           # NPM_CONFIG_PROVENANCE requires a public repo; disabled for private repos
           NPM_CONFIG_PROVENANCE: false
 
+      # Empirical post-publish verification — `pnpm changeset publish`
+      # has been observed reporting success while individual scoped
+      # packages silently failed to upload (NPM_TOKEN scope permits
+      # update but not create on @directive-run/*). Hit the registry
+      # directly for each published package; fail if 404. This turns
+      # silent ship failures into loud red CI runs.
+      - name: Verify packages reached npm
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          set -e
+          published='${{ steps.changesets.outputs.publishedPackages }}'
+          if [ -z "$published" ] || [ "$published" = "null" ]; then
+            echo "No publishedPackages output — skipping verify."
+            exit 0
+          fi
+          fail=0
+          echo "$published" | jq -c '.[]' | while read -r pkg; do
+            name=$(echo "$pkg" | jq -r '.name')
+            version=$(echo "$pkg" | jq -r '.version')
+            url="https://registry.npmjs.org/${name}/${version}"
+            echo "Verify: $url"
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$status" != "200" ]; then
+              echo "::error title=Publish verification failed::${name}@${version} returned HTTP ${status} from npm registry. Token likely lacks 'create new package' permission for @directive-run/* scope."
+              fail=1
+            fi
+          done
+          exit $fail
+
   docs-artifacts:
     name: Publish docs artifacts
     needs: release
