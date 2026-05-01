@@ -25,6 +25,17 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import pc from "picocolors";
+import { loadTimelinePackage } from "../lib/timeline-loader.js";
+// R5 arch C2: import types directly from the timeline package. These
+// imports are fully erased at compile time (no runtime require), so the
+// optional-peer / lazy `await import()` pattern below is preserved
+// exactly. Sourcing the types from the package eliminates the silent
+// drift risk that would arise from re-declaring them here.
+import type {
+  CountDelta,
+  ResolverRunDelta,
+  ErrorDelta,
+} from "@directive-run/timeline";
 
 interface TimelineDiffCliOptions {
   json: boolean;
@@ -85,42 +96,6 @@ Examples:
   directive timeline diff baseline.json regression.json
   directive timeline diff a.json b.json --json | jq .constraintFires
 `);
-}
-
-interface CountDelta {
-  id: string;
-  aCount: number;
-  bCount: number;
-  delta: number;
-}
-
-interface ResolverRunDelta {
-  resolver: string;
-  aStarts: number;
-  bStarts: number;
-  aCompletes: number;
-  bCompletes: number;
-  aErrors: number;
-  bErrors: number;
-}
-
-interface ErrorDelta {
-  side: "a" | "b";
-  kind: string;
-  id: string;
-  error: unknown;
-  frameIndex: number;
-}
-
-interface TimelineDiff {
-  frameCountDelta: number;
-  aFrameCount: number;
-  bFrameCount: number;
-  constraintFires: CountDelta[];
-  mutations: CountDelta[];
-  resolverRuns: ResolverRunDelta[];
-  newErrors: ErrorDelta[];
-  identical: boolean;
 }
 
 function fmtSign(n: number): string {
@@ -210,30 +185,15 @@ export async function timelineDiffCommand(args: string[]): Promise<void> {
   }
 
   // Lazy-import the timeline package — optional peer.
-  let deserializeTimeline: (input: unknown) => unknown;
-  let diffTimelines: (a: unknown, b: unknown) => TimelineDiff;
-  try {
-    const mod = (await import("@directive-run/timeline")) as unknown as {
-      deserializeTimeline: typeof deserializeTimeline;
-      diffTimelines: typeof diffTimelines;
-    };
-    deserializeTimeline = mod.deserializeTimeline;
-    diffTimelines = mod.diffTimelines;
-  } catch (err) {
-    console.error(
-      pc.red(
-        `error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline`,
-      ),
-    );
-    if (opts.verbose) console.error(pc.dim((err as Error).message));
-    process.exit(1);
-  }
+  const { deserializeTimeline, diffTimelines } = await loadTimelinePackage(
+    opts.verbose,
+  );
 
   // Parse + validate.
   const aRaw = readTimeline(aPath);
   const bRaw = readTimeline(bPath);
-  let aTl: unknown;
-  let bTl: unknown;
+  let aTl: ReturnType<typeof deserializeTimeline>;
+  let bTl: ReturnType<typeof deserializeTimeline>;
   try {
     aTl = deserializeTimeline(aRaw);
     bTl = deserializeTimeline(bRaw);

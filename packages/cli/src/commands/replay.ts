@@ -34,6 +34,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import pc from "picocolors";
 import { loadSystem } from "../lib/loader.js";
+import { loadTimelinePackage } from "../lib/timeline-loader.js";
 
 interface ReplayCliOptions {
   systemPath?: string;
@@ -171,35 +172,13 @@ export async function replayCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // Lazy-import the timeline package so the CLI doesn't pull it in
-  // unless the replay command actually runs. timeline is a peer dep
-  // (in CLI's package.json, optional) — if it isn't installed,
-  // surface a clear error.
-  let deserializeTimeline: (input: unknown) => unknown;
-  let replayTimeline: (
-    timeline: unknown,
-    system: unknown,
-    opts: unknown,
-  ) => Promise<{ dispatched: number; skipped: number; truncated: number }>;
-  try {
-    const mod = (await import("@directive-run/timeline")) as unknown as {
-      deserializeTimeline: typeof deserializeTimeline;
-      replayTimeline: typeof replayTimeline;
-    };
-    deserializeTimeline = mod.deserializeTimeline;
-    replayTimeline = mod.replayTimeline;
-  } catch (err) {
-    console.error(
-      pc.red(
-        `error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline`,
-      ),
-    );
-    if (opts.verbose) console.error(pc.dim((err as Error).message));
-    process.exit(1);
-  }
+  // Lazy-import the timeline package — optional peer.
+  const { deserializeTimeline, replayTimeline } = await loadTimelinePackage(
+    opts.verbose,
+  );
 
   // Validate + deserialize.
-  let timeline: unknown;
+  let timeline: ReturnType<typeof deserializeTimeline>;
   try {
     timeline = deserializeTimeline(parsed);
   } catch (err) {
@@ -244,11 +223,18 @@ export async function replayCommand(args: string[]): Promise<void> {
     }
   }
 
-  // Replay.
-  const result = await replayTimeline(timeline, sys, {
-    dispatchableOnly: opts.dispatchableOnly,
-    maxFrames: opts.maxFrames,
-  });
+  // Replay. The earlier `typeof sys.dispatch !== 'function'` guard
+  // (line ~210) verifies the duck-type at runtime; the cast here just
+  // bridges the unknown-typed loadSystem return to replayTimeline's
+  // typed ReplayableSystem.
+  const result = await replayTimeline(
+    timeline,
+    sys as { dispatch: (event: { type: string; [key: string]: unknown }) => void },
+    {
+      dispatchableOnly: opts.dispatchableOnly,
+      maxFrames: opts.maxFrames,
+    },
+  );
 
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));

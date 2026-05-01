@@ -745,11 +745,23 @@ function reconstructDispatch(
   if (next === null) return null;
   // R2 sec C-1: spread BEFORE the type literal so an attacker-controlled
   // `next.type` from untrusted JSON cannot override the MUTATE
-  // dispatch type. This was the documented use case (prod-error JSON
-  // → replay) so the input is by-design untrusted; without this
-  // ordering, a malicious `frames[i].event.next.type = '...'` reroutes
-  // every replayed event to an arbitrary handler.
-  return { ...next, type: "MUTATE" };
+  // dispatch type.
+  // R5 sec #8 (defense-in-depth): drop own `__proto__` / `constructor` /
+  // `prototype` keys before the spread. JSON.parse already stores these
+  // as own properties (no prototype slot manipulation), and a plain
+  // spread does not perform `obj["__proto__"] = ...` assignment, so the
+  // surface here is benign today — but downstream user handlers that
+  // do `Object.assign(target, event.payload)` or `Object.create(...)`
+  // could still be misled by a hostile timeline. Stripping at the
+  // boundary is cheaper than auditing every consumer.
+  const safe: Record<string, unknown> = {};
+  for (const k of Object.keys(next)) {
+    if (k === "__proto__" || k === "constructor" || k === "prototype") {
+      continue;
+    }
+    safe[k] = next[k];
+  }
+  return { ...safe, type: "MUTATE" };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1403,10 +1415,14 @@ export function diffTimelines(
   resolverRuns.sort((x, y) => x.resolver.localeCompare(y.resolver));
 
   // Errors: surface entries on each side that have no structural twin
-  // on the other side. v0.1 keys on (kind, id, errorJson, frameIndex);
-  // structurally-identical errors at the same index are elided.
+  // on the other side. R5 arch C1 fix — key on (kind, id, errorJson)
+  // ONLY; including frameIndex caused false positives when unrelated
+  // count deltas earlier in the timeline shifted error indices,
+  // making the same logical error appear as both a-only AND b-only.
+  // The "first occurrence index" is preserved on the surviving
+  // ErrorDelta entries so consumers can still locate them.
   const errorKey = (e: ErrorDelta): string =>
-    `${e.kind}::${e.id}::${e.frameIndex}::${safeStringify(e.error)}`;
+    `${e.kind}::${e.id}::${safeStringify(e.error)}`;
   const aKeys = new Set(ab.errors.map(errorKey));
   const bKeys = new Set(bb.errors.map(errorKey));
   const newErrors: ErrorDelta[] = [

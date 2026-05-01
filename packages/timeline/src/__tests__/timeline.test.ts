@@ -390,6 +390,50 @@ describe("@directive-run/timeline", () => {
     expect(dispatched).toHaveLength(0);
   });
 
+  it("R5 sec #8: hostile timeline with own __proto__/constructor/prototype keys does not propagate them into the dispatch", async () => {
+    // Hostile timeline JSON that includes attacker-controlled own
+    // properties on `next`. After the R5 fix, these MUST be stripped
+    // before the spread-into-dispatch — otherwise downstream user code
+    // doing Object.assign(target, event) inherits the malicious keys.
+    const hostile = {
+      version: 1 as const,
+      id: "hostile",
+      startedAtMs: 0,
+      frames: [
+        {
+          ts: 1,
+          event: {
+            type: "fact.change" as const,
+            key: "pendingMutation",
+            prev: null,
+            next: {
+              kind: "increment",
+              payload: { by: 1 },
+              status: "pending",
+              error: null,
+              __proto__: { polluted: true },
+              constructor: { polluted: true },
+              prototype: { polluted: true },
+            },
+          },
+        },
+      ],
+    };
+
+    const dispatched: Array<{ type: string; [key: string]: unknown }> = [];
+    await replayTimeline(hostile, {
+      dispatch: (e) => dispatched.push(e),
+    });
+    expect(dispatched).toHaveLength(1);
+    const ev = dispatched[0]!;
+    expect(ev.type).toBe("MUTATE");
+    expect(ev.kind).toBe("increment");
+    // Stripped: hostile keys MUST NOT survive into the dispatched event.
+    expect(Object.prototype.hasOwnProperty.call(ev, "__proto__")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(ev, "constructor")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(ev, "prototype")).toBe(false);
+  });
+
   it("R1.A replayTimeline { dispatchable: false } walks every frame", async () => {
     const synthetic = {
       version: 1 as const,
@@ -927,5 +971,29 @@ describe("R2.C diffTimelines", () => {
     const diff = diffTimelines(a, b);
     expect(diff.identical).toBe(true);
     expect(diff.frameCountDelta).toBe(0);
+  });
+
+  it("R5 arch C1: same logical error at different frame indices is NOT reported as new on both sides", () => {
+    // The original errorKey included frameIndex, which meant any
+    // unrelated count delta earlier in the timeline shifted the
+    // error's index and made the SAME logical error look like two
+    // distinct "a-only" + "b-only" entries. Post-fix, the key drops
+    // frameIndex — only structural shape (kind, id, errorJson) keys
+    // the identity.
+    const a = makeTimeline("a", [
+      { kind: "resolver-error", res: "loader", error: "boom" },
+    ]);
+    const b = makeTimeline("b", [
+      // Two extra constraint fires shift the error's frameIndex from 0 to 2.
+      { kind: "constraint", cid: "x" },
+      { kind: "constraint", cid: "x" },
+      { kind: "resolver-error", res: "loader", error: "boom" },
+    ]);
+    const diff = diffTimelines(a, b);
+    // The constraint-fire delta IS surfaced.
+    expect(diff.constraintFires).toHaveLength(1);
+    // But the resolver error is the SAME on both sides — should be
+    // elided despite the index shift.
+    expect(diff.newErrors).toHaveLength(0);
   });
 });

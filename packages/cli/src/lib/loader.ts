@@ -159,12 +159,36 @@ export async function loadSystemFactory(filePath: string): Promise<() => Promise
     }
   }
 
+  // R5 DX C4: detect the most common confusion — user passed a file
+  // that exports a STARTED system (the shape `directive replay` wants)
+  // and got a confusing "no factory" error. Surface a targeted message
+  // explaining how to wrap it.
+  const hasStartedInstance =
+    isSystem(mod.default) ||
+    isSystem(mod.system) ||
+    Object.values(mod).some(isSystem);
+
+  if (hasStartedInstance) {
+    throw new Error(
+      `Found a started Directive system in ${pc.dim(filePath)}, but bisect needs a factory.\n` +
+        `Bisect instantiates a fresh system for every midpoint replay (so each attempt is hermetic),\n` +
+        `which means it can't reuse a singleton instance the way ${pc.cyan("directive replay")} does.\n\n` +
+        `Wrap the existing export in a function:\n\n` +
+        `  ${pc.cyan("export function createSystem()")} {\n` +
+        `    const sys = createSystem({ module: yourModule });\n` +
+        `    sys.start();\n` +
+        `    return sys;\n` +
+        `  }`,
+    );
+  }
+
   throw new Error(
     `No system factory found in ${pc.dim(filePath)}\n` +
       `Bisect needs to instantiate a fresh system per midpoint replay. Export one of:\n\n` +
       `  ${pc.cyan("export function createSystem()")} { ... return sys; }\n` +
       `  ${pc.cyan("export const systemFactory")} = () => { ... return sys; };\n` +
       `  ${pc.cyan("export default")} () => { ... return sys; };\n\n` +
-      `The factory MUST call sys.start() and return the started system.`,
+      `The factory MUST call sys.start() and return the started system.\n` +
+      `(Did you forget ${pc.cyan("sys.start()")} before returning?)`,
   );
 }

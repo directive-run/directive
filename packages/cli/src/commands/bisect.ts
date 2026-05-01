@@ -54,6 +54,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import pc from "picocolors";
 import { loadSystemFactory } from "../lib/loader.js";
+import { loadTimelinePackage } from "../lib/timeline-loader.js";
 
 interface BisectCliOptions {
   systemPath?: string;
@@ -141,6 +142,11 @@ Options:
   --json                     Emit BisectResult as JSON
   --verbose, -v              Print every midpoint and its verdict
   --help, -h                 Show this help
+
+SECURITY: --assert is evaluated as JavaScript in this process. Only
+pass expressions from sources you trust (your own scripts, your own
+PRs). Don't paste expressions from issues, untrusted Slack messages,
+or third-party sources without reading them first.
 
 Examples:
   directive bisect bug-1234.json --system test/bisect-sys.ts \\
@@ -251,42 +257,18 @@ export async function bisectCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // Lazy-import the timeline package — optional peer.
-  let deserializeTimeline: (input: unknown) => unknown;
-  let bisectTimeline: (
-    timeline: unknown,
-    factory: () => unknown | Promise<unknown>,
-    assertion: (system: unknown) => boolean | Promise<boolean>,
-    opts: unknown,
-  ) => Promise<{
-    firstFailingFrameIndex?: number;
-    firstFailingFrame?: { ts: number; event: { type: string } };
-    iterations: number;
-    noFailureFound: boolean;
-    failsOnEmptyReplay: boolean;
-    nonDeterministic: boolean;
-  }>;
-  try {
-    const mod = (await import("@directive-run/timeline")) as unknown as {
-      deserializeTimeline: typeof deserializeTimeline;
-      bisectTimeline: typeof bisectTimeline;
-    };
-    deserializeTimeline = mod.deserializeTimeline;
-    bisectTimeline = mod.bisectTimeline;
-  } catch (err) {
-    console.error(
-      pc.red(
-        `error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline`,
-      ),
-    );
-    if (opts.verbose) console.error(pc.dim((err as Error).message));
-    process.exit(1);
-  }
+  // Lazy-import the timeline package — optional peer. Types come
+  // from `import type` inside the helper, so we get full type safety
+  // without forcing timeline into the install graph for non-timeline
+  // CLI commands.
+  const { deserializeTimeline, bisectTimeline } = await loadTimelinePackage(
+    opts.verbose,
+  );
 
   // Validate + deserialize.
-  let timeline: { frames: { ts: number; event: { type: string } }[] };
+  let timeline: ReturnType<typeof deserializeTimeline>;
   try {
-    timeline = deserializeTimeline(parsed) as typeof timeline;
+    timeline = deserializeTimeline(parsed);
   } catch (err) {
     console.error(
       pc.red(
@@ -325,18 +307,34 @@ export async function bisectCommand(args: string[]): Promise<void> {
     );
   }
 
-  // Run bisect.
-  const result = await bisectTimeline(timeline, factory, assertion, {
-    maxFrames: opts.maxFrames,
-    determinismCheck: !opts.noDeterminismCheck,
-  });
+  // Run bisect. The factory's return is verified at runtime by
+  // loadSystemFactory() to be a started Directive system (which
+  // satisfies ReplayableSystem's `dispatch` requirement); the cast
+  // here just bridges loadSystemFactory's `any` return to bisect's
+  // typed factory shape.
+  const result = await bisectTimeline(
+    timeline,
+    factory as () => Promise<{
+      dispatch: (event: { type: string; [key: string]: unknown }) => void;
+    }>,
+    assertion,
+    {
+      maxFrames: opts.maxFrames,
+      determinismCheck: !opts.noDeterminismCheck,
+    },
+  );
 
   if (opts.json) {
     // Strip the heavy frame object from JSON output — the index alone
     // is enough for tooling, and the full frame would double the
     // payload size for callers that just want to pipe into jq.
+    // R5 sec #9: emit `null` (not `undefined`) for absent index so jq
+    // consumers can distinguish "fails before frame 0" (index=null,
+    // failsOnEmptyReplay=true) from "frame 0 itself triggers"
+    // (index=0, failsOnEmptyReplay=false). JSON.stringify drops
+    // `undefined` keys which made these states indistinguishable.
     const lean = {
-      firstFailingFrameIndex: result.firstFailingFrameIndex,
+      firstFailingFrameIndex: result.firstFailingFrameIndex ?? null,
       iterations: result.iterations,
       noFailureFound: result.noFailureFound,
       failsOnEmptyReplay: result.failsOnEmptyReplay,
