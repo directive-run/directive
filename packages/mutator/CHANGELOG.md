@@ -4,7 +4,18 @@
 
 Initial release.
 
-### Added
+### Added — v0.2 (R1.C cancellable)
+- `cancellable(opts, handler)` — HOC that wraps a mutator handler with
+  auto-cancellation. Receives a `signal: AbortSignal` in the handler
+  context. Two cancellation triggers: `supersedeOn: 'self' | 'never'`
+  (default `'self'`) and `timeoutMs?: number`. The signal's `reason`
+  carries a typed `CancelReason` distinguishing `{kind:'superseded'}`
+  from `{kind:'timeout', afterMs}`. Pass `setTimeout` from
+  `virtualClock` for deterministic test timing.
+- `CancellableOptions`, `CancellableHandlerContext<F, P>`,
+  `CancelReason` type exports.
+
+### Added — v0.1
 - `defineMutator(handlers)` — typed builder that returns six fragments
   (facts / events / requirements / eventHandlers / constraints /
   resolvers) wiring a discriminated `pendingMutation` lifecycle into a

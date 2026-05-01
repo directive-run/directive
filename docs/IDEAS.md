@@ -101,7 +101,16 @@ on prod replays from R1.A.
 
 ## R1.C — `defineMutator.cancellable()` virtual-clock-aware automatic mutation cancellation when superseded
 
-**[2 days]**
+**[v0.1 SHIPPED 2026-05-01 — `@directive-run/mutator@0.2.0`]**
+
+`cancellable(opts, handler)` HOC ships in mutator. Handler receives
+`signal: AbortSignal`; two cancellation triggers
+(`supersedeOn: 'self'|'never'` and `timeoutMs`). The signal's reason
+carries a typed `CancelReason` enum. Pass `virtualClock.setTimeout`
+for deterministic test timing — timeouts fire under
+`clock.advanceBy()` with no real-time waits. 9 new tests cover basic
+invocation, supersession (both modes), timeout (with virtualClock),
+supersession+timeout composition, and HOC independence.
 
 **Pitch:** Today's mutator overwrites `pendingMutation` if a new MUTATE
 arrives mid-flight, but the in-flight handler still runs to completion
@@ -203,7 +212,7 @@ primitive.
 |---|---|---|---|---|---|
 | 1 | **R1.A** — `directive replay` from prod error | 2 | Max | Max | **v0.1 SCAFFOLD SHIPPED** (timeline@0.2.0) |
 | 2 | **R1.B** — Causal-graph vitest matchers | 2 | High | High | **v0.1 SHIPPED** (timeline/matchers) |
-| 3 | **R1.C** — `cancellable()` mutator + timer | 2 | High | Med-High | killer for type-ahead |
+| 3 | **R1.C** — `cancellable()` mutator + timer | 2 | High | Med-High | **v0.1 SHIPPED** (mutator@0.2.0) |
 | 4 | **R1.D** — Live timeline devtools scrubber | 7 | Max | High | Phase 5 pulled forward |
 | 5 | **R1.E** — `.invariant()` runtime-checked transitions | 7 | Med-High | High | risky scope creep |
 

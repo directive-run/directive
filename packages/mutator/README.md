@@ -201,6 +201,65 @@ need runtime checks, validate at the boundary before dispatch.
 The mutator earns its weight when you have **multi-variant async work
 with a discriminator**. That's the 12-instance shape from the migration.
 
+## Auto-cancel on supersede (R1.C `cancellable()`)
+
+For mutations where a fresh dispatch should cancel the prior in-flight
+one — type-ahead search, debounce, throttle, request dedup — wrap
+the handler with `cancellable()`. The wrapped handler receives a
+`signal: AbortSignal` that aborts when superseded or when an
+optional timeout fires:
+
+```ts
+import { defineMutator, cancellable } from '@directive-run/mutator';
+
+const formMutator = defineMutator<MyMutations, MyFacts>({
+  search: cancellable(
+    { supersedeOn: 'self', timeoutMs: 3_000 },
+    async ({ payload, facts, signal }) => {
+      const res = await fetch(`/q?${payload.q}`, { signal });
+      facts.results = await res.json();
+    },
+  ),
+  submit: async ({ payload, facts }) => {
+    // No cancellation — plain handler.
+    facts.values = await deps.submit(payload.values);
+  },
+});
+```
+
+**Two cancellation triggers, both opt-in:**
+
+- `supersedeOn: 'self'` (default) — a new dispatch of the same
+  wrapped handler aborts the prior in-flight invocation. Set
+  `'never'` if parallel runs are fine.
+- `timeoutMs: number` — abort after N ms from invocation start.
+  Default unset (no timeout).
+
+**Test ergonomics:** pass `virtualClock.setTimeout` from
+`@directive-run/core` via the `setTimeout` option to make timeouts
+fire synchronously under `clock.advanceBy(ms)`:
+
+```ts
+import { virtualClock } from '@directive-run/core';
+const clock = virtualClock(0);
+const wrapped = cancellable(
+  { timeoutMs: 1_000, setTimeout: clock.setTimeout },
+  handler,
+);
+// In tests: clock.advanceBy(1_001) fires the timeout deterministically.
+```
+
+**The signal's `reason` carries a `CancelReason`:**
+
+```ts
+type CancelReason =
+  | { kind: 'superseded' }
+  | { kind: 'timeout'; afterMs: number };
+```
+
+Use it inside handlers to distinguish how the cancellation arrived
+(e.g. log a different message for timeouts vs supersession).
+
 ## Optimistic updates + rollback
 
 A future `@directive-run/optimistic` package will integrate with this

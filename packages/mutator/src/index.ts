@@ -459,3 +459,177 @@ export function mutate<M extends MutationMap>(
     error: null,
   } as PendingMutation<M>;
 }
+
+// ============================================================================
+// cancellable() — auto-cancel-on-supersede (R1.C v0.1)
+// ============================================================================
+
+/**
+ * Options for {@link cancellable}.
+ */
+export interface CancellableOptions {
+  /**
+   * When to fire the AbortSignal that the wrapped handler receives.
+   *
+   * - `'self'` (default): a new dispatch of the SAME handler aborts the
+   *   prior in-flight invocation. The classic "cancel previous on new
+   *   keystroke" pattern.
+   * - `'never'`: only the timeout fires the signal; new dispatches do
+   *   NOT abort prior ones. Useful when you want a hard timeout but
+   *   parallel runs are fine.
+   */
+  supersedeOn?: "self" | "never";
+
+  /**
+   * Maximum ms a handler may run before its signal is aborted. Counted
+   * from the start of THIS invocation. Combine with `realClock` for
+   * production or pass a `setTimeout` shim for deterministic testing.
+   */
+  timeoutMs?: number;
+
+  /**
+   * Optional `setTimeout` injection. Defaults to `globalThis.setTimeout`.
+   * For deterministic tests, pass `virtualClock.setTimeout` from
+   * `@directive-run/core` so the timeout fires under
+   * `clock.advanceBy()` instead of wall-clock real time.
+   *
+   * @example
+   * ```ts
+   * import { virtualClock } from '@directive-run/core';
+   * const clock = virtualClock(0);
+   * cancellable({ timeoutMs: 1_000, setTimeout: clock.setTimeout }, handler);
+   * ```
+   */
+  setTimeout?: (cb: () => void, ms: number) => () => void;
+}
+
+/**
+ * Handler context augmented with a cancellation signal.
+ */
+export interface CancellableHandlerContext<F, P> {
+  facts: F;
+  payload: P;
+  /** Aborts when a new dispatch supersedes this one OR the timeout fires. */
+  signal: AbortSignal;
+  requeue: () => void;
+}
+
+/**
+ * Reason a cancellable handler's signal aborted. Stamped on
+ * `signal.reason` so the handler can disambiguate.
+ */
+export type CancelReason =
+  | { kind: "superseded" }
+  | { kind: "timeout"; afterMs: number };
+
+/**
+ * Wrap a mutator handler with auto-cancellation. The wrapped handler
+ * receives an extra `signal: AbortSignal` in its context. Use the
+ * signal to short-circuit awaitable work — pass it to `fetch(url, {
+ * signal })`, watch it inside long-running loops, etc.
+ *
+ * Two cancellation triggers, both opt-in via {@link CancellableOptions}:
+ *
+ *   1. **Supersession** (default `supersedeOn: 'self'`): when a new
+ *      dispatch of the same wrapped handler arrives while a prior
+ *      invocation is still running, the prior signal aborts.
+ *   2. **Timeout** (default `timeoutMs: undefined`, meaning no timeout):
+ *      after `timeoutMs` ms from invocation start, the signal aborts.
+ *
+ * If a handler's signal aborts, the handler should observe the abort
+ * (via `signal.aborted` or the AbortError-throwing helpers) and
+ * return promptly. The signal's `reason` carries a {@link CancelReason}
+ * disambiguating which trigger fired.
+ *
+ * Compose with {@link defineMutator} by using `cancellable()` directly
+ * in the handler map:
+ *
+ * @example
+ * ```ts
+ * import { defineMutator, cancellable } from '@directive-run/mutator';
+ *
+ * const formMutator = defineMutator<MyMutations, MyFacts>({
+ *   search: cancellable(
+ *     { supersedeOn: 'self', timeoutMs: 3_000 },
+ *     async ({ payload, facts, signal }) => {
+ *       const res = await fetch(`/q?${payload.q}`, { signal });
+ *       facts.results = await res.json();
+ *     },
+ *   ),
+ *   submit: async ({ payload, facts }) => {
+ *     // No cancellation needed for submit — plain handler.
+ *     facts.values = await deps.submit(payload.values);
+ *   },
+ * });
+ * ```
+ *
+ * **Idempotency note.** The wrapped handler stays a regular
+ * `MutationHandler<M, K, F>` from the mutator's perspective. The
+ * supersession registry is closure-scoped per `cancellable()` call —
+ * two separate `cancellable(...)` HOCs around different handlers do
+ * NOT cancel each other.
+ *
+ * **Test ergonomics.** Pass `virtualClock.setTimeout` via the
+ * `setTimeout` option to make timeouts deterministic under
+ * `clock.advanceBy(ms)`. Without that, timeouts use wall-clock
+ * `globalThis.setTimeout` and are real-time.
+ */
+export function cancellable<F, P>(
+  opts: CancellableOptions,
+  handler: (ctx: CancellableHandlerContext<F, P>) => Promise<void> | void,
+): (ctx: { facts: F; payload: P; requeue: () => void }) => Promise<void> {
+  const supersedeOn = opts.supersedeOn ?? "self";
+  const timeoutMs = opts.timeoutMs;
+  const scheduleTimeout = opts.setTimeout ?? defaultSetTimeout;
+
+  // Closure-scoped supersession slot — one entry for the wrapped
+  // handler. When a new invocation arrives, the prior entry's
+  // controller aborts before the new one starts.
+  let priorController: AbortController | undefined;
+
+  return async (ctx: { facts: F; payload: P; requeue: () => void }) => {
+    // Supersession: abort the prior in-flight invocation, if any.
+    if (supersedeOn === "self" && priorController !== undefined) {
+      priorController.abort({ kind: "superseded" } satisfies CancelReason);
+    }
+
+    const controller = new AbortController();
+    priorController = controller;
+
+    // Timeout: schedule an abort after `timeoutMs`. The cancel handle
+    // returned by `scheduleTimeout` lets us clear the timer if the
+    // handler completes first (saves leaking timers under a barrage
+    // of dispatches).
+    let cancelTimeout: (() => void) | undefined;
+    if (typeof timeoutMs === "number" && timeoutMs > 0) {
+      cancelTimeout = scheduleTimeout(() => {
+        controller.abort({ kind: "timeout", afterMs: timeoutMs } satisfies CancelReason);
+      }, timeoutMs);
+    }
+
+    try {
+      await handler({
+        facts: ctx.facts,
+        payload: ctx.payload,
+        requeue: ctx.requeue,
+        signal: controller.signal,
+      });
+    } finally {
+      // Clean up: clear the timeout (if it hasn't fired) and release
+      // the supersession slot if it still belongs to this invocation.
+      cancelTimeout?.();
+      if (priorController === controller) {
+        priorController = undefined;
+      }
+    }
+  };
+}
+
+/**
+ * Default `setTimeout` shim — wraps `globalThis.setTimeout` to match
+ * the cancel-handle signature `cancellable()` expects.
+ */
+function defaultSetTimeout(cb: () => void, ms: number): () => void {
+  const handle = globalThis.setTimeout(cb, ms);
+  return () => globalThis.clearTimeout(handle);
+}
