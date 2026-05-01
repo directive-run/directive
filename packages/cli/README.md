@@ -152,6 +152,75 @@ directive examples copy counter
 directive examples copy auth-flow --dest ./src/examples
 ```
 
+### `directive replay <timeline.json>`
+
+Re-dispatch a serialized [`@directive-run/timeline`](../timeline) JSON dump against a fresh system. Designed for the prod-error-to-local-repro flow: production captures the last N seconds of timeline frames via `serializeTimeline()`, ships the JSON to your bug tracker, and an engineer pastes the path into `replay`.
+
+```bash
+directive replay bug-1234.json --system src/app/system.ts
+# ✓ replay complete: 47 dispatched / 18 skipped
+
+directive replay bug-1234.json --system src/system.ts --json
+# {"dispatched": 47, "skipped": 18, "truncated": 0}
+
+directive replay bug-1234.json --system src/system.ts --max-frames 10000
+```
+
+The `--system <path>` file must export a started Directive system as either a default export or a named `system` export. Same shape as `inspect` / `graph` / `explain`.
+
+**Requires `@directive-run/timeline` as a peer dep:** install it with `npm install --save-dev @directive-run/timeline`.
+
+### `directive bisect <timeline.json>`
+
+Binary-search a recorded timeline for the first frame whose inclusion flips a user-supplied assertion from passing to failing — git-bisect, but over `ObservationEvent` frames.
+
+```bash
+directive bisect bug-1234.json \
+  --system test/bisect-system.ts \
+  --assert 'facts.count >= 0'
+# ✓ bisect complete: first failing frame is #47 (fact.change)
+```
+
+The `--system <path>` file must export a **factory** (not a started instance — bisect calls the factory once per midpoint to keep each replay hermetic). Looks for `createSystem` / `systemFactory` / `default` exports, in that order. The factory must return a started system:
+
+```ts
+// test/bisect-system.ts
+export function createSystem() {
+  const sys = makeSys({ module: counterModule });
+  sys.start();
+  return sys;
+}
+```
+
+The `--assert <expression>` is evaluated as JS with `facts` and `system` in scope. Truthy = good prefix; falsy = bad prefix. Bisect locates the smallest bad prefix.
+
+**SECURITY:** `--assert` runs as JavaScript in the CLI process. Only pass expressions from sources you trust. Don't paste expressions from untrusted issues / Slack / third parties.
+
+Options: `--max-frames <n>` (default 100,000), `--no-determinism-check` (skip the replay-twice gate), `--json`, `--verbose`.
+
+Exit codes: `0` (no failure to bisect / fails-on-empty), `2` (bisect found a frame OR refused due to non-determinism), `1` (CLI error).
+
+### `directive timeline diff <a.json> <b.json>`
+
+Semantic causal-graph diff between two serialized timelines. Not a textual JSON diff — per-category deltas (frame counts, constraint fires, mutation kinds, resolver runs, new errors).
+
+```bash
+directive timeline diff baseline.json regression.json
+# Frames:           23 → 31  (+8)
+# Constraint fires:
+#   loadOnLoading                    1 →    4  (+3)
+# Mutations:
+#   submit                           2 →    3  (+1)
+# Resolver runs:
+#   loader              starts 1→2 (+1)  completes 1→1 ( 0)  errors 0→1 (+1)
+# New errors:
+#   b-only  frame #15  resolver.error 'loader'  "timeout"
+
+directive timeline diff a.json b.json --json | jq .constraintFires
+```
+
+Exit codes: `0` (identical), `2` (differences found, CI-gate friendly), `1` (CLI error).
+
 ## Supported AI Tools
 
 | Tool | Output File |

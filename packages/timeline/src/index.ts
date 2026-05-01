@@ -841,23 +841,67 @@ export interface BisectOptions {
 }
 
 /**
+ * Discriminator on {@link BisectResult.kind}. Lets consumers `switch`
+ * over the four mutually-exclusive outcomes without juggling three
+ * booleans plus an optional index.
+ *
+ * - `'found'` — bisect located the first failing frame. `firstFailingFrameIndex`
+ *   and `firstFailingFrame` are set.
+ * - `'no-failure'` — assertion passes even after replaying every frame; nothing
+ *   to bisect. The caller probably has the wrong `bad.json` or the wrong oracle.
+ * - `'fails-on-empty'` — assertion fails on a system with ZERO frames replayed
+ *   (the bug is in initialization, not any specific frame).
+ * - `'non-deterministic'` — two full-timeline replays produced different oracle
+ *   verdicts, so {@link BisectOptions.determinismCheck} refused to bisect.
+ */
+export type BisectResultKind =
+  | "found"
+  | "no-failure"
+  | "fails-on-empty"
+  | "non-deterministic";
+
+/**
  * Outcome of {@link bisectTimeline}.
+ *
+ * Prefer the {@link BisectResult.kind} discriminator over the legacy
+ * boolean fields for type-narrowed access — the booleans are kept
+ * populated for back-compat with the v0.2 surface.
+ *
+ * @example
+ * ```ts
+ * const result = await bisectTimeline(timeline, factory, oracle);
+ * switch (result.kind) {
+ *   case 'found':
+ *     console.log(`first failing frame: #${result.firstFailingFrameIndex!}`);
+ *     break;
+ *   case 'no-failure':
+ *     console.log('oracle never fails — wrong bad.json?');
+ *     break;
+ *   case 'fails-on-empty':
+ *     console.log('bug is in initialization');
+ *     break;
+ *   case 'non-deterministic':
+ *     console.log('determinism gate refused to bisect');
+ *     break;
+ * }
+ * ```
  */
 export interface BisectResult {
   /**
+   * Discriminator for the four mutually-exclusive outcomes. Prefer
+   * this over the legacy boolean fields. (R5 DX M1.)
+   */
+  kind: BisectResultKind;
+  /**
    * 0-based index into `timeline.frames` of the first frame whose
    * inclusion in the replay prefix flips the assertion from passing
-   * to failing.
-   *
-   * Undefined when {@link BisectResult.noFailureFound} is true OR when
-   * the assertion already fails on the empty prefix
-   * ({@link BisectResult.failsOnEmptyReplay} is true).
+   * to failing. Set when `kind === 'found'`; undefined otherwise.
    */
   firstFailingFrameIndex?: number;
   /**
    * The frame at {@link BisectResult.firstFailingFrameIndex}, copied
-   * for convenience so callers don't have to re-index. Undefined in
-   * the same cases as the index.
+   * for convenience so callers don't have to re-index. Set when
+   * `kind === 'found'`; undefined otherwise.
    */
   firstFailingFrame?: TimelineFrame;
   /**
@@ -865,23 +909,18 @@ export interface BisectResult {
    */
   iterations: number;
   /**
-   * True when the assertion passes even after replaying every frame —
-   * there's nothing to bisect. The caller probably has the wrong
-   * `bad.json` or the wrong assertion.
+   * @deprecated Prefer {@link BisectResult.kind} === `'no-failure'`.
+   * Kept for back-compat with the v0.2 surface.
    */
   noFailureFound: boolean;
   /**
-   * True when the assertion fails on a system with ZERO frames
-   * replayed (i.e. the freshly-started system). Indicates the bug is
-   * in initialization, not in any specific frame. Bisect cannot
-   * narrow further.
+   * @deprecated Prefer {@link BisectResult.kind} === `'fails-on-empty'`.
+   * Kept for back-compat with the v0.2 surface.
    */
   failsOnEmptyReplay: boolean;
   /**
-   * True when the {@link BisectOptions.determinismCheck} ran and
-   * detected mismatched oracle verdicts across two full-timeline
-   * replays. When set, the bisect was not performed and all *Index
-   * fields are undefined.
+   * @deprecated Prefer {@link BisectResult.kind} === `'non-deterministic'`.
+   * Kept for back-compat with the v0.2 surface.
    */
   nonDeterministic: boolean;
 }
@@ -976,6 +1015,7 @@ export async function bisectTimeline(
     iterations += 2;
     if (v1 !== v2) {
       return {
+        kind: "non-deterministic",
         iterations,
         noFailureFound: false,
         failsOnEmptyReplay: false,
@@ -985,6 +1025,7 @@ export async function bisectTimeline(
     // v1 is now the canonical full-replay verdict; reuse below.
     if (v1 === true) {
       return {
+        kind: "no-failure",
         iterations,
         noFailureFound: true,
         failsOnEmptyReplay: false,
@@ -1002,6 +1043,7 @@ export async function bisectTimeline(
     iterations += 1;
     if (fullPasses) {
       return {
+        kind: "no-failure",
         iterations,
         noFailureFound: true,
         failsOnEmptyReplay: false,
@@ -1021,6 +1063,7 @@ export async function bisectTimeline(
   iterations += 1;
   if (!emptyPasses) {
     return {
+      kind: "fails-on-empty",
       iterations,
       noFailureFound: false,
       failsOnEmptyReplay: true,
@@ -1048,6 +1091,7 @@ export async function bisectTimeline(
   // The smallest failing prefix has length `hi` (== lo + 1). The
   // frame whose inclusion flips the verdict is at index `lo` (0-based).
   return {
+    kind: "found",
     firstFailingFrameIndex: lo,
     firstFailingFrame: timeline.frames[lo],
     iterations,

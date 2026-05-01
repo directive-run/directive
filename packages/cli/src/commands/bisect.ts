@@ -404,5 +404,13 @@ export async function bisectCommand(args: string[]): Promise<void> {
     console.log(pc.dim("  • frame:"));
     console.log(pc.dim(`    ${JSON.stringify(frame, null, 2).split("\n").join("\n    ")}`));
   }
-  process.exit(0);
+  // R5 DX M3: align with `directive timeline diff` and the rest of
+  // the CLI's exit-code convention. A "standard hit" means we LOCATED
+  // a failing frame — the user's original premise (bad.json fails)
+  // is now confirmed. CI gates can branch on `directive bisect && echo OK`
+  // to mean "the timeline is clean."
+  //   0 — nothing wrong (noFailureFound / failsOnEmptyReplay handled above)
+  //   1 — CLI argument / file / module error (handled above)
+  //   2 — problem found (this branch) OR refused to bisect (nonDeterministic, above)
+  process.exit(2);
 }

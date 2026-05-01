@@ -676,6 +676,41 @@ describe("R2.A bisectTimeline", () => {
     expect(result.firstFailingFrameIndex).toBe(0);
   });
 
+  it("R5 DX M1: BisectResult exposes a `kind` discriminator alongside legacy booleans", async () => {
+    // Each of the four outcomes maps to a distinct kind value.
+    const tl = makeIncTimeline(8);
+    const counting = makeCountingSystem;
+
+    const found = await bisectTimeline(
+      tl,
+      () => counting(),
+      (sys) => (sys as { facts: { count: number } }).facts.count <= 3,
+    );
+    expect(found.kind).toBe("found");
+    expect(found.noFailureFound).toBe(false);
+    expect(found.firstFailingFrameIndex).toBe(3);
+
+    const noFailure = await bisectTimeline(tl, () => counting(), () => true);
+    expect(noFailure.kind).toBe("no-failure");
+    expect(noFailure.noFailureFound).toBe(true);
+
+    const empty = await bisectTimeline(tl, () => counting(), () => false);
+    expect(empty.kind).toBe("fails-on-empty");
+    expect(empty.failsOnEmptyReplay).toBe(true);
+
+    let calls = 0;
+    const nonDet = await bisectTimeline(
+      tl,
+      () => counting(),
+      () => {
+        calls++;
+        return calls % 2 === 0;
+      },
+    );
+    expect(nonDet.kind).toBe("non-deterministic");
+    expect(nonDet.nonDeterministic).toBe(true);
+  });
+
   it("handles a 0-frame timeline as 'no failure to find'", async () => {
     const tl: SerializedTimeline = {
       version: 1,

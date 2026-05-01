@@ -752,16 +752,23 @@ export interface RecordReplayableOptions<F, P> extends CancellableOptions {
 }
 
 /**
- * `cancellable()` plus structured cancel-event recording. Wrap your
- * handler with `recordReplayable()` instead of `cancellable()` when you
- * want every supersession + timeout to leave a machine-readable trail
- * in the timeline (rather than only the indirect `pendingMutation`
- * fact.change with a stringified error).
+ * `cancellable()` plus a synchronous on-abort callback. Wrap your
+ * handler with `recordReplayable()` instead of `cancellable()` when
+ * you want a hook that fires the moment a supersession or timeout
+ * aborts the in-flight invocation — *before* the handler's pending
+ * await rejects with AbortError. The callback receives a structured
+ * {@link CancelEvent} carrying the cancel kind, payload, dispatch
+ * sequence, and a live facts reference.
  *
- * Pairs with {@link "@directive-run/timeline".bisectTimeline} (R2.A) and
- * `replayTimeline` (R1.A): with the cancel events recorded, a replay
- * report can answer "which dispatches were cancelled and why" without
- * pattern-matching error strings.
+ * The callback is GENERIC ("call me when abort fires"); the most
+ * common use case is pinning cancel events into facts so a recorded
+ * timeline carries them — which then lets `replayTimeline()`,
+ * `bisectTimeline()`, and `diffTimelines()` (all in
+ * `@directive-run/timeline`) reason about which dispatches were
+ * superseded vs which completed without parsing free-form error
+ * strings. But the same callback works equally well for Sentry
+ * breadcrumbs, a Redux action log, OpenTelemetry spans, or a metrics
+ * sink — `recordReplayable` doesn't know or care about the timeline.
  *
  * @example Pin cancel events into facts so the timeline carries them:
  * ```ts

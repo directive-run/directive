@@ -260,6 +260,52 @@ type CancelReason =
 Use it inside handlers to distinguish how the cancellation arrived
 (e.g. log a different message for timeouts vs supersession).
 
+## Recording cancellations for replay (R2.B `recordReplayable()`)
+
+`recordReplayable()` is `cancellable()` plus a synchronous `onCancel`
+callback that fires the moment the AbortController calls `abort()` —
+*before* the handler's pending await rejects with AbortError. The
+callback receives a structured `CancelEvent` with the cancel kind,
+payload, dispatch sequence, and a live facts reference, so you can
+pin cancellations into a place that survives in the timeline.
+
+Use this when you record a timeline (with `@directive-run/timeline`)
+and want a replay or `directive bisect` to reason about *which*
+dispatches were superseded vs which completed — not just see a
+free-form error string.
+
+```ts
+import { defineMutator, recordReplayable } from '@directive-run/mutator';
+
+interface MyFacts {
+  results: string[];
+  cancellations: Array<{ kind: string; queryAtCancel: string; seq: number }>;
+}
+
+const search = recordReplayable<MyFacts, { q: string }>(
+  {
+    supersedeOn: 'self',
+    timeoutMs: 3_000,
+    onCancel: ({ facts, kind, payload, dispatchSeq }) => {
+      // Pin the cancel event into facts so the timeline carries it.
+      facts.cancellations.push({
+        kind,
+        queryAtCancel: payload.q,
+        seq: dispatchSeq,
+      });
+    },
+  },
+  async ({ payload, facts, signal }) => {
+    const res = await fetch(`/q?${payload.q}`, { signal });
+    facts.results = await res.json();
+  },
+);
+```
+
+`recordReplayable()` is implemented as `cancellable(opts, innerHandler)` where `innerHandler` adds an `addEventListener('abort')` around the user's handler — timeout/supersession semantics are exactly those of `cancellable()`. The callback is generic ("call me when abort fires"); pinning into facts is one use case among many. Wire `onCancel` to Sentry breadcrumbs, a Redux action log, or a metrics sink with equal ease.
+
+`onCancel` errors are caught and swallowed — the abort path stays clean.
+
 ## Optimistic updates + rollback
 
 A future `@directive-run/optimistic` package will integrate with this

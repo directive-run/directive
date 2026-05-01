@@ -229,12 +229,12 @@ Each matcher operates on the recorded `ObservationEvent` stream — the
 same data the formatter renders and `replayTimeline` re-dispatches. No
 other state library has assertion-against-causal-graph for free.
 
-## `directive replay` (R1.A scaffold)
+## Serialize, replay, bisect, diff
 
-Recorded timelines are **JSON-serializable** — paste a frame stream into
-a CLI, get a re-dispatched system back. This is the BUILD CANDIDATE
-from the innovation review and the substrate for the
-"prod-error → vitest replay" feature.
+Recorded timelines are **JSON-serializable**. The package ships four
+operational entry points that all consume that same JSON:
+
+### `serializeTimeline()` + `replayTimeline()` — re-dispatch a recorded run
 
 ```ts
 import {
@@ -252,45 +252,116 @@ await fetch('/bug-reports', { method: 'POST', body: json });
 const incoming = deserializeTimeline(JSON.parse(prodErrorJson));
 const sys = createSystem({ module: createSameModuleAsProd() });
 sys.start();
-await replayTimeline(incoming, sys);
-// Now your test's expect() assertions can run against the replayed system.
+const result = await replayTimeline(incoming, sys);
+// result is { dispatched, skipped, truncated } — verify the replay
+// actually re-fired what you expected.
 ```
 
-**v0.1 scope (deliberately narrow):**
-- Walks frames in order.
-- Today reconstructs `MUTATE` dispatches from
-  `@directive-run/mutator`-shaped `pendingMutation` fact.change frames.
-  Other dispatch sources land when core emits first-class `event.dispatch`
-  observation events.
-- Skips non-dispatchable frames (`system.start`, `reconcile.start`,
-  `derivation.compute`, ...) by default — opt out with
-  `{ dispatchable: false }` for diagnostic walks.
+CLI equivalent: `directive replay bug.json --system test/system.ts`.
 
-**v0.2 scope (deferred):**
-- Auto-derived vitest source codegen — `directive replay <id>.json` →
-  `<id>.test.ts` with full setup + assertions.
-- Determinism gate — assert replay's observed frame stream matches the
-  input byte-for-byte.
-- Mock-stub generation from recorded `resolver.start` /
-  `resolver.complete` pairs (deps closure → `vi.mock(...)`).
+Replay walks frames in order and re-dispatches anything that maps to a
+known dispatchable surface (today: `@directive-run/mutator`-shaped
+`pendingMutation` fact.change frames). Non-dispatchable frames
+(`system.start`, `reconcile.start`, `derivation.compute`, ...) are
+skipped by default — opt out with `{ dispatchableOnly: false }` for
+diagnostic walks.
+
+### `bisectTimeline()` — git-bisect for timelines (R2.A)
+
+Binary-search a recorded timeline for the first frame whose inclusion
+flips a user-supplied assertion from passing to failing.
+
+```ts
+import { bisectTimeline, deserializeTimeline } from '@directive-run/timeline';
+
+const bad = deserializeTimeline(JSON.parse(prodCrashJson));
+const result = await bisectTimeline(
+  bad,
+  // Factory: bisect calls this once per midpoint to get a fresh system.
+  () => {
+    const sys = createSystem({ module: counterModule });
+    sys.start();
+    return sys;
+  },
+  // Oracle: true = good prefix, false = bad prefix.
+  (sys) => sys.facts.score >= 0,
+);
+
+if (result.firstFailingFrameIndex !== undefined) {
+  console.log(`first failing frame: #${result.firstFailingFrameIndex}`);
+} else if (result.noFailureFound) {
+  console.log('assertion never fails — wrong oracle?');
+} else if (result.failsOnEmptyReplay) {
+  console.log('bug is in initialization — bisect cannot narrow further');
+} else if (result.nonDeterministic) {
+  console.log('two full replays disagreed — fix determinism first');
+}
+```
+
+CLI equivalent: `directive bisect bug.json --system factory.ts --assert 'facts.score >= 0'`.
+
+**Cost:** O(log N) replays of up to N frames each, plus two
+full-timeline replays for the determinism gate. The dominant cost in
+practice is the **factory** — your `createSystem + start + initial reconcile`
+runs ~log₂(N) times. Keep the factory cheap (lazy DB/network init,
+no real I/O in module factories) or expect bisect of large timelines
+to take seconds.
+
+### `diffTimelines()` — semantic causal-graph diff (R2.C)
+
+Compare two serialized timelines as a structured causal-graph report.
+Not a textual JSON diff — a per-category delta.
+
+```ts
+import { diffTimelines, deserializeTimeline } from '@directive-run/timeline';
+
+const a = deserializeTimeline(JSON.parse(goodJson));
+const b = deserializeTimeline(JSON.parse(badJson));
+const diff = diffTimelines(a, b);
+
+if (diff.identical) {
+  console.log('semantically identical');
+} else {
+  for (const c of diff.constraintFires) {
+    console.log(`'${c.id}': ${c.aCount} → ${c.bCount} (${c.delta > 0 ? '+' : ''}${c.delta})`);
+  }
+  for (const m of diff.mutations) {
+    console.log(`mutation '${m.id}': ${m.aCount} → ${m.bCount}`);
+  }
+  for (const r of diff.resolverRuns) {
+    console.log(`resolver '${r.resolver}': errors ${r.aErrors}→${r.bErrors}`);
+  }
+}
+```
+
+CLI equivalent: `directive timeline diff a.json b.json` (exit 0 = identical, 2 = differences, 1 = error).
+
+The diff vocabulary mirrors the matcher vocabulary inverted into
+reporters: `toFireConstraint(id, count)` ↔ `diff.constraintFires`,
+`toMutate(kind)` ↔ `diff.mutations`, `toResolveWithinMs(resolver)` ↔
+`diff.resolverRuns`. Same buckets, opposite direction.
 
 ## Roadmap
 
-v0.1 ships the recorder + formatter + vitest reporter + serialize/replay
-scaffold. Future versions explore:
+v0.2 ships the recorder + formatter + vitest reporter + serialize +
+replay + bisect + diff + matchers. Shipped surfaces compose: one JSON
+spec, four operational entry points.
 
-- **v0.2** — interactive scrubbing: pipe failures into a CLI prompt
+Future versions explore:
+
+- **v0.3** — interactive scrubbing: pipe failures into a CLI prompt
   with `n`/`p` to step forward/back through frames, showing the facts
-  snapshot at each step. (Foundation: facts at frame N can be
-  reconstructed by replaying frames 0..N from `system.init`.)
-- **v0.3** — web UI: a small static page (served via vitest UI plugin)
-  that renders the timeline as a swim-lane diagram. Same data; richer
-  rendering.
-- **v0.4** — diff mode: compare two timelines (CI failing vs local
-  passing) and highlight the divergence point.
+  snapshot at each step.
+- **v0.4** — web UI: a small static page that renders the timeline as
+  a swim-lane diagram. Same data; richer rendering.
+- **v0.5** — Mermaid sequence-diagram emitter for `diffTimelines`
+  (PR-comment-friendly causal diff visualization).
+- **v0.5** — first-class `event.dispatch` ObservationEvent support
+  (today replay/diff coupling is mutator-shape-based; core will land
+  the canonical wire format).
 
-These all rest on the v0.1 recorder. If the data model is right, the
-frontends compose.
+These all rest on the recorder + JSON. If the data model is right,
+the frontends compose.
 
 ## See also
 
