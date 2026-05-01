@@ -1,5 +1,48 @@
 # @directive-run/core
 
+## 1.3.0
+
+### Minor Changes
+
+- [`08ac983`](https://github.com/directive-run/directive/commit/08ac9830ae062dbc61de66ca51c77e7049b0bd47) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add `SignalClock` + timer helpers (RFC 0001 v0.1)
+
+  Resolves four MIGRATION_FEEDBACK items in one shape: declarative `after` (#4), fake-timer integration (#15), clock-in-derivation (#16), and predicate-gated tick wiring (#18).
+
+  **New exports** (all from `@directive-run/core`):
+
+  - `SignalClock` interface — injectable time source.
+  - `realClock()` — production clock backed by `Date.now()` + `globalThis.setTimeout`.
+  - `virtualClock(initialMs?)` — test clock; advance synchronously via `clock.advanceBy(ms)` to fire scheduled callbacks in deadline order.
+  - `defaultClock()` — auto-detects vitest (`process.env.VITEST === 'true'`) and returns `virtualClock()` there, `realClock()` everywhere else.
+  - `TimerFactState` interface — JSON-roundtrippable timer state (idle / running / paused / completed) suitable for storing inside any Directive fact.
+  - `initialTimerState()`, `startTimer()`, `pauseTimer()`, `resumeTimer()`, `resetTimer()`, `completeTimer()`, `registerRepeat()` — pure transition helpers.
+  - `elapsedMs()`, `remainingMs()`, `tickTimer()` — pure read helpers; `tickTimer` returns a structured signal (`'no-op' | 'complete' | 'repeat'`).
+  - `timerOps({ms, mode})` — convenience bundle of all of the above closed over a single timer's options.
+
+  **Scope:** v0.1 ships the value layer. The engine doesn't auto-tick timer facts yet — consumers wire a small `setInterval(() => sys.events.TICK(), 100)`. Engine-integrated `t.timer({ms})` schema is the v0.2 deliverable.
+
+  **Replay determinism:** the clock is the only source of time in timer ops. Replaying through a `virtualClock` seeded from a recorded stream reproduces fact streams byte-for-byte. Pause durations survive dehydrate/hydrate intact.
+
+  35 new tests (`clock.test.ts` ×14, `timer.test.ts` ×21).
+
+  Docs: [`docs/api/timer.md`](https://github.com/directive-run/directive/blob/main/docs/api/timer.md).
+
+### Patch Changes
+
+- [`dcad00d`](https://github.com/directive-run/directive/commit/dcad00db373f7d77cffb9e3f7f971e40118b1d48) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix: `t.union<>()` declaration emit cycle
+
+  The 1.2.0 release shipped `t.union<T>()` as a generic-only schema constructor (the Phase 1 P0 from MIGRATION_FEEDBACK item #21). The runtime works correctly, but the declaration emitter hit a self-reference cycle when typing the `t` object — the overload-cast pattern (`(impl) as { ovl1; ovl2 }`) inside an object literal triggered:
+
+  ```
+  error TS7022: 't' implicitly has type 'any' because it does not have a
+  type annotation and is referenced directly or indirectly in its own
+  initializer.
+  ```
+
+  Downstream consumers running `tsc --noEmit` against `@directive-run/core@1.2.0` saw type errors. Hoist `unionImpl` to a typed top-level const (`unionImpl: UnionFn`) and reference it as `union: unionImpl` in the `t` object — runtime semantics unchanged, declaration emit walks cleanly.
+
+  Caught when Minglingo's `apps/web` tried to consume `@directive-run/core/testing.flushAsync` — the JS dist built fine but the DTS build failed for the union exports, masking the entire testing surface from typed downstream usage.
+
 ## 1.1.2
 
 ### Patch Changes
