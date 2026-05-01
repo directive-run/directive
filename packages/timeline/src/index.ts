@@ -530,28 +530,99 @@ export function deserializeTimeline(input: unknown): SerializedTimeline {
   if (!Array.isArray(obj.frames)) {
     throw new TypeError("[timeline] deserialize: frames must be an array");
   }
+  // R2 sec C-2: validate every frame is a structurally-sound object
+  // before returning. Without this guard, untrusted input with
+  // `frames: [null]` or `frames: [{event: null}]` slips through and
+  // crashes the replay loop AND every matcher iteration with a
+  // bare TypeError instead of a clean rejection. The documented use
+  // case (prod-error JSON → replay) requires the input to be
+  // by-design untrusted.
+  const frames = obj.frames.map((f, i) => validateFrame(f, i));
   return {
     version: 1,
     id: obj.id,
     startedAtMs: obj.startedAtMs,
-    frames: obj.frames as TimelineFrame[],
+    frames,
   };
 }
 
 /**
+ * Validate a single frame slot. Throws TypeError with a precise index
+ * on malformed input. Returns the frame typed as `TimelineFrame`.
+ *
+ * @internal
+ */
+function validateFrame(raw: unknown, index: number): TimelineFrame {
+  if (raw === null || typeof raw !== "object") {
+    throw new TypeError(
+      `[timeline] deserialize: frames[${index}] must be an object`,
+    );
+  }
+  const f = raw as { ts?: unknown; event?: unknown };
+  if (typeof f.ts !== "number" || !Number.isFinite(f.ts)) {
+    throw new TypeError(
+      `[timeline] deserialize: frames[${index}].ts must be a finite number`,
+    );
+  }
+  if (f.event === null || typeof f.event !== "object") {
+    throw new TypeError(
+      `[timeline] deserialize: frames[${index}].event must be an object`,
+    );
+  }
+  const ev = f.event as { type?: unknown };
+  if (typeof ev.type !== "string") {
+    throw new TypeError(
+      `[timeline] deserialize: frames[${index}].event.type must be a string`,
+    );
+  }
+  return raw as TimelineFrame;
+}
+
+/**
  * Replay options. The minimum-viable surface is "no options" — replay
- * dispatches every recorded event through the supplied system. Future
- * additions: payload-substitution hooks, frame filters, dry-run mode.
+ * dispatches every recorded event through the supplied system.
  */
 export interface ReplayOptions {
   /**
-   * If true, skip frames whose event type doesn't have a corresponding
+   * Skip frames whose event type doesn't have a corresponding
    * dispatchable surface (e.g. `system.init`, `reconcile.start`,
-   * `derivation.compute` — all of these are caused-by-effect, not
-   * dispatchable). Default: true. Set false for diagnostic replays
-   * that just want to walk the event stream without re-executing.
+   * `derivation.compute` — all caused-by-effect, not dispatchable).
+   * Default: true.
+   */
+  dispatchableOnly?: boolean;
+  /**
+   * @deprecated Use {@link ReplayOptions.dispatchableOnly} instead.
+   * Kept for v0.1 compatibility — read as the inverse of
+   * `dispatchableOnly`. The original name was unintuitive ("dispatchable: true"
+   * read as "this thing IS dispatchable" rather than "filter to dispatchable
+   * frames"). Removed in v1.0.
    */
   dispatchable?: boolean;
+  /**
+   * Maximum number of frames the replay loop will process before
+   * stopping. Defaults to {@link DEFAULT_MAX_REPLAY_FRAMES}. Replay
+   * of an unbounded prod-error JSON dump otherwise lets a malicious
+   * input run an unbounded synchronous loop in a worker. (R2 sec M-4.)
+   */
+  maxFrames?: number;
+}
+
+/** Default maxFrames cap on {@link replayTimeline}. */
+export const DEFAULT_MAX_REPLAY_FRAMES = 100_000;
+
+/**
+ * Diagnostic result returned by {@link replayTimeline}. Lets callers
+ * verify that the replay actually re-dispatched the events they
+ * expected, instead of silently no-op'ing on a non-mutator system.
+ * (R2 arch M-2.)
+ */
+export interface ReplayResult {
+  /** Number of frames that produced a dispatch. */
+  dispatched: number;
+  /** Number of frames skipped (non-dispatchable or reconstruct returned null). */
+  skipped: number;
+  /** Number of frames truncated by `maxFrames` cap. */
+  truncated: number;
 }
 
 /**
@@ -607,17 +678,37 @@ export async function replayTimeline(
   timeline: SerializedTimeline,
   system: ReplayableSystem,
   opts: ReplayOptions = {},
-): Promise<void> {
-  const dispatchableOnly = opts.dispatchable ?? true;
+): Promise<ReplayResult> {
+  // Both `dispatchableOnly` (preferred) and `dispatchable` (deprecated)
+  // are accepted; preferred wins.
+  const dispatchableOnly =
+    opts.dispatchableOnly ?? opts.dispatchable ?? true;
+  const maxFrames = opts.maxFrames ?? DEFAULT_MAX_REPLAY_FRAMES;
+  let dispatched = 0;
+  let skipped = 0;
+  let processed = 0;
   for (const frame of timeline.frames) {
+    if (processed >= maxFrames) {
+      return {
+        dispatched,
+        skipped,
+        truncated: timeline.frames.length - processed,
+      };
+    }
+    processed++;
     if (!isDispatchable(frame.event)) {
+      skipped++;
       if (dispatchableOnly) continue;
     }
-    const dispatched = reconstructDispatch(frame.event);
-    if (dispatched !== null) {
-      system.dispatch(dispatched);
+    const reconstructed = reconstructDispatch(frame.event);
+    if (reconstructed !== null) {
+      system.dispatch(reconstructed);
+      dispatched++;
+    } else {
+      skipped++;
     }
   }
+  return { dispatched, skipped, truncated: 0 };
 }
 
 /**
@@ -652,6 +743,11 @@ function reconstructDispatch(
   if (event.key !== "pendingMutation") return null;
   const next = event.next as Record<string, unknown> | null;
   if (next === null) return null;
-  // Mutator's MUTATE event payload IS the pendingMutation fact value.
-  return { type: "MUTATE", ...next };
+  // R2 sec C-1: spread BEFORE the type literal so an attacker-controlled
+  // `next.type` from untrusted JSON cannot override the MUTATE
+  // dispatch type. This was the documented use case (prod-error JSON
+  // → replay) so the input is by-design untrusted; without this
+  // ordering, a malicious `frames[i].event.next.type = '...'` reroutes
+  // every replayed event to an arbitrary handler.
+  return { ...next, type: "MUTATE" };
 }

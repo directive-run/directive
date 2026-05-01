@@ -216,6 +216,80 @@ primitive.
 | 4 | **R1.D** — Live timeline devtools scrubber | 7 | Max | High | Phase 5 pulled forward |
 | 5 | **R1.E** — `.invariant()` runtime-checked transitions | 7 | Med-High | High | risky scope creep |
 
+---
+
+## R2.A-E — Second-order ideas surfaced after R1.A+B+C shipped
+
+The substrate compounds. Five new candidates emerged from the post-ship innovation review — each only became cheap to build *because* the three R1 surfaces shipped together.
+
+### R2.A — `directive bisect <good.json> <bad.json>` — git-bisect for timelines
+
+**[BUILD CANDIDATE — 2 days]**
+
+Two serialized timelines, one passing, one failing. CLI binary-searches the frame delta, replays each midpoint, runs your matchers, prints "frame #47 (`MUTATE submit`) is the first divergence."
+
+**Substrate dependency:** R1.A's `replayTimeline` (deterministic re-run of any prefix) + R1.B's matchers (pass/fail oracle). Without both, the midpoint-replay-and-assert loop is impossible.
+
+**Pre-mortem:** non-determinism breaks bisection — every midpoint must produce the same outcome. Mitigate by refusing to bisect unless `replayTimeline(input)` twice matches byte-for-byte.
+
+**Compound effect:** Seeds R2.C diff (same midpoint primitive). Foundation for "CI bisect bot."
+
+### R2.B — `recordReplayable()` HOC: prod cancellable mutations auto-emit supersession-aware replay frames
+
+**[1 day — quick win]**
+
+Wrap `cancellable()` with `recordReplayable()`. Cancellation cause + the original payload that would have completed gets pinned into the timeline's serialized frame stream as a `cancel.reason` annotation. Replay reproduces the cancellation race exactly.
+
+**Substrate dependency:** R1.C's `signal` + `CancelReason` (now `CancelError` post-R2 fix). R1.A's JSON round-trip. R1.B's matchers as the assertion form.
+
+**Compound effect:** Cancellation races become first-class replayable bugs. Combined with R2.A, prod typeahead bugs become 2-line CI repros.
+
+### R2.C — `directive timeline diff <a.json> <b.json>` — semantic causal-graph diff
+
+**[2 days]**
+
+Not a textual JSON diff — a causal one. "Run B fired constraint `pendingMutation` 3 extra times Run A didn't. Run B has a new cascade edge." Output is structured + a Mermaid sequence diagram.
+
+**Substrate dependency:** Both inputs are R1.A serialized timelines. The diff vocabulary IS R1.B's matchers inverted into reporters.
+
+**Compound effect:** Killer review surface for PRs that touch state. Foundation for R1.D scrubber rendering two timelines side-by-side.
+
+### R2.D — Sentry/PostHog adapter → CI auto-PR with matcher-based test
+
+**[1 week — flywheel]**
+
+Drop-in `@directive-run/sentry` attaches `serializeTimeline()` to every Sentry breadcrumb. GitHub Action consumes new Sentry issues, runs `directive replay --as-test`, opens a PR with a failing vitest using R1.B matchers. Engineer reviews, fixes, merges.
+
+**Karpathy angle:** "Production errors arrive as failing PRs. I never write repro steps."
+
+**Substrate dependency:** R1.A serialize + the v0.2 codegen IDEAS deferred. Critically, the *generated test body* uses R1.B matchers (not brittle `toBe` assertions) — without matchers, auto-generated tests are fragile point-state checks.
+
+**Pre-mortem:** auto-PR noise hell at high-cardinality. Mitigate by deduping on causal-graph hash (shape, not values). PII story needed: ship `redactTimeline()` alongside.
+
+**Compound effect:** This is the *flywheel*. Every prod error ships a deterministic test. Drives the matcher library toward real-world idioms (drives R1.B v0.2). Replay archive becomes a corpus for property-testing fuzzers (R2.E territory).
+
+### R2.E — Property-test generator: `forAllTimelines((events) => expect(timeline).notToCascade())`
+
+**[1 week]**
+
+A `@directive-run/test-utils/fast-check` adapter. Define legal event arbitraries; the runner generates 1000 sequences, replays each, asserts matcher invariants. Counter-example emits a serialized timeline JSON identical to R1.A's prod-replay format — same shrinker, same playback.
+
+**Substrate dependency:** Replay (R1.A) is the engine. Matchers (R1.B) are the invariants. Cancellable's deterministic AbortSignal under virtualClock (R1.C) is what makes 1000 trial replays not flake on async races.
+
+**Compound effect:** Closes the loop — replay JSON is the exchange format for prod errors (R2.D), bisect inputs (R2.A), diff inputs (R2.C), AND fuzzer outputs (R2.E). One serialization spec, four entry points.
+
+### R2 ranked
+
+| Rank | Idea | Days | Viral | Compound | Tag |
+|---|---|---|---|---|---|
+| 1 | **R2.A** — `directive bisect` over timelines | 2 | Max | Max | **BUILD CANDIDATE** |
+| 2 | **R2.D** — Sentry → auto-PR with matcher-based test | 7 | Max | Max | flywheel |
+| 3 | **R2.B** — `recordReplayable()` cancel-aware replay HOC | 1 | High | High | quick win |
+| 4 | **R2.C** — Causal-graph timeline diff CLI | 2 | High | High | review surface |
+| 5 | **R2.E** — fast-check property tests over timelines | 7 | Med-High | Max | exchange-format payoff |
+
+**R2.A is the asymmetric pick** — same structure as R1.A, R1.B, R1.C: 2 days, runs entirely on already-shipped surface, demo writes itself ("upload two JSONs, get the divergence frame"). Seeds R2.C and validates the determinism guarantees R2.D and R2.E both lean on.
+
 **Recommendation:** R1.A is the asymmetric-payoff pick. Two days, one
 screencast, solves a problem every engineer has every week. The
 substrate (typed observation events + virtual clock + serializable

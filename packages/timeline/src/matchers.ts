@@ -57,7 +57,68 @@ function frames(input: unknown): TimelineFrame[] {
       "[timeline-matchers] input.frames is missing or not an array",
     );
   }
-  return obj.frames as TimelineFrame[];
+  // R2 sec C-3: filter out frames lacking a structurally-valid
+  // `event.type`. Untrusted JSON (e.g. a hostile prod-error dump)
+  // could embed `frames: [{ ts: 0, event: null }]` which would
+  // crash matcher iteration with a bare TypeError instead of
+  // producing a clean assertion result.
+  return (obj.frames as unknown[]).filter(isWellFormedFrame) as TimelineFrame[];
+}
+
+/**
+ * Structural deep-equality. NaN equals NaN; undefined equals undefined;
+ * arrays compared by index; objects compared by enumerable own keys.
+ * Avoids the false-positive matches that `JSON.stringify` equality
+ * produces when values contain NaN, Infinity, or undefined fields.
+ *
+ * @internal
+ */
+function structuredEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true; // handles NaN, identity
+  if (a === null || b === null) return false;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!structuredEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (Array.isArray(b)) return false;
+  const aObj = a as Record<string, unknown>;
+  const bObj = b as Record<string, unknown>;
+  const aKeys = Object.keys(aObj);
+  const bKeys = Object.keys(bObj);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(bObj, k)) return false;
+    if (!structuredEqual(aObj[k], bObj[k])) return false;
+  }
+  return true;
+}
+
+/**
+ * Best-effort string rendering for an expected value in matcher
+ * messages. Uses JSON.stringify for normal values; falls back to
+ * String() for shapes JSON can't handle (BigInt, circular refs).
+ *
+ * @internal
+ */
+function formatValue(v: unknown): string {
+  try {
+    return JSON.stringify(v) ?? String(v);
+  } catch {
+    return String(v);
+  }
+}
+
+function isWellFormedFrame(raw: unknown): raw is TimelineFrame {
+  if (raw === null || typeof raw !== "object") return false;
+  const f = raw as { event?: unknown };
+  if (f.event === null || typeof f.event !== "object") return false;
+  const ev = f.event as { type?: unknown };
+  return typeof ev.type === "string";
 }
 
 // ============================================================================
@@ -72,13 +133,16 @@ function toReachInMs(
   withinMs: number,
 ): MatcherResult {
   const fs = frames(received);
-  const valueJson = JSON.stringify(expectedValue);
   let firstReachTs: number | null = null;
 
   for (const f of fs) {
     if (f.event.type !== "fact.change") continue;
     if (f.event.key !== factKey) continue;
-    if (JSON.stringify(f.event.next) === valueJson) {
+    // R2 sec M-2: structural equality instead of JSON.stringify.
+    // JSON-roundtrip equality drops NaN/undefined/Infinity (NaN
+    // coerces to null; undefined keys disappear), producing false
+    // positive matches. structuredEqual compares directly.
+    if (structuredEqual(f.event.next, expectedValue)) {
       firstReachTs = f.ts;
       break;
     }
@@ -88,7 +152,7 @@ function toReachInMs(
     return {
       pass: false,
       message: () =>
-        `expected timeline to reach ${factKey} = ${valueJson} within ${withinMs}ms — fact never reached that value`,
+        `expected timeline to reach ${factKey} = ${formatValue(expectedValue)} within ${withinMs}ms — fact never reached that value`,
     };
   }
 
@@ -97,8 +161,8 @@ function toReachInMs(
     pass,
     message: () =>
       pass
-        ? `expected timeline NOT to reach ${factKey} = ${valueJson} within ${withinMs}ms — but reached at +${firstReachTs!.toFixed(1)}ms`
-        : `expected timeline to reach ${factKey} = ${valueJson} within ${withinMs}ms — reached at +${firstReachTs!.toFixed(1)}ms`,
+        ? `expected timeline NOT to reach ${factKey} = ${formatValue(expectedValue)} within ${withinMs}ms — but reached at +${firstReachTs!.toFixed(1)}ms`
+        : `expected timeline to reach ${factKey} = ${formatValue(expectedValue)} within ${withinMs}ms — reached at +${firstReachTs!.toFixed(1)}ms`,
   };
 }
 

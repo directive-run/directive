@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { virtualClock } from "@directive-run/core";
-import { cancellable, type CancelReason } from "../index.js";
+import {
+  cancellable,
+  type CancelReason,
+  CancelError,
+  SupersededCancelError,
+  TimeoutCancelError,
+  cancelReason,
+} from "../index.js";
 
 describe("R1.C cancellable() — basic invocation", () => {
   it("invokes the wrapped handler with a non-aborted signal", async () => {
@@ -234,6 +241,111 @@ describe("R1.C cancellable() — timeout", () => {
     // should fire (controller is already aborted; clean exit).
     clock.advanceBy?.(2_000);
     expect(abortReasons.length).toBe(1);
+  });
+});
+
+describe("R2 sec M-1: signal.reason is a CancelError subclass", () => {
+  it("supersession reason is a SupersededCancelError instance", async () => {
+    let releaseFirst: () => void = () => {};
+    let abortReason: unknown;
+    const wrapped = cancellable<Record<string, never>, { tag: string }>(
+      { supersedeOn: "self" },
+      async ({ payload, signal }) => {
+        if (payload.tag === "first") {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+          if (signal.aborted) abortReason = signal.reason;
+        }
+      },
+    );
+
+    const facts = {};
+    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
+    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    await second;
+    releaseFirst();
+    await first;
+
+    // The reason is now an Error subclass — survives transit through
+    // fetch/.catch(err => err instanceof Error)/logging frameworks.
+    expect(abortReason).toBeInstanceOf(Error);
+    expect(abortReason).toBeInstanceOf(CancelError);
+    expect(abortReason).toBeInstanceOf(SupersededCancelError);
+    expect((abortReason as CancelError).kind).toBe("superseded");
+    expect((abortReason as Error).message).toContain("superseded");
+  });
+
+  it("timeout reason is a TimeoutCancelError instance carrying afterMs", async () => {
+    const clock = virtualClock(0);
+    let abortReason: unknown;
+
+    const wrapped = cancellable<Record<string, never>, Record<string, never>>(
+      { timeoutMs: 1_000, setTimeout: clock.setTimeout },
+      async ({ signal }) => {
+        await new Promise<void>((resolve) => {
+          if (signal.aborted) {
+            resolve();
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            abortReason = signal.reason;
+            resolve();
+          });
+        });
+      },
+    );
+
+    const promise = wrapped({ facts: {}, payload: {}, requeue: () => {} });
+    await Promise.resolve();
+    clock.advanceBy?.(1_001);
+    await promise;
+
+    expect(abortReason).toBeInstanceOf(Error);
+    expect(abortReason).toBeInstanceOf(CancelError);
+    expect(abortReason).toBeInstanceOf(TimeoutCancelError);
+    expect((abortReason as TimeoutCancelError).afterMs).toBe(1_000);
+  });
+
+  it("cancelReason factory produces matching instances", () => {
+    const s = cancelReason.superseded();
+    expect(s).toBeInstanceOf(SupersededCancelError);
+    expect(s.kind).toBe("superseded");
+
+    const t = cancelReason.timeout(500);
+    expect(t).toBeInstanceOf(TimeoutCancelError);
+    expect(t.kind).toBe("timeout");
+    expect(t.afterMs).toBe(500);
+  });
+
+  it("CancelReason type narrows correctly off signal.reason", () => {
+    // Type-level smoke test: kind discriminator narrows.
+    const reason: CancelReason = cancelReason.timeout(100);
+    if (reason.kind === "timeout") {
+      // TS knows reason has afterMs here
+      expect(reason.afterMs).toBe(100);
+    }
+  });
+});
+
+describe("R2 sec M-3: cancelTimeout cleanup does not shadow handler errors", () => {
+  it("a throwing setTimeout cancel-handle does not replace handler exception", async () => {
+    const wrapped = cancellable<Record<string, never>, Record<string, never>>(
+      {
+        timeoutMs: 1_000,
+        // Hostile setTimeout that returns a cancel function which throws.
+        setTimeout: (_cb, _ms) => () => {
+          throw new Error("hostile cancel");
+        },
+      },
+      async () => {
+        throw new Error("real handler error");
+      },
+    );
+
+    await expect(
+      wrapped({ facts: {}, payload: {}, requeue: () => {} }),
+    ).rejects.toThrow("real handler error");
   });
 });
 

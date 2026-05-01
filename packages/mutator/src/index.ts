@@ -517,10 +517,58 @@ export interface CancellableHandlerContext<F, P> {
 /**
  * Reason a cancellable handler's signal aborted. Stamped on
  * `signal.reason` so the handler can disambiguate.
+ *
+ * Note: at runtime the value is a {@link CancelError} subclass with
+ * the same shape — `signal.reason instanceof CancelError` is the
+ * canonical check. Older usages that did `signal.reason?.kind ===
+ * 'superseded'` continue to work because the Error subclass exposes
+ * the same `kind` field. (R2 sec M-1.)
  */
 export type CancelReason =
   | { kind: "superseded" }
   | { kind: "timeout"; afterMs: number };
+
+/**
+ * Runtime carrier for {@link CancelReason}. Subclasses `Error` so the
+ * value survives transit through `fetch(url, { signal })` and other
+ * web-platform APIs that re-throw `signal.reason`. Older mutator
+ * versions passed plain objects, which `.catch(err => err instanceof
+ * Error)` filters silently dropped. (R2 sec M-1.)
+ */
+export class CancelError extends Error {
+  constructor(public readonly kind: CancelReason["kind"], message?: string) {
+    super(message ?? `[mutator] cancellable: ${kind}`);
+    this.name = "CancelError";
+  }
+}
+
+/** Subclass of {@link CancelError} for timeout-driven aborts. */
+export class TimeoutCancelError extends CancelError {
+  constructor(public readonly afterMs: number) {
+    super("timeout", `[mutator] cancellable: timeout after ${afterMs}ms`);
+    this.name = "TimeoutCancelError";
+  }
+}
+
+/** Subclass of {@link CancelError} for supersede-driven aborts. */
+export class SupersededCancelError extends CancelError {
+  constructor() {
+    super("superseded", "[mutator] cancellable: superseded by new dispatch");
+    this.name = "SupersededCancelError";
+  }
+}
+
+/**
+ * Factory for cancel-reason values. Pure — these are the runtime
+ * counterparts of the {@link CancelReason} type. Use them in custom
+ * cancellation flows that need a typed reason without re-typing the
+ * literal.
+ */
+export const cancelReason = {
+  superseded: (): SupersededCancelError => new SupersededCancelError(),
+  timeout: (afterMs: number): TimeoutCancelError =>
+    new TimeoutCancelError(afterMs),
+} as const;
 
 /**
  * Wrap a mutator handler with auto-cancellation. The wrapped handler
@@ -589,8 +637,12 @@ export function cancellable<F, P>(
 
   return async (ctx: { facts: F; payload: P; requeue: () => void }) => {
     // Supersession: abort the prior in-flight invocation, if any.
+    // R2 sec M-1: pass an Error subclass so signal.reason survives
+    // re-throw through fetch / .catch(err => err instanceof Error)
+    // / logging frameworks. Plain object reasons silently fail those
+    // checks downstream.
     if (supersedeOn === "self" && priorController !== undefined) {
-      priorController.abort({ kind: "superseded" } satisfies CancelReason);
+      priorController.abort(cancelReason.superseded());
     }
 
     const controller = new AbortController();
@@ -603,7 +655,7 @@ export function cancellable<F, P>(
     let cancelTimeout: (() => void) | undefined;
     if (typeof timeoutMs === "number" && timeoutMs > 0) {
       cancelTimeout = scheduleTimeout(() => {
-        controller.abort({ kind: "timeout", afterMs: timeoutMs } satisfies CancelReason);
+        controller.abort(cancelReason.timeout(timeoutMs));
       }, timeoutMs);
     }
 
@@ -617,7 +669,15 @@ export function cancellable<F, P>(
     } finally {
       // Clean up: clear the timeout (if it hasn't fired) and release
       // the supersession slot if it still belongs to this invocation.
-      cancelTimeout?.();
+      // R2 sec M-3: wrap cancelTimeout in try/catch so a hostile
+      // setTimeout-cancel-handle (e.g. a custom virtual clock that
+      // throws on cancel) cannot shadow the original handler's
+      // exception.
+      try {
+        cancelTimeout?.();
+      } catch {
+        /* swallow — the cancel-handle's failure is not the caller's problem */
+      }
       if (priorController === controller) {
         priorController = undefined;
       }
