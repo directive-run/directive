@@ -76,6 +76,7 @@ export type {
 // Resolver types
 export type {
   RetryPolicy,
+  JitterStrategy,
   BatchConfig,
   BatchItemResult,
   BatchResolveResults,

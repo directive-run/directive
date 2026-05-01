@@ -228,11 +228,50 @@ const DEFAULT_BATCH: BatchConfig = {
 };
 
 /**
+ * Apply a jitter strategy to a computed retry delay.
+ *
+ * `"full"` and `"equal"` produce a delay within the existing computed
+ * window — they never increase the worst-case wait. `{ maxMs }` adds
+ * additive jitter on top of the computed delay (the operator opted into
+ * a known upper bound on the spread).
+ *
+ * @internal
+ */
+function applyJitter(
+  computedDelay: number,
+  jitter: RetryPolicy["jitter"],
+): number {
+  if (!jitter || jitter === "none") {
+    return computedDelay;
+  }
+
+  if (jitter === "full") {
+    return Math.floor(Math.random() * computedDelay);
+  }
+
+  if (jitter === "equal") {
+    const half = computedDelay / 2;
+
+    return Math.floor(half + Math.random() * half);
+  }
+
+  if (typeof jitter === "object" && "maxMs" in jitter) {
+    const maxMs = Number.isFinite(jitter.maxMs) && jitter.maxMs > 0
+      ? jitter.maxMs
+      : 0;
+
+    return computedDelay + Math.floor(Math.random() * maxMs);
+  }
+
+  return computedDelay;
+}
+
+/**
  * Calculate delay for a retry attempt based on backoff policy.
  *
  * @param policy - Retry policy with backoff strategy and delay bounds
  * @param attempt - Current attempt number (1-based)
- * @returns Delay in milliseconds, clamped to maxDelay
+ * @returns Delay in milliseconds, clamped to maxDelay (then jittered)
  */
 function calculateDelay(policy: RetryPolicy, attempt: number): number {
   const { backoff, initialDelay = 100, maxDelay = 30000 } = policy;
@@ -253,8 +292,13 @@ function calculateDelay(policy: RetryPolicy, attempt: number): number {
       delay = initialDelay;
   }
 
-  // Ensure delay is at least 1ms to prevent busy loops
-  return Math.max(1, Math.min(delay, maxDelay));
+  // Clamp BEFORE jitter so "full"/"equal" sample within [0, maxDelay].
+  const clamped = Math.min(delay, maxDelay);
+
+  const jittered = applyJitter(clamped, policy.jitter);
+
+  // Ensure delay is at least 1ms to prevent busy loops.
+  return Math.max(1, jittered);
 }
 
 /**

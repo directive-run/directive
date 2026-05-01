@@ -17,6 +17,27 @@ import type { Schema } from "./schema.js";
 // Resolver Configuration Types
 // ============================================================================
 
+/**
+ * Jitter strategy applied to the computed retry delay.
+ *
+ * Jitter spreads synchronized retries across a fleet of clients to
+ * prevent thundering-herd against shared services (e.g. Rekor, ACME,
+ * upstream APIs) when a regional outage causes every retry pass to
+ * wake at the same multiple of the initial delay.
+ *
+ * - `"none"` (default): no jitter; delay is exactly the computed value.
+ * - `"full"`: delay is uniformly distributed in `[0, computedDelay]`.
+ *   AWS-style "full jitter" — best for thundering-herd protection
+ *   against shared services at fleet scale.
+ * - `"equal"`: delay is `computedDelay/2 + uniform[0, computedDelay/2]`.
+ *   Bounds the worst-case wait while still spreading retries.
+ * - `{ maxMs: number }`: adds `uniform[0, maxMs]` to the computed delay.
+ *   Useful when bounded jitter is desired regardless of attempt number.
+ *
+ * Reference: https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+ */
+export type JitterStrategy = "none" | "full" | "equal" | { maxMs: number };
+
 /** Retry policy configuration */
 export interface RetryPolicy {
   /** Maximum number of attempts */
@@ -27,6 +48,17 @@ export interface RetryPolicy {
   initialDelay?: number;
   /** Maximum delay in ms */
   maxDelay?: number;
+  /**
+   * Jitter strategy applied to the computed delay before each retry.
+   * Defaults to `"none"`. See {@link JitterStrategy} for options.
+   *
+   * Jitter is applied AFTER `maxDelay` clamping for `"full"` and `"equal"`
+   * strategies (so the jittered range respects `maxDelay`). For
+   * `{ maxMs }`, the additive jitter can push the final delay above
+   * `maxDelay` by up to `maxMs` — this is intentional, since `maxMs` is
+   * the operator's explicit upper bound on the jitter spread.
+   */
+  jitter?: JitterStrategy;
   /**
    * Optional predicate to decide whether to retry after an error.
    * Return `true` to retry, `false` to stop immediately.

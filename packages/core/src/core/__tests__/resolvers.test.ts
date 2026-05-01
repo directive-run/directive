@@ -355,6 +355,264 @@ describe("retry logic", () => {
 });
 
 // ============================================================================
+// Retry Jitter
+// ============================================================================
+
+describe("retry jitter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Helper: drive a retry to completion with a known Math.random value
+   * and capture the actual delay between attempts.
+   */
+  async function captureRetryDelay(
+    retry: Parameters<typeof setup>[0][string]["retry"],
+    randomValue: number,
+  ): Promise<number> {
+    vi.spyOn(Math, "random").mockReturnValue(randomValue);
+
+    let firstFailAt = 0;
+    let secondCallAt = 0;
+    let callCount = 0;
+
+    const { manager } = setup({
+      fetchData: {
+        requirement: "FETCH",
+        retry,
+        resolve: async () => {
+          callCount++;
+          if (callCount === 1) {
+            firstFailAt = Date.now();
+            throw new Error("fail");
+          }
+          secondCallAt = Date.now();
+        },
+      },
+    });
+
+    const req = makeReq("FETCH");
+    manager.resolve(req);
+
+    // Advance enough to cover any plausible delay.
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(2_000);
+    }
+
+    expect(callCount).toBe(2);
+
+    return secondCallAt - firstFailAt;
+  }
+
+  it("jitter undefined uses computed delay unchanged", async () => {
+    const delay = await captureRetryDelay(
+      { attempts: 2, backoff: "exponential", initialDelay: 1_000 },
+      0.5,
+    );
+    expect(delay).toBe(1_000);
+  });
+
+  it("jitter 'none' uses computed delay unchanged", async () => {
+    const delay = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "none",
+      },
+      0.5,
+    );
+    expect(delay).toBe(1_000);
+  });
+
+  it("jitter 'full' samples in [0, computedDelay)", async () => {
+    // random=0 → floor(0 * 1000) = 0 → clamped to 1ms minimum
+    const lo = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "full",
+      },
+      0,
+    );
+    expect(lo).toBe(1);
+
+    // random ~ 1 → floor(0.999... * 1000) = 999
+    const hi = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "full",
+      },
+      0.9999999999,
+    );
+    expect(hi).toBe(999);
+
+    // random=0.5 → floor(0.5 * 1000) = 500
+    const mid = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "full",
+      },
+      0.5,
+    );
+    expect(mid).toBe(500);
+  });
+
+  it("jitter 'equal' samples in [computedDelay/2, computedDelay)", async () => {
+    // random=0 → floor(500 + 0 * 500) = 500
+    const lo = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "equal",
+      },
+      0,
+    );
+    expect(lo).toBe(500);
+
+    // random=0.5 → floor(500 + 0.5 * 500) = 750
+    const mid = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "equal",
+      },
+      0.5,
+    );
+    expect(mid).toBe(750);
+
+    // random ~ 1 → floor(500 + 0.999... * 500) = 999
+    const hi = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: "equal",
+      },
+      0.9999999999,
+    );
+    expect(hi).toBe(999);
+  });
+
+  it("jitter { maxMs } adds [0, maxMs) to computed delay", async () => {
+    // random=0 → 1000 + floor(0 * 100) = 1000
+    const lo = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: { maxMs: 100 },
+      },
+      0,
+    );
+    expect(lo).toBe(1_000);
+
+    // random=0.5 → 1000 + floor(0.5 * 100) = 1050
+    const mid = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: { maxMs: 100 },
+      },
+      0.5,
+    );
+    expect(mid).toBe(1_050);
+
+    // random ~ 1 → 1000 + floor(0.999... * 100) = 1099
+    const hi = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: { maxMs: 100 },
+      },
+      0.9999999999,
+    );
+    expect(hi).toBe(1_099);
+  });
+
+  it("jitter { maxMs: 0 } is a no-op (degenerate guard)", async () => {
+    const delay = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 1_000,
+        jitter: { maxMs: 0 },
+      },
+      0.5,
+    );
+    expect(delay).toBe(1_000);
+  });
+
+  it("jitter respects maxDelay clamp BEFORE applying full jitter", async () => {
+    // computed = 4000, clamped to maxDelay = 1000, full jitter → floor(0.5 * 1000) = 500
+    const delay = await captureRetryDelay(
+      {
+        attempts: 2,
+        backoff: "exponential",
+        initialDelay: 4_000,
+        maxDelay: 1_000,
+        jitter: "full",
+      },
+      0.5,
+    );
+    expect(delay).toBe(500);
+  });
+
+  it("backwards compat: existing exponential-without-jitter path is identical", async () => {
+    // Confirms that a policy without `jitter` produces the exact same delay
+    // it did before this change (no implicit randomization).
+    let callCount = 0;
+    const { manager } = setup({
+      fetchData: {
+        requirement: "FETCH",
+        retry: {
+          attempts: 4,
+          backoff: "exponential",
+          initialDelay: 100,
+        },
+        resolve: async () => {
+          callCount++;
+          throw new Error("fail");
+        },
+      },
+    });
+
+    const req = makeReq("FETCH");
+    manager.resolve(req);
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(callCount).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+    expect(callCount).toBe(2);
+
+    await vi.advanceTimersByTimeAsync(200);
+    await flush();
+    expect(callCount).toBe(3);
+
+    await vi.advanceTimersByTimeAsync(400);
+    await flush();
+    expect(callCount).toBe(4);
+  });
+});
+
+// ============================================================================
 // Abort / Cancel
 // ============================================================================
 
