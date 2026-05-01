@@ -1,5 +1,13 @@
 # @directive-run/example-form-wizard
 
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies [[`dcad00d`](https://github.com/directive-run/directive/commit/dcad00db373f7d77cffb9e3f7f971e40118b1d48), [`08ac983`](https://github.com/directive-run/directive/commit/08ac9830ae062dbc61de66ca51c77e7049b0bd47)]:
+  - @directive-run/core@1.3.0
+  - @directive-run/el@1.0.0
+
 ## 0.0.24
 
 ### Patch Changes

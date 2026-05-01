@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-sudoku",
-  "version": "0.0.24",
+  "version": "0.0.25",
   "private": true,
   "type": "module",
   "scripts": {
