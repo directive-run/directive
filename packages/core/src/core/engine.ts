@@ -45,8 +45,10 @@ import type {
   DerivationsDef,
   EffectsDef,
   EventsDef,
+  Facts,
   FactsSnapshot,
   InferSchema,
+  MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
   ResolversDef,
@@ -55,7 +57,6 @@ import type {
   SystemConfig,
   SystemEvent,
   SystemInspection,
-  MetaMatch,
   TraceEntry,
 } from "./types.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
@@ -199,7 +200,11 @@ export function createEngine<S extends Schema>(
     if (module.events) {
       // Unwrap { handler, meta } event forms before merging
       for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler")) {
+        if (
+          typeof raw === "object" &&
+          raw !== null &&
+          Object.hasOwn(raw, "handler")
+        ) {
           const obj = raw as { handler: Function; meta?: DefinitionMeta };
           (module.events as Record<string, unknown>)[key] = obj.handler;
           if (obj.meta) {
@@ -514,6 +519,32 @@ export function createEngine<S extends Schema>(
     definitions: mergedResolvers,
     facts,
     store,
+    // RFC-1: resolver constraint-binding. Resolves the source constraint's
+    // bind mode + sync `when()` reference so the resolver context can gate
+    // fact writes on the live predicate. Async constraints are forced to
+    // `'none'` (binding requires a sync predicate; logged once in dev).
+    getConstraintBinding: (constraintId) => {
+      const def = mergedConstraints[constraintId];
+      if (!def) return undefined;
+      const mode = def.bind ?? "none";
+      if (mode === "none") return { mode: "none", when: null };
+      // `bind: 'auto'` requires a sync predicate. Force-downgrade async
+      // constraints; they cannot be bound because the binding checker
+      // re-evaluates `when()` on every fact write.
+      const state = constraintsManager.getState(constraintId);
+      if (state?.isAsync || def.async) {
+        if (isDevelopment) {
+          console.warn(
+            `[Directive] Constraint "${constraintId}" has bind: 'auto' but is async. Binding is disabled — async predicates cannot be re-evaluated synchronously on every fact write.`,
+          );
+        }
+        return { mode: "none", when: null };
+      }
+      return {
+        mode: "auto",
+        when: def.when as (factsArg: Facts<S>) => boolean,
+      };
+    },
     onStart: (resolver, req) => {
       if (hasPlugins()) pluginManager.emitResolverStart(resolver, req);
     },
@@ -996,7 +1027,8 @@ export function createEngine<S extends Schema>(
       results.push({ type: "module", id, meta });
     }
     for (const key of Object.keys(mergedSchema)) {
-      const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })?._meta;
+      const meta = (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta })
+        ?._meta;
       if (meta) results.push({ type: "fact", id: key, meta });
     }
     for (const [name, meta] of eventMeta) {
@@ -1125,14 +1157,10 @@ export function createEngine<S extends Schema>(
         return derivationsManager.getMeta(id as keyof DerivationsDef<S>);
       },
       byCategory(category: string): MetaMatch[] {
-        return collectAllMeta().filter(
-          (m) => m.meta.category === category,
-        );
+        return collectAllMeta().filter((m) => m.meta.category === category);
       },
       byTag(tag: string): MetaMatch[] {
-        return collectAllMeta().filter(
-          (m) => m.meta.tags?.includes(tag),
-        );
+        return collectAllMeta().filter((m) => m.meta.tags?.includes(tag));
       },
     },
 
@@ -1165,26 +1193,49 @@ export function createEngine<S extends Schema>(
           observer({ type: "constraint.evaluate", id, active }),
         onConstraintError: (id: string, error: unknown) =>
           observer({ type: "constraint.error", id, error }),
-        onRequirementCreated: (req: { id: string; requirement: { type: string } }) =>
-          observer({ type: "requirement.created", id: req.id, requirementType: req.requirement.type }),
+        onRequirementCreated: (req: {
+          id: string;
+          requirement: { type: string };
+        }) =>
+          observer({
+            type: "requirement.created",
+            id: req.id,
+            requirementType: req.requirement.type,
+          }),
         onRequirementMet: (req: { id: string }, byResolver: string) =>
           observer({ type: "requirement.met", id: req.id, byResolver }),
         onRequirementCanceled: (req: { id: string }) =>
           observer({ type: "requirement.canceled", id: req.id }),
         onResolverStart: (resolver: string, req: { id: string }) =>
           observer({ type: "resolver.start", resolver, requirementId: req.id }),
-        onResolverComplete: (resolver: string, req: { id: string }, duration: number) =>
-          observer({ type: "resolver.complete", resolver, requirementId: req.id, duration }),
-        onResolverError: (resolver: string, req: { id: string }, error: unknown) =>
-          observer({ type: "resolver.error", resolver, requirementId: req.id, error }),
-        onEffectRun: (id: string) =>
-          observer({ type: "effect.run", id }),
+        onResolverComplete: (
+          resolver: string,
+          req: { id: string },
+          duration: number,
+        ) =>
+          observer({
+            type: "resolver.complete",
+            resolver,
+            requirementId: req.id,
+            duration,
+          }),
+        onResolverError: (
+          resolver: string,
+          req: { id: string },
+          error: unknown,
+        ) =>
+          observer({
+            type: "resolver.error",
+            resolver,
+            requirementId: req.id,
+            error,
+          }),
+        onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
-        onReconcileStart: () =>
-          observer({ type: "reconcile.start" }),
+        onReconcileStart: () => observer({ type: "reconcile.start" }),
         onReconcileEnd: (result: unknown) => {
           const r = result as {
             completed?: unknown[];
@@ -1476,7 +1527,11 @@ export function createEngine<S extends Schema>(
         inflight: resolversManager.getInflightInfo(),
         facts: Object.keys(mergedSchema).map((key) => ({
           key,
-          meta: (mergedSchema[key as keyof S] as { _meta?: DefinitionMeta } | undefined)?._meta,
+          meta: (
+            mergedSchema[key as keyof S] as
+              | { _meta?: DefinitionMeta }
+              | undefined
+          )?._meta,
         })),
         events: Object.keys(mergedEvents).map((name) => ({
           name,
@@ -1506,8 +1561,7 @@ export function createEngine<S extends Schema>(
         })),
         effects: Object.entries(mergedEffects).map(([id, def]) => ({
           id,
-          meta: (def as { meta?: DefinitionMeta })
-            .meta,
+          meta: (def as { meta?: DefinitionMeta }).meta,
         })),
         derivations: Object.keys(mergedDerive).map((id) => ({
           id,
@@ -2094,13 +2148,19 @@ export function createEngine<S extends Schema>(
     // Merge into existing engine state
     Object.assign(mergedSchema, module.schema);
     // Freeze fact/schema field _meta for new module
-    for (const schemaType of Object.values(module.schema as Record<string, unknown>)) {
+    for (const schemaType of Object.values(
+      module.schema as Record<string, unknown>,
+    )) {
       const st = schemaType as { _meta?: DefinitionMeta };
       if (st._meta) st._meta = freezeMeta(st._meta)!;
     }
     if (module.events) {
       for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler")) {
+        if (
+          typeof raw === "object" &&
+          raw !== null &&
+          Object.hasOwn(raw, "handler")
+        ) {
           const obj = raw as { handler: Function; meta?: DefinitionMeta };
           (module.events as Record<string, unknown>)[key] = obj.handler;
           if (obj.meta) {

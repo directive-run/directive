@@ -14,6 +14,7 @@ import { withTimeout } from "../utils/utils.js";
 import type {
   BatchConfig,
   BatchResolveResults,
+  ConstraintBindMode,
   Facts,
   FactsSnapshot,
   FactsStore,
@@ -177,6 +178,29 @@ interface BatchState {
 }
 
 /**
+ * Per-constraint binding info, used by RFC-1 (resolver constraint-binding).
+ *
+ * The engine wires this lookup into the resolvers manager so that a resolver
+ * dispatched from a constraint with `bind: 'auto'` can re-evaluate the
+ * constraint's `when()` predicate live on every fact write.
+ *
+ * Returns `null` (or the lookup itself returns `undefined`) when the source
+ * constraint is unknown, async, or has `bind: 'none'` — in which case
+ * binding is a no-op and the resolver behaves exactly as before.
+ *
+ * @internal
+ */
+export interface ConstraintBindingInfo<S extends Schema> {
+  /** The constraint's `bind` mode (effective; async predicates are forced to `'none'`). */
+  mode: ConstraintBindMode;
+  /**
+   * The constraint's `when()` predicate, narrowed to a sync signature.
+   * Only populated when `mode === 'auto'` and the constraint is sync.
+   */
+  when: ((facts: Facts<S>) => boolean) | null;
+}
+
+/**
  * Configuration options accepted by {@link createResolversManager}.
  *
  * @internal
@@ -188,6 +212,17 @@ export interface CreateResolversOptions<S extends Schema> {
   facts: Facts<S>;
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
+  /**
+   * Look up binding info for a source constraint id (RFC-1).
+   *
+   * Wired by the engine — given the `fromConstraint` of a `RequirementWithId`,
+   * returns the constraint's effective bind mode + a synchronous `when()`
+   * reference. Return `undefined` if the constraint is unknown or binding
+   * does not apply.
+   */
+  getConstraintBinding?: (
+    constraintId: string,
+  ) => ConstraintBindingInfo<S> | undefined;
   /** Called when a resolver begins execution. */
   onStart?: (resolver: string, req: RequirementWithId) => void;
   /** Called when a resolver completes successfully, with the wall-clock duration in ms. */
@@ -256,9 +291,8 @@ function applyJitter(
   }
 
   if (typeof jitter === "object" && "maxMs" in jitter) {
-    const maxMs = Number.isFinite(jitter.maxMs) && jitter.maxMs > 0
-      ? jitter.maxMs
-      : 0;
+    const maxMs =
+      Number.isFinite(jitter.maxMs) && jitter.maxMs > 0 ? jitter.maxMs : 0;
 
     return computedDelay + Math.floor(Math.random() * maxMs);
   }
@@ -395,6 +429,7 @@ export function createResolversManager<S extends Schema>(
     definitions,
     facts,
     store,
+    getConstraintBinding,
     onStart,
     onComplete,
     onError,
@@ -540,6 +575,109 @@ export function createResolversManager<S extends Schema>(
   }
 
   /**
+   * Resolve the effective constraint binding for a requirement (RFC-1).
+   *
+   * Returns `null` when binding does not apply:
+   * - No `getConstraintBinding` wired (e.g. tests calling the manager directly).
+   * - The requirement has no `fromConstraint` (out-of-band dispatch / callOne).
+   * - The constraint's `bind` mode is `'none'` (default).
+   * - The constraint is async (binding requires a sync `when()` predicate).
+   *
+   * @internal
+   */
+  function resolveBinding(
+    req: RequirementWithId | null,
+  ): ConstraintBindingInfo<S> | null {
+    if (!getConstraintBinding || !req || !req.fromConstraint) return null;
+    const info = getConstraintBinding(req.fromConstraint);
+    if (!info || info.mode !== "auto" || !info.when) return null;
+    return info;
+  }
+
+  /**
+   * Build a binding-aware Proxy around the engine `facts` proxy.
+   *
+   * **Semantics (RFC-1):**
+   * - Reads pass through unchanged.
+   * - Each write evaluates `binding.when(facts)` against the *pre-write*
+   *   snapshot. If the predicate returns `false`, the write is dropped, the
+   *   resolver's `AbortController` is aborted, and the binding is marked
+   *   deactivated. Subsequent writes silently no-op without re-evaluating.
+   * - Binding is **one-shot per resolver invocation**: once deactivated, it
+   *   stays deactivated even if `when()` would later flip back to `true`.
+   * - The set trap returns `true` even when dropping a write so resolvers
+   *   running in strict mode don't see a `TypeError`. The signal-aborted
+   *   side channel is the canonical signal that writes are no longer
+   *   landing.
+   *
+   * @internal
+   */
+  function createBoundFacts(
+    binding: ConstraintBindingInfo<S>,
+    controller: AbortController,
+  ): Facts<S> {
+    let deactivated = false;
+
+    return new Proxy(facts as object, {
+      get(_target, prop, receiver) {
+        return Reflect.get(facts as object, prop, receiver);
+      },
+      set(_target, prop, value, _receiver) {
+        if (deactivated) {
+          // Binding already flipped false earlier in this resolver — silent drop.
+          return true;
+        }
+        // Internal accessors must always pass through (and never read by user code).
+        if (prop === "$store" || prop === "$snapshot") {
+          return Reflect.set(facts as object, prop, value);
+        }
+        // Evaluate the constraint's predicate against the pre-write snapshot.
+        // `binding.when` is guaranteed sync at this point (resolveBinding
+        // filters async constraints).
+        let active: boolean;
+        try {
+          active = binding.when!(facts);
+        } catch {
+          // A throwing `when()` is treated as "not active": drop and abort.
+          // This matches the engine's `onError` constraint policy (the
+          // engine has already logged the throw via its own evaluation path).
+          active = false;
+        }
+        if (!active) {
+          deactivated = true;
+          controller.abort();
+          return true;
+        }
+        return Reflect.set(facts as object, prop, value);
+      },
+      deleteProperty(_target, prop) {
+        if (deactivated) return true;
+        let active: boolean;
+        try {
+          active = binding.when!(facts);
+        } catch {
+          active = false;
+        }
+        if (!active) {
+          deactivated = true;
+          controller.abort();
+          return true;
+        }
+        return Reflect.deleteProperty(facts as object, prop);
+      },
+      has(_target, prop) {
+        return Reflect.has(facts as object, prop);
+      },
+      ownKeys() {
+        return Reflect.ownKeys(facts as object);
+      },
+      getOwnPropertyDescriptor(_target, prop) {
+        return Reflect.getOwnPropertyDescriptor(facts as object, prop);
+      },
+    }) as Facts<S>;
+  }
+
+  /**
    * Create resolver context.
    *
    * @param signal - The AbortSignal for this resolver invocation.
@@ -548,13 +686,22 @@ export function createResolversManager<S extends Schema>(
    *   requirement in the batch — calling `ctx.requeue()` requeues all of them.
    *   For out-of-band invocations (e.g. `callOne`) pass an empty array; the
    *   `requeue()` call will be a safe no-op.
+   * @param binding - Optional RFC-1 constraint binding. When present, fact
+   *   writes through `ctx.facts` are gated by the constraint's `when()`
+   *   predicate. See {@link ConstraintBindingInfo}.
+   * @param controller - The AbortController owning `signal`. Required when
+   *   `binding` is present so the proxy can abort on a dropped write.
    */
   function createContext(
     signal: AbortSignal,
     requirementIds: readonly string[],
+    binding?: ConstraintBindingInfo<S> | null,
+    controller?: AbortController,
   ): ResolverContext<S> {
+    const ctxFacts =
+      binding && controller ? createBoundFacts(binding, controller) : facts;
     return {
-      facts,
+      facts: ctxFacts,
       signal,
       snapshot: () => facts.$snapshot() as FactsSnapshot<S>,
       requeue: () => {
@@ -636,17 +783,20 @@ export function createResolversManager<S extends Schema>(
     resolverId: string,
     req: RequirementWithId,
     signal: AbortSignal,
+    controller: AbortController,
   ): Promise<void> {
     if (!def.resolve) {
       return;
     }
+
+    const binding = resolveBinding(req);
 
     // Batch wraps only the synchronous start — see JSDoc above.
     let resolvePromise!: Promise<void>;
     store.batch(() => {
       resolvePromise = def.resolve!(
         req.requirement as Parameters<NonNullable<typeof def.resolve>>[0],
-        createContext(signal, [req.id]),
+        createContext(signal, [req.id], binding, controller),
       ) as Promise<void>;
     });
 
@@ -768,7 +918,13 @@ export function createResolversManager<S extends Schema>(
       updateInflightAttempt(req.id, attempt, startedAt);
 
       try {
-        await invokeResolve(def, resolverId, req, controller.signal);
+        await invokeResolve(
+          def,
+          resolverId,
+          req,
+          controller.signal,
+          controller,
+        );
         recordSuccess(resolverId, req, startedAt);
 
         return;
@@ -931,13 +1087,30 @@ export function createResolversManager<S extends Schema>(
     resolverId: string,
     requirements: RequirementWithId[],
     signal: AbortSignal,
+    controller: AbortController,
     timeout: number | undefined,
     startedAt: number,
     attempt: number,
   ): Promise<"done" | "retry"> {
+    // Resolve binding for the batch (RFC-1). Binding only applies when
+    // every requirement in the batch shares the same source constraint —
+    // otherwise the predicate would be ambiguous. Mixed batches fall back
+    // to no binding (current behavior).
+    let batchBinding: ConstraintBindingInfo<S> | null = null;
+    if (requirements.length > 0) {
+      const first = requirements[0]!;
+      const allSameSource = requirements.every(
+        (r) => r.fromConstraint === first.fromConstraint,
+      );
+      if (allSameSource) {
+        batchBinding = resolveBinding(first);
+      }
+    }
     const ctx = createContext(
       signal,
       requirements.map((r) => r.id),
+      batchBinding,
+      controller,
     );
     const reqPayloads = requirements.map((r) => r.requirement);
 
@@ -1001,6 +1174,7 @@ export function createResolversManager<S extends Schema>(
           resolverId,
           requirements,
           controller.signal,
+          controller,
           timeout,
           startedAt,
           attempt,
