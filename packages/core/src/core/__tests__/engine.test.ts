@@ -1587,3 +1587,150 @@ describe("Engine — Effects", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Constraint-Binding (RFC-1) — engine-level integration
+// ============================================================================
+
+describe("constraint-binding (RFC-1) — engine integration", () => {
+  it("bind: 'auto' prevents tail-clobber end-to-end through createSystem", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("phaseA", {
+      schema: {
+        facts: {
+          status: t.string(),
+          progress: t.number(),
+        },
+        derivations: {},
+        events: {
+          start: {},
+          forceLeft: {},
+        },
+        requirements: {
+          EXECUTE_ACTION: {},
+        },
+      },
+      init: (f) => {
+        f.status = "idle";
+        f.progress = 0;
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+        forceLeft: (f) => {
+          f.status = "left";
+        },
+      },
+      constraints: {
+        mutate: {
+          when: (f) => f.status === "mutating",
+          require: { type: "EXECUTE_ACTION" },
+          bind: "auto",
+        },
+      },
+      resolvers: {
+        execute: {
+          requirement: "EXECUTE_ACTION",
+          resolve: async (_req, ctx) => {
+            ctx.facts.progress = 50;
+            await blocker;
+            // Tail clobber attempt — must be dropped because the constraint
+            // has flipped to false (status === 'left' by then).
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+
+    system.events.start();
+    await flush();
+    expect(system.facts.progress).toBe(50);
+
+    // External event: leave the party.
+    system.events.forceLeft();
+    await flush();
+    expect(system.facts.status).toBe("left");
+
+    // Now resolver tail wakes up and tries to clobber.
+    release();
+    await flush();
+
+    // Without RFC-1 binding, status would be 'playing' here. With binding,
+    // the tail write was dropped → status stays 'left'.
+    expect(system.facts.status).toBe("left");
+
+    system.destroy();
+  });
+
+  it("bind: 'none' (default) preserves the clobber behavior", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("noBind", {
+      schema: {
+        facts: { status: t.string(), progress: t.number() },
+        derivations: {},
+        events: {
+          start: {},
+          forceLeft: {},
+        },
+        requirements: { EXECUTE_ACTION: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+        f.progress = 0;
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+        forceLeft: (f) => {
+          f.status = "left";
+        },
+      },
+      constraints: {
+        mutate: {
+          when: (f) => f.status === "mutating",
+          require: { type: "EXECUTE_ACTION" },
+          // bind defaults to 'none'
+        },
+      },
+      resolvers: {
+        execute: {
+          requirement: "EXECUTE_ACTION",
+          resolve: async (_req, ctx) => {
+            ctx.facts.progress = 50;
+            await blocker;
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+    system.events.start();
+    await flush();
+    system.events.forceLeft();
+    await flush();
+    release();
+    await flush();
+
+    // Default behavior: tail-clobber lands.
+    expect(system.facts.status).toBe("playing");
+
+    system.destroy();
+  });
+});

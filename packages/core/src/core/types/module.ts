@@ -10,6 +10,7 @@ import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { Facts, FactsSnapshot } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
+import type { ConstraintBindMode } from "./requirements.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -166,6 +167,11 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
+   * Resolver-to-constraint binding mode (RFC-1).
+   * Defaults to `'none'`. See {@link ConstraintBindMode}.
+   */
+  bind?: ConstraintBindMode;
+  /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
    * If a dependency's resolver fails, this constraint remains blocked.
@@ -223,6 +229,11 @@ export interface CrossModuleConstraintDef<
       ) => RequirementOutput<InferRequirements<M>>);
   /** Timeout for async constraints (ms) */
   timeout?: number;
+  /**
+   * Resolver-to-constraint binding mode (RFC-1).
+   * Defaults to `'none'`. See {@link ConstraintBindMode}.
+   */
+  bind?: ConstraintBindMode;
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.

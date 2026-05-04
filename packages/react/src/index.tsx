@@ -116,10 +116,7 @@ export function useFact(
   keyOrKeys: string | string[],
 ): unknown {
   assertSystem("useFact", system);
-  if (
-    isDevelopment &&
-    typeof keyOrKeys === "function"
-  ) {
+  if (isDevelopment && typeof keyOrKeys === "function") {
     console.error(
       "[Directive] useFact() received a function. Did you mean useSelector()? " +
         "useFact() takes a string key or array of keys, not a selector function.",
@@ -211,6 +208,83 @@ function _useFacts(
 }
 
 // ============================================================================
+// useFactWithDefault — stable-identity nullable-fact fallback (RFC-2)
+// ============================================================================
+
+/**
+ * Read a fact, falling back to a lazily-computed default with **stable
+ * referential identity** when the fact is `null`/`undefined`.
+ *
+ * **Why this exists:** the natural pattern
+ *
+ * ```tsx
+ * const markedCells = useFact(sys, "markedCells") ?? deps.initializeMarkedCells();
+ * ```
+ *
+ * calls `initializeMarkedCells()` on every render where `markedCells` is
+ * `null`, producing a fresh array/object identity each time. Anything
+ * downstream that memoizes on that identity (`useMemo` deps,
+ * `React.memo`, virtualized list keys) re-runs unnecessarily and can
+ * trigger re-render storms.
+ *
+ * `useFactWithDefault` runs `factory` at most once per system instance and
+ * caches the result in a ref. While the fact is `null`/`undefined`, every
+ * render returns the same cached value. When the fact transitions to a
+ * non-null value, that value is returned instead. If the fact later
+ * returns to `null`, the originally-cached factory result is reused
+ * (the factory is **not** called again).
+ *
+ * Swapping the `system` argument re-runs the factory on the new system.
+ *
+ * @example
+ * ```tsx
+ * const markedCells = useFactWithDefault(
+ *   sys,
+ *   "markedCells",
+ *   () => deps.initializeMarkedCells(),
+ * );
+ * // `markedCells` has stable identity across renders while the fact is null.
+ * ```
+ *
+ * @param system - The system to read the fact from.
+ * @param factKey - The fact key.
+ * @param factory - Lazy default factory; runs at most once per system instance.
+ * @returns The fact value when non-null, otherwise the cached factory result.
+ */
+export function useFactWithDefault<
+  S extends ModuleSchema,
+  K extends keyof InferFacts<S> & string,
+>(
+  system: SingleModuleSystem<S>,
+  factKey: K,
+  factory: () => NonNullable<InferFacts<S>[K]>,
+): NonNullable<InferFacts<S>[K]>;
+
+/** Implementation */
+export function useFactWithDefault(
+  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
+  system: SingleModuleSystem<any>,
+  factKey: string,
+  factory: () => unknown,
+): unknown {
+  assertSystem("useFactWithDefault", system);
+
+  // Track factory result keyed by system identity. When the consumer swaps
+  // the system, we deliberately re-run the factory on the new instance —
+  // a fresh system has a fresh default.
+  const cacheRef = useRef<{ system: unknown; value: unknown } | null>(null);
+  if (cacheRef.current === null || cacheRef.current.system !== system) {
+    cacheRef.current = { system, value: factory() };
+  }
+
+  const value = useFact(system, factKey);
+  if (value === null || value === undefined) {
+    return cacheRef.current.value;
+  }
+  return value;
+}
+
+// ============================================================================
 // useDerived — single key or multi key
 // ============================================================================
 
@@ -236,10 +310,7 @@ export function useDerived(
   keyOrKeys: string | string[],
 ): unknown {
   assertSystem("useDerived", system);
-  if (
-    isDevelopment &&
-    typeof keyOrKeys === "function"
-  ) {
+  if (isDevelopment && typeof keyOrKeys === "function") {
     console.error(
       "[Directive] useDerived() received a function. Did you mean useSelector()? " +
         "useDerived() takes a string key or array of keys, not a selector function.",
@@ -2295,9 +2366,7 @@ export function createDirectiveContext<M extends ModuleSchema>(
     system?: SingleModuleSystem<M>;
   }) {
     return (
-      <Ctx.Provider value={overrideSystem ?? system}>
-        {children}
-      </Ctx.Provider>
+      <Ctx.Provider value={overrideSystem ?? system}>{children}</Ctx.Provider>
     );
   }
 
@@ -2358,7 +2427,8 @@ export function createDirectiveContext<M extends ModuleSchema>(
     useInspect: () => useInspect(useSystem()),
 
     /** Explain a requirement. */
-    useExplain: (requirementId: string) => useExplain(useSystem(), requirementId),
+    useExplain: (requirementId: string) =>
+      useExplain(useSystem(), requirementId),
 
     /** Get history state. */
     useHistory: () => useHistory(useSystem()),
