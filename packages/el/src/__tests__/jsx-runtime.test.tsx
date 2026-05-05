@@ -60,8 +60,8 @@ describe("JSX runtime", () => {
     const items = ["one", "two", "three"];
     const ul = (
       <ul>
-        {items.map((item) => (
-          <li>{item}</li>
+        {items.map((item, i) => (
+          <li key={i}>{item}</li>
         ))}
       </ul>
     );
@@ -162,6 +162,7 @@ describe("Fragment", () => {
 
   it("renders empty fragment with no children", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
+    // biome-ignore lint/complexity/noUselessFragments: testing empty fragment behavior intentionally
     const frag = (<></>) as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);

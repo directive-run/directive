@@ -161,7 +161,7 @@ function main() {
   // Extract all backtick-quoted identifiers from the skeleton
   const apiSymbols = new Set<string>();
   const symbolPattern = /`(\w+)`/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = symbolPattern.exec(skeletonContent)) !== null) {
     if (match[1]) {
       apiSymbols.add(match[1]);
@@ -186,7 +186,7 @@ function main() {
     // Extract identifier references that look like API symbols
     // (PascalCase or camelCase starting identifiers, not lowercase keywords)
     const refPattern = /`((?:create|use|with|assert|mock|estimate|validate|pipe|select|t\.|Module|System|Plugin|Constraint|Resolver|Requirement|Derivation|Effect|Schema|Facts|Engine|Orchestrator|Agent|Runner|Budget|Guardrail|Memory|Circuit)\w*)`/g;
-    let ref;
+    let ref: RegExpExecArray | null = null;
     while ((ref = refPattern.exec(file.content)) !== null) {
       const symbol = ref[1];
       if (!symbol || KNOWN_EXCEPTIONS.has(symbol)) {

@@ -604,10 +604,13 @@ export function capabilityRoute(
     },
     require: (facts) => {
       // Use cached matches only if from the current when() call
-      const matches =
-        cacheGeneration !== requireGeneration && cachedMatches.length > 0
-          ? ((requireGeneration = cacheGeneration), cachedMatches)
-          : findAgentsByCapability(registry, getCapabilities(facts));
+      let matches: ReturnType<typeof findAgentsByCapability>;
+      if (cacheGeneration !== requireGeneration && cachedMatches.length > 0) {
+        requireGeneration = cacheGeneration;
+        matches = cachedMatches;
+      } else {
+        matches = findAgentsByCapability(registry, getCapabilities(facts));
+      }
 
       if (matches.length === 0) {
         throw new Error(
@@ -856,12 +859,15 @@ export function derivedConstraint(
     },
     require: (facts) => {
       // Re-read from facts if generation is stale (concurrent evaluation)
-      const value =
-        whenGeneration !== requireGeneration
-          ? ((requireGeneration = whenGeneration), lastValue)
-          : (facts.__derived as Record<string, unknown> | undefined)?.[
-              derivationId
-            ];
+      let value: unknown;
+      if (whenGeneration !== requireGeneration) {
+        requireGeneration = whenGeneration;
+        value = lastValue;
+      } else {
+        value = (facts.__derived as Record<string, unknown> | undefined)?.[
+          derivationId
+        ];
+      }
 
       return {
         type: "RUN_AGENT",

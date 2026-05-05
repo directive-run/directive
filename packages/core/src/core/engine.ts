@@ -1490,6 +1490,7 @@ export function createEngine<S extends Schema>(
           return;
         }
 
+        // biome-ignore lint/style/useConst: declare-then-assign required because the cleanup closure references unsub before subscribeAll returns
         let unsub: (() => void) | undefined;
         let timer: ReturnType<typeof setTimeout> | undefined;
 

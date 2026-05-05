@@ -42,7 +42,7 @@ const allKeys = [
 // Status bar
 
 // Search form
-  "dc-search-input",
+void "dc-search-input";
 
 // Progress bar
 
@@ -53,9 +53,9 @@ const allKeys = [
 // Stats
 
 // Config sliders
-  "dc-debounce-delay",
-  "dc-api-delay",
-  "dc-min-chars",
+void "dc-debounce-delay";
+void "dc-api-delay";
+void "dc-min-chars";
 
 // Timeline
 
