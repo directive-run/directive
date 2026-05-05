@@ -6,17 +6,28 @@ import { devtoolsPlugin } from "../devtools.js";
 // Environment Setup — simulate browser for window.__DIRECTIVE__ registration
 // ============================================================================
 
+// devtoolsPlugin defines __DIRECTIVE__ with writable: false +
+// configurable: isDevMode(), so plain `=` assignment throws in strict mode
+// once the property is locked. Re-defining via Object.defineProperty works
+// because the property remains configurable in non-production builds.
+function resetDirectiveGlobal(): void {
+  Object.defineProperty(globalThis, "__DIRECTIVE__", {
+    value: undefined,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+}
+
 beforeEach(() => {
   // Make the plugin think it's running in a browser
   (globalThis as Record<string, unknown>).window = globalThis;
-  // Use delete because devtoolsPlugin defines __DIRECTIVE__ with
-  // writable: false; plain `=` assignment would throw in strict mode.
-  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
+  resetDirectiveGlobal();
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
 afterEach(() => {
-  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
+  resetDirectiveGlobal();
   (globalThis as Record<string, unknown>).window = undefined;
   vi.restoreAllMocks();
 });

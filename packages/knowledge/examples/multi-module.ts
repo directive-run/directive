@@ -15,8 +15,7 @@
  * - No asCombined() helper needed
  */
 
-import { el } from "@directive-run/el";
-import { getFacts, system } from "./system";
+import { system } from "./system";
 
 // DOM Elements
 
@@ -43,7 +42,6 @@ system.subscribe(
 // Also update on fact changes via polling (simple approach for this demo)
 
 // Event handlers using namespaced events accessor
-
 
 // Initial render
 updateUI();
