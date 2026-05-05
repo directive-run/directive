@@ -20,6 +20,12 @@ import { createInfiniteQuery } from "./create-infinite-query.js";
 import type { InfiniteResourceState } from "./create-infinite-query.js";
 import { createMutation } from "./create-mutation.js";
 import { createQuery } from "./create-query.js";
+import {
+  bindListQueryHandle,
+  createListQuery,
+  type BoundListQueryHandle,
+  type ListQueryOptions,
+} from "./create-list-query.js";
 import { createSubscription } from "./create-subscription.js";
 import { explainQuery } from "./explain.js";
 import type {
@@ -206,6 +212,13 @@ export interface QuerySystemConfig {
     Omit<Parameters<typeof createInfiniteQuery>[0], "name">
   >;
 
+  /**
+   * List query definitions (per-key cached fetches — the "N items each
+   * fetched independently" pattern). Key becomes the query name.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: List options have varying generics
+  listQueries?: Record<string, Omit<ListQueryOptions<any, any, any, any>, "name">>;
+
   // Module config pass-through
   derive?: Record<
     string,
@@ -332,6 +345,7 @@ export function createQuerySystem(config: QuerySystemConfig) {
     mutations: mutationConfigs,
     subscriptions: subscriptionConfigs,
     infiniteQueries: infiniteQueryConfigs,
+    listQueries: listQueryConfigs,
     derive,
     events,
     effects,
@@ -415,6 +429,17 @@ export function createQuerySystem(config: QuerySystemConfig) {
         typeof createInfiniteQuery
       >[0]);
       infiniteQueryDefs[name] = def;
+      allDefinitions.push(def);
+    }
+  }
+
+  const listQueryNames: string[] = [];
+  if (listQueryConfigs) {
+    for (const [name, opts] of Object.entries(listQueryConfigs)) {
+      const def = createListQuery({ ...opts, name } as Parameters<
+        typeof createListQuery
+      >[0]);
+      listQueryNames.push(name);
       allDefinitions.push(def);
     }
   }
@@ -509,12 +534,29 @@ export function createQuerySystem(config: QuerySystemConfig) {
     };
   }
 
+  // Bind list-query handles using bindListQueryHandle from create-list-query
+  const boundListQueries: Record<
+    string,
+    BoundListQueryHandle<unknown, Error, Record<string, unknown>>
+  > = {};
+  for (const name of listQueryNames) {
+    boundListQueries[name] = bindListQueryHandle<
+      unknown,
+      Error,
+      Record<string, unknown>
+    >(system.facts as Record<string, unknown>, name);
+  }
+
   // Extend system with convenience properties
   const extended = system as typeof system & {
     queries: Record<string, BoundQueryHandle>;
     mutations: Record<string, BoundMutationHandle>;
     subscriptions: Record<string, BoundSubscriptionHandle>;
     infiniteQueries: Record<string, BoundInfiniteQueryHandle>;
+    listQueries: Record<
+      string,
+      BoundListQueryHandle<unknown, Error, Record<string, unknown>>
+    >;
     explain: (queryName: string) => string;
   };
 
@@ -522,6 +564,7 @@ export function createQuerySystem(config: QuerySystemConfig) {
   extended.mutations = boundMutations;
   extended.subscriptions = boundSubscriptions;
   extended.infiniteQueries = boundInfiniteQueries;
+  extended.listQueries = boundListQueries;
   extended.explain = (queryName: string) => explainQuery(system, queryName);
 
   if (autoStart) {

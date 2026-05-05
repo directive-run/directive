@@ -32,6 +32,12 @@ export { createQuery } from "./create-query.js";
 export { createMutation, createIdleMutationState } from "./create-mutation.js";
 export { createSubscription } from "./create-subscription.js";
 export { createInfiniteQuery } from "./create-infinite-query.js";
+export { createListQuery, bindListQueryHandle } from "./create-list-query.js";
+export type {
+  ListQueryOptions,
+  ListResourceMap,
+  BoundListQueryHandle,
+} from "./create-list-query.js";
 export { createBaseQuery } from "./create-base-query.js";
 export {
   createGraphQLQuery,

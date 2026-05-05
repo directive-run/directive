@@ -137,6 +137,50 @@ app.subscriptions.prices.setData({ price: 150 });
 app.explain("user"); // causal chain
 ```
 
+### List queries (the "N items each fetched independently" pattern)
+
+`createQuery` is intentionally singular: one ResourceState per query name, key change replaces the entry. That fits page-level "current entity" reads. For "render N cards each fetching its own data" — TanStack's `useQuery({queryKey: ["X", id]})`-per-component pattern — use `createListQuery` (or the `listQueries:` config field on `createQuerySystem`).
+
+```typescript
+const sys = createQuerySystem({
+  facts: { activeGameIds: [] as string[] },
+  listQueries: {
+    drift: {
+      // Returns the active list of keys; null/[] disables the query
+      keys: (f) =>
+        f.activeGameIds.length > 0
+          ? f.activeGameIds.map((id) => ({ gameId: id }))
+          : null,
+      fetcher: async ({ gameId }, signal) => {
+        const res = await fetch(`/api/drift?id=${gameId}`, { signal });
+        return res.json();
+      },
+      refetchAfter: 30_000,
+    },
+  },
+});
+
+// Page sets the active list:
+sys.facts.activeGameIds = ["abc", "xyz", "and-30-more-ids"];
+
+// Each card component reads its own entry by params:
+const drift = sys.listQueries.drift.peek({ gameId: "abc" });
+if (drift?.isSuccess) renderCard(drift.data);
+```
+
+The constraint emits one requirement per active key, the resolver runs in parallel per item, each entry gets its own `ResourceState` keyed by `serializeKey(params)`. Cache is `Record<serializedKey, ResourceState>` — JSON-serializable so time-travel snapshots and structuredClone keep working.
+
+Bound handle methods:
+
+```typescript
+sys.listQueries.drift.peek({ gameId: "abc" });   // pure cache lookup → ResourceState | null
+sys.listQueries.drift.refetch({ gameId: "abc" }); // single-key refetch
+sys.listQueries.drift.refetchAll();              // every active key
+sys.listQueries.drift.setData({ gameId: "abc" }, optimistic);
+sys.listQueries.drift.invalidate({ gameId: "abc" });
+sys.listQueries.drift.invalidateAll();
+```
+
 ### createQueryModule (multi-module path)
 
 For composing query modules with other modules in a namespaced system.
