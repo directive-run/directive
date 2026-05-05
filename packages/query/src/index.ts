@@ -49,6 +49,13 @@ export { withQueries } from "./with-queries.js";
 export type { AnyQueryDefinition } from "./with-queries.js";
 export { explainQuery } from "./explain.js";
 
+// Stable cache-key serialization — the canonical hash used by every
+// query/listQuery cache. Exported so framework adapters (React, Solid,
+// etc.) can compute the same key for client-side selectors without
+// duplicating the implementation. Sorts keys, prototype-pollution-safe
+// via Object.create(null).
+export { serializeKey } from "./internal.js";
+
 // Types
 export type {
   ResourceState,

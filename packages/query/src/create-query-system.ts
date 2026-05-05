@@ -108,6 +108,7 @@ export type TypedQuerySystem<
   TMutations extends Record<string, unknown>,
   TSubscriptions extends Record<string, unknown>,
   TInfiniteQueries extends Record<string, unknown>,
+  TListQueries extends Record<string, unknown> = {},
 > = {
   readonly facts: TFacts;
   readonly queries: {
@@ -124,6 +125,13 @@ export type TypedQuerySystem<
   };
   readonly infiniteQueries: {
     [K in keyof TInfiniteQueries]: BoundInfiniteQueryHandle;
+  };
+  readonly listQueries: {
+    [K in keyof TListQueries]: BoundListQueryHandle<
+      unknown,
+      Error,
+      Record<string, unknown>
+    >;
   };
 
   // Typed read() overloads
@@ -317,6 +325,7 @@ export function createQuerySystem<
   const TMutations extends Record<string, unknown> = {},
   const TSubscriptions extends Record<string, unknown> = {},
   const TInfiniteQueries extends Record<string, unknown> = {},
+  const TListQueries extends Record<string, unknown> = {},
 >(
   config: {
     facts: TFacts;
@@ -324,16 +333,23 @@ export function createQuerySystem<
     mutations?: TMutations;
     subscriptions?: TSubscriptions;
     infiniteQueries?: TInfiniteQueries;
+    listQueries?: TListQueries;
   } & Omit<
     QuerySystemConfig,
-    "facts" | "queries" | "mutations" | "subscriptions" | "infiniteQueries"
+    | "facts"
+    | "queries"
+    | "mutations"
+    | "subscriptions"
+    | "infiniteQueries"
+    | "listQueries"
   >,
 ): TypedQuerySystem<
   TFacts,
   TQueries,
   TMutations,
   TSubscriptions,
-  TInfiniteQueries
+  TInfiniteQueries,
+  TListQueries
 >;
 
 /** Implementation */
