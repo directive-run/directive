@@ -70,7 +70,8 @@
       ".turbo",
       "test-results",
       ".vercel",
-      "*.tsbuildinfo"
+      "*.tsbuildinfo",
+      "worktrees"
     ]
   },
   "overrides": [
