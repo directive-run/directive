@@ -9,12 +9,14 @@ import { devtoolsPlugin } from "../devtools.js";
 beforeEach(() => {
   // Make the plugin think it's running in a browser
   (globalThis as Record<string, unknown>).window = globalThis;
-  (globalThis as Record<string, unknown>).__DIRECTIVE__ = undefined;
+  // Use delete because devtoolsPlugin defines __DIRECTIVE__ with
+  // writable: false; plain `=` assignment would throw in strict mode.
+  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
 afterEach(() => {
-  (globalThis as Record<string, unknown>).__DIRECTIVE__ = undefined;
+  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
   (globalThis as Record<string, unknown>).window = undefined;
   vi.restoreAllMocks();
 });

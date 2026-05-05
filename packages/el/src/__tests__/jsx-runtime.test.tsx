@@ -166,8 +166,9 @@ describe("Fragment", () => {
   });
 
   it("renders text children", () => {
+    // biome-ignore lint/complexity/noUselessFragments: Fragment is the unit under test
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
-    const frag = "Hello world" as any as DocumentFragment;
+    const frag = (<>Hello world</>) as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);
     expect(frag.textContent).toBe("Hello world");

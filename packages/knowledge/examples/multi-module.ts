@@ -1,4 +1,22 @@
-import { system } from "./system";
+// Example: multi-module
+// Source: examples/multi-module/src/main.ts
+// Extracted for AI rules — DOM wiring stripped
+
+/**
+ * Multi-Module Example - Main Entry Point
+ *
+ * Demonstrates the NEW namespaced module access:
+ * - `system.facts.auth.token` instead of `system.facts.auth_token`
+ * - `system.derive.data.userCount` instead of `system.derive.data_userCount`
+ * - `system.events.auth.login({ token })` instead of `dispatch({ type: "auth_login", token })`
+ *
+ * Cross-module constraints work automatically:
+ * - Data fetches when auth succeeds
+ * - No asCombined() helper needed
+ */
+
+import { el } from "@directive-run/el";
+import { getFacts, system } from "./system";
 
 // DOM Elements
 
@@ -25,6 +43,7 @@ system.subscribe(
 // Also update on fact changes via polling (simple approach for this demo)
 
 // Event handlers using namespaced events accessor
+
 
 // Initial render
 updateUI();
