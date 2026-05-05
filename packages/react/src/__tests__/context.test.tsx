@@ -1,7 +1,7 @@
+import { createModule, createSystem, t } from "@directive-run/core";
+import { act, render, screen } from "@testing-library/react";
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { createModule, createSystem, t } from "@directive-run/core";
-import { render, screen, act } from "@testing-library/react";
 import { createDirectiveContext } from "../index";
 
 const counterModule = createModule("ctx-test", {

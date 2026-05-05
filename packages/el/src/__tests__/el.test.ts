@@ -245,7 +245,11 @@ describe("el()", () => {
 
     it("fires click handler via dispatchEvent", () => {
       let clicked = false;
-      const button = el("button", { onclick: () => { clicked = true; } });
+      const button = el("button", {
+        onclick: () => {
+          clicked = true;
+        },
+      });
 
       button.dispatchEvent(new Event("click"));
 
@@ -350,7 +354,9 @@ describe("el()", () => {
   describe("BLOCKED_PROPS", () => {
     it("strips innerHTML from props (XSS prevention)", () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing security guard
-      const div = el("div", { innerHTML: "<img src=x onerror=alert(1)>" } as any);
+      const div = el("div", {
+        innerHTML: "<img src=x onerror=alert(1)>",
+      } as any);
 
       expect(div.innerHTML).toBe("");
     });
@@ -364,7 +370,10 @@ describe("el()", () => {
 
     it("still applies safe props alongside blocked ones", () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing security guard
-      const div = el("div", { className: "safe", innerHTML: "<script>bad</script>" } as any);
+      const div = el("div", {
+        className: "safe",
+        innerHTML: "<script>bad</script>",
+      } as any);
 
       expect(div.className).toBe("safe");
       expect(div.innerHTML).toBe("");
@@ -380,16 +389,8 @@ describe("el()", () => {
       const tree = el(
         "div",
         { className: "root" },
-        el(
-          "header",
-          {},
-          el("h1", {}, "Title"),
-        ),
-        el(
-          "main",
-          {},
-          el("p", {}, "Content"),
-        ),
+        el("header", {}, el("h1", {}, "Title")),
+        el("main", {}, el("p", {}, "Content")),
       );
 
       expect(tree.children.length).toBe(2);
@@ -402,9 +403,7 @@ describe("el()", () => {
       const list = el(
         "ul",
         { className: "todo-list" },
-        items.map((item) =>
-          el("li", { className: "todo-item" }, item),
-        ),
+        items.map((item) => el("li", { className: "todo-item" }, item)),
       );
 
       expect(list.className).toBe("todo-list");

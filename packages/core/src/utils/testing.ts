@@ -489,7 +489,7 @@ export function mockResolver<R extends Requirement = Requirement>(
     return new Promise<void>((resolve, reject) => {
       pending.push({
         requirement: req as R,
-        resolve: (val?: unknown) => resolve(val as void),
+        resolve: (val?: unknown) => resolve(val as undefined),
         reject,
       });
     });
@@ -673,15 +673,11 @@ export function createTestSystem<
   S extends ModuleSchema,
   Modules extends ModulesMap,
 >(
-  options:
-    | CreateTestSystemOptionsSingle<S>
-    | CreateTestSystemOptions<Modules>,
+  options: CreateTestSystemOptionsSingle<S> | CreateTestSystemOptions<Modules>,
 ): TestSystemSingle<S> | TestSystem<Modules> {
   // Single module mode: wrap into namespaced and delegate
   if ("module" in options) {
-    return createTestSystemSingle(
-      options as CreateTestSystemOptionsSingle<S>,
-    );
+    return createTestSystemSingle(options as CreateTestSystemOptionsSingle<S>);
   }
 
   return createTestSystemNamed(options as CreateTestSystemOptions<Modules>);
@@ -738,7 +734,7 @@ function createTestSystemSingle<S extends ModuleSchema>(
     ...options,
     module: moduleWithMocks,
     plugins: [trackingPlugin, ...(options.plugins ?? [])],
-  // biome-ignore lint/suspicious/noExplicitAny: Internal overload compatibility
+    // biome-ignore lint/suspicious/noExplicitAny: Internal overload compatibility
   } as any) as SingleModuleSystem<S>;
 
   // Wrap dispatch to track events
@@ -774,9 +770,7 @@ function createTestSystemSingle<S extends ModuleSchema>(
         const inspection = system.inspect();
         if (inspection.inflight.length > 0) {
           if (Date.now() - startTime > maxWait) {
-            const resolverIds = inspection.inflight
-              .map((r) => r.id)
-              .join(", ");
+            const resolverIds = inspection.inflight.map((r) => r.id).join(", ");
             throw new Error(
               `[Directive] waitForIdle timed out after ${maxWait}ms. ${inspection.inflight.length} resolvers still inflight: ${resolverIds}`,
             );
@@ -1228,9 +1222,7 @@ export function createCoverageTracker(
       const inspection = system.inspect();
 
       const allConstraints = new Set(inspection.constraints.map((c) => c.id));
-      const allResolvers = new Set(
-        inspection.resolverDefs.map((r) => r.id),
-      );
+      const allResolvers = new Set(inspection.resolverDefs.map((r) => r.id));
 
       const constraintsMissed = new Set<string>();
       for (const id of allConstraints) {
@@ -1254,9 +1246,7 @@ export function createCoverageTracker(
             ? 1
             : constraintsHit.size / allConstraints.size,
         resolverCoverage:
-          allResolvers.size === 0
-            ? 1
-            : resolversRun.size / allResolvers.size,
+          allResolvers.size === 0 ? 1 : resolversRun.size / allResolvers.size,
         effectCoverage:
           inspection.effects.length === 0
             ? 1
@@ -1299,9 +1289,14 @@ export function createTestObserver(
   /** All collected events. */
   events: import("../core/types/system.js").ObservationEvent[];
   /** Filter events by type. */
-  ofType: <T extends import("../core/types/system.js").ObservationEvent["type"]>(
+  ofType: <
+    T extends import("../core/types/system.js").ObservationEvent["type"],
+  >(
     type: T,
-  ) => Extract<import("../core/types/system.js").ObservationEvent, { type: T }>[];
+  ) => Extract<
+    import("../core/types/system.js").ObservationEvent,
+    { type: T }
+  >[];
   /** Clear collected events. */
   clear: () => void;
   /** Stop observing. */

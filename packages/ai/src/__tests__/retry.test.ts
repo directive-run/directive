@@ -386,7 +386,7 @@ describe("parseRetryAfter", () => {
 
 describe("parseHttpStatus ReDoS protection", () => {
   it("handles very long error messages without hanging", () => {
-    const longMessage = "request failed: " + "a".repeat(100_000) + " 503";
+    const longMessage = `request failed: ${"a".repeat(100_000)} 503`;
     // The status code is beyond the 1000-char truncation point, so it won't be found
     const result = parseHttpStatus(new Error(longMessage));
     // Should not hang — either finds or doesn't find, but completes quickly

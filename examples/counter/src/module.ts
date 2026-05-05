@@ -5,7 +5,12 @@
  * Total: ~40 lines.
  */
 
-import { createModule, createSystem, t, type ModuleSchema } from "@directive-run/core";
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 
 const schema = {
   facts: {
@@ -38,9 +43,15 @@ export const counterModule = createModule("counter", {
   },
 
   events: {
-    increment: (facts) => { facts.count += 1; },
-    decrement: (facts) => { facts.count -= 1; },
-    reset: (facts) => { facts.count = 0; },
+    increment: (facts) => {
+      facts.count += 1;
+    },
+    decrement: (facts) => {
+      facts.count -= 1;
+    },
+    reset: (facts) => {
+      facts.count = 0;
+    },
   },
 
   // When count goes negative, automatically fix it
@@ -54,7 +65,7 @@ export const counterModule = createModule("counter", {
   resolvers: {
     clamp: {
       requirement: "CLAMP_TO_ZERO",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.count = 0;
       },
     },

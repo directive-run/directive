@@ -2,8 +2,8 @@
 import { useFact } from "@directive-run/vue";
 import { system } from "../system";
 
-const count = useFact(system, "count");
-const multi = useFact(system, ["count", "name"]);
+const _count = useFact(system, "count");
+const _multi = useFact(system, ["count", "name"]);
 </script>
 
 <template>

@@ -9,6 +9,7 @@
  * - Schema validation in development mode
  */
 
+import isDevelopment from "#is-development";
 import {
   BLOCKED_PROPS,
   detectNonJsonValueType,
@@ -23,7 +24,6 @@ import type {
   InferSchema,
   Schema,
 } from "./types.js";
-import isDevelopment from "#is-development";
 
 /** Safely stringify a value for error messages */
 function safeStringify(value: unknown, maxLength = 100): string {
@@ -100,8 +100,7 @@ export function createFactsStore<S extends Schema>(
   // Default strictKeys to false for type assertion schemas (they have no runtime keys)
   const validate = options.validate ?? isDevelopment;
   const strictKeys =
-    options.strictKeys ??
-    (isDevelopment && !isTypeAssertionSchema);
+    options.strictKeys ?? (isDevelopment && !isTypeAssertionSchema);
   const redactErrors = options.redactErrors ?? false;
 
   const map = new Map<string, unknown>();
@@ -666,11 +665,7 @@ export function createFactsProxy<S extends Schema>(
       const value = store.get(prop as keyof InferSchema<S>);
 
       // Dev-mode: warn when users mutate nested objects (won't trigger reactivity)
-      if (
-        isDevelopment &&
-        value !== null &&
-        typeof value === "object"
-      ) {
+      if (isDevelopment && value !== null && typeof value === "object") {
         return wrapWithNestedWarning(value as object, prop);
       }
 

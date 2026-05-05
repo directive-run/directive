@@ -22,4 +22,9 @@ export {
 export { loadSystem } from "./lib/loader.js";
 
 // Constants
-export { CLI_NAME, PACKAGE_NAME, SECTION_START, SECTION_END } from "./lib/constants.js";
+export {
+  CLI_NAME,
+  PACKAGE_NAME,
+  SECTION_START,
+  SECTION_END,
+} from "./lib/constants.js";

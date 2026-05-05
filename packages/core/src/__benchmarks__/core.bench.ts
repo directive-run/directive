@@ -49,7 +49,9 @@ function createCounterSystem() {
       events: {},
       requirements: {},
     },
-    init: (f) => { f.count = 0; },
+    init: (f) => {
+      f.count = 0;
+    },
   });
   const sys = createSystem({ module: mod });
   sys.start();
@@ -62,7 +64,9 @@ function create100FactSystem() {
   for (let i = 0; i < 100; i++) facts[`f${i}`] = { _type: 0 as unknown };
   const mod = createModule("bench", {
     schema: { facts, derivations: {}, events: {}, requirements: {} },
-    init: (f) => { for (let i = 0; i < 100; i++) f[`f${i}`] = 0; },
+    init: (f) => {
+      for (let i = 0; i < 100; i++) f[`f${i}`] = 0;
+    },
   });
   const sys = createSystem({ module: mod });
   sys.start();
@@ -115,7 +119,9 @@ describe("Derivations", () => {
       events: {},
       requirements: {},
     },
-    init: (f) => { f.count = 5; },
+    init: (f) => {
+      f.count = 5;
+    },
     derive: { doubled: (f) => (f.count as number) * 2 },
   });
   const simpleSys = createSystem({ module: simpleMod });
@@ -136,7 +142,9 @@ describe("Derivations", () => {
       events: {},
       requirements: {},
     },
-    init: (f) => { f.f0 = 1; },
+    init: (f) => {
+      f.f0 = 1;
+    },
     derive: derive10,
   });
   const sys10 = createSystem({ module: mod10 });
@@ -157,7 +165,9 @@ describe("Derivations", () => {
       events: {},
       requirements: {},
     },
-    init: (f) => { f.f0 = 1; },
+    init: (f) => {
+      f.f0 = 1;
+    },
     derive: derive50,
   });
   const sys50 = createSystem({ module: mod50 });
@@ -184,7 +194,9 @@ describe("Derivation Invalidation", () => {
       events: {},
       requirements: {},
     },
-    init: (f) => { f.f0 = 0; },
+    init: (f) => {
+      f.f0 = 0;
+    },
     derive,
   });
   const sys = createSystem({ module: mod });
@@ -290,7 +302,10 @@ describe("Sync vs Async Resolvers", () => {
         events: {},
         requirements: { DO_IT: {} },
       },
-      init: (f) => { f.ready = false; f.result = ""; },
+      init: (f) => {
+        f.ready = false;
+        f.result = "";
+      },
       constraints: {
         go: {
           when: (f) => f.ready === true && f.result === "",
@@ -322,7 +337,10 @@ describe("Sync vs Async Resolvers", () => {
         events: {},
         requirements: { DO_IT: {} },
       },
-      init: (f) => { f.ready = false; f.result = ""; },
+      init: (f) => {
+        f.ready = false;
+        f.result = "";
+      },
       constraints: {
         go: {
           when: (f) => f.ready === true && f.result === "",
@@ -585,9 +603,7 @@ describe("Real-World: Auth Flow", () => {
       derive: {
         isLoggedIn: (f) => f.token !== "",
         displayName: (f) =>
-          f.profile
-            ? (f.profile as { name: string }).name
-            : "Guest",
+          f.profile ? (f.profile as { name: string }).name : "Guest",
       },
       events: {
         login: (f, { email }) => {

@@ -164,12 +164,8 @@ function prefixEventHandlers(
     // Unwrap { handler, meta } form
     const isObj =
       typeof raw === "object" && raw !== null && Object.hasOwn(raw, "handler");
-    const handler = isObj
-      ? (raw as { handler: Function }).handler
-      : raw;
-    const meta = isObj
-      ? (raw as { meta?: unknown }).meta
-      : undefined;
+    const handler = isObj ? (raw as { handler: Function }).handler : raw;
+    const meta = isObj ? (raw as { meta?: unknown }).meta : undefined;
 
     const wrapper = (facts: unknown, event: unknown) => {
       const moduleFactsProxy = createModuleFactsProxy(

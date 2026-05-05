@@ -70,9 +70,8 @@ function error(msg: string): void {
 function done(name: string): void {
   const start = timers.get(name);
   const elapsed = start ? Date.now() - start : 0;
-  const time = elapsed >= 1000
-    ? `${(elapsed / 1000).toFixed(1)}s`
-    : `${elapsed}ms`;
+  const time =
+    elapsed >= 1000 ? `${(elapsed / 1000).toFixed(1)}s` : `${elapsed}ms`;
   write(`${c.green}✓${c.reset} done ${c.dim}${time}${c.reset}`);
   write("");
   timers.delete(name);

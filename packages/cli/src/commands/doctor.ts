@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import pc from "picocolors";
 import { hasDirectiveSection } from "../lib/merge.js";
@@ -84,7 +84,8 @@ function checkVersionCompatibility(dir: string): CheckResult {
     return {
       label: "Package version compatibility",
       passed: true,
-      message: directivePackages.length === 0 ? "No packages found" : "Single package",
+      message:
+        directivePackages.length === 0 ? "No packages found" : "Single package",
     };
   }
 
@@ -111,7 +112,9 @@ function checkTypeScript(dir: string): CheckResult {
     // Simple JSON parse — doesn't handle comments or extends
     const raw = readFileSync(tsconfigPath, "utf-8");
     // Strip single-line comments for parsing
-    const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const stripped = raw
+      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
     const config = JSON.parse(stripped);
     const co = config.compilerOptions || {};
 
@@ -180,7 +183,9 @@ function checkDuplicateInstances(dir: string): CheckResult {
           "core",
         );
         if (existsSync(nestedCore)) {
-          duplicates.push(`@directive-run/${pkg}/node_modules/@directive-run/core`);
+          duplicates.push(
+            `@directive-run/${pkg}/node_modules/@directive-run/core`,
+          );
         }
       }
     }

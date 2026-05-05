@@ -31,10 +31,16 @@ export function UseHistoryPage() {
       >
         inc
       </button>
-      <button data-testid={TestIds.btnGoBack} onClick={() => history()?.goBack()}>
+      <button
+        data-testid={TestIds.btnGoBack}
+        onClick={() => history()?.goBack()}
+      >
         goBack
       </button>
-      <button data-testid={TestIds.btnGoForward} onClick={() => history()?.goForward()}>
+      <button
+        data-testid={TestIds.btnGoForward}
+        onClick={() => history()?.goForward()}
+      >
         goForward
       </button>
     </div>

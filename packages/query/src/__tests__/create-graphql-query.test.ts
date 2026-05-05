@@ -544,7 +544,7 @@ describe("createGraphQLClient", () => {
     );
 
     const gql = createGraphQLClient({ endpoint: "/api/graphql" });
-    const userDef = gql.query({
+    const _userDef = gql.query({
       name: "user",
       document: GetUserDocument,
       variables: (facts) => {

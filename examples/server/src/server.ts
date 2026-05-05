@@ -105,7 +105,7 @@ app.get("/snapshot/:userId", async (req, res) => {
     snapshotCache.set(userId, { snapshot, cachedAt: Date.now() });
 
     res.json({ source: "fresh", snapshot });
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ error: "Failed to settle system" });
   } finally {
     system.destroy();
@@ -158,7 +158,7 @@ app.post("/snapshot/:userId/verify", async (req, res) => {
         signedSnapshot: signed,
       });
     }
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ error: "Verification failed" });
   } finally {
     system.destroy();

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import pc from "picocolors";
-import { getAllExamples, getExample, getExampleFiles } from "../lib/knowledge.js";
+import { getAllExamples, getExample } from "../lib/knowledge.js";
 
 // ---------------------------------------------------------------------------
 // Categories
@@ -123,7 +123,11 @@ export async function examplesListCommand(args: string[]) {
   for (const [name, content] of examples) {
     const cat = getCategory(name);
 
-    if (filter && !cat.toLowerCase().includes(filter) && !name.includes(filter)) {
+    if (
+      filter &&
+      !cat.toLowerCase().includes(filter) &&
+      !name.includes(filter)
+    ) {
       continue;
     }
 
@@ -142,7 +146,8 @@ export async function examplesListCommand(args: string[]) {
   // Print in category order
   const categoryOrder = Object.keys(CATEGORIES);
   const sortedCategories = [...byCategory.keys()].sort(
-    (a, b) => (categoryOrder.indexOf(a) ?? 99) - (categoryOrder.indexOf(b) ?? 99),
+    (a, b) =>
+      (categoryOrder.indexOf(a) ?? 99) - (categoryOrder.indexOf(b) ?? 99),
   );
 
   for (const cat of sortedCategories) {
@@ -158,7 +163,9 @@ export async function examplesListCommand(args: string[]) {
   }
 
   console.log(
-    pc.dim(`${examples.size} examples available. Run ${pc.cyan("directive examples copy <name>")} to extract one.`),
+    pc.dim(
+      `${examples.size} examples available. Run ${pc.cyan("directive examples copy <name>")} to extract one.`,
+    ),
   );
 }
 
@@ -166,10 +173,7 @@ export async function examplesListCommand(args: string[]) {
 // Copy command
 // ---------------------------------------------------------------------------
 
-export async function examplesCopyCommand(
-  name: string,
-  args: string[],
-) {
+export async function examplesCopyCommand(name: string, args: string[]) {
   let dest = process.cwd();
 
   for (let i = 0; i < args.length; i++) {
@@ -206,10 +210,7 @@ export async function examplesCopyCommand(
       /from\s+["']@directive-run\/core["']/g,
       'from "@directive-run/core"',
     )
-    .replace(
-      /from\s+["']@directive-run\/ai["']/g,
-      'from "@directive-run/ai"',
-    );
+    .replace(/from\s+["']@directive-run\/ai["']/g, 'from "@directive-run/ai"');
 
   const filePath = join(dest, `${name}.ts`);
 

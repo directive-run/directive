@@ -56,7 +56,7 @@ function formatPrice(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-const ITEM_ICONS: Record<string, string> = {
+const _ITEM_ICONS: Record<string, string> = {
   headphones: "headphones-icon",
   keyboard: "keyboard-icon",
   hub: "hub-icon",
@@ -95,7 +95,9 @@ function render(): void {
   // ---- Cart Items ----
   if (isEmpty) {
     itemListEl.replaceChildren(
-      el("div", { className: "sc-empty-cart" },
+      el(
+        "div",
+        { className: "sc-empty-cart" },
         el("div", { className: "sc-empty-icon" }, "\u{1F6D2}"),
         el("p", "Your cart is empty"),
       ),
@@ -106,20 +108,63 @@ function render(): void {
         const overstock = item.quantity > item.maxStock;
         const itemTotal = item.price * item.quantity;
 
-        return el("div", { className: `sc-item${overstock ? " sc-item-overstock" : ""}`, dataset: { itemId: item.id } } as any,
+        return el(
+          "div",
+          {
+            className: `sc-item${overstock ? " sc-item-overstock" : ""}`,
+            dataset: { itemId: item.id },
+          } as any,
           el("div", { className: `sc-item-icon sc-icon-${item.image}` }),
-          el("div", { className: "sc-item-details" },
+          el(
+            "div",
+            { className: "sc-item-details" },
             el("div", { className: "sc-item-name" }, item.name),
-            el("div", { className: "sc-item-price" }, `${formatPrice(item.price)} each`),
-            overstock ? el("div", { className: "sc-stock-warning" }, `Only ${item.maxStock} in stock`) : null,
+            el(
+              "div",
+              { className: "sc-item-price" },
+              `${formatPrice(item.price)} each`,
+            ),
+            overstock
+              ? el(
+                  "div",
+                  { className: "sc-stock-warning" },
+                  `Only ${item.maxStock} in stock`,
+                )
+              : null,
           ),
-          el("div", { className: "sc-item-controls" },
-            el("button", { className: "sc-qty-btn", dataset: { action: "decrease", id: item.id }, disabled: item.quantity <= 1 } as any, "-"),
+          el(
+            "div",
+            { className: "sc-item-controls" },
+            el(
+              "button",
+              {
+                className: "sc-qty-btn",
+                dataset: { action: "decrease", id: item.id },
+                disabled: item.quantity <= 1,
+              } as any,
+              "-",
+            ),
             el("span", { className: "sc-qty-value" }, `${item.quantity}`),
-            el("button", { className: "sc-qty-btn", dataset: { action: "increase", id: item.id }, disabled: item.quantity >= item.maxStock } as any, "+"),
+            el(
+              "button",
+              {
+                className: "sc-qty-btn",
+                dataset: { action: "increase", id: item.id },
+                disabled: item.quantity >= item.maxStock,
+              } as any,
+              "+",
+            ),
           ),
           el("div", { className: "sc-item-total" }, formatPrice(itemTotal)),
-          el("button", { className: "sc-remove-btn", dataset: { action: "remove", id: item.id }, title: "Remove item" } as any, "\u00D7"),
+          el(
+            "button",
+            {
+              className: "sc-remove-btn",
+              dataset: { action: "remove", id: item.id },
+              title: "Remove item",
+            } as any,
+            "\u00D7",
+          ),
         );
       }),
     );
@@ -171,7 +216,10 @@ function render(): void {
   checkoutBtn.disabled = isEmpty || !isAuthenticated || isProcessing;
 
   if (checkoutStatus === "processing") {
-    checkoutBtn.replaceChildren(el("span", { className: "sc-spinner" }), " Processing...");
+    checkoutBtn.replaceChildren(
+      el("span", { className: "sc-spinner" }),
+      " Processing...",
+    );
   } else {
     checkoutBtn.textContent = "Checkout";
   }
@@ -179,22 +227,45 @@ function render(): void {
   // Checkout status overlay
   if (checkoutStatus === "complete") {
     checkoutStatusEl.replaceChildren(
-      el("div", { className: "sc-overlay sc-overlay-success" },
+      el(
+        "div",
+        { className: "sc-overlay sc-overlay-success" },
         el("div", { className: "sc-overlay-icon" }, "\u2713"),
         el("div", { className: "sc-overlay-title" }, "Order Complete!"),
-        el("div", { className: "sc-overlay-detail" }, "Thank you for your purchase."),
-        el("button", { className: "sc-overlay-btn", id: "sc-reset-btn" }, "Continue Shopping"),
+        el(
+          "div",
+          { className: "sc-overlay-detail" },
+          "Thank you for your purchase.",
+        ),
+        el(
+          "button",
+          { className: "sc-overlay-btn", id: "sc-reset-btn" },
+          "Continue Shopping",
+        ),
       ),
     );
     checkoutStatusEl.style.display = "flex";
   } else if (checkoutStatus === "failed") {
     checkoutStatusEl.replaceChildren(
-      el("div", { className: "sc-overlay sc-overlay-error" },
+      el(
+        "div",
+        { className: "sc-overlay sc-overlay-error" },
         el("div", { className: "sc-overlay-icon" }, "\u2717"),
         el("div", { className: "sc-overlay-title" }, "Checkout Failed"),
         el("div", { className: "sc-overlay-detail" }, checkoutError),
-        el("button", { className: "sc-overlay-btn", id: "sc-retry-checkout-btn" }, "Try Again"),
-        el("button", { className: "sc-overlay-btn sc-overlay-btn-secondary", id: "sc-dismiss-btn" }, "Dismiss"),
+        el(
+          "button",
+          { className: "sc-overlay-btn", id: "sc-retry-checkout-btn" },
+          "Try Again",
+        ),
+        el(
+          "button",
+          {
+            className: "sc-overlay-btn sc-overlay-btn-secondary",
+            id: "sc-dismiss-btn",
+          },
+          "Dismiss",
+        ),
       ),
     );
     checkoutStatusEl.style.display = "flex";
@@ -206,7 +277,11 @@ function render(): void {
   if (isAuthenticated) {
     authToggleBtn.textContent = "Sign Out";
     authStatusEl.replaceChildren(
-      el("span", { className: "sc-auth-badge sc-auth-in" }, `Signed in as ${userName}`),
+      el(
+        "span",
+        { className: "sc-auth-badge sc-auth-in" },
+        `Signed in as ${userName}`,
+      ),
     );
   } else {
     authToggleBtn.textContent = "Sign In";

@@ -2,7 +2,7 @@
 import { useFact, useOptimisticUpdate } from "@directive-run/vue";
 import { statusPlugin, system } from "../system";
 
-const count = useFact(system, "count");
+const _count = useFact(system, "count");
 const { mutate, isPending, error, rollback } = useOptimisticUpdate(
   system,
   statusPlugin,

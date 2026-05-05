@@ -2,8 +2,8 @@
 import { useExplain, useFact } from "@directive-run/vue";
 import { system } from "../system";
 
-const status = useFact(system, "status");
-const explanation = useExplain(system, "LOAD_DATA:{}");
+const _status = useFact(system, "status");
+const _explanation = useExplain(system, "LOAD_DATA:{}");
 </script>
 
 <template>

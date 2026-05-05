@@ -135,7 +135,9 @@ export interface CreateTraceManagerOptions<S extends Schema> {
   /** Plugin manager for emitting trace lifecycle events */
   pluginManager: PluginManager<S>;
   /** Optional callback to resolve meta for a resolver ID (for trace enrichment) */
-  resolverMetaLookup?: (resolverId: string) => import("./types/meta.js").DefinitionMeta | undefined;
+  resolverMetaLookup?: (
+    resolverId: string,
+  ) => import("./types/meta.js").DefinitionMeta | undefined;
 }
 
 /**

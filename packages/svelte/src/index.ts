@@ -40,9 +40,9 @@ import {
   createThrottle,
   defaultEquality,
   depsChanged,
+  mergeHydrationFacts,
   pickFacts,
   runTrackedSelector,
-  mergeHydrationFacts,
   shallowEqual,
 } from "@directive-run/core/adapter-utils";
 import { getContext, onDestroy, setContext } from "svelte";
@@ -1029,8 +1029,14 @@ export function useHydratedSystem<S extends ModuleSchema>(
   moduleDef: ModuleDef<S>,
   config?: UseDirectiveConfig,
 ): SingleModuleSystem<S> {
-  const snapshot = getContext<Record<string, unknown> | undefined>(HYDRATION_KEY);
-  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
+  const snapshot = getContext<Record<string, unknown> | undefined>(
+    HYDRATION_KEY,
+  );
+  const mergedFacts = mergeHydrationFacts(
+    snapshot,
+    config?.initialFacts as Record<string, unknown>,
+  );
 
-  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts }).system;
+  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts })
+    .system;
 }

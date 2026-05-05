@@ -92,7 +92,7 @@ function render(): void {
   const hintsUsed = facts.hintsUsed;
   const errorsCount = facts.errorsCount;
 
-  const conflicts = derive.conflicts;
+  const _conflicts = derive.conflicts;
   const conflictIndices = derive.conflictIndices;
   const selectedPeers = derive.selectedPeers;
   const sameValueIndices = derive.sameValueIndices;
@@ -191,16 +191,24 @@ function render(): void {
       const noteDigits: HTMLElement[] = [];
       for (let d = 1; d <= 9; d++) {
         noteDigits.push(
-          el("span", { className: "note-digit" }, notes[i].has(d) ? String(d) : ""),
+          el(
+            "span",
+            { className: "note-digit" },
+            notes[i].has(d) ? String(d) : "",
+          ),
         );
       }
       children = [el("div", { className: "notes-grid" }, ...noteDigits)];
     }
 
-    const cell = el("div", {
-      className: classes.join(" "),
-      tabIndex: 0,
-    }, ...children);
+    const cell = el(
+      "div",
+      {
+        className: classes.join(" "),
+        tabIndex: 0,
+      },
+      ...children,
+    );
     cell.dataset.testid = `sudoku-cell-${i}`;
     cell.setAttribute(
       "aria-label",

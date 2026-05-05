@@ -175,8 +175,7 @@ function buildGraph(
     const inCycle = agentIds.filter((id) => !orderSet.has(id));
 
     throw new Error(
-      `[Directive Goal] Circular dependency detected among agents: ${inCycle.join(", ")}. ` +
-        "Review their produces/requires declarations.",
+      `[Directive Goal] Circular dependency detected among agents: ${inCycle.join(", ")}. Review their produces/requires declarations.`,
     );
   }
 
@@ -543,11 +542,7 @@ export function explainGoal<T = unknown>(
       : "";
   const errorNote = result.error ? ` Error: ${result.error}` : "";
 
-  const summary =
-    `${status} in ${result.steps} step(s) (${result.totalTokens.toLocaleString()} tokens, ${result.durationMs}ms). ` +
-    `Satisfaction: ${firstSatisfaction} → ${lastSatisfaction}.` +
-    relaxationNote +
-    errorNote;
+  const summary = `${status} in ${result.steps} step(s) (${result.totalTokens.toLocaleString()} tokens, ${result.durationMs}ms). Satisfaction: ${firstSatisfaction} → ${lastSatisfaction}.${relaxationNote}${errorNote}`;
 
   return {
     achieved: result.achieved,

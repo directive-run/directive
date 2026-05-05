@@ -89,14 +89,7 @@ export function generateLlmsTxt(): string {
   for (const name of exampleOrder) {
     const content = examples.get(name);
     if (content) {
-      sections.push(
-        `### ${name}`,
-        "",
-        "```typescript",
-        content,
-        "```",
-        "",
-      );
+      sections.push(`### ${name}`, "", "```typescript", content, "```", "");
     }
   }
 

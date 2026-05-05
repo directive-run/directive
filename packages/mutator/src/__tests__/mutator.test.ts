@@ -1,7 +1,7 @@
-// @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { flushAsync } from "@directive-run/core/testing";
+// @vitest-environment node
+import { describe, expect, it, vi } from "vitest";
 import { defineMutator, mutate } from "../index.js";
 
 type FormMutations = {

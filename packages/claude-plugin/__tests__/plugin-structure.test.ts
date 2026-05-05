@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -66,7 +66,10 @@ describe("plugin structure", () => {
           const content = readFileSync(skillMdPath, "utf-8");
           const fm = parseFrontmatter(content);
           expect(fm.name, `${skill} missing name in frontmatter`).toBeTruthy();
-          expect(fm.description, `${skill} missing description in frontmatter`).toBeTruthy();
+          expect(
+            fm.description,
+            `${skill} missing description in frontmatter`,
+          ).toBeTruthy();
         });
 
         it("name matches directory", () => {

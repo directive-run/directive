@@ -297,7 +297,8 @@ export function timerOps(opts: TimerFactOpts) {
     reset: resetTimer,
     complete: completeTimer,
     registerRepeat: (state: TimerFactState) => registerRepeat(state, opts.ms),
-    tick: (state: TimerFactState, nowMs: number) => tickTimer(state, nowMs, opts),
+    tick: (state: TimerFactState, nowMs: number) =>
+      tickTimer(state, nowMs, opts),
     elapsedMs,
     remainingMs: (state: TimerFactState, nowMs: number) =>
       remainingMs(state, nowMs, opts.ms),

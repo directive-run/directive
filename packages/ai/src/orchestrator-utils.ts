@@ -6,6 +6,11 @@
 // classes that are independent of the orchestrator instance.
 // ============================================================================
 
+import type { CheckpointStore } from "./checkpoint.js";
+import type {
+  MultiAgentOrchestrator,
+  MultiAgentOrchestratorOptions,
+} from "./orchestrator-types.js";
 import type {
   CheckpointDiff,
   CheckpointProgress,
@@ -13,11 +18,6 @@ import type {
   GoalCheckpointState,
   PatternCheckpointState,
 } from "./types.js";
-import type { CheckpointStore } from "./checkpoint.js";
-import type {
-  MultiAgentOrchestrator,
-  MultiAgentOrchestratorOptions,
-} from "./orchestrator-types.js";
 
 // ============================================================================
 // Shallow Equality

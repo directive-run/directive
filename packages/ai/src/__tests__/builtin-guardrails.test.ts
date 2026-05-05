@@ -41,7 +41,10 @@ const defaultContext = { agentName: "test-agent", input: "", facts: {} };
 describe("createPIIGuardrail", () => {
   it("blocks input with SSN pattern (default)", () => {
     const guardrail = createPIIGuardrail({});
-    const result = guardrail(inputData("My SSN is 123-45-6789"), defaultContext);
+    const result = guardrail(
+      inputData("My SSN is 123-45-6789"),
+      defaultContext,
+    );
 
     expect(result).toEqual({ passed: false, reason: "Input contains PII" });
   });
@@ -68,10 +71,7 @@ describe("createPIIGuardrail", () => {
 
   it("passes clean input", () => {
     const guardrail = createPIIGuardrail({});
-    const result = guardrail(
-      inputData("Hello, how are you?"),
-      defaultContext,
-    );
+    const result = guardrail(inputData("Hello, how are you?"), defaultContext);
 
     expect(result).toEqual({ passed: true, transformed: undefined });
   });
@@ -109,10 +109,7 @@ describe("createPIIGuardrail", () => {
     const guardrail = createPIIGuardrail({
       patterns: [/\bSECRET-\d+\b/g],
     });
-    const result = guardrail(
-      inputData("Code is SECRET-42"),
-      defaultContext,
-    );
+    const result = guardrail(inputData("Code is SECRET-42"), defaultContext);
 
     expect(result).toEqual({ passed: false, reason: "Input contains PII" });
   });
@@ -297,10 +294,7 @@ describe("createToolGuardrail", () => {
 
     expect(passResult).toEqual({ passed: true });
 
-    const blockResult = guardrail(
-      toolCallData("admin_search"),
-      defaultContext,
-    );
+    const blockResult = guardrail(toolCallData("admin_search"), defaultContext);
 
     expect(blockResult).toEqual({
       passed: false,
@@ -424,7 +418,7 @@ describe("createOutputTypeGuardrail", () => {
 
     expect(validResult).toEqual({ passed: true });
 
-    const nanResult = guardrail(outputData(NaN), defaultContext);
+    const nanResult = guardrail(outputData(Number.NaN), defaultContext);
 
     expect(nanResult).toEqual({
       passed: false,
@@ -564,10 +558,7 @@ describe("createLengthGuardrail", () => {
       estimateTokens: customEstimator,
     });
 
-    const result = guardrail(
-      outputData("one two three four"),
-      defaultContext,
-    );
+    const result = guardrail(outputData("one two three four"), defaultContext);
 
     // Core safeStringify JSON-encodes strings (adds surrounding quotes)
     expect(customEstimator).toHaveBeenCalledWith('"one two three four"');

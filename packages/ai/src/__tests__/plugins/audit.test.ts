@@ -81,15 +81,9 @@ describe("getEntries", () => {
       sessionId: "sess-1",
     });
     const entries: AuditEntry[] = [];
-    entries.push(
-      await audit.addEntry("agent.run.start", { agent: "a" }),
-    );
-    entries.push(
-      await audit.addEntry("tool.call.start", { tool: "t" }),
-    );
-    entries.push(
-      await audit.addEntry("agent.run.complete", { agent: "a" }),
-    );
+    entries.push(await audit.addEntry("agent.run.start", { agent: "a" }));
+    entries.push(await audit.addEntry("tool.call.start", { tool: "t" }));
+    entries.push(await audit.addEntry("agent.run.complete", { agent: "a" }));
 
     return { audit, entries };
   }

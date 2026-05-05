@@ -56,9 +56,13 @@ function render() {
     const exposed = exposures[exp.id];
 
     const variantBtns = exp.variants.map((variant) => {
-      const btn = el("button", {
-        className: `variant-btn${assigned === variant.id ? " active" : ""}`,
-      }, `${variant.label} (${variant.weight}%)`);
+      const btn = el(
+        "button",
+        {
+          className: `variant-btn${assigned === variant.id ? " active" : ""}`,
+        },
+        `${variant.label} (${variant.weight}%)`,
+      );
 
       btn.addEventListener("click", () => {
         system.events.assignVariant({
@@ -71,12 +75,20 @@ function render() {
       return btn;
     });
 
-    const statusText = exp.active ? (system.facts.paused ? "Paused" : "Active") : "Inactive";
+    const statusText = exp.active
+      ? system.facts.paused
+        ? "Paused"
+        : "Active"
+      : "Inactive";
 
     cards.push(
-      el("div", { className: "experiment" },
+      el(
+        "div",
+        { className: "experiment" },
         el("div", { className: "experiment-name" }, exp.name),
-        el("div", { className: "experiment-meta" },
+        el(
+          "div",
+          { className: "experiment-meta" },
           `ID: ${exp.id} \u00a0|\u00a0 Status: ${statusText} \u00a0|\u00a0 Assigned: ${assigned ?? "\u2013"} \u00a0|\u00a0 Exposed: ${exposed ? new Date(exposed).toLocaleTimeString() : "\u2013"}`,
         ),
         el("div", { className: "experiment-variants" }, ...variantBtns),
@@ -88,7 +100,11 @@ function render() {
   // --- Timeline ---
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "ab-timeline-empty" }, "Events appear after interactions"),
+      el(
+        "div",
+        { className: "ab-timeline-empty" },
+        "Events appear after interactions",
+      ),
     );
   } else {
     const entries = timeline.map((entry) => {
@@ -99,7 +115,9 @@ function render() {
         second: "2-digit",
       });
 
-      return el("div", { className: `ab-timeline-entry ${entry.type}` },
+      return el(
+        "div",
+        { className: `ab-timeline-entry ${entry.type}` },
         el("span", { className: "ab-timeline-time" }, timeStr),
         el("span", { className: "ab-timeline-event" }, entry.event),
         el("span", { className: "ab-timeline-detail" }, entry.detail),

@@ -13,13 +13,12 @@
 
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TSDocParser, type ParserMessage } from "@microsoft/tsdoc";
+import { type ParserMessage, TSDocParser } from "@microsoft/tsdoc";
 import {
   type FunctionDeclaration,
   type JSDoc,
   Project,
   type SourceFile,
-  SyntaxKind,
   type VariableStatement,
 } from "ts-morph";
 
@@ -76,7 +75,10 @@ function validateTSDocSyntax(
 }
 
 function isTSDocError(msg: ParserMessage): boolean {
-  return msg.messageId.startsWith("tsdoc-") && !msg.messageId.includes("undefined-tag");
+  return (
+    msg.messageId.startsWith("tsdoc-") &&
+    !msg.messageId.includes("undefined-tag")
+  );
 }
 
 // ============================================================================
@@ -158,7 +160,13 @@ function validateFunctionExport(
     }
 
     if (!documentedParams.has(paramName)) {
-      addError(filePath, line, name, `Missing @param for "${paramName}"`, "warning");
+      addError(
+        filePath,
+        line,
+        name,
+        `Missing @param for "${paramName}"`,
+        "warning",
+      );
     }
   }
 

@@ -28,11 +28,7 @@
  * ```
  */
 
-import type {
-  ModuleSchema,
-  Requirement,
-  System,
-} from "@directive-run/core";
+import type { ModuleSchema, Requirement, System } from "@directive-run/core";
 import { createModule, createSystem, t } from "@directive-run/core";
 import {
   createCallbackPlugin,
@@ -150,7 +146,15 @@ import { safeStringify } from "@directive-run/core/internals";
 // ============================================================================
 
 export * from "./orchestrator-types.js";
-export { Semaphore, shallowEqual, getPatternStep, getCheckpointProgress, diffCheckpoints, forkFromCheckpoint, validateDagAcyclic } from "./orchestrator-utils.js";
+export {
+  Semaphore,
+  shallowEqual,
+  getPatternStep,
+  getCheckpointProgress,
+  diffCheckpoints,
+  forkFromCheckpoint,
+  validateDagAcyclic,
+} from "./orchestrator-utils.js";
 
 // ============================================================================
 // Internal imports from extracted modules (used by createMultiAgentOrchestrator)
@@ -164,8 +168,8 @@ import type {
   ExecutionPattern,
   HandoffRequest,
   HandoffResult,
-  MultiAgentOrchestratorOptions,
   MultiAgentOrchestrator,
+  MultiAgentOrchestratorOptions,
   MultiAgentRunCallOptions,
   MultiAgentState,
   ParallelPattern,
@@ -179,7 +183,12 @@ import type {
   TaskContext,
   TaskRegistration,
 } from "./orchestrator-types.js";
-import { Semaphore, shallowEqual, validateDagAcyclic, getPatternStep } from "./orchestrator-utils.js";
+import {
+  Semaphore,
+  getPatternStep,
+  shallowEqual,
+  validateDagAcyclic,
+} from "./orchestrator-utils.js";
 
 /** Built-in pause requirement type */
 interface PauseBudgetExceededReq extends Requirement {
@@ -1412,12 +1421,7 @@ export function createMultiAgentOrchestrator(
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
         reject(
           new Error(
-            `[Directive MultiAgent] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-              "Solutions:\n" +
-              "  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n" +
-              "  2. Set autoApproveToolCalls: true to auto-approve\n" +
-              `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-              "See: https://directive.run/docs/ai/multi-agent",
+            `[Directive MultiAgent] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\nSolutions:\n  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n  2. Set autoApproveToolCalls: true to auto-approve\n  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\nSee: https://directive.run/docs/ai/multi-agent`,
           ),
         );
       }, approvalTimeoutMs);
@@ -1927,10 +1931,7 @@ export function createMultiAgentOrchestrator(
             .join("\n");
           agent = {
             ...agent,
-            instructions:
-              (agent.instructions ?? "") +
-              "\n\nConversation context:\n" +
-              contextStr,
+            instructions: `${agent.instructions ?? ""}\n\nConversation context:\n${contextStr}`,
           };
         }
       }
@@ -1941,7 +1942,7 @@ export function createMultiAgentOrchestrator(
         if (metaStr) {
           agent = {
             ...agent,
-            instructions: (agent.instructions ?? "") + "\n\n" + metaStr,
+            instructions: `${agent.instructions ?? ""}\n\n${metaStr}`,
           };
         }
       }
@@ -3217,8 +3218,7 @@ export function createMultiAgentOrchestrator(
           action = raw as typeof action;
         } else {
           throw new Error(
-            `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned invalid output (round ${round + 1}). ` +
-              `Expected { action: "delegate"|"complete", worker?, workerInput? }`,
+            `[Directive MultiAgent] Supervisor "${pattern.supervisor}" returned invalid output (round ${round + 1}). Expected { action: "delegate"|"complete", worker?, workerInput? }`,
           );
         }
 
@@ -4201,10 +4201,11 @@ export function createMultiAgentOrchestrator(
                 resolved = true;
                 reject(
                   new Error(
-                    `[Directive MultiAgent] Race: all ${entries.length} agents failed.\n` +
-                      Object.entries(agentErrors)
-                        .map(([id, msg]) => `  - ${id}: ${msg}`)
-                        .join("\n"),
+                    `[Directive MultiAgent] Race: all ${entries.length} agents failed.\n${Object.entries(
+                      agentErrors,
+                    )
+                      .map(([id, msg]) => `  - ${id}: ${msg}`)
+                      .join("\n")}`,
                   ),
                 );
               } else if (maxPossibleSuccesses < minSuccess) {
@@ -4212,11 +4213,11 @@ export function createMultiAgentOrchestrator(
                 resolved = true;
                 reject(
                   new Error(
-                    `[Directive MultiAgent] Race: cannot reach minSuccess (${minSuccess}). ` +
-                      `${failedCount} agent(s) failed.\n` +
-                      Object.entries(agentErrors)
-                        .map(([id, msg]) => `  - ${id}: ${msg}`)
-                        .join("\n"),
+                    `[Directive MultiAgent] Race: cannot reach minSuccess (${minSuccess}). ${failedCount} agent(s) failed.\n${Object.entries(
+                      agentErrors,
+                    )
+                      .map(([id, msg]) => `  - ${id}: ${msg}`)
+                      .join("\n")}`,
                   ),
                 );
               }

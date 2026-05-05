@@ -1,4 +1,13 @@
 import type {
+  ParallelPattern,
+  RacePattern,
+  ReflectIterationRecord,
+  ReflectPattern,
+  SequentialPattern,
+  SupervisorPattern,
+} from "./multi-agent-orchestrator.js";
+import type { ReflectionEvaluation } from "./reflection.js";
+import type {
   AgentSelectionStrategy,
   DagExecutionContext,
   DagNode,
@@ -10,15 +19,6 @@ import type {
   RelaxationTier,
   RunResult,
 } from "./types.js";
-import type {
-  ParallelPattern,
-  SequentialPattern,
-  SupervisorPattern,
-  ReflectPattern,
-  RacePattern,
-  ReflectIterationRecord,
-} from "./multi-agent-orchestrator.js";
-import type { ReflectionEvaluation } from "./reflection.js";
 
 // ============================================================================
 // Pattern Helpers

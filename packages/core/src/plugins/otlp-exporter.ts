@@ -279,7 +279,9 @@ export function createOTLPExporter(config: OTLPExporterConfig): OTLPExporter {
   try {
     const url = new URL(endpoint);
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      throw new Error("[Directive] Only http: and https: protocols are supported");
+      throw new Error(
+        "[Directive] Only http: and https: protocols are supported",
+      );
     }
   } catch (error) {
     throw new Error(
@@ -290,9 +292,7 @@ export function createOTLPExporter(config: OTLPExporterConfig): OTLPExporter {
   // Warn if endpoint already contains a path like /v1/metrics or /v1/traces
   if (/\/v1\/(metrics|traces)/.test(endpoint)) {
     console.warn(
-      `[Directive OTLP] Endpoint "${endpoint}" already contains a /v1/metrics or /v1/traces path. ` +
-        "The exporter will append /v1/metrics or /v1/traces automatically. " +
-        `Use the base URL (e.g., "http://localhost:4318") instead.`,
+      `[Directive OTLP] Endpoint "${endpoint}" already contains a /v1/metrics or /v1/traces path. The exporter will append /v1/metrics or /v1/traces automatically. Use the base URL (e.g., "http://localhost:4318") instead.`,
     );
   }
 

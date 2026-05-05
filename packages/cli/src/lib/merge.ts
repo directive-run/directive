@@ -23,14 +23,12 @@ export function mergeSection(
 
   const separator = existingContent.endsWith("\n") ? "\n" : "\n\n";
 
-  return existingContent + separator + wrapped + "\n";
+  return `${existingContent + separator + wrapped}\n`;
 }
 
 /**
  * Check if content already has a Directive section.
  */
 export function hasDirectiveSection(content: string): boolean {
-  return (
-    content.includes(SECTION_START) && content.includes(SECTION_END)
-  );
+  return content.includes(SECTION_START) && content.includes(SECTION_END);
 }

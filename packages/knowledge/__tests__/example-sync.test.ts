@@ -1,11 +1,11 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = join(__dirname, "..", "examples");
-const EXAMPLES_ROOT = join(__dirname, "..", "..", "..", "examples");
+const _EXAMPLES_ROOT = join(__dirname, "..", "..", "..", "examples");
 
 function getExtractedExamples(): string[] {
   try {
@@ -28,10 +28,7 @@ describe("example sync", () => {
     for (const name of extractedNames) {
       const filePath = join(EXAMPLES_DIR, `${name}.ts`);
       const content = readFileSync(filePath, "utf-8");
-      expect(
-        content.length,
-        `${name}.ts is empty`,
-      ).toBeGreaterThan(100);
+      expect(content.length, `${name}.ts is empty`).toBeGreaterThan(100);
     }
   });
 
@@ -41,13 +38,19 @@ describe("example sync", () => {
       const content = readFileSync(filePath, "utf-8");
       const hasModule = content.includes("createModule");
       const hasSystem = content.includes("createSystem");
-      const hasOrchestrator = content.includes("createAgentOrchestrator") ||
+      const hasOrchestrator =
+        content.includes("createAgentOrchestrator") ||
         content.includes("createMultiAgentOrchestrator") ||
         content.includes("createCheckersAI");
       const importsDirective = content.includes("@directive-run/");
-      const importsLocal = content.includes("import") && content.includes("system");
+      const importsLocal =
+        content.includes("import") && content.includes("system");
       expect(
-        hasModule || hasSystem || hasOrchestrator || importsDirective || importsLocal,
+        hasModule ||
+          hasSystem ||
+          hasOrchestrator ||
+          importsDirective ||
+          importsLocal,
         `${name}.ts doesn't contain module/system/orchestrator code or directive imports`,
       ).toBe(true);
     }
@@ -71,10 +74,9 @@ describe("example sync", () => {
     for (const name of extractedNames) {
       const filePath = join(EXAMPLES_DIR, `${name}.ts`);
       const content = readFileSync(filePath, "utf-8");
-      expect(
-        content,
-        `${name}.ts missing header comment`,
-      ).toContain("// Example:");
+      expect(content, `${name}.ts missing header comment`).toContain(
+        "// Example:",
+      );
     }
   });
 
@@ -127,10 +129,9 @@ describe("example sync", () => {
     for (const name of extractedNames) {
       const filePath = join(EXAMPLES_DIR, `${name}.ts`);
       const content = readFileSync(filePath, "utf-8");
-      expect(
-        content,
-        `${name}.ts has 3+ consecutive blank lines`,
-      ).not.toMatch(/\n\n\n\n/);
+      expect(content, `${name}.ts has 3+ consecutive blank lines`).not.toMatch(
+        /\n\n\n\n/,
+      );
     }
   });
 });

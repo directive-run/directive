@@ -1,6 +1,6 @@
-import * as p from "@clack/prompts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { CLI_NAME } from "../lib/constants.js";
 import {
@@ -137,8 +137,7 @@ export async function aiRulesCommand(args: string[]) {
       });
     } else {
       const choices = await p.multiselect({
-        message:
-          "No AI tools detected. Which tools do you use?",
+        message: "No AI tools detected. Which tools do you use?",
         options: getAllToolIds().map((id) => {
           const config = getToolConfig(id);
 
@@ -338,11 +337,27 @@ export async function aiRulesCheckCommand(args: string[]) {
   const opts = parseArgs(args);
   const targetDir = opts.dir;
 
-  const ruleFiles: Array<{ id: DetectedTool["id"]; path: string; name: string }> = [
+  const ruleFiles: Array<{
+    id: DetectedTool["id"];
+    path: string;
+    name: string;
+  }> = [
     { id: "cursor", path: join(targetDir, ".cursorrules"), name: "Cursor" },
-    { id: "claude", path: join(targetDir, ".claude/CLAUDE.md"), name: "Claude Code" },
-    { id: "copilot", path: join(targetDir, ".github/copilot-instructions.md"), name: "GitHub Copilot" },
-    { id: "windsurf", path: join(targetDir, ".windsurfrules"), name: "Windsurf" },
+    {
+      id: "claude",
+      path: join(targetDir, ".claude/CLAUDE.md"),
+      name: "Claude Code",
+    },
+    {
+      id: "copilot",
+      path: join(targetDir, ".github/copilot-instructions.md"),
+      name: "GitHub Copilot",
+    },
+    {
+      id: "windsurf",
+      path: join(targetDir, ".windsurfrules"),
+      name: "Windsurf",
+    },
     { id: "cline", path: join(targetDir, ".clinerules"), name: "Cline" },
   ];
 
@@ -366,10 +381,14 @@ export async function aiRulesCheckCommand(args: string[]) {
     const merged = mergeSection(existing, freshContent);
 
     if (merged !== existing) {
-      console.log(`${pc.red("✗")} ${file.name} rules are ${pc.yellow("stale")}`);
+      console.log(
+        `${pc.red("✗")} ${file.name} rules are ${pc.yellow("stale")}`,
+      );
       stale++;
     } else {
-      console.log(`${pc.green("✓")} ${file.name} rules are ${pc.green("current")}`);
+      console.log(
+        `${pc.green("✓")} ${file.name} rules are ${pc.green("current")}`,
+      );
     }
   }
 

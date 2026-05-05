@@ -4,8 +4,8 @@
  * Six-section pattern: System → DOM Refs → Render → Subscribe → Controls → Initial Render
  */
 
-import { el } from "@directive-run/el";
 import type { CircuitState } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 
 import {
   type ProviderStats,
@@ -50,7 +50,9 @@ function renderProvider(
 ): void {
   container.replaceChildren(
     circuitBadge(state),
-    el("span", { style: "font-size:0.55rem;color:var(--brand-text-dim)" },
+    el(
+      "span",
+      { style: "font-size:0.55rem;color:var(--brand-text-dim)" },
       `${stats.callCount} calls, ${stats.errorCount} err, $${stats.totalCost}`,
     ),
   );
@@ -88,7 +90,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "pr-timeline-empty" }, "Events appear after sending requests"),
+      el(
+        "div",
+        { className: "pr-timeline-empty" },
+        "Events appear after sending requests",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -100,7 +106,9 @@ function render(): void {
           second: "2-digit",
         });
 
-        return el("div", { className: `pr-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `pr-timeline-entry ${entry.type}` },
           el("span", { className: "pr-timeline-time" }, timeStr),
           el("span", { className: "pr-timeline-event" }, entry.event),
           el("span", { className: "pr-timeline-detail" }, entry.detail),

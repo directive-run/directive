@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  detectPII,
-  redactPII,
-  createEnhancedPIIGuardrail,
-  createOutputPIIGuardrail,
-  regexDetector,
   type DetectedPII,
   type PIIDetector,
   type PIIType,
+  createEnhancedPIIGuardrail,
+  createOutputPIIGuardrail,
+  detectPII,
+  redactPII,
+  regexDetector,
 } from "../../guardrails/pii-enhanced.js";
 import type { GuardrailContext } from "../../types.js";
 
@@ -57,10 +57,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("detects credit card with Luhn validation 4111-1111-1111-1111", async () => {
-    const result = await regexDetector.detect(
-      "Card: 4111-1111-1111-1111",
-      ["credit_card"],
-    );
+    const result = await regexDetector.detect("Card: 4111-1111-1111-1111", [
+      "credit_card",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("credit_card");
@@ -68,10 +67,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("rejects invalid credit card failing Luhn 1234-5678-9012-3456", async () => {
-    const result = await regexDetector.detect(
-      "Card: 1234-5678-9012-3456",
-      ["credit_card"],
-    );
+    const result = await regexDetector.detect("Card: 1234-5678-9012-3456", [
+      "credit_card",
+    ]);
 
     expect(result).toHaveLength(0);
   });
@@ -89,10 +87,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("detects phone numbers like (555) 555-1234", async () => {
-    const result = await regexDetector.detect(
-      "Call me at (555) 555-1234",
-      ["phone"],
-    );
+    const result = await regexDetector.detect("Call me at (555) 555-1234", [
+      "phone",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("phone");
@@ -106,10 +103,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("detects IP addresses like 192.168.1.1", async () => {
-    const result = await regexDetector.detect(
-      "Server at 192.168.1.1",
-      ["ip_address"],
-    );
+    const result = await regexDetector.detect("Server at 192.168.1.1", [
+      "ip_address",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("ip_address");
@@ -117,19 +113,17 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("rejects invalid IP 999.999.999.999", async () => {
-    const result = await regexDetector.detect(
-      "IP: 999.999.999.999",
-      ["ip_address"],
-    );
+    const result = await regexDetector.detect("IP: 999.999.999.999", [
+      "ip_address",
+    ]);
 
     expect(result).toHaveLength(0);
   });
 
   it('detects "dob: 01/15/1990" as date_of_birth', async () => {
-    const result = await regexDetector.detect(
-      "dob: 01/15/1990",
-      ["date_of_birth"],
-    );
+    const result = await regexDetector.detect("dob: 01/15/1990", [
+      "date_of_birth",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("date_of_birth");
@@ -137,10 +131,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it('detects "passport: AB1234567"', async () => {
-    const result = await regexDetector.detect(
-      "passport: AB1234567",
-      ["passport"],
-    );
+    const result = await regexDetector.detect("passport: AB1234567", [
+      "passport",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("passport");
@@ -148,10 +141,9 @@ describe("regexDetector / detectPII", () => {
   });
 
   it('detects "account #12345678" as bank_account', async () => {
-    const result = await regexDetector.detect(
-      "account #12345678",
-      ["bank_account"],
-    );
+    const result = await regexDetector.detect("account #12345678", [
+      "bank_account",
+    ]);
 
     expect(result).toHaveLength(1);
     expect(result[0]!.type).toBe("bank_account");
@@ -183,10 +175,9 @@ describe("detectAddresses", () => {
 describe("detectNames", () => {
   it('detects "Mr. John Smith"', async () => {
     // Use "Mr." directly at the start so it matches as the prefix
-    const result = await regexDetector.detect(
-      "Mr. John Smith is here",
-      ["name"],
-    );
+    const result = await regexDetector.detect("Mr. John Smith is here", [
+      "name",
+    ]);
 
     expect(result.length).toBeGreaterThanOrEqual(1);
     const nameItem = result.find((r) => r.type === "name");
@@ -196,10 +187,7 @@ describe("detectNames", () => {
 
   it('detects "name is Jane Doe"', async () => {
     // End sentence right after the name to avoid greedy capture of trailing words
-    const result = await regexDetector.detect(
-      "My name is Jane Doe.",
-      ["name"],
-    );
+    const result = await regexDetector.detect("My name is Jane Doe.", ["name"]);
 
     expect(result.length).toBeGreaterThanOrEqual(1);
     const nameItem = result.find((r) => r.type === "name");
@@ -388,10 +376,7 @@ describe("createEnhancedPIIGuardrail", () => {
     });
 
     await expect(
-      guardrail(
-        { input: "some text", agentName: "test" },
-        mockContext,
-      ),
+      guardrail({ input: "some text", agentName: "test" }, mockContext),
     ).rejects.toThrow(/timed out after 50ms/);
   });
 });

@@ -1,13 +1,13 @@
+import { virtualClock } from "@directive-run/core";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { virtualClock } from "@directive-run/core";
 import {
-  cancellable,
-  type CancelReason,
   CancelError,
+  type CancelReason,
   SupersededCancelError,
   TimeoutCancelError,
   cancelReason,
+  cancellable,
 } from "../index.js";
 
 describe("R1.C cancellable() — basic invocation", () => {
@@ -71,9 +71,17 @@ describe("R1.C cancellable() — supersession", () => {
 
     const facts = { result: "" };
     // First dispatch — pauses on releaseFirst.
-    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
+    const first = wrapped({
+      facts,
+      payload: { tag: "first" },
+      requeue: () => {},
+    });
     // Second dispatch — supersedes; first's signal aborts.
-    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    const second = wrapped({
+      facts,
+      payload: { tag: "second" },
+      requeue: () => {},
+    });
 
     // Let second complete (it's synchronous after entry).
     await second;
@@ -105,8 +113,16 @@ describe("R1.C cancellable() — supersession", () => {
     );
 
     const facts = {};
-    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
-    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    const first = wrapped({
+      facts,
+      payload: { tag: "first" },
+      requeue: () => {},
+    });
+    const second = wrapped({
+      facts,
+      payload: { tag: "second" },
+      requeue: () => {},
+    });
 
     await second;
     releaseFirst();
@@ -134,8 +150,16 @@ describe("R1.C cancellable() — supersession", () => {
     );
 
     const facts = {};
-    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
-    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    const first = wrapped({
+      facts,
+      payload: { tag: "first" },
+      requeue: () => {},
+    });
+    const second = wrapped({
+      facts,
+      payload: { tag: "second" },
+      requeue: () => {},
+    });
     await second;
     releaseFirst();
     await first;
@@ -225,8 +249,16 @@ describe("R1.C cancellable() — timeout", () => {
     );
 
     const facts = {};
-    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
-    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    const first = wrapped({
+      facts,
+      payload: { tag: "first" },
+      requeue: () => {},
+    });
+    const second = wrapped({
+      facts,
+      payload: { tag: "second" },
+      requeue: () => {},
+    });
 
     await second;
     releaseFirst();
@@ -261,8 +293,16 @@ describe("R2 sec M-1: signal.reason is a CancelError subclass", () => {
     );
 
     const facts = {};
-    const first = wrapped({ facts, payload: { tag: "first" }, requeue: () => {} });
-    const second = wrapped({ facts, payload: { tag: "second" }, requeue: () => {} });
+    const first = wrapped({
+      facts,
+      payload: { tag: "first" },
+      requeue: () => {},
+    });
+    const second = wrapped({
+      facts,
+      payload: { tag: "second" },
+      requeue: () => {},
+    });
     await second;
     releaseFirst();
     await first;

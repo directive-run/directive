@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { realClock, virtualClock, defaultClock } from "../clock.js";
+import { defaultClock, realClock, virtualClock } from "../clock.js";
 
 describe("realClock", () => {
   it("now() reports a real wall-clock value", () => {

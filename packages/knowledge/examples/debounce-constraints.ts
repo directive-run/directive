@@ -13,7 +13,6 @@
 
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
-import { el } from "@directive-run/el";
 import {
   debounceSearchModule,
   debounceSearchSchema,
@@ -43,7 +42,6 @@ const allKeys = [
 
 // Search form
 void "dc-search-input";
-
 // Progress bar
 
 // Query display
@@ -56,13 +54,11 @@ void "dc-search-input";
 void "dc-debounce-delay";
 void "dc-api-delay";
 void "dc-min-chars";
-
 // Timeline
 
 // ============================================================================
 // Render
 // ============================================================================
-
 
 // ============================================================================
 // Subscribe
@@ -71,7 +67,7 @@ void "dc-min-chars";
 system.subscribe(allKeys, render);
 
 // Timer — tick every 100ms for smooth debounce progress bar
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 100);
 
@@ -84,7 +80,6 @@ const tickInterval = setInterval(() => {
 // Clear
 
 // Sliders
-
 
 // ============================================================================
 // Initial Render

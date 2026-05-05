@@ -27,14 +27,14 @@ export type TimelineModule = typeof Timeline;
  * error to stderr for debugging.
  */
 export async function loadTimelinePackage(
-  verbose: boolean = false,
+  verbose = false,
 ): Promise<TimelineModule> {
   try {
     return (await import("@directive-run/timeline")) as TimelineModule;
   } catch (err) {
     console.error(
       pc.red(
-        `error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline`,
+        "error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline",
       ),
     );
     if (verbose) console.error(pc.dim((err as Error).message));

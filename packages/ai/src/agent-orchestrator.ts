@@ -483,9 +483,7 @@ export function createAgentOrchestrator<
   for (const key of Object.keys(factsSchema)) {
     if (RESERVED_ORCHESTRATOR_KEYS.includes(key)) {
       throw new Error(
-        `[Directive] Facts schema key "${key}" conflicts with orchestrator state. ` +
-          `Reserved keys: ${RESERVED_ORCHESTRATOR_KEYS.join(", ")}. ` +
-          "Rename your fact to avoid the collision.",
+        `[Directive] Facts schema key "${key}" conflicts with orchestrator state. Reserved keys: ${RESERVED_ORCHESTRATOR_KEYS.join(", ")}. Rename your fact to avoid the collision.`,
       );
     }
   }
@@ -779,10 +777,7 @@ export function createAgentOrchestrator<
           .join("\n");
         agent = {
           ...agent,
-          instructions:
-            (agent.instructions ?? "") +
-            "\n\nConversation context:\n" +
-            contextStr,
+          instructions: `${agent.instructions ?? ""}\n\nConversation context:\n${contextStr}`,
         };
       }
     }
@@ -793,7 +788,7 @@ export function createAgentOrchestrator<
       if (metaStr) {
         agent = {
           ...agent,
-          instructions: (agent.instructions ?? "") + "\n\n" + metaStr,
+          instructions: `${agent.instructions ?? ""}\n\n${metaStr}`,
         };
       }
     }
@@ -1509,12 +1504,7 @@ export function createAgentOrchestrator<
         const timeoutSeconds = Math.round(approvalTimeoutMs / 1000);
         reject(
           new Error(
-            `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\n` +
-              "Solutions:\n" +
-              "  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n" +
-              "  2. Set autoApproveToolCalls: true to auto-approve\n" +
-              `  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\n` +
-              "See: https://directive.run/docs/ai/running-agents",
+            `[Directive] Approval timeout: Request ${requestId} not resolved within ${timeoutSeconds}s.\nSolutions:\n  1. Handle via onApprovalRequest callback and call orchestrator.approve()/reject()\n  2. Set autoApproveToolCalls: true to auto-approve\n  3. Increase approvalTimeoutMs (current: ${approvalTimeoutMs}ms)\nSee: https://directive.run/docs/ai/running-agents`,
           ),
         );
       }, approvalTimeoutMs);

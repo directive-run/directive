@@ -102,7 +102,15 @@ describe("JSX runtime", () => {
 
   it("applies event handlers", () => {
     let clicked = false;
-    const btn = <button onclick={() => { clicked = true; }}>Click</button>;
+    const btn = (
+      <button
+        onclick={() => {
+          clicked = true;
+        }}
+      >
+        Click
+      </button>
+    );
 
     btn.dispatchEvent(new Event("click"));
 
@@ -110,7 +118,11 @@ describe("JSX runtime", () => {
   });
 
   it("renders a single child without wrapping in array", () => {
-    const div = <div><span>only</span></div>;
+    const div = (
+      <div>
+        <span>only</span>
+      </div>
+    );
 
     expect(div.children.length).toBe(1);
     expect(div.textContent).toBe("only");
@@ -118,14 +130,18 @@ describe("JSX runtime", () => {
 
   it("strips innerHTML prop (XSS prevention)", () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing security guard
-    const div = <div {...{ innerHTML: "<img src=x onerror=alert(1)>" } as any} />;
+    const div = (
+      <div {...({ innerHTML: "<img src=x onerror=alert(1)>" } as any)} />
+    );
 
     expect(div.innerHTML).toBe("");
   });
 
   it("strips outerHTML prop (XSS prevention)", () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing security guard
-    const div = <div {...{ outerHTML: "<script>alert(1)</script>" } as any} />;
+    const div = (
+      <div {...({ outerHTML: "<script>alert(1)</script>" } as any)} />
+    );
 
     expect(div.tagName).toBe("DIV");
   });
@@ -138,7 +154,12 @@ describe("JSX runtime", () => {
 describe("Fragment", () => {
   it("renders children into a DocumentFragment", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
-    const frag = (<><li>One</li><li>Two</li></>) as any as DocumentFragment;
+    const frag = (
+      <>
+        <li>One</li>
+        <li>Two</li>
+      </>
+    ) as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);
     expect(frag.childNodes.length).toBe(2);
@@ -146,7 +167,7 @@ describe("Fragment", () => {
 
   it("renders text children", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
-    const frag = (<>Hello world</>) as any as DocumentFragment;
+    const frag = "Hello world" as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);
     expect(frag.textContent).toBe("Hello world");
@@ -154,7 +175,11 @@ describe("Fragment", () => {
 
   it("renders mixed element and text children", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
-    const frag = (<>Hello<span>world</span></>) as any as DocumentFragment;
+    const frag = (
+      <>
+        Hello<span>world</span>
+      </>
+    ) as any as DocumentFragment;
 
     expect(frag.childNodes.length).toBe(2);
     expect(frag.textContent).toBe("Helloworld");
@@ -171,7 +196,13 @@ describe("Fragment", () => {
 
   it("appends fragment children to a parent element", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
-    const frag = (<><li>A</li><li>B</li><li>C</li></>) as any as DocumentFragment;
+    const frag = (
+      <>
+        <li>A</li>
+        <li>B</li>
+        <li>C</li>
+      </>
+    ) as any as DocumentFragment;
 
     const ul = <ul />;
     ul.appendChild(frag);

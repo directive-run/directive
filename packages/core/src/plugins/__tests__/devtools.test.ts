@@ -9,13 +9,13 @@ import { devtoolsPlugin } from "../devtools.js";
 beforeEach(() => {
   // Make the plugin think it's running in a browser
   (globalThis as Record<string, unknown>).window = globalThis;
-  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
+  (globalThis as Record<string, unknown>).__DIRECTIVE__ = undefined;
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
 afterEach(() => {
-  delete (globalThis as Record<string, unknown>).__DIRECTIVE__;
-  delete (globalThis as Record<string, unknown>).window;
+  (globalThis as Record<string, unknown>).__DIRECTIVE__ = undefined;
+  (globalThis as Record<string, unknown>).window = undefined;
   vi.restoreAllMocks();
 });
 

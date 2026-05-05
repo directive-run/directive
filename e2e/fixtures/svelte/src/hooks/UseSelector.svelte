@@ -2,7 +2,7 @@
 import { useSelector } from "@directive-run/svelte";
 import { system } from "../system";
 
-const tripled = useSelector(system, (state) => state.count * 3);
+const _tripled = useSelector(system, (state) => state.count * 3);
 </script>
 
 <div>

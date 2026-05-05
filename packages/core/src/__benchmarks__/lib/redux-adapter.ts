@@ -17,7 +17,8 @@ export const reduxAdapter: BenchAdapter = {
   createCounter() {
     return configureStore({
       reducer: counterSlice.reducer,
-      middleware: (getDefault) => getDefault({ serializableCheck: false, immutableCheck: false }),
+      middleware: (getDefault) =>
+        getDefault({ serializableCheck: false, immutableCheck: false }),
     });
   },
 
@@ -33,7 +34,8 @@ export const reduxAdapter: BenchAdapter = {
     // Redux has no built-in derived — use a selector
     const store = configureStore({
       reducer: counterSlice.reducer,
-      middleware: (getDefault) => getDefault({ serializableCheck: false, immutableCheck: false }),
+      middleware: (getDefault) =>
+        getDefault({ serializableCheck: false, immutableCheck: false }),
     });
     return { store, getDoubled: () => (store as any).getState().count * 2 };
   },

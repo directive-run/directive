@@ -368,7 +368,7 @@ describe("extractJsonFromOutput length guard", () => {
 
   it("accepts output at exactly 1MB", () => {
     // 1MB of valid JSON-ish text (won't parse, but shouldn't throw the size error)
-    const maxSize = "{" + "a".repeat(1_048_574) + "}";
+    const maxSize = `{${"a".repeat(1_048_574)}}`;
     expect(() => extractJsonFromOutput(maxSize)).toThrow(); // Parse error, not size error
   });
 });

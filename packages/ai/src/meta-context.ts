@@ -14,7 +14,7 @@
  * ```
  */
 
-import type { SystemInspection, DefinitionMeta } from "@directive-run/core";
+import type { DefinitionMeta, SystemInspection } from "@directive-run/core";
 
 // ============================================================================
 // Format Helpers

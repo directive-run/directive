@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { createSnapshot, OptimisticCloneError, withOptimistic } from "../index.js";
+import {
+  OptimisticCloneError,
+  createSnapshot,
+  withOptimistic,
+} from "../index.js";
 
 describe("@directive-run/optimistic — createSnapshot", () => {
   it("captures + restores plain values", () => {

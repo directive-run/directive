@@ -1,4 +1,4 @@
-import { createActor, setup, assign } from "xstate";
+import { assign, createActor, setup } from "xstate";
 import type { BenchAdapter } from "./types";
 
 const counterMachine = setup({
@@ -36,7 +36,10 @@ export const xstateAdapter: BenchAdapter = {
     // XState has no built-in derived/computed
     const actor = createActor(counterMachine);
     actor.start();
-    return { actor, getDoubled: () => (actor as any).getSnapshot().context.count * 2 };
+    return {
+      actor,
+      getDoubled: () => (actor as any).getSnapshot().context.count * 2,
+    };
   },
 
   readDerived(store) {

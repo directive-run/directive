@@ -6,8 +6,15 @@ export const directiveAdapter: BenchAdapter = {
 
   createCounter() {
     const mod = createModule("bench", {
-      schema: { facts: { count: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (f) => { f.count = 0; },
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.count = 0;
+      },
     });
     const sys = createSystem({ module: mod });
     sys.start();
@@ -30,7 +37,9 @@ export const directiveAdapter: BenchAdapter = {
         events: {},
         requirements: {},
       },
-      init: (f) => { f.count = 0; },
+      init: (f) => {
+        f.count = 0;
+      },
       derive: { doubled: (f) => (f.count as number) * 2 },
     });
     const sys = createSystem({ module: mod });

@@ -15,10 +15,12 @@
 
 import { type ElChild, appendChildren } from "./el.js";
 
-type ElProps<K extends keyof HTMLElementTagNameMap> =
-  Omit<Partial<HTMLElementTagNameMap[K]>, "children"> & {
-    children?: ElChild | ElChild[];
-  };
+type ElProps<K extends keyof HTMLElementTagNameMap> = Omit<
+  Partial<HTMLElementTagNameMap[K]>,
+  "children"
+> & {
+  children?: ElChild | ElChild[];
+};
 
 type IntrinsicEl = {
   [K in keyof HTMLElementTagNameMap]: ElProps<K>;
@@ -47,10 +49,7 @@ export function jsx(
     delete rest[key];
   }
 
-  const element = Object.assign(
-    document.createElement(type),
-    rest,
-  );
+  const element = Object.assign(document.createElement(type), rest);
 
   if (children != null) {
     const childArray = Array.isArray(children) ? children : [children];
@@ -63,7 +62,9 @@ export function jsx(
 export const jsxs = jsx;
 export const jsxDEV = jsx;
 
-export function Fragment(props: { children?: ElChild | ElChild[] }): DocumentFragment {
+export function Fragment(props: {
+  children?: ElChild | ElChild[];
+}): DocumentFragment {
   const fragment = document.createDocumentFragment();
   if (props.children != null) {
     const children = Array.isArray(props.children)

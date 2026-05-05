@@ -2,8 +2,8 @@
 import { useDispatch, useFact } from "@directive-run/vue";
 import { system } from "../system";
 
-const count = useFact(system, "count");
-const dispatch = useDispatch(system);
+const _count = useFact(system, "count");
+const _dispatch = useDispatch(system);
 </script>
 
 <template>

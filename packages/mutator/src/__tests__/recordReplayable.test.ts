@@ -1,12 +1,12 @@
+import { virtualClock } from "@directive-run/core";
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
-import { virtualClock } from "@directive-run/core";
 import {
-  recordReplayable,
-  type CancelEvent,
   CancelError,
+  type CancelEvent,
   SupersededCancelError,
   TimeoutCancelError,
+  recordReplayable,
 } from "../index.js";
 
 describe("R2.B recordReplayable() — basic invocation", () => {
@@ -242,18 +242,18 @@ describe("R2.B recordReplayable() — robustness", () => {
     // CancelError subclasses — but defending against future code paths
     // that might abort via the same controller for other reasons.
     const onCancel = vi.fn();
-    const wrapped = recordReplayable<Record<string, never>, Record<string, never>>(
-      { supersedeOn: "self", onCancel },
-      async ({ signal }) => {
-        // Abort the signal manually with a non-CancelError. We can do
-        // this by reaching for the signal — but the controller is
-        // closure-private inside cancellable(). Instead, test the same
-        // negative-case path by using "never" supersedeOn and no
-        // timeout: the signal is never aborted, and onCancel is never
-        // called.
-        expect(signal.aborted).toBe(false);
-      },
-    );
+    const wrapped = recordReplayable<
+      Record<string, never>,
+      Record<string, never>
+    >({ supersedeOn: "self", onCancel }, async ({ signal }) => {
+      // Abort the signal manually with a non-CancelError. We can do
+      // this by reaching for the signal — but the controller is
+      // closure-private inside cancellable(). Instead, test the same
+      // negative-case path by using "never" supersedeOn and no
+      // timeout: the signal is never aborted, and onCancel is never
+      // called.
+      expect(signal.aborted).toBe(false);
+    });
     await wrapped({ facts: {}, payload: {}, requeue: () => {} });
     expect(onCancel).not.toHaveBeenCalled();
   });

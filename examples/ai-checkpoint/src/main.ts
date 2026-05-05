@@ -75,7 +75,8 @@ function render(): void {
   const checkpoints = system.facts.checkpoints;
   if (checkpoints.length === 0) {
     const emptyMsg = el("div", "No checkpoints saved");
-    emptyMsg.style.cssText = "color:var(--brand-text-faint);font-size:0.65rem;font-style:italic";
+    emptyMsg.style.cssText =
+      "color:var(--brand-text-faint);font-size:0.65rem;font-style:italic";
     checkpointList.replaceChildren(emptyMsg);
   } else {
     checkpointList.replaceChildren(
@@ -90,15 +91,25 @@ function render(): void {
         const restoreBtn = el("button", { className: "cp-btn-sm" }, "Restore");
         restoreBtn.setAttribute("data-restore", cp.id);
 
-        const deleteBtn = el("button", { className: "cp-btn-sm danger" }, "Del");
+        const deleteBtn = el(
+          "button",
+          { className: "cp-btn-sm danger" },
+          "Del",
+        );
         deleteBtn.setAttribute("data-delete", cp.id);
 
-        const entry = el("div", { className: "cp-checkpoint-entry" },
-          el("div", { className: "cp-checkpoint-info" },
+        const entry = el(
+          "div",
+          { className: "cp-checkpoint-entry" },
+          el(
+            "div",
+            { className: "cp-checkpoint-info" },
             el("span", { className: "cp-checkpoint-label" }, cp.label),
             el("span", { className: "cp-checkpoint-time" }, timeStr),
           ),
-          el("div", { className: "cp-checkpoint-actions" },
+          el(
+            "div",
+            { className: "cp-checkpoint-actions" },
             restoreBtn,
             deleteBtn,
           ),
@@ -113,7 +124,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "cp-timeline-empty" }, "Events appear after running the pipeline"),
+      el(
+        "div",
+        { className: "cp-timeline-empty" },
+        "Events appear after running the pipeline",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -125,7 +140,9 @@ function render(): void {
           second: "2-digit",
         });
 
-        return el("div", { className: `cp-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `cp-timeline-entry ${entry.type}` },
           el("span", { className: "cp-timeline-time" }, timeStr),
           el("span", { className: "cp-timeline-event" }, entry.event),
           el("span", { className: "cp-timeline-detail" }, entry.detail),

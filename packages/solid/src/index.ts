@@ -1045,7 +1045,11 @@ export function useHydratedSystem<S extends ModuleSchema>(
   config?: UseDirectiveConfig,
 ): SingleModuleSystem<S> {
   const snapshot = useContext(HydrationContext);
-  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
+  const mergedFacts = mergeHydrationFacts(
+    snapshot,
+    config?.initialFacts as Record<string, unknown>,
+  );
 
-  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts }).system;
+  return useDirective(moduleDef, { ...config, initialFacts: mergedFacts })
+    .system;
 }

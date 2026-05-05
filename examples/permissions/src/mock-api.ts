@@ -86,14 +86,16 @@ export async function fetchArticles(): Promise<Article[]> {
 }
 
 export async function publishArticle(
-  id: string,
+  _id: string,
 ): Promise<{ success: boolean }> {
   await wait(300);
 
   return { success: true };
 }
 
-export async function deleteArticle(id: string): Promise<{ success: boolean }> {
+export async function deleteArticle(
+  _id: string,
+): Promise<{ success: boolean }> {
   await wait(300);
 
   return { success: true };

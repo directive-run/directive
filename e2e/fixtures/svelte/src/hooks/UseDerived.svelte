@@ -2,9 +2,9 @@
 import { useDerived } from "@directive-run/svelte";
 import { system } from "../system";
 
-const doubled = useDerived(system, "doubled");
-const isPositive = useDerived(system, "isPositive");
-const multi = useDerived(system, ["doubled", "isPositive"]);
+const _doubled = useDerived(system, "doubled");
+const _isPositive = useDerived(system, "isPositive");
+const _multi = useDerived(system, ["doubled", "isPositive"]);
 </script>
 
 <div>

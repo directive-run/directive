@@ -68,7 +68,10 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     children = [propsOrChild as ElChild, ...children];
   }
 
-  const element = Object.assign(document.createElement(type), props ? sanitizeProps(props) : props);
+  const element = Object.assign(
+    document.createElement(type),
+    props ? sanitizeProps(props) : props,
+  );
 
   appendChildren(element, children);
 

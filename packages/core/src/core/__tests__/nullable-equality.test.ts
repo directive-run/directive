@@ -12,9 +12,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createSystem } from "../system.js";
 import { createModule } from "../module.js";
 import { t } from "../schema-builders.js";
+import { createSystem } from "../system.js";
 
 describe("nullable() equality — item 10 reproduction", () => {
   it("explicit null assignment makes facts.x === null", () => {
@@ -192,8 +192,7 @@ describe("nullable() equality — item 10 reproduction", () => {
         },
         derive: {
           isNull: (f) => f.items === null,
-          isEmptyArray: (f) =>
-            Array.isArray(f.items) && f.items.length === 0,
+          isEmptyArray: (f) => Array.isArray(f.items) && f.items.length === 0,
         },
         events: {
           SET_NULL: (f) => {

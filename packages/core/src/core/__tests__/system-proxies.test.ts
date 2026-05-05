@@ -994,11 +994,9 @@ describe("hardened proxy util.inspect.custom hook", () => {
   it("namespaced facts proxy snapshot enumerates module namespaces", () => {
     const facts: Record<string, unknown> = { "auth::token": "abc" };
     const modulesMap = { auth: {} };
-    const proxy = createNamespacedFactsProxy(
-      facts,
-      modulesMap as any,
-      () => ["auth"],
-    );
+    const proxy = createNamespacedFactsProxy(facts, modulesMap as any, () => [
+      "auth",
+    ]);
 
     const inspect = (proxy as unknown as Record<symbol, unknown>)[inspectSym];
     expect(typeof inspect).toBe("function");
@@ -1013,11 +1011,9 @@ describe("hardened proxy util.inspect.custom hook", () => {
     const { inspect } = await import("node:util");
     const facts: Record<string, unknown> = { "auth::token": "abc" };
     const modulesMap = { auth: {} };
-    const proxy = createNamespacedFactsProxy(
-      facts,
-      modulesMap as any,
-      () => ["auth"],
-    );
+    const proxy = createNamespacedFactsProxy(facts, modulesMap as any, () => [
+      "auth",
+    ]);
 
     // Just ensure inspection completes without crashing — exact format
     // is not asserted (varies by node version).

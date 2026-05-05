@@ -9,7 +9,14 @@
  * Run: tsx scripts/build-skills.ts
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { log } from "../../../scripts/lib/log";
@@ -42,18 +49,62 @@ const SKILL_MAP: SkillConfig[] = [
   },
   {
     name: "writing-directive-modules",
-    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "naming", "anti-patterns"],
-    examples: ["counter", "contact-form", "newsletter", "feature-flags", "shopping-cart", "form-wizard"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "core-patterns",
+      "schema-types",
+      "naming",
+      "anti-patterns",
+    ],
+    examples: [
+      "counter",
+      "contact-form",
+      "newsletter",
+      "feature-flags",
+      "shopping-cart",
+      "form-wizard",
+    ],
   },
   {
     name: "writing-directive-constraints",
-    knowledgeFiles: ["api-skeleton", "constraints", "resolvers", "error-boundaries"],
-    examples: ["auth-flow", "async-chains", "debounce-constraints", "batch-resolver", "error-boundaries"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "constraints",
+      "resolvers",
+      "error-boundaries",
+    ],
+    examples: [
+      "auth-flow",
+      "async-chains",
+      "debounce-constraints",
+      "batch-resolver",
+      "error-boundaries",
+    ],
   },
   {
     name: "building-directive-systems",
-    knowledgeFiles: ["api-skeleton", "multi-module", "system-api", "plugins", "react-adapter"],
-    examples: ["multi-module", "dynamic-modules", "theme-locale", "permissions", "notifications", "dashboard-loader", "pagination", "url-sync", "websocket", "server", "optimistic-updates", "ab-testing", "sudoku"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "multi-module",
+      "system-api",
+      "plugins",
+      "react-adapter",
+    ],
+    examples: [
+      "multi-module",
+      "dynamic-modules",
+      "theme-locale",
+      "permissions",
+      "notifications",
+      "dashboard-loader",
+      "pagination",
+      "url-sync",
+      "websocket",
+      "server",
+      "optimistic-updates",
+      "ab-testing",
+      "sudoku",
+    ],
   },
   {
     name: "testing-directive-code",
@@ -62,27 +113,52 @@ const SKILL_MAP: SkillConfig[] = [
   },
   {
     name: "building-ai-orchestrators",
-    knowledgeFiles: ["api-skeleton", "ai-orchestrator", "ai-multi-agent", "ai-tasks"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "ai-orchestrator",
+      "ai-multi-agent",
+      "ai-tasks",
+    ],
     examples: ["checkers", "goal-heist", "fraud-analysis"],
   },
   {
     name: "building-ai-agents",
-    knowledgeFiles: ["api-skeleton", "ai-agents-streaming", "ai-adapters", "ai-communication"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "ai-agents-streaming",
+      "ai-adapters",
+      "ai-communication",
+    ],
     examples: ["ai-checkpoint", "provider-routing"],
   },
   {
     name: "hardening-ai-systems",
-    knowledgeFiles: ["api-skeleton", "ai-guardrails-memory", "ai-budget-resilience", "ai-security"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "ai-guardrails-memory",
+      "ai-budget-resilience",
+      "ai-security",
+    ],
     examples: ["ai-guardrails", "topic-guard"],
   },
   {
     name: "testing-ai-systems",
-    knowledgeFiles: ["api-skeleton", "ai-testing-evals", "ai-debug-observability", "ai-mcp-rag"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "ai-testing-evals",
+      "ai-debug-observability",
+      "ai-mcp-rag",
+    ],
     examples: ["ai-orchestrator", "fraud-analysis"],
   },
   {
     name: "reviewing-directive-code",
-    knowledgeFiles: ["api-skeleton", "anti-patterns", "core-patterns", "naming"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "anti-patterns",
+      "core-patterns",
+      "naming",
+    ],
     examples: ["counter", "auth-flow"],
   },
   {
@@ -92,7 +168,12 @@ const SKILL_MAP: SkillConfig[] = [
   },
   {
     name: "migrating-to-directive",
-    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "anti-patterns"],
+    knowledgeFiles: [
+      "api-skeleton",
+      "core-patterns",
+      "schema-types",
+      "anti-patterns",
+    ],
     examples: ["counter", "shopping-cart"],
   },
 ];
@@ -214,7 +295,7 @@ function main() {
     buildSkill(config);
   }
 
-  log.writes(`claude-plugin/skills/`, `${SKILL_MAP.length} directories`);
+  log.writes("claude-plugin/skills/", `${SKILL_MAP.length} directories`);
   log.done(PHASE);
 }
 

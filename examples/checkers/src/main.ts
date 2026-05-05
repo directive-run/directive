@@ -128,38 +128,63 @@ function renderDashboard(container: HTMLElement): void {
     { value: `${uptime}s`, label: "Uptime" },
   ];
 
-  const tracesSection = data.traces.length > 0
-    ? el("div", { className: "traces-section" },
-        el("div", { className: "traces-title" }, "Recent Traces"),
-        ...data.traces.slice(-5).reverse().map((t) =>
-          el("div", { className: "trace-item" },
-            el("span", { className: "trace-op" }, t.operationName),
-            el("span", { className: "trace-duration" }, `${t.duration ?? "..."}ms`),
-            el("span", { className: `trace-status ${t.status}` }, t.status),
-          ),
-        ),
-      )
-    : null;
+  const tracesSection =
+    data.traces.length > 0
+      ? el(
+          "div",
+          { className: "traces-section" },
+          el("div", { className: "traces-title" }, "Recent Traces"),
+          ...data.traces
+            .slice(-5)
+            .reverse()
+            .map((t) =>
+              el(
+                "div",
+                { className: "trace-item" },
+                el("span", { className: "trace-op" }, t.operationName),
+                el(
+                  "span",
+                  { className: "trace-duration" },
+                  `${t.duration ?? "..."}ms`,
+                ),
+                el("span", { className: `trace-status ${t.status}` }, t.status),
+              ),
+            ),
+        )
+      : null;
 
-  const alertsSection = data.alerts.length > 0
-    ? el("div", { className: "alerts-section" },
-        el("div", { className: "traces-title" }, "Alerts"),
-        ...data.alerts.slice(-3).map((a) =>
-          el("div", { className: "alert-item" }, a.message),
-        ),
-      )
-    : null;
+  const alertsSection =
+    data.alerts.length > 0
+      ? el(
+          "div",
+          { className: "alerts-section" },
+          el("div", { className: "traces-title" }, "Alerts"),
+          ...data.alerts
+            .slice(-3)
+            .map((a) => el("div", { className: "alert-item" }, a.message)),
+        )
+      : null;
 
   const children: (HTMLElement | null)[] = [
-    el("div", { className: "dashboard-header" },
+    el(
+      "div",
+      { className: "dashboard-header" },
       el("span", "AI Dashboard"),
-      el("span", { className: `health-badge ${health.healthy ? "healthy" : "unhealthy"}` },
+      el(
+        "span",
+        {
+          className: `health-badge ${health.healthy ? "healthy" : "unhealthy"}`,
+        },
         health.healthy ? "Healthy" : "Degraded",
       ),
     ),
-    el("div", { className: "metrics-grid" },
+    el(
+      "div",
+      { className: "metrics-grid" },
       ...metricCards.map((m) =>
-        el("div", { className: "metric-card" },
+        el(
+          "div",
+          { className: "metric-card" },
           el("div", { className: "metric-value" }, m.value),
           el("div", { className: "metric-label" }, m.label),
         ),
@@ -169,7 +194,9 @@ function renderDashboard(container: HTMLElement): void {
     alertsSection,
   ];
 
-  container.replaceChildren(...children.filter((c): c is HTMLElement => c !== null));
+  container.replaceChildren(
+    ...children.filter((c): c is HTMLElement => c !== null),
+  );
 }
 
 // ============================================================================
@@ -378,7 +405,9 @@ function render() {
       const children: HTMLElement[] = [];
       if (piece) {
         children.push(
-          el("div", { className: `piece ${piece.player}${piece.king ? " king" : ""}` }),
+          el("div", {
+            className: `piece ${piece.player}${piece.king ? " king" : ""}`,
+          }),
         );
       }
 
@@ -469,15 +498,22 @@ function renderChat() {
     ];
 
     if (msg.reasoning) {
-      children.push(
-        el("div", { className: "chat-reasoning" }, msg.reasoning),
-      );
+      children.push(el("div", { className: "chat-reasoning" }, msg.reasoning));
     }
 
     if (msg.analysis) {
       const arrow = el("span", { className: "arrow" }, "\u25B6");
-      const content = el("div", { className: "analysis-content" }, msg.analysis);
-      const toggle = el("div", { className: "analysis-toggle" }, arrow, " Strategic Analysis");
+      const content = el(
+        "div",
+        { className: "analysis-content" },
+        msg.analysis,
+      );
+      const toggle = el(
+        "div",
+        { className: "analysis-toggle" },
+        arrow,
+        " Strategic Analysis",
+      );
 
       toggle.addEventListener("click", () => {
         const isOpen = content.classList.toggle("open");
@@ -489,20 +525,28 @@ function renderChat() {
       );
     }
 
-    bubbles.push(el("div", { className: `chat-bubble ${msg.sender}` }, ...children));
+    bubbles.push(
+      el("div", { className: `chat-bubble ${msg.sender}` }, ...children),
+    );
   }
 
   // Streaming: show in-progress text with blinking cursor
   if (isStreaming && streamingText) {
     bubbles.push(
-      el("div", { className: "chat-bubble claude" },
+      el(
+        "div",
+        { className: "chat-bubble claude" },
         el("div", { className: "chat-text streaming-cursor" }, streamingText),
       ),
     );
   } else if (thinking) {
     bubbles.push(
-      el("div", { className: "chat-bubble claude thinking-bubble" },
-        el("span", { className: "thinking-dots" },
+      el(
+        "div",
+        { className: "chat-bubble claude thinking-bubble" },
+        el(
+          "span",
+          { className: "thinking-dots" },
           el("span", "."),
           el("span", "."),
           el("span", "."),

@@ -153,9 +153,7 @@ export type MutationHandler<
   F,
 > = keyof M[K] extends never
   ? (ctx: MutatorHandlerContext<F>) => void | Promise<void>
-  : (
-      ctx: MutatorHandlerContext<F> & { payload: M[K] },
-    ) => void | Promise<void>;
+  : (ctx: MutatorHandlerContext<F> & { payload: M[K] }) => void | Promise<void>;
 
 /**
  * The full handler map. Every variant in `M` MUST have a handler.
@@ -536,7 +534,10 @@ export type CancelReason =
  * Error)` filters silently dropped. (R2 sec M-1.)
  */
 export class CancelError extends Error {
-  constructor(public readonly kind: CancelReason["kind"], message?: string) {
+  constructor(
+    public readonly kind: CancelReason["kind"],
+    message?: string,
+  ) {
     super(message ?? `[mutator] cancellable: ${kind}`);
     this.name = "CancelError";
   }

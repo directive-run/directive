@@ -343,10 +343,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     // Freeze meta on non-derivation definitions (derivations freeze in their manager)
     if (type !== "derivation") {
       const d = def as { meta?: unknown };
-      if (d.meta)
-        d.meta = freezeMeta(
-          d.meta as DefinitionMeta,
-        )!;
+      if (d.meta) d.meta = freezeMeta(d.meta as DefinitionMeta)!;
     }
 
     desc.mergedMap[id] = def;
@@ -377,10 +374,7 @@ export function createDefinitionsRegistry<S extends Schema>(
     // Freeze meta on non-derivation definitions (derivations freeze in their manager)
     if (type !== "derivation") {
       const d = def as { meta?: unknown };
-      if (d.meta)
-        d.meta = freezeMeta(
-          d.meta as DefinitionMeta,
-        )!;
+      if (d.meta) d.meta = freezeMeta(d.meta as DefinitionMeta)!;
     }
 
     const original = desc.mergedMap[id];

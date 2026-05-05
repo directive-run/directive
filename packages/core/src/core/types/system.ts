@@ -260,7 +260,11 @@ export interface SystemInspection {
   }>;
   resolvers: Record<string, ResolverStatus>;
   /** All defined resolver names and their requirement types */
-  resolverDefs: Array<{ id: string; requirement: string; meta?: DefinitionMeta }>;
+  resolverDefs: Array<{
+    id: string;
+    requirement: string;
+    meta?: DefinitionMeta;
+  }>;
   /** All defined effect names with optional metadata */
   effects: Array<{ id: string; meta?: DefinitionMeta }>;
   /** All defined derivation names with optional metadata */
@@ -564,7 +568,7 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
     facts: Readonly<InferSchema<M["facts"]>>,
     prev: InferSchema<M["facts"]> | null,
-  ) => void | (() => void) | Promise<void | (() => void)>;
+  ) => void | (() => void) | Promise<undefined | (() => void)>;
   deps?: Array<string & keyof InferSchema<M["facts"]>>;
   meta?: DefinitionMeta;
 }
@@ -597,7 +601,14 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
 
 /** Result from bulk meta queries (byCategory, byTag). */
 export interface MetaMatch {
-  type: "module" | "fact" | "event" | "constraint" | "resolver" | "effect" | "derivation";
+  type:
+    | "module"
+    | "fact"
+    | "event"
+    | "constraint"
+    | "resolver"
+    | "effect"
+    | "derivation";
   id: string;
   meta: DefinitionMeta;
 }
@@ -637,13 +648,27 @@ export type ObservationEvent =
   | { type: "requirement.met"; id: string; byResolver: string }
   | { type: "requirement.canceled"; id: string }
   | { type: "resolver.start"; resolver: string; requirementId: string }
-  | { type: "resolver.complete"; resolver: string; requirementId: string; duration: number }
-  | { type: "resolver.error"; resolver: string; requirementId: string; error: unknown }
+  | {
+      type: "resolver.complete";
+      resolver: string;
+      requirementId: string;
+      duration: number;
+    }
+  | {
+      type: "resolver.error";
+      resolver: string;
+      requirementId: string;
+      error: unknown;
+    }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   | { type: "derivation.compute"; id: string; value: unknown }
   | { type: "reconcile.start" }
-  | { type: "reconcile.end"; resolversCompleted: number; resolversCanceled: number }
+  | {
+      type: "reconcile.end";
+      resolversCompleted: number;
+      resolversCanceled: number;
+    }
   | { type: "system.init" }
   | { type: "system.start" }
   | { type: "system.stop" }
@@ -719,7 +744,7 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
    * @example system.subscribe(["count", "doubled"], () => { ... })
    */
-  subscribe(ids: Array<ObservableKeys<M>>, listener: () => void): () => void;
+  subscribe(ids: ObservableKeys<M>[], listener: () => void): () => void;
 
   /**
    * Watch a fact or derivation for value changes.
@@ -849,9 +874,9 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 
 /** System configuration */
 export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
-  modules: Array<ModuleDef<M>>;
+  modules: ModuleDef<M>[];
   // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
-  plugins?: Array<Plugin<any>>;
+  plugins?: Plugin<any>[];
   history?: HistoryOption;
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;

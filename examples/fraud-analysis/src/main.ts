@@ -130,9 +130,13 @@ function formatTimestamp(ts: string): string {
 }
 
 function renderTransactionTable(events: FlagEvent[]): HTMLTableElement {
-  return el("table", { className: "fraud-txn-table" },
-    el("thead",
-      el("tr",
+  return el(
+    "table",
+    { className: "fraud-txn-table" },
+    el(
+      "thead",
+      el(
+        "tr",
         el("th", "Time"),
         el("th", "Merchant"),
         el("th", "Amount"),
@@ -140,15 +144,26 @@ function renderTransactionTable(events: FlagEvent[]): HTMLTableElement {
         el("th", "Card"),
       ),
     ),
-    el("tbody",
+    el(
+      "tbody",
       events.map((e) =>
-        el("tr",
+        el(
+          "tr",
           el("td", formatTimestamp(e.timestamp)),
-          el("td",
+          el(
+            "td",
             e.redactedMerchant ?? e.merchant,
-            e.piiFound ? el("span", { className: "fraud-pii-dot", title: "PII detected" }) : null,
+            e.piiFound
+              ? el("span", {
+                  className: "fraud-pii-dot",
+                  title: "PII detected",
+                })
+              : null,
           ),
-          el("td", `$${e.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`),
+          el(
+            "td",
+            `$${e.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+          ),
           el("td", { className: "fraud-txn-col-location" }, e.location),
           el("td", e.cardLast4),
         ),
@@ -165,11 +180,17 @@ function renderSignals(signals: EnrichmentSignal[]): DocumentFragment | null {
   const frag = document.createDocumentFragment();
   frag.appendChild(el("div", { className: "fraud-detail-label" }, "Signals"));
   frag.appendChild(
-    el("div", { className: "fraud-signal-list" },
+    el(
+      "div",
+      { className: "fraud-signal-list" },
       signals.flatMap((s) => [
-        el("div", { className: "fraud-signal-item" },
+        el(
+          "div",
+          { className: "fraud-signal-item" },
           el("span", { className: "fraud-signal-name" }, s.source),
-          el("div", { className: "fraud-signal-bar-track" },
+          el(
+            "div",
+            { className: "fraud-signal-bar-track" },
             el("div", {
               className: "fraud-signal-bar-fill",
               style: `width: ${s.risk}%; background: ${signalColor(s.risk)};`,
@@ -185,7 +206,9 @@ function renderSignals(signals: EnrichmentSignal[]): DocumentFragment | null {
   return frag;
 }
 
-function renderAnalysisNotes(notes: string | undefined): DocumentFragment | null {
+function renderAnalysisNotes(
+  notes: string | undefined,
+): DocumentFragment | null {
   if (!notes) {
     return null;
   }
@@ -197,7 +220,9 @@ function renderAnalysisNotes(notes: string | undefined): DocumentFragment | null
   return frag;
 }
 
-function renderDispositionReason(reason: string | undefined): HTMLDivElement | null {
+function renderDispositionReason(
+  reason: string | undefined,
+): HTMLDivElement | null {
   if (!reason) {
     return null;
   }
@@ -210,9 +235,13 @@ function renderCaseCard(c: FraudCase, testId: string): HTMLDivElement {
 
   let detailsBlock: HTMLDetailsElement | null = null;
   if (c.events.length > 0) {
-    detailsBlock = el("details", { className: "fraud-case-details" },
+    detailsBlock = el(
+      "details",
+      { className: "fraud-case-details" },
       el("summary", "Details"),
-      el("div", { className: "fraud-case-details-body" },
+      el(
+        "div",
+        { className: "fraud-case-details-body" },
         el("div", { className: "fraud-detail-label" }, "Transactions"),
         renderTransactionTable(c.events),
         renderSignals(c.signals),
@@ -223,19 +252,33 @@ function renderCaseCard(c: FraudCase, testId: string): HTMLDivElement {
     detailsBlock.dataset.testid = `${testId}-details`;
   }
 
-  const dispText = c.disposition !== "pending" ? c.disposition.replace("_", " ") : "pending";
+  const dispText =
+    c.disposition !== "pending" ? c.disposition.replace("_", " ") : "pending";
   const dispClass = `fraud-case-disposition fraud-disp-${c.disposition}`;
 
-  const card = el("div", { className: "fraud-case-card" },
-    el("div", { className: "fraud-case-header" },
+  const card = el(
+    "div",
+    { className: "fraud-case-card" },
+    el(
+      "div",
+      { className: "fraud-case-header" },
       el("span", { className: "fraud-case-id" }, c.id),
       c.analyzed
-        ? el("span", { className: `fraud-case-badge fraud-badge-${c.severity}` }, c.severity)
+        ? el(
+            "span",
+            { className: `fraud-case-badge fraud-badge-${c.severity}` },
+            c.severity,
+          )
         : null,
     ),
-    el("div", { className: "fraud-case-meta" },
+    el(
+      "div",
+      { className: "fraud-case-meta" },
       el("span", `${c.events.length} txns`),
-      el("span", `$${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`),
+      el(
+        "span",
+        `$${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      ),
       el("span", c.accountId),
       c.riskScore > 0 ? el("span", `Risk: ${c.riskScore}`) : null,
     ),
@@ -305,38 +348,63 @@ function render(): void {
   if (hasDispositions) {
     dispositionBreakdown.replaceChildren(
       el("div", { className: "fraud-metric-label" }, "Dispositions"),
-      ...DISPOSITION_ORDER.filter((d) => (dispositionSummary[d] ?? 0) > 0).map((d) =>
-        el("div", { className: "fraud-disposition-row" },
-          el("span", { className: `fraud-disposition-dot disp-${d}` }),
-          el("span", { className: "fraud-disposition-label" }, d.replace("_", " ")),
-          el("span", { className: "fraud-disposition-count" }, String(dispositionSummary[d])),
-        ),
+      ...DISPOSITION_ORDER.filter((d) => (dispositionSummary[d] ?? 0) > 0).map(
+        (d) =>
+          el(
+            "div",
+            { className: "fraud-disposition-row" },
+            el("span", { className: `fraud-disposition-dot disp-${d}` }),
+            el(
+              "span",
+              { className: "fraud-disposition-label" },
+              d.replace("_", " "),
+            ),
+            el(
+              "span",
+              { className: "fraud-disposition-count" },
+              String(dispositionSummary[d]),
+            ),
+          ),
       ),
     );
   } else {
     dispositionBreakdown.replaceChildren(
       el("div", { className: "fraud-metric-label" }, "Dispositions"),
-      el("div", { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" }, "No cases"),
+      el(
+        "div",
+        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" },
+        "No cases",
+      ),
     );
   }
 
   // ---- Stage Progress Stats ----
   const maxBudget = facts.maxAnalysisBudget;
 
-  function statBlock(label: string, value: string, testId?: string): HTMLDivElement {
+  function statBlock(
+    label: string,
+    value: string,
+    testId?: string,
+  ): HTMLDivElement {
     const valEl = el("div", { className: "fraud-stage-stat-value" }, value);
     if (testId) {
       valEl.dataset.testid = testId;
     }
 
-    return el("div", { className: "fraud-stage-stat" },
+    return el(
+      "div",
+      { className: "fraud-stage-stat" },
       el("div", { className: "fraud-stage-stat-label" }, label),
       valEl,
     );
   }
 
   stageStatsEl.replaceChildren(
-    statBlock("Events", String(facts.totalEventsProcessed), "fraud-stat-events"),
+    statBlock(
+      "Events",
+      String(facts.totalEventsProcessed),
+      "fraud-stat-events",
+    ),
     statBlock("Cases", String(caseCount)),
     statBlock("Ungrouped", String(ungroupedCount)),
     statBlock("Pending Analysis", String(pendingAnalysisCount)),
@@ -347,7 +415,11 @@ function render(): void {
   // ---- Case Cards (with open-state preservation) ----
   if (cases.length === 0) {
     casesEl.replaceChildren(
-      el("div", { className: "fraud-empty" }, "No cases yet. Select a scenario and run the pipeline."),
+      el(
+        "div",
+        { className: "fraud-empty" },
+        "No cases yet. Select a scenario and run the pipeline.",
+      ),
     );
   } else {
     // Capture which details are currently open
@@ -379,12 +451,21 @@ function render(): void {
   // ---- Timeline ----
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "fraud-empty", style: "padding: 0.5rem 0; font-size: 0.6rem;" }, "No activity yet"),
+      el(
+        "div",
+        {
+          className: "fraud-empty",
+          style: "padding: 0.5rem 0; font-size: 0.6rem;",
+        },
+        "No activity yet",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
       ...timeline.slice(-30).map((entry) => {
-        const entryEl = el("div", { className: "fraud-timeline-entry" },
+        const entryEl = el(
+          "div",
+          { className: "fraud-timeline-entry" },
           el("span", { className: "fraud-timeline-time" }, entry.time),
           el("span", { className: "fraud-timeline-msg" }, entry.message),
         );
@@ -399,28 +480,51 @@ function render(): void {
   // ---- Checkpoints ----
   if (checkpoints.length === 0) {
     checkpointsEl.replaceChildren(
-      el("div", { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" }, "No checkpoints saved"),
+      el(
+        "div",
+        { style: "font-size: 0.6rem; color: var(--fraud-text-dim);" },
+        "No checkpoints saved",
+      ),
     );
   } else {
     checkpointsEl.replaceChildren(
       ...checkpoints.map((cp) => {
-        const restoreBtn = el("button", {
-          className: "fraud-checkpoint-btn",
-          title: "Restore",
-        }, "\u21BA");
+        const restoreBtn = el(
+          "button",
+          {
+            className: "fraud-checkpoint-btn",
+            title: "Restore",
+          },
+          "\u21BA",
+        );
         restoreBtn.dataset.action = "restore";
         restoreBtn.dataset.checkpointId = cp.id;
 
-        const deleteBtn = el("button", {
-          className: "fraud-checkpoint-btn delete",
-          title: "Delete",
-        }, "\u00D7");
+        const deleteBtn = el(
+          "button",
+          {
+            className: "fraud-checkpoint-btn delete",
+            title: "Delete",
+          },
+          "\u00D7",
+        );
         deleteBtn.dataset.action = "delete-checkpoint";
         deleteBtn.dataset.checkpointId = cp.id;
 
-        const item = el("div", { className: "fraud-checkpoint-item" },
-          el("span", { className: "fraud-checkpoint-label", title: cp.label }, cp.label),
-          el("div", { className: "fraud-checkpoint-actions" }, restoreBtn, deleteBtn),
+        const item = el(
+          "div",
+          { className: "fraud-checkpoint-item" },
+          el(
+            "span",
+            { className: "fraud-checkpoint-label", title: cp.label },
+            cp.label,
+          ),
+          el(
+            "div",
+            { className: "fraud-checkpoint-actions" },
+            restoreBtn,
+            deleteBtn,
+          ),
         );
         item.dataset.testid = `fraud-checkpoint-${cp.id}`;
 
@@ -702,9 +806,17 @@ function updateScenarioDesc(): void {
     scenarioDesc.textContent = scenario.description;
     rulesEl.replaceChildren(
       ...scenario.rules.map((r) =>
-        el("div", { className: "fraud-rule" },
-          el("div", { className: "fraud-rule-header" },
-            el("span", { className: `fraud-rule-severity fraud-rule-${r.severity}` }, r.severity),
+        el(
+          "div",
+          { className: "fraud-rule" },
+          el(
+            "div",
+            { className: "fraud-rule-header" },
+            el(
+              "span",
+              { className: `fraud-rule-severity fraud-rule-${r.severity}` },
+              r.severity,
+            ),
             " ",
             el("strong", r.name),
           ),

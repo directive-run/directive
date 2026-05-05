@@ -384,7 +384,9 @@ export function createHistoryManager<S extends Schema>(
           );
         }
         if (!Array.isArray(data.snapshots)) {
-          throw new Error("[Directive] Invalid history data: snapshots must be an array");
+          throw new Error(
+            "[Directive] Invalid history data: snapshots must be an array",
+          );
         }
         if (typeof data.currentIndex !== "number") {
           throw new Error(

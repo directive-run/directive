@@ -1,11 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import {
-  existsSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -268,7 +263,10 @@ describe("detectMonorepo", () => {
   it("detects pnpm workspace", async () => {
     const { detectMonorepo } = await import("../src/lib/monorepo.js");
 
-    writeFileSync(join(TMP_DIR, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+    writeFileSync(
+      join(TMP_DIR, "pnpm-workspace.yaml"),
+      "packages:\n  - 'packages/*'\n",
+    );
 
     const result = detectMonorepo(TMP_DIR);
 
@@ -280,7 +278,10 @@ describe("detectMonorepo", () => {
   it("detects turbo", async () => {
     const { detectMonorepo } = await import("../src/lib/monorepo.js");
 
-    writeFileSync(join(TMP_DIR, "turbo.json"), JSON.stringify({ pipeline: {} }));
+    writeFileSync(
+      join(TMP_DIR, "turbo.json"),
+      JSON.stringify({ pipeline: {} }),
+    );
 
     const result = detectMonorepo(TMP_DIR);
 
@@ -324,7 +325,10 @@ describe("detectMonorepo", () => {
     const { detectMonorepo } = await import("../src/lib/monorepo.js");
 
     // Create monorepo signal at root
-    writeFileSync(join(TMP_DIR, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+    writeFileSync(
+      join(TMP_DIR, "pnpm-workspace.yaml"),
+      "packages:\n  - 'packages/*'\n",
+    );
 
     // Create nested child directory
     const childDir = join(TMP_DIR, "packages", "my-pkg");
@@ -340,7 +344,10 @@ describe("detectMonorepo", () => {
   it("prefers pnpm-workspace.yaml over package.json workspaces", async () => {
     const { detectMonorepo } = await import("../src/lib/monorepo.js");
 
-    writeFileSync(join(TMP_DIR, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+    writeFileSync(
+      join(TMP_DIR, "pnpm-workspace.yaml"),
+      "packages:\n  - 'packages/*'\n",
+    );
     writeFileSync(
       join(TMP_DIR, "package.json"),
       JSON.stringify({ workspaces: ["packages/*"] }),
@@ -374,7 +381,13 @@ describe("detectMonorepo", () => {
     const { detectMonorepo } = await import("../src/lib/monorepo.js");
 
     // Use an isolated /tmp dir so walking up doesn't find real monorepo signals
-    const isolatedDir = join("/tmp", ".directive-monorepo-test-noroot", "some", "nested", "dir");
+    const isolatedDir = join(
+      "/tmp",
+      ".directive-monorepo-test-noroot",
+      "some",
+      "nested",
+      "dir",
+    );
     mkdirSync(isolatedDir, { recursive: true });
 
     try {
@@ -383,7 +396,10 @@ describe("detectMonorepo", () => {
       expect(result.isMonorepo).toBe(false);
       expect(result.rootDir).toBe(isolatedDir);
     } finally {
-      rmSync(join("/tmp", ".directive-monorepo-test-noroot"), { recursive: true, force: true });
+      rmSync(join("/tmp", ".directive-monorepo-test-noroot"), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 });
@@ -466,7 +482,9 @@ describe("mergeSection", () => {
 
     const result = mergeSection("start", "body");
 
-    expect(result).toMatch(new RegExp(`${SECTION_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n$`));
+    expect(result).toMatch(
+      new RegExp(`${SECTION_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n$`),
+    );
   });
 });
 

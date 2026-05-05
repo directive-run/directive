@@ -875,8 +875,7 @@ export function useTickWhile<S extends ModuleSchema>(
     if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
       if (isDevelopment) {
         console.warn(
-          `[Directive] useTickWhile() received non-positive intervalMs: ${intervalMs}. ` +
-            `Interval will not fire.`,
+          `[Directive] useTickWhile() received non-positive intervalMs: ${intervalMs}. Interval will not fire.`,
         );
       }
       return;

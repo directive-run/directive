@@ -245,7 +245,7 @@ export interface FormatOptions {
   /** Maximum number of frames to render. Default: 200. */
   maxFrames?: number;
   /** Frame kinds to include. Default: all. */
-  include?: ReadonlyArray<ObservationEvent["type"]>;
+  include?: readonly ObservationEvent["type"][];
   /** Truncate fact-change values to this length. Default: 80. */
   valuePreviewLen?: number;
 }
@@ -351,7 +351,10 @@ export function formatTimeline(
 
   if (truncated > 0) {
     lines.push(
-      c("dim", `  … (${truncated} more frame${truncated === 1 ? "" : "s"} elided; raise maxFrames to see all)`),
+      c(
+        "dim",
+        `  … (${truncated} more frame${truncated === 1 ? "" : "s"} elided; raise maxFrames to see all)`,
+      ),
     );
   }
 
@@ -681,8 +684,7 @@ export async function replayTimeline(
 ): Promise<ReplayResult> {
   // Both `dispatchableOnly` (preferred) and `dispatchable` (deprecated)
   // are accepted; preferred wins.
-  const dispatchableOnly =
-    opts.dispatchableOnly ?? opts.dispatchable ?? true;
+  const dispatchableOnly = opts.dispatchableOnly ?? opts.dispatchable ?? true;
   const maxFrames = opts.maxFrames ?? DEFAULT_MAX_REPLAY_FRAMES;
   let dispatched = 0;
   let skipped = 0;
@@ -726,8 +728,7 @@ function isDispatchable(event: ObservationEvent): boolean {
   if (next === null || typeof next !== "object") return false;
   const maybeMutation = next as { kind?: unknown; status?: unknown };
   return (
-    typeof maybeMutation.kind === "string" &&
-    maybeMutation.status === "pending"
+    typeof maybeMutation.kind === "string" && maybeMutation.status === "pending"
   );
 }
 
@@ -805,9 +806,7 @@ export type BisectSystemFactory = () =>
  * `facts`, `inspect`, etc.) and the oracle needs access to those — the
  * narrow `ReplayableSystem` only exposes `dispatch`.
  */
-export type BisectAssertion = (
-  system: unknown,
-) => boolean | Promise<boolean>;
+export type BisectAssertion = (system: unknown) => boolean | Promise<boolean>;
 
 /**
  * Tunables for {@link bisectTimeline}. All fields are optional — sane
@@ -1501,7 +1500,7 @@ export function diffTimelines(
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v, (_k, val) =>
-      typeof val === "bigint" ? val.toString() + "n" : val,
+      typeof val === "bigint" ? `${val.toString()}n` : val,
     );
   } catch {
     return `[unstringifiable ${typeof v}]`;

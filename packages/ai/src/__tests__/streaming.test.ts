@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createStreamingRunner,
-  createToxicityStreamingGuardrail,
-  createLengthStreamingGuardrail,
-  createPatternStreamingGuardrail,
-  combineStreamingGuardrails,
   type StreamChunk,
   type StreamingGuardrail,
+  combineStreamingGuardrails,
+  createLengthStreamingGuardrail,
+  createPatternStreamingGuardrail,
+  createStreamingRunner,
+  createToxicityStreamingGuardrail,
 } from "../streaming.js";
 import type {
   AgentLike,
@@ -63,7 +63,10 @@ function createMockRunnerWithTools(
 
 function createMockRunnerWithMessages(
   tokens: string[],
-  messages: Array<{ role: "user" | "assistant" | "tool" | "system"; content: string }>,
+  messages: Array<{
+    role: "user" | "assistant" | "tool" | "system";
+    content: string;
+  }>,
 ): StreamingCallbackRunner {
   return async (_agent, _input, callbacks) => {
     for (const msg of messages) {
@@ -84,7 +87,9 @@ function createErrorRunner(error: Error): StreamingCallbackRunner {
   };
 }
 
-async function collectChunks(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
+async function collectChunks(
+  stream: AsyncIterable<StreamChunk>,
+): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = [];
   for await (const chunk of stream) {
     chunks.push(chunk);
@@ -99,7 +104,9 @@ async function collectChunks(stream: AsyncIterable<StreamChunk>): Promise<Stream
 
 describe("createStreamingRunner", () => {
   it("emits token chunks with incrementing tokenCount", async () => {
-    const runner = createStreamingRunner(createMockRunner(["Hello", " ", "World"]));
+    const runner = createStreamingRunner(
+      createMockRunner(["Hello", " ", "World"]),
+    );
     const { stream, result } = runner(mockAgent(), "hi");
 
     const chunks = await collectChunks(stream);
@@ -107,16 +114,25 @@ describe("createStreamingRunner", () => {
 
     const tokenChunks = chunks.filter((c) => c.type === "token");
     expect(tokenChunks).toHaveLength(3);
-    expect(tokenChunks[0]).toEqual({ type: "token", data: "Hello", tokenCount: 1 });
+    expect(tokenChunks[0]).toEqual({
+      type: "token",
+      data: "Hello",
+      tokenCount: 1,
+    });
     expect(tokenChunks[1]).toEqual({ type: "token", data: " ", tokenCount: 2 });
-    expect(tokenChunks[2]).toEqual({ type: "token", data: "World", tokenCount: 3 });
+    expect(tokenChunks[2]).toEqual({
+      type: "token",
+      data: "World",
+      tokenCount: 3,
+    });
   });
 
   it("emits tool_start and tool_end chunks", async () => {
     const runner = createStreamingRunner(
-      createMockRunnerWithTools(["ok"], [
-        { name: "search", id: "tc_1", args: '{"q":"test"}', result: "found" },
-      ]),
+      createMockRunnerWithTools(
+        ["ok"],
+        [{ name: "search", id: "tc_1", args: '{"q":"test"}', result: "found" }],
+      ),
     );
     const { stream, result } = runner(mockAgent(), "test");
 
@@ -141,9 +157,10 @@ describe("createStreamingRunner", () => {
 
   it("emits message chunks", async () => {
     const runner = createStreamingRunner(
-      createMockRunnerWithMessages(["ok"], [
-        { role: "assistant", content: "thinking..." },
-      ]),
+      createMockRunnerWithMessages(
+        ["ok"],
+        [{ role: "assistant", content: "thinking..." }],
+      ),
     );
     const { stream, result } = runner(mockAgent(), "test");
 
@@ -159,9 +176,10 @@ describe("createStreamingRunner", () => {
 
   it("emits progress chunks (starting, tool_calling, generating, finishing)", async () => {
     const runner = createStreamingRunner(
-      createMockRunnerWithTools(["ok"], [
-        { name: "search", id: "tc_1", args: "{}", result: "done" },
-      ]),
+      createMockRunnerWithTools(
+        ["ok"],
+        [{ name: "search", id: "tc_1", args: "{}", result: "done" }],
+      ),
     );
     const { stream, result } = runner(mockAgent(), "test");
 
@@ -201,12 +219,18 @@ describe("createStreamingRunner", () => {
 
     expect(runResult.output).toBe("Hello");
     expect(runResult.totalTokens).toBe(1);
-    expect(runResult.messages).toEqual([{ role: "assistant", content: "Hello" }]);
+    expect(runResult.messages).toEqual([
+      { role: "assistant", content: "Hello" },
+    ]);
   });
 
   it("abort() cancels the stream via AbortController", async () => {
     let tokensSent = 0;
-    const slowRunner: StreamingCallbackRunner = async (_agent, _input, callbacks) => {
+    const slowRunner: StreamingCallbackRunner = async (
+      _agent,
+      _input,
+      callbacks,
+    ) => {
       for (let i = 0; i < 100; i++) {
         if (callbacks.signal?.aborted) {
           throw new DOMException("Aborted", "AbortError");
@@ -225,7 +249,10 @@ describe("createStreamingRunner", () => {
     // Consume a few then abort
     for await (const chunk of stream) {
       chunks.push(chunk);
-      if (chunk.type === "token" && chunks.filter((c) => c.type === "token").length >= 3) {
+      if (
+        chunk.type === "token" &&
+        chunks.filter((c) => c.type === "token").length >= 3
+      ) {
         abort();
       }
     }
@@ -236,7 +263,11 @@ describe("createStreamingRunner", () => {
 
   it("external AbortSignal cancels the stream", async () => {
     const externalController = new AbortController();
-    const slowRunner: StreamingCallbackRunner = async (_agent, _input, callbacks) => {
+    const slowRunner: StreamingCallbackRunner = async (
+      _agent,
+      _input,
+      callbacks,
+    ) => {
       for (let i = 0; i < 100; i++) {
         if (callbacks.signal?.aborted) {
           throw new DOMException("Aborted", "AbortError");
@@ -255,7 +286,10 @@ describe("createStreamingRunner", () => {
     const chunks: StreamChunk[] = [];
     for await (const chunk of stream) {
       chunks.push(chunk);
-      if (chunk.type === "token" && chunks.filter((c) => c.type === "token").length >= 3) {
+      if (
+        chunk.type === "token" &&
+        chunks.filter((c) => c.type === "token").length >= 3
+      ) {
         externalController.abort();
       }
     }
@@ -281,7 +315,10 @@ describe("createStreamingRunner", () => {
 
   it("cleanup removes abort signal listener (no memory leak)", async () => {
     const externalController = new AbortController();
-    const removeSpy = vi.spyOn(externalController.signal, "removeEventListener");
+    const removeSpy = vi.spyOn(
+      externalController.signal,
+      "removeEventListener",
+    );
 
     const runner = createStreamingRunner(createMockRunner(["a"]));
     const { stream, result } = runner(mockAgent(), "test", {
@@ -319,7 +356,9 @@ describe("backpressure strategies", () => {
     const tokenChunks = chunks.filter((c) => c.type === "token");
     expect(tokenChunks).toHaveLength(20);
 
-    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & { type: "done" };
+    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & {
+      type: "done";
+    };
     expect(doneChunk.droppedTokens).toBe(0);
   });
 
@@ -335,7 +374,9 @@ describe("backpressure strategies", () => {
     const chunks = await collectChunks(stream);
     await result;
 
-    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & { type: "done" };
+    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & {
+      type: "done";
+    };
     // Some tokens should have been dropped because the buffer is tiny
     // The exact count depends on timing, but droppedTokens should be >= 0
     // and total token chunks + dropped should approximate 50
@@ -357,7 +398,9 @@ describe("backpressure strategies", () => {
     const tokenChunks = chunks.filter((c) => c.type === "token");
     expect(tokenChunks).toHaveLength(5);
 
-    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & { type: "done" };
+    const doneChunk = chunks.find((c) => c.type === "done") as StreamChunk & {
+      type: "done";
+    };
     expect(doneChunk.droppedTokens).toBe(0);
   });
 });
@@ -654,7 +697,9 @@ describe("combineStreamingGuardrails", () => {
       check: vi.fn().mockReturnValue({ passed: true }),
     };
 
-    const combined = combineStreamingGuardrails([g1, g2], { stopOnFirstFail: true });
+    const combined = combineStreamingGuardrails([g1, g2], {
+      stopOnFirstFail: true,
+    });
     const result = await combined.check("test", 1);
 
     expect(result.passed).toBe(false);
@@ -674,7 +719,9 @@ describe("combineStreamingGuardrails", () => {
       check: () => ({ passed: false, reason: "beta failed" }),
     };
 
-    const combined = combineStreamingGuardrails([g1, g2], { stopOnFirstFail: false });
+    const combined = combineStreamingGuardrails([g1, g2], {
+      stopOnFirstFail: false,
+    });
     const result = await combined.check("test", 1);
 
     expect(result.passed).toBe(false);
@@ -705,7 +752,7 @@ describe("validation", () => {
   it("throws on NaN guardrailCheckInterval", () => {
     const runner = createStreamingRunner(createMockRunner(["a"]));
     expect(() =>
-      runner(mockAgent(), "test", { guardrailCheckInterval: NaN }),
+      runner(mockAgent(), "test", { guardrailCheckInterval: Number.NaN }),
     ).toThrow("guardrailCheckInterval must be a positive number");
   });
 });

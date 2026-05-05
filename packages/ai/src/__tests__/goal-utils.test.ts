@@ -409,7 +409,7 @@ describe("explainGoal", () => {
   });
 
   it("includes all 5 relaxation strategy descriptions", () => {
-    const strategies: Array<RelaxationRecord["strategy"]> = [
+    const strategies: RelaxationRecord["strategy"][] = [
       "allow_rerun",
       "inject_facts",
       "accept_partial",

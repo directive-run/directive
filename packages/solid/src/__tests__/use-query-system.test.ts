@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { useQuerySystem } from "../index";
 
 // Note: Solid's onCleanup requires reactive context.

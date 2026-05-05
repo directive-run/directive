@@ -175,9 +175,7 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
 
   // ---- Outbound message handlers ----
 
-  function resolveLifecycle(
-    resolve: (() => void) | null,
-  ): (() => void) | null {
+  function resolveLifecycle(resolve: (() => void) | null): (() => void) | null {
     resolve?.();
 
     return null;
@@ -207,35 +205,51 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
     destroyResolve = resolveLifecycle(destroyResolve);
   }
 
-  function handleFactChanged(message: Extract<WorkerOutboundMessage, { type: "FACT_CHANGED" }>): void {
+  function handleFactChanged(
+    message: Extract<WorkerOutboundMessage, { type: "FACT_CHANGED" }>,
+  ): void {
     onFactChange?.(message.key, message.value, message.prev);
   }
 
-  function handleDerivationChanged(message: Extract<WorkerOutboundMessage, { type: "DERIVATION_CHANGED" }>): void {
+  function handleDerivationChanged(
+    message: Extract<WorkerOutboundMessage, { type: "DERIVATION_CHANGED" }>,
+  ): void {
     onDerivationChange?.(message.key, message.value);
   }
 
-  function handleRequirementCreated(message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_CREATED" }>): void {
+  function handleRequirementCreated(
+    message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_CREATED" }>,
+  ): void {
     onRequirementCreated?.(message.requirement);
   }
 
-  function handleRequirementMet(message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_MET" }>): void {
+  function handleRequirementMet(
+    message: Extract<WorkerOutboundMessage, { type: "REQUIREMENT_MET" }>,
+  ): void {
     onRequirementMet?.(message.requirementId, message.resolverId);
   }
 
-  function handleError(message: Extract<WorkerOutboundMessage, { type: "ERROR" }>): void {
+  function handleError(
+    message: Extract<WorkerOutboundMessage, { type: "ERROR" }>,
+  ): void {
     onError?.(message.error, message.source);
   }
 
-  function handleSnapshotResult(message: Extract<WorkerOutboundMessage, { type: "SNAPSHOT_RESULT" }>): void {
+  function handleSnapshotResult(
+    message: Extract<WorkerOutboundMessage, { type: "SNAPSHOT_RESULT" }>,
+  ): void {
     resolvePendingRequest(message.requestId, message.snapshot);
   }
 
-  function handleInspectResult(message: Extract<WorkerOutboundMessage, { type: "INSPECT_RESULT" }>): void {
+  function handleInspectResult(
+    message: Extract<WorkerOutboundMessage, { type: "INSPECT_RESULT" }>,
+  ): void {
     resolvePendingRequest(message.requestId, message.inspection);
   }
 
-  function handleSettleResult(message: Extract<WorkerOutboundMessage, { type: "SETTLE_RESULT" }>): void {
+  function handleSettleResult(
+    message: Extract<WorkerOutboundMessage, { type: "SETTLE_RESULT" }>,
+  ): void {
     const pending = pendingRequests.get(message.requestId);
     if (pending) {
       if (message.success) {
@@ -252,18 +266,30 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
     const message = event.data;
 
     switch (message.type) {
-      case "READY": return handleReady();
-      case "STARTED": return handleStarted();
-      case "STOPPED": return handleStopped();
-      case "DESTROYED": return handleDestroyed();
-      case "FACT_CHANGED": return handleFactChanged(message);
-      case "DERIVATION_CHANGED": return handleDerivationChanged(message);
-      case "REQUIREMENT_CREATED": return handleRequirementCreated(message);
-      case "REQUIREMENT_MET": return handleRequirementMet(message);
-      case "ERROR": return handleError(message);
-      case "SNAPSHOT_RESULT": return handleSnapshotResult(message);
-      case "INSPECT_RESULT": return handleInspectResult(message);
-      case "SETTLE_RESULT": return handleSettleResult(message);
+      case "READY":
+        return handleReady();
+      case "STARTED":
+        return handleStarted();
+      case "STOPPED":
+        return handleStopped();
+      case "DESTROYED":
+        return handleDestroyed();
+      case "FACT_CHANGED":
+        return handleFactChanged(message);
+      case "DERIVATION_CHANGED":
+        return handleDerivationChanged(message);
+      case "REQUIREMENT_CREATED":
+        return handleRequirementCreated(message);
+      case "REQUIREMENT_MET":
+        return handleRequirementMet(message);
+      case "ERROR":
+        return handleError(message);
+      case "SNAPSHOT_RESULT":
+        return handleSnapshotResult(message);
+      case "INSPECT_RESULT":
+        return handleInspectResult(message);
+      case "SETTLE_RESULT":
+        return handleSettleResult(message);
     }
   };
 
@@ -485,9 +511,7 @@ export function handleWorkerMessages(): void {
 
   // ---- Message dispatch ----
 
-  async function dispatchMessage(
-    message: WorkerInboundMessage,
-  ): Promise<void> {
+  async function dispatchMessage(message: WorkerInboundMessage): Promise<void> {
     if (message.type === "INIT") {
       system = await handleInit(message);
 

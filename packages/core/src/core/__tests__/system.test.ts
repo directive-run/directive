@@ -1315,9 +1315,7 @@ describe("when()", () => {
     const system = createSystem({ modules: { auth: authModule } });
     system.start();
 
-    const promise = system.when(
-      (facts: any) => facts.auth.loggedIn === true,
-    );
+    const promise = system.when((facts: any) => facts.auth.loggedIn === true);
 
     system.facts.auth.loggedIn = true;
     await promise;

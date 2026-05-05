@@ -67,7 +67,11 @@ function render() {
   // --- Timeline ---
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "nm-timeline-empty" }, "Events appear after interactions"),
+      el(
+        "div",
+        { className: "nm-timeline-empty" },
+        "Events appear after interactions",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -79,7 +83,9 @@ function render() {
           second: "2-digit",
         });
 
-        return el("div", { className: `nm-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `nm-timeline-entry ${entry.type}` },
           el("span", { className: "nm-timeline-time" }, timeStr),
           el("span", { className: "nm-timeline-event" }, entry.event),
           el("span", { className: "nm-timeline-detail" }, entry.detail),

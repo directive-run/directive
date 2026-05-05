@@ -1,8 +1,8 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { flushAsync } from "@directive-run/core/testing";
-import { recordTimeline, clearAllTimelines } from "../index.js";
+// @vitest-environment node
+import { describe, expect, it } from "vitest";
+import { clearAllTimelines, recordTimeline } from "../index.js";
 import { matchers, registerMatchers } from "../matchers.js";
 
 // Register the matchers explicitly so the side-effect-on-import path
@@ -296,9 +296,9 @@ describe("R1.B matchers — toMutate", () => {
 
 describe("R1.B matchers — input validation", () => {
   it("toReachInMs rejects null input", () => {
-    expect(() =>
-      matchers.toReachInMs(null as never, "x", 1, 100),
-    ).toThrow(/expected a Timeline/);
+    expect(() => matchers.toReachInMs(null as never, "x", 1, 100)).toThrow(
+      /expected a Timeline/,
+    );
   });
 
   it("toReachInMs rejects input without frames array", () => {

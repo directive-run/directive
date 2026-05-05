@@ -21,9 +21,7 @@ function msg(role: Message["role"], content: string): Message {
 }
 
 function msgs(count: number, prefix = "msg"): Message[] {
-  return Array.from({ length: count }, (_, i) =>
-    msg("user", `${prefix}-${i}`),
-  );
+  return Array.from({ length: count }, (_, i) => msg("user", `${prefix}-${i}`));
 }
 
 // ============================================================================

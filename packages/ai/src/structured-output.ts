@@ -256,12 +256,7 @@ export function withStructuredOutput<T = unknown>(
     // Append JSON instruction to agent's system prompt
     const structuredAgent: AgentLike = {
       ...agent,
-      instructions:
-        (agent.instructions ?? "") +
-        "\n\nIMPORTANT: Respond with valid JSON matching " +
-        schemaPrompt +
-        ". " +
-        "Output ONLY the JSON object, no additional text or markdown formatting.",
+      instructions: `${agent.instructions ?? ""}\n\nIMPORTANT: Respond with valid JSON matching ${schemaPrompt}. Output ONLY the JSON object, no additional text or markdown formatting.`,
     };
 
     let lastResult: RunResult<unknown> | undefined;

@@ -22,10 +22,8 @@
  *   2  → diff found differences (CI gate friendly)
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import pc from "picocolors";
-import { loadTimelinePackage } from "../lib/timeline-loader.js";
 // R5 arch C2: import types directly from the timeline package. These
 // imports are fully erased at compile time (no runtime require), so the
 // optional-peer / lazy `await import()` pattern below is preserved
@@ -33,9 +31,11 @@ import { loadTimelinePackage } from "../lib/timeline-loader.js";
 // drift risk that would arise from re-declaring them here.
 import type {
   CountDelta,
-  ResolverRunDelta,
   ErrorDelta,
+  ResolverRunDelta,
 } from "@directive-run/timeline";
+import pc from "picocolors";
+import { loadTimelinePackage } from "../lib/timeline-loader.js";
 
 interface TimelineDiffCliOptions {
   json: boolean;
@@ -126,9 +126,7 @@ function fmtResolverRows(rows: ResolverRunDelta[]): string[] {
 function fmtErrors(rows: ErrorDelta[]): string[] {
   if (rows.length === 0) return [pc.dim("  (no new errors)")];
   return rows.map((e) => {
-    const sideTag = e.side === "a"
-      ? pc.cyan("a-only")
-      : pc.yellow("b-only");
+    const sideTag = e.side === "a" ? pc.cyan("a-only") : pc.yellow("b-only");
     const errStr = (() => {
       try {
         return JSON.stringify(e.error);
@@ -159,20 +157,14 @@ function readTimeline(path: string): unknown {
     return JSON.parse(raw);
   } catch (err) {
     console.error(
-      pc.red(
-        `error: ${resolved} is not valid JSON: ${(err as Error).message}`,
-      ),
+      pc.red(`error: ${resolved} is not valid JSON: ${(err as Error).message}`),
     );
     process.exit(1);
   }
 }
 
 export async function timelineDiffCommand(args: string[]): Promise<void> {
-  if (
-    args.includes("--help") ||
-    args.includes("-h") ||
-    args.length === 0
-  ) {
+  if (args.includes("--help") || args.includes("-h") || args.length === 0) {
     printUsage();
     process.exit(args.length === 0 ? 1 : 0);
   }
@@ -222,10 +214,7 @@ export async function timelineDiffCommand(args: string[]): Promise<void> {
     process.exit(0);
   }
 
-  console.log(
-    pc.bold("Timeline diff"),
-    pc.dim(`(${aPath} vs ${bPath})`),
-  );
+  console.log(pc.bold("Timeline diff"), pc.dim(`(${aPath} vs ${bPath})`));
   console.log("");
   console.log(
     `Frames:           ${diff.aFrameCount} → ${diff.bFrameCount}  (${fmtSign(diff.frameCountDelta)})`,

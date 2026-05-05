@@ -261,7 +261,7 @@ function toResolveWithinMs(
   withinMs: number,
 ): MatcherResult {
   const fs = frames(received);
-  let durations: number[] = [];
+  const durations: number[] = [];
   for (const f of fs) {
     if (
       f.event.type === "resolver.complete" &&
@@ -334,8 +334,8 @@ function toCascade(this: unknown, received: Timeline): MatcherResult {
     pass: cascadeDetected,
     message: () =>
       cascadeDetected
-        ? `expected timeline NOT to cascade — detected ≥2 constraints firing within the same reconcile cycle`
-        : `expected timeline to cascade — no reconcile cycle had ≥2 active constraints`,
+        ? "expected timeline NOT to cascade — detected ≥2 constraints firing within the same reconcile cycle"
+        : "expected timeline to cascade — no reconcile cycle had ≥2 active constraints",
   };
 }
 
@@ -398,7 +398,8 @@ try {
   // Prefer dynamic import-time discovery so this file works against
   // either vitest 1.x or 2.x without a hard peer-dep.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const vitestModule = (globalThis as { __vitest_expect?: unknown }).__vitest_expect;
+  const vitestModule = (globalThis as { __vitest_expect?: unknown })
+    .__vitest_expect;
   if (vitestModule !== undefined) {
     (vitestModule as ExpectExtendShape).extend(
       matcherImpls as unknown as Record<

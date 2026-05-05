@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  type ComplianceStorage,
   createCompliance,
   createInMemoryComplianceStorage,
-  type ComplianceStorage,
 } from "../../plugins/compliance.js";
 import type { InputGuardrailData } from "../../types.js";
 
@@ -332,9 +332,7 @@ describe("compliance", () => {
       expect(result.expiresAt!).toBeGreaterThanOrEqual(
         before + exportExpirationMs,
       );
-      expect(result.expiresAt!).toBeLessThanOrEqual(
-        after + exportExpirationMs,
-      );
+      expect(result.expiresAt!).toBeLessThanOrEqual(after + exportExpirationMs);
     });
 
     it("onExport callback fires", async () => {
@@ -353,7 +351,9 @@ describe("compliance", () => {
 
     it("returns success=false with error on storage failure", async () => {
       const storage = createMockStorage();
-      storage.getSubjectData.mockRejectedValue(new Error("Storage unavailable"));
+      storage.getSubjectData.mockRejectedValue(
+        new Error("Storage unavailable"),
+      );
       const compliance = createCompliance({ storage });
 
       const result = await compliance.exportData({
@@ -456,9 +456,7 @@ describe("compliance", () => {
 
     it("returns success=false with error on storage failure", async () => {
       const storage = createMockStorage();
-      storage.deleteSubjectData.mockRejectedValue(
-        new Error("Deletion failed"),
-      );
+      storage.deleteSubjectData.mockRejectedValue(new Error("Deletion failed"));
       const compliance = createCompliance({ storage });
 
       const result = await compliance.deleteData({
@@ -561,27 +559,29 @@ describe("compliance", () => {
 
       const now = Date.now();
       const expectedCutoff = now - defaultRetentionMs;
-      expect(Math.abs((callArgs[1] as number) - expectedCutoff)).toBeLessThan(1000);
+      expect(Math.abs((callArgs[1] as number) - expectedCutoff)).toBeLessThan(
+        1000,
+      );
     });
 
     it("returns total deleted count", async () => {
       const storage = createMockStorage();
-      storage.getExpiredData.mockImplementation(
-        async (category: string) => {
-          if (category === "audit") {
-            return [{ id: "a1", createdAt: 1000 }];
-          }
-          if (category === "logs") {
-            return [
-              { id: "l1", createdAt: 1000 },
-              { id: "l2", createdAt: 2000 },
-            ];
-          }
+      storage.getExpiredData.mockImplementation(async (category: string) => {
+        if (category === "audit") {
+          return [{ id: "a1", createdAt: 1000 }];
+        }
+        if (category === "logs") {
+          return [
+            { id: "l1", createdAt: 1000 },
+            { id: "l2", createdAt: 2000 },
+          ];
+        }
 
-          return [];
-        },
+        return [];
+      });
+      storage.deleteByIds.mockImplementation(
+        async (ids: string[]) => ids.length,
       );
-      storage.deleteByIds.mockImplementation(async (ids: string[]) => ids.length);
 
       const compliance = createCompliance({
         storage,

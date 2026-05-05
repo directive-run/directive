@@ -46,10 +46,11 @@ import {
   createCircuitBreaker,
   createOTLPExporter,
 } from "@directive-run/core/plugins";
+// createObservability is alpha (not in bundle) — direct source import
 import {
-  createObservability,
   createAgentMetrics,
-} from "@directive-run/core/plugins";
+  createObservability,
+} from "../../../packages/core/src/plugins/observability.lab.js";
 import {
   analysisAgent,
   chatAgent,
@@ -102,7 +103,7 @@ export interface CheckersAI {
     cacheStats: CacheStats;
     busMessageCount: number;
   };
-  destroy(): void;
+  dispose(): void;
   /** Escape hatch for dashboard rendering */
   readonly observability: ReturnType<typeof createObservability> | null;
 }
@@ -322,7 +323,7 @@ export function createCheckersAI(): CheckersAI {
 
   function buildMoveInput(
     board: Board,
-    player: Player,
+    _player: Player,
     legalMoves: Move[],
     humanMoveDesc?: string,
   ): string {
@@ -563,7 +564,7 @@ export function createCheckersAI(): CheckersAI {
     };
   }
 
-  function destroy(): void {
+  function dispose(): void {
     clearInterval(otlpInterval);
     // Flush OTLP one final time
     try {
@@ -573,9 +574,9 @@ export function createCheckersAI(): CheckersAI {
     } catch {
       // Best-effort flush on dispose
     }
-    orchestrator.destroy();
-    multi.destroy();
-    obs.destroy();
+    orchestrator.dispose();
+    multi.dispose();
+    obs.dispose();
   }
 
   return {

@@ -270,7 +270,7 @@ export function hasNoValidMoves(board: Board, player: Player): boolean {
 /** Heuristic board evaluation from `player`'s perspective */
 export function evaluateBoard(board: Board, player: Player): number {
   let score = 0;
-  const opp = opponent(player);
+  const _opp = opponent(player);
 
   for (let i = 0; i < 64; i++) {
     const piece = board[i];

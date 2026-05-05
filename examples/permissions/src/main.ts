@@ -129,30 +129,66 @@ function render(): void {
 
         if (canEdit) {
           actionButtons.push(
-            el("button", { className: "pm-article-action edit", dataset: { articleId: article.id, action: "edit" } } as any, "Edit"),
+            el(
+              "button",
+              {
+                className: "pm-article-action edit",
+                dataset: { articleId: article.id, action: "edit" },
+              } as any,
+              "Edit",
+            ),
           );
         }
 
         if (canPublish && article.status === "draft") {
           actionButtons.push(
-            el("button", { className: "pm-article-action publish", dataset: { articleId: article.id, action: "publish" } } as any, "Publish"),
+            el(
+              "button",
+              {
+                className: "pm-article-action publish",
+                dataset: { articleId: article.id, action: "publish" },
+              } as any,
+              "Publish",
+            ),
           );
         }
 
         if (canDelete) {
           actionButtons.push(
-            el("button", { className: "pm-article-action delete", dataset: { articleId: article.id, action: "delete" } } as any, "Delete"),
+            el(
+              "button",
+              {
+                className: "pm-article-action delete",
+                dataset: { articleId: article.id, action: "delete" },
+              } as any,
+              "Delete",
+            ),
           );
         }
 
-        const actionsContent = actionButtons.length > 0
-          ? actionButtons
-          : [el("span", { className: "pm-no-actions" }, "No actions available")];
+        const actionsContent =
+          actionButtons.length > 0
+            ? actionButtons
+            : [
+                el(
+                  "span",
+                  { className: "pm-no-actions" },
+                  "No actions available",
+                ),
+              ];
 
-        return el("div", { className: "pm-article-card" },
-          el("div", { className: "pm-article-header" },
+        return el(
+          "div",
+          { className: "pm-article-card" },
+          el(
+            "div",
+            { className: "pm-article-header" },
             el("span", { className: "pm-article-title" }, article.title),
-            el("span", { className: `pm-article-status ${article.status}` }, article.status),
+            el(
+              "span",
+              { className: `pm-article-status ${article.status}` },
+              article.status,
+            ),
           ),
           el("div", { className: "pm-article-meta" }, `by ${article.author}`),
           el("div", { className: "pm-article-actions" }, ...actionsContent),
@@ -181,14 +217,28 @@ function render(): void {
     adminPanelEl.classList.add("visible");
     adminPanelEl.replaceChildren(
       el("div", { className: "pm-panel-header" }, "Admin Panel"),
-      el("div", { className: "pm-panel-body" },
-        el("div", { className: "pm-admin-info" },
+      el(
+        "div",
+        { className: "pm-panel-body" },
+        el(
+          "div",
+          { className: "pm-admin-info" },
           el("div", { className: "pm-admin-icon" }, "\u{1F6E1}"),
           el("div", { className: "pm-admin-label" }, "User Management"),
-          el("div", { className: "pm-admin-detail" }, `Logged in as ${userName} (${role})`),
-          el("div", { className: "pm-admin-detail" }, `${permissions.length} permissions granted`),
+          el(
+            "div",
+            { className: "pm-admin-detail" },
+            `Logged in as ${userName} (${role})`,
+          ),
+          el(
+            "div",
+            { className: "pm-admin-detail" },
+            `${permissions.length} permissions granted`,
+          ),
         ),
-        el("div", { className: "pm-admin-placeholder" },
+        el(
+          "div",
+          { className: "pm-admin-placeholder" },
           el("div", { className: "pm-admin-row" }, "Users online: 12"),
           el("div", { className: "pm-admin-row" }, "Pending invites: 3"),
           el("div", { className: "pm-admin-row" }, "System health: OK"),

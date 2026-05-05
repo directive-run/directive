@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bisectCommand } from "../src/commands/bisect.js";
 
 let tmpDir: string;
@@ -44,9 +44,9 @@ describe("directive bisect command — argument parsing", () => {
       JSON.stringify({ version: 1, id: "x", startedAtMs: 0, frames: [] }),
     );
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(
-      bisectCommand([fakeJson, "--assert", "true"]),
-    ).rejects.toThrow("__exit__");
+    await expect(bisectCommand([fakeJson, "--assert", "true"])).rejects.toThrow(
+      "__exit__",
+    );
     const calls = errSpy.mock.calls.flat().join(" ");
     expect(calls).toContain("--system");
   });
@@ -91,13 +91,7 @@ describe("directive bisect command — argument parsing", () => {
     writeFileSync(fakeSys, "export function createSystem() { return {}; }");
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      bisectCommand([
-        fakeJson,
-        "--system",
-        fakeSys,
-        "--assert",
-        "true",
-      ]),
+      bisectCommand([fakeJson, "--system", fakeSys, "--assert", "true"]),
     ).rejects.toThrow("__exit__");
     const calls = errSpy.mock.calls.flat().join(" ");
     expect(calls.toLowerCase()).toContain("not valid json");
@@ -116,13 +110,7 @@ describe("directive bisect command — argument parsing", () => {
     );
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      bisectCommand([
-        fakeJson,
-        "--system",
-        fakeSys,
-        "--assert",
-        "facts.x ===",
-      ]),
+      bisectCommand([fakeJson, "--system", fakeSys, "--assert", "facts.x ==="]),
     ).rejects.toThrow("__exit__");
     const calls = errSpy.mock.calls.flat().join(" ");
     expect(calls).toContain("Failed to compile --assert");
@@ -138,13 +126,7 @@ describe("directive bisect command — argument parsing", () => {
     writeFileSync(fakeSys, "export const notAFactory = 42;");
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
-      bisectCommand([
-        fakeJson,
-        "--system",
-        fakeSys,
-        "--assert",
-        "true",
-      ]),
+      bisectCommand([fakeJson, "--system", fakeSys, "--assert", "true"]),
     ).rejects.toThrow("__exit__");
     const calls = errSpy.mock.calls.flat().join(" ");
     expect(calls).toContain("system factory");
@@ -256,13 +238,7 @@ export function createSystem() {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(
-      bisectCommand([
-        tlFile,
-        "--system",
-        sysFile,
-        "--assert",
-        "true",
-      ]),
+      bisectCommand([tlFile, "--system", sysFile, "--assert", "true"]),
     ).rejects.toThrow("__exit__");
 
     const stderr = errSpy.mock.calls.flat().join("\n");

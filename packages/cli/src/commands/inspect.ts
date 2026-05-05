@@ -83,9 +83,7 @@ function formatConstraints(
         ? pc.green("active")
         : pc.dim("inactive");
     const hits = c.hitCount > 0 ? pc.yellow(` (${c.hitCount} hits)`) : "";
-    lines.push(
-      `  ${pc.cyan(c.id)}  ${status}  priority=${c.priority}${hits}`,
-    );
+    lines.push(`  ${pc.cyan(c.id)}  ${status}  priority=${c.priority}${hits}`);
   }
 
   return lines.join("\n");
@@ -93,7 +91,10 @@ function formatConstraints(
 
 function formatResolverDefs(
   resolverDefs: Array<{ id: string; requirement: string }>,
-  resolvers: Record<string, { state: string; error?: string; duration?: number }>,
+  resolvers: Record<
+    string,
+    { state: string; error?: string; duration?: number }
+  >,
 ): string {
   const lines: string[] = [];
   lines.push(pc.bold("Resolvers:"));
@@ -109,9 +110,7 @@ function formatResolverDefs(
     const stateStr = status
       ? formatResolverState(status.state, status.error, status.duration)
       : pc.dim("idle");
-    lines.push(
-      `  ${pc.cyan(def.id)} → ${def.requirement}  ${stateStr}`,
-    );
+    lines.push(`  ${pc.cyan(def.id)} → ${def.requirement}  ${stateStr}`);
   }
 
   return lines.join("\n");
@@ -218,18 +217,17 @@ function findWarnings(inspection: {
   const warnings: string[] = [];
 
   // Orphaned resolvers: resolver handles a type no constraint emits
-  const constraintTypes = new Set<string>();
+  const _constraintTypes = new Set<string>();
   // We can't know constraint requirement types from inspection alone,
   // but we can check unmet requirements
-  const unmetTypes = new Set(inspection.unmet.map((u) => u.requirement.type));
-  const resolverTypes = new Set(
+  const _unmetTypes = new Set(inspection.unmet.map((u) => u.requirement.type));
+  const _resolverTypes = new Set(
     inspection.resolverDefs.map((r) => r.requirement),
   );
 
   // Resolver types not in unmet — might be orphaned (can't be sure without full constraint analysis)
   for (const def of inspection.resolverDefs) {
     if (def.requirement === "(predicate)") {
-      continue;
     }
   }
 
@@ -240,9 +238,7 @@ function findWarnings(inspection: {
         r.requirement === u.requirement.type || r.requirement === "(predicate)",
     );
     if (!hasResolver) {
-      warnings.push(
-        `No resolver for requirement type "${u.requirement.type}"`,
-      );
+      warnings.push(`No resolver for requirement type "${u.requirement.type}"`);
     }
   }
 
@@ -257,9 +253,7 @@ export async function inspectCommand(args: string[]) {
   const { filePath, opts } = parseArgs(args);
 
   if (!filePath) {
-    console.error(
-      "Usage: directive inspect <file> [--json] [--module <name>]",
-    );
+    console.error("Usage: directive inspect <file> [--json] [--module <name>]");
     process.exit(1);
   }
 
@@ -325,7 +319,9 @@ export async function inspectCommand(args: string[]) {
   console.log();
 
   // Resolvers
-  console.log(formatResolverDefs(inspection.resolverDefs, inspection.resolvers));
+  console.log(
+    formatResolverDefs(inspection.resolverDefs, inspection.resolvers),
+  );
   console.log();
 
   // Unmet requirements

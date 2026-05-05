@@ -200,7 +200,7 @@ export function createCheckersAI(): CheckersAI {
     serviceName: "checkers-ai",
     onError: (err) => {
       console.debug(
-        `[OTLP] export failed (collector not running?):`,
+        "[OTLP] export failed (collector not running?):",
         err.message,
       );
     },
@@ -320,7 +320,7 @@ export function createCheckersAI(): CheckersAI {
 
   function buildMoveInput(
     board: Board,
-    player: Player,
+    _player: Player,
     legalMoves: Move[],
     humanMoveDesc?: string,
   ): string {

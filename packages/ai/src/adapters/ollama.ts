@@ -15,10 +15,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type {
-  AdapterHooks,
-  AgentRunner,
-} from "../types.js";
+import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
   buildStreamingResult,
@@ -58,7 +55,7 @@ export const OLLAMA_PRICING: Record<string, { input: number; output: number }> =
     mistral: { input: 0, output: 0 },
     mixtral: { input: 0, output: 0 },
     codellama: { input: 0, output: 0 },
-    "gemma2": { input: 0, output: 0 },
+    gemma2: { input: 0, output: 0 },
     phi3: { input: 0, output: 0 },
     qwen2: { input: 0, output: 0 },
     deepseek: { input: 0, output: 0 },
@@ -327,9 +324,7 @@ export function createOllamaStreamingRunner(
               continue;
             }
 
-            const msg = chunk.message as
-              | Record<string, unknown>
-              | undefined;
+            const msg = chunk.message as Record<string, unknown> | undefined;
             const content = (msg?.content as string) ?? "";
             if (content) {
               fullText += content;
@@ -337,8 +332,7 @@ export function createOllamaStreamingRunner(
             }
 
             if (chunk.done) {
-              inputTokens =
-                (chunk.prompt_eval_count as number) ?? 0;
+              inputTokens = (chunk.prompt_eval_count as number) ?? 0;
               outputTokens = (chunk.eval_count as number) ?? 0;
             }
           }
@@ -351,7 +345,15 @@ export function createOllamaStreamingRunner(
       const totalTokens = inputTokens + outputTokens;
 
       callbacks.onMessage?.({ role: "assistant", content: fullText });
-      fireAfterCallHook(hooks, agent, input, fullText, totalTokens, tokenUsage, startTime);
+      fireAfterCallHook(
+        hooks,
+        agent,
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        startTime,
+      );
 
       return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
     } catch (err) {

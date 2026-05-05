@@ -115,7 +115,7 @@ function generateSitemap(docs: NavSection[], ai: NavSection[]): string {
     "# Directive Documentation Sitemap",
     "",
     "> Auto-generated from the docs site navigation. Do not edit manually.",
-    `> Run \`pnpm --filter @directive-run/knowledge generate-sitemap\` to refresh.`,
+    "> Run `pnpm --filter @directive-run/knowledge generate-sitemap` to refresh.",
     "",
     `Website: ${BASE_URL}`,
     "",
@@ -158,10 +158,13 @@ if (!existsSync(NAV_PATH)) {
 const source = readFileSync(NAV_PATH, "utf-8");
 const { docs, ai } = parseNavigation(source);
 
-const totalLinks = docs.reduce((n, s) => n + s.links.length, 0) +
+const totalLinks =
+  docs.reduce((n, s) => n + s.links.length, 0) +
   ai.reduce((n, s) => n + s.links.length, 0);
 
 const sitemap = generateSitemap(docs, ai);
 writeFileSync(OUTPUT, sitemap, "utf-8");
 
-log.success(`Generated sitemap.md — ${docs.length + ai.length} sections, ${totalLinks} pages`);
+log.success(
+  `Generated sitemap.md — ${docs.length + ai.length} sections, ${totalLinks} pages`,
+);

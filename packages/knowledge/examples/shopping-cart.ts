@@ -193,7 +193,7 @@ export const cartModule = createModule("cart", {
       return sub * (facts.self.couponDiscount / 100);
     },
 
-    tax: (facts, derived) => {
+    tax: (_facts, derived) => {
       const sub = derived.subtotal;
       const disc = derived.discount;
 

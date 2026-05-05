@@ -19,9 +19,40 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Accept path as CLI arg, or check sibling directive-docs repo, or fall back to legacy path
 const JSON_PATH = process.argv[2]
   ? join(process.cwd(), process.argv[2])
-  : existsSync(join(__dirname, "..", "..", "..", "..", "directive-docs", "docs", "generated", "api-reference.json"))
-    ? join(__dirname, "..", "..", "..", "..", "directive-docs", "docs", "generated", "api-reference.json")
-    : join(__dirname, "..", "..", "..", "website", "docs", "generated", "api-reference.json");
+  : existsSync(
+        join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          "..",
+          "directive-docs",
+          "docs",
+          "generated",
+          "api-reference.json",
+        ),
+      )
+    ? join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "directive-docs",
+        "docs",
+        "generated",
+        "api-reference.json",
+      )
+    : join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "website",
+        "docs",
+        "generated",
+        "api-reference.json",
+      );
 const OUTPUT = join(__dirname, "..", "api-skeleton.md");
 
 interface ApiDocEntry {
@@ -73,7 +104,9 @@ function main() {
     }
   }
 
-  log.step(`Condensing ${coreEntries.length} core + ${aiEntries.length} ai symbols...`);
+  log.step(
+    `Condensing ${coreEntries.length} core + ${aiEntries.length} ai symbols...`,
+  );
 
   const lines: string[] = [
     "# API Skeleton",
@@ -89,7 +122,7 @@ function main() {
   lines.push("", "## @directive-run/ai", "");
   lines.push(...formatEntries(aiEntries));
 
-  const output = lines.join("\n") + "\n";
+  const output = `${lines.join("\n")}\n`;
   writeFileSync(OUTPUT, output, "utf-8");
 
   const size = `${(Buffer.byteLength(output) / 1024).toFixed(0)} KB`;

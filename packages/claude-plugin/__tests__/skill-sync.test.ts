@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -17,8 +17,7 @@ function getAllKnowledgeFiles(): string[] {
   for (const dir of [KNOWLEDGE_ROOT, CORE_DIR, AI_DIR]) {
     try {
       for (const f of readdirSync(dir).filter(
-        (f) =>
-          f.endsWith(".md") && f !== "README.md" && f !== "CHANGELOG.md",
+        (f) => f.endsWith(".md") && f !== "README.md" && f !== "CHANGELOG.md",
       )) {
         files.push(f.replace(".md", ""));
       }

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useFact, useDerived, useEvents } from "@directive-run/vue";
+import { useDerived, useEvents, useFact } from "@directive-run/vue";
 import { system } from "./module";
 
 system.start();
 
-const count = useFact(system, "count");
-const doubled = useDerived(system, "doubled");
-const events = useEvents(system);
+const _count = useFact(system, "count");
+const _doubled = useDerived(system, "doubled");
+const _events = useEvents(system);
 </script>
 
 <template>

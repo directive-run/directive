@@ -2,8 +2,8 @@
 import { useFact, useInspect } from "@directive-run/vue";
 import { system } from "../system";
 
-const inspect = useInspect(system);
-const status = useFact(system, "status");
+const _inspect = useInspect(system);
+const _status = useFact(system, "status");
 </script>
 
 <template>

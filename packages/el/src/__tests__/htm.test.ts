@@ -71,7 +71,9 @@ describe("html tagged template (htm)", () => {
   it("applies event handlers", () => {
     let clicked = false;
     const btn = html`
-      <button onclick=${() => { clicked = true; }}>Click</button>
+      <button onclick=${() => {
+        clicked = true;
+      }}>Click</button>
     ` as HTMLButtonElement;
 
     btn.dispatchEvent(new Event("click"));

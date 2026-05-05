@@ -6,9 +6,9 @@
  * and event timeline. A 1s timer drives reactive token countdown.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import { authFlowModule, authFlowSchema } from "./auth-flow.js";
 
 // ============================================================================
@@ -139,7 +139,11 @@ function render(): void {
   // --- Timeline ---
   if (eventLog.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "af-timeline-empty" }, "Events will appear here after login"),
+      el(
+        "div",
+        { className: "af-timeline-empty" },
+        "Events will appear here after login",
+      ),
     );
   } else {
     const entries: HTMLElement[] = [];
@@ -153,7 +157,9 @@ function render(): void {
       });
 
       entries.push(
-        el("div", { className: `af-timeline-entry ${entry.event}` },
+        el(
+          "div",
+          { className: `af-timeline-entry ${entry.event}` },
           el("span", { className: "af-timeline-time" }, timeStr),
           el("span", { className: "af-timeline-event" }, entry.event),
           el("span", { className: "af-timeline-detail" }, entry.detail),
@@ -171,7 +177,7 @@ function render(): void {
 system.subscribe(allKeys, render);
 
 // Timer — tick every 1s for reactive countdown
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 1000);
 

@@ -211,7 +211,7 @@ export interface CreateSystemOptionsNamed<Modules extends ModulesMap> {
   /** Modules as object = namespaced access */
   modules: Modules;
   /** Plugins to register */
-  plugins?: Array<Plugin<ModuleSchema>>;
+  plugins?: Plugin<ModuleSchema>[];
   /** History configuration for snapshot-based state history */
   history?: HistoryOption;
   /** Trace: per-run reconciliation changelog */
@@ -613,7 +613,7 @@ export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
   /** Single module = direct access (use `modules` for multiple) */
   module: ModuleDef<S>;
   /** Plugins to register */
-  plugins?: Array<Plugin<ModuleSchema>>;
+  plugins?: Plugin<ModuleSchema>[];
   /** History configuration for snapshot-based state history */
   history?: HistoryOption;
   /** Trace: per-run reconciliation changelog */

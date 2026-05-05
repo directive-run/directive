@@ -176,7 +176,7 @@ function main() {
   log.step(`Checking ${files.length} knowledge files...`);
 
   let totalRefs = 0;
-  let missingRefs = 0;
+  let _missingRefs = 0;
   const missing: Array<{ file: string; symbol: string }> = [];
   const fileRefCounts: Record<string, number> = {};
 
@@ -185,7 +185,8 @@ function main() {
 
     // Extract identifier references that look like API symbols
     // (PascalCase or camelCase starting identifiers, not lowercase keywords)
-    const refPattern = /`((?:create|use|with|assert|mock|estimate|validate|pipe|select|t\.|Module|System|Plugin|Constraint|Resolver|Requirement|Derivation|Effect|Schema|Facts|Engine|Orchestrator|Agent|Runner|Budget|Guardrail|Memory|Circuit)\w*)`/g;
+    const refPattern =
+      /`((?:create|use|with|assert|mock|estimate|validate|pipe|select|t\.|Module|System|Plugin|Constraint|Resolver|Requirement|Derivation|Effect|Schema|Facts|Engine|Orchestrator|Agent|Runner|Budget|Guardrail|Memory|Circuit)\w*)`/g;
     let ref: RegExpExecArray | null = null;
     while ((ref = refPattern.exec(file.content)) !== null) {
       const symbol = ref[1];
@@ -197,7 +198,7 @@ function main() {
       fileRefs++;
 
       if (!apiSymbols.has(symbol)) {
-        missingRefs++;
+        _missingRefs++;
         missing.push({ file: file.name, symbol });
       }
     }
@@ -217,10 +218,14 @@ function main() {
     for (const { file, symbol } of missing) {
       log.item(file, `\`${symbol}\``);
     }
-    log.warn("Run `pnpm --filter @directive-run/knowledge generate` to refresh");
+    log.warn(
+      "Run `pnpm --filter @directive-run/knowledge generate` to refresh",
+    );
     process.exitCode = 1;
   } else {
-    log.success(`${totalRefs} symbol references valid across ${files.length} files`);
+    log.success(
+      `${totalRefs} symbol references valid across ${files.length} files`,
+    );
   }
 
   log.done(PHASE);

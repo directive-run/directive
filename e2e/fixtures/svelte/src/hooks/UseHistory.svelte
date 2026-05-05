@@ -2,8 +2,8 @@
 import { useFact, useHistory } from "@directive-run/svelte";
 import { system } from "../system";
 
-const count = useFact(system, "count");
-const history = useHistory(system);
+const _count = useFact(system, "count");
+const _history = useHistory(system);
 </script>
 
 <div>

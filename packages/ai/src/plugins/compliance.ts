@@ -338,7 +338,7 @@ async function sha256(content: string): Promise<string> {
 }
 
 /** Convert data to CSV format */
-function toCSV(data: Array<Record<string, unknown>>): string {
+function toCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) return "";
 
   // Get all unique keys

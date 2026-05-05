@@ -47,10 +47,10 @@
  * boundary (e.g. `Date → number`, `BigInt → string`) before assigning
  * to facts.
  */
-export function createSnapshot<F extends Record<string, unknown>, K extends keyof F>(
-  facts: F,
-  keys: readonly K[],
-): () => void {
+export function createSnapshot<
+  F extends Record<string, unknown>,
+  K extends keyof F,
+>(facts: F, keys: readonly K[]): () => void {
   // Atomic capture: build the snapshot into a local first; only after
   // every key clones successfully do we expose the restore closure.
   // If any single clone throws, the partial snapshot is discarded and
@@ -130,10 +130,12 @@ export function withOptimistic<F extends Record<string, unknown>>(
  */
 export class OptimisticCloneError extends Error {
   override readonly name = "OptimisticCloneError";
-  constructor(public readonly key: PropertyKey, cause?: unknown) {
+  constructor(
+    public readonly key: PropertyKey,
+    cause?: unknown,
+  ) {
     super(
-      `[optimistic] Failed to snapshot fact key "${String(key)}": value is not JSON-roundtrippable. ` +
-        `Convert at the boundary (e.g. Date → number, Set/Map → array/object, BigInt → string) before assigning to facts.`,
+      `[optimistic] Failed to snapshot fact key "${String(key)}": value is not JSON-roundtrippable. Convert at the boundary (e.g. Date → number, Set/Map → array/object, BigInt → string) before assigning to facts.`,
     );
     if (cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = cause;

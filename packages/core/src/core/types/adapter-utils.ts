@@ -334,7 +334,7 @@ export function requirementGuard<R extends Requirement>(
  * ```
  */
 export function requirementGuardMultiple<R extends Requirement>(
-  types: Array<R["type"]>,
+  types: R["type"][],
 ): (req: Requirement) => req is R {
   const typeSet = new Set(types);
   return (req): req is R => typeSet.has(req.type);

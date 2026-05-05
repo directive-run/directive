@@ -256,7 +256,7 @@ const contactForm = createModule("contact-form", {
   resolvers: {
     sendMessage: {
       requirement: "SEND_MESSAGE",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         log(
           `Sending: ${context.facts.name} <${context.facts.email}> [${context.facts.subject}]`,
         );
@@ -281,7 +281,7 @@ const contactForm = createModule("contact-form", {
 
     resetAfterDelay: {
       requirement: "RESET_AFTER_DELAY",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         log("Auto-resetting in 3 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
         context.facts.name = "";

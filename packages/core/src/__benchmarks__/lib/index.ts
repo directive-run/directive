@@ -8,12 +8,12 @@ export { signalsAdapter } from "./signals-adapter";
 export { xstateAdapter } from "./xstate-adapter";
 
 import { directiveAdapter } from "./directive-adapter";
-import { zustandAdapter } from "./zustand-adapter";
-import { reduxAdapter } from "./redux-adapter";
-import { mobxAdapter } from "./mobx-adapter";
 import { jotaiAdapter } from "./jotai-adapter";
+import { mobxAdapter } from "./mobx-adapter";
+import { reduxAdapter } from "./redux-adapter";
 import { signalsAdapter } from "./signals-adapter";
 import { xstateAdapter } from "./xstate-adapter";
+import { zustandAdapter } from "./zustand-adapter";
 
 export const adapters = [
   directiveAdapter,

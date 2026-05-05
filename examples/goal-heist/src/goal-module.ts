@@ -399,7 +399,7 @@ export const heistModule = createModule("heist", {
   resolvers: {
     executeStep: {
       requirement: "EXECUTE_NEXT_STEP",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         const {
           goalFacts,
           nodeStatuses,
@@ -568,7 +568,7 @@ export const heistModule = createModule("heist", {
 
     applyRelaxation: {
       requirement: "APPLY_RELAXATION",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         const {
           relaxations,
           currentStep,

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { replayCommand } from "../src/commands/replay.js";
 
 let tmpDir: string;
@@ -40,7 +40,10 @@ describe("directive replay command — argument parsing", () => {
 
   it("errors when --system is missing", async () => {
     const fakeJson = join(tmpDir, "t.json");
-    writeFileSync(fakeJson, JSON.stringify({ version: 1, id: "x", startedAtMs: 0, frames: [] }));
+    writeFileSync(
+      fakeJson,
+      JSON.stringify({ version: 1, id: "x", startedAtMs: 0, frames: [] }),
+    );
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(replayCommand([fakeJson])).rejects.toThrow("__exit__");
     const calls = errSpy.mock.calls.flat().join(" ");
@@ -52,11 +55,7 @@ describe("directive replay command — argument parsing", () => {
     const fakeSys = join(tmpDir, "sys.ts");
     writeFileSync(fakeSys, "export const system = {};");
     await expect(
-      replayCommand([
-        join(tmpDir, "missing.json"),
-        "--system",
-        fakeSys,
-      ]),
+      replayCommand([join(tmpDir, "missing.json"), "--system", fakeSys]),
     ).rejects.toThrow("__exit__");
     const calls = errSpy.mock.calls.flat().join(" ");
     expect(calls).toContain("not found");

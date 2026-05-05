@@ -11,10 +11,10 @@
 
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
+  DefinitionMeta,
   DerivationState,
   DerivationsDef,
   DerivedValues,
-  DefinitionMeta,
   Facts,
   Schema,
 } from "./types.js";
@@ -275,7 +275,10 @@ export function createDerivationsManager<
         deps = tracked.deps;
 
         // Check dep stability
-        if (state.dependencies.size > 0 && setsEqual(deps, state.dependencies)) {
+        if (
+          state.dependencies.size > 0 &&
+          setsEqual(deps, state.dependencies)
+        ) {
           state.stableRunCount++;
           if (state.stableRunCount >= STABLE_THRESHOLD) {
             state.depsStable = true;

@@ -210,11 +210,7 @@ export function warnNonJsonFactAssignment(
 
   const hint = nonJsonHints[valueType] ?? "a JSON-roundtrippable value";
   console.warn(
-    `[Directive] Fact "${factPath}" assigned a ${valueType} instance.\n` +
-      `Facts must be JSON-roundtrippable for reactivity to work correctly.\n` +
-      `${valueType} mutations are not tracked.\n` +
-      `Use ${hint} instead.\n` +
-      `See: https://directive.run/docs/facts#json-rule`,
+    `[Directive] Fact "${factPath}" assigned a ${valueType} instance.\nFacts must be JSON-roundtrippable for reactivity to work correctly.\n${valueType} mutations are not tracked.\nUse ${hint} instead.\nSee: https://directive.run/docs/facts#json-rule`,
   );
 }
 

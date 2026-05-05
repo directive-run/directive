@@ -127,7 +127,11 @@ function render(): void {
   // --- Results list ---
   if (query === "" && results.length === 0) {
     resultsList.replaceChildren(
-      el("div", { className: "dc-results-empty" }, "Type to search 30 tech items..."),
+      el(
+        "div",
+        { className: "dc-results-empty" },
+        "Type to search 30 tech items...",
+      ),
     );
   } else if (
     results.length === 0 &&
@@ -136,7 +140,11 @@ function render(): void {
     !isDebouncing
   ) {
     resultsList.replaceChildren(
-      el("div", { className: "dc-results-empty" }, `No results for "${debouncedQuery}"`),
+      el(
+        "div",
+        { className: "dc-results-empty" },
+        `No results for "${debouncedQuery}"`,
+      ),
     );
   } else if (results.length === 0 && (isSearching || isDebouncing)) {
     resultsList.replaceChildren(
@@ -145,9 +153,15 @@ function render(): void {
   } else {
     resultsList.replaceChildren(
       ...results.map((item) =>
-        el("div", { className: "dc-result-item" },
+        el(
+          "div",
+          { className: "dc-result-item" },
           el("span", { className: "dc-result-title" }, item.title),
-          el("span", { className: `dc-result-badge ${item.category.toLowerCase()}` }, item.category),
+          el(
+            "span",
+            { className: `dc-result-badge ${item.category.toLowerCase()}` },
+            item.category,
+          ),
         ),
       ),
     );
@@ -171,7 +185,11 @@ function render(): void {
   // --- Timeline ---
   if (eventLog.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "dc-timeline-empty" }, "Events will appear here after typing"),
+      el(
+        "div",
+        { className: "dc-timeline-empty" },
+        "Events will appear here after typing",
+      ),
     );
   } else {
     const entries: HTMLElement[] = [];
@@ -185,7 +203,9 @@ function render(): void {
       });
 
       entries.push(
-        el("div", { className: `dc-timeline-entry ${entry.event}` },
+        el(
+          "div",
+          { className: `dc-timeline-entry ${entry.event}` },
           el("span", { className: "dc-timeline-time" }, timeStr),
           el("span", { className: "dc-timeline-event" }, entry.event),
           el("span", { className: "dc-timeline-detail" }, entry.detail),
@@ -204,7 +224,7 @@ function render(): void {
 system.subscribe(allKeys, render);
 
 // Timer — tick every 100ms for smooth debounce progress bar
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 100);
 

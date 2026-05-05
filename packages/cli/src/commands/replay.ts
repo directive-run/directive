@@ -30,7 +30,7 @@
  *   - `--diff <other.json>` for causal-graph diff output.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import pc from "picocolors";
 import { loadSystem } from "../lib/loader.js";
@@ -118,11 +118,7 @@ Examples:
 }
 
 export async function replayCommand(args: string[]): Promise<void> {
-  if (
-    args.includes("--help") ||
-    args.includes("-h") ||
-    args.length === 0
-  ) {
+  if (args.includes("--help") || args.includes("-h") || args.length === 0) {
     printUsage();
     process.exit(args.length === 0 ? 1 : 0);
   }
@@ -155,7 +151,9 @@ export async function replayCommand(args: string[]): Promise<void> {
     raw = readFileSync(resolvedJson, "utf8");
   } catch (err) {
     console.error(
-      pc.red(`error: failed to read ${resolvedJson}: ${(err as Error).message}`),
+      pc.red(
+        `error: failed to read ${resolvedJson}: ${(err as Error).message}`,
+      ),
     );
     process.exit(1);
   }
@@ -206,7 +204,7 @@ export async function replayCommand(args: string[]): Promise<void> {
   if (typeof sys.dispatch !== "function") {
     console.error(
       pc.red(
-        `error: loaded system has no dispatch() method. The --system file must export a started Directive system or a factory.`,
+        "error: loaded system has no dispatch() method. The --system file must export a started Directive system or a factory.",
       ),
     );
     process.exit(1);
@@ -229,7 +227,9 @@ export async function replayCommand(args: string[]): Promise<void> {
   // typed ReplayableSystem.
   const result = await replayTimeline(
     timeline,
-    sys as { dispatch: (event: { type: string; [key: string]: unknown }) => void },
+    sys as {
+      dispatch: (event: { type: string; [key: string]: unknown }) => void;
+    },
     {
       dispatchableOnly: opts.dispatchableOnly,
       maxFrames: opts.maxFrames,

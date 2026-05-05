@@ -44,8 +44,8 @@ import {
 } from "@directive-run/core/plugins";
 // createObservability is alpha (not in bundle) — direct source import
 import {
-  createObservability,
   createAgentMetrics,
+  createObservability,
 } from "../../../packages/core/src/plugins/observability.lab.js";
 import {
   analysisAgent,
@@ -319,7 +319,7 @@ export function createCheckersAI(): CheckersAI {
 
   function buildMoveInput(
     board: Board,
-    player: Player,
+    _player: Player,
     legalMoves: Move[],
     humanMoveDesc?: string,
   ): string {
