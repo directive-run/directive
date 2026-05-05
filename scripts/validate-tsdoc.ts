@@ -123,6 +123,62 @@ function getParamNames(jsDocs: JSDoc[]): Set<string> {
   return names;
 }
 
+function validateFunctionParams(
+  name: string,
+  decl: FunctionDeclaration,
+  jsDocs: JSDoc[],
+  filePath: string,
+  line: number,
+): void {
+  const params = decl.getParameters();
+  const documentedParams = getParamNames(jsDocs);
+
+  for (const param of params) {
+    const paramName = param.getName();
+    // Skip destructured params (they start with { or have dots)
+    if (paramName.startsWith("{") || paramName.startsWith("[")) {
+      continue;
+    }
+
+    if (!documentedParams.has(paramName)) {
+      addError(
+        filePath,
+        line,
+        name,
+        `Missing @param for "${paramName}"`,
+        "warning",
+      );
+    }
+  }
+}
+
+function validateFunctionReturnsAndExample(
+  name: string,
+  decl: FunctionDeclaration,
+  jsDocs: JSDoc[],
+  filePath: string,
+  line: number,
+): void {
+  // Check @returns
+  if (!hasTag(jsDocs, "@returns") && !hasTag(jsDocs, "@return")) {
+    const returnType = decl.getReturnType().getText();
+    if (returnType !== "void" && returnType !== "undefined") {
+      addError(filePath, line, name, "Missing @returns", "warning");
+    }
+  }
+
+  // Check @example on create* factory functions
+  if (name.startsWith("create") && !hasTag(jsDocs, "@example")) {
+    addError(
+      filePath,
+      line,
+      name,
+      "Factory function missing @example",
+      "warning",
+    );
+  }
+}
+
 function validateFunctionExport(
   name: string,
   decl: FunctionDeclaration,
@@ -148,46 +204,8 @@ function validateFunctionExport(
     return;
   }
 
-  // Check @param for each parameter
-  const params = decl.getParameters();
-  const documentedParams = getParamNames(jsDocs);
-
-  for (const param of params) {
-    const paramName = param.getName();
-    // Skip destructured params (they start with { or have dots)
-    if (paramName.startsWith("{") || paramName.startsWith("[")) {
-      continue;
-    }
-
-    if (!documentedParams.has(paramName)) {
-      addError(
-        filePath,
-        line,
-        name,
-        `Missing @param for "${paramName}"`,
-        "warning",
-      );
-    }
-  }
-
-  // Check @returns
-  if (!hasTag(jsDocs, "@returns") && !hasTag(jsDocs, "@return")) {
-    const returnType = decl.getReturnType().getText();
-    if (returnType !== "void" && returnType !== "undefined") {
-      addError(filePath, line, name, "Missing @returns", "warning");
-    }
-  }
-
-  // Check @example on create* factory functions
-  if (name.startsWith("create") && !hasTag(jsDocs, "@example")) {
-    addError(
-      filePath,
-      line,
-      name,
-      "Factory function missing @example",
-      "warning",
-    );
-  }
+  validateFunctionParams(name, decl, jsDocs, filePath, line);
+  validateFunctionReturnsAndExample(name, decl, jsDocs, filePath, line);
 }
 
 function validateVariableExport(
@@ -214,33 +232,40 @@ function validateVariableExport(
 // Index.ts @internal Leak Check
 // ============================================================================
 
+function checkNamedExportForInternalLeak(
+  namedExport: ReturnType<
+    ReturnType<SourceFile["getExportDeclarations"]>[number]["getNamedExports"]
+  >[number],
+  filePath: string,
+): void {
+  const symbol = namedExport.getSymbol();
+  if (!symbol) {
+    return;
+  }
+
+  // Resolve to the original declaration
+  const declarations = symbol.getDeclarations();
+  for (const decl of declarations) {
+    const jsDocs =
+      "getJsDocs" in decl ? (decl as { getJsDocs(): JSDoc[] }).getJsDocs() : [];
+    if (hasTag(jsDocs, "@internal")) {
+      addError(
+        filePath,
+        namedExport.getStartLineNumber(),
+        namedExport.getName(),
+        "@internal symbol is re-exported from index.ts",
+      );
+    }
+  }
+}
+
 function checkInternalLeaks(sourceFile: SourceFile): void {
   const filePath = sourceFile.getFilePath();
 
   // Look through all export declarations
   for (const exportDecl of sourceFile.getExportDeclarations()) {
     for (const namedExport of exportDecl.getNamedExports()) {
-      const symbol = namedExport.getSymbol();
-      if (!symbol) {
-        continue;
-      }
-
-      // Resolve to the original declaration
-      const declarations = symbol.getDeclarations();
-      for (const decl of declarations) {
-        const jsDocs =
-          "getJsDocs" in decl
-            ? (decl as { getJsDocs(): JSDoc[] }).getJsDocs()
-            : [];
-        if (hasTag(jsDocs, "@internal")) {
-          addError(
-            filePath,
-            namedExport.getStartLineNumber(),
-            namedExport.getName(),
-            "@internal symbol is re-exported from index.ts",
-          );
-        }
-      }
+      checkNamedExportForInternalLeak(namedExport, filePath);
     }
   }
 }
@@ -249,7 +274,7 @@ function checkInternalLeaks(sourceFile: SourceFile): void {
 // Main
 // ============================================================================
 
-function main(): void {
+function setupProject(): { project: Project; entryPoints: string[] } {
   const project = new Project({
     tsConfigFilePath: path.join(ROOT, "tsconfig.base.json"),
     skipAddingFilesFromTsConfig: true,
@@ -278,6 +303,93 @@ function main(): void {
   // Resolve dependencies
   project.resolveSourceFileDependencies();
 
+  return { project, entryPoints };
+}
+
+function isValidatableSourceFile(filePath: string): boolean {
+  return (
+    !filePath.includes("__tests__") &&
+    !filePath.includes(".test.") &&
+    !filePath.includes(".spec.") &&
+    !filePath.endsWith("index.ts") &&
+    (filePath.includes("packages/core/src/") ||
+      filePath.includes("packages/ai/src/"))
+  );
+}
+
+function validateSourceFile(sf: SourceFile): void {
+  const filePath = sf.getFilePath();
+
+  // Check exported functions
+  for (const fn of sf.getFunctions()) {
+    if (!fn.isExported()) {
+      continue;
+    }
+
+    validateFunctionExport(fn.getName() ?? "<anonymous>", fn, filePath);
+  }
+
+  // Check exported variable statements (arrow functions, const objects)
+  for (const stmt of sf.getVariableStatements()) {
+    if (!stmt.isExported()) {
+      continue;
+    }
+
+    for (const decl of stmt.getDeclarations()) {
+      validateVariableExport(decl.getName(), stmt, filePath);
+    }
+  }
+}
+
+function iterateSourceFiles(project: Project): void {
+  const sourceFiles = project
+    .getSourceFiles()
+    .filter((sf) => isValidatableSourceFile(sf.getFilePath()));
+
+  for (const sf of sourceFiles) {
+    validateSourceFile(sf);
+  }
+}
+
+function renderReport(): { errorCount: number; warningCount: number } {
+  const errorCount = errors.filter((e) => e.severity === "error").length;
+  const warningCount = errors.filter((e) => e.severity === "warning").length;
+
+  if (errors.length === 0) {
+    console.log("TSDoc validation passed — no issues found.\n");
+
+    return { errorCount, warningCount };
+  }
+
+  console.log("\nTSDoc Validation Results\n");
+
+  // Group by file
+  const byFile = new Map<string, ValidationError[]>();
+  for (const err of errors) {
+    const existing = byFile.get(err.file) ?? [];
+    existing.push(err);
+    byFile.set(err.file, existing);
+  }
+
+  for (const [file, fileErrors] of byFile) {
+    console.log(`${file}:`);
+    for (const err of fileErrors) {
+      const prefix = err.severity === "error" ? "ERROR" : "WARN ";
+      console.log(`  ${prefix} L${err.line} ${err.symbol}: ${err.message}`);
+    }
+    console.log();
+  }
+
+  console.log(
+    `${errorCount} error(s), ${warningCount} warning(s) in ${byFile.size} file(s)\n`,
+  );
+
+  return { errorCount, warningCount };
+}
+
+function main(): void {
+  const { project, entryPoints } = setupProject();
+
   // Check @internal leaks from index files
   for (const entry of entryPoints) {
     const sf = project.getSourceFile(entry);
@@ -287,72 +399,10 @@ function main(): void {
   }
 
   // Validate exported functions in source files (not test files)
-  const sourceFiles = project.getSourceFiles().filter((sf) => {
-    const fp = sf.getFilePath();
-
-    return (
-      !fp.includes("__tests__") &&
-      !fp.includes(".test.") &&
-      !fp.includes(".spec.") &&
-      !fp.endsWith("index.ts") &&
-      (fp.includes("packages/core/src/") || fp.includes("packages/ai/src/"))
-    );
-  });
-
-  for (const sf of sourceFiles) {
-    const filePath = sf.getFilePath();
-
-    // Check exported functions
-    for (const fn of sf.getFunctions()) {
-      if (!fn.isExported()) {
-        continue;
-      }
-
-      validateFunctionExport(fn.getName() ?? "<anonymous>", fn, filePath);
-    }
-
-    // Check exported variable statements (arrow functions, const objects)
-    for (const stmt of sf.getVariableStatements()) {
-      if (!stmt.isExported()) {
-        continue;
-      }
-
-      for (const decl of stmt.getDeclarations()) {
-        validateVariableExport(decl.getName(), stmt, filePath);
-      }
-    }
-  }
+  iterateSourceFiles(project);
 
   // Report results
-  const errorCount = errors.filter((e) => e.severity === "error").length;
-  const warningCount = errors.filter((e) => e.severity === "warning").length;
-
-  if (errors.length > 0) {
-    console.log("\nTSDoc Validation Results\n");
-
-    // Group by file
-    const byFile = new Map<string, ValidationError[]>();
-    for (const err of errors) {
-      const existing = byFile.get(err.file) ?? [];
-      existing.push(err);
-      byFile.set(err.file, existing);
-    }
-
-    for (const [file, fileErrors] of byFile) {
-      console.log(`${file}:`);
-      for (const err of fileErrors) {
-        const prefix = err.severity === "error" ? "ERROR" : "WARN ";
-        console.log(`  ${prefix} L${err.line} ${err.symbol}: ${err.message}`);
-      }
-      console.log();
-    }
-
-    console.log(
-      `${errorCount} error(s), ${warningCount} warning(s) in ${byFile.size} file(s)\n`,
-    );
-  } else {
-    console.log("TSDoc validation passed — no issues found.\n");
-  }
+  const { errorCount } = renderReport();
 
   // Exit with error code only for hard errors, not warnings
   if (errorCount > 0) {

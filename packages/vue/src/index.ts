@@ -103,8 +103,8 @@ export function useFact(
   return _useFactSingle(system, keyOrKeys);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactSingle(
+  // biome-ignore lint/suspicious/noExplicitAny: Internal helper accepts any module shape
   system: SingleModuleSystem<any>,
   factKey: string,
 ): Ref<unknown> {
@@ -125,8 +125,8 @@ function _useFactSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactMulti(
+  // biome-ignore lint/suspicious/noExplicitAny: Internal helper accepts any module shape
   system: SingleModuleSystem<any>,
   factKeys: string[],
 ): ShallowRef<Record<string, unknown>> {
@@ -185,8 +185,8 @@ export function useDerived(
   return _useDerivedSingle(system, idOrIds);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedSingle(
+  // biome-ignore lint/suspicious/noExplicitAny: Internal helper accepts any module shape
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): Ref<unknown> {
@@ -207,8 +207,8 @@ function _useDerivedSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedMulti(
+  // biome-ignore lint/suspicious/noExplicitAny: Internal helper accepts any module shape
   system: SingleModuleSystem<any>,
   derivationIds: string[],
 ): ShallowRef<Record<string, unknown>> {
