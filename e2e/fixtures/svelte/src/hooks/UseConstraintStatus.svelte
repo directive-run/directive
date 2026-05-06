@@ -5,6 +5,7 @@ import { system } from "../system";
 const _constraints = useConstraintStatus(system);
 const _status = useFact(system, "status");
 
+// biome-ignore lint/suspicious/noExplicitAny: Svelte framework store type-erasure
 $: constraintsList = /** @type {any[]} */ ($constraints) as any[];
 $: activeCount = constraintsList.filter((c) => c.active).length;
 $: constraintCount = constraintsList.length;

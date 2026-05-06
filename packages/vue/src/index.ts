@@ -558,42 +558,55 @@ async function _useSuspenseRequirementSingle(
   return status;
 }
 
+function _findFirstStatusError(
+  statusPlugin: StatusPlugin,
+  types: string[],
+): Error | null {
+  for (const type of types) {
+    const s = statusPlugin.getStatus(type);
+    if (s.hasError && s.lastError) {
+      return s.lastError;
+    }
+  }
+
+  return null;
+}
+
+function _waitForAllSettled(
+  statusPlugin: StatusPlugin,
+  types: string[],
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onTick = () => {
+      const allDone = types.every((t) => !statusPlugin.getStatus(t).isLoading);
+      if (!allDone) return;
+      unsubscribe();
+      const err = _findFirstStatusError(statusPlugin, types);
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    };
+    const unsubscribe = statusPlugin.subscribe(onTick);
+    onScopeDispose(unsubscribe);
+  });
+}
+
 async function _useSuspenseRequirementMulti(
   statusPlugin: StatusPlugin,
   types: string[],
 ): Promise<ShallowRef<Record<string, RequirementTypeStatus>>> {
   // Check for immediate errors
-  for (const type of types) {
-    const s = statusPlugin.getStatus(type);
-    if (s.hasError && s.lastError) {
-      throw s.lastError;
-    }
+  const initialError = _findFirstStatusError(statusPlugin, types);
+  if (initialError) {
+    throw initialError;
   }
 
   // If any are loading, wait for all to settle
   const anyLoading = types.some((t) => statusPlugin.getStatus(t).isLoading);
   if (anyLoading) {
-    await new Promise<void>((resolve, reject) => {
-      const unsubscribe = statusPlugin.subscribe(() => {
-        const allDone = types.every(
-          (t) => !statusPlugin.getStatus(t).isLoading,
-        );
-        if (allDone) {
-          unsubscribe();
-          // Check for errors after settling
-          for (const type of types) {
-            const s = statusPlugin.getStatus(type);
-            if (s.hasError && s.lastError) {
-              reject(s.lastError);
-
-              return;
-            }
-          }
-          resolve();
-        }
-      });
-      onScopeDispose(unsubscribe);
-    });
+    await _waitForAllSettled(statusPlugin, types);
   }
 
   // Now settled — return a reactive ref that continues tracking
@@ -651,10 +664,12 @@ export function useExplain(
 
 /** Get all constraints */
 export function useConstraintStatus(
+  // biome-ignore lint/suspicious/noExplicitAny: Overload must work with any schema
   system: SingleModuleSystem<any>,
 ): ComputedRef<ConstraintInfo[]>;
 /** Get a single constraint by ID */
 export function useConstraintStatus(
+  // biome-ignore lint/suspicious/noExplicitAny: Overload must work with any schema
   system: SingleModuleSystem<any>,
   constraintId: string,
 ): ComputedRef<ConstraintInfo | null>;
@@ -811,30 +826,105 @@ interface UseDirectiveConfig {
  * const { facts, derived } = useDirective(counterModule, { facts: ["count"], derived: ["doubled"] });
  * ```
  */
-export function useDirective<M extends ModuleSchema>(
-  moduleDef: ModuleDef<M>,
-  config?: UseDirectiveConfig,
-) {
-  const allPlugins = [...(config?.plugins ?? [])];
+function _buildDirectivePlugins(config: UseDirectiveConfig | undefined): {
+  plugins: Plugin<unknown>[];
+  statusPlugin: StatusPlugin | undefined;
+} {
+  const plugins = [...(config?.plugins ?? [])] as Plugin<unknown>[];
   let statusPlugin: StatusPlugin | undefined;
 
   if (config?.status) {
     const sp = createRequirementStatusPlugin();
     statusPlugin = sp;
     // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
-    allPlugins.push(sp.plugin as Plugin<any>);
+    plugins.push(sp.plugin as Plugin<any>);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-  const system = createSystem({
+  return { plugins, statusPlugin };
+}
+
+function _createDirectiveSystem<M extends ModuleSchema>(
+  moduleDef: ModuleDef<M>,
+  config: UseDirectiveConfig | undefined,
+  plugins: Plugin<unknown>[],
+): SingleModuleSystem<M> {
+  const systemConfig = {
     module: moduleDef,
-    plugins: allPlugins.length > 0 ? allPlugins : undefined,
+    plugins: plugins.length > 0 ? plugins : undefined,
     trace: config?.trace,
     errorBoundary: config?.errorBoundary,
     tickMs: config?.tickMs,
     zeroConfig: config?.zeroConfig,
     initialFacts: config?.initialFacts,
-  } as any) as unknown as SingleModuleSystem<M>;
+    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
+  } as any;
+
+  return createSystem(systemConfig) as unknown as SingleModuleSystem<M>;
+}
+
+function _subscribeFacts<M extends ModuleSchema>(
+  system: SingleModuleSystem<M>,
+  factKeys: string[] | undefined,
+  subscribeAll: boolean,
+): { state: ShallowRef<InferFacts<M>>; unsubscribe: (() => void) | null } {
+  const state = shallowRef(
+    subscribeAll
+      ? (system.facts.$store.toObject() as InferFacts<M>)
+      : pickFacts(system, factKeys ?? []),
+  ) as ShallowRef<InferFacts<M>>;
+
+  if (subscribeAll) {
+    const unsubscribe = system.facts.$store.subscribeAll(() => {
+      state.value = system.facts.$store.toObject() as InferFacts<M>;
+    });
+    return { state, unsubscribe };
+  }
+
+  if (factKeys && factKeys.length > 0) {
+    const unsubscribe = system.facts.$store.subscribe(factKeys, () => {
+      state.value = pickFacts(system, factKeys) as InferFacts<M>;
+    });
+    return { state, unsubscribe };
+  }
+
+  return { state, unsubscribe: null };
+}
+
+function _subscribeDerived<M extends ModuleSchema>(
+  system: SingleModuleSystem<M>,
+  derivedKeys: string[] | undefined,
+  subscribeAll: boolean,
+): {
+  state: ShallowRef<InferDerivations<M>>;
+  unsubscribe: (() => void) | null;
+} {
+  const allDerivationKeys = subscribeAll
+    ? Object.keys(system.derive ?? {})
+    : (derivedKeys ?? []);
+  const getDerived = (): InferDerivations<M> => {
+    const result: Record<string, unknown> = {};
+    for (const key of allDerivationKeys) {
+      result[key] = system.read(key);
+    }
+    return result as InferDerivations<M>;
+  };
+  const state = shallowRef(getDerived()) as ShallowRef<InferDerivations<M>>;
+  const unsubscribe =
+    allDerivationKeys.length > 0
+      ? system.subscribe(allDerivationKeys, () => {
+          state.value = getDerived();
+        })
+      : null;
+
+  return { state, unsubscribe };
+}
+
+export function useDirective<M extends ModuleSchema>(
+  moduleDef: ModuleDef<M>,
+  config?: UseDirectiveConfig,
+) {
+  const { plugins, statusPlugin } = _buildDirectivePlugins(config);
+  const system = _createDirectiveSystem(moduleDef, config, plugins);
 
   // SSR guard: initialize facts for SSR rendering, start reconciliation only in the browser
   if (typeof window !== "undefined") {
@@ -851,40 +941,16 @@ export function useDirective<M extends ModuleSchema>(
   const derivedKeys = config?.derived;
   const subscribeAll = !factKeys && !derivedKeys;
 
-  // Subscribe to facts
-  const factsState = shallowRef(
-    subscribeAll
-      ? (system.facts.$store.toObject() as InferFacts<M>)
-      : pickFacts(system, factKeys ?? []),
+  const { state: factsState, unsubscribe: unsubFacts } = _subscribeFacts(
+    system,
+    factKeys,
+    subscribeAll,
   );
-  const unsubFacts = subscribeAll
-    ? system.facts.$store.subscribeAll(() => {
-        factsState.value = system.facts.$store.toObject() as InferFacts<M>;
-      })
-    : factKeys && factKeys.length > 0
-      ? system.facts.$store.subscribe(factKeys, () => {
-          factsState.value = pickFacts(system, factKeys) as InferFacts<M>;
-        })
-      : null;
-
-  // Subscribe to derivations
-  const allDerivationKeys = subscribeAll
-    ? Object.keys(system.derive ?? {})
-    : (derivedKeys ?? []);
-  const getDerived = (): InferDerivations<M> => {
-    const result: Record<string, unknown> = {};
-    for (const key of allDerivationKeys) {
-      result[key] = system.read(key);
-    }
-    return result as InferDerivations<M>;
-  };
-  const derivedState = shallowRef(getDerived());
-  const unsubDerived =
-    allDerivationKeys.length > 0
-      ? system.subscribe(allDerivationKeys, () => {
-          derivedState.value = getDerived();
-        })
-      : null;
+  const { state: derivedState, unsubscribe: unsubDerived } = _subscribeDerived(
+    system,
+    derivedKeys,
+    subscribeAll,
+  );
 
   onScopeDispose(() => {
     unsubFacts?.();
@@ -1037,12 +1103,12 @@ function getCreateQuerySystem() {
  * </script>
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 export function useQuerySystem<
   T extends {
     start: () => void;
     destroy: () => void;
     isRunning?: boolean;
+    // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
     [key: string]: any;
   },
 >(config: Record<string, unknown>): T {
