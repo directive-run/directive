@@ -38,6 +38,9 @@ website/
 .claude/
 .claude-plugin/
 
+# Git worktrees (sz CLI parallel-dev slots)
+worktrees/
+
 # Playwright
 playwright-report/
 test-results/
