@@ -1,5 +1,13 @@
 # @directive-run/example-dynamic-modules
 
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@2.0.0
+  - @directive-run/el@2.0.0
+
 ## 0.0.24
 
 ### Patch Changes

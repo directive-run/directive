@@ -1,10 +1,18 @@
 # @directive-run/optimistic changelog
 
+## 1.0.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@2.0.0
+
 ## 0.1.0 — 2026-04-29
 
 Initial release.
 
 ### Added
+
 - `createSnapshot(facts, keys)` — captures the current values of selected
   fact keys; returns a `restore` function that writes them back. Deep
   clone via `structuredClone` (Node 17+ / modern browsers). On clone
@@ -21,6 +29,7 @@ Initial release.
   Composes with `@directive-run/mutator` for full optimistic-UI flows.
 
 ### Scope (intentional)
+
 - Resolver-scope only. Not a system-wide transaction primitive. Not a
   cross-module rollback. Not a replay-undo.
 - Relies on `structuredClone` availability (Node 17+ / modern
@@ -29,6 +38,7 @@ Initial release.
   mis-restore.
 
 ### Why the 0.x version
+
 The API surface (HOC vs context-method vs explicit createSnapshot) needs
 ≥3 external consumers before settling. v1.0 ships when the wrapper
 shape is validated by real-world use.

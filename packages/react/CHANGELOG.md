@@ -1,5 +1,13 @@
 # @directive-run/react
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`f2b306b`](https://github.com/directive-run/directive/commit/f2b306b86ea9df3820fedd7513d9b1e9f065524d)]:
+  - @directive-run/query@2.0.0
+  - @directive-run/core@2.0.0
+
 ## 1.3.0
 
 ## 1.1.2

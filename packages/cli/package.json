@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/cli",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -73,7 +73,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "@directive-run/timeline": "^0.2.0"
+    "@directive-run/timeline": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@directive-run/timeline": {

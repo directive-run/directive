@@ -1,5 +1,12 @@
 # @directive-run/ai
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@2.0.0
+
 ## 1.3.0
 
 ## 1.1.2

@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/optimistic",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Resolver-scope optimistic update + automatic rollback for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -52,7 +52,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^1.2.0"
+    "@directive-run/core": "^2.0.0"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",
