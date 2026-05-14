@@ -49,6 +49,7 @@ test-results/
 packages/knowledge/api-skeleton.md
 packages/knowledge/examples/
 packages/claude-plugin/skills/*/api-skeleton.md
+packages/claude-plugin/skills/*/examples.md
 
 # Reference materials (third-party code, not for redistribution)
 .references/
