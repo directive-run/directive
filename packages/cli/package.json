@@ -73,7 +73,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "@directive-run/timeline": "^0.2.0"
+    "@directive-run/timeline": ">=0.2.0 <1.0.0"
   },
   "peerDependenciesMeta": {
     "@directive-run/timeline": {
