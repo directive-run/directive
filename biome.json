@@ -70,7 +70,10 @@
       ".turbo",
       "test-results",
       ".vercel",
-      "*.tsbuildinfo"
+      "*.tsbuildinfo",
+      "worktrees",
+      "packages/knowledge/examples",
+      "packages/claude-plugin/skills/*/examples.md"
     ]
   },
   "overrides": [

@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # Opt into Node 24 for JavaScript actions ahead of GH's 2026-06-02
+  # forced flip; lets us keep current pinned SHAs (Node 20-era) running
+  # until the action authors ship Node 24 releases.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
