@@ -124,12 +124,12 @@ system.subscribe(allKeys, render);
 // Controls
 // ============================================================================
 
-function sendMessage(text: string) {
+async function sendMessage(text: string) {
   if (!text.trim()) {
     return;
   }
 
-  const msg = analyzeMessage(text);
+  const msg = await analyzeMessage(text);
   const messages = [...system.facts.messages, msg];
   system.facts.messages = messages;
 }
