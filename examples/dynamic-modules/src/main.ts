@@ -6,9 +6,9 @@
  * Uses subscribeModule for per-namespace reactivity.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   type EventLogEntry,
   dashboardModule,
@@ -93,7 +93,11 @@ function render(): void {
   // --- Widgets area ---
   if (loaded.length === 0) {
     widgetsArea.replaceChildren(
-      el("div", { className: "dm-widgets-empty" }, "Load a module to get started"),
+      el(
+        "div",
+        { className: "dm-widgets-empty" },
+        "Load a module to get started",
+      ),
     );
   } else {
     widgetsArea.replaceChildren();
@@ -119,7 +123,11 @@ function renderCounterWidget(): void {
   const step = facts.step;
   const isNearMax = derive.isNearMax;
 
-  const decrementBtn = el("button", { className: "dm-btn dm-btn-sm" }, "\u2212");
+  const decrementBtn = el(
+    "button",
+    { className: "dm-btn dm-btn-sm" },
+    "\u2212",
+  );
   decrementBtn.dataset.testid = "dm-counter-decrement";
 
   const incrementBtn = el("button", { className: "dm-btn dm-btn-sm" }, "+");
@@ -133,16 +141,33 @@ function renderCounterWidget(): void {
   }) as HTMLInputElement;
   stepInput.dataset.testid = "dm-counter-step";
 
-  const counterDisplay = el("div", { className: "dm-counter-display" }, String(count));
+  const counterDisplay = el(
+    "div",
+    { className: "dm-counter-display" },
+    String(count),
+  );
   counterDisplay.dataset.testid = "dm-counter-value";
 
-  const card = el("div", { className: "dm-widget-card counter" },
+  const card = el(
+    "div",
+    { className: "dm-widget-card counter" },
     el("div", { className: "dm-widget-header" }, "Counter"),
-    el("div", { className: "dm-widget-body" },
+    el(
+      "div",
+      { className: "dm-widget-body" },
       counterDisplay,
-      isNearMax ? el("div", { className: "dm-counter-near-max" }, "Near max (100)") : null,
-      el("div", { className: "dm-counter-controls" }, decrementBtn, incrementBtn),
-      el("div", { className: "dm-step-row" },
+      isNearMax
+        ? el("div", { className: "dm-counter-near-max" }, "Near max (100)")
+        : null,
+      el(
+        "div",
+        { className: "dm-counter-controls" },
+        decrementBtn,
+        incrementBtn,
+      ),
+      el(
+        "div",
+        { className: "dm-step-row" },
         el("span", "Step"),
         stepInput,
         el("span", { className: "dm-step-val" }, String(step)),
@@ -177,13 +202,19 @@ function renderWeatherWidget(): void {
 
   let weatherBody: HTMLElement;
   if (isLoading) {
-    weatherBody = el("div", { className: "dm-weather-loading" }, "Fetching weather...");
+    weatherBody = el(
+      "div",
+      { className: "dm-weather-loading" },
+      "Fetching weather...",
+    );
   } else if (!hasFetched) {
     weatherBody = el("div", { className: "dm-weather-empty" }, "Enter a city");
   } else {
     const summaryEl = el("div", { className: "dm-weather-temp" }, summary);
     summaryEl.dataset.testid = "dm-weather-summary";
-    weatherBody = el("div", { className: "dm-weather-data" },
+    weatherBody = el(
+      "div",
+      { className: "dm-weather-data" },
       summaryEl,
       el("div", { className: "dm-weather-humidity" }, `Humidity: ${humidity}%`),
     );
@@ -204,15 +235,23 @@ function renderWeatherWidget(): void {
   }) as HTMLInputElement;
   cityInput.dataset.testid = "dm-weather-city";
 
-  const refreshBtn = el("button", {
-    className: "dm-btn dm-btn-sm dm-btn-secondary",
-    disabled: !hasFetched,
-  }, "Refresh");
+  const refreshBtn = el(
+    "button",
+    {
+      className: "dm-btn dm-btn-sm dm-btn-secondary",
+      disabled: !hasFetched,
+    },
+    "Refresh",
+  );
   refreshBtn.dataset.testid = "dm-weather-refresh";
 
-  const card = el("div", { className: "dm-widget-card weather" },
+  const card = el(
+    "div",
+    { className: "dm-widget-card weather" },
     el("div", { className: "dm-widget-header" }, "Weather"),
-    el("div", { className: "dm-widget-body" },
+    el(
+      "div",
+      { className: "dm-widget-body" },
       el("div", { className: "dm-weather-input-row" }, cityInput, refreshBtn),
       weatherBody,
     ),
@@ -267,9 +306,13 @@ function renderDiceWidget(): void {
   const rollBtn = el("button", { className: "dm-btn dm-btn-sm" }, "Roll");
   rollBtn.dataset.testid = "dm-dice-roll";
 
-  const card = el("div", { className: "dm-widget-card dice" },
+  const card = el(
+    "div",
+    { className: "dm-widget-card dice" },
     el("div", { className: "dm-widget-header" }, "Dice"),
-    el("div", { className: "dm-widget-body" },
+    el(
+      "div",
+      { className: "dm-widget-body" },
       el("div", { className: "dm-dice-faces" }, die1Span, die2Span),
       el("div", { className: "dm-dice-info" }, totalSpan, doublesEl),
       el("div", { className: "dm-dice-roll-count" }, `Rolls: ${rollCount}`),
@@ -324,7 +367,9 @@ function renderTimeline(eventLog: EventLogEntry[]): void {
     });
 
     entries.push(
-      el("div", { className: `dm-timeline-entry ${entryClass}` },
+      el(
+        "div",
+        { className: `dm-timeline-entry ${entryClass}` },
         el("span", { className: "dm-timeline-time" }, timeStr),
         el("span", { className: "dm-timeline-event" }, entry.event),
         el("span", { className: "dm-timeline-detail" }, entry.detail),

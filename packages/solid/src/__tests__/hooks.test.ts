@@ -1,29 +1,29 @@
-import { createRoot } from "solid-js";
 import {
   createModule,
-  createSystem,
   createRequirementStatusPlugin,
+  createSystem,
   t,
 } from "@directive-run/core";
 import type { SingleModuleSystem } from "@directive-run/core";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createRoot } from "solid-js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  useFact,
+  createDerivedSignal,
+  createFactSignal,
+  useConstraintStatus,
   useDerived,
+  useDirective,
   useDispatch,
   useEvents,
-  useSelector,
-  useWatch,
-  useInspect,
-  useRequirementStatus,
-  useSuspenseRequirement,
   useExplain,
-  useConstraintStatus,
-  useOptimisticUpdate,
+  useFact,
   useHistory,
-  useDirective,
-  createFactSignal,
-  createDerivedSignal,
+  useInspect,
+  useOptimisticUpdate,
+  useRequirementStatus,
+  useSelector,
+  useSuspenseRequirement,
+  useWatch,
 } from "../index";
 
 // ============================================================================
@@ -268,7 +268,10 @@ describe("useSelector", () => {
     let dispose: () => void;
     createRoot((_dispose) => {
       dispose = _dispose;
-      const tripled = useSelector(system, (state) => (state.count as number) * 3);
+      const tripled = useSelector(
+        system,
+        (state) => (state.count as number) * 3,
+      );
 
       expect(tripled()).toBe(0);
     });
@@ -452,7 +455,10 @@ describe("useEvents", () => {
 
   it("calling events updates the system", () => {
     let dispose: () => void;
-    let events: { increment: () => void; setName: (payload: { name: string }) => void };
+    let events: {
+      increment: () => void;
+      setName: (payload: { name: string }) => void;
+    };
     let count: () => number | undefined;
     createRoot((_dispose) => {
       dispose = _dispose;

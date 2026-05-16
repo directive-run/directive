@@ -3,7 +3,7 @@
  */
 
 import { createModule, createSystem, t } from "@directive-run/core";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bind, bindText, mount } from "../bind.js";
 import { el } from "../el.js";
 
@@ -119,9 +119,11 @@ describe("bind()", () => {
 
   it("returns a cleanup function that unsubscribes", () => {
     const span = el("span");
-    const updater = vi.fn((el: HTMLSpanElement, facts: Record<string, unknown>) => {
-      el.textContent = `${facts.count}`;
-    });
+    const updater = vi.fn(
+      (el: HTMLSpanElement, facts: Record<string, unknown>) => {
+        el.textContent = `${facts.count}`;
+      },
+    );
 
     const cleanup = bind(system, span, updater);
 
@@ -265,9 +267,7 @@ describe("mount()", () => {
     const container = el("div");
 
     mount(system, container, (facts) => {
-      return [
-        el("span", {}, `Count: ${facts.count}`),
-      ];
+      return [el("span", {}, `Count: ${facts.count}`)];
     });
 
     expect(container.children.length).toBe(1);
@@ -320,10 +320,7 @@ describe("mount()", () => {
         return [el("p", {}, "Empty state")];
       }
 
-      return [
-        el("h2", {}, "Results"),
-        el("span", {}, `${count} items`),
-      ];
+      return [el("h2", {}, "Results"), el("span", {}, `${count} items`)];
     });
 
     expect(container.children.length).toBe(1);

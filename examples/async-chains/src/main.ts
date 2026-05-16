@@ -8,9 +8,9 @@
  * controls, and event timeline.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin, loggingPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   authModule,
   authSchema,
@@ -325,7 +325,11 @@ function render(): void {
 function renderTimeline(): void {
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "ac-timeline-empty" }, "Events will appear here after starting the chain"),
+      el(
+        "div",
+        { className: "ac-timeline-empty" },
+        "Events will appear here after starting the chain",
+      ),
     );
 
     return;
@@ -343,7 +347,9 @@ function renderTimeline(): void {
     });
 
     entries.push(
-      el("div", { className: `ac-timeline-entry ${entry.module}` },
+      el(
+        "div",
+        { className: `ac-timeline-entry ${entry.module}` },
         el("span", { className: "ac-timeline-time" }, timeStr),
         el("span", { className: "ac-timeline-module" }, entry.module),
         el("span", { className: "ac-timeline-event" }, entry.event),

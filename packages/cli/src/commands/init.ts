@@ -1,6 +1,6 @@
-import * as p from "@clack/prompts";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { CLI_NAME } from "../lib/constants.js";
 

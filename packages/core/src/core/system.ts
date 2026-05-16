@@ -352,11 +352,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
   // Dev-mode warning: tickMs set without tick event handler
-  if (
-    isDevelopment &&
-    options.tickMs &&
-    options.tickMs > 0
-  ) {
+  if (isDevelopment && options.tickMs && options.tickMs > 0) {
     const hasTickHandler = flatModules.some(
       (m) =>
         m.events &&
@@ -933,10 +929,7 @@ function warnIfNotStarted(
   // biome-ignore lint/suspicious/noExplicitAny: System type
   system: any,
 ): void {
-  if (
-    isDevelopment &&
-    process.env.NODE_ENV !== "test"
-  ) {
+  if (isDevelopment && process.env.NODE_ENV !== "test") {
     setTimeout(() => {
       if (!system.isRunning && !system.isInitialized) {
         console.warn(

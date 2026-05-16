@@ -508,9 +508,9 @@ describe("createGeminiStreamingRunner", () => {
     });
 
     const agent = mockAgent();
-    await expect(
-      streamingRunner(agent, "test", {}),
-    ).rejects.toThrow(/streaming error 500/i);
+    await expect(streamingRunner(agent, "test", {})).rejects.toThrow(
+      /streaming error 500/i,
+    );
 
     expect(onError).toHaveBeenCalledOnce();
     expect(onError.mock.calls[0]![0]).toEqual(
@@ -525,9 +525,7 @@ describe("createGeminiStreamingRunner", () => {
   it("throws when response has no body", async () => {
     const mockFetch = vi
       .fn()
-      .mockResolvedValue(
-        new Response(null, { status: 200, statusText: "OK" }),
-      );
+      .mockResolvedValue(new Response(null, { status: 200, statusText: "OK" }));
 
     const streamingRunner = createGeminiStreamingRunner({
       apiKey: "test-key",

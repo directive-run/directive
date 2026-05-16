@@ -161,20 +161,34 @@ function render(): void {
       classNames.push("ou-item-rollback");
     }
 
-    const itemEl = el("div", { className: classNames.join(" ") } as any,
+    const itemEl = el(
+      "div",
+      { className: classNames.join(" ") } as any,
       el("input", {
         type: "checkbox",
         className: "ou-todo-checkbox",
         checked: item.done,
         disabled: isPending,
-        dataset: { testid: `ou-toggle-${item.id}`, action: "toggle", id: item.id },
+        dataset: {
+          testid: `ou-toggle-${item.id}`,
+          action: "toggle",
+          id: item.id,
+        },
       } as any),
       el("span", { className: "ou-todo-text" }, item.text),
-      el("button", {
-        className: "ou-todo-delete",
-        disabled: isPending,
-        dataset: { testid: `ou-delete-${item.id}`, action: "delete", id: item.id },
-      } as any, "\u{1F5D1}"),
+      el(
+        "button",
+        {
+          className: "ou-todo-delete",
+          disabled: isPending,
+          dataset: {
+            testid: `ou-delete-${item.id}`,
+            action: "delete",
+            id: item.id,
+          },
+        } as any,
+        "\u{1F5D1}",
+      ),
     );
 
     itemEl.setAttribute("data-testid", `ou-item-${item.id}`);
@@ -219,7 +233,11 @@ function render(): void {
   // --- Timeline ---
   if (eventLog.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "ou-timeline-empty" }, "Events will appear here after actions"),
+      el(
+        "div",
+        { className: "ou-timeline-empty" },
+        "Events will appear here after actions",
+      ),
     );
   } else {
     const entries = [];
@@ -233,7 +251,9 @@ function render(): void {
       });
 
       entries.push(
-        el("div", { className: `ou-timeline-entry ${entry.event}` },
+        el(
+          "div",
+          { className: `ou-timeline-entry ${entry.event}` },
           el("span", { className: "ou-timeline-time" }, timeStr),
           el("span", { className: "ou-timeline-event" }, entry.event),
           el("span", { className: "ou-timeline-detail" }, entry.detail),

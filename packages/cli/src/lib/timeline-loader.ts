@@ -27,7 +27,7 @@ export type TimelineModule = typeof Timeline;
  * error to stderr for debugging.
  */
 export async function loadTimelinePackage(
-  verbose: boolean = false,
+  verbose = false,
 ): Promise<TimelineModule> {
   try {
     return (await import("@directive-run/timeline")) as TimelineModule;

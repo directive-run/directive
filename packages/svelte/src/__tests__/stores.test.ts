@@ -1,7 +1,7 @@
 import { createModule, createSystem, t } from "@directive-run/core";
 import { createRequirementStatusPlugin } from "@directive-run/core";
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ============================================================================
 // Mock Svelte lifecycle
@@ -72,26 +72,26 @@ function runDestroyCallbacks() {
 
 // Import AFTER mocks are defined
 import {
-  createFactStore,
   createDerivedStore,
   createDerivedsStore,
+  createFactStore,
   createInspectStore,
-  useFact,
+  createTypedHooks,
+  shallowEqual,
+  useConstraintStatus,
   useDerived,
-  useSelector,
+  useDirective,
   useDispatch,
   useEvents,
-  useWatch,
-  useInspect,
-  useRequirementStatus,
   useExplain,
-  useConstraintStatus,
-  useOptimisticUpdate,
+  useFact,
   useHistory,
-  useDirective,
-  createTypedHooks,
+  useInspect,
   useNamespacedSelector,
-  shallowEqual,
+  useOptimisticUpdate,
+  useRequirementStatus,
+  useSelector,
+  useWatch,
 } from "../index";
 
 // ============================================================================
@@ -146,7 +146,9 @@ function createTestSystem() {
 type TestSystem = ReturnType<typeof createTestSystem>;
 
 /** Helper: subscribe to a Svelte readable and return { getValue, unsubscribe } */
-function subscribeToStore<T>(store: { subscribe: (fn: (v: T) => void) => () => void }) {
+function subscribeToStore<T>(store: {
+  subscribe: (fn: (v: T) => void) => () => void;
+}) {
   let value: T;
   const unsubscribe = store.subscribe((v) => {
     value = v;
@@ -1093,8 +1095,15 @@ describe("useHistory", () => {
 
   it("returns null when history is disabled", () => {
     const mod = createModule("tt-disabled", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
     const system = createSystem({ module: mod });
     system.start();
@@ -1110,8 +1119,15 @@ describe("useHistory", () => {
 
   it("returns HistoryState when enabled", () => {
     const mod = createModule("tt-enabled", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
     const system = createSystem({
       module: mod,
@@ -1137,8 +1153,15 @@ describe("useHistory", () => {
 
   it("provides history API methods", () => {
     const mod = createModule("tt-api", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
     const system = createSystem({
       module: mod,
@@ -1186,8 +1209,12 @@ describe("useDirective", () => {
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = facts.count + 1; },
-        setName: (facts, { name }: { name: string }) => { facts.name = name; },
+        increment: (facts) => {
+          facts.count = facts.count + 1;
+        },
+        setName: (facts, { name }: { name: string }) => {
+          facts.name = name;
+        },
       },
     });
 
@@ -1213,8 +1240,12 @@ describe("useDirective", () => {
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = facts.count + 1; },
-        setName: (facts, { name }: { name: string }) => { facts.name = name; },
+        increment: (facts) => {
+          facts.count = facts.count + 1;
+        },
+        setName: (facts, { name }: { name: string }) => {
+          facts.name = name;
+        },
       },
     });
 
@@ -1243,8 +1274,12 @@ describe("useDirective", () => {
         greeting: (facts) => `Hi, ${facts.name}!`,
       },
       events: {
-        increment: (facts) => { facts.count = facts.count + 1; },
-        setName: (facts, { name }: { name: string }) => { facts.name = name; },
+        increment: (facts) => {
+          facts.count = facts.count + 1;
+        },
+        setName: (facts, { name }: { name: string }) => {
+          facts.name = name;
+        },
       },
     });
 
@@ -1262,8 +1297,15 @@ describe("useDirective", () => {
 
   it("registers onDestroy for cleanup", () => {
     const mod = createModule("directive-cleanup", {
-      schema: { facts: { x: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (facts) => { facts.x = 0; },
+      schema: {
+        facts: { x: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
     });
 
     const before = destroyCallbacks.length;
@@ -1349,7 +1391,9 @@ describe("useNamespacedSelector", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.count = 0; },
+      init: (facts) => {
+        facts.count = 0;
+      },
     });
 
     const mod2 = createModule("user", {
@@ -1359,7 +1403,9 @@ describe("useNamespacedSelector", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.name = "Alice"; },
+      init: (facts) => {
+        facts.name = "Alice";
+      },
     });
 
     const system = createSystem({
@@ -1392,7 +1438,9 @@ describe("useNamespacedSelector", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.value = 100; },
+      init: (facts) => {
+        facts.value = 100;
+      },
     });
 
     const system = createSystem({
@@ -1429,7 +1477,9 @@ describe("useNamespacedSelector", () => {
         events: {},
         requirements: {},
       },
-      init: (facts) => { facts.v = 0; },
+      init: (facts) => {
+        facts.v = 0;
+      },
     });
 
     const system = createSystem({

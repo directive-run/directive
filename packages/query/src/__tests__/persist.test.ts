@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { persistQueryCache } from "../persist";
 
 // Mock storage
@@ -39,7 +39,11 @@ describe("persistQueryCache", () => {
   it("saves query states to storage on fact change", () => {
     const plugin = persistQueryCache({ storage, key: "cache" });
     const system = createMockSystem({
-      _q_user_state: { status: "success", data: { id: 1 }, dataUpdatedAt: 1000 },
+      _q_user_state: {
+        status: "success",
+        data: { id: 1 },
+        dataUpdatedAt: 1000,
+      },
       _q_user_key: '{"id":"1"}',
     });
 

@@ -28,11 +28,7 @@
  * ```
  */
 
-import type {
-  ModuleSchema,
-  Requirement,
-  System,
-} from "@directive-run/core";
+import type { ModuleSchema, Requirement, System } from "@directive-run/core";
 import { createModule, createSystem, t } from "@directive-run/core";
 import {
   createCallbackPlugin,
@@ -150,7 +146,15 @@ import { safeStringify } from "@directive-run/core/internals";
 // ============================================================================
 
 export * from "./orchestrator-types.js";
-export { Semaphore, shallowEqual, getPatternStep, getCheckpointProgress, diffCheckpoints, forkFromCheckpoint, validateDagAcyclic } from "./orchestrator-utils.js";
+export {
+  Semaphore,
+  shallowEqual,
+  getPatternStep,
+  getCheckpointProgress,
+  diffCheckpoints,
+  forkFromCheckpoint,
+  validateDagAcyclic,
+} from "./orchestrator-utils.js";
 
 // ============================================================================
 // Internal imports from extracted modules (used by createMultiAgentOrchestrator)
@@ -164,8 +168,8 @@ import type {
   ExecutionPattern,
   HandoffRequest,
   HandoffResult,
-  MultiAgentOrchestratorOptions,
   MultiAgentOrchestrator,
+  MultiAgentOrchestratorOptions,
   MultiAgentRunCallOptions,
   MultiAgentState,
   ParallelPattern,
@@ -179,7 +183,12 @@ import type {
   TaskContext,
   TaskRegistration,
 } from "./orchestrator-types.js";
-import { Semaphore, shallowEqual, validateDagAcyclic, getPatternStep } from "./orchestrator-utils.js";
+import {
+  Semaphore,
+  getPatternStep,
+  shallowEqual,
+  validateDagAcyclic,
+} from "./orchestrator-utils.js";
 
 /** Built-in pause requirement type */
 interface PauseBudgetExceededReq extends Requirement {

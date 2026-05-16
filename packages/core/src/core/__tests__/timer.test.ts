@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { virtualClock } from "../clock.js";
 import {
-  initialTimerState,
-  elapsedMs,
-  remainingMs,
-  startTimer,
-  pauseTimer,
-  resumeTimer,
-  resetTimer,
   completeTimer,
+  elapsedMs,
+  initialTimerState,
+  pauseTimer,
   registerRepeat,
+  remainingMs,
+  resetTimer,
+  resumeTimer,
+  startTimer,
   tickTimer,
   timerOps,
 } from "../timer.js";

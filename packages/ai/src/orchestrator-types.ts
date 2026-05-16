@@ -6,19 +6,22 @@
 // and type re-exports that define the orchestrator's public API surface.
 // ============================================================================
 
-import type {
-  Plugin,
-  Requirement,
-  System,
-} from "@directive-run/core";
+import type { Plugin, Requirement, System } from "@directive-run/core";
 import type { CircuitBreaker } from "@directive-run/core/plugins";
+import type { OrchestratorStreamResult } from "./agent-orchestrator.js";
 import type {
-  OrchestratorStreamResult,
-} from "./agent-orchestrator.js";
+  BreakpointConfig,
+  BreakpointModifications,
+  BreakpointRequest,
+  MultiAgentBreakpointType,
+} from "./breakpoints.js";
+import type { Checkpoint, CheckpointStore } from "./checkpoint.js";
 import type { DebugTimeline } from "./debug-timeline.js";
 import type { HealthMonitor } from "./health-monitor.js";
 import type { AgentMemory } from "./memory.js";
 import type { ReflectionEvaluation } from "./reflection.js";
+import type { MultiplexedStreamResult } from "./streaming.js";
+import type { SafeParseable } from "./structured-output.js";
 import type {
   AgentLike,
   AgentRetryConfig,
@@ -52,22 +55,6 @@ import type {
   SupervisorCheckpointState,
   ToolCallGuardrailData,
 } from "./types.js";
-import type {
-  BreakpointConfig,
-  BreakpointModifications,
-  BreakpointRequest,
-  MultiAgentBreakpointType,
-} from "./breakpoints.js";
-import type {
-  Checkpoint,
-  CheckpointStore,
-} from "./checkpoint.js";
-import type {
-  MultiplexedStreamResult,
-} from "./streaming.js";
-import type {
-  SafeParseable,
-} from "./structured-output.js";
 
 // ============================================================================
 // Agent Registry Types

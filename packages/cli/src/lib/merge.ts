@@ -30,7 +30,5 @@ export function mergeSection(
  * Check if content already has a Directive section.
  */
 export function hasDirectiveSection(content: string): boolean {
-  return (
-    content.includes(SECTION_START) && content.includes(SECTION_END)
-  );
+  return content.includes(SECTION_START) && content.includes(SECTION_END);
 }

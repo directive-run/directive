@@ -5,9 +5,9 @@
  * and renders the chat UI + guardrail log + stats to the DOM.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import { topicGuardModule, topicGuardSchema } from "./topic-guard.js";
 
 // ============================================================================
@@ -72,16 +72,26 @@ function render(): void {
   // Messages
   if (messages.length === 0) {
     messagesEl.replaceChildren(
-      el("div", { className: "tg-empty-state" }, "Send a message to see guardrails in action"),
+      el(
+        "div",
+        { className: "tg-empty-state" },
+        "Send a message to see guardrails in action",
+      ),
     );
   } else {
     messagesEl.replaceChildren(
       ...messages.map((msg, i) => {
         const className = `tg-message ${msg.role}${msg.blocked ? " blocked" : ""}`;
-        const msgEl = el("div", { className },
+        const msgEl = el(
+          "div",
+          { className },
           msg.text,
           msg.blocked && msg.guardrail
-            ? el("div", { className: "tg-guardrail-badge" }, `${msg.guardrail} guardrail`)
+            ? el(
+                "div",
+                { className: "tg-guardrail-badge" },
+                `${msg.guardrail} guardrail`,
+              )
             : null,
         );
         msgEl.dataset.testid = `topic-guard-message-${i}`;
@@ -113,13 +123,19 @@ function render(): void {
       const resultClass = entry.result.blocked ? "blocked" : "allowed";
 
       entries.push(
-        el("div", { className: `tg-log-entry ${resultClass}` },
+        el(
+          "div",
+          { className: `tg-log-entry ${resultClass}` },
           el("div", { className: "tg-log-time" }, timeStr),
           el("span", { className: "tg-log-input" }, truncate(entry.input, 40)),
-          el("span", { className: `tg-log-result ${resultClass}` },
+          el(
+            "span",
+            { className: `tg-log-result ${resultClass}` },
             entry.result.blocked ? "\u2715 Blocked" : "\u2713 Allowed",
           ),
-          el("span", { className: "tg-log-guardrail" },
+          el(
+            "span",
+            { className: "tg-log-guardrail" },
             `${entry.result.guardrailName} \u2014 ${entry.result.reason}`,
           ),
         ),

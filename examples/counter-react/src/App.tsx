@@ -1,4 +1,4 @@
-import { useFact, useDerived, useEvents } from "@directive-run/react";
+import { useDerived, useEvents, useFact } from "@directive-run/react";
 import { system } from "./module";
 
 system.start();
@@ -9,9 +9,18 @@ export default function App() {
   const events = useEvents(system);
 
   return (
-    <div style={{ fontFamily: "system-ui", maxWidth: 400, margin: "40px auto", textAlign: "center" }}>
+    <div
+      style={{
+        fontFamily: "system-ui",
+        maxWidth: 400,
+        margin: "40px auto",
+        textAlign: "center",
+      }}
+    >
       <h1>Counter (React)</h1>
-      <p style={{ fontSize: "3rem", fontWeight: "bold", margin: "20px 0" }}>{count}</p>
+      <p style={{ fontSize: "3rem", fontWeight: "bold", margin: "20px 0" }}>
+        {count}
+      </p>
       <p style={{ color: "#666", marginBottom: 20 }}>Doubled: {doubled}</p>
       <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
         <button onClick={() => events.decrement()}>-</button>

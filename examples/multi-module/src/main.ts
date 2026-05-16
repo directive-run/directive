@@ -38,7 +38,11 @@ function updateUI() {
       : "unauthenticated";
 
   const welcomeSpan = facts.auth.user
-    ? (() => { const s = el("span", `Welcome, ${facts.auth.user.name}!`); s.style.marginLeft = "0.5rem"; return s; })()
+    ? (() => {
+        const s = el("span", `Welcome, ${facts.auth.user.name}!`);
+        s.style.marginLeft = "0.5rem";
+        return s;
+      })()
     : null;
   authStatusEl.replaceChildren(
     el("span", { className: `status ${authStatus}` }, authStatus),
@@ -58,20 +62,34 @@ function updateUI() {
         ? "success"
         : "idle";
 
-  const statusClass = dataStatus === "success" ? "authenticated" : dataStatus === "error" ? "unauthenticated" : "loading";
-  const usersSpan = facts.data.users.length > 0
-    ? (() => { const s = el("span", `${facts.data.users.length} users loaded`); s.style.marginLeft = "0.5rem"; return s; })()
-    : null;
+  const statusClass =
+    dataStatus === "success"
+      ? "authenticated"
+      : dataStatus === "error"
+        ? "unauthenticated"
+        : "loading";
+  const usersSpan =
+    facts.data.users.length > 0
+      ? (() => {
+          const s = el("span", `${facts.data.users.length} users loaded`);
+          s.style.marginLeft = "0.5rem";
+          return s;
+        })()
+      : null;
   dataStatusEl.replaceChildren(
     el("span", { className: `status ${statusClass}` }, dataStatus),
     ...(usersSpan ? [usersSpan] : []),
-    ...(facts.data.error ? [el("div", { className: "error" }, facts.data.error)] : []),
+    ...(facts.data.error
+      ? [el("div", { className: "error" }, facts.data.error)]
+      : []),
   );
 
   // User list
   if (facts.data.users.length > 0) {
     userListEl.replaceChildren(
-      el("ul", { className: "user-list" },
+      el(
+        "ul",
+        { className: "user-list" },
         facts.data.users.map((u) =>
           el("li", el("strong", u.name), ` - ${u.department}`),
         ),
@@ -96,8 +114,17 @@ function updateUI() {
   if (notifications.length > 0) {
     uiNotificationEl.replaceChildren(
       ...notifications.map((n) => {
-        const notifClass = n.type === "success" ? "authenticated" : n.type === "error" ? "unauthenticated" : "loading";
-        const notifEl = el("div", { className: `status ${notifClass}` }, n.message);
+        const notifClass =
+          n.type === "success"
+            ? "authenticated"
+            : n.type === "error"
+              ? "unauthenticated"
+              : "loading";
+        const notifEl = el(
+          "div",
+          { className: `status ${notifClass}` },
+          n.message,
+        );
         notifEl.style.marginBottom = "0.5rem";
         notifEl.style.display = "block";
 

@@ -1,11 +1,15 @@
-// @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "@directive-run/core";
 import { flushAsync } from "@directive-run/core/testing";
+// @vitest-environment node
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  type ReplayableSystem,
+  type SerializedTimeline,
+  bisectTimeline,
   clearAllTimelines,
   clearTimeline,
   deserializeTimeline,
+  diffTimelines,
   formatTimeline,
   getTimeline,
   recordTimeline,
@@ -13,10 +17,6 @@ import {
   serializeTimeline,
   setRegistryCap,
   withTimeline,
-  bisectTimeline,
-  diffTimelines,
-  type SerializedTimeline,
-  type ReplayableSystem,
 } from "../index.js";
 
 interface CounterDeps {
@@ -109,9 +109,19 @@ describe("@directive-run/timeline", () => {
     const timeline = getTimeline("fact-prev-next")!;
     const factChanges = timeline.frames
       .filter((f) => f.event.type === "fact.change")
-      .map((f) => f.event as { type: "fact.change"; key: string; prev: unknown; next: unknown });
+      .map(
+        (f) =>
+          f.event as {
+            type: "fact.change";
+            key: string;
+            prev: unknown;
+            next: unknown;
+          },
+      );
 
-    const countChange = factChanges.find((c) => c.key === "count" && c.next === 42);
+    const countChange = factChanges.find(
+      (c) => c.key === "count" && c.next === 42,
+    );
     expect(countChange).toBeDefined();
     expect(countChange!.prev).toBe(0);
 
@@ -316,7 +326,12 @@ describe("@directive-run/timeline", () => {
       deserializeTimeline({ version: 1, id: 123, startedAtMs: 0, frames: [] }),
     ).toThrow(/id must be a string/);
     expect(() =>
-      deserializeTimeline({ version: 1, id: "x", startedAtMs: 0, frames: "no" }),
+      deserializeTimeline({
+        version: 1,
+        id: "x",
+        startedAtMs: 0,
+        frames: "no",
+      }),
     ).toThrow(/frames must be an array/);
   });
 
@@ -690,11 +705,19 @@ describe("R2.A bisectTimeline", () => {
     expect(found.noFailureFound).toBe(false);
     expect(found.firstFailingFrameIndex).toBe(3);
 
-    const noFailure = await bisectTimeline(tl, () => counting(), () => true);
+    const noFailure = await bisectTimeline(
+      tl,
+      () => counting(),
+      () => true,
+    );
     expect(noFailure.kind).toBe("no-failure");
     expect(noFailure.noFailureFound).toBe(true);
 
-    const empty = await bisectTimeline(tl, () => counting(), () => false);
+    const empty = await bisectTimeline(
+      tl,
+      () => counting(),
+      () => false,
+    );
     expect(empty.kind).toBe("fails-on-empty");
     expect(empty.failsOnEmptyReplay).toBe(true);
 

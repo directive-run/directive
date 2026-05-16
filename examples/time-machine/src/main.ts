@@ -99,7 +99,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "tm-timeline-empty" }, "Events appear after drawing"),
+      el(
+        "div",
+        { className: "tm-timeline-empty" },
+        "Events appear after drawing",
+      ),
     );
   } else {
     const entries = timeline.map((entry) => {
@@ -110,7 +114,9 @@ function render(): void {
         second: "2-digit",
       });
 
-      return el("div", { className: `tm-timeline-entry ${entry.type}` },
+      return el(
+        "div",
+        { className: `tm-timeline-entry ${entry.type}` },
         el("span", { className: "tm-timeline-time" }, timeStr),
         el("span", { className: "tm-timeline-event" }, entry.event),
         el("span", { className: "tm-timeline-detail" }, entry.detail),

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { SystemInspection } from "@directive-run/core";
+import { describe, expect, it } from "vitest";
 import { formatSystemMeta, toAIContext } from "../meta-context";
 
 // ============================================================================
@@ -51,7 +51,14 @@ describe("formatSystemMeta", () => {
     const result = formatSystemMeta(
       makeInspection({
         modules: [
-          { id: "auth", meta: { label: "Authentication", description: "Handles login", category: "auth" } },
+          {
+            id: "auth",
+            meta: {
+              label: "Authentication",
+              description: "Handles login",
+              category: "auth",
+            },
+          },
           { id: "data", meta: undefined },
         ],
       }),
@@ -127,7 +134,14 @@ describe("formatSystemMeta", () => {
     const result = formatSystemMeta(
       makeInspection({
         resolverDefs: [
-          { id: "login", requirement: "LOGIN", meta: { label: "OAuth Flow", description: "Exchanges code for token" } },
+          {
+            id: "login",
+            requirement: "LOGIN",
+            meta: {
+              label: "OAuth Flow",
+              description: "Exchanges code for token",
+            },
+          },
           { id: "plain", requirement: "OTHER" },
         ],
       }),
@@ -173,7 +187,10 @@ describe("formatSystemMeta", () => {
     const result = formatSystemMeta(
       makeInspection({
         derivations: [
-          { id: "fullName", meta: { label: "Full Name", description: "First + last" } },
+          {
+            id: "fullName",
+            meta: { label: "Full Name", description: "First + last" },
+          },
         ],
       }),
     );
@@ -203,7 +220,11 @@ describe("formatSystemMeta", () => {
         modules: [
           {
             id: "auth",
-            meta: { label: "Auth", category: "auth", tags: ["auth", "critical"] },
+            meta: {
+              label: "Auth",
+              category: "auth",
+              tags: ["auth", "critical"],
+            },
           },
         ],
       }),
@@ -231,7 +252,9 @@ describe("formatSystemMeta", () => {
             meta: { label: "Constraint 1" },
           },
         ],
-        resolverDefs: [{ id: "r1", requirement: "DO", meta: { label: "Resolver 1" } }],
+        resolverDefs: [
+          { id: "r1", requirement: "DO", meta: { label: "Resolver 1" } },
+        ],
         facts: [{ key: "f1", meta: { label: "Fact 1" } }],
         effects: [{ id: "e1", meta: { label: "Effect 1" } }],
         derivations: [{ id: "d1", meta: { label: "Derivation 1" } }],

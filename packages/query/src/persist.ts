@@ -185,9 +185,7 @@ export function persistQueryCache(options: PersistQueryCacheOptions): any {
 
       return parsed as PersistedCache;
     } catch (err) {
-      onError?.(
-        err instanceof Error ? err : new Error(String(err)),
-      );
+      onError?.(err instanceof Error ? err : new Error(String(err)));
 
       return null;
     }
@@ -241,9 +239,7 @@ export function persistQueryCache(options: PersistQueryCacheOptions): any {
       storage.setItem(key, JSON.stringify(cache));
       onSave?.(count);
     } catch (err) {
-      onError?.(
-        err instanceof Error ? err : new Error(String(err)),
-      );
+      onError?.(err instanceof Error ? err : new Error(String(err)));
     }
   }
 

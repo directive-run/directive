@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -157,7 +157,8 @@ describe("knowledge validation", () => {
       const ap = files.find((f) => f.name === "anti-patterns.md");
       expect(ap).toBeDefined();
       // Count headers like "## 1." or "### #1"
-      const patternHeaders = (ap!.content.match(/^##+ (?:#?\d+[.\s])/gm) || []).length;
+      const patternHeaders = (ap!.content.match(/^##+ (?:#?\d+[.\s])/gm) || [])
+        .length;
       expect(patternHeaders).toBeGreaterThanOrEqual(19);
     });
 

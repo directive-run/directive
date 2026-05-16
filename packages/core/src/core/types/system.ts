@@ -260,7 +260,11 @@ export interface SystemInspection {
   }>;
   resolvers: Record<string, ResolverStatus>;
   /** All defined resolver names and their requirement types */
-  resolverDefs: Array<{ id: string; requirement: string; meta?: DefinitionMeta }>;
+  resolverDefs: Array<{
+    id: string;
+    requirement: string;
+    meta?: DefinitionMeta;
+  }>;
   /** All defined effect names with optional metadata */
   effects: Array<{ id: string; meta?: DefinitionMeta }>;
   /** All defined derivation names with optional metadata */
@@ -597,7 +601,14 @@ export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
 
 /** Result from bulk meta queries (byCategory, byTag). */
 export interface MetaMatch {
-  type: "module" | "fact" | "event" | "constraint" | "resolver" | "effect" | "derivation";
+  type:
+    | "module"
+    | "fact"
+    | "event"
+    | "constraint"
+    | "resolver"
+    | "effect"
+    | "derivation";
   id: string;
   meta: DefinitionMeta;
 }
@@ -637,13 +648,27 @@ export type ObservationEvent =
   | { type: "requirement.met"; id: string; byResolver: string }
   | { type: "requirement.canceled"; id: string }
   | { type: "resolver.start"; resolver: string; requirementId: string }
-  | { type: "resolver.complete"; resolver: string; requirementId: string; duration: number }
-  | { type: "resolver.error"; resolver: string; requirementId: string; error: unknown }
+  | {
+      type: "resolver.complete";
+      resolver: string;
+      requirementId: string;
+      duration: number;
+    }
+  | {
+      type: "resolver.error";
+      resolver: string;
+      requirementId: string;
+      error: unknown;
+    }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   | { type: "derivation.compute"; id: string; value: unknown }
   | { type: "reconcile.start" }
-  | { type: "reconcile.end"; resolversCompleted: number; resolversCanceled: number }
+  | {
+      type: "reconcile.end";
+      resolversCompleted: number;
+      resolversCanceled: number;
+    }
   | { type: "system.init" }
   | { type: "system.start" }
   | { type: "system.stop" }

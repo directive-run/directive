@@ -15,10 +15,7 @@
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
-import type {
-  AdapterHooks,
-  AgentRunner,
-} from "../types.js";
+import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
   buildStreamingResult,
@@ -60,7 +57,7 @@ export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
     "gpt-4o-mini": { input: 0.15, output: 0.6 },
     "gpt-4-turbo": { input: 10, output: 30 },
     "o4-mini": { input: 1.1, output: 4.4 },
-    "o3": { input: 10, output: 40 },
+    o3: { input: 10, output: 40 },
     "o3-mini": { input: 1.1, output: 4.4 },
   };
 
@@ -137,7 +134,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   const resolvedResponseFormat =
     responseFormat === "json"
       ? { type: "json_object" as const }
-      : responseFormat ?? undefined;
+      : (responseFormat ?? undefined);
 
   return createRunner({
     fetch: fetchFn,
@@ -324,7 +321,7 @@ export function createOpenAIStreamingRunner(
   const resolvedResponseFormat =
     responseFormat === "json"
       ? { type: "json_object" as const }
-      : responseFormat ?? undefined;
+      : (responseFormat ?? undefined);
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
@@ -367,7 +364,11 @@ export function createOpenAIStreamingRunner(
         reader,
         callbacks.onToken,
         (event) => {
-          const result: { text?: string; inputTokens?: number; outputTokens?: number } = {};
+          const result: {
+            text?: string;
+            inputTokens?: number;
+            outputTokens?: number;
+          } = {};
 
           const delta = (event.choices as Array<Record<string, unknown>>)?.[0]
             ?.delta as Record<string, unknown> | undefined;
@@ -376,8 +377,12 @@ export function createOpenAIStreamingRunner(
           }
 
           if (event.usage) {
-            result.inputTokens = (event.usage as Record<string, unknown>).prompt_tokens as number ?? 0;
-            result.outputTokens = (event.usage as Record<string, unknown>).completion_tokens as number ?? 0;
+            result.inputTokens =
+              ((event.usage as Record<string, unknown>)
+                .prompt_tokens as number) ?? 0;
+            result.outputTokens =
+              ((event.usage as Record<string, unknown>)
+                .completion_tokens as number) ?? 0;
           }
 
           return result;
@@ -389,7 +394,15 @@ export function createOpenAIStreamingRunner(
       const totalTokens = inputTokens + outputTokens;
 
       callbacks.onMessage?.({ role: "assistant", content: fullText });
-      fireAfterCallHook(hooks, agent, input, fullText, totalTokens, tokenUsage, startTime);
+      fireAfterCallHook(
+        hooks,
+        agent,
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        startTime,
+      );
 
       return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
     } catch (err) {

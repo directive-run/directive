@@ -7,11 +7,11 @@ import UseDispatch from "./hooks/UseDispatch.vue";
 import UseEvents from "./hooks/UseEvents.vue";
 import UseExplain from "./hooks/UseExplain.vue";
 import UseFact from "./hooks/UseFact.vue";
+import UseHistory from "./hooks/UseHistory.vue";
 import UseInspect from "./hooks/UseInspect.vue";
 import UseOptimisticUpdate from "./hooks/UseOptimisticUpdate.vue";
 import UseRequirementStatus from "./hooks/UseRequirementStatus.vue";
 import UseSelector from "./hooks/UseSelector.vue";
-import UseHistory from "./hooks/UseHistory.vue";
 import UseWatch from "./hooks/UseWatch.vue";
 
 const routes: Record<string, any> = {

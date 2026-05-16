@@ -37,7 +37,7 @@
  * memory pressure is a concern).
  */
 
-import { _getRegistry, formatTimeline, type FormatOptions } from "./index.js";
+import { type FormatOptions, _getRegistry, formatTimeline } from "./index.js";
 
 /**
  * Minimal subset of the vitest Reporter interface that we use. We
@@ -103,7 +103,11 @@ export class TimelineReporter {
       // cross-test contamination in R1 (substring match between
       // unrelated tests with similar names).
       let timeline = registry.get(name);
-      if (timeline === undefined && test.name !== undefined && test.name !== name) {
+      if (
+        timeline === undefined &&
+        test.name !== undefined &&
+        test.name !== name
+      ) {
         timeline = registry.get(test.name);
       }
       if (timeline === undefined) continue;

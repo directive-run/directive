@@ -169,7 +169,7 @@ export const system = createSystem({
 // Analysis Functions
 // ============================================================================
 
-export function analyzeMessage(text: string): ChatMessage {
+export async function analyzeMessage(text: string): Promise<ChatMessage> {
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   let blocked = false;
 
@@ -193,7 +193,7 @@ export function analyzeMessage(text: string): ChatMessage {
   });
 
   // 2. PII detection
-  const piiResult = detectPII(text, {
+  const piiResult = await detectPII(text, {
     redact: system.facts.redactionEnabled as boolean,
     redactionStyle: "typed",
   });

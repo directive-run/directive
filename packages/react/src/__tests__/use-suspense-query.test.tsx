@@ -1,8 +1,8 @@
+import { createModule, createSystem, t } from "@directive-run/core";
 // @ts-nocheck
 // @vitest-environment happy-dom
 import { renderHook } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
-import { createModule, createSystem, t } from "@directive-run/core";
+import { describe, expect, it } from "vitest";
 import { useSuspenseQuery } from "../index";
 
 // Simple module with a derivation that mimics query ResourceState

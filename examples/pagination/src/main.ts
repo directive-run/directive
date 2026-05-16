@@ -62,8 +62,14 @@ function renderItems(items: ListItem[]): void {
     ...items.map((item) => {
       const color = CATEGORY_COLORS[item.category] ?? "var(--brand-text-dim)";
 
-      return el("div", { className: "pg-item" },
-        el("span", { className: "pg-item-category", style: `background: ${color}` }, item.category),
+      return el(
+        "div",
+        { className: "pg-item" },
+        el(
+          "span",
+          { className: "pg-item-category", style: `background: ${color}` },
+          item.category,
+        ),
         el("span", { className: "pg-item-title" }, item.title),
         el("span", { className: "pg-item-id" }, item.id),
       );

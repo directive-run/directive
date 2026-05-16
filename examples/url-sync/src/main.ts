@@ -92,15 +92,29 @@ function render(): void {
   const items = productFacts.items;
   if (items.length === 0 && !productFacts.isLoading) {
     productList.replaceChildren(
-      el("div", { className: "us-empty" }, "No products found. Try adjusting your filters."),
+      el(
+        "div",
+        { className: "us-empty" },
+        "No products found. Try adjusting your filters.",
+      ),
     );
   } else {
     productList.replaceChildren(
       ...items.map((product) =>
-        el("div", { className: "us-product-card" },
-          el("div", { className: "us-product-category" }, categoryLabel(product.category)),
+        el(
+          "div",
+          { className: "us-product-card" },
+          el(
+            "div",
+            { className: "us-product-category" },
+            categoryLabel(product.category),
+          ),
           el("div", { className: "us-product-name" }, product.name),
-          el("div", { className: "us-product-price" }, formatPrice(product.price)),
+          el(
+            "div",
+            { className: "us-product-price" },
+            formatPrice(product.price),
+          ),
         ),
       ),
     );
@@ -150,9 +164,13 @@ function render(): void {
 }
 
 function makePageBtn(page: number, currentPage: number): HTMLButtonElement {
-  const btn = el("button", {
-    className: `us-btn us-page-btn${page === currentPage ? " active" : ""}`,
-  }, String(page));
+  const btn = el(
+    "button",
+    {
+      className: `us-btn us-page-btn${page === currentPage ? " active" : ""}`,
+    },
+    String(page),
+  );
   btn.addEventListener("click", () => {
     system.events.url.setPage({ value: page });
   });

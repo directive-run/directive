@@ -247,14 +247,17 @@ describe("named guardrails", () => {
       runner,
       guardrails: {
         input: [
-          { name: "pii-detector", fn: () => ({ passed: false, reason: "PII found" }) },
+          {
+            name: "pii-detector",
+            fn: () => ({ passed: false, reason: "PII found" }),
+          },
         ],
       },
     });
 
-    await expect(orchestrator.run(mockAgent(), "my ssn is 123-45-6789")).rejects.toThrow(
-      /pii-detector/,
-    );
+    await expect(
+      orchestrator.run(mockAgent(), "my ssn is 123-45-6789"),
+    ).rejects.toThrow(/pii-detector/);
   });
 });
 
@@ -407,9 +410,8 @@ describe("token budget", () => {
   it("throws on invalid budgetWarningThreshold", () => {
     const runner = createMockRunner();
 
-    expect(
-      () =>
-        createAgentOrchestrator({ runner, budgetWarningThreshold: 1.5 }),
+    expect(() =>
+      createAgentOrchestrator({ runner, budgetWarningThreshold: 1.5 }),
     ).toThrow("budgetWarningThreshold must be between 0 and 1");
   });
 });
@@ -460,24 +462,22 @@ describe("validation", () => {
   it("throws when autoApproveToolCalls=false without callback", () => {
     const runner = createMockRunner();
 
-    expect(
-      () =>
-        createAgentOrchestrator({
-          runner,
-          autoApproveToolCalls: false,
-        }),
+    expect(() =>
+      createAgentOrchestrator({
+        runner,
+        autoApproveToolCalls: false,
+      }),
     ).toThrow("autoApproveToolCalls is false but no onApprovalRequest");
   });
 
   it("throws when factsSchema uses reserved keys", () => {
     const runner = createMockRunner();
 
-    expect(
-      () =>
-        createAgentOrchestrator({
-          runner,
-          factsSchema: { agent: { _type: "", _validators: [] } },
-        } as any),
+    expect(() =>
+      createAgentOrchestrator({
+        runner,
+        factsSchema: { agent: { _type: "", _validators: [] } },
+      } as any),
     ).toThrow('Facts schema key "agent" conflicts with orchestrator state');
   });
 });

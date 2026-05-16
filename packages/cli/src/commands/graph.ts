@@ -1,5 +1,5 @@
-import { existsSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import pc from "picocolors";
 import { loadSystem } from "../lib/loader.js";
 
@@ -140,9 +140,7 @@ function renderAsciiGraph(inspection: {
     lines.push(pc.bold("Standalone Resolvers:"));
     for (const r of inspection.resolverDefs) {
       if (!usedResolvers.has(r.id)) {
-        lines.push(
-          `  ${pc.magenta(r.id)} handles ${pc.yellow(r.requirement)}`,
-        );
+        lines.push(`  ${pc.magenta(r.id)} handles ${pc.yellow(r.requirement)}`);
       }
     }
   }
@@ -340,7 +338,9 @@ export async function graphCommand(args: string[]) {
   const { filePath, opts } = parseArgs(args);
 
   if (!filePath) {
-    console.error("Usage: directive graph <file> [--ascii] [--no-open] [--output <path>]");
+    console.error(
+      "Usage: directive graph <file> [--ascii] [--no-open] [--output <path>]",
+    );
     process.exit(1);
   }
 
@@ -372,7 +372,8 @@ export async function graphCommand(args: string[]) {
   }
 
   const html = renderHtmlGraph(inspection, factsObj);
-  const outputPath = opts.output || join(process.cwd(), ".directive-graph.html");
+  const outputPath =
+    opts.output || join(process.cwd(), ".directive-graph.html");
 
   writeFileSync(outputPath, html, "utf-8");
   console.log(`${pc.green("Generated")} ${pc.dim(outputPath)}`);

@@ -38,20 +38,28 @@ function render(): void {
   // User list
   if (users.length === 0 && loadingIds.length === 0) {
     userListEl.replaceChildren(
-      el("div", { className: "bl-empty" }, "No users loaded. Click a button to start."),
+      el(
+        "div",
+        { className: "bl-empty" },
+        "No users loaded. Click a button to start.",
+      ),
     );
   } else {
     userListEl.replaceChildren(
       // Loading indicators
       ...loadingIds.map((id) =>
-        el("div", { className: "bl-user-item loading" },
+        el(
+          "div",
+          { className: "bl-user-item loading" },
           el("span", { className: "bl-user-id" }, `#${id}`),
           " Loading...",
         ),
       ),
       // Loaded users
       ...users.map((user) => {
-        const row = el("div", { className: "bl-user-item" },
+        const row = el(
+          "div",
+          { className: "bl-user-item" },
           el("span", { className: "bl-user-id" }, `#${user.id}`),
           el("span", { className: "bl-user-name" }, user.name),
           el("span", { className: "bl-user-role" }, user.role),
@@ -72,7 +80,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "bl-timeline-empty" }, "Events appear after interactions"),
+      el(
+        "div",
+        { className: "bl-timeline-empty" },
+        "Events appear after interactions",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -84,7 +96,9 @@ function render(): void {
           second: "2-digit",
         });
 
-        return el("div", { className: `bl-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `bl-timeline-entry ${entry.type}` },
           el("span", { className: "bl-timeline-time" }, timeStr),
           el("span", { className: "bl-timeline-event" }, entry.event),
           el("span", { className: "bl-timeline-detail" }, entry.detail),

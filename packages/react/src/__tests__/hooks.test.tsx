@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { createModule, createSystem, t } from "@directive-run/core";
-import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  useFact,
   useDerived,
   useDispatch,
   useEvents,
+  useFact,
   useWatch,
 } from "../index";
 
@@ -109,17 +109,13 @@ describe("useFact", () => {
   });
 
   it("multi-key: reads multiple facts as object", () => {
-    const { result } = renderHook(() =>
-      useFact(system, ["count", "name"]),
-    );
+    const { result } = renderHook(() => useFact(system, ["count", "name"]));
 
     expect(result.current).toEqual({ count: 0, name: "hello" });
   });
 
   it("multi-key: updates when any subscribed fact changes", () => {
-    const { result } = renderHook(() =>
-      useFact(system, ["count", "name"]),
-    );
+    const { result } = renderHook(() => useFact(system, ["count", "name"]));
 
     expect(result.current).toEqual({ count: 0, name: "hello" });
 
@@ -166,9 +162,7 @@ describe("useFact", () => {
   it("returns undefined for non-existent fact key", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const { result } = renderHook(() =>
-      useFact(system, "nonexistent" as any),
-    );
+    const { result } = renderHook(() => useFact(system, "nonexistent" as any));
 
     expect(result.current).toBeUndefined();
     warnSpy.mockRestore();
@@ -186,9 +180,7 @@ describe("useFact", () => {
   });
 
   it("dev warning when function passed instead of string", () => {
-    const errorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     // Also suppress the warn about fact not found
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -383,9 +375,7 @@ describe("useDerived", () => {
   it("dev warning when derivation not found", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // Suppress React error boundary console.error from the throw
-    const errorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     // system.read() throws for unknown derivations, so the hook will error
     expect(() => {
@@ -400,9 +390,7 @@ describe("useDerived", () => {
   });
 
   it("dev warning when function passed instead of string", () => {
-    const errorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     // system.read() throws for the stringified function as a key
@@ -441,9 +429,7 @@ describe("useDispatch", () => {
 
   it("dispatching events updates facts", () => {
     const { result: dispatchResult } = renderHook(() => useDispatch(system));
-    const { result: factResult } = renderHook(() =>
-      useFact(system, "count"),
-    );
+    const { result: factResult } = renderHook(() => useFact(system, "count"));
 
     expect(factResult.current).toBe(0);
 
@@ -457,9 +443,7 @@ describe("useDispatch", () => {
       dispatchResult.current({ type: "setName", name: "dispatch-test" });
     });
 
-    const { result: nameResult } = renderHook(() =>
-      useFact(system, "name"),
-    );
+    const { result: nameResult } = renderHook(() => useFact(system, "name"));
     expect(nameResult.current).toBe("dispatch-test");
   });
 
@@ -499,9 +483,7 @@ describe("useEvents", () => {
 
   it("calling event method updates system", () => {
     const { result: eventsResult } = renderHook(() => useEvents(system));
-    const { result: factResult } = renderHook(() =>
-      useFact(system, "count"),
-    );
+    const { result: factResult } = renderHook(() => useFact(system, "count"));
 
     expect(factResult.current).toBe(0);
 
@@ -599,9 +581,7 @@ describe("useWatch", () => {
   it("cleans up subscription on unmount", () => {
     const callback = vi.fn();
 
-    const { unmount } = renderHook(() =>
-      useWatch(system, "count", callback),
-    );
+    const { unmount } = renderHook(() => useWatch(system, "count", callback));
 
     // Verify the watch is active
     act(() => {
@@ -622,16 +602,13 @@ describe("useWatch", () => {
   it("callback ref is always current (no stale closure)", () => {
     const calls: number[] = [];
 
-    const { rerender } = renderHook(
-      ({ cb }) => useWatch(system, "count", cb),
-      {
-        initialProps: {
-          cb: (newVal: number | undefined) => {
-            calls.push((newVal ?? 0) * 10);
-          },
+    const { rerender } = renderHook(({ cb }) => useWatch(system, "count", cb), {
+      initialProps: {
+        cb: (newVal: number | undefined) => {
+          calls.push((newVal ?? 0) * 10);
         },
       },
-    );
+    });
 
     // Re-render with a different callback
     rerender({

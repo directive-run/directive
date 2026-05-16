@@ -1,19 +1,22 @@
-import { CLI_NAME } from "./lib/constants.js";
 import {
+  aiRulesCheckCommand,
   aiRulesCommand,
   aiRulesUpdateCommand,
-  aiRulesCheckCommand,
 } from "./commands/ai-rules.js";
-import { initCommand } from "./commands/init.js";
-import { newModuleCommand, newOrchestratorCommand } from "./commands/new.js";
-import { inspectCommand } from "./commands/inspect.js";
+import { bisectCommand } from "./commands/bisect.js";
+import { doctorCommand } from "./commands/doctor.js";
+import {
+  examplesCopyCommand,
+  examplesListCommand,
+} from "./commands/examples.js";
 import { explainCommand } from "./commands/explain.js";
 import { graphCommand } from "./commands/graph.js";
-import { doctorCommand } from "./commands/doctor.js";
-import { examplesListCommand, examplesCopyCommand } from "./commands/examples.js";
+import { initCommand } from "./commands/init.js";
+import { inspectCommand } from "./commands/inspect.js";
+import { newModuleCommand, newOrchestratorCommand } from "./commands/new.js";
 import { replayCommand } from "./commands/replay.js";
-import { bisectCommand } from "./commands/bisect.js";
 import { timelineDiffCommand } from "./commands/timeline-diff.js";
+import { CLI_NAME } from "./lib/constants.js";
 
 const HELP = `
 ${CLI_NAME} — CLI tools for Directive

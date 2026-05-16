@@ -87,10 +87,7 @@ export function useFact(
   keyOrKeys: string | string[],
 ): Ref<unknown> | ShallowRef<unknown> {
   assertSystem("useFact", system);
-  if (
-    isDevelopment &&
-    typeof keyOrKeys === "function"
-  ) {
+  if (isDevelopment && typeof keyOrKeys === "function") {
     console.error(
       "[Directive] useFact() received a function. Did you mean useSelector()? " +
         "useFact() takes a string key or array of keys, not a selector function.",
@@ -1069,7 +1066,9 @@ export function useQuerySystem<
 // ============================================================================
 
 /** @internal Injection key for SSR hydration snapshot */
-const HYDRATION_KEY: InjectionKey<Record<string, unknown>> = Symbol("directive-hydration");
+const HYDRATION_KEY: InjectionKey<Record<string, unknown>> = Symbol(
+  "directive-hydration",
+);
 
 /**
  * Vue component that provides a DistributableSnapshot to child components.
@@ -1114,8 +1113,14 @@ export function useHydratedSystem<S extends ModuleSchema>(
   config?: UseDirectiveConfig,
 ): SingleModuleSystem<S> {
   const snapshot = inject(HYDRATION_KEY, undefined);
-  const mergedFacts = mergeHydrationFacts(snapshot, config?.initialFacts as Record<string, unknown>);
-  const { system } = useDirective(moduleDef, { ...config, initialFacts: mergedFacts });
+  const mergedFacts = mergeHydrationFacts(
+    snapshot,
+    config?.initialFacts as Record<string, unknown>,
+  );
+  const { system } = useDirective(moduleDef, {
+    ...config,
+    initialFacts: mergedFacts,
+  });
 
   return system;
 }

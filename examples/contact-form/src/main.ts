@@ -85,7 +85,11 @@ function render() {
   // --- Timeline ---
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "cf-timeline-empty" }, "Events appear after interactions"),
+      el(
+        "div",
+        { className: "cf-timeline-empty" },
+        "Events appear after interactions",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -97,7 +101,9 @@ function render() {
           second: "2-digit",
         });
 
-        return el("div", { className: `cf-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `cf-timeline-entry ${entry.type}` },
           el("span", { className: "cf-timeline-time" }, timeStr),
           el("span", { className: "cf-timeline-event" }, entry.event),
           el("span", { className: "cf-timeline-detail" }, entry.detail),

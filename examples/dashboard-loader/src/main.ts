@@ -128,11 +128,20 @@ function renderCard(
   // Body
   if (res.status === "idle") {
     bodyEl.replaceChildren(
-      el("span", { className: "dl-loading-msg", style: "color: var(--brand-text-faint); font-style: italic;" } as any, "Waiting to start"),
+      el(
+        "span",
+        {
+          className: "dl-loading-msg",
+          style: "color: var(--brand-text-faint); font-style: italic;",
+        } as any,
+        "Waiting to start",
+      ),
     );
   } else if (res.status === "loading") {
     bodyEl.replaceChildren(
-      el("span", { className: "dl-loading-msg" },
+      el(
+        "span",
+        { className: "dl-loading-msg" },
         el("span", { className: "dl-spinner" }),
         " Fetching data...",
       ),
@@ -140,11 +149,14 @@ function renderCard(
   } else if (res.status === "success" && res.data) {
     const data = res.data as Record<string, unknown>;
     bodyEl.replaceChildren(
-      el("div", { className: "dl-data-preview" },
+      el(
+        "div",
+        { className: "dl-data-preview" },
         ...Object.entries(data).map(([key, val]) => {
           const displayVal = Array.isArray(val) ? val.join(", ") : String(val);
 
-          return el("div",
+          return el(
+            "div",
             el("span", { className: "dl-data-label" }, key),
             ` ${displayVal}`,
           );
@@ -154,7 +166,14 @@ function renderCard(
   } else if (res.status === "error") {
     bodyEl.replaceChildren(
       el("span", { className: "dl-error-msg" }, res.error ?? "Unknown error"),
-      el("button", { className: "dl-btn retry-btn", dataset: { testid: retryTestId, resource: resourceKey } } as any, "Retry"),
+      el(
+        "button",
+        {
+          className: "dl-btn retry-btn",
+          dataset: { testid: retryTestId, resource: resourceKey },
+        } as any,
+        "Retry",
+      ),
     );
   }
 }
@@ -233,7 +252,11 @@ function render(): void {
   // Timeline
   if (eventLog.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "dl-timeline-empty" }, "Events will appear here when loading starts"),
+      el(
+        "div",
+        { className: "dl-timeline-empty" },
+        "Events will appear here when loading starts",
+      ),
     );
   } else {
     const entries = [];
@@ -248,7 +271,9 @@ function render(): void {
       });
 
       entries.push(
-        el("div", { className: `dl-timeline-entry ${entry.event}` },
+        el(
+          "div",
+          { className: `dl-timeline-entry ${entry.event}` },
           el("span", { className: "dl-timeline-time" }, timeStr),
           el("span", { className: "dl-timeline-resource" }, entry.resource),
           el("span", { className: "dl-timeline-detail" }, entry.detail),

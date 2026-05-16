@@ -92,7 +92,10 @@ describe("getAllKnowledge", () => {
     for (const [key, value] of all) {
       expect(typeof key).toBe("string");
       expect(typeof value).toBe("string");
-      expect(value.length, `knowledge "${key}" should not be empty`).toBeGreaterThan(0);
+      expect(
+        value.length,
+        `knowledge "${key}" should not be empty`,
+      ).toBeGreaterThan(0);
     }
   });
 });
@@ -163,7 +166,10 @@ describe("getAllExamples", () => {
     for (const [key, value] of all) {
       expect(typeof key).toBe("string");
       expect(typeof value).toBe("string");
-      expect(value.length, `example "${key}" should not be empty`).toBeGreaterThan(0);
+      expect(
+        value.length,
+        `example "${key}" should not be empty`,
+      ).toBeGreaterThan(0);
     }
   });
 });
@@ -185,7 +191,11 @@ describe("getKnowledgeFiles", () => {
   });
 
   it("filters out missing/unknown names", () => {
-    const result = getKnowledgeFiles(["core-patterns", "does-not-exist", "constraints"]);
+    const result = getKnowledgeFiles([
+      "core-patterns",
+      "does-not-exist",
+      "constraints",
+    ]);
     const parts = result.split("\n\n---\n\n");
     expect(parts).toHaveLength(2);
   });

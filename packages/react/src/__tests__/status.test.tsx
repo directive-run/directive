@@ -1,19 +1,19 @@
 // @vitest-environment happy-dom
 import {
   createModule,
-  createSystem,
   createRequirementStatusPlugin,
+  createSystem,
   t,
 } from "@directive-run/core";
 import type { Plugin } from "@directive-run/core";
-import { renderHook, act } from "@testing-library/react";
-import React, { Suspense } from "react";
+import { act, renderHook } from "@testing-library/react";
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import React, { Suspense } from "react";
+import { describe, expect, it, vi } from "vitest";
 import {
+  useOptimisticUpdate,
   useRequirementStatus,
   useSuspenseRequirement,
-  useOptimisticUpdate,
 } from "../index";
 
 // ============================================================================
@@ -574,10 +574,7 @@ describe("useSuspenseRequirement", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     function Inner() {
-      useSuspenseRequirement(statusPlugin, [
-        "LOAD_A",
-        "LOAD_B",
-      ]);
+      useSuspenseRequirement(statusPlugin, ["LOAD_A", "LOAD_B"]);
 
       return <div data-testid="resolved">done</div>;
     }

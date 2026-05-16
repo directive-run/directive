@@ -29,11 +29,7 @@ import {
   replaceEqualDeep,
   serializeKey,
 } from "./internal.js";
-import type {
-  QueryDefinition,
-  QueryOptions,
-  ResourceState,
-} from "./types.js";
+import type { QueryDefinition, QueryOptions, ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
 /** Build the requirement type for a list query. */
@@ -75,7 +71,11 @@ export interface ListQueryOptions<
   TKey extends Record<string, unknown> = Record<string, unknown>,
 > extends Omit<
     QueryOptions<TData, TRaw, TError, TKey>,
-    "key" | "placeholderData" | "keepPreviousData" | "initialData" | "initialDataUpdatedAt"
+    | "key"
+    | "placeholderData"
+    | "keepPreviousData"
+    | "initialData"
+    | "initialDataUpdatedAt"
   > {
   /**
    * Derive the active list of keys from facts. Return `null` or `[]` to
@@ -217,8 +217,7 @@ export function createListQuery<
     facts: Record<string, unknown>,
   ): ListResourceMap<TData, TError> {
     const states = readStates(facts);
-    const expireAt =
-      (facts[expireKey] as Record<string, number>) ?? {};
+    const expireAt = (facts[expireKey] as Record<string, number>) ?? {};
     const active = (facts[activeKeysKey] as Record<string, true>) ?? {};
     const stateKeys = Object.keys(states);
     const activeCount = Object.keys(active).length;
@@ -394,7 +393,11 @@ export function createListQuery<
               : (rawData as unknown as TData);
 
             // Structural sharing per-key — preserve refs if data is deep-equal.
-            if (structuralSharing && prev?.data !== null && prev?.data !== undefined) {
+            if (
+              structuralSharing &&
+              prev?.data !== null &&
+              prev?.data !== undefined
+            ) {
               data = replaceEqualDeep(prev.data, data) as TData;
             }
 
@@ -419,8 +422,7 @@ export function createListQuery<
             facts[statesKey] = { ...latestStates, [sk]: successEntry };
 
             // Schedule GC for when this key is no longer active.
-            const expire =
-              (facts[expireKey] as Record<string, number>) ?? {};
+            const expire = (facts[expireKey] as Record<string, number>) ?? {};
             facts[expireKey] = { ...expire, [sk]: now + expireAfter };
 
             // The shared QueryOptions types onSuccess/onSettled with TData
@@ -428,7 +430,11 @@ export function createListQuery<
             // cast needed; the QueryDefinition wrapper's TData generic
             // refers to the derivation type (the Map), not the per-item type.
             (onSuccess as ((d: TData) => void) | undefined)?.(data);
-            (onSettled as ((d: TData | undefined, e: TError | null) => void) | undefined)?.(data, null);
+            (
+              onSettled as
+                | ((d: TData | undefined, e: TError | null) => void)
+                | undefined
+            )?.(data, null);
           } catch (error) {
             if (signal.aborted) return;
             const typedError = error as TError;
@@ -447,10 +453,11 @@ export function createListQuery<
             };
             facts[statesKey] = { ...latestStates, [sk]: errorEntry };
             (onError as ((e: TError) => void) | undefined)?.(typedError);
-            (onSettled as ((d: TData | undefined, e: TError | null) => void) | undefined)?.(
-              undefined,
-              typedError,
-            );
+            (
+              onSettled as
+                | ((d: TData | undefined, e: TError | null) => void)
+                | undefined
+            )?.(undefined, typedError);
           }
         },
       },
@@ -534,7 +541,10 @@ export function createListQuery<
        * fired by the engine when keys leave the active set. */
     },
 
-    setData: (facts: Record<string, unknown>, _data: ListResourceMap<TData, TError>) => {
+    setData: (
+      facts: Record<string, unknown>,
+      _data: ListResourceMap<TData, TError>,
+    ) => {
       // Setting the entire map at once is the documented escape hatch for
       // SSR-style hydration. For per-key writes use the bound handle's
       // setData(params, data) — wired in createQuerySystem.
@@ -577,8 +587,7 @@ export function bindListQueryHandle<
   return {
     refetchAll: () => bumpAllTriggers(facts, triggerKey, activeKeysKey),
     refetch: (params) => {
-      const triggers =
-        (facts[triggerKey] as Record<string, number>) ?? {};
+      const triggers = (facts[triggerKey] as Record<string, number>) ?? {};
       facts[triggerKey] = { ...triggers, [serializeKey(params)]: Date.now() };
     },
     peek: (params) => {
@@ -586,8 +595,7 @@ export function bindListQueryHandle<
       return states?.[serializeKey(params)] ?? null;
     },
     setData: (params, data) => {
-      const states =
-        (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
+      const states = (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
       const sk = serializeKey(params);
       const prev = states[sk];
       facts[statesKey] = {
@@ -607,8 +615,7 @@ export function bindListQueryHandle<
       };
     },
     invalidate: (params) => {
-      const states =
-        (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
+      const states = (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
       const sk = serializeKey(params);
       const prev = states[sk];
       if (prev) {
@@ -619,8 +626,7 @@ export function bindListQueryHandle<
       }
     },
     invalidateAll: () => {
-      const states =
-        (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
+      const states = (facts[statesKey] as ListResourceMap<TData, TError>) ?? {};
       const next: ListResourceMap<TData, TError> = {};
       for (const [k, s] of Object.entries(states)) {
         next[k] = { ...s, isStale: true, dataUpdatedAt: null };

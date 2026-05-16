@@ -1,6 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMCPAdapter, convertToolsForLLM, mcpCallTool, mcpReadResource, mcpGetPrompt, mcpSyncResources } from "../mcp.js";
-import type { MCPClient, MCPServerConfig, MCPTool, MCPResource, MCPToolResult, MCPResourceResult, MCPPromptResult } from "../mcp-types.js";
+import type {
+  MCPClient,
+  MCPPromptResult,
+  MCPResource,
+  MCPResourceResult,
+  MCPServerConfig,
+  MCPTool,
+  MCPToolResult,
+} from "../mcp-types.js";
+import {
+  convertToolsForLLM,
+  createMCPAdapter,
+  mcpCallTool,
+  mcpGetPrompt,
+  mcpReadResource,
+  mcpSyncResources,
+} from "../mcp.js";
 
 // ============================================================================
 // Helpers
@@ -11,18 +26,27 @@ function createMockClient(overrides: Partial<MCPClient> = {}): MCPClient {
     connect: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn().mockResolvedValue(undefined),
     isConnected: vi.fn().mockReturnValue(true),
-    getCapabilities: vi.fn().mockReturnValue({ tools: true, resources: true, prompts: true }),
+    getCapabilities: vi
+      .fn()
+      .mockReturnValue({ tools: true, resources: true, prompts: true }),
     listTools: vi.fn().mockResolvedValue([]),
     listResources: vi.fn().mockResolvedValue([]),
-    callTool: vi.fn().mockResolvedValue({ content: [{ type: "text", text: "result" }] }),
-    readResource: vi.fn().mockResolvedValue({ contents: [{ uri: "test", text: "data" }] }),
+    callTool: vi
+      .fn()
+      .mockResolvedValue({ content: [{ type: "text", text: "result" }] }),
+    readResource: vi
+      .fn()
+      .mockResolvedValue({ contents: [{ uri: "test", text: "data" }] }),
     listPrompts: vi.fn().mockResolvedValue([]),
     getPrompt: vi.fn().mockResolvedValue({ messages: [] }),
     ...overrides,
   };
 }
 
-function serverConfig(name: string, transport: "stdio" | "sse" = "stdio"): MCPServerConfig {
+function serverConfig(
+  name: string,
+  transport: "stdio" | "sse" = "stdio",
+): MCPServerConfig {
   return { name, transport, command: `mcp-server-${name}` };
 }
 
@@ -48,7 +72,9 @@ describe("connect / disconnect", () => {
   });
 
   it("fetches tools and resources after connecting", async () => {
-    const tools: MCPTool[] = [{ name: "read_file", inputSchema: { type: "object" } }];
+    const tools: MCPTool[] = [
+      { name: "read_file", inputSchema: { type: "object" } },
+    ];
     const resources: MCPResource[] = [{ uri: "file:///tmp", name: "tmp" }];
     const client = createMockClient({
       listTools: vi.fn().mockResolvedValue(tools),
@@ -139,7 +165,9 @@ describe("connectServer / disconnectServer", () => {
       clientFactory: () => createMockClient(),
     });
 
-    await expect(adapter.connectServer("unknown")).rejects.toThrow("Unknown MCP server: unknown");
+    await expect(adapter.connectServer("unknown")).rejects.toThrow(
+      "Unknown MCP server: unknown",
+    );
   });
 
   it("disconnects a single server without affecting others", async () => {
@@ -189,14 +217,20 @@ describe("getTools", () => {
   });
 
   it("returns tools grouped by server", async () => {
-    const toolsA: MCPTool[] = [{ name: "read_file", inputSchema: { type: "object" } }];
-    const toolsB: MCPTool[] = [{ name: "query", inputSchema: { type: "object" } }];
+    const toolsA: MCPTool[] = [
+      { name: "read_file", inputSchema: { type: "object" } },
+    ];
+    const toolsB: MCPTool[] = [
+      { name: "query", inputSchema: { type: "object" } },
+    ];
 
     const adapter = createMCPAdapter({
       servers: [serverConfig("fs"), serverConfig("db")],
       clientFactory: (cfg) =>
         createMockClient({
-          listTools: vi.fn().mockResolvedValue(cfg.name === "fs" ? toolsA : toolsB),
+          listTools: vi
+            .fn()
+            .mockResolvedValue(cfg.name === "fs" ? toolsA : toolsB),
         }),
     });
 
@@ -214,7 +248,9 @@ describe("getTools", () => {
 
 describe("getResources", () => {
   it("returns resources grouped by server", async () => {
-    const resources: MCPResource[] = [{ uri: "file:///etc/hosts", name: "hosts" }];
+    const resources: MCPResource[] = [
+      { uri: "file:///etc/hosts", name: "hosts" },
+    ];
     const adapter = createMCPAdapter({
       servers: [serverConfig("fs")],
       clientFactory: () =>
@@ -235,7 +271,9 @@ describe("getResources", () => {
 
 describe("callTool", () => {
   it("calls tool on the correct server and returns result", async () => {
-    const expectedResult: MCPToolResult = { content: [{ type: "text", text: "file contents" }] };
+    const expectedResult: MCPToolResult = {
+      content: [{ type: "text", text: "file contents" }],
+    };
     const client = createMockClient({
       callTool: vi.fn().mockResolvedValue(expectedResult),
     });
@@ -246,7 +284,12 @@ describe("callTool", () => {
     });
 
     await adapter.connect();
-    const result = await adapter.callTool("fs", "read_file", { path: "/tmp" }, {});
+    const result = await adapter.callTool(
+      "fs",
+      "read_file",
+      { path: "/tmp" },
+      {},
+    );
 
     expect(client.callTool).toHaveBeenCalledWith("read_file", { path: "/tmp" });
     expect(result).toEqual(expectedResult);
@@ -259,7 +302,9 @@ describe("callTool", () => {
     });
 
     await adapter.connect();
-    await expect(adapter.callTool("unknown", "read", {}, {})).rejects.toThrow("Unknown server 'unknown'");
+    await expect(adapter.callTool("unknown", "read", {}, {})).rejects.toThrow(
+      "Unknown server 'unknown'",
+    );
   });
 
   it("throws when calling tool on disconnected server", async () => {
@@ -269,7 +314,9 @@ describe("callTool", () => {
     });
 
     // Never connected
-    await expect(adapter.callTool("fs", "read", {}, {})).rejects.toThrow("not connected");
+    await expect(adapter.callTool("fs", "read", {}, {})).rejects.toThrow(
+      "not connected",
+    );
   });
 
   it("fires onToolCall and onToolResult events", async () => {
@@ -324,7 +371,12 @@ describe("callTool with constraints", () => {
     });
 
     await adapter.connect();
-    const result = await adapter.callTool("fs", "write_file", { path: "/tmp" }, { canWrite: true });
+    const result = await adapter.callTool(
+      "fs",
+      "write_file",
+      { path: "/tmp" },
+      { canWrite: true },
+    );
 
     expect(result.content[0]).toEqual({ type: "text", text: "result" });
   });
@@ -345,7 +397,9 @@ describe("callTool with constraints", () => {
     await adapter.callTool("fs", "read_file", {}, {});
 
     // Third call exceeds rate limit
-    await expect(adapter.callTool("fs", "read_file", {}, {})).rejects.toThrow("Rate limit exceeded");
+    await expect(adapter.callTool("fs", "read_file", {}, {})).rejects.toThrow(
+      "Rate limit exceeded",
+    );
   });
 
   it("enforces maxArgSize", async () => {
@@ -377,7 +431,12 @@ describe("callTool with constraints", () => {
 
     await adapter.connect();
 
-    const callPromise = adapter.callTool("fs", "delete_file", { path: "/tmp" }, {});
+    const callPromise = adapter.callTool(
+      "fs",
+      "delete_file",
+      { path: "/tmp" },
+      {},
+    );
 
     // Wait a tick for the approval request to be emitted
     await new Promise((r) => setTimeout(r, 10));
@@ -408,7 +467,12 @@ describe("callTool with constraints", () => {
 
     await adapter.connect();
 
-    const callPromise = adapter.callTool("fs", "delete_file", { path: "/tmp" }, {});
+    const callPromise = adapter.callTool(
+      "fs",
+      "delete_file",
+      { path: "/tmp" },
+      {},
+    );
 
     await new Promise((r) => setTimeout(r, 10));
 
@@ -437,9 +501,13 @@ describe("callToolDirect", () => {
 
     await adapter.connect();
     // callToolDirect bypasses the `when` constraint
-    const result = await adapter.callToolDirect("fs", "write_file", { path: "/tmp" });
+    const result = await adapter.callToolDirect("fs", "write_file", {
+      path: "/tmp",
+    });
 
-    expect(client.callTool).toHaveBeenCalledWith("write_file", { path: "/tmp" });
+    expect(client.callTool).toHaveBeenCalledWith("write_file", {
+      path: "/tmp",
+    });
     expect(result.content[0]).toEqual({ type: "text", text: "result" });
   });
 });
@@ -450,7 +518,9 @@ describe("callToolDirect", () => {
 
 describe("readResource", () => {
   it("reads resource from the correct server", async () => {
-    const expectedResult: MCPResourceResult = { contents: [{ uri: "file:///etc/hosts", text: "127.0.0.1" }] };
+    const expectedResult: MCPResourceResult = {
+      contents: [{ uri: "file:///etc/hosts", text: "127.0.0.1" }],
+    };
     const client = createMockClient({
       readResource: vi.fn().mockResolvedValue(expectedResult),
     });
@@ -475,7 +545,9 @@ describe("readResource", () => {
     });
 
     await adapter.connect();
-    await expect(adapter.readResource("unknown", "file:///tmp")).rejects.toThrow("Unknown server 'unknown'");
+    await expect(
+      adapter.readResource("unknown", "file:///tmp"),
+    ).rejects.toThrow("Unknown server 'unknown'");
   });
 
   it("throws when reading from disconnected server", async () => {
@@ -484,7 +556,9 @@ describe("readResource", () => {
       clientFactory: () => createMockClient(),
     });
 
-    await expect(adapter.readResource("fs", "file:///tmp")).rejects.toThrow("not connected");
+    await expect(adapter.readResource("fs", "file:///tmp")).rejects.toThrow(
+      "not connected",
+    );
   });
 });
 
@@ -510,9 +584,13 @@ describe("getPrompt", () => {
 
     // Access the client through server status to call getPrompt
     const serverState = adapter.getServerStatus("fs");
-    const result = await serverState!.client!.getPrompt("greeting", { name: "world" });
+    const result = await serverState!.client!.getPrompt("greeting", {
+      name: "world",
+    });
 
-    expect(client.getPrompt).toHaveBeenCalledWith("greeting", { name: "world" });
+    expect(client.getPrompt).toHaveBeenCalledWith("greeting", {
+      name: "world",
+    });
     expect(result).toEqual(promptResult);
   });
 });
@@ -580,7 +658,9 @@ describe("syncResources", () => {
   });
 
   it("applies transform function to synced content", async () => {
-    const resources: MCPResource[] = [{ uri: "file:///config.json", name: "config" }];
+    const resources: MCPResource[] = [
+      { uri: "file:///config.json", name: "config" },
+    ];
     const client = createMockClient({
       listResources: vi.fn().mockResolvedValue(resources),
       readResource: vi.fn().mockResolvedValue({
@@ -678,9 +758,13 @@ describe("error handling", () => {
       autoReconnect: false,
     });
 
-    await expect(adapter.connectServer("fs")).rejects.toThrow("Connection refused");
+    await expect(adapter.connectServer("fs")).rejects.toThrow(
+      "Connection refused",
+    );
     expect(adapter.getServerStatus("fs")?.status).toBe("error");
-    expect(adapter.getServerStatus("fs")?.error?.message).toBe("Connection refused");
+    expect(adapter.getServerStatus("fs")?.error?.message).toBe(
+      "Connection refused",
+    );
   });
 
   it("fires onError event on connect failure", async () => {
@@ -778,11 +862,16 @@ describe("convertToolsForLLM", () => {
   it("converts tools map to LLM function calling format", () => {
     const tools = new Map<string, MCPTool[]>();
     tools.set("fs", [
-      { name: "read_file", description: "Read a file", inputSchema: { type: "object", properties: { path: { type: "string" } } } },
+      {
+        name: "read_file",
+        description: "Read a file",
+        inputSchema: {
+          type: "object",
+          properties: { path: { type: "string" } },
+        },
+      },
     ]);
-    tools.set("db", [
-      { name: "query", inputSchema: { type: "object" } },
-    ]);
+    tools.set("db", [{ name: "query", inputSchema: { type: "object" } }]);
 
     const result = convertToolsForLLM(tools);
 
@@ -792,7 +881,10 @@ describe("convertToolsForLLM", () => {
       function: {
         name: "fs.read_file",
         description: "Read a file",
-        parameters: { type: "object", properties: { path: { type: "string" } } },
+        parameters: {
+          type: "object",
+          properties: { path: { type: "string" } },
+        },
       },
     });
     expect(result[1]).toEqual({

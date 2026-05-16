@@ -261,7 +261,7 @@ function toResolveWithinMs(
   withinMs: number,
 ): MatcherResult {
   const fs = frames(received);
-  let durations: number[] = [];
+  const durations: number[] = [];
   for (const f of fs) {
     if (
       f.event.type === "resolver.complete" &&
@@ -398,7 +398,8 @@ try {
   // Prefer dynamic import-time discovery so this file works against
   // either vitest 1.x or 2.x without a hard peer-dep.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const vitestModule = (globalThis as { __vitest_expect?: unknown }).__vitest_expect;
+  const vitestModule = (globalThis as { __vitest_expect?: unknown })
+    .__vitest_expect;
   if (vitestModule !== undefined) {
     (vitestModule as ExpectExtendShape).extend(
       matcherImpls as unknown as Record<

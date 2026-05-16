@@ -121,9 +121,15 @@ describe("createMessageBus", () => {
     it("filters by type", async () => {
       const bus = createMessageBus();
       const received: TypedAgentMessage[] = [];
-      bus.subscribe("agent", (msg) => { received.push(msg); }, {
-        types: ["REQUEST"],
-      });
+      bus.subscribe(
+        "agent",
+        (msg) => {
+          received.push(msg);
+        },
+        {
+          types: ["REQUEST"],
+        },
+      );
 
       // Publish an INFORM — should be filtered out
       publishInform(bus, "other", "agent");
@@ -135,7 +141,13 @@ describe("createMessageBus", () => {
     it("filters by from", async () => {
       const bus = createMessageBus();
       const received: TypedAgentMessage[] = [];
-      bus.subscribe("agent", (msg) => { received.push(msg); }, { from: "alice" });
+      bus.subscribe(
+        "agent",
+        (msg) => {
+          received.push(msg);
+        },
+        { from: "alice" },
+      );
 
       publishInform(bus, "bob", "agent");
       publishInform(bus, "alice", "agent");
@@ -148,9 +160,15 @@ describe("createMessageBus", () => {
     it("filters by priority", async () => {
       const bus = createMessageBus();
       const received: TypedAgentMessage[] = [];
-      bus.subscribe("agent", (msg) => { received.push(msg); }, {
-        priority: ["urgent"],
-      });
+      bus.subscribe(
+        "agent",
+        (msg) => {
+          received.push(msg);
+        },
+        {
+          priority: ["urgent"],
+        },
+      );
 
       publishInform(bus, "a", "agent", { priority: "low" });
       publishInform(bus, "a", "agent", { priority: "urgent" });
@@ -163,9 +181,15 @@ describe("createMessageBus", () => {
     it("filters by custom function", async () => {
       const bus = createMessageBus();
       const received: TypedAgentMessage[] = [];
-      bus.subscribe("agent", (msg) => { received.push(msg); }, {
-        custom: (msg) => msg.from === "vip",
-      });
+      bus.subscribe(
+        "agent",
+        (msg) => {
+          received.push(msg);
+        },
+        {
+          custom: (msg) => msg.from === "vip",
+        },
+      );
 
       publishInform(bus, "nobody", "agent");
       publishInform(bus, "vip", "agent");
@@ -359,7 +383,9 @@ describe("createMessageBus", () => {
 
     expect(onDeliveryError).toHaveBeenCalledTimes(1);
     expect(onDeliveryError.mock.calls[0]![1]).toBeInstanceOf(Error);
-    expect((onDeliveryError.mock.calls[0]![1] as Error).message).toBe("handler boom");
+    expect((onDeliveryError.mock.calls[0]![1] as Error).message).toBe(
+      "handler boom",
+    );
   });
 
   // --------------------------------------------------------------------------
@@ -381,7 +407,9 @@ describe("createMessageBus", () => {
 
     // Subscriptions still work
     const received: TypedAgentMessage[] = [];
-    bus.subscribe("agent2", (msg) => { received.push(msg); });
+    bus.subscribe("agent2", (msg) => {
+      received.push(msg);
+    });
     publishInform(bus, "x", "agent2");
     await tick();
 
@@ -392,7 +420,9 @@ describe("createMessageBus", () => {
     const bus = createMessageBus();
     const received: TypedAgentMessage[] = [];
 
-    bus.subscribe("agent", (msg) => { received.push(msg); });
+    bus.subscribe("agent", (msg) => {
+      received.push(msg);
+    });
     publishInform(bus, "a", "agent");
     await tick();
 
@@ -478,9 +508,15 @@ describe("createAgentNetwork", () => {
   it("send() publishes via bus", async () => {
     const network = createAgentNetwork({ bus });
     const received: TypedAgentMessage[] = [];
-    bus.subscribe("target", (msg) => { received.push(msg); });
+    bus.subscribe("target", (msg) => {
+      received.push(msg);
+    });
 
-    network.send("sender", "target", { type: "INFORM", topic: "hi", content: "yo" });
+    network.send("sender", "target", {
+      type: "INFORM",
+      topic: "hi",
+      content: "yo",
+    });
     await tick();
 
     expect(received).toHaveLength(1);
@@ -491,10 +527,18 @@ describe("createAgentNetwork", () => {
     const network = createAgentNetwork({ bus });
     const aMsgs: TypedAgentMessage[] = [];
     const bMsgs: TypedAgentMessage[] = [];
-    bus.subscribe("a", (msg) => { aMsgs.push(msg); });
-    bus.subscribe("b", (msg) => { bMsgs.push(msg); });
+    bus.subscribe("a", (msg) => {
+      aMsgs.push(msg);
+    });
+    bus.subscribe("b", (msg) => {
+      bMsgs.push(msg);
+    });
 
-    network.broadcast("sender", { type: "INFORM", topic: "alert", content: "!" });
+    network.broadcast("sender", {
+      type: "INFORM",
+      topic: "alert",
+      content: "!",
+    });
     await tick();
 
     expect(aMsgs).toHaveLength(1);
@@ -618,7 +662,9 @@ describe("createAgentNetwork", () => {
     network.register("listener", { capabilities: [] });
     const received: TypedAgentMessage[] = [];
 
-    network.listen("listener", (msg) => { received.push(msg); });
+    network.listen("listener", (msg) => {
+      received.push(msg);
+    });
 
     publishInform(bus, "sender", "listener");
     await tick();

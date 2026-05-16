@@ -44,8 +44,8 @@ import {
 } from "@directive-run/core/plugins";
 // createObservability is alpha (not in bundle) — direct source import
 import {
-  createObservability,
   createAgentMetrics,
+  createObservability,
 } from "../../../packages/core/src/plugins/observability.lab.js";
 import {
   analysisAgent,

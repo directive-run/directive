@@ -7,11 +7,11 @@ import { UseDispatchPage } from "./hooks/UseDispatch";
 import { UseEventsPage } from "./hooks/UseEvents";
 import { UseExplainPage } from "./hooks/UseExplain";
 import { UseFactPage } from "./hooks/UseFact";
+import { UseHistoryPage } from "./hooks/UseHistory";
 import { UseInspectPage } from "./hooks/UseInspect";
 import { UseOptimisticUpdatePage } from "./hooks/UseOptimisticUpdate";
 import { UseRequirementStatusPage } from "./hooks/UseRequirementStatus";
 import { UseSelectorPage } from "./hooks/UseSelector";
-import { UseHistoryPage } from "./hooks/UseHistory";
 import { UseWatchPage } from "./hooks/UseWatch";
 
 const routes: Record<string, Component> = {

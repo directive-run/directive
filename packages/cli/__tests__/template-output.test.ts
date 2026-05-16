@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTemplate, generateLlmsTxt } from "../src/index.js";
+import { generateLlmsTxt, getTemplate } from "../src/index.js";
 
 describe("template output", () => {
   describe("size limits", () => {

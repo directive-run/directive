@@ -1575,5 +1575,4 @@ describe("goal pattern", () => {
       ),
     ).rejects.toThrow("Invalid goal checkpoint state");
   });
-
 });

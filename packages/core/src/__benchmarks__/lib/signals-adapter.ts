@@ -1,4 +1,4 @@
-import { signal, computed } from "@preact/signals-core";
+import { computed, signal } from "@preact/signals-core";
 import type { BenchAdapter } from "./types";
 
 export const signalsAdapter: BenchAdapter = {

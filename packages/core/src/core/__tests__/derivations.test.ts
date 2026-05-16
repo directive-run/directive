@@ -21,7 +21,6 @@ function setup(
   const manager = createDerivationsManager({
     definitions: defs as any,
     facts: facts as any,
-
   });
 
   return { store, facts, manager };
@@ -225,7 +224,6 @@ describe("derivations", () => {
           looping: (f: any) => f.count,
         } as any,
         facts: facts as any,
-    
       });
 
       manager.get("looping");
@@ -434,7 +432,7 @@ describe("derivations", () => {
           doubled: (f: any) => (f.count as number) * 2,
         } as any,
         facts: facts as any,
-    
+
         onCompute,
       });
 
@@ -462,7 +460,7 @@ describe("derivations", () => {
           },
         } as any,
         facts: facts as any,
-    
+
         onError,
       });
 

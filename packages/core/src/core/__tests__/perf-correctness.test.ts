@@ -28,7 +28,6 @@ function setupDerivations(
   const manager = createDerivationsManager({
     definitions: defs as any,
     facts: facts as any,
-
   });
 
   return { store, facts, manager };
@@ -56,7 +55,6 @@ describe("P0-1: iterative invalidateDerivation", () => {
     const manager = createDerivationsManager({
       definitions: defs as any,
       facts: facts as any,
-  
     });
 
     // Force computation of the entire chain (establishes dependency tracking)

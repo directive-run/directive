@@ -5,13 +5,7 @@
  */
 
 import { el } from "@directive-run/el";
-import {
-  type ChatMessage,
-  analyzeMessage,
-  schema,
-  system,
-  timeline,
-} from "./module.js";
+import { analyzeMessage, schema, system, timeline } from "./module.js";
 
 // ============================================================================
 // System Startup
@@ -63,7 +57,9 @@ function render(): void {
 
         const flags: HTMLElement[] = [];
         if (msg.injectionResult) {
-          flags.push(el("span", { className: "gs-flag injection" }, "injection"));
+          flags.push(
+            el("span", { className: "gs-flag injection" }, "injection"),
+          );
         }
         if (msg.piiResult) {
           const types = msg.piiResult.items.map((i) => i.type).join(", ");
@@ -73,9 +69,13 @@ function render(): void {
           flags.push(el("span", { className: "gs-flag blocked" }, "BLOCKED"));
         }
 
-        const msgEl = el("div", { className: `gs-message ${msg.blocked ? "blocked" : "passed"}` },
+        const msgEl = el(
+          "div",
+          { className: `gs-message ${msg.blocked ? "blocked" : "passed"}` },
           el("div", { className: "gs-message-text" }, displayText),
-          ...(flags.length > 0 ? [el("div", { className: "gs-message-flags" }, ...flags)] : []),
+          ...(flags.length > 0
+            ? [el("div", { className: "gs-message-flags" }, ...flags)]
+            : []),
         );
         msgEl.setAttribute("data-testid", `gs-msg-${msg.id}`);
 
@@ -88,7 +88,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "gs-timeline-empty" }, "Events appear after sending messages"),
+      el(
+        "div",
+        { className: "gs-timeline-empty" },
+        "Events appear after sending messages",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -100,7 +104,9 @@ function render(): void {
           second: "2-digit",
         });
 
-        return el("div", { className: `gs-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `gs-timeline-entry ${entry.type}` },
           el("span", { className: "gs-timeline-time" }, timeStr),
           el("span", { className: "gs-timeline-event" }, entry.event),
           el("span", { className: "gs-timeline-detail" }, entry.detail),

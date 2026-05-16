@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import type { EmbedderFn } from "../guardrails/semantic-cache.js";
 import {
-  createJSONFileStore,
-  createRAGEnricher,
   type RAGChunk,
   type RAGStorage,
+  createJSONFileStore,
+  createRAGEnricher,
 } from "../rag.js";
-import type { EmbedderFn } from "../guardrails/semantic-cache.js";
 
 // ============================================================================
 // Helpers
@@ -161,9 +161,7 @@ describe("createRAGEnricher — retrieve", () => {
 
 describe("createRAGEnricher — enrich", () => {
   it("returns just the input when no chunks match", async () => {
-    const storage = createMockStorage([
-      chunk("a", "alpha", VEC_Y),
-    ]);
+    const storage = createMockStorage([chunk("a", "alpha", VEC_Y)]);
     const enricher = createRAGEnricher({
       embedder: staticEmbedder(VEC_X),
       storage,
@@ -192,9 +190,7 @@ describe("createRAGEnricher — enrich", () => {
   });
 
   it("includes prefix before context block", async () => {
-    const storage = createMockStorage([
-      chunk("doc1", "content", VEC_X),
-    ]);
+    const storage = createMockStorage([chunk("doc1", "content", VEC_X)]);
     const enricher = createRAGEnricher({
       embedder: staticEmbedder(VEC_X),
       storage,
@@ -232,9 +228,7 @@ describe("createRAGEnricher — enrich", () => {
   });
 
   it('all parts separated by "\\n\\n---\\n\\n"', async () => {
-    const storage = createMockStorage([
-      chunk("doc1", "content", VEC_X),
-    ]);
+    const storage = createMockStorage([chunk("doc1", "content", VEC_X)]);
     const enricher = createRAGEnricher({
       embedder: staticEmbedder(VEC_X),
       storage,
@@ -293,9 +287,7 @@ describe("createRAGEnricher — enrich", () => {
   });
 
   it("custom formatContext overrides default context block", async () => {
-    const storage = createMockStorage([
-      chunk("c1", "content", VEC_X),
-    ]);
+    const storage = createMockStorage([chunk("c1", "content", VEC_X)]);
     const enricher = createRAGEnricher({
       embedder: staticEmbedder(VEC_X),
       storage,
@@ -315,9 +307,7 @@ describe("createRAGEnricher — enrich", () => {
     const failingEmbedder: EmbedderFn = async () => {
       throw new Error("Embedding service down");
     };
-    const storage = createMockStorage([
-      chunk("c1", "content", VEC_X),
-    ]);
+    const storage = createMockStorage([chunk("c1", "content", VEC_X)]);
     const enricher = createRAGEnricher({
       embedder: failingEmbedder,
       storage,
@@ -431,7 +421,10 @@ describe("createJSONFileStore", () => {
   it("reload() clears cache and re-reads", async () => {
     let callCount = 0;
     const batch1 = [chunk("a", "first", [1, 0, 0])];
-    const batch2 = [chunk("a", "first", [1, 0, 0]), chunk("b", "second", [0, 1, 0])];
+    const batch2 = [
+      chunk("a", "first", [1, 0, 0]),
+      chunk("b", "second", [0, 1, 0]),
+    ];
 
     const mockReadFile = vi.fn(async () => {
       callCount++;

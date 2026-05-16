@@ -50,7 +50,7 @@
  *   - `--git-bisect` — emit a bisect-run script.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import pc from "picocolors";
 import { loadSystemFactory } from "../lib/loader.js";
@@ -166,18 +166,15 @@ Examples:
  * with their own input), so this is acceptable. Do NOT relay this
  * surface to a server-side context.
  */
-function compileAssertion(
-  expr: string,
-): (system: unknown) => boolean {
+function compileAssertion(expr: string): (system: unknown) => boolean {
   let fn: (facts: unknown, system: unknown) => unknown;
   try {
     // Function constructor is intentional: the assertion expression
     // needs lexical scope of `facts` + `system` as variables.
-    fn = new Function(
-      "facts",
-      "system",
-      `"use strict"; return (${expr});`,
-    ) as (facts: unknown, system: unknown) => unknown;
+    fn = new Function("facts", "system", `"use strict"; return (${expr});`) as (
+      facts: unknown,
+      system: unknown,
+    ) => unknown;
   } catch (err) {
     throw new Error(
       `Failed to compile --assert expression: ${(err as Error).message}\n  expression: ${expr}`,
@@ -191,11 +188,7 @@ function compileAssertion(
 }
 
 export async function bisectCommand(args: string[]): Promise<void> {
-  if (
-    args.includes("--help") ||
-    args.includes("-h") ||
-    args.length === 0
-  ) {
+  if (args.includes("--help") || args.includes("-h") || args.length === 0) {
     printUsage();
     process.exit(args.length === 0 ? 1 : 0);
   }
@@ -240,7 +233,9 @@ export async function bisectCommand(args: string[]): Promise<void> {
     raw = readFileSync(resolvedJson, "utf8");
   } catch (err) {
     console.error(
-      pc.red(`error: failed to read ${resolvedJson}: ${(err as Error).message}`),
+      pc.red(
+        `error: failed to read ${resolvedJson}: ${(err as Error).message}`,
+      ),
     );
     process.exit(1);
   }
@@ -346,9 +341,7 @@ export async function bisectCommand(args: string[]): Promise<void> {
 
   // Human-friendly output.
   if (result.nonDeterministic) {
-    console.error(
-      pc.red("✗ bisect aborted: timeline is non-deterministic"),
-    );
+    console.error(pc.red("✗ bisect aborted: timeline is non-deterministic"));
     console.error(
       pc.dim(
         `       Two full-timeline replays produced different oracle verdicts.\n` +
@@ -361,7 +354,9 @@ export async function bisectCommand(args: string[]): Promise<void> {
   }
   if (result.noFailureFound) {
     console.error(
-      pc.yellow("⚠ no failure to bisect: assertion passes on the full timeline"),
+      pc.yellow(
+        "⚠ no failure to bisect: assertion passes on the full timeline",
+      ),
     );
     console.error(
       pc.dim(
@@ -402,7 +397,11 @@ export async function bisectCommand(args: string[]): Promise<void> {
   );
   if (opts.verbose && frame) {
     console.log(pc.dim("  • frame:"));
-    console.log(pc.dim(`    ${JSON.stringify(frame, null, 2).split("\n").join("\n    ")}`));
+    console.log(
+      pc.dim(
+        `    ${JSON.stringify(frame, null, 2).split("\n").join("\n    ")}`,
+      ),
+    );
   }
   // R5 DX M3: align with `directive timeline diff` and the rest of
   // the CLI's exit-code convention. A "standard hit" means we LOCATED

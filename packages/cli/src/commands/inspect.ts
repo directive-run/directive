@@ -83,9 +83,7 @@ function formatConstraints(
         ? pc.green("active")
         : pc.dim("inactive");
     const hits = c.hitCount > 0 ? pc.yellow(` (${c.hitCount} hits)`) : "";
-    lines.push(
-      `  ${pc.cyan(c.id)}  ${status}  priority=${c.priority}${hits}`,
-    );
+    lines.push(`  ${pc.cyan(c.id)}  ${status}  priority=${c.priority}${hits}`);
   }
 
   return lines.join("\n");
@@ -93,7 +91,10 @@ function formatConstraints(
 
 function formatResolverDefs(
   resolverDefs: Array<{ id: string; requirement: string }>,
-  resolvers: Record<string, { state: string; error?: string; duration?: number }>,
+  resolvers: Record<
+    string,
+    { state: string; error?: string; duration?: number }
+  >,
 ): string {
   const lines: string[] = [];
   lines.push(pc.bold("Resolvers:"));
@@ -109,9 +110,7 @@ function formatResolverDefs(
     const stateStr = status
       ? formatResolverState(status.state, status.error, status.duration)
       : pc.dim("idle");
-    lines.push(
-      `  ${pc.cyan(def.id)} → ${def.requirement}  ${stateStr}`,
-    );
+    lines.push(`  ${pc.cyan(def.id)} → ${def.requirement}  ${stateStr}`);
   }
 
   return lines.join("\n");
@@ -240,9 +239,7 @@ function findWarnings(inspection: {
         r.requirement === u.requirement.type || r.requirement === "(predicate)",
     );
     if (!hasResolver) {
-      warnings.push(
-        `No resolver for requirement type "${u.requirement.type}"`,
-      );
+      warnings.push(`No resolver for requirement type "${u.requirement.type}"`);
     }
   }
 
@@ -257,9 +254,7 @@ export async function inspectCommand(args: string[]) {
   const { filePath, opts } = parseArgs(args);
 
   if (!filePath) {
-    console.error(
-      "Usage: directive inspect <file> [--json] [--module <name>]",
-    );
+    console.error("Usage: directive inspect <file> [--json] [--module <name>]");
     process.exit(1);
   }
 
@@ -325,7 +320,9 @@ export async function inspectCommand(args: string[]) {
   console.log();
 
   // Resolvers
-  console.log(formatResolverDefs(inspection.resolverDefs, inspection.resolvers));
+  console.log(
+    formatResolverDefs(inspection.resolverDefs, inspection.resolvers),
+  );
   console.log();
 
   // Unmet requirements

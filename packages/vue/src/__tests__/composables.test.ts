@@ -1,29 +1,29 @@
 import {
   createModule,
-  createSystem,
   createRequirementStatusPlugin,
+  createSystem,
   t,
 } from "@directive-run/core";
 import type { Plugin } from "@directive-run/core";
-import { effectScope, type EffectScope, type Ref, type ShallowRef } from "vue";
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { type EffectScope, type Ref, type ShallowRef, effectScope } from "vue";
 import {
-  useFact,
-  useDerived,
-  useSelector,
-  useDispatch,
-  useEvents,
-  useWatch,
-  useInspect,
-  useRequirementStatus,
-  useExplain,
-  useConstraintStatus,
-  useOptimisticUpdate,
-  useHistory,
-  useDirective,
-  useNamespacedSelector,
   createTypedHooks,
   shallowEqual,
+  useConstraintStatus,
+  useDerived,
+  useDirective,
+  useDispatch,
+  useEvents,
+  useExplain,
+  useFact,
+  useHistory,
+  useInspect,
+  useNamespacedSelector,
+  useOptimisticUpdate,
+  useRequirementStatus,
+  useSelector,
+  useWatch,
 } from "../index";
 
 // ============================================================================
@@ -971,7 +971,11 @@ describe("useRequirementStatus", () => {
       },
     );
     scope = effectScope();
-    let status!: ShallowRef<{ isLoading: boolean; pending: number; inflight: number }>;
+    let status!: ShallowRef<{
+      isLoading: boolean;
+      pending: number;
+      inflight: number;
+    }>;
 
     scope.run(() => {
       status = useRequirementStatus(statusPlugin, "LOAD_DATA");
@@ -999,7 +1003,9 @@ describe("useRequirementStatus", () => {
   it("status has correct shape", () => {
     const { system, statusPlugin } = createSystemWithStatus();
     scope = effectScope();
-    const status = scope.run(() => useRequirementStatus(statusPlugin, "LOAD_DATA"))!;
+    const status = scope.run(() =>
+      useRequirementStatus(statusPlugin, "LOAD_DATA"),
+    )!;
 
     expect(status.value).toHaveProperty("pending");
     expect(status.value).toHaveProperty("inflight");
@@ -1180,7 +1186,11 @@ describe("useConstraintStatus", () => {
       constraint = useConstraintStatus(system, "needsReady");
     });
 
-    const c = constraint.value as { id: string; active: boolean; priority: number } | null;
+    const c = constraint.value as {
+      id: string;
+      active: boolean;
+      priority: number;
+    } | null;
     expect(c).not.toBeNull();
     expect(c!.id).toBe("needsReady");
 
@@ -1665,15 +1675,11 @@ describe("useNamespacedSelector", () => {
     let updateCount = 0;
 
     scope.run(() => {
-      value = useNamespacedSelector(
-        system,
-        ["data.count"],
-        (s) => {
-          updateCount++;
+      value = useNamespacedSelector(system, ["data.count"], (s) => {
+        updateCount++;
 
-          return s.facts.data.count as number;
-        },
-      );
+        return s.facts.data.count as number;
+      });
     });
 
     const initialUpdateCount = updateCount;

@@ -11,8 +11,8 @@ import {
 
 import type {
   CacheEntry,
-  Embedding,
   EmbedderFn,
+  Embedding,
 } from "../../guardrails/semantic-cache.js";
 
 // ============================================================================
@@ -41,7 +41,12 @@ function unitVector(i: number, dims = 4): Embedding {
 
 /** Build a minimal CacheEntry for import tests. */
 function makeCacheEntry(
-  overrides: Partial<CacheEntry> & { id: string; query: string; response: string; queryEmbedding: Embedding },
+  overrides: Partial<CacheEntry> & {
+    id: string;
+    query: string;
+    response: string;
+    queryEmbedding: Embedding;
+  },
 ): CacheEntry {
   return {
     metadata: {},
@@ -160,17 +165,32 @@ describe("createInMemoryStorage", () => {
     const storage = createInMemoryStorage();
     await storage.addEntry(
       "ns",
-      makeCacheEntry({ id: "e1", query: "a", response: "1", queryEmbedding: [1, 0] }),
+      makeCacheEntry({
+        id: "e1",
+        query: "a",
+        response: "1",
+        queryEmbedding: [1, 0],
+      }),
     );
     await storage.addEntry(
       "ns",
-      makeCacheEntry({ id: "e2", query: "b", response: "2", queryEmbedding: [0, 1] }),
+      makeCacheEntry({
+        id: "e2",
+        query: "b",
+        response: "2",
+        queryEmbedding: [0, 1],
+      }),
     );
 
     // Entries in a different namespace should be unaffected
     await storage.addEntry(
       "other",
-      makeCacheEntry({ id: "e3", query: "c", response: "3", queryEmbedding: [1, 1] }),
+      makeCacheEntry({
+        id: "e3",
+        query: "c",
+        response: "3",
+        queryEmbedding: [1, 1],
+      }),
     );
 
     await storage.clear("ns");
@@ -343,7 +363,7 @@ describe("createSemanticCache", () => {
 
     await cache.store("stored", "response");
 
-    await cache.lookup("hit");  // hit
+    await cache.lookup("hit"); // hit
     await cache.lookup("miss"); // miss
 
     const stats = cache.getStats();
@@ -404,9 +424,27 @@ describe("createSemanticCache", () => {
     });
 
     const entries: CacheEntry[] = [
-      makeCacheEntry({ id: "i1", query: "a", response: "r1", queryEmbedding: unitVector(0, 4), accessedAt: 100 }),
-      makeCacheEntry({ id: "i2", query: "b", response: "r2", queryEmbedding: unitVector(1, 4), accessedAt: 200 }),
-      makeCacheEntry({ id: "i3", query: "c", response: "r3", queryEmbedding: unitVector(2, 4), accessedAt: 300 }),
+      makeCacheEntry({
+        id: "i1",
+        query: "a",
+        response: "r1",
+        queryEmbedding: unitVector(0, 4),
+        accessedAt: 100,
+      }),
+      makeCacheEntry({
+        id: "i2",
+        query: "b",
+        response: "r2",
+        queryEmbedding: unitVector(1, 4),
+        accessedAt: 200,
+      }),
+      makeCacheEntry({
+        id: "i3",
+        query: "c",
+        response: "r3",
+        queryEmbedding: unitVector(2, 4),
+        accessedAt: 300,
+      }),
     ];
 
     await cache.import(entries);
@@ -429,7 +467,9 @@ describe("createSemanticCache", () => {
     await cache.store("agent-a query", "r1", "agent-a");
     await cache.store("agent-b query", "r2", "agent-b");
 
-    const removed = await cache.invalidate((entry) => entry.agentName === "agent-a");
+    const removed = await cache.invalidate(
+      (entry) => entry.agentName === "agent-a",
+    );
 
     expect(removed).toBe(1);
 
@@ -608,9 +648,7 @@ describe("createBatchedEmbedder", () => {
   });
 
   it("destroy() rejects pending requests", async () => {
-    const embedBatch = vi.fn(async (texts: string[]) =>
-      texts.map(() => [1]),
-    );
+    const embedBatch = vi.fn(async (texts: string[]) => texts.map(() => [1]));
 
     const { embed, destroy } = createBatchedEmbedder({
       batchSize: 100,

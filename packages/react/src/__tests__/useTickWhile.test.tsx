@@ -1,14 +1,7 @@
 // @vitest-environment happy-dom
 import { createModule, createSystem, t } from "@directive-run/core";
-import { renderHook, act } from "@testing-library/react";
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useTickWhile } from "../index";
 
 // ============================================================================
@@ -220,12 +213,7 @@ describe("useTickWhile", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     renderHook(() =>
-      useTickWhile(
-        system,
-        (sys) => sys.facts.status === "running",
-        "TICK",
-        0,
-      ),
+      useTickWhile(system, (sys) => sys.facts.status === "running", "TICK", 0),
     );
 
     act(() => {
@@ -240,14 +228,7 @@ describe("useTickWhile", () => {
   });
 
   it("does not fire while predicate is false even at construction", () => {
-    renderHook(() =>
-      useTickWhile(
-        system,
-        () => false,
-        "TICK",
-        50,
-      ),
-    );
+    renderHook(() => useTickWhile(system, () => false, "TICK", 50));
 
     act(() => {
       vi.advanceTimersByTime(1000);

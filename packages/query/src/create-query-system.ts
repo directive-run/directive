@@ -18,14 +18,14 @@ import type {
 } from "@directive-run/core";
 import { createInfiniteQuery } from "./create-infinite-query.js";
 import type { InfiniteResourceState } from "./create-infinite-query.js";
-import { createMutation } from "./create-mutation.js";
-import { createQuery } from "./create-query.js";
 import {
-  bindListQueryHandle,
-  createListQuery,
   type BoundListQueryHandle,
   type ListQueryOptions,
+  bindListQueryHandle,
+  createListQuery,
 } from "./create-list-query.js";
+import { createMutation } from "./create-mutation.js";
+import { createQuery } from "./create-query.js";
 import { createSubscription } from "./create-subscription.js";
 import { explainQuery } from "./explain.js";
 import type {
@@ -225,7 +225,10 @@ export interface QuerySystemConfig {
    * fetched independently" pattern). Key becomes the query name.
    */
   // biome-ignore lint/suspicious/noExplicitAny: List options have varying generics
-  listQueries?: Record<string, Omit<ListQueryOptions<any, any, any, any>, "name">>;
+  listQueries?: Record<
+    string,
+    Omit<ListQueryOptions<any, any, any, any>, "name">
+  >;
 
   // Module config pass-through
   derive?: Record<

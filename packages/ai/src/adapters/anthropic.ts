@@ -13,10 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type {
-  AdapterHooks,
-  AgentRunner,
-} from "../types.js";
+import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
   buildStreamingResult,
@@ -262,18 +259,34 @@ export function createAnthropicStreamingRunner(
             );
           }
 
-          const result: { text?: string; inputTokens?: number; outputTokens?: number } = {};
+          const result: {
+            text?: string;
+            inputTokens?: number;
+            outputTokens?: number;
+          } = {};
           if (
             event.type === "content_block_delta" &&
             (event.delta as Record<string, unknown>)?.type === "text_delta"
           ) {
-            result.text = (event.delta as Record<string, unknown>).text as string;
+            result.text = (event.delta as Record<string, unknown>)
+              .text as string;
           }
           if (event.type === "message_delta" && event.usage) {
-            result.outputTokens = (event.usage as Record<string, unknown>).output_tokens as number ?? 0;
+            result.outputTokens =
+              ((event.usage as Record<string, unknown>)
+                .output_tokens as number) ?? 0;
           }
-          if (event.type === "message_start" && (event.message as Record<string, unknown>)?.usage) {
-            result.inputTokens = ((event.message as Record<string, unknown>).usage as Record<string, unknown>).input_tokens as number ?? 0;
+          if (
+            event.type === "message_start" &&
+            (event.message as Record<string, unknown>)?.usage
+          ) {
+            result.inputTokens =
+              ((
+                (event.message as Record<string, unknown>).usage as Record<
+                  string,
+                  unknown
+                >
+              ).input_tokens as number) ?? 0;
           }
 
           return result;
@@ -285,7 +298,15 @@ export function createAnthropicStreamingRunner(
       const totalTokens = inputTokens + outputTokens;
 
       callbacks.onMessage?.({ role: "assistant", content: fullText });
-      fireAfterCallHook(hooks, agent, input, fullText, totalTokens, tokenUsage, startTime);
+      fireAfterCallHook(
+        hooks,
+        agent,
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        startTime,
+      );
 
       return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
     } catch (err) {

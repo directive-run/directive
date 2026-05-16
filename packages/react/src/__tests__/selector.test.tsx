@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { createModule, createSystem, t } from "@directive-run/core";
-import { renderHook, act, cleanup } from "@testing-library/react";
-import { describe, it, expect, afterEach } from "vitest";
-import { useSelector, useNamespacedSelector, shallowEqual } from "../index";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { shallowEqual, useNamespacedSelector, useSelector } from "../index";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -185,14 +185,11 @@ describe("useSelector (SingleModuleSystem)", () => {
       return useSelector(sys, (s) => s.count, -1);
     }
 
-    const { result, rerender } = renderHook(
-      ({ sys }) => useTestHook(sys),
-      {
-        initialProps: {
-          sys: null as ReturnType<typeof createTestSystem> | null,
-        },
+    const { result, rerender } = renderHook(({ sys }) => useTestHook(sys), {
+      initialProps: {
+        sys: null as ReturnType<typeof createTestSystem> | null,
       },
-    );
+    });
 
     expect(result.current).toBe(-1);
 
@@ -297,9 +294,7 @@ describe("useSelector (SingleModuleSystem)", () => {
   it("subscribes to everything when selector accesses no tracked keys", () => {
     system = createTestSystem();
 
-    const { result } = renderHook(() =>
-      useSelector(system, () => "static"),
-    );
+    const { result } = renderHook(() => useSelector(system, () => "static"));
 
     expect(result.current).toBe("static");
 
@@ -352,12 +347,7 @@ describe("useSelector (SingleModuleSystem)", () => {
   it("reads derivations that depend on multiple facts", () => {
     system = createTestSystem();
     const { result } = renderHook(() =>
-      useSelector(
-        system,
-        (s) => s.coords,
-        { x: 0, y: 0 },
-        shallowEqual,
-      ),
+      useSelector(system, (s) => s.coords, { x: 0, y: 0 }, shallowEqual),
     );
 
     expect(result.current).toEqual({ x: 0, y: 0 });
@@ -479,11 +469,7 @@ describe("useNamespacedSelector", () => {
   it("selects with explicit keys", () => {
     system = createNamespacedSystem();
     const { result } = renderHook(() =>
-      useNamespacedSelector(
-        system,
-        ["auth.token"],
-        (s) => s.facts.auth.token,
-      ),
+      useNamespacedSelector(system, ["auth.token"], (s) => s.facts.auth.token),
     );
 
     expect(result.current).toBe("");
@@ -492,11 +478,7 @@ describe("useNamespacedSelector", () => {
   it("updates when subscribed key changes", () => {
     system = createNamespacedSystem();
     const { result } = renderHook(() =>
-      useNamespacedSelector(
-        system,
-        ["data.count"],
-        (s) => s.facts.data.count,
-      ),
+      useNamespacedSelector(system, ["data.count"], (s) => s.facts.data.count),
     );
 
     expect(result.current).toBe(0);
@@ -565,11 +547,7 @@ describe("useNamespacedSelector", () => {
   it("supports wildcard subscriptions", () => {
     system = createNamespacedSystem();
     const { result } = renderHook(() =>
-      useNamespacedSelector(
-        system,
-        ["data.*"],
-        (s) => s.derive.data.doubled,
-      ),
+      useNamespacedSelector(system, ["data.*"], (s) => s.derive.data.doubled),
     );
 
     expect(result.current).toBe(0);

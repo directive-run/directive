@@ -115,7 +115,10 @@ describe("createListQuery", () => {
 
     it("init() with initialData populates the states Map as success", () => {
       const initial = new Map<string, DriftRow>();
-      initial.set(serializeKey({ gameId: "abc" }), { gameId: "abc", spread: 3.5 });
+      initial.set(serializeKey({ gameId: "abc" }), {
+        gameId: "abc",
+        spread: 3.5,
+      });
       const q = createListQuery({
         name: "drift",
         keys: () => null,
@@ -358,7 +361,10 @@ describe("createListQuery", () => {
           },
         },
         events: {
-          setIds: (facts: Record<string, unknown>, { value }: { value: string[] }) => {
+          setIds: (
+            facts: Record<string, unknown>,
+            { value }: { value: string[] },
+          ) => {
             facts.activeGameIds = value;
           },
         },

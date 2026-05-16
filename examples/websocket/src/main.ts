@@ -6,9 +6,9 @@
  * and event timeline. A 500ms timer drives reactive reconnect countdown.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   getActiveSocket,
   websocketModule,
@@ -140,7 +140,11 @@ function render(): void {
   // --- Message feed ---
   if (messages.length === 0) {
     messageFeed.replaceChildren(
-      el("div", { className: "ws-message-empty" }, "Messages will appear here after connecting"),
+      el(
+        "div",
+        { className: "ws-message-empty" },
+        "Messages will appear here after connecting",
+      ),
     );
   } else {
     messageFeed.replaceChildren(
@@ -153,10 +157,16 @@ function render(): void {
           second: "2-digit",
         });
 
-        const row = el("div", {
-          className: `ws-message-item ${isEcho ? "" : msg.type}`,
-        },
-          el("span", { className: `ws-msg-type ${msg.type}` }, isEcho ? "echo" : msg.type),
+        const row = el(
+          "div",
+          {
+            className: `ws-message-item ${isEcho ? "" : msg.type}`,
+          },
+          el(
+            "span",
+            { className: `ws-msg-type ${msg.type}` },
+            isEcho ? "echo" : msg.type,
+          ),
           el("span", { className: "ws-msg-from" }, msg.from),
           el("span", { className: "ws-msg-text" }, msg.text),
           el("span", { className: "ws-msg-time" }, timeStr),
@@ -188,7 +198,11 @@ function render(): void {
   // --- Timeline ---
   if (eventLog.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "ws-timeline-empty" }, "Events will appear here after connecting"),
+      el(
+        "div",
+        { className: "ws-timeline-empty" },
+        "Events will appear here after connecting",
+      ),
     );
   } else {
     const entries: HTMLElement[] = [];
@@ -202,7 +216,9 @@ function render(): void {
       });
 
       entries.push(
-        el("div", { className: `ws-timeline-entry ${entry.event}` },
+        el(
+          "div",
+          { className: `ws-timeline-entry ${entry.event}` },
           el("span", { className: "ws-timeline-time" }, timeStr),
           el("span", { className: "ws-timeline-event" }, entry.event),
           el("span", { className: "ws-timeline-detail" }, entry.detail),

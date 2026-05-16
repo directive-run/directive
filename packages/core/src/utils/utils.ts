@@ -70,10 +70,7 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
   }
 
   /** Guard against circular references using a seen-set, then delegate to fn. */
-  function withCircularGuard(
-    obj: object,
-    fn: () => string,
-  ): string {
+  function withCircularGuard(obj: object, fn: () => string): string {
     if (seen.has(obj)) {
       return '"[circular]"';
     }
@@ -86,13 +83,17 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
 
   /** Stringify an array with circular reference protection. */
   function stringifyArray(val: unknown[], depth: number): string {
-    return withCircularGuard(val, () =>
-      `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`,
+    return withCircularGuard(
+      val,
+      () => `[${val.map((v) => stringify(v, depth + 1)).join(",")}]`,
     );
   }
 
   /** Stringify an object with sorted keys and circular reference protection. */
-  function stringifyObject(obj: Record<string, unknown>, depth: number): string {
+  function stringifyObject(
+    obj: Record<string, unknown>,
+    depth: number,
+  ): string {
     return withCircularGuard(obj, () => {
       const keys = Object.keys(obj).sort();
       const pairs = keys.map(
@@ -141,10 +142,7 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
   const seen = new WeakSet();
 
   /** Guard against circular references using a seen-set, then delegate to fn. */
-  function withCircularGuard(
-    objVal: object,
-    fn: () => boolean,
-  ): boolean {
+  function withCircularGuard(objVal: object, fn: () => boolean): boolean {
     if (seen.has(objVal)) return true;
     seen.add(objVal);
     const result = fn();
@@ -165,7 +163,10 @@ export function isPrototypeSafe(obj: unknown, maxDepth = 50): boolean {
   }
 
   /** Check object keys and values for prototype pollution. */
-  function checkObject(objVal: Record<string, unknown>, depth: number): boolean {
+  function checkObject(
+    objVal: Record<string, unknown>,
+    depth: number,
+  ): boolean {
     for (const key of Object.keys(objVal)) {
       if (dangerousKeys.has(key)) {
         return false;
@@ -714,10 +715,7 @@ function timingSafeEqual(a: string, b: string): boolean {
  * This is the canonical implementation – all packages should import this
  * instead of maintaining local copies.
  */
-export function safeStringify(
-  data: unknown,
-  maxLen = 500,
-): string {
+export function safeStringify(data: unknown, maxLen = 500): string {
   try {
     const str = JSON.stringify(
       data,

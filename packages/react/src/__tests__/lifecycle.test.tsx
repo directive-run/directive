@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { createModule, t } from "@directive-run/core";
 import type { ModuleDef } from "@directive-run/core";
-import { renderHook, act, render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import {
-  useDirectiveRef,
-  useDirective,
   DirectiveHydrator,
-  useHydratedSystem,
+  useDirective,
+  useDirectiveRef,
   useFact,
+  useHydratedSystem,
 } from "../index";
 
 // ---------------------------------------------------------------------------
@@ -227,9 +227,7 @@ describe("useDirective", () => {
     expect(result.current.facts).toHaveProperty("count");
     expect(result.current.facts).toHaveProperty("name");
     expect((result.current.facts as Record<string, unknown>).count).toBe(0);
-    expect((result.current.facts as Record<string, unknown>).name).toBe(
-      "test",
-    );
+    expect((result.current.facts as Record<string, unknown>).name).toBe("test");
 
     // All derivations should be present
     expect(result.current.derived).toHaveProperty("doubled");
@@ -293,7 +291,9 @@ describe("useDirective", () => {
     expect(result.current).toHaveProperty("statusPlugin");
     const withStatus = result.current as { statusPlugin: unknown };
     expect(withStatus.statusPlugin).toBeDefined();
-    expect(typeof (withStatus.statusPlugin as { getStatus: unknown }).getStatus).toBe("function");
+    expect(
+      typeof (withStatus.statusPlugin as { getStatus: unknown }).getStatus,
+    ).toBe("function");
   });
 
   it("facts update reactively when underlying system changes", () => {

@@ -1,28 +1,33 @@
-import { createModule, createSystem, createRequirementStatusPlugin, t } from "@directive-run/core";
-import type { ReactiveControllerHost, ReactiveController } from "lit";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  FactController,
+  createModule,
+  createRequirementStatusPlugin,
+  createSystem,
+  t,
+} from "@directive-run/core";
+import type { ReactiveController, ReactiveControllerHost } from "lit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ConstraintStatusController,
   DerivedController,
   DirectiveSelectorController,
-  WatchController,
-  InspectController,
-  RequirementStatusController,
   ExplainController,
-  ConstraintStatusController,
-  OptimisticUpdateController,
+  FactController,
   HistoryController,
-  SystemController,
+  InspectController,
   ModuleController,
-  createFact,
+  OptimisticUpdateController,
+  RequirementStatusController,
+  SystemController,
+  WatchController,
+  createConstraintStatus,
   createDerived,
-  createInspect,
-  createWatch,
   createDirectiveSelector,
   createExplain,
-  createConstraintStatus,
-  createOptimisticUpdate,
+  createFact,
+  createInspect,
   createModule as createModuleController,
+  createOptimisticUpdate,
+  createWatch,
   shallowEqual,
 } from "../index";
 
@@ -1026,9 +1031,7 @@ describe("ModuleController", () => {
 
     controller.system.facts.count = 10;
 
-    expect(controller.facts).toEqual(
-      expect.objectContaining({ count: 10 }),
-    );
+    expect(controller.facts).toEqual(expect.objectContaining({ count: 10 }));
     expect(controller.derived).toEqual(
       expect.objectContaining({ doubled: 20 }),
     );
@@ -1170,9 +1173,7 @@ describe("Factory functions", () => {
 
     expect(controller).toBeInstanceOf(ModuleController);
     controller.hostConnected();
-    expect(controller.facts).toEqual(
-      expect.objectContaining({ count: 0 }),
-    );
+    expect(controller.facts).toEqual(expect.objectContaining({ count: 0 }));
     controller.hostDisconnected();
   });
 });

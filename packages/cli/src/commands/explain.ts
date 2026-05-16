@@ -5,9 +5,11 @@ interface ExplainOptions {
   module?: string;
 }
 
-function parseArgs(
-  args: string[],
-): { filePath: string; requirementId?: string; opts: ExplainOptions } {
+function parseArgs(args: string[]): {
+  filePath: string;
+  requirementId?: string;
+  opts: ExplainOptions;
+} {
   const opts: ExplainOptions = {};
   let filePath = "";
   let requirementId: string | undefined;
@@ -45,9 +47,7 @@ export async function explainCommand(args: string[]) {
   const { filePath, requirementId } = parseArgs(args);
 
   if (!filePath) {
-    console.error(
-      "Usage: directive explain <file> [requirement-id]",
-    );
+    console.error("Usage: directive explain <file> [requirement-id]");
     process.exit(1);
   }
 
@@ -102,7 +102,10 @@ export async function explainCommand(args: string[]) {
 
       // Show resolver history if available
       const resolverEntries = Object.entries(
-        inspection.resolvers as Record<string, { state: string; duration?: number; error?: string }>,
+        inspection.resolvers as Record<
+          string,
+          { state: string; duration?: number; error?: string }
+        >,
       );
       if (resolverEntries.length > 0) {
         console.log(pc.bold("Recent Resolver Activity:"));
@@ -134,7 +137,12 @@ export async function explainCommand(args: string[]) {
         }
 
         // Check resolver status
-        const resolverStatus = (inspection.resolvers as Record<string, { state: string; error?: string } | undefined>)[u.id];
+        const resolverStatus = (
+          inspection.resolvers as Record<
+            string,
+            { state: string; error?: string } | undefined
+          >
+        )[u.id];
         if (resolverStatus) {
           console.log(
             `  Resolver: ${formatState(resolverStatus.state)}${resolverStatus.error ? ` — ${resolverStatus.error}` : ""}`,

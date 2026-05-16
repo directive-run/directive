@@ -5,9 +5,9 @@
  * renders the mission board, sidebar, and event log.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import { AGENTS, AGENT_ORDER, getApiKey } from "./agents.js";
 import { advanceStep, heistModule } from "./goal-module.js";
 import type { NodeStatus, StrategyId } from "./goal-module.js";
@@ -305,8 +305,13 @@ function render() {
     ...FACT_KEYS.map((key) => {
       const hasValue = goalFacts[key] != null;
 
-      return el("li",
-        el("span", { className: hasValue ? "fact-check" : "fact-empty" }, hasValue ? "\u25CF" : "\u25CB"),
+      return el(
+        "li",
+        el(
+          "span",
+          { className: hasValue ? "fact-check" : "fact-empty" },
+          hasValue ? "\u25CF" : "\u25CB",
+        ),
         el("span", { className: "fact-key" }, key),
       );
     }),
@@ -322,10 +327,16 @@ function render() {
       const nodeStatus = nodeStatuses[id] ?? "pending";
       const tokens = facts.nodeTokens[id] ?? 0;
 
-      return el("div", { className: "agent-row" },
+      return el(
+        "div",
+        { className: "agent-row" },
         el("span", { className: `agent-dot ${nodeStatus}` }),
         el("span", { className: "agent-name" }, `${agent.emoji} ${agent.name}`),
-        el("span", { className: "agent-tokens" }, tokens > 0 ? `${tokens}t` : ""),
+        el(
+          "span",
+          { className: "agent-tokens" },
+          tokens > 0 ? `${tokens}t` : "",
+        ),
       );
     }),
   );
@@ -352,10 +363,14 @@ function render() {
       const deltaSign = entry.satisfactionDelta > 0 ? "+" : "";
 
       logEntries.appendChild(
-        el("div", { className: "log-entry" },
+        el(
+          "div",
+          { className: "log-entry" },
           el("span", { className: "log-step" }, `Step ${entry.step}:`),
           ` ${names} `,
-          el("span", { className: `log-delta ${deltaClass}` },
+          el(
+            "span",
+            { className: `log-delta ${deltaClass}` },
             `${deltaSign}${(entry.satisfactionDelta * 100).toFixed(0)}%`,
           ),
         ),
@@ -369,7 +384,9 @@ function render() {
       );
 
       if (!existing) {
-        const relDiv = el("div", { className: "log-entry relaxation" },
+        const relDiv = el(
+          "div",
+          { className: "log-entry relaxation" },
           el("span", { className: "log-step" }, `\u26A0 Step ${rel.step}:`),
           ` ${rel.label} [${rel.strategy}]`,
         );
@@ -381,7 +398,9 @@ function render() {
     // Completion
     if (achieved && !logEntries.querySelector(".completion")) {
       logEntries.appendChild(
-        el("div", { className: "log-entry completion" },
+        el(
+          "div",
+          { className: "log-entry completion" },
           `\u2705 Mission complete! ${stepHistory.length} steps, ${facts.totalTokens} tokens.`,
         ),
       );

@@ -11,7 +11,13 @@
  * Run: tsx scripts/extract-examples.ts
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { log } from "../../../scripts/lib/log";
@@ -23,7 +29,7 @@ const OUTPUT_DIR = join(__dirname, "..", "examples");
 // Examples to skip — must be a conscious decision with a comment
 const EXCLUDED_EXAMPLES: string[] = [
   "schema-patterns", // Non-standard structure (files at root, not in src/)
-  "eleven-up",       // React game, non-standard structure
+  "eleven-up", // React game, non-standard structure
 ];
 
 interface ExampleSource {
@@ -36,15 +42,15 @@ interface ExampleSource {
 // Patterns that indicate DOM wiring code
 const DOM_PATTERNS = [
   /document\.(getElementById|querySelector|querySelectorAll|createElement)/,
-  /^\s*document\s*$/,           // standalone `document` (start of chained call)
-  /^\s*\.(getElementById|querySelector|querySelectorAll|createElement)\(/,  // continuation of chained document.xxx
+  /^\s*document\s*$/, // standalone `document` (start of chained call)
+  /^\s*\.(getElementById|querySelector|querySelectorAll|createElement)\(/, // continuation of chained document.xxx
   /\.innerHTML\s*[+=]/,
   /\.textContent\s*[+=]/,
   /\.classList\./,
   /\.style\./,
   /\.setAttribute\(/,
   /\.removeAttribute\(/,
-  /(?<!window)\.addEventListener\(/,  // element.addEventListener (not window.addEventListener)
+  /(?<!window)\.addEventListener\(/, // element.addEventListener (not window.addEventListener)
   /removeEventListener\(/,
   /\.appendChild\(/,
   /\.removeChild\(/,
@@ -110,7 +116,10 @@ function isDomLine(line: string): boolean {
  * For AI examples, also check:
  * 5. src/ai-orchestrator.ts
  */
-function findSourceFile(exampleDir: string, name: string): { path: string; pure: boolean } | null {
+function findSourceFile(
+  exampleDir: string,
+  name: string,
+): { path: string; pure: boolean } | null {
   const srcDir = join(exampleDir, "src");
   if (!existsSync(srcDir)) {
     return null;
@@ -310,7 +319,12 @@ function extractExample(source: ExampleSource): string {
     }
 
     // Skip lines that reference DOM-only variables
-    if (/^\s*\w+(El|Element|Container|Btn|Button|Input|Form|Display|Badge|Fill|Bar|Slider|Card|Grid|List|Timeline)\b/.test(trimmed) && !trimmed.startsWith("//")) {
+    if (
+      /^\s*\w+(El|Element|Container|Btn|Button|Input|Form|Display|Badge|Fill|Bar|Slider|Card|Grid|List|Timeline)\b/.test(
+        trimmed,
+      ) &&
+      !trimmed.startsWith("//")
+    ) {
       continue;
     }
 
@@ -379,7 +393,9 @@ function main() {
   mkdirSync(OUTPUT_DIR, { recursive: true });
 
   const sources = discoverExamples();
-  log.step(`Scanning examples/ (${sources.length} found, ${EXCLUDED_EXAMPLES.length} excluded)`);
+  log.step(
+    `Scanning examples/ (${sources.length} found, ${EXCLUDED_EXAMPLES.length} excluded)`,
+  );
 
   let extracted = 0;
   let warnings = 0;
@@ -395,7 +411,10 @@ function main() {
       log.warn(`${source.name}: source not found`);
     } else {
       extracted++;
-      log.io(`examples/${source.sourcePath}`, `${source.name}.ts (${lineCount} lines)`);
+      log.io(
+        `examples/${source.sourcePath}`,
+        `${source.name}.ts (${lineCount} lines)`,
+      );
     }
   }
 

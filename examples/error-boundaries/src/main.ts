@@ -109,7 +109,11 @@ function render(): void {
   // Timeline
   if (timeline.length === 0) {
     timelineEl.replaceChildren(
-      el("div", { className: "eb-timeline-empty" }, "Events appear after interactions"),
+      el(
+        "div",
+        { className: "eb-timeline-empty" },
+        "Events appear after interactions",
+      ),
     );
   } else {
     timelineEl.replaceChildren(
@@ -121,7 +125,9 @@ function render(): void {
           second: "2-digit",
         });
 
-        return el("div", { className: `eb-timeline-entry ${entry.type}` },
+        return el(
+          "div",
+          { className: `eb-timeline-entry ${entry.type}` },
           el("span", { className: "eb-timeline-time" }, timeStr),
           el("span", { className: "eb-timeline-event" }, entry.event),
           el("span", { className: "eb-timeline-detail" }, entry.detail),

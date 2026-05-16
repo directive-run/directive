@@ -678,7 +678,11 @@ describe("DefinitionMeta", () => {
         init: (f) => {
           f.token = "";
         },
-        meta: { label: "Authentication", description: "Handles user auth", category: "auth" },
+        meta: {
+          label: "Authentication",
+          description: "Handles user auth",
+          category: "auth",
+        },
       });
       const sys = createSystem({ module: mod });
       sys.start();
@@ -846,8 +850,12 @@ describe("DefinitionMeta", () => {
     it("fact meta survives chain order: meta before type-specific", () => {
       // t.string().meta({...}).minLength(3) — meta should NOT be lost
       // Runtime: specialized .meta() overrides base and returns ChainableString
-      const nameField = t.string().meta({ label: "Name" }) as ReturnType<typeof t.string> & { minLength(n: number): unknown };
-      const countField = t.number().meta({ label: "Count" }) as ReturnType<typeof t.number> & { min(n: number): unknown };
+      const nameField = t.string().meta({ label: "Name" }) as ReturnType<
+        typeof t.string
+      > & { minLength(n: number): unknown };
+      const countField = t.number().meta({ label: "Count" }) as ReturnType<
+        typeof t.number
+      > & { min(n: number): unknown };
       const mod = createModule("chain-order", {
         schema: {
           facts: {
@@ -1084,9 +1092,7 @@ describe("DefinitionMeta", () => {
 
       const trace = sys.trace;
       expect(trace).not.toBeNull();
-      const entry = trace!.find(
-        (t) => t.constraintsHit.length > 0,
-      );
+      const entry = trace!.find((t) => t.constraintsHit.length > 0);
       expect(entry).toBeDefined();
       const hit = entry!.constraintsHit.find((c) => c.id === "check");
       expect(hit?.meta?.label).toBe("Positive Check");
@@ -1204,9 +1210,7 @@ describe("DefinitionMeta", () => {
       expect(trace).not.toBeNull();
       const entry = trace!.find((t) => t.resolversCompleted.length > 0);
       expect(entry).toBeDefined();
-      const rc = entry!.resolversCompleted.find(
-        (r) => r.resolver === "doer",
-      );
+      const rc = entry!.resolversCompleted.find((r) => r.resolver === "doer");
       expect(rc?.meta?.label).toBe("Doer Resolver");
 
       sys.destroy();
@@ -1251,9 +1255,7 @@ describe("DefinitionMeta", () => {
       const entry = trace!.find((t) => t.derivationsRecomputed.length > 0);
       // Derivation recompute tracking depends on subscriber reads during reconcile
       if (entry) {
-        const dr = entry.derivationsRecomputed.find(
-          (d) => d.id === "doubled",
-        );
+        const dr = entry.derivationsRecomputed.find((d) => d.id === "doubled");
         if (dr) {
           expect(dr.meta?.label).toBe("Doubled Value");
         }
@@ -1364,7 +1366,9 @@ describe("DefinitionMeta", () => {
       const mod = createModule("tags", {
         schema: {
           facts: {
-            email: t.string().meta({ label: "Email", tags: ["pii", "contact"] }),
+            email: t
+              .string()
+              .meta({ label: "Email", tags: ["pii", "contact"] }),
             name: t.string().meta({ label: "Name", tags: ["pii"] }),
             count: t.number(),
           },

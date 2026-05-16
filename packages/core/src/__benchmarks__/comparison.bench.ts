@@ -1,3 +1,7 @@
+import { computed, effect, signal } from "@preact/signals-core";
+import { configureStore, createSlice } from "@reduxjs/toolkit";
+import { atom, createStore as createJotaiStore } from "jotai/vanilla";
+import { autorun, makeAutoObservable } from "mobx";
 // @ts-nocheck
 /**
  * Head-to-Head Benchmark: Directive vs Zustand vs Redux vs MobX vs Jotai vs Signals vs XState
@@ -6,14 +10,10 @@
  * Run: pnpm bench
  */
 import { bench, describe } from "vitest";
-import { adapters } from "./lib";
-import { createModule, createSystem, t } from "../../src/index";
+import { assign, createActor, setup } from "xstate";
 import { createStore as createZustandStore } from "zustand/vanilla";
-import { makeAutoObservable, autorun } from "mobx";
-import { signal, effect, computed } from "@preact/signals-core";
-import { configureStore, createSlice } from "@reduxjs/toolkit";
-import { atom, createStore as createJotaiStore } from "jotai/vanilla";
-import { createActor, setup, assign } from "xstate";
+import { createModule, createSystem, t } from "../../src/index";
+import { adapters } from "./lib";
 
 // ============================================================================
 // 1. Single Read
@@ -102,13 +102,23 @@ describe("Comparison: 50 Writes + 1 Read (batch efficiency)", () => {
 describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () => {
   bench("Directive", () => {
     const mod = createModule("b", {
-      schema: { facts: { count: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (f) => { f.count = 0; },
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.count = 0;
+      },
     });
     const sys = createSystem({ module: mod });
     sys.start();
     let n = 0;
-    for (let i = 0; i < 10; i++) sys.subscribe(() => { n++; });
+    for (let i = 0; i < 10; i++)
+      sys.subscribe(() => {
+        n++;
+      });
     sys.facts.count = 1;
     sys.destroy();
   });
@@ -116,7 +126,10 @@ describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () =
   bench("Zustand", () => {
     const store = createZustandStore<{ count: number }>()(() => ({ count: 0 }));
     let n = 0;
-    for (let i = 0; i < 10; i++) store.subscribe(() => { n++; });
+    for (let i = 0; i < 10; i++)
+      store.subscribe(() => {
+        n++;
+      });
     store.setState({ count: 1 });
   });
 
@@ -124,7 +137,13 @@ describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () =
     const store = makeAutoObservable({ count: 0 });
     let n = 0;
     const disposers: (() => void)[] = [];
-    for (let i = 0; i < 10; i++) disposers.push(autorun(() => { void store.count; n++; }));
+    for (let i = 0; i < 10; i++)
+      disposers.push(
+        autorun(() => {
+          void store.count;
+          n++;
+        }),
+      );
     store.count = 1;
     for (const d of disposers) d();
   });
@@ -133,7 +152,13 @@ describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () =
     const count = signal(0);
     let n = 0;
     const disposers: (() => void)[] = [];
-    for (let i = 0; i < 10; i++) disposers.push(effect(() => { void count.value; n++; }));
+    for (let i = 0; i < 10; i++)
+      disposers.push(
+        effect(() => {
+          void count.value;
+          n++;
+        }),
+      );
     count.value = 1;
     for (const d of disposers) d();
   });
@@ -146,8 +171,15 @@ describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () =
 describe("Comparison: Store Creation (cold start)", () => {
   bench("Directive", () => {
     const mod = createModule("b", {
-      schema: { facts: { count: t.number() }, derivations: {}, events: {}, requirements: {} },
-      init: (f) => { f.count = 0; },
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.count = 0;
+      },
     });
     const sys = createSystem({ module: mod });
     sys.start();
@@ -159,8 +191,19 @@ describe("Comparison: Store Creation (cold start)", () => {
   });
 
   bench("Redux Toolkit", () => {
-    const slice = createSlice({ name: "c", initialState: { count: 0 }, reducers: { set: (s, a: { payload: number }) => { s.count = a.payload; } } });
-    configureStore({ reducer: slice.reducer, middleware: (g) => g({ serializableCheck: false, immutableCheck: false }) });
+    const slice = createSlice({
+      name: "c",
+      initialState: { count: 0 },
+      reducers: {
+        set: (s, a: { payload: number }) => {
+          s.count = a.payload;
+        },
+      },
+    });
+    configureStore({
+      reducer: slice.reducer,
+      middleware: (g) => g({ serializableCheck: false, immutableCheck: false }),
+    });
   });
 
   bench("MobX", () => {
@@ -178,7 +221,10 @@ describe("Comparison: Store Creation (cold start)", () => {
 
   bench("XState", () => {
     const machine = setup({
-      types: { context: {} as { count: number }, events: {} as { type: "SET"; value: number } },
+      types: {
+        context: {} as { count: number },
+        events: {} as { type: "SET"; value: number },
+      },
     }).createMachine({
       context: { count: 0 },
       on: { SET: { actions: assign({ count: ({ event }) => event.value }) } },
@@ -198,10 +244,22 @@ describe("Comparison: Read 10 Keys", () => {
   (() => {
     const facts: Record<string, any> = {};
     const schema: Record<string, any> = {};
-    for (let i = 0; i < 10; i++) { facts[`k${i}`] = i; schema[`k${i}`] = { _type: 0 }; }
-    const mod = createModule("mk", { schema: { facts: schema, derivations: {}, events: {}, requirements: {} }, init: (f) => { for (let i = 0; i < 10; i++) f[`k${i}`] = i; } });
-    const sys = createSystem({ module: mod }); sys.start();
-    bench("Directive", () => { let s = 0; for (let i = 0; i < 10; i++) s += sys.facts[`k${i}`]; });
+    for (let i = 0; i < 10; i++) {
+      facts[`k${i}`] = i;
+      schema[`k${i}`] = { _type: 0 };
+    }
+    const mod = createModule("mk", {
+      schema: { facts: schema, derivations: {}, events: {}, requirements: {} },
+      init: (f) => {
+        for (let i = 0; i < 10; i++) f[`k${i}`] = i;
+      },
+    });
+    const sys = createSystem({ module: mod });
+    sys.start();
+    bench("Directive", () => {
+      let s = 0;
+      for (let i = 0; i < 10; i++) s += sys.facts[`k${i}`];
+    });
   })();
 
   // Zustand
@@ -209,26 +267,50 @@ describe("Comparison: Read 10 Keys", () => {
     const init: Record<string, number> = {};
     for (let i = 0; i < 10; i++) init[`k${i}`] = i;
     const store = createZustandStore()(() => init);
-    bench("Zustand", () => { let s = 0; const st = store.getState(); for (let i = 0; i < 10; i++) s += st[`k${i}`]; });
+    bench("Zustand", () => {
+      let s = 0;
+      const st = store.getState();
+      for (let i = 0; i < 10; i++) s += st[`k${i}`];
+    });
   })();
 
   // MobX
   (() => {
-    const store = makeAutoObservable({ k0: 0, k1: 1, k2: 2, k3: 3, k4: 4, k5: 5, k6: 6, k7: 7, k8: 8, k9: 9 });
-    bench("MobX", () => { let s = 0; for (let i = 0; i < 10; i++) s += store[`k${i}`]; });
+    const store = makeAutoObservable({
+      k0: 0,
+      k1: 1,
+      k2: 2,
+      k3: 3,
+      k4: 4,
+      k5: 5,
+      k6: 6,
+      k7: 7,
+      k8: 8,
+      k9: 9,
+    });
+    bench("MobX", () => {
+      let s = 0;
+      for (let i = 0; i < 10; i++) s += store[`k${i}`];
+    });
   })();
 
   // Preact Signals
   (() => {
     const sigs = Array.from({ length: 10 }, (_, i) => signal(i));
-    bench("Preact Signals", () => { let s = 0; for (let i = 0; i < 10; i++) s += sigs[i].value; });
+    bench("Preact Signals", () => {
+      let s = 0;
+      for (let i = 0; i < 10; i++) s += sigs[i].value;
+    });
   })();
 
   // Jotai
   (() => {
     const atoms = Array.from({ length: 10 }, (_, i) => atom(i));
     const store = createJotaiStore();
-    bench("Jotai", () => { let s = 0; for (let i = 0; i < 10; i++) s += store.get(atoms[i]); });
+    bench("Jotai", () => {
+      let s = 0;
+      for (let i = 0; i < 10; i++) s += store.get(atoms[i]);
+    });
   })();
 });
 
@@ -273,33 +355,59 @@ describe("Comparison: 3 Derived Values from 1 Source", () => {
     const mod = createModule("md", {
       schema: {
         facts: { count: t.number() },
-        derivations: { doubled: t.number(), tripled: t.number(), squared: t.number() },
-        events: {}, requirements: {},
+        derivations: {
+          doubled: t.number(),
+          tripled: t.number(),
+          squared: t.number(),
+        },
+        events: {},
+        requirements: {},
       },
-      init: (f) => { f.count = 1; },
+      init: (f) => {
+        f.count = 1;
+      },
       derive: {
         doubled: (f) => f.count * 2,
         tripled: (f) => f.count * 3,
         squared: (f) => f.count * f.count,
       },
     });
-    const sys = createSystem({ module: mod }); sys.start();
+    const sys = createSystem({ module: mod });
+    sys.start();
     let i = 0;
-    bench("Directive", () => { sys.facts.count = ++i; sys.read("doubled"); sys.read("tripled"); sys.read("squared"); });
+    bench("Directive", () => {
+      sys.facts.count = ++i;
+      sys.read("doubled");
+      sys.read("tripled");
+      sys.read("squared");
+    });
   })();
 
   // MobX
   (() => {
     class Store {
       count = 1;
-      constructor() { makeAutoObservable(this); }
-      get doubled() { return this.count * 2; }
-      get tripled() { return this.count * 3; }
-      get squared() { return this.count * this.count; }
+      constructor() {
+        makeAutoObservable(this);
+      }
+      get doubled() {
+        return this.count * 2;
+      }
+      get tripled() {
+        return this.count * 3;
+      }
+      get squared() {
+        return this.count * this.count;
+      }
     }
     const store = new Store();
     let i = 0;
-    bench("MobX", () => { store.count = ++i; void store.doubled; void store.tripled; void store.squared; });
+    bench("MobX", () => {
+      store.count = ++i;
+      void store.doubled;
+      void store.tripled;
+      void store.squared;
+    });
   })();
 
   // Preact Signals
@@ -309,7 +417,12 @@ describe("Comparison: 3 Derived Values from 1 Source", () => {
     const tripled = computed(() => count.value * 3);
     const squared = computed(() => count.value * count.value);
     let i = 0;
-    bench("Preact Signals", () => { count.value = ++i; doubled.value; tripled.value; squared.value; });
+    bench("Preact Signals", () => {
+      count.value = ++i;
+      doubled.value;
+      tripled.value;
+      squared.value;
+    });
   })();
 
   // Jotai
@@ -320,6 +433,11 @@ describe("Comparison: 3 Derived Values from 1 Source", () => {
     const squaredAtom = atom((get) => get(countAtom) * get(countAtom));
     const store = createJotaiStore();
     let i = 0;
-    bench("Jotai", () => { store.set(countAtom, ++i); store.get(doubledAtom); store.get(tripledAtom); store.get(squaredAtom); });
+    bench("Jotai", () => {
+      store.set(countAtom, ++i);
+      store.get(doubledAtom);
+      store.get(tripledAtom);
+      store.get(squaredAtom);
+    });
   })();
 });

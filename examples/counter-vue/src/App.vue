@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useFact, useDerived, useEvents } from "@directive-run/vue";
+import { useDerived, useEvents, useFact } from "@directive-run/vue";
 import { system } from "./module";
 
 system.start();

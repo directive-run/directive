@@ -15,8 +15,8 @@
 
 import type {
   CreateSystemOptionsSingle,
-  TraceOption,
   ErrorBoundaryConfig,
+  HistoryState,
   InferDerivations,
   InferEvents,
   InferFacts,
@@ -27,7 +27,7 @@ import type {
   Plugin,
   SingleModuleSystem,
   SystemSnapshot,
-  HistoryState,
+  TraceOption,
 } from "@directive-run/core";
 import {
   createRequirementStatusPlugin,
@@ -1114,8 +1114,14 @@ export function createNamespacedSelector<Modules extends ModulesMap, R>(
  * ```
  */
 // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
-export class QuerySystemController<T extends { start: () => void; destroy: () => void; isRunning?: boolean; [key: string]: any }>
-  implements ReactiveController
+export class QuerySystemController<
+  T extends {
+    start: () => void;
+    destroy: () => void;
+    isRunning?: boolean;
+    [key: string]: any;
+  },
+> implements ReactiveController
 {
   // biome-ignore lint/suspicious/noExplicitAny: System type varies
   private _system: T | null = null;
@@ -1170,7 +1176,10 @@ export class HydrationController implements ReactiveController {
   // biome-ignore lint/suspicious/noExplicitAny: Systems vary by module schema
   private systems: SingleModuleSystem<any>[] = [];
 
-  constructor(host: ReactiveControllerHost, snapshot?: Record<string, unknown>) {
+  constructor(
+    host: ReactiveControllerHost,
+    snapshot?: Record<string, unknown>,
+  ) {
     this.snapshot = snapshot;
     host.addController(this);
   }
@@ -1197,7 +1206,10 @@ export class HydrationController implements ReactiveController {
       initialFacts?: Record<string, any>;
     },
   ): SingleModuleSystem<S> {
-    const mergedFacts = mergeHydrationFacts(this.snapshot, config?.initialFacts);
+    const mergedFacts = mergeHydrationFacts(
+      this.snapshot,
+      config?.initialFacts,
+    );
     // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
     const system = createSystem({
       module: moduleDef,

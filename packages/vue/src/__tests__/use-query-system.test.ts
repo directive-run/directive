@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { effectScope } from "vue";
 import { useQuerySystem } from "../index";
 

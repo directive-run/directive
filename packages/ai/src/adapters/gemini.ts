@@ -13,10 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type {
-  AdapterHooks,
-  AgentRunner,
-} from "../types.js";
+import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
   buildStreamingResult,
@@ -271,7 +268,11 @@ export function createGeminiStreamingRunner(
         reader,
         callbacks.onToken,
         (event) => {
-          const result: { text?: string; inputTokens?: number; outputTokens?: number } = {};
+          const result: {
+            text?: string;
+            inputTokens?: number;
+            outputTokens?: number;
+          } = {};
 
           const text = (
             (event.candidates as Array<Record<string, unknown>>)?.[0]
@@ -301,7 +302,15 @@ export function createGeminiStreamingRunner(
       const totalTokens = inputTokens + outputTokens;
 
       callbacks.onMessage?.({ role: "assistant", content: fullText });
-      fireAfterCallHook(hooks, agent, input, fullText, totalTokens, tokenUsage, startTime);
+      fireAfterCallHook(
+        hooks,
+        agent,
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        startTime,
+      );
 
       return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
     } catch (err) {

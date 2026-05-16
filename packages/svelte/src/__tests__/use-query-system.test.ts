@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { useQuerySystem } from "../index";
 
 // Note: Svelte's onDestroy requires component context.

@@ -526,9 +526,9 @@ describe("t.union<T>() — generic-only form", () => {
     expect(validates(schema, 42 as string | number | boolean)).toBe(true);
     expect(validates(schema, true as string | number | boolean)).toBe(true);
     // Even values outside the type union pass at runtime — narrowing is type-only
-    expect(validates(schema, null as unknown as string | number | boolean)).toBe(
-      true,
-    );
+    expect(
+      validates(schema, null as unknown as string | number | boolean),
+    ).toBe(true);
   });
 
   it("does not warn when called with no schema args", () => {
@@ -564,9 +564,9 @@ describe("t.union<T>() — generic-only form", () => {
       .union<string | number>()
       .describe("Polymorphic payload value");
 
-    expect(
-      (schema as ExtendedSchemaType<string | number>)._description,
-    ).toBe("Polymorphic payload value");
+    expect((schema as ExtendedSchemaType<string | number>)._description).toBe(
+      "Polymorphic payload value",
+    );
   });
 
   it("works as a fact field — value flows through facts unchanged", () => {

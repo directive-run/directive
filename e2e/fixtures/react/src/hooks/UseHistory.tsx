@@ -10,7 +10,9 @@ export function UseHistoryPage() {
   return (
     <div>
       <span data-testid={TestIds.factSingle}>{count}</span>
-      <span data-testid={TestIds.historyEnabled}>{String(history !== null)}</span>
+      <span data-testid={TestIds.historyEnabled}>
+        {String(history !== null)}
+      </span>
       <span data-testid={TestIds.historyCanGoBack}>
         {String(history?.canGoBack ?? false)}
       </span>
@@ -32,7 +34,10 @@ export function UseHistoryPage() {
       <button data-testid={TestIds.btnGoBack} onClick={() => history?.goBack()}>
         goBack
       </button>
-      <button data-testid={TestIds.btnGoForward} onClick={() => history?.goForward()}>
+      <button
+        data-testid={TestIds.btnGoForward}
+        onClick={() => history?.goForward()}
+      >
         goForward
       </button>
     </div>

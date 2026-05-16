@@ -1,4 +1,3 @@
-import * as p from "@clack/prompts";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import pc from "picocolors";
@@ -57,10 +56,7 @@ const ALL_SECTIONS: Section[] = [
   "effects",
 ];
 
-function generateModule(
-  name: string,
-  sections: Section[],
-): string {
+function generateModule(name: string, sections: Section[]): string {
   const camelName = toCamelCase(name);
   const hasConstraints = sections.includes("constraints");
   const hasResolvers = sections.includes("resolvers");
@@ -397,5 +393,7 @@ export async function newOrchestratorCommand(name: string, args: string[]) {
 
   const rel = relative(opts.dir, filePath);
   console.log(`${pc.green("Created")} ${pc.dim(rel)}`);
-  console.log(pc.dim("  AI orchestrator with memory, guardrails, and streaming"));
+  console.log(
+    pc.dim("  AI orchestrator with memory, guardrails, and streaming"),
+  );
 }

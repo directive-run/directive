@@ -115,7 +115,9 @@ function isSystem(obj: unknown): boolean {
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function loadSystemFactory(filePath: string): Promise<() => Promise<any>> {
+export async function loadSystemFactory(
+  filePath: string,
+): Promise<() => Promise<any>> {
   const resolved = resolve(filePath);
 
   if (!existsSync(resolved)) {
@@ -145,9 +147,7 @@ export async function loadSystemFactory(filePath: string): Promise<() => Promise
       // shape after each call (catches "factory exists but returns
       // junk" — common when the user forgets to call sys.start()).
       return async () => {
-        const result = await Promise.resolve(
-          (candidate as () => unknown)(),
-        );
+        const result = await Promise.resolve((candidate as () => unknown)());
         if (!isSystem(result)) {
           throw new Error(
             `Factory '${name}' from ${pc.dim(filePath)} returned a value that is not a started Directive system.\n` +

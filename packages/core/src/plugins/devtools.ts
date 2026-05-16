@@ -766,9 +766,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
     onResolverStart: (resolver, req) => {
       const label = state.system?.meta?.resolver(resolver)?.label;
       const basePayload = { resolver, requirementId: req.id };
-      const payload = label
-        ? { ...basePayload, label }
-        : basePayload;
+      const payload = label ? { ...basePayload, label } : basePayload;
       addEvent("resolver.start", payload);
       recordEvent("resolver.start", payload);
       // Track timeline

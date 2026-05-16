@@ -289,7 +289,10 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "m::count": 5 };
       const flatDerive = {};
-      const value = (result.derive!["m::doubled"] as Function)(flatFacts, flatDerive);
+      const value = (result.derive!["m::doubled"] as Function)(
+        flatFacts,
+        flatDerive,
+      );
 
       expect(value).toBe(10);
     });
@@ -308,7 +311,10 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "z::count": 3 };
       const flatDerive = { "z::doubled": 6 };
-      const value = (result.derive!["z::label"] as Function)(flatFacts, flatDerive);
+      const value = (result.derive!["z::label"] as Function)(
+        flatFacts,
+        flatDerive,
+      );
 
       expect(value).toBe("6-label");
     });
@@ -329,7 +335,10 @@ describe("prefixModuleDefinition", () => {
 
       const flatFacts = { "m::count": 7, "other::token": "abc" };
       const flatDerive = {};
-      const value = (result.derive!["m::doubled"] as Function)(flatFacts, flatDerive);
+      const value = (result.derive!["m::doubled"] as Function)(
+        flatFacts,
+        flatDerive,
+      );
 
       expect(value).toBe(14);
     });

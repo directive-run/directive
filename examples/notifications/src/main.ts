@@ -6,9 +6,9 @@
  * and config panel.
  */
 
-import { el } from "@directive-run/el";
 import { createSystem } from "@directive-run/core";
 import { devtoolsPlugin } from "@directive-run/core/plugins";
+import { el } from "@directive-run/el";
 import {
   type Notification,
   appModule,
@@ -141,21 +141,31 @@ function render(): void {
     );
 
     if (!existing) {
-      const enterClass = !renderedIds.has(notification.id) ? " nt-toast-enter" : "";
+      const enterClass = !renderedIds.has(notification.id)
+        ? " nt-toast-enter"
+        : "";
       const levelIcon = getLevelIcon(notification.level);
 
-      const toast = el("div", {
-        className: `nt-toast nt-toast-${notification.level}${enterClass}`,
-      },
+      const toast = el(
+        "div",
+        {
+          className: `nt-toast nt-toast-${notification.level}${enterClass}`,
+        },
         el("span", { className: "nt-toast-icon" }, levelIcon),
         el("span", { className: "nt-toast-message" }, notification.message),
-        el("button", {
-          className: "nt-toast-close",
-          ariaLabel: "Dismiss",
-        }, "\u00D7"),
+        el(
+          "button",
+          {
+            className: "nt-toast-close",
+            ariaLabel: "Dismiss",
+          },
+          "\u00D7",
+        ),
       );
       toast.dataset.id = notification.id;
-      toast.querySelector(".nt-toast-close")!.setAttribute("data-dismiss", notification.id);
+      toast
+        .querySelector(".nt-toast-close")!
+        .setAttribute("data-dismiss", notification.id);
 
       toastStack.appendChild(toast);
     }

@@ -1,6 +1,12 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { existsSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -44,7 +50,9 @@ describe("init command", () => {
     expect(moduleContent).toContain("createModule");
     expect(moduleContent).toContain("t.number()");
     expect(moduleContent).toContain("t.string()");
-    expect(moduleContent).toContain('export const myModule = createModule("my-module"');
+    expect(moduleContent).toContain(
+      'export const myModule = createModule("my-module"',
+    );
   });
 
   it("creates auth-flow template files", async () => {
@@ -102,10 +110,7 @@ describe("init command", () => {
     await initCommand(["--no-interactive", "--dir", TMP_DIR]);
 
     // Should not overwrite
-    const content = readFileSync(
-      join(TMP_DIR, "src/my-module.ts"),
-      "utf-8",
-    );
+    const content = readFileSync(join(TMP_DIR, "src/my-module.ts"), "utf-8");
     expect(content).toBe("existing content");
   });
 });
@@ -317,9 +322,9 @@ describe("loadSystem", () => {
   it("throws for non-existent file", async () => {
     const { loadSystem } = await import("../src/lib/loader.js");
 
-    await expect(
-      loadSystem("/nonexistent/path/file.ts"),
-    ).rejects.toThrow("File not found");
+    await expect(loadSystem("/nonexistent/path/file.ts")).rejects.toThrow(
+      "File not found",
+    );
   });
 
   it("throws for file without system export", async () => {
@@ -393,18 +398,14 @@ export default system;
 
 describe("examples list command", () => {
   it("lists examples without error", async () => {
-    const { examplesListCommand } = await import(
-      "../src/commands/examples.js"
-    );
+    const { examplesListCommand } = await import("../src/commands/examples.js");
 
     // Should not throw
     await examplesListCommand([]);
   });
 
   it("filters examples by name", async () => {
-    const { examplesListCommand } = await import(
-      "../src/commands/examples.js"
-    );
+    const { examplesListCommand } = await import("../src/commands/examples.js");
 
     // Should not throw
     await examplesListCommand(["--filter", "counter"]);
@@ -420,9 +421,7 @@ describe("examples copy command", () => {
   afterEach(cleanupTmpDir);
 
   it("copies a known example", async () => {
-    const { examplesCopyCommand } = await import(
-      "../src/commands/examples.js"
-    );
+    const { examplesCopyCommand } = await import("../src/commands/examples.js");
 
     await examplesCopyCommand("counter", ["--dest", TMP_DIR]);
 
@@ -434,27 +433,20 @@ describe("examples copy command", () => {
   });
 
   it("exits if example not found", async () => {
-    const { examplesCopyCommand } = await import(
-      "../src/commands/examples.js"
-    );
+    const { examplesCopyCommand } = await import("../src/commands/examples.js");
 
     const exitSpy = vi
       .spyOn(process, "exit")
       .mockImplementation(() => undefined as never);
 
-    await examplesCopyCommand("nonexistent-example-xyz", [
-      "--dest",
-      TMP_DIR,
-    ]);
+    await examplesCopyCommand("nonexistent-example-xyz", ["--dest", TMP_DIR]);
     expect(exitSpy).toHaveBeenCalledWith(1);
 
     exitSpy.mockRestore();
   });
 
   it("exits if target file already exists", async () => {
-    const { examplesCopyCommand } = await import(
-      "../src/commands/examples.js"
-    );
+    const { examplesCopyCommand } = await import("../src/commands/examples.js");
 
     writeFileSync(join(TMP_DIR, "counter.ts"), "existing");
 
@@ -492,18 +484,14 @@ describe("ai-rules check command", () => {
   afterEach(cleanupTmpDir);
 
   it("reports nothing when no rule files exist", async () => {
-    const { aiRulesCheckCommand } = await import(
-      "../src/commands/ai-rules.js"
-    );
+    const { aiRulesCheckCommand } = await import("../src/commands/ai-rules.js");
 
     // Should not throw or exit
     await aiRulesCheckCommand(["--dir", TMP_DIR]);
   });
 
   it("detects stale rules", async () => {
-    const { aiRulesCheckCommand } = await import(
-      "../src/commands/ai-rules.js"
-    );
+    const { aiRulesCheckCommand } = await import("../src/commands/ai-rules.js");
     const { SECTION_START, SECTION_END } = await import(
       "../src/lib/constants.js"
     );
@@ -533,9 +521,9 @@ describe("inspect command", () => {
   it("throws when given a non-existent file", async () => {
     const { inspectCommand } = await import("../src/commands/inspect.js");
 
-    await expect(
-      inspectCommand(["nonexistent-file.ts"]),
-    ).rejects.toThrow("File not found");
+    await expect(inspectCommand(["nonexistent-file.ts"])).rejects.toThrow(
+      "File not found",
+    );
   });
 });
 
@@ -547,9 +535,9 @@ describe("explain command", () => {
   it("throws when given a non-existent file", async () => {
     const { explainCommand } = await import("../src/commands/explain.js");
 
-    await expect(
-      explainCommand(["nonexistent-file.ts"]),
-    ).rejects.toThrow("File not found");
+    await expect(explainCommand(["nonexistent-file.ts"])).rejects.toThrow(
+      "File not found",
+    );
   });
 });
 
@@ -561,8 +549,8 @@ describe("graph command", () => {
   it("throws when given a non-existent file", async () => {
     const { graphCommand } = await import("../src/commands/graph.js");
 
-    await expect(
-      graphCommand(["nonexistent-file.ts"]),
-    ).rejects.toThrow("File not found");
+    await expect(graphCommand(["nonexistent-file.ts"])).rejects.toThrow(
+      "File not found",
+    );
   });
 });

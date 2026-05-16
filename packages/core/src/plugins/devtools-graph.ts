@@ -219,13 +219,19 @@ export function updateDependencyGraph(
   const factNodes = layoutColumn(
     factKeys.map((k) => {
       const fMeta = inspection.facts.find((f) => f.key === k);
-      return { id: k, label: truncate(fMeta?.meta?.label ?? k, FLOW.labelMaxChars) };
+      return {
+        id: k,
+        label: truncate(fMeta?.meta?.label ?? k, FLOW.labelMaxChars),
+      };
     }),
   );
   const derivNodes = layoutColumn(
     derivKeys.map((k) => {
       const dMeta = inspection.derivations.find((d) => d.id === k);
-      return { id: k, label: truncate(dMeta?.meta?.label ?? k, FLOW.labelMaxChars) };
+      return {
+        id: k,
+        label: truncate(dMeta?.meta?.label ?? k, FLOW.labelMaxChars),
+      };
     }),
   );
   const constraintNodes = layoutColumn(
@@ -247,7 +253,10 @@ export function updateDependencyGraph(
   const resolverNodeArr = layoutColumn(
     resolverIds.map((id) => {
       const rDef = inspection.resolverDefs.find((r) => r.id === id);
-      return { id, label: truncate(rDef?.meta?.label ?? id, FLOW.labelMaxChars) };
+      return {
+        id,
+        label: truncate(rDef?.meta?.label ?? id, FLOW.labelMaxChars),
+      };
     }),
   );
 
@@ -300,7 +309,10 @@ export function updateDependencyGraph(
   ) {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     if (tooltip) {
-      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      const title = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "title",
+      );
       title.textContent = tooltip;
       g.appendChild(title);
     }
@@ -365,7 +377,14 @@ export function updateDependencyGraph(
     const pulsing = depGraph.recentlyChangedFacts.has(f.id);
     const fMeta = inspection.facts.find((ff) => ff.key === f.id)?.meta;
     const pos = drawNode(
-      0, colX[0], f.y, f.id, f.label, S.text, false, pulsing,
+      0,
+      colX[0],
+      f.y,
+      f.id,
+      f.label,
+      S.text,
+      false,
+      pulsing,
       fMeta?.description,
     );
     factPositions.set(f.id, pos);
@@ -376,7 +395,14 @@ export function updateDependencyGraph(
     const pulsing = depGraph.recentlyComputedDerivations.has(d.id);
     const dMeta = inspection.derivations.find((dd) => dd.id === d.id)?.meta;
     const pos = drawNode(
-      1, colX[1], d.y, d.id, d.label, S.accent, false, pulsing,
+      1,
+      colX[1],
+      d.y,
+      d.id,
+      d.label,
+      S.accent,
+      false,
+      pulsing,
       dMeta?.description,
     );
     derivPositions.set(d.id, pos);
@@ -387,9 +413,14 @@ export function updateDependencyGraph(
     const pulsing = depGraph.recentlyActiveConstraints.has(c.id);
     const cMeta = allConstraints.find((cc) => cc.id === c.id)?.meta;
     const pos = drawNode(
-      2, colX[2], c.y, c.id, c.label,
+      2,
+      colX[2],
+      c.y,
+      c.id,
+      c.label,
       cMeta?.color ?? (c.active ? S.yellow : S.muted),
-      !c.active, pulsing,
+      !c.active,
+      pulsing,
       cMeta?.description,
     );
     constraintPositions.set(c.id, pos);
@@ -416,9 +447,14 @@ export function updateDependencyGraph(
     const isActive = inflightReqs.some((f) => f.resolverId === r.id);
     const rMeta = inspection.resolverDefs.find((rd) => rd.id === r.id)?.meta;
     drawNode(
-      4, colX[4], r.y, r.id, r.label,
+      4,
+      colX[4],
+      r.y,
+      r.id,
+      r.label,
       rMeta?.color ?? (isActive ? S.green : S.muted),
-      !isActive, false,
+      !isActive,
+      false,
       rMeta?.description,
     );
   }

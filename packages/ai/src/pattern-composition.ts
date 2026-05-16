@@ -8,26 +8,26 @@
 // ============================================================================
 
 import type {
-  RunResult,
+  DagExecutionContext,
+  DagPattern,
+  GoalPattern,
   OrchestratorConstraint,
   OrchestratorState,
-  DagPattern,
-  DagExecutionContext,
-  GoalPattern,
+  RunResult,
 } from "./types.js";
 
 import type {
-  MultiAgentOrchestrator,
-  RunAgentRequirement,
+  AgentRegistry,
   DebatePattern,
   DebateResult,
-  AgentRegistry,
   ExecutionPattern,
+  MultiAgentOrchestrator,
   ParallelPattern,
+  RacePattern,
+  ReflectPattern,
+  RunAgentRequirement,
   SequentialPattern,
   SupervisorPattern,
-  ReflectPattern,
-  RacePattern,
 } from "./multi-agent-orchestrator.js";
 
 import type { ReflectionEvaluation } from "./reflection.js";

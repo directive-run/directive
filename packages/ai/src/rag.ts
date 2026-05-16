@@ -251,7 +251,10 @@ function validateFilePath(filePath: string, baseDir?: string): string {
 
   if (baseDir) {
     const resolvedBase = path.resolve(baseDir) + path.sep;
-    if (!resolved.startsWith(resolvedBase) && resolved !== resolvedBase.slice(0, -1)) {
+    if (
+      !resolved.startsWith(resolvedBase) &&
+      resolved !== resolvedBase.slice(0, -1)
+    ) {
       throw new Error(
         `[Directive] File path escapes allowed directory: ${filePath}`,
       );

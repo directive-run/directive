@@ -22,7 +22,10 @@ export default defineConfig({
   },
   resolve: {
     alias: Object.fromEntries(
-      NODE_SHIMS.map((mod) => [mod, new URL("./src/empty-shim.ts", import.meta.url).pathname]),
+      NODE_SHIMS.map((mod) => [
+        mod,
+        new URL("./src/empty-shim.ts", import.meta.url).pathname,
+      ]),
     ),
   },
   plugins: [

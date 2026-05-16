@@ -342,9 +342,9 @@ describe("event pruning", () => {
     const metrics = monitor.getMetrics("agent");
 
     // Only last 5 events should remain
-    expect(metrics.recentSuccesses + metrics.recentFailures).toBeLessThanOrEqual(
-      5,
-    );
+    expect(
+      metrics.recentSuccesses + metrics.recentFailures,
+    ).toBeLessThanOrEqual(5);
   });
 
   it("reset clears all agents and circuit states", () => {

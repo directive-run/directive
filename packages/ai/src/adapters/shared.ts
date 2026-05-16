@@ -5,12 +5,7 @@
  * building logic used across Anthropic, OpenAI, and Gemini streaming runners.
  */
 
-import type {
-  AdapterHooks,
-  AgentLike,
-  Message,
-  TokenUsage,
-} from "../types.js";
+import type { AdapterHooks, AgentLike, Message, TokenUsage } from "../types.js";
 
 // ============================================================================
 // HTTP Error Handling
