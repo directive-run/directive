@@ -422,6 +422,14 @@ function validateDefinitions<S extends Schema>(
   }
 }
 
+/**
+ * Creates a resolver manager that tracks active resolver instances and
+ * coordinates their lifecycle (start / complete / error / cancel) against
+ * the engine's requirement graph.
+ *
+ * @param options - resolver definitions, facts reference, and event hooks
+ * @returns the manager handle used by the engine to drive resolver invocations
+ */
 export function createResolversManager<S extends Schema>(
   options: CreateResolversOptions<S>,
 ): ResolversManager<S> {

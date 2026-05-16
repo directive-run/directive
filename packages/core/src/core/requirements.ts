@@ -36,6 +36,14 @@ import type {
 /** Cache for default requirement IDs (no custom keyFn) to avoid repeated stableStringify */
 const reqIdCache = new WeakMap<Requirement, string>();
 
+/**
+ * Computes a stable identifier for a requirement, used for coalescing
+ * duplicate fetches across the constraint graph.
+ *
+ * @param req - the requirement to identify
+ * @param keyFn - optional custom key function; if omitted, a stableStringify-based default is used (memoized via WeakMap)
+ * @returns the requirement's stable string ID
+ */
 export function generateRequirementId(
   req: Requirement,
   keyFn?: RequirementKeyFn,

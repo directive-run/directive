@@ -669,6 +669,7 @@ export function createTestSystem<S extends ModuleSchema>(
 export function createTestSystem<Modules extends ModulesMap>(
   options: CreateTestSystemOptions<Modules>,
 ): TestSystem<Modules>;
+/** @internal — implementation signature for the overloads above. */
 export function createTestSystem<
   S extends ModuleSchema,
   Modules extends ModulesMap,

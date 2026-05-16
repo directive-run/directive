@@ -186,7 +186,7 @@ export function resetTimer(): TimerFactState {
 
 /**
  * Transition: mark the timer completed. For countdown mode when
- * elapsed >= ms; for repeat mode when consumer wants to halt.
+ * elapsed reaches `ms`; for repeat mode when consumer wants to halt.
  */
 export function completeTimer(state: TimerFactState): TimerFactState {
   return { ...state, status: "completed" };
