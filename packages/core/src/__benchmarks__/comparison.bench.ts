@@ -1,8 +1,8 @@
+// @ts-nocheck
 import { computed, effect, signal } from "@preact/signals-core";
 import { configureStore, createSlice } from "@reduxjs/toolkit";
 import { atom, createStore as createJotaiStore } from "jotai/vanilla";
 import { autorun, makeAutoObservable } from "mobx";
-// @ts-nocheck
 /**
  * Head-to-Head Benchmark: Directive vs Zustand vs Redux vs MobX vs Jotai vs Signals vs XState
  *

@@ -413,6 +413,7 @@ export {
   DEFAULT_INJECTION_PATTERNS,
   STRICT_INJECTION_PATTERNS,
   type PromptInjectionGuardrailOptions,
+  type InjectionDetectionResult,
 } from "./guardrails/prompt-injection.js";
 
 // Compliance (GDPR/CCPA)
@@ -431,6 +432,11 @@ export {
   detectPII,
   redactPII,
   type EnhancedPIIGuardrailOptions,
+  type PIIDetectionResult,
+  type DetectedPII,
+  type PIIType,
+  type PIIDetector,
+  type RedactionStyle,
 } from "./guardrails/pii-enhanced.js";
 
 // ANN Index

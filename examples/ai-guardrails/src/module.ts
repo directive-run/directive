@@ -10,6 +10,7 @@ import {
   type PIIDetectionResult,
   detectPII,
   detectPromptInjection,
+  redactPII,
 } from "@directive-run/ai";
 import {
   type ModuleSchema,
@@ -188,11 +189,13 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
     inputLength: text.length,
   });
 
-  // 2. PII detection
-  const piiResult = await detectPII(text, {
-    redact: system.facts.redactionEnabled as boolean,
-    redactionStyle: "typed",
-  });
+  // 2. PII detection (and optional redaction so consumers can read
+  // `piiResult.redactedText`). detectPII is detection-only by design;
+  // redactPII is the separate concern.
+  const piiResult = await detectPII(text);
+  if (piiResult.detected && system.facts.redactionEnabled) {
+    piiResult.redactedText = redactPII(text, piiResult.items, "typed");
+  }
   if (piiResult.detected) {
     system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
     for (const item of piiResult.items) {

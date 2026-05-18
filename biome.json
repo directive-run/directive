@@ -73,7 +73,8 @@
       "*.tsbuildinfo",
       "worktrees",
       "packages/knowledge/examples",
-      "packages/claude-plugin/skills/*/examples.md"
+      "packages/claude-plugin/skills/*/examples.md",
+      "**/__benchmarks__/**"
     ]
   },
   "overrides": [
