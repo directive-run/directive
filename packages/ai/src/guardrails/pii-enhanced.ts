@@ -76,7 +76,8 @@ interface PIIPattern {
    * Capture group holding the PII value itself. Defaults to 1.
    * Keyword-anchored patterns set this to 2 — group 1 is the keyword
    * ("account", "passport", …) and group 2 is the actual identifier.
-   * The detector redacts the value group's span, never the keyword.
+   * `value` is read from this group; the redacted span still covers the
+   * whole match (keyword included) so the category is not re-disclosed.
    */
   valueGroup?: number;
   /** Additional validation function (reduces false positives) */
@@ -356,26 +357,22 @@ export interface PIIDetector {
 
 /**
  * Run a single PII pattern over `text` and collect every (validated) match.
- * Keyword-anchored patterns capture the value in group 2; the `d` flag gives
- * per-group indices so we redact the value's exact span, never the keyword.
+ * `position` spans the FULL match: for keyword-anchored patterns the keyword
+ * is redacted along with the identifier, so the redacted output never
+ * re-discloses the PII category (e.g. "MRN: ABC123" → "[REDACTED]"). `value`
+ * reports just the identifier (the value group) for masking/hashing/allowlist.
  */
 function matchPattern(pattern: PIIPattern, text: string): DetectedPII[] {
   const results: DetectedPII[] = [];
-  const flags = pattern.pattern.flags.includes("d")
-    ? pattern.pattern.flags
-    : `${pattern.pattern.flags}d`;
-  const regex = new RegExp(pattern.pattern.source, flags);
+  const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
   const group = pattern.valueGroup ?? 1;
   let match: RegExpExecArray | null;
 
   // biome-ignore lint/suspicious/noAssignInExpressions: standard regex.exec loop
   while ((match = regex.exec(text)) !== null) {
     const value = match[group] ?? match[0];
-    // Prefer the value group's real offsets; fall back to the whole match
-    // only if indices are unavailable (older runtimes).
-    const groupIndices = match.indices?.[group];
-    const start = groupIndices ? groupIndices[0] : match.index;
-    const end = groupIndices ? groupIndices[1] : match.index + value.length;
+    const start = match.index;
+    const end = match.index + match[0].length;
     const context = text.slice(Math.max(0, start - 20), end + 20);
 
     if (pattern.validate && !pattern.validate(value, context)) {

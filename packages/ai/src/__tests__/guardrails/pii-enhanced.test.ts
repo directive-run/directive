@@ -680,32 +680,35 @@ describe("keyword-anchored value capture (C2)", () => {
     expect(result.items[0]!.value).not.toBe("account");
   });
 
-  it("redacts the bank account ID and leaves the 'account' keyword intact", async () => {
+  it("redacts the full bank account match, keyword included", async () => {
     const text = "account: 12345678";
     const items = (await detectPII(text, { types: ["bank_account"] })).items;
     const redacted = redactPII(text, items, "typed");
 
-    // The raw ID must not survive; the keyword must.
+    // Neither the raw ID nor the category-revealing keyword may survive —
+    // the whole "account: 12345678" match is redacted.
     expect(redacted).not.toContain("12345678");
-    expect(redacted).toContain("account");
-    expect(redacted).toBe("account: [REDACTED]");
+    expect(redacted).not.toContain("account");
+    expect(redacted).toBe("[REDACTED]");
   });
 
-  it("captures the national ID value, not the 'national id' keyword", async () => {
+  it("captures the national ID value and redacts the whole match", async () => {
     const text = "national id: AB1234567";
     const items = (await detectPII(text, { types: ["national_id"] })).items;
 
     expect(items).toHaveLength(1);
+    // `value` is the identifier itself, not the keyword.
     expect(items[0]!.value).toBe("AB1234567");
     expect(items[0]!.value.toLowerCase()).not.toContain("national");
 
+    // Redaction covers the keyword too so the category is not re-disclosed.
     const redacted = redactPII(text, items, "typed");
     expect(redacted).not.toContain("AB1234567");
-    expect(redacted).toContain("national id");
-    expect(redacted).toBe("national id: [REDACTED]");
+    expect(redacted).not.toContain("national id");
+    expect(redacted).toBe("[REDACTED]");
   });
 
-  it("captures the passport value, not the 'passport' keyword", async () => {
+  it("captures the passport value and redacts the whole match", async () => {
     const text = "passport: AB1234567";
     const items = (await detectPII(text, { types: ["passport"] })).items;
 
@@ -715,8 +718,8 @@ describe("keyword-anchored value capture (C2)", () => {
 
     const redacted = redactPII(text, items, "typed");
     expect(redacted).not.toContain("AB1234567");
-    expect(redacted).toContain("passport");
-    expect(redacted).toBe("passport: [REDACTED]");
+    expect(redacted).not.toContain("passport");
+    expect(redacted).toBe("[REDACTED]");
   });
 });
 
