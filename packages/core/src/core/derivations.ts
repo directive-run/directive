@@ -9,6 +9,11 @@
  * - Lazy evaluation
  */
 
+import {
+  compilePredicate,
+  evaluateTemplate,
+  isTemplate,
+} from "./predicate.js";
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
   DefinitionMeta,
@@ -18,7 +23,7 @@ import type {
   Facts,
   Schema,
 } from "./types.js";
-import { freezeMeta, isDerivationWithMeta } from "./types/meta.js";
+import { freezeMeta } from "./types/meta.js";
 
 // ============================================================================
 // Derivations Manager
@@ -109,16 +114,47 @@ export function createDerivationsManager<
   // Meta storage for derivations using object form { compute, meta }
   const derivationMeta = new Map<string, DefinitionMeta>();
 
-  // Unwrap any { compute, meta } object-form definitions at construction time.
-  // After this, definitions[id] is always a bare function.
-  for (const [key, raw] of Object.entries(definitions)) {
-    if (isDerivationWithMeta(raw)) {
-      (definitions as Record<string, unknown>)[key] = raw.compute;
-      const frozen = freezeMeta(raw.meta);
+  /**
+   * Resolve any object-form derivation into a bare function. Accepts:
+   *   - `(facts, derived) => T`                 (function form)
+   *   - `{ compute: fn, meta }`                 (function with meta)
+   *   - `{ compute: FactPredicate, meta }`      (boolean data form)
+   *   - `{ compute: FactTemplate,  meta }`      (string data form)
+   * Mutates `definitions[key]` to a bare function and stores any meta.
+   */
+  function unwrapDerivationAt(key: string, raw: unknown): void {
+    if (typeof raw !== "object" || raw === null || !Object.hasOwn(raw, "compute")) {
+      return;
+    }
+    const obj = raw as { compute: unknown; meta?: DefinitionMeta };
+    const c = obj.compute;
+    let fn: ((facts: unknown, derived: unknown) => unknown) | undefined;
+
+    if (typeof c === "function") {
+      fn = c as (facts: unknown, derived: unknown) => unknown;
+    } else if (isTemplate(c)) {
+      Object.freeze(c);
+      fn = (facts) =>
+        evaluateTemplate(c, facts as Record<string, unknown>);
+    } else if (typeof c === "object" && c !== null) {
+      Object.freeze(c);
+      const compiled = compilePredicate(c);
+      fn = (facts) => compiled(facts as Record<string, unknown>);
+    }
+
+    if (fn) {
+      (definitions as Record<string, unknown>)[key] = fn;
+      const frozen = freezeMeta(obj.meta);
       if (frozen) {
         derivationMeta.set(key, frozen);
       }
     }
+  }
+
+  // Unwrap any object-form definitions at construction time.
+  // After this, definitions[id] is always a bare function.
+  for (const [key, raw] of Object.entries(definitions)) {
+    unwrapDerivationAt(key, raw);
   }
 
   // Internal state for each derivation
@@ -588,14 +624,10 @@ export function createDerivationsManager<
 
     registerDefinitions(newDefs: DerivationsDef<S>): void {
       for (const [key, raw] of Object.entries(newDefs)) {
-        if (isDerivationWithMeta(raw)) {
-          (definitions as Record<string, unknown>)[key] = raw.compute;
-          const frozen = freezeMeta(raw.meta);
-          if (frozen) {
-            derivationMeta.set(key, frozen);
-          }
-        } else {
+        if (typeof raw === "function") {
           (definitions as Record<string, unknown>)[key] = raw;
+        } else {
+          unwrapDerivationAt(key, raw);
         }
         initState(key);
       }
@@ -611,17 +643,13 @@ export function createDerivationsManager<
         );
       }
 
-      // Unwrap object form if needed
-      if (isDerivationWithMeta(fn)) {
-        (definitions as Record<string, unknown>)[id] = fn.compute;
-        const frozen = freezeMeta(fn.meta);
-        if (frozen) {
-          derivationMeta.set(id, frozen);
-        } else {
-          derivationMeta.delete(id);
-        }
-      } else {
+      // Unwrap object forms (function-with-meta, predicate, or template).
+      if (typeof fn === "function") {
         (definitions as Record<string, unknown>)[id] = fn;
+        derivationMeta.delete(id);
+      } else {
+        derivationMeta.delete(id);
+        unwrapDerivationAt(id, fn);
       }
 
       // Mark stale so it recomputes with the new function

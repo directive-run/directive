@@ -10,12 +10,14 @@
 
 import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
+import { compilePredicate } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
 import type {
   ConstraintState,
   ConstraintsDef,
   Facts,
+  FactPredicate,
   Requirement,
   RequirementKeyFn,
   RequirementWithId,
@@ -238,6 +240,44 @@ export function createConstraintsManager<S extends Schema>(
     onEvaluate,
     onError,
   } = options;
+
+  // Side store for the original data-form `when` spec (when present), used
+  // by inspect()/explain()/devtools to render the predicate structure.
+  const whenSpecs = new Map<string, FactPredicate<Record<string, unknown>>>();
+
+  // Normalize any data-form `when` specs into wrapper functions so the
+  // eval-time path keeps calling a `(facts) => boolean` function. The
+  // wrapper reads via the same facts proxy that the function form sees,
+  // so dep tracking (withTracking) captures both fact and derivation deps
+  // automatically — no explicit deps array required.
+  for (const id in definitions) {
+    const def = definitions[id];
+    if (def && typeof def.when !== "function") {
+      const spec = def.when as FactPredicate<Record<string, unknown>>;
+      if (isDevelopment) {
+        if (def.async) {
+          console.warn(
+            `[Directive] constraint "${id}": data \`when\` is always sync; \`async: true\` will be ignored`,
+          );
+        }
+        if (def.deps) {
+          console.warn(
+            `[Directive] constraint "${id}": data \`when\` cannot be combined with explicit \`deps\` — deps are tracked automatically`,
+          );
+        }
+      }
+      Object.freeze(spec);
+      const compiled = compilePredicate(spec as object);
+      (def as { when: unknown }).when = (f: Facts<S>) =>
+        compiled(f as unknown as Record<string, unknown>);
+      whenSpecs.set(id, spec);
+      // Data `when` is structurally sync; clear any async flag so the
+      // engine uses the sync evaluation path.
+      if (def.async) {
+        (def as { async?: boolean }).async = false;
+      }
+    }
+  }
 
   // Internal state for each constraint
   const states = new Map<string, ConstraintState>();
@@ -513,19 +553,28 @@ export function createConstraintsManager<S extends Schema>(
     constraintDeps.set(id, newDeps);
   }
 
+  /**
+   * `def.when` is typed as `Fn | FactPredicate` to accept either form. Data
+   * forms are normalized to a function at manager construction, so by the
+   * time this runs `def.when` is always a function.
+   */
+  type WhenFn = (facts: Facts<S>) => boolean | Promise<boolean>;
+
   /** Track or evaluate the `when()` predicate, returning the result and recording deps */
   function evaluateWhenPredicate(
     id: string,
     def: ConstraintsDef<S>[string],
   ): boolean | Promise<boolean> {
+    const whenFn = def.when as WhenFn;
+
     if (def.deps) {
       latestWhenDeps.set(id, new Set(def.deps));
 
-      return def.when(facts);
+      return whenFn(facts);
     }
 
     // Track dependencies during evaluation
-    const tracked = withTracking(() => def.when(facts));
+    const tracked = withTracking(() => whenFn(facts));
     latestWhenDeps.set(id, tracked.deps);
 
     return tracked.value;
@@ -636,7 +685,7 @@ export function createConstraintsManager<S extends Schema>(
     }
 
     try {
-      const resultPromise = def.when(facts) as Promise<boolean>;
+      const resultPromise = (def.when as WhenFn)(facts) as Promise<boolean>;
 
       // Race against timeout (with proper cleanup)
       const result = await withTimeout(

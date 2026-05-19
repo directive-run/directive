@@ -37,6 +37,7 @@ import {
 } from "./errors.js";
 import { createFacts } from "./facts.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
+import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { BLOCKED_PROPS } from "./tracking.js";
@@ -50,6 +51,7 @@ import type {
   MetaMatch,
   ReconcileResult,
   RequirementKeyFn,
+  ResolverDef,
   ResolversDef,
   Schema,
   System,
@@ -197,18 +199,36 @@ export function createEngine<S extends Schema>(
 
     Object.assign(mergedSchema, module.schema);
     if (module.events) {
-      // Unwrap { handler, meta } event forms before merging
+      // Unwrap object-form events ({ handler, meta } or { patch, meta }) into
+      // bare handler functions before merging.
       for (const [key, raw] of Object.entries(module.events)) {
-        if (
-          typeof raw === "object" &&
-          raw !== null &&
-          Object.hasOwn(raw, "handler")
-        ) {
-          const obj = raw as { handler: Function; meta?: DefinitionMeta };
-          (module.events as Record<string, unknown>)[key] = obj.handler;
-          if (obj.meta) {
-            const frozen = freezeMeta(obj.meta);
-            if (frozen) eventMeta.set(key, frozen);
+        if (typeof raw === "object" && raw !== null) {
+          if (Object.hasOwn(raw, "handler")) {
+            const obj = raw as { handler: Function; meta?: DefinitionMeta };
+            (module.events as Record<string, unknown>)[key] = obj.handler;
+            if (obj.meta) {
+              const frozen = freezeMeta(obj.meta);
+              if (frozen) eventMeta.set(key, frozen);
+            }
+          } else if (Object.hasOwn(raw, "patch")) {
+            const obj = raw as {
+              patch: { $set: Record<string, unknown> };
+              meta?: DefinitionMeta;
+            };
+            const spec = obj.patch;
+            (module.events as Record<string, unknown>)[key] = (
+              facts: Record<string, unknown>,
+              event: { payload?: Record<string, unknown> } | undefined,
+            ) =>
+              applyPatch(
+                spec as Parameters<typeof applyPatch>[0],
+                facts,
+                event?.payload ?? {},
+              );
+            if (obj.meta) {
+              const frozen = freezeMeta(obj.meta);
+              if (frozen) eventMeta.set(key, frozen);
+            }
           }
         }
       }
@@ -467,13 +487,31 @@ export function createEngine<S extends Schema>(
     },
   });
 
-  // Extract resolver key functions keyed by requirement type.
-  // Resolvers with a string `requirement` and a `key` function contribute
-  // to requirement deduplication inside the constraints manager.
+  /**
+   * Normalize `key`: a function passes through, an array `KeySelector`
+   * (a list of requirement-payload field names) is wrapped into a
+   * function that builds a stable JSON-encoded dedup key from those fields.
+   */
+  function normalizeResolverKey(
+    key: NonNullable<ResolverDef<S>["key"]>,
+  ): RequirementKeyFn {
+    if (Array.isArray(key)) {
+      const selector = key as readonly string[];
+
+      return (req) =>
+        evaluateKeySelector(selector, req as unknown as Record<string, unknown>);
+    }
+
+    return key as RequirementKeyFn;
+  }
+
+  // Extract resolver key functions keyed by requirement type. Resolvers
+  // with a string `requirement` and a `key` contribute to requirement
+  // deduplication inside the constraints manager.
   const requirementKeys: Record<string, RequirementKeyFn> = Object.create(null);
   for (const def of Object.values(mergedResolvers)) {
     if (def.key && typeof def.requirement === "string") {
-      requirementKeys[def.requirement] = def.key;
+      requirementKeys[def.requirement] = normalizeResolverKey(def.key);
     }
   }
 
@@ -499,7 +537,10 @@ export function createEngine<S extends Schema>(
   function syncResolverKeys(defs: ResolversDef<S>): void {
     for (const def of Object.values(defs)) {
       if (def.key && typeof def.requirement === "string") {
-        constraintsManager.setRequirementKey(def.requirement, def.key);
+        constraintsManager.setRequirementKey(
+          def.requirement,
+          normalizeResolverKey(def.key),
+        );
       }
     }
   }
@@ -2170,16 +2211,33 @@ export function createEngine<S extends Schema>(
     }
     if (module.events) {
       for (const [key, raw] of Object.entries(module.events)) {
-        if (
-          typeof raw === "object" &&
-          raw !== null &&
-          Object.hasOwn(raw, "handler")
-        ) {
-          const obj = raw as { handler: Function; meta?: DefinitionMeta };
-          (module.events as Record<string, unknown>)[key] = obj.handler;
-          if (obj.meta) {
-            const frozen = freezeMeta(obj.meta);
-            if (frozen) eventMeta.set(key, frozen);
+        if (typeof raw === "object" && raw !== null) {
+          if (Object.hasOwn(raw, "handler")) {
+            const obj = raw as { handler: Function; meta?: DefinitionMeta };
+            (module.events as Record<string, unknown>)[key] = obj.handler;
+            if (obj.meta) {
+              const frozen = freezeMeta(obj.meta);
+              if (frozen) eventMeta.set(key, frozen);
+            }
+          } else if (Object.hasOwn(raw, "patch")) {
+            const obj = raw as {
+              patch: { $set: Record<string, unknown> };
+              meta?: DefinitionMeta;
+            };
+            const spec = obj.patch;
+            (module.events as Record<string, unknown>)[key] = (
+              facts: Record<string, unknown>,
+              event: { payload?: Record<string, unknown> } | undefined,
+            ) =>
+              applyPatch(
+                spec as Parameters<typeof applyPatch>[0],
+                facts,
+                event?.payload ?? {},
+              );
+            if (obj.meta) {
+              const frozen = freezeMeta(obj.meta);
+              if (frozen) eventMeta.set(key, frozen);
+            }
           }
         }
       }

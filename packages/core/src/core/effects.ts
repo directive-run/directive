@@ -36,6 +36,11 @@
  * ```
  */
 
+import {
+  compilePredicate,
+  extractDeps,
+  isPredicateSpec,
+} from "./predicate.js";
 import { withTracking } from "./tracking.js";
 import type {
   EffectsDef,
@@ -224,6 +229,9 @@ export function createEffectsManager<S extends Schema>(
   // If an async effect resolves after stop, its cleanup is invoked immediately.
   let stopped = false;
 
+  // Compiled predicate gate per effect (only effects with a data `on` field).
+  const onGates = new Map<string, (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean>();
+
   /** Initialize state for an effect */
   function initState(id: string): EffectState {
     const def = definitions[id];
@@ -231,11 +239,27 @@ export function createEffectsManager<S extends Schema>(
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
 
+    let dependencies: Set<string> | null = null;
+    let hasExplicitDeps = false;
+
+    if (def.deps) {
+      dependencies = new Set(def.deps as string[]);
+      hasExplicitDeps = true;
+    } else if (def.on && isPredicateSpec(def.on)) {
+      // Declarative trigger — deps are extracted statically from the
+      // predicate; the predicate is the gate evaluated after the
+      // dep-overlap pre-filter in shouldRun().
+      Object.freeze(def.on);
+      dependencies = extractDeps(def.on);
+      hasExplicitDeps = true;
+      onGates.set(id, compilePredicate(def.on as object));
+    }
+
     const state: EffectState = {
       id,
       enabled: true,
-      hasExplicitDeps: !!def.deps,
-      dependencies: def.deps ? new Set(def.deps as string[]) : null,
+      hasExplicitDeps,
+      dependencies,
       cleanup: null,
       stableRunCount: 0,
       depsStable: false,
@@ -292,6 +316,19 @@ export function createEffectsManager<S extends Schema>(
       // re-tracks via withTracking() and can discover new conditional reads.
       if (state.depsStable) {
         resetStability(state);
+      }
+
+      // For effects with a declarative `on` predicate, also evaluate the
+      // predicate after the dep-overlap pre-filter so we only run when the
+      // condition currently holds. `$changed` reads `prev` via the previous
+      // snapshot — on the first run `prev` is null, which the predicate
+      // runtime treats as "value present is a change".
+      const gate = onGates.get(id);
+      if (gate) {
+        const facts = createSnapshot();
+        const prev = previousSnapshot ?? undefined;
+
+        return gate(facts, prev);
       }
 
       return true;
@@ -518,14 +555,14 @@ export function createEffectsManager<S extends Schema>(
       }
     },
 
-    registerDefinitions(newDefs: EffectsDef<S>): void {
+    registerDefinitions(newDefs: EffectsDef<Schema>): void {
       for (const [key, def] of Object.entries(newDefs)) {
         (definitions as Record<string, unknown>)[key] = def;
         initState(key);
       }
     },
 
-    assignDefinition(id: string, def: EffectsDef<S>[string]): void {
+    assignDefinition(id: string, def: EffectsDef<Schema>[string]): void {
       if (!definitions[id]) {
         throw new Error(
           `[Directive] Cannot assign effect "${id}" — it does not exist. Use register() to create it.`,
