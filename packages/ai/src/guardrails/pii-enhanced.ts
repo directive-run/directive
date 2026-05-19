@@ -111,7 +111,10 @@ const PII_PATTERNS: PIIPattern[] = [
   // Credit Card Numbers (Luhn validated)
   {
     type: "credit_card",
-    pattern: /\b(\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})\b|\b(\d{15,16})\b/g,
+    // Separated branch covers 4-4-4-4 grouping; unseparated branch widened to
+    // \d{13,19} so the regex range matches the Luhn validator's 13-19 range
+    // (previously \d{15,16} left 13/14/17/18/19-digit PANs undetected).
+    pattern: /\b(\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})\b|\b(\d{13,19})\b/g,
     validate: (match) => {
       const digits = match.replace(/[-\s]/g, "");
       if (digits.length < 13 || digits.length > 19) return false;
@@ -141,10 +144,11 @@ const PII_PATTERNS: PIIPattern[] = [
     confidence: 0.9,
   },
 
-  // Phone numbers (US and international formats)
+  // Phone numbers (US/NANP only — not international)
   {
     type: "phone",
-    // Matches various formats: (555) 555-5555, 555-555-5555, +1 555 555 5555, etc.
+    // Matches US/NANP formats only: (555) 555-5555, 555-555-5555,
+    // +1 555 555 5555. Does NOT support non-NANP international numbers.
     pattern: /\b(\+?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4})\b/g,
     validate: (match) => {
       const digits = match.replace(/\D/g, "");
@@ -163,16 +167,28 @@ const PII_PATTERNS: PIIPattern[] = [
     confidence: 0.85,
   },
 
-  // IP addresses
+  // IP addresses (IPv4 only — IPv6 deferred)
   {
     type: "ip_address",
     pattern: /\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/g,
     validate: (match) => {
       const parts = match.split(".");
-      return parts.every((p) => {
-        const num = Number.parseInt(p, 10);
-        return num >= 0 && num <= 255;
-      });
+      const octets = parts.map((p) => Number.parseInt(p, 10));
+      // Each octet must be a valid 0-255 number
+      if (octets.some((n) => Number.isNaN(n) || n < 0 || n > 255)) {
+        return false;
+      }
+      const [a, b] = octets as [number, number, number, number];
+      // Skip non-PII infrastructure noise: RFC1918 private ranges,
+      // loopback, link-local, and the unspecified/broadcast addresses.
+      if (a === 10) return false; // 10.0.0.0/8 private
+      if (a === 172 && b >= 16 && b <= 31) return false; // 172.16.0.0/12 private
+      if (a === 192 && b === 168) return false; // 192.168.0.0/16 private
+      if (a === 127) return false; // 127.0.0.0/8 loopback
+      if (a === 169 && b === 254) return false; // 169.254.0.0/16 link-local
+      if (match === "0.0.0.0" || match === "255.255.255.255") return false;
+
+      return true;
     },
     confidence: 0.9,
   },
@@ -205,6 +221,14 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "medical_id",
     pattern: /\b(mrn|medical.?record|patient.?id)[\s#:]+([A-Z0-9-]{6,15})\b/gi,
     confidence: 0.7,
+  },
+
+  // National IDs (non-US) — keyword-anchored, alphanumeric ID 6-20 chars
+  {
+    type: "national_id",
+    pattern:
+      /\b(national.?id|nin|identity.?number|identity.?card|id.?number)[\s#:]+([A-Z0-9-]{6,20})\b/gi,
+    confidence: 0.85,
   },
 ];
 
@@ -386,8 +410,28 @@ export type RedactionStyle =
   | "typed"
   /** Replace with asterisks preserving length */
   | "masked"
-  /** Replace with hash for reversible redaction */
+  /**
+   * Replace with a deterministic FNV-1a hash.
+   *
+   * **WARNING — this is PSEUDONYMIZATION, not anonymization.** FNV-1a is a
+   * fast, non-cryptographic 32-bit hash. For low-entropy structured PII (SSNs,
+   * card numbers, phone numbers) the output is trivially RE-IDENTIFIABLE via
+   * brute force or a precomputed rainbow table. It MUST NOT be relied on for
+   * GDPR / HIPAA de-identification. Use it only for referential integrity
+   * (correlating the same value across audit logs).
+   */
   | "hashed";
+
+/**
+ * Special-category PII types whose *category name* is itself sensitive.
+ * For these, `typed` redaction emits a generic `[REDACTED]` instead of the
+ * type name so the redacted text does not reveal that the user has, e.g., a
+ * medical record or a national ID on file.
+ */
+const SPECIAL_CATEGORY_TYPES: ReadonlySet<PIIType> = new Set<PIIType>([
+  "medical_id",
+  "national_id",
+]);
 
 /** Redact detected PII from text */
 export function redactPII(
@@ -395,8 +439,45 @@ export function redactPII(
   items: DetectedPII[],
   style: RedactionStyle = "typed",
 ): string {
-  // Sort by position descending to avoid offset issues
-  const sorted = [...items].sort((a, b) => b.position.start - a.position.start);
+  // FIX (overlap corruption): the same span can be matched by multiple
+  // patterns (e.g. a 16-digit number flagged as BOTH credit_card and phone).
+  // Splicing overlapping/nested ranges shifts offsets and can leave raw PII
+  // in the output. So first dedupe: sort ascending by start and keep an item
+  // only if its span does not intersect an already-kept item. On a conflict
+  // we prefer the higher-confidence match, tie-broken by the longer span.
+  const ascending = [...items].sort(
+    (a, b) => a.position.start - b.position.start,
+  );
+
+  const kept: DetectedPII[] = [];
+  for (const item of ascending) {
+    const conflictIndex = kept.findIndex(
+      (k) =>
+        item.position.start < k.position.end &&
+        k.position.start < item.position.end,
+    );
+
+    if (conflictIndex === -1) {
+      kept.push(item);
+      continue;
+    }
+
+    const existing = kept[conflictIndex]!;
+    const itemSpan = item.position.end - item.position.start;
+    const existingSpan = existing.position.end - existing.position.start;
+    const itemWins =
+      item.confidence > existing.confidence ||
+      (item.confidence === existing.confidence && itemSpan > existingSpan);
+
+    if (itemWins) {
+      kept[conflictIndex] = item;
+    }
+    // Otherwise drop `item` — the existing kept range stays.
+  }
+
+  // Redact the surviving non-overlapping set descending by start so earlier
+  // splices do not shift the offsets of later ones.
+  const sorted = kept.sort((a, b) => b.position.start - a.position.start);
 
   let result = text;
   for (const item of sorted) {
@@ -407,7 +488,12 @@ export function redactPII(
         replacement = "[REDACTED]";
         break;
       case "typed":
-        replacement = `[${item.type.toUpperCase()}]`;
+        // FIX (category leak): for special-category types, emit a generic
+        // [REDACTED] — the category name itself would otherwise reveal the
+        // presence of, e.g., medical or national-ID data.
+        replacement = SPECIAL_CATEGORY_TYPES.has(item.type)
+          ? "[REDACTED]"
+          : `[${item.type.toUpperCase()}]`;
         break;
       case "masked":
         replacement = "*".repeat(item.value.length);
@@ -431,11 +517,18 @@ export function redactPII(
 /**
  * FNV-1a hash function for referential integrity.
  *
- * **Note:** This is NOT a cryptographic hash. It's designed for:
+ * **WARNING — PSEUDONYMIZATION, NOT ANONYMIZATION.** This is NOT a
+ * cryptographic hash. FNV-1a 32-bit is fast and unkeyed, so for low-entropy
+ * structured PII (SSNs, card numbers, phone numbers) the hash is trivially
+ * RE-IDENTIFIABLE by brute force or a precomputed rainbow table. The output
+ * MUST NOT be treated as de-identified data under GDPR or HIPAA.
+ *
+ * It is designed only for:
  * - Consistent redaction references (same PII → same hash)
  * - Audit trail correlation (track redacted values across logs)
  *
- * For security-sensitive hashing, use Web Crypto API externally.
+ * For security-sensitive hashing, use a keyed cryptographic hash via the
+ * Web Crypto API externally.
  *
  * @see https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
  */
@@ -540,23 +633,28 @@ export function createEnhancedPIIGuardrail(
       return detectorInstance.detect(text, piiTypes);
     }
 
-    // Custom detectors get a timeout
+    // Custom detectors get a timeout.
+    // FIX (unhandled rejection): whichever promise loses the race still
+    // settles afterwards. Attach a no-op .catch() to each so the loser's
+    // rejection (timeout firing after detector wins, or detector throwing
+    // after timeout wins) never surfaces as an unhandledRejection.
     let timer: ReturnType<typeof setTimeout>;
+    const detectPromise = detectorInstance.detect(text, piiTypes);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`,
+            ),
+          ),
+        detectorTimeout,
+      );
+    });
+    detectPromise.catch(() => {});
+    timeoutPromise.catch(() => {});
     try {
-      return await Promise.race([
-        detectorInstance.detect(text, piiTypes),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `[Directive] PII detector '${detectorInstance.name}' timed out after ${detectorTimeout}ms`,
-                ),
-              ),
-            detectorTimeout,
-          );
-        }),
-      ]);
+      return await Promise.race([detectPromise, timeoutPromise]);
     } finally {
       clearTimeout(timer!);
     }
@@ -676,23 +774,27 @@ export async function detectPII(
     // Built-in regex detector is synchronous, no timeout needed
     items = await detectorInstance.detect(text, types);
   } else {
-    // Custom detectors get a timeout
+    // Custom detectors get a timeout.
+    // FIX (unhandled rejection): attach a no-op .catch() to each racer so the
+    // losing promise's rejection (timeout after detector wins, or detector
+    // throwing after timeout wins) never surfaces as an unhandledRejection.
     let timer: ReturnType<typeof setTimeout>;
+    const detectPromise = detectorInstance.detect(text, types);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`,
+            ),
+          ),
+        timeout,
+      );
+    });
+    detectPromise.catch(() => {});
+    timeoutPromise.catch(() => {});
     try {
-      items = await Promise.race([
-        detectorInstance.detect(text, types),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `[Directive] PII detector '${detectorInstance.name}' timed out after ${timeout}ms`,
-                ),
-              ),
-            timeout,
-          );
-        }),
-      ]);
+      items = await Promise.race([detectPromise, timeoutPromise]);
     } finally {
       clearTimeout(timer!);
     }
@@ -709,6 +811,52 @@ export async function detectPII(
     detected: filtered.length > 0,
     items: filtered,
     typeCounts,
+  };
+}
+
+/**
+ * Detect PII in text and return a result whose `redactedText` is populated.
+ *
+ * This composes {@link detectPII} and {@link redactPII} so callers do not have
+ * to manually wire the two together (and do not have to mutate the detection
+ * result). When no PII is detected, `redactedText` is left `undefined` — it is
+ * deliberately NOT defaulted to the raw input.
+ *
+ * @example
+ * ```typescript
+ * const result = await detectAndRedactPII('My SSN is 123-45-6789', {
+ *   types: ['ssn'],
+ *   style: 'typed',
+ * });
+ * console.log(result.detected);      // true
+ * console.log(result.redactedText);  // 'My SSN is [SSN]'
+ *
+ * const clean = await detectAndRedactPII('nothing here', { types: ['ssn'] });
+ * console.log(clean.detected);       // false
+ * console.log(clean.redactedText);   // undefined
+ * ```
+ */
+export async function detectAndRedactPII(
+  text: string,
+  options: {
+    types?: PIIType[];
+    detector?: "regex" | PIIDetector;
+    minConfidence?: number;
+    /** Timeout for custom detectors in milliseconds (default: 5000) */
+    timeout?: number;
+    /** Redaction style applied when PII is detected (default: 'typed') */
+    style?: RedactionStyle;
+  } = {},
+): Promise<PIIDetectionResult> {
+  const result = await detectPII(text, options);
+
+  if (!result.detected) {
+    return { ...result };
+  }
+
+  return {
+    ...result,
+    redactedText: redactPII(text, result.items, options.style ?? "typed"),
   };
 }
 

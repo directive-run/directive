@@ -12,6 +12,7 @@
 import {
   type InjectionDetectionResult,
   type PIIDetectionResult,
+  detectAndRedactPII,
   detectPII,
   detectPromptInjection,
 } from "@directive-run/ai";
@@ -192,11 +193,12 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
     inputLength: text.length,
   });
 
-  // 2. PII detection
-  const piiResult = await detectPII(text, {
-    redact: system.facts.redactionEnabled as boolean,
-    redactionStyle: "typed",
-  });
+  // 2. PII detection. detectPII is detection-only; detectAndRedactPII also
+  // populates `redactedText` so we never have to mutate a returned result.
+  const redactionEnabled = system.facts.redactionEnabled;
+  const piiResult = redactionEnabled
+    ? await detectAndRedactPII(text, { style: "typed" })
+    : await detectPII(text);
   if (piiResult.detected) {
     system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
     for (const item of piiResult.items) {
@@ -258,12 +260,25 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
 
   const redactedText = piiResult.redactedText ?? text;
 
+  // When redaction is on, never persist raw PII into reactive facts:
+  // store the redacted text in the displayed `text` field, and strip the
+  // plaintext `value` from each detected item before it reaches facts.
+  const safeText = redactionEnabled ? redactedText : text;
+  const safePiiResult: PIIDetectionResult | null = !piiResult.detected
+    ? null
+    : redactionEnabled
+      ? {
+          ...piiResult,
+          items: piiResult.items.map((item) => ({ ...item, value: "[redacted]" })),
+        }
+      : piiResult;
+
   return {
     id,
-    text,
+    text: safeText,
     blocked,
     redactedText,
     injectionResult: injectionResult.detected ? injectionResult : null,
-    piiResult: piiResult.detected ? piiResult : null,
+    piiResult: safePiiResult,
   };
 }

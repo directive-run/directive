@@ -430,6 +430,7 @@ export {
   createEnhancedPIIGuardrail,
   createOutputPIIGuardrail,
   detectPII,
+  detectAndRedactPII,
   redactPII,
   type EnhancedPIIGuardrailOptions,
   type PIIDetectionResult,

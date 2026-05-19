@@ -5,6 +5,7 @@ import {
   type PIIType,
   createEnhancedPIIGuardrail,
   createOutputPIIGuardrail,
+  detectAndRedactPII,
   detectPII,
   redactPII,
   regexDetector,
@@ -102,8 +103,10 @@ describe("regexDetector / detectPII", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("detects IP addresses like 192.168.1.1", async () => {
-    const result = await regexDetector.detect("Server at 192.168.1.1", [
+  it("detects public IP addresses like 8.8.8.8", async () => {
+    // Private/loopback ranges are intentionally filtered (see FIX 8), so this
+    // uses a public IP.
+    const result = await regexDetector.detect("Server at 8.8.8.8", [
       "ip_address",
     ]);
 
@@ -447,5 +450,235 @@ describe("detectPII utility", () => {
     expect(result.detected).toBe(true);
     expect(result.typeCounts).toEqual({ ssn: 1, email: 1 });
     expect(result.items).toHaveLength(2);
+  });
+});
+
+// ============================================================================
+// FIX 1 — redactPII overlap dedup
+// ============================================================================
+
+describe("redactPII overlap dedup", () => {
+  it("does not corrupt output when two items overlap, keeps higher confidence", () => {
+    const text = "call 4111111111111111 now";
+    const start = text.indexOf("4111111111111111");
+    const end = start + 16;
+    // Two overlapping detections of the same 16-digit span.
+    const items: DetectedPII[] = [
+      {
+        type: "credit_card",
+        value: "4111111111111111",
+        position: { start, end },
+        confidence: 0.95,
+      },
+      {
+        type: "phone",
+        value: "4111111111111111",
+        position: { start, end },
+        confidence: 0.8,
+      },
+    ];
+
+    const redacted = redactPII(text, items, "typed");
+    // Higher-confidence credit_card wins; phone span dropped.
+    expect(redacted).toBe("call [CREDIT_CARD] now");
+    // No raw digits left, no doubled/garbled brackets.
+    expect(redacted).not.toMatch(/\d/);
+    expect(redacted).not.toContain("[PHONE]");
+  });
+
+  it("drops a nested span contained within a larger kept span", () => {
+    const text = "id 123456789 end";
+    const start = text.indexOf("123456789");
+    const items: DetectedPII[] = [
+      {
+        type: "ssn",
+        value: "123456789",
+        position: { start, end: start + 9 },
+        confidence: 0.9,
+      },
+      // Nested 4-digit sub-span, lower confidence.
+      {
+        type: "bank_account",
+        value: "4567",
+        position: { start: start + 3, end: start + 7 },
+        confidence: 0.7,
+      },
+    ];
+
+    const redacted = redactPII(text, items, "typed");
+    expect(redacted).toBe("id [SSN] end");
+  });
+});
+
+// ============================================================================
+// FIX 3 — credit-card 13-19 digit detection
+// ============================================================================
+
+describe("credit_card 13-19 digit detection", () => {
+  it("detects a valid 13-digit Luhn PAN", async () => {
+    // 4222222222222 is a valid 13-digit Visa test number (Luhn-valid).
+    const result = await detectPII("card 4222222222222 ok", {
+      types: ["credit_card"],
+    });
+    expect(result.detected).toBe(true);
+    expect(result.items[0]!.type).toBe("credit_card");
+  });
+
+  it("detects a valid 19-digit Luhn PAN", async () => {
+    // 4111111111111111110 is a 19-digit Luhn-valid number.
+    const result = await detectPII("card 4111111111111111110 ok", {
+      types: ["credit_card"],
+    });
+    expect(result.detected).toBe(true);
+    expect(result.items[0]!.type).toBe("credit_card");
+  });
+});
+
+// ============================================================================
+// FIX 4 — national_id keyword detection
+// ============================================================================
+
+describe("national_id detection", () => {
+  it("detects a keyword-anchored national ID", async () => {
+    const result = await detectPII("National ID: AB1234567X here", {
+      types: ["national_id"],
+    });
+    expect(result.detected).toBe(true);
+    expect(result.items[0]!.type).toBe("national_id");
+  });
+
+  it("detects the 'nin' keyword variant", async () => {
+    const result = await detectPII("NIN# QQ123456C", {
+      types: ["national_id"],
+    });
+    expect(result.detected).toBe(true);
+    expect(result.items[0]!.type).toBe("national_id");
+  });
+});
+
+// ============================================================================
+// FIX 6 — typed redaction hides special-category names
+// ============================================================================
+
+describe("redactPII special-category masking", () => {
+  it("emits [REDACTED] for medical_id under typed style", () => {
+    const text = "mrn: AB123456";
+    const start = text.indexOf("AB123456");
+    const items: DetectedPII[] = [
+      {
+        type: "medical_id",
+        value: "AB123456",
+        position: { start: 0, end: start + 8 },
+        confidence: 0.7,
+      },
+    ];
+    const redacted = redactPII(text, items, "typed");
+    expect(redacted).toBe("[REDACTED]");
+    expect(redacted).not.toContain("MEDICAL_ID");
+  });
+
+  it("still emits [TYPE] for non-special types", () => {
+    const items: DetectedPII[] = [
+      {
+        type: "email",
+        value: "a@b.com",
+        position: { start: 0, end: 7 },
+        confidence: 0.9,
+      },
+    ];
+    expect(redactPII("a@b.com", items, "typed")).toBe("[EMAIL]");
+  });
+});
+
+// ============================================================================
+// FIX 8 — private/loopback IP false positives
+// ============================================================================
+
+describe("ip_address private/loopback filtering", () => {
+  it("does not flag RFC1918 private IPs", async () => {
+    const result = await detectPII("server at 10.0.0.1 and 192.168.1.5", {
+      types: ["ip_address"],
+    });
+    expect(result.detected).toBe(false);
+  });
+
+  it("does not flag loopback 127.0.0.1", async () => {
+    const result = await detectPII("localhost 127.0.0.1", {
+      types: ["ip_address"],
+    });
+    expect(result.detected).toBe(false);
+  });
+
+  it("still flags a public IP", async () => {
+    const result = await detectPII("client 8.8.8.8 connected", {
+      types: ["ip_address"],
+    });
+    expect(result.detected).toBe(true);
+    expect(result.items[0]!.type).toBe("ip_address");
+  });
+});
+
+// ============================================================================
+// FIX 9 — detectAndRedactPII compose helper
+// ============================================================================
+
+describe("detectAndRedactPII", () => {
+  it("returns a new object with redactedText set when PII is found", async () => {
+    const result = await detectAndRedactPII("My SSN is 123-45-6789", {
+      types: ["ssn"],
+      style: "typed",
+    });
+    expect(result.detected).toBe(true);
+    expect(result.redactedText).toBe("My SSN is [SSN]");
+  });
+
+  it("leaves redactedText undefined when no PII is detected", async () => {
+    const result = await detectAndRedactPII("nothing sensitive here", {
+      types: ["ssn"],
+    });
+    expect(result.detected).toBe(false);
+    expect(result.redactedText).toBeUndefined();
+  });
+
+  it("does not mutate the detectPII result (returns a fresh object)", async () => {
+    const text = "SSN 123-45-6789";
+    const detect = await detectPII(text, { types: ["ssn"] });
+    const composed = await detectAndRedactPII(text, { types: ["ssn"] });
+    expect(detect.redactedText).toBeUndefined();
+    expect(composed).not.toBe(detect);
+    expect(composed.redactedText).toBeDefined();
+  });
+});
+
+// ============================================================================
+// FIX 2 — no unhandled rejection from a fast custom detector
+// ============================================================================
+
+describe("detectPII timeout race hygiene", () => {
+  it("does not emit an unhandled rejection when a fast detector wins", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+
+    const fastDetector: PIIDetector = {
+      name: "fast",
+      async detect(): Promise<DetectedPII[]> {
+        return [];
+      },
+    };
+
+    try {
+      const result = await detectPII("anything", {
+        detector: fastDetector,
+        timeout: 50,
+      });
+      expect(result.detected).toBe(false);
+      // Let the (cleared) timeout's microtask flush.
+      await new Promise((r) => setTimeout(r, 100));
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+
+    expect(rejections).toHaveLength(0);
   });
 });

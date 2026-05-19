@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { computed, effect, signal } from "@preact/signals-core";
 import { configureStore, createSlice } from "@reduxjs/toolkit";
 import { atom, createStore as createJotaiStore } from "jotai/vanilla";
@@ -116,7 +115,7 @@ describe("Comparison: Subscribe + Notify (create store, 10 subs, 1 write)", () =
     sys.start();
     let n = 0;
     for (let i = 0; i < 10; i++)
-      sys.subscribe(() => {
+      sys.subscribe(["count"], () => {
         n++;
       });
     sys.facts.count = 1;
@@ -269,8 +268,8 @@ describe("Comparison: Read 10 Keys", () => {
     const store = createZustandStore()(() => init);
     bench("Zustand", () => {
       let s = 0;
-      const st = store.getState();
-      for (let i = 0; i < 10; i++) s += st[`k${i}`];
+      const st = store.getState() as Record<string, number>;
+      for (let i = 0; i < 10; i++) s += st[`k${i}`]!;
     });
   })();
 
@@ -290,7 +289,8 @@ describe("Comparison: Read 10 Keys", () => {
     });
     bench("MobX", () => {
       let s = 0;
-      for (let i = 0; i < 10; i++) s += store[`k${i}`];
+      const obj = store as Record<string, number>;
+      for (let i = 0; i < 10; i++) s += obj[`k${i}`]!;
     });
   })();
 
@@ -299,7 +299,7 @@ describe("Comparison: Read 10 Keys", () => {
     const sigs = Array.from({ length: 10 }, (_, i) => signal(i));
     bench("Preact Signals", () => {
       let s = 0;
-      for (let i = 0; i < 10; i++) s += sigs[i].value;
+      for (let i = 0; i < 10; i++) s += sigs[i]!.value;
     });
   })();
 
@@ -309,7 +309,7 @@ describe("Comparison: Read 10 Keys", () => {
     const store = createJotaiStore();
     bench("Jotai", () => {
       let s = 0;
-      for (let i = 0; i < 10; i++) s += store.get(atoms[i]);
+      for (let i = 0; i < 10; i++) s += store.get(atoms[i]!);
     });
   })();
 });

@@ -19,6 +19,7 @@
 import {
   type InjectionDetectionResult,
   type PIIDetectionResult,
+  detectAndRedactPII,
   detectPII,
   detectPromptInjection,
 } from "@directive-run/ai";
@@ -199,11 +200,11 @@ export function analyzeMessage(text: string): ChatMessage {
     inputLength: text.length,
   });
 
-  // 2. PII detection
-  const piiResult = detectPII(text, {
-    redact: system.facts.redactionEnabled as boolean,
-    redactionStyle: "typed",
-  });
+  // 2. PII detection. detectPII is detection-only; detectAndRedactPII also
+  // populates `redactedText` so we never have to mutate a returned result.
+  const piiResult = system.facts.redactionEnabled
+    ? await detectAndRedactPII(text, { style: "typed" })
+    : await detectPII(text);
   if (piiResult.detected) {
     system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
     for (const item of piiResult.items) {

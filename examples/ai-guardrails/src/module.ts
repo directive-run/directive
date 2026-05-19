@@ -8,9 +8,9 @@
 import {
   type InjectionDetectionResult,
   type PIIDetectionResult,
+  detectAndRedactPII,
   detectPII,
   detectPromptInjection,
-  redactPII,
 } from "@directive-run/ai";
 import {
   type ModuleSchema,
@@ -166,53 +166,17 @@ export const system = createSystem({
 // Analysis Functions
 // ============================================================================
 
-export async function analyzeMessage(text: string): Promise<ChatMessage> {
-  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+/**
+ * Compliance gate: blocks the message when the active mode forbids the kinds
+ * of PII detected. Emits its own devtools event and returns whether it blocked.
+ */
+function runComplianceCheck(
+  piiResult: PIIDetectionResult,
+  textLength: number,
+): boolean {
+  const mode = system.facts.complianceMode as ComplianceMode;
   let blocked = false;
 
-  // 1. Prompt injection detection
-  const injectionResult = detectPromptInjection(text);
-  if (injectionResult.detected) {
-    blocked = true;
-    system.facts.injectionAttempts =
-      (system.facts.injectionAttempts as number) + 1;
-    for (const p of injectionResult.patterns) {
-      addTimeline("injection", `${p.name} (${p.severity})`, "injection");
-    }
-  }
-
-  emitDevToolsEvent({
-    type: "guardrail_check",
-    guardrailName: "prompt-injection",
-    guardrailType: "input",
-    passed: !injectionResult.detected,
-    inputLength: text.length,
-  });
-
-  // 2. PII detection (and optional redaction so consumers can read
-  // `piiResult.redactedText`). detectPII is detection-only by design;
-  // redactPII is the separate concern.
-  const piiResult = await detectPII(text);
-  if (piiResult.detected && system.facts.redactionEnabled) {
-    piiResult.redactedText = redactPII(text, piiResult.items, "typed");
-  }
-  if (piiResult.detected) {
-    system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
-    for (const item of piiResult.items) {
-      addTimeline("pii", `${item.type} found`, "pii");
-    }
-  }
-
-  emitDevToolsEvent({
-    type: "guardrail_check",
-    guardrailName: "pii-detection",
-    guardrailType: "input",
-    passed: !piiResult.detected,
-    inputLength: text.length,
-  });
-
-  // 3. Compliance check
-  const mode = system.facts.complianceMode as ComplianceMode;
   if (mode !== "standard" && piiResult.detected) {
     const hasPHI = piiResult.items.some(
       (i) =>
@@ -244,8 +208,85 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
     guardrailName: `compliance-${mode}`,
     guardrailType: "input",
     passed: !blocked || !piiResult.detected,
+    inputLength: textLength,
+  });
+
+  return blocked;
+}
+
+/**
+ * When redaction is on, never persist raw PII into reactive facts: strip the
+ * plaintext `value` from each detected item before it reaches facts.
+ */
+function toSafePiiResult(
+  piiResult: PIIDetectionResult,
+  redactionEnabled: boolean,
+): PIIDetectionResult | null {
+  if (!piiResult.detected) {
+    return null;
+  }
+
+  if (!redactionEnabled) {
+    return piiResult;
+  }
+
+  return {
+    ...piiResult,
+    items: piiResult.items.map((item) => ({
+      ...item,
+      value: "[redacted]",
+    })),
+  };
+}
+
+export async function analyzeMessage(text: string): Promise<ChatMessage> {
+  const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  let blocked = false;
+
+  // 1. Prompt injection detection
+  const injectionResult = detectPromptInjection(text);
+  if (injectionResult.detected) {
+    blocked = true;
+    system.facts.injectionAttempts =
+      (system.facts.injectionAttempts as number) + 1;
+    for (const p of injectionResult.patterns) {
+      addTimeline("injection", `${p.name} (${p.severity})`, "injection");
+    }
+  }
+
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: "prompt-injection",
+    guardrailType: "input",
+    passed: !injectionResult.detected,
     inputLength: text.length,
   });
+
+  // 2. PII detection. detectPII is detection-only; detectAndRedactPII also
+  // populates `redactedText` so we never have to mutate a returned result.
+  const redactionEnabled = system.facts.redactionEnabled;
+  const piiResult = redactionEnabled
+    ? await detectAndRedactPII(text, { style: "typed" })
+    : await detectPII(text);
+  if (piiResult.detected) {
+    system.facts.piiDetections = (system.facts.piiDetections as number) + 1;
+    for (const item of piiResult.items) {
+      addTimeline("pii", `${item.type} found`, "pii");
+    }
+  }
+
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: "pii-detection",
+    guardrailType: "input",
+    passed: !piiResult.detected,
+    inputLength: text.length,
+  });
+
+  // 3. Compliance check
+  if (runComplianceCheck(piiResult, text.length)) {
+    blocked = true;
+  }
 
   if (blocked) {
     system.facts.blockedCount = (system.facts.blockedCount as number) + 1;
@@ -259,10 +300,10 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
 
   return {
     id,
-    text,
+    text: redactionEnabled ? redactedText : text,
     blocked,
     redactedText,
     injectionResult: injectionResult.detected ? injectionResult : null,
-    piiResult: piiResult.detected ? piiResult : null,
+    piiResult: toSafePiiResult(piiResult, redactionEnabled),
   };
 }

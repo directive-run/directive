@@ -73,8 +73,7 @@
       "*.tsbuildinfo",
       "worktrees",
       "packages/knowledge/examples",
-      "packages/claude-plugin/skills/*/examples.md",
-      "**/__benchmarks__/**"
+      "packages/claude-plugin/skills/*/examples.md"
     ]
   },
   "overrides": [
@@ -84,6 +83,20 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["**/__benchmarks__/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
           }
         }
       }
