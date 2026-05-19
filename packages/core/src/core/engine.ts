@@ -45,7 +45,6 @@ import type {
   DerivationsDef,
   EffectsDef,
   EventsDef,
-  Facts,
   FactsSnapshot,
   InferSchema,
   MetaMatch,
@@ -506,6 +505,31 @@ export function createEngine<S extends Schema>(
   }
 
   /**
+   * RFC-0003 resolver constraint-binding lookup. Returns the constraint's
+   * owned-fact list, or `undefined` when the constraint has no `owns` field,
+   * an empty list, or is async — async constraints `await` between
+   * predicate evaluation and resolver dispatch, which would race the
+   * binding's owned-fact snapshot, so they cannot be bound.
+   */
+  function getConstraintBinding(
+    constraintId: string,
+  ): { fields: readonly string[] } | undefined {
+    const def = mergedConstraints[constraintId];
+    if (!def?.owns || def.owns.length === 0) return undefined;
+    const state = constraintsManager.getState(constraintId);
+    if (state?.isAsync || def.async) {
+      if (isDevelopment) {
+        console.warn(
+          `[Directive] Constraint "${constraintId}" has \`owns\` but is async. ` +
+            "Binding is disabled — async constraints cannot be bound.",
+        );
+      }
+      return undefined;
+    }
+    return { fields: def.owns };
+  }
+
+  /**
    * Requirement IDs that resolvers requested to be re-fired via
    * `ctx.requeue()`. The engine removes these IDs from
    * `state.previousRequirements` AFTER each reconcile commits its next
@@ -519,32 +543,8 @@ export function createEngine<S extends Schema>(
     definitions: mergedResolvers,
     facts,
     store,
-    // RFC-1: resolver constraint-binding. Resolves the source constraint's
-    // bind mode + sync `when()` reference so the resolver context can gate
-    // fact writes on the live predicate. Async constraints are forced to
-    // `'none'` (binding requires a sync predicate; logged once in dev).
-    getConstraintBinding: (constraintId) => {
-      const def = mergedConstraints[constraintId];
-      if (!def) return undefined;
-      const mode = def.bind ?? "none";
-      if (mode === "none") return { mode: "none", when: null };
-      // `bind: 'auto'` requires a sync predicate. Force-downgrade async
-      // constraints; they cannot be bound because the binding checker
-      // re-evaluates `when()` on every fact write.
-      const state = constraintsManager.getState(constraintId);
-      if (state?.isAsync || def.async) {
-        if (isDevelopment) {
-          console.warn(
-            `[Directive] Constraint "${constraintId}" has bind: 'auto' but is async. Binding is disabled — async predicates cannot be re-evaluated synchronously on every fact write.`,
-          );
-        }
-        return { mode: "none", when: null };
-      }
-      return {
-        mode: "auto",
-        when: def.when as (factsArg: Facts<S>) => boolean,
-      };
-    },
+    // RFC-0003: resolver constraint-binding — see getConstraintBinding above.
+    getConstraintBinding,
     onStart: (resolver, req) => {
       if (hasPlugins()) pluginManager.emitResolverStart(resolver, req);
     },
@@ -872,9 +872,23 @@ export function createEngine<S extends Schema>(
         }
       }
 
-      // Cancel resolvers for removed requirements
+      // Handle resolvers for removed requirements. Unbound: cancel (abort the
+      // signal). Bound (RFC-0003): detach instead — untrack the resolver but
+      // do not abort it. It runs to completion so its data writes land (the
+      // binding still drops owned-fact clobbers); untracking lets the
+      // requirement re-dispatch cleanly if the constraint flips true again.
+      // Cancelling a bound resolver would abort the signal and make a
+      // signal-checking resolver bail early, losing those data writes (the
+      // win-at-the-buzzer regression).
       for (const req of removed) {
-        resolversManager.cancel(req.id);
+        const bound = req.fromConstraint
+          ? getConstraintBinding(req.fromConstraint)
+          : undefined;
+        if (bound) {
+          resolversManager.detach(req.id);
+        } else {
+          resolversManager.cancel(req.id);
+        }
       }
 
       // Start resolvers for new requirements

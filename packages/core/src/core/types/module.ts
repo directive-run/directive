@@ -10,7 +10,6 @@ import type { EffectCleanup, EffectsDef } from "./effects.js";
 import type { DirectiveError } from "./errors.js";
 import type { Facts, FactsSnapshot } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
-import type { ConstraintBindMode } from "./requirements.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -167,10 +166,12 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver-to-constraint binding mode (RFC-1).
-   * Defaults to `'none'`. See {@link ConstraintBindMode}.
+   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
+   * dispatched by this constraint owns — an external clobber of one of them
+   * drops the resolver's write. Omit for no binding (default). Ignored on
+   * async constraints.
    */
-  bind?: ConstraintBindMode;
+  owns?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
@@ -230,10 +231,12 @@ export interface CrossModuleConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver-to-constraint binding mode (RFC-1).
-   * Defaults to `'none'`. See {@link ConstraintBindMode}.
+   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
+   * dispatched by this constraint owns — an external clobber of one of them
+   * drops the resolver's write. Omit for no binding (default). Ignored on
+   * async constraints.
    */
-  bind?: ConstraintBindMode;
+  owns?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.

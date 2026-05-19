@@ -69,7 +69,6 @@ export type {
   RequirementWithId,
   RequirementKeyFn,
   ConstraintDef,
-  ConstraintBindMode,
   ConstraintsDef,
   ConstraintState,
 } from "./requirements.js";

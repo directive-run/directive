@@ -1593,7 +1593,7 @@ describe("Engine — Effects", () => {
 // ============================================================================
 
 describe("constraint-binding (RFC-1) — engine integration", () => {
-  it("bind: 'auto' prevents tail-clobber end-to-end through createSystem", async () => {
+  it("the binding prevents tail-clobber end-to-end through createSystem", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -1630,7 +1630,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "EXECUTE_ACTION" },
-          bind: "auto",
+          owns: ["status"],
         },
       },
       resolvers: {
@@ -1639,8 +1639,8 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
           resolve: async (_req, ctx) => {
             ctx.facts.progress = 50;
             await blocker;
-            // Tail clobber attempt — must be dropped because the constraint
-            // has flipped to false (status === 'left' by then).
+            // Tail clobber attempt — must be dropped because `status` (owned)
+            // was changed externally (status === 'left' by then).
             ctx.facts.status = "playing";
           },
         },
@@ -1671,7 +1671,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     system.destroy();
   });
 
-  it("bind: 'none' (default) preserves the clobber behavior", async () => {
+  it("no `owns` (default) preserves the clobber behavior", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -1703,7 +1703,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "EXECUTE_ACTION" },
-          // bind defaults to 'none'
+          // no `owns` — binding off by default
         },
       },
       resolvers: {
@@ -1729,6 +1729,336 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     await flush();
 
     // Default behavior: tail-clobber lands.
+    expect(system.facts.status).toBe("playing");
+
+    system.destroy();
+  });
+
+  it("a resolver's data write survives an owned-fact clobber (win-at-the-buzzer)", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("winAtBuzzer", {
+      schema: {
+        facts: {
+          status: t.string(),
+          winRecord: t.string(),
+        },
+        derivations: {},
+        events: {
+          claim: {},
+          endRound: {},
+        },
+        requirements: { CLAIM_WIN: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+        f.winRecord = "";
+      },
+      events: {
+        claim: (f) => {
+          f.status = "mutating";
+        },
+        endRound: (f) => {
+          f.status = "ended";
+        },
+      },
+      constraints: {
+        mutate: {
+          when: (f) => f.status === "mutating",
+          require: { type: "CLAIM_WIN" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        execute: {
+          requirement: "CLAIM_WIN",
+          resolve: async (_req, ctx) => {
+            await blocker; // server confirms the win
+            // `winRecord` is data — not owned — so it lands even though the
+            // round ended mid-flight. `status` is owned → dropped.
+            ctx.facts.winRecord = "recorded";
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+
+    system.events.claim();
+    await flush();
+
+    // The round ends while the claim is in flight.
+    system.events.endRound();
+    await flush();
+    expect(system.facts.status).toBe("ended");
+
+    release();
+    await flush();
+
+    // The win was recorded (data write landed); the stale status-restore was
+    // dropped — a player who wins at the buzzer is not silently dropped.
+    expect(system.facts.winRecord).toBe("recorded");
+    expect(system.facts.status).toBe("ended");
+
+    system.destroy();
+  });
+
+  it("a bound resolver is NOT cancelled when its requirement is removed", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+    let signalAfterAwait: boolean | null = null;
+
+    const m = createModule("notCancelled", {
+      schema: {
+        facts: { status: t.string(), data: t.string() },
+        derivations: {},
+        events: { start: {}, interrupt: {} },
+        requirements: { WORK: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+        f.data = "";
+      },
+      events: {
+        start: (f) => {
+          f.status = "working";
+        },
+        interrupt: (f) => {
+          f.status = "interrupted";
+        },
+      },
+      constraints: {
+        work: {
+          when: (f) => f.status === "working",
+          require: { type: "WORK" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        worker: {
+          requirement: "WORK",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            // A bound resolver is not cancelled by requirement removal — the
+            // signal stays unaborted so a signal-checking resolver does not
+            // bail and lose its data writes.
+            signalAfterAwait = ctx.signal.aborted;
+            ctx.facts.data = "landed"; // data write — lands
+            ctx.facts.status = "done"; // owned — clobbered, dropped
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+    system.events.start();
+    await flush();
+
+    // A competing event removes the WORK requirement (status leaves 'working').
+    system.events.interrupt();
+    await flush();
+
+    release();
+    await flush();
+
+    expect(signalAfterAwait).toBe(false); // resolver was not cancelled
+    expect(system.facts.data).toBe("landed"); // data write landed
+    expect(system.facts.status).toBe("interrupted"); // owned write dropped
+
+    system.destroy();
+  });
+
+  it("an unbound resolver is still cancelled when its requirement is removed", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+    let signalAfterAwait: boolean | null = null;
+
+    const m = createModule("stillCancelled", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { start: {}, interrupt: {} },
+        requirements: { WORK: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "working";
+        },
+        interrupt: (f) => {
+          f.status = "interrupted";
+        },
+      },
+      constraints: {
+        work: {
+          when: (f) => f.status === "working",
+          require: { type: "WORK" },
+          // no `owns` — default cancellation behavior
+        },
+      },
+      resolvers: {
+        worker: {
+          requirement: "WORK",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            signalAfterAwait = ctx.signal.aborted;
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+    system.events.start();
+    await flush();
+    system.events.interrupt();
+    await flush();
+    release();
+    await flush();
+
+    expect(signalAfterAwait).toBe(true); // unbound resolver was cancelled
+
+    system.destroy();
+  });
+
+  it("a detached bound resolver does not block re-dispatch when the constraint returns", async () => {
+    let runs = 0;
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("reDispatch", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { go: {}, stop: {} },
+        requirements: { WORK: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        go: (f) => {
+          f.status = "working";
+        },
+        stop: (f) => {
+          f.status = "idle";
+        },
+      },
+      constraints: {
+        work: {
+          when: (f) => f.status === "working",
+          require: { type: "WORK" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        worker: {
+          requirement: "WORK",
+          resolve: async () => {
+            runs++;
+            await blocker;
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+
+    system.events.go(); // constraint true → resolver A dispatched
+    await flush();
+    expect(runs).toBe(1);
+
+    system.events.stop(); // constraint false → resolver A detached (still running)
+    await flush();
+
+    system.events.go(); // constraint true again → resolver B must dispatch
+    await flush();
+    // Re-dispatch happened even though A is still in flight. Detach (not a
+    // bare skip-cancel) frees the in-flight slot for the requirement id.
+    expect(runs).toBe(2);
+
+    release();
+    await flush();
+    system.destroy();
+  });
+
+  it("`owns` on an async constraint is ignored — the clobber lands", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("asyncBound", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { start: {}, forceLeft: {} },
+        requirements: { EXECUTE_ACTION: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+        forceLeft: (f) => {
+          f.status = "left";
+        },
+      },
+      constraints: {
+        mutate: {
+          async: true,
+          deps: ["status"],
+          when: async (f) => f.status === "mutating",
+          require: { type: "EXECUTE_ACTION" },
+          owns: ["status"], // ignored — async constraint
+        },
+      },
+      resolvers: {
+        execute: {
+          requirement: "EXECUTE_ACTION",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    system.start();
+    await flush();
+    system.events.start();
+    await flush();
+    await flush();
+    system.events.forceLeft();
+    await flush();
+    release();
+    await flush();
+    await flush();
+
+    // `owns` is ignored on async constraints — the resolver's tail write is
+    // not clobber-checked, so it lands (same as `owns` absent).
     expect(system.facts.status).toBe("playing");
 
     system.destroy();

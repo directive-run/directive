@@ -14,7 +14,6 @@ import { withTimeout } from "../utils/utils.js";
 import type {
   BatchConfig,
   BatchResolveResults,
-  ConstraintBindMode,
   Facts,
   FactsSnapshot,
   FactsStore,
@@ -74,6 +73,20 @@ export interface ResolversManager<_S extends Schema> {
    * @param requirementId - The unique requirement ID to cancel.
    */
   cancel(requirementId: string): void;
+  /**
+   * Untrack an in-flight resolver by requirement ID **without** aborting it
+   * (RFC-0003 resolver constraint-binding).
+   *
+   * @remarks
+   * Used for bound resolvers whose triggering requirement was removed: the
+   * resolver runs to completion (its data writes land; the binding still
+   * guards owned facts) but it no longer occupies the `inflight` slot, so the
+   * same requirement re-dispatches cleanly if it returns. A no-op if the
+   * requirement is not in-flight.
+   *
+   * @param requirementId - The unique requirement ID to detach.
+   */
+  detach(requirementId: string): void;
   /**
    * Cancel every in-flight resolver and flush all pending batch queues.
    */
@@ -181,23 +194,18 @@ interface BatchState {
  * Per-constraint binding info, used by RFC-1 (resolver constraint-binding).
  *
  * The engine wires this lookup into the resolvers manager so that a resolver
- * dispatched from a constraint with `bind: 'auto'` can re-evaluate the
- * constraint's `when()` predicate live on every fact write.
+ * dispatched from a constraint with an `owns` field knows which facts it
+ * *owns* — writes to those are clobber-checked (see {@link createBoundFacts}).
  *
- * Returns `null` (or the lookup itself returns `undefined`) when the source
- * constraint is unknown, async, or has `bind: 'none'` — in which case
- * binding is a no-op and the resolver behaves exactly as before.
+ * Returns `undefined`/`null` when the source constraint is unknown or has no
+ * `owns` field — in which case binding is a no-op and the resolver behaves
+ * exactly as before.
  *
  * @internal
  */
-export interface ConstraintBindingInfo<S extends Schema> {
-  /** The constraint's `bind` mode (effective; async predicates are forced to `'none'`). */
-  mode: ConstraintBindMode;
-  /**
-   * The constraint's `when()` predicate, narrowed to a sync signature.
-   * Only populated when `mode === 'auto'` and the constraint is sync.
-   */
-  when: ((facts: Facts<S>) => boolean) | null;
+export interface ConstraintBindingInfo {
+  /** Fact keys the triggering resolver owns; writes to these are clobber-checked. */
+  readonly fields: readonly string[];
 }
 
 /**
@@ -216,13 +224,12 @@ export interface CreateResolversOptions<S extends Schema> {
    * Look up binding info for a source constraint id (RFC-1).
    *
    * Wired by the engine — given the `fromConstraint` of a `RequirementWithId`,
-   * returns the constraint's effective bind mode + a synchronous `when()`
-   * reference. Return `undefined` if the constraint is unknown or binding
-   * does not apply.
+   * returns the constraint's owned fact keys. Return `undefined` if the
+   * constraint is unknown or has no `owns` field.
    */
   getConstraintBinding?: (
     constraintId: string,
-  ) => ConstraintBindingInfo<S> | undefined;
+  ) => ConstraintBindingInfo | undefined;
   /** Called when a resolver begins execution. */
   onStart?: (resolver: string, req: RequirementWithId) => void;
   /** Called when a resolver completes successfully, with the wall-clock duration in ms. */
@@ -588,90 +595,89 @@ export function createResolversManager<S extends Schema>(
    * Returns `null` when binding does not apply:
    * - No `getConstraintBinding` wired (e.g. tests calling the manager directly).
    * - The requirement has no `fromConstraint` (out-of-band dispatch / callOne).
-   * - The constraint's `bind` mode is `'none'` (default).
-   * - The constraint is async (binding requires a sync `when()` predicate).
+   * - The constraint has no `owns` field (default) or an empty list.
    *
    * @internal
    */
   function resolveBinding(
     req: RequirementWithId | null,
-  ): ConstraintBindingInfo<S> | null {
+  ): ConstraintBindingInfo | null {
     if (!getConstraintBinding || !req || !req.fromConstraint) return null;
     const info = getConstraintBinding(req.fromConstraint);
-    if (!info || info.mode !== "auto" || !info.when) return null;
+    if (!info || info.fields.length === 0) return null;
     return info;
   }
 
   /**
-   * Build a binding-aware Proxy around the engine `facts` proxy.
+   * Build a binding-aware Proxy around the engine `facts` proxy (RFC-1).
    *
-   * **Semantics (RFC-1):**
+   * **Semantics — per-fact optimistic concurrency:**
    * - Reads pass through unchanged.
-   * - Each write evaluates `binding.when(facts)` against the *pre-write*
-   *   snapshot. If the predicate returns `false`, the write is dropped, the
-   *   resolver's `AbortController` is aborted, and the binding is marked
-   *   deactivated. Subsequent writes silently no-op without re-evaluating.
-   * - Binding is **one-shot per resolver invocation**: once deactivated, it
-   *   stays deactivated even if `when()` would later flip back to `true`.
+   * - A write to a fact NOT in `binding.fields` (a "data" write) always lands.
+   * - A write to an *owned* fact (in `binding.fields`) lands only if the fact
+   *   still holds the value this resolver last wrote or started with. If it
+   *   was changed by anything else (an event, another resolver), the write is
+   *   dropped, the resolver's `AbortController` is aborted, and that fact's
+   *   ownership is lost.
+   * - Ownership is **one-shot per fact**: once lost, further writes to that
+   *   fact are dropped even if it later returns to the expected value.
    * - The set trap returns `true` even when dropping a write so resolvers
-   *   running in strict mode don't see a `TypeError`. The signal-aborted
-   *   side channel is the canonical signal that writes are no longer
-   *   landing.
+   *   running in strict mode don't see a `TypeError`. `ctx.signal.aborted`
+   *   is the canonical signal that an owned write was dropped.
+   *
+   * `when()` is never consulted here — it remains purely the constraint
+   * trigger. The binding works with async constraints too.
    *
    * @internal
    */
   function createBoundFacts(
-    binding: ConstraintBindingInfo<S>,
+    binding: ConstraintBindingInfo,
     controller: AbortController,
   ): Facts<S> {
-    let deactivated = false;
+    const rawFacts = facts as Record<string, unknown>;
+    const owned = new Set(binding.fields);
+    // The value each owned fact had when this resolver last wrote or observed
+    // it. Snapshotted at resolver dispatch; updated on each landed owned write.
+    const expected = new Map<string, unknown>();
+    for (const field of owned) {
+      expected.set(field, rawFacts[field]);
+    }
+    // Owned facts whose ownership was lost to an external writer (one-shot).
+    const lost = new Set<string>();
+
+    // Returns true if the resolver may still write `prop`. On a detected
+    // external clobber, marks the fact lost and aborts the resolver.
+    function ownedWriteAllowed(prop: string): boolean {
+      if (lost.has(prop)) return false;
+      if (Object.is(rawFacts[prop], expected.get(prop))) return true;
+      lost.add(prop);
+      controller.abort();
+      return false;
+    }
 
     return new Proxy(facts as object, {
       get(_target, prop, receiver) {
         return Reflect.get(facts as object, prop, receiver);
       },
       set(_target, prop, value, _receiver) {
-        if (deactivated) {
-          // Binding already flipped false earlier in this resolver — silent drop.
-          return true;
-        }
-        // Internal accessors must always pass through (and never read by user code).
-        if (prop === "$store" || prop === "$snapshot") {
+        if (typeof prop !== "string" || !owned.has(prop)) {
+          // Data write (or internal $store/$snapshot accessor) — always lands.
           return Reflect.set(facts as object, prop, value);
         }
-        // Evaluate the constraint's predicate against the pre-write snapshot.
-        // `binding.when` is guaranteed sync at this point (resolveBinding
-        // filters async constraints).
-        let active: boolean;
-        try {
-          active = binding.when!(facts);
-        } catch {
-          // A throwing `when()` is treated as "not active": drop and abort.
-          // This matches the engine's `onError` constraint policy (the
-          // engine has already logged the throw via its own evaluation path).
-          active = false;
-        }
-        if (!active) {
-          deactivated = true;
-          controller.abort();
-          return true;
-        }
-        return Reflect.set(facts as object, prop, value);
+        if (!ownedWriteAllowed(prop)) return true;
+        const ok = Reflect.set(facts as object, prop, value);
+        // Re-read so `expected` matches whatever the store actually holds.
+        expected.set(prop, rawFacts[prop]);
+        return ok;
       },
       deleteProperty(_target, prop) {
-        if (deactivated) return true;
-        let active: boolean;
-        try {
-          active = binding.when!(facts);
-        } catch {
-          active = false;
+        if (typeof prop !== "string" || !owned.has(prop)) {
+          return Reflect.deleteProperty(facts as object, prop);
         }
-        if (!active) {
-          deactivated = true;
-          controller.abort();
-          return true;
-        }
-        return Reflect.deleteProperty(facts as object, prop);
+        if (!ownedWriteAllowed(prop)) return true;
+        const ok = Reflect.deleteProperty(facts as object, prop);
+        expected.set(prop, rawFacts[prop]);
+        return ok;
       },
       has(_target, prop) {
         return Reflect.has(facts as object, prop);
@@ -694,16 +700,16 @@ export function createResolversManager<S extends Schema>(
    *   requirement in the batch — calling `ctx.requeue()` requeues all of them.
    *   For out-of-band invocations (e.g. `callOne`) pass an empty array; the
    *   `requeue()` call will be a safe no-op.
-   * @param binding - Optional RFC-1 constraint binding. When present, fact
-   *   writes through `ctx.facts` are gated by the constraint's `when()`
-   *   predicate. See {@link ConstraintBindingInfo}.
+   * @param binding - Optional RFC-1 constraint binding. When present, writes
+   *   through `ctx.facts` to the owned facts are clobber-checked. See
+   *   {@link ConstraintBindingInfo} and {@link createBoundFacts}.
    * @param controller - The AbortController owning `signal`. Required when
    *   `binding` is present so the proxy can abort on a dropped write.
    */
   function createContext(
     signal: AbortSignal,
     requirementIds: readonly string[],
-    binding?: ConstraintBindingInfo<S> | null,
+    binding?: ConstraintBindingInfo | null,
     controller?: AbortController,
   ): ResolverContext<S> {
     const ctxFacts =
@@ -1104,7 +1110,7 @@ export function createResolversManager<S extends Schema>(
     // every requirement in the batch shares the same source constraint —
     // otherwise the predicate would be ambiguous. Mixed batches fall back
     // to no binding (current behavior).
-    let batchBinding: ConstraintBindingInfo<S> | null = null;
+    let batchBinding: ConstraintBindingInfo | null = null;
     if (requirements.length > 0) {
       const first = requirements[0]!;
       const allSameSource = requirements.every(
@@ -1422,6 +1428,13 @@ export function createResolversManager<S extends Schema>(
           return;
         }
       }
+    },
+
+    detach(requirementId: string): void {
+      // Untrack only — do NOT abort the controller. The resolver runs to
+      // completion; its `.finally()` will find the slot already gone and skip
+      // the duplicate `onResolutionComplete`. See ResolversManager.detach.
+      inflight.delete(requirementId);
     },
 
     cancelAll(): void {

@@ -1,57 +1,47 @@
-# Upgrade Guide: Resolver Constraint-Binding (`bind: 'auto'`)
+# Upgrade Guide: Resolver Constraint-Binding (`owns`)
 
-**RFC-1.** Available in `@directive-run/core` ≥ next minor.
+**RFC-0003.** Available in `@directive-run/core` ≥ next minor.
 
 ## TL;DR
 
-A resolver fires from a constraint whose `when` predicate is true. While
-the resolver is mid-`await`, an event flips the predicate to false. The
-resolver's tail then writes to a fact and silently overwrites whatever
-the event just wrote.
+A resolver fires from a constraint, does async work, then writes a fact in its
+tail. While it was mid-`await`, an event changed that fact. The resolver's tail
+then silently overwrites what the event wrote.
 
-Set `bind: 'auto'` on the constraint and Directive will drop those late
-writes for you, and abort the resolver's signal so you can early-exit.
+Declare the facts the resolver **owns** and Directive drops the clobbering
+write for you — while leaving the resolver's other writes alone:
 
 ```ts
 constraints: {
   mutate: {
     when: (f) => f.status === "mutating",
     require: { type: "EXECUTE_ACTION" },
-    bind: "auto", // <-- opt in
+    owns: ["status"], // <-- the resolver owns `status`
   },
 }
 ```
 
-Default is `bind: 'none'` — existing code keeps the current behavior.
+Omit `owns` (the default) and every write lands — current behavior.
 
 ## The bug this fixes
 
-The canonical Minglingo Phase A bug, generalized:
-
 ```ts
 // status: "idle" | "mutating" | "playing" | "left"
-// constraint:
-//   when: (f) => f.status === "mutating"
-//   require: { type: "EXECUTE_ACTION" }
-
 resolvers: {
   execute: {
     requirement: "EXECUTE_ACTION",
     resolve: async (_req, ctx) => {
-      ctx.facts.progress = 0;
-      await mutate();          // <-- await
-      ctx.facts.status = "playing"; // <-- the tail write
+      await mutate();                 // <-- await
+      ctx.facts.status = "playing";   // <-- the tail write
     },
   },
 }
 ```
 
-If a `forceLeft` event sets `status = "left"` between the await
-resolving and the tail running, the tail's `status = "playing"` clobbers
-the user's intent. The user is now back in a stale state.
+If a `forceLeft` event sets `status = "left"` between the await resolving and
+the tail running, the tail's `status = "playing"` clobbers the user's intent.
 
-The naive defensive pattern is to gate every post-await write on the
-fact you care about:
+The naive defense is a manual guard at every mutation site:
 
 ```ts
 await mutate();
@@ -60,181 +50,124 @@ if (ctx.facts.status === "mutating") {
 }
 ```
 
-That's a per-write boilerplate burden that scales linearly with mutation
-sites — and is easy to forget in a recovery branch or a rare retry path.
+`owns` replaces that boilerplate — and, unlike a blanket guard, it is precise:
+it protects *only* the facts you name.
+
+## How it works
+
+`owns` lists the facts the resolver owns. For each owned fact the
+binding remembers the value the resolver last wrote or started with. A write
+to an owned fact:
+
+- **lands** if the fact still holds that value — nobody else wrote it;
+- **is dropped** (and `ctx.signal` is aborted) if the fact's live value
+  differs — an event or another resolver changed it. That fact is then
+  locked dropped for the rest of the invocation.
+
+Writes to any fact **not** listed always land. The constraint's `when()`
+predicate is never consulted by the binding.
 
 ## Before / after
 
-**Before** — manual gates, easy to miss:
+**Before** — manual guards, easy to miss, and they have to be surgical:
 
 ```ts
-constraints: {
-  mutate: { when: (f) => f.status === "mutating", require: { type: "EXECUTE_ACTION" } },
-}
-resolvers: {
-  execute: {
-    requirement: "EXECUTE_ACTION",
-    resolve: async (_req, ctx) => {
-      ctx.facts.progress = 0;
-      try {
-        await mutate();
-        // ❌ forget this guard and you clobber an event-driven `left` status:
-        if (ctx.facts.status === "mutating") ctx.facts.status = "playing";
-      } catch {
-        if (ctx.facts.status === "mutating") ctx.facts.status = "rolled-back";
-      }
-    },
-  },
+resolve: async (_req, ctx) => {
+  try {
+    const result = await mutate();
+    ctx.facts.lastResult = result;                       // data — keep
+    if (ctx.facts.status === "mutating")                 // ❌ forget this and
+      ctx.facts.status = "playing";                      //    you clobber `left`
+  } catch {
+    if (ctx.facts.status === "mutating")
+      ctx.facts.status = "rolled-back";
+  }
 }
 ```
 
-**After** — declarative, single line:
+**After** — declare the owned fact, write plainly:
 
 ```ts
-constraints: {
-  mutate: {
-    when: (f) => f.status === "mutating",
-    require: { type: "EXECUTE_ACTION" },
-    bind: "auto", // ✅
-  },
-}
-resolvers: {
-  execute: {
-    requirement: "EXECUTE_ACTION",
-    resolve: async (_req, ctx) => {
-      ctx.facts.progress = 0;
-      try {
-        await mutate();
-        ctx.facts.status = "playing"; // dropped automatically if status flipped
-      } catch {
-        ctx.facts.status = "rolled-back"; // dropped automatically too
-      }
-    },
-  },
+// constraint: owns: ["status"]
+resolve: async (_req, ctx) => {
+  try {
+    const result = await mutate();
+    ctx.facts.lastResult = result;   // data — always lands
+    ctx.facts.status = "playing";    // owned — dropped if `status` was clobbered
+  } catch {
+    ctx.facts.status = "rolled-back"; // owned — dropped too
+  }
 }
 ```
 
-Optionally short-circuit on the abort signal to skip expensive
-post-await work:
+`lastResult` lands either way — the async work succeeded, the data is real.
+Only the owned `status` write is clobber-checked. Optionally bail early:
 
 ```ts
-await mutate();
-if (ctx.signal.aborted) return; // binding deactivated → bail early
+const result = await mutate();
+ctx.facts.lastResult = result;
+if (ctx.signal.aborted) return; // an owned write was already dropped
 ctx.facts.status = "playing";
 ```
 
-## When to use `bind: 'auto'` vs leave as `'none'`
+## Choosing the fields
 
-Reach for `bind: 'auto'` when:
+Name the facts the resolver re-asserts in its tail that an event could change
+out from under it — the "phase" facts (`status`, `phase`, `mode`). This is
+almost always a single fact.
 
-- The constraint encodes a **transient operation phase** (`status === 'mutating'`,
-  `phase === 'submitting'`, `mode === 'editing'`) and external events can
-  abort that phase.
-- The resolver does **stateful tail writes** that are only correct while
-  the constraint is active.
-- The cost of a late clobber is a **stale UI state** the user has to
-  manually recover from.
+**Do not** list the data facts the resolver produces (`lastResult`,
+`callHistory`, `winRecord`). Those should land regardless — that is the whole
+point of per-fact binding.
 
-Leave at `'none'` (default) when:
+## Notes
 
-- The constraint is a **steady-state derivation** (`isOnline`,
-  `hasPermission`) — the resolver's writes are valid regardless of any
-  flip.
-- The resolver is **idempotent** and the constraint will simply re-fire
-  if it flips back true.
-- You want explicit control over which writes are conditional.
+### Resolvers are not cancelled on requirement removal
 
-## Edge cases
+Normally the engine cancels an in-flight resolver when its requirement goes
+away (the constraint flipped false). A **bound** resolver is exempt — it runs
+to completion so its data writes land; the binding drops only the owned-fact
+clobber. A bound resolver's `ctx.signal` is aborted only by a dropped owned
+write, an explicit `cancel()`, or a timeout.
 
 ### Async constraints
 
-Forbidden. `bind: 'auto'` requires a synchronous `when()` predicate
-because the binding checker re-evaluates `when()` on every fact write.
-Async predicates would force every write to await, which is unsound and
-prohibitively slow.
+Not supported. The binding snapshots the owned facts when the resolver is
+dispatched; an async constraint `await`s between predicate evaluation and
+dispatch, so an event could move an owned fact before the snapshot is taken.
+`owns` on an async constraint is ignored (dev-mode warning).
 
-Setting `bind: 'auto'` on `async: true` constraints logs a dev-mode
-warning and is treated as `'none'`:
+### `callOne()` and out-of-band invocations
 
-```
-[Directive] Constraint "fetchUserStatus" has bind: 'auto' but is async.
-Binding is disabled — async predicates cannot be re-evaluated synchronously
-on every fact write.
-```
-
-### `manager.callOne()` and out-of-band invocations
-
-No-op. `callOne` has no source constraint, so binding cannot determine a
-predicate to gate against. Writes go through unconditionally.
-
-```ts
-// Even if the equivalent constraint is currently false:
-await sys.resolvers.callOne("execute", { type: "EXECUTE_ACTION" });
-// → all writes land
-```
-
-### Pre-await synchronous writes
-
-Pass through. The constraint was true when the resolver fired (otherwise
-the resolver wouldn't have been dispatched). Synchronous writes before
-the first `await` see the same predicate state and pass.
+No-op. `callOne` has no source constraint, so there is nothing to bind.
 
 ### Mixed-source batches
 
-Fall back to no binding. When a single batch resolver receives
-requirements from multiple constraints, the binding's predicate is
-ambiguous. Same-source batches are bound normally.
+No-op. A batch resolver fed by multiple constraints has no single owner;
+same-source batches are bound normally.
 
-### One-shot per invocation
+### One-shot per fact
 
-Binding is **one-shot**: once the predicate flips false during a write
-attempt, the binding stays deactivated even if `when()` would later
-flip back to true mid-resolver. This prevents zombie writes from
-"resurrecting" a stale intent after the user has moved past it.
+Once an owned write is dropped, further writes to *that fact* are dropped for
+the rest of the invocation — even if the fact transiently returns to its
+expected value. Writes to other owned facts are unaffected.
 
-### Error-recovery branches
+### ABA
 
-Recovery branches are bound too. If your `catch` block writes facts
-expecting the constraint to still be active, those writes are dropped
-when the constraint has flipped:
+The check is value-based. If an external writer changes an owned fact and then
+changes it back to the resolver's expected value before the resolver writes,
+no clobber is detected — correctly: the external change netted to nothing.
+A clobber that matters (an event moving a fact to a terminal value and leaving
+it there) is always caught.
 
-```ts
-try {
-  await mutate();
-} catch {
-  ctx.facts.status = "rolled-back"; // dropped if `mutating` is no longer true
-}
+## Migrating from `bind: 'auto'`
+
+The reverted v1 used `bind: 'auto'` and gated every write by re-evaluating
+`when()`. Replace it:
+
+```diff
+- bind: 'auto',
++ owns: ['status'],
 ```
 
-This is usually what you want — the user has already moved on, so the
-rollback is moot.
-
-## Companion: `useFactWithDefault` (RFC-2)
-
-If you're migrating from the `useFact(sys, k) ?? factory()` pattern in
-React, swap to `useFactWithDefault` for stable identity. See
-`@directive-run/react` exports.
-
-```ts
-// Before — fresh identity every render where fact is null:
-const marked = useFact(sys, "markedCells") ?? deps.initializeMarkedCells();
-
-// After — stable identity, factory runs once per system:
-const marked = useFactWithDefault(sys, "markedCells", () =>
-  deps.initializeMarkedCells(),
-);
-```
-
-## Implementation notes
-
-- The bound `ctx.facts` is a `Proxy` wrapper around the engine's facts
-  proxy. Reads pass through; writes consult the binding before
-  delegating.
-- Predicate evaluation runs against the **pre-write** snapshot. If the
-  resolver itself writes a value that would flip `when()` false, the
-  write still lands (you cannot lock yourself out by writing).
-- The `AbortController` is shared with the resolver's existing
-  cancellation channel — if the resolver was already aborted (timeout,
-  cancel(), etc.), binding is a moot wrapper.
-- Constraint definitions: `bind?: 'none' | 'auto'`. The literal type is
-  exported as `ConstraintBindMode` from `@directive-run/core`.
+Pick the fact(s) the resolver re-asserts in its tail. No change to `when()`.

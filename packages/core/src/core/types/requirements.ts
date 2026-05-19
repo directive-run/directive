@@ -87,40 +87,6 @@ export type RequirementOutput<R extends Requirement = Requirement> =
   | R[]
   | null;
 
-/**
- * Resolver-to-constraint binding mode (RFC-1: Resolver Constraint-Binding).
- *
- * Controls whether fact writes from a resolver are *bound* to the constraint
- * that triggered them. When the binding is `'auto'`, every write performed by
- * the resolver re-evaluates the constraint's `when()` predicate against the
- * latest facts; if `when()` no longer holds, the write is dropped, the
- * resolver's {@link AbortController} is aborted, and `ctx.signal.aborted`
- * becomes `true` so the resolver can early-exit on its next checkpoint.
- *
- * Binding is **one-shot per resolver invocation**: once `when()` flips to
- * `false`, the binding stays deactivated even if `when()` would later flip
- * back to `true` mid-resolver. This prevents a resolver from "resurrecting"
- * a stale intent after the user has moved past it.
- *
- * - `'none'` (default): Current behavior. Every fact write succeeds.
- * - `'auto'`: Writes are gated by the constraint's `when()` predicate. The
- *   predicate **must be synchronous** for `bind: 'auto'`; async constraints
- *   cannot be bound (their `when()` cannot be re-evaluated cheaply on every
- *   set).
- *
- * @example
- * ```ts
- * constraints: {
- *   leaveParty: {
- *     when: (f) => f.status === 'mutating',
- *     require: { type: 'EXECUTE_ACTION' },
- *     bind: 'auto', // resolver tail won't clobber `status = 'left'`
- *   },
- * }
- * ```
- */
-export type ConstraintBindMode = "none" | "auto";
-
 /** Constraint definition */
 export interface ConstraintDef<
   S extends Schema,
@@ -143,21 +109,23 @@ export interface ConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver-to-constraint binding mode (RFC-1).
+   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
+   * dispatched by this constraint *owns*: a write from that resolver to an
+   * owned fact is dropped — and the resolver aborted — if the fact was
+   * changed by anything else since the resolver last wrote it. Writes to
+   * facts not listed always land; `when()` is not consulted. Omit for no
+   * binding (default). Ignored on async constraints.
    *
-   * When `'auto'`, fact writes from the resolver triggered by this
-   * constraint are dropped (and the resolver is aborted) once `when()`
-   * flips to false. Defaults to `'none'` (current behavior preserved).
-   *
-   * **Forbidden on async constraints** (`async: true`): the binding
-   * checker re-evaluates `when()` synchronously on every fact write,
-   * which is incompatible with async predicates. Setting `bind: 'auto'`
-   * on an async constraint logs a dev-mode warning and is treated as
-   * `'none'`.
-   *
-   * @see {@link ConstraintBindMode}
+   * @example
+   * ```ts
+   * executeAction: {
+   *   when: (f) => f.status === 'mutating',
+   *   require: { type: 'EXECUTE_ACTION' },
+   *   owns: ['status'], // the resolver owns `status`
+   * }
+   * ```
    */
-  bind?: ConstraintBindMode;
+  owns?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
