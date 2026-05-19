@@ -72,6 +72,13 @@ export interface PIIDetectionResult {
 interface PIIPattern {
   type: PIIType;
   pattern: RegExp;
+  /**
+   * Capture group holding the PII value itself. Defaults to 1.
+   * Keyword-anchored patterns set this to 2 — group 1 is the keyword
+   * ("account", "passport", …) and group 2 is the actual identifier.
+   * The detector redacts the value group's span, never the keyword.
+   */
+  valueGroup?: number;
   /** Additional validation function (reduces false positives) */
   validate?: (match: string, context: string) => boolean;
   /** Confidence score (0-1) */
@@ -164,6 +171,7 @@ const PII_PATTERNS: PIIPattern[] = [
     // Various formats: MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY
     pattern:
       /\b(born|dob|birth.?date|date.?of.?birth)[:.\s]+(\d{1,4}[-/]\d{1,2}[-/]\d{1,4})\b/gi,
+    valueGroup: 2,
     confidence: 0.85,
   },
 
@@ -198,6 +206,7 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "bank_account",
     // Account number followed by routing or preceded by "account"
     pattern: /\b(account|acct)[\s#:]+(\d{8,17})\b/gi,
+    valueGroup: 2,
     confidence: 0.7,
   },
 
@@ -206,6 +215,7 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "passport",
     // US passports: 9 digits, UK: 9 digits, etc.
     pattern: /\b(passport)[\s#:]+([A-Z0-9]{6,9})\b/gi,
+    valueGroup: 2,
     confidence: 0.75,
   },
 
@@ -213,6 +223,7 @@ const PII_PATTERNS: PIIPattern[] = [
   {
     type: "driver_license",
     pattern: /\b(driver'?s?\s*licen[cs]e|dl)[\s#:]+([A-Z0-9]{5,15})\b/gi,
+    valueGroup: 2,
     confidence: 0.7,
   },
 
@@ -220,6 +231,7 @@ const PII_PATTERNS: PIIPattern[] = [
   {
     type: "medical_id",
     pattern: /\b(mrn|medical.?record|patient.?id)[\s#:]+([A-Z0-9-]{6,15})\b/gi,
+    valueGroup: 2,
     confidence: 0.7,
   },
 
@@ -228,6 +240,7 @@ const PII_PATTERNS: PIIPattern[] = [
     type: "national_id",
     pattern:
       /\b(national.?id|nin|identity.?number|identity.?card|id.?number)[\s#:]+([A-Z0-9-]{6,20})\b/gi,
+    valueGroup: 2,
     confidence: 0.85,
   },
 ];
@@ -340,6 +353,46 @@ export interface PIIDetector {
   name: string;
 }
 
+/**
+ * Run a single PII pattern over `text` and collect every (validated) match.
+ * Keyword-anchored patterns capture the value in group 2; the `d` flag gives
+ * per-group indices so we redact the value's exact span, never the keyword.
+ */
+function matchPattern(pattern: PIIPattern, text: string): DetectedPII[] {
+  const results: DetectedPII[] = [];
+  const flags = pattern.pattern.flags.includes("d")
+    ? pattern.pattern.flags
+    : `${pattern.pattern.flags}d`;
+  const regex = new RegExp(pattern.pattern.source, flags);
+  const group = pattern.valueGroup ?? 1;
+  let match: RegExpExecArray | null;
+
+  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex.exec loop
+  while ((match = regex.exec(text)) !== null) {
+    const value = match[group] ?? match[0];
+    // Prefer the value group's real offsets; fall back to the whole match
+    // only if indices are unavailable (older runtimes).
+    const groupIndices = match.indices?.[group];
+    const start = groupIndices ? groupIndices[0] : match.index;
+    const end = groupIndices ? groupIndices[1] : match.index + value.length;
+    const context = text.slice(Math.max(0, start - 20), end + 20);
+
+    if (pattern.validate && !pattern.validate(value, context)) {
+      continue;
+    }
+
+    results.push({
+      type: pattern.type,
+      value,
+      position: { start, end },
+      confidence: pattern.confidence,
+      context,
+    });
+  }
+
+  return results;
+}
+
 /** Built-in regex detector */
 export const regexDetector: PIIDetector = {
   name: "regex",
@@ -357,30 +410,8 @@ export const regexDetector: PIIDetector = {
 
     // Pattern-based detection
     for (const pattern of PII_PATTERNS) {
-      if (!typeSet.has(pattern.type)) continue;
-
-      const regex = new RegExp(pattern.pattern.source, pattern.pattern.flags);
-      let match: RegExpExecArray | null;
-
-      while ((match = regex.exec(text)) !== null) {
-        const value = match[1] || match[0];
-        const context = text.slice(
-          Math.max(0, match.index - 20),
-          match.index + value.length + 20,
-        );
-
-        // Apply validation if present
-        if (pattern.validate && !pattern.validate(value, context)) {
-          continue;
-        }
-
-        results.push({
-          type: pattern.type,
-          value,
-          position: { start: match.index, end: match.index + value.length },
-          confidence: pattern.confidence,
-          context,
-        });
+      if (typeSet.has(pattern.type)) {
+        results.push(...matchPattern(pattern, text));
       }
     }
 
@@ -408,7 +439,10 @@ export type RedactionStyle =
   | "placeholder"
   /** Replace with type-specific placeholder like [EMAIL] */
   | "typed"
-  /** Replace with asterisks preserving length */
+  /**
+   * Replace with a fixed-width `****` mask plus the last 4 characters
+   * (e.g. `****6789`). Does not preserve or reveal the original length.
+   */
   | "masked"
   /**
    * Replace with a deterministic FNV-1a hash.
@@ -423,14 +457,17 @@ export type RedactionStyle =
   | "hashed";
 
 /**
- * Special-category PII types whose *category name* is itself sensitive.
- * For these, `typed` redaction emits a generic `[REDACTED]` instead of the
- * type name so the redacted text does not reveal that the user has, e.g., a
- * medical record or a national ID on file.
+ * PII types whose *category name* is itself sensitive. For these, `typed`
+ * redaction emits a generic `[REDACTED]` instead of the type name so the
+ * redacted text does not reveal that the user has, e.g., a medical record,
+ * a passport, a driver's license, or a bank account on file.
  */
-const SPECIAL_CATEGORY_TYPES: ReadonlySet<PIIType> = new Set<PIIType>([
+const SENSITIVE_CATEGORY_TYPES: ReadonlySet<PIIType> = new Set<PIIType>([
   "medical_id",
   "national_id",
+  "passport",
+  "driver_license",
+  "bank_account",
 ]);
 
 /** Redact detected PII from text */
@@ -442,37 +479,36 @@ export function redactPII(
   // FIX (overlap corruption): the same span can be matched by multiple
   // patterns (e.g. a 16-digit number flagged as BOTH credit_card and phone).
   // Splicing overlapping/nested ranges shifts offsets and can leave raw PII
-  // in the output. So first dedupe: sort ascending by start and keep an item
-  // only if its span does not intersect an already-kept item. On a conflict
-  // we prefer the higher-confidence match, tie-broken by the longer span.
-  const ascending = [...items].sort(
-    (a, b) => a.position.start - b.position.start,
-  );
+  // in the output. Dedupe first, order-independently: sort by confidence
+  // (then longer span, then earlier start) so the strongest match claims its
+  // range first, and keep a later item only if it overlaps NOTHING already
+  // kept. This handles chains of 3+ overlapping spans, which a first-conflict
+  // scan does not.
+  const byPriority = [...items].sort((a, b) => {
+    if (b.confidence !== a.confidence) {
+      return b.confidence - a.confidence;
+    }
+
+    const aSpan = a.position.end - a.position.start;
+    const bSpan = b.position.end - b.position.start;
+    if (bSpan !== aSpan) {
+      return bSpan - aSpan;
+    }
+
+    return a.position.start - b.position.start;
+  });
 
   const kept: DetectedPII[] = [];
-  for (const item of ascending) {
-    const conflictIndex = kept.findIndex(
+  for (const item of byPriority) {
+    const overlaps = kept.some(
       (k) =>
         item.position.start < k.position.end &&
         k.position.start < item.position.end,
     );
 
-    if (conflictIndex === -1) {
+    if (!overlaps) {
       kept.push(item);
-      continue;
     }
-
-    const existing = kept[conflictIndex]!;
-    const itemSpan = item.position.end - item.position.start;
-    const existingSpan = existing.position.end - existing.position.start;
-    const itemWins =
-      item.confidence > existing.confidence ||
-      (item.confidence === existing.confidence && itemSpan > existingSpan);
-
-    if (itemWins) {
-      kept[conflictIndex] = item;
-    }
-    // Otherwise drop `item` — the existing kept range stays.
   }
 
   // Redact the surviving non-overlapping set descending by start so earlier
@@ -488,16 +524,22 @@ export function redactPII(
         replacement = "[REDACTED]";
         break;
       case "typed":
-        // FIX (category leak): for special-category types, emit a generic
+        // FIX (category leak): for sensitive-category types, emit a generic
         // [REDACTED] — the category name itself would otherwise reveal the
-        // presence of, e.g., medical or national-ID data.
-        replacement = SPECIAL_CATEGORY_TYPES.has(item.type)
+        // presence of, e.g., medical, passport, or national-ID data.
+        replacement = SENSITIVE_CATEGORY_TYPES.has(item.type)
           ? "[REDACTED]"
           : `[${item.type.toUpperCase()}]`;
         break;
-      case "masked":
-        replacement = "*".repeat(item.value.length);
+      case "masked": {
+        // FIX (length leak): a full-length `*` run reveals the exact digit
+        // count of structured PII (SSN, card). Use a fixed-width mask plus
+        // the last 4 chars — the universal receipt convention — so the
+        // output length does not disclose the original value's length.
+        const tail = item.value.length > 4 ? item.value.slice(-4) : "";
+        replacement = `****${tail}`;
         break;
+      }
       case "hashed":
         // FNV-1a hash for referential integrity (not for security)
         // Same input always produces same hash, useful for audit trails

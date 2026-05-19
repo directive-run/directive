@@ -379,7 +379,7 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
  *   guardrails: {
  *     input: [
  *       async (data) => {
- *         const hasPII = await detectPII(data.input);
+ *         const hasPII = (await detectPII(data.input)).detected;
  *         return { passed: !hasPII, reason: hasPII ? 'Contains PII' : undefined };
  *       },
  *     ],

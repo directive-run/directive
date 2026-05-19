@@ -222,7 +222,7 @@ const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
  *     reviewer: { agent: reviewerAgent },
  *   },
  *   guardrails: {
- *     input: [detectPII],
+ *     input: [createEnhancedPIIGuardrail()],
  *     output: [checkToxicity],
  *   },
  *   hooks: {

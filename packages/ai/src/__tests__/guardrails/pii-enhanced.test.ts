@@ -230,12 +230,12 @@ describe("redactPII", () => {
     expect(result).toBe("My SSN is [SSN]");
   });
 
-  it('"masked" style replaces with asterisks matching length', () => {
+  it('"masked" style uses a fixed-width mask plus the last 4 chars', () => {
     const text = "My SSN is 123-45-6789";
     const result = redactPII(text, [ssnItem], "masked");
 
-    // "123-45-6789" is 11 characters
-    expect(result).toBe("My SSN is ***********");
+    // Fixed-width "****" + last 4 — does not reveal the original length.
+    expect(result).toBe("My SSN is ****6789");
   });
 
   it('"hashed" style replaces with [HASH:xxxxxxxx] (8-char hex)', () => {
@@ -647,6 +647,204 @@ describe("detectAndRedactPII", () => {
     expect(detect.redactedText).toBeUndefined();
     expect(composed).not.toBe(detect);
     expect(composed.redactedText).toBeDefined();
+  });
+});
+
+// ============================================================================
+// C2 — keyword-anchored patterns capture the ID value, not the keyword
+// ============================================================================
+
+describe("keyword-anchored value capture (C2)", () => {
+  it("captures the bank account ID, not the 'account' keyword", async () => {
+    const result = await detectPII("account: 12345678", {
+      types: ["bank_account"],
+    });
+
+    expect(result.detected).toBe(true);
+    expect(result.items).toHaveLength(1);
+    // value is the actual ID — NOT the "account" keyword.
+    expect(result.items[0]!.value).toBe("12345678");
+    expect(result.items[0]!.value).not.toBe("account");
+  });
+
+  it("redacts the bank account ID and leaves the 'account' keyword intact", async () => {
+    const text = "account: 12345678";
+    const items = (await detectPII(text, { types: ["bank_account"] })).items;
+    const redacted = redactPII(text, items, "typed");
+
+    // The raw ID must not survive; the keyword must.
+    expect(redacted).not.toContain("12345678");
+    expect(redacted).toContain("account");
+    expect(redacted).toBe("account: [REDACTED]");
+  });
+
+  it("captures the national ID value, not the 'national id' keyword", async () => {
+    const text = "national id: AB1234567";
+    const items = (await detectPII(text, { types: ["national_id"] })).items;
+
+    expect(items).toHaveLength(1);
+    expect(items[0]!.value).toBe("AB1234567");
+    expect(items[0]!.value.toLowerCase()).not.toContain("national");
+
+    const redacted = redactPII(text, items, "typed");
+    expect(redacted).not.toContain("AB1234567");
+    expect(redacted).toContain("national id");
+    expect(redacted).toBe("national id: [REDACTED]");
+  });
+
+  it("captures the passport value, not the 'passport' keyword", async () => {
+    const text = "passport: AB1234567";
+    const items = (await detectPII(text, { types: ["passport"] })).items;
+
+    expect(items).toHaveLength(1);
+    expect(items[0]!.value).toBe("AB1234567");
+    expect(items[0]!.value.toLowerCase()).not.toContain("passport");
+
+    const redacted = redactPII(text, items, "typed");
+    expect(redacted).not.toContain("AB1234567");
+    expect(redacted).toContain("passport");
+    expect(redacted).toBe("passport: [REDACTED]");
+  });
+});
+
+// ============================================================================
+// C1 — redactPII dedup handles chains of 3+ overlapping spans
+// ============================================================================
+
+describe("redactPII 3+ overlap chain dedup (C1)", () => {
+  it("redacts the highest-confidence span and leaks no raw PII from a 3-span chain", () => {
+    // Chain: A overlaps B overlaps C, with A and C not overlapping directly.
+    //   text indices:  "leak 1234567890123456 tail"
+    const text = "leak 1234567890123456 tail";
+    const base = text.indexOf("1234567890123456");
+
+    // A: [base, base+10)  -- lowest confidence
+    // B: [base+6, base+12) -- HIGHEST confidence (overlaps both A and C)
+    // C: [base+11, base+16) -- middle confidence
+    const items: DetectedPII[] = [
+      {
+        type: "ssn",
+        value: "1234567890",
+        position: { start: base, end: base + 10 },
+        confidence: 0.7,
+      },
+      {
+        type: "credit_card",
+        value: "789012",
+        position: { start: base + 6, end: base + 12 },
+        confidence: 0.95,
+      },
+      {
+        type: "phone",
+        value: "23456",
+        position: { start: base + 11, end: base + 16 },
+        confidence: 0.8,
+      },
+    ];
+
+    const redacted = redactPII(text, items, "typed");
+
+    // The single highest-confidence item (B) wins its span; A and C overlap it
+    // and are dropped. Output: prefix + "[CREDIT_CARD]" + remaining digits.
+    expect(redacted).toBe("leak 123456[CREDIT_CARD]3456 tail");
+    // No corruption: exactly one redaction token, brackets intact.
+    expect(redacted.match(/\[CREDIT_CARD\]/g)).toHaveLength(1);
+    expect(redacted).not.toContain("[PHONE]");
+    expect(redacted).not.toContain("[SSN]");
+    // No fragment of any original value's full span leaked as a whole.
+    expect(redacted).not.toContain("789012");
+  });
+
+  it("keeps only non-overlapping survivors from a fully-overlapping triple", () => {
+    // Three spans all covering the exact same range — only one may survive.
+    const text = "x 999999999 y";
+    const start = text.indexOf("999999999");
+    const span = { start, end: start + 9 };
+    const items: DetectedPII[] = [
+      { type: "ssn", value: "999999999", position: span, confidence: 0.6 },
+      {
+        type: "credit_card",
+        value: "999999999",
+        position: span,
+        confidence: 0.9,
+      },
+      { type: "phone", value: "999999999", position: span, confidence: 0.75 },
+    ];
+
+    const redacted = redactPII(text, items, "typed");
+    // Highest confidence (credit_card) claims the span; no raw digits remain.
+    expect(redacted).toBe("x [CREDIT_CARD] y");
+    expect(redacted).not.toMatch(/\d/);
+  });
+});
+
+// ============================================================================
+// D1 — typed redaction emits [REDACTED] for passport & driver_license
+// ============================================================================
+
+describe("typed redaction sensitive-category coverage (D1)", () => {
+  it("emits [REDACTED] for passport under typed style", () => {
+    const items: DetectedPII[] = [
+      {
+        type: "passport",
+        value: "AB1234567",
+        position: { start: 0, end: 9 },
+        confidence: 0.75,
+      },
+    ];
+    const redacted = redactPII("AB1234567", items, "typed");
+
+    expect(redacted).toBe("[REDACTED]");
+    expect(redacted).not.toContain("PASSPORT");
+  });
+
+  it("emits [REDACTED] for driver_license under typed style", () => {
+    const items: DetectedPII[] = [
+      {
+        type: "driver_license",
+        value: "D1234567",
+        position: { start: 0, end: 8 },
+        confidence: 0.7,
+      },
+    ];
+    const redacted = redactPII("D1234567", items, "typed");
+
+    expect(redacted).toBe("[REDACTED]");
+    expect(redacted).not.toContain("DRIVER_LICENSE");
+  });
+});
+
+// ============================================================================
+// M4 — masked style: fixed-width **** + last 4
+// ============================================================================
+
+describe("masked redaction style (M4)", () => {
+  it("emits **** + last 4 chars for a long value", () => {
+    const items: DetectedPII[] = [
+      {
+        type: "credit_card",
+        value: "4111111111116789",
+        position: { start: 0, end: 16 },
+        confidence: 0.95,
+      },
+    ];
+    const redacted = redactPII("4111111111116789", items, "masked");
+
+    expect(redacted).toBe("****6789");
+  });
+
+  it("emits **** only (no tail) for a value of length <= 4", () => {
+    const items: DetectedPII[] = [
+      {
+        type: "ssn",
+        value: "6789",
+        position: { start: 0, end: 4 },
+        confidence: 0.95,
+      },
+    ];
+    const redacted = redactPII("6789", items, "masked");
+
+    expect(redacted).toBe("****");
   });
 });
 

@@ -185,7 +185,12 @@ function runComplianceCheck(
         i.type === "date_of_birth",
     );
     const hasContactInfo = piiResult.items.some(
-      (i) => i.type === "email" || i.type === "phone" || i.type === "name",
+      (i) =>
+        i.type === "email" ||
+        i.type === "phone" ||
+        i.type === "name" ||
+        i.type === "date_of_birth" ||
+        i.type === "address",
     );
 
     if (mode === "hipaa" && hasPHI) {

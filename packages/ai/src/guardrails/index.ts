@@ -48,6 +48,7 @@ export {
 export {
   createEnhancedPIIGuardrail,
   createOutputPIIGuardrail,
+  detectAndRedactPII,
   detectPII,
   redactPII,
   regexDetector,
