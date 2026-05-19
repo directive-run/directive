@@ -901,7 +901,8 @@ export async function detectPII(
  *   style: 'typed',
  * });
  * console.log(result.detected);      // true
- * console.log(result.redactedText);  // 'My SSN is [SSN]'
+ * // ssn is a sensitive-category type, so `typed` emits a generic [REDACTED]
+ * console.log(result.redactedText);  // 'My SSN is [REDACTED]'
  *
  * const clean = await detectAndRedactPII('nothing here', { types: ['ssn'] });
  * console.log(clean.detected);       // false
