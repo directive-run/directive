@@ -421,8 +421,9 @@ describe("PII masking", () => {
     });
 
     expect(entry.maskedPayload).toBeDefined();
-    // The SSN should be redacted with typed style -> [SSN]
-    expect(entry.maskedPayload!.message).toContain("[SSN]");
+    // SSN is a sensitive-category type — typed redaction emits a generic
+    // [REDACTED] so the redacted text does not reveal the SSN category.
+    expect(entry.maskedPayload!.message).toContain("[REDACTED]");
     expect(entry.maskedPayload!.message).not.toContain("123-45-6789");
 
     // Original payload should be untouched

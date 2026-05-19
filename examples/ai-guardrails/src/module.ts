@@ -178,12 +178,11 @@ function runComplianceCheck(
   let blocked = false;
 
   if (mode !== "standard" && piiResult.detected) {
-    const hasPHI = piiResult.items.some(
-      (i) =>
-        i.type === "medical_id" ||
-        i.type === "ssn" ||
-        i.type === "date_of_birth",
-    );
+    // HIPAA Safe Harbor (45 CFR 164.514) enumerates 18 identifier classes —
+    // names, geographic data, dates, contact info, account/certificate/license
+    // numbers, IP addresses, and more. That is effectively every PII type this
+    // detector emits, so under HIPAA *any* detected PII is PHI and blocks.
+    const hasPHI = piiResult.detected;
     const hasContactInfo = piiResult.items.some(
       (i) =>
         i.type === "email" ||

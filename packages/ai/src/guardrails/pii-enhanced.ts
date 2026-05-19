@@ -118,10 +118,11 @@ const PII_PATTERNS: PIIPattern[] = [
   // Credit Card Numbers (Luhn validated)
   {
     type: "credit_card",
-    // Separated branch covers 4-4-4-4 grouping; unseparated branch widened to
-    // \d{13,19} so the regex range matches the Luhn validator's 13-19 range
-    // (previously \d{15,16} left 13/14/17/18/19-digit PANs undetected).
-    pattern: /\b(\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})\b|\b(\d{13,19})\b/g,
+    // One capture group wraps both branches so the value group is always 1
+    // (default valueGroup): the 4-4-4-4 separated grouping, or an unseparated
+    // \d{13,19} run matching the Luhn validator's 13-19 range (previously
+    // \d{15,16} left 13/14/17/18/19-digit PANs undetected).
+    pattern: /\b((?:\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})|\d{13,19})\b/g,
     validate: (match) => {
       const digits = match.replace(/[-\s]/g, "");
       if (digits.length < 13 || digits.length > 19) return false;
@@ -459,10 +460,15 @@ export type RedactionStyle =
 /**
  * PII types whose *category name* is itself sensitive. For these, `typed`
  * redaction emits a generic `[REDACTED]` instead of the type name so the
- * redacted text does not reveal that the user has, e.g., a medical record,
- * a passport, a driver's license, or a bank account on file.
+ * redacted text does not reveal that the user has, e.g., an SSN, a credit
+ * card, a medical record, a passport, or a bank account on file. Only the
+ * mundane contact/network types (email, phone, name, address, ip_address)
+ * keep their `[TYPE]` label.
  */
 const SENSITIVE_CATEGORY_TYPES: ReadonlySet<PIIType> = new Set<PIIType>([
+  "ssn",
+  "credit_card",
+  "date_of_birth",
   "medical_id",
   "national_id",
   "passport",
@@ -470,12 +476,67 @@ const SENSITIVE_CATEGORY_TYPES: ReadonlySet<PIIType> = new Set<PIIType>([
   "bank_account",
 ]);
 
+/** Whether a detected item's span is a valid, in-bounds slice of `text`. */
+function hasValidSpan(item: DetectedPII, textLength: number): boolean {
+  const { start, end } = item.position;
+
+  return (
+    Number.isInteger(start) &&
+    Number.isInteger(end) &&
+    start >= 0 &&
+    start < end &&
+    end <= textLength
+  );
+}
+
+/** Build the replacement string for one detected item under a given style. */
+function buildRedactionReplacement(
+  item: DetectedPII,
+  style: RedactionStyle,
+): string {
+  switch (style) {
+    case "placeholder":
+      return "[REDACTED]";
+    case "typed":
+      // FIX (category leak): for sensitive-category types, emit a generic
+      // [REDACTED] — the category name itself would otherwise reveal the
+      // presence of, e.g., medical, passport, or national-ID data.
+      return SENSITIVE_CATEGORY_TYPES.has(item.type)
+        ? "[REDACTED]"
+        : `[${item.type.toUpperCase()}]`;
+    case "masked": {
+      // FIX (length leak): a full-length `*` run reveals the exact digit
+      // count of structured PII. Use a fixed-width `****` mask. Only a
+      // credit-card PAN may show a last-4 tail (PCI-permitted for display);
+      // the tail is digit-normalized so separators never leak. Every other
+      // type — SSN especially, whose last 4 are an auth token — is fully
+      // masked.
+      if (item.type !== "credit_card") {
+        return "****";
+      }
+
+      const digits = item.value.replace(/\D/g, "");
+
+      return `****${digits.length > 4 ? digits.slice(-4) : ""}`;
+    }
+    case "hashed":
+      // FNV-1a hash for referential integrity (not for security). Same
+      // input always produces same hash, useful for audit trails.
+      return `[HASH:${fnv1aHash(item.value)}]`;
+  }
+}
+
 /** Redact detected PII from text */
 export function redactPII(
   text: string,
   items: DetectedPII[],
   style: RedactionStyle = "typed",
 ): string {
+  // Items may come from an untrusted custom PIIDetector. Drop any with a
+  // malformed span before splicing — a negative, fractional, out-of-range,
+  // or inverted range would corrupt offsets and could re-expose raw PII.
+  const safeItems = items.filter((item) => hasValidSpan(item, text.length));
+
   // FIX (overlap corruption): the same span can be matched by multiple
   // patterns (e.g. a 16-digit number flagged as BOTH credit_card and phone).
   // Splicing overlapping/nested ranges shifts offsets and can leave raw PII
@@ -484,7 +545,7 @@ export function redactPII(
   // range first, and keep a later item only if it overlaps NOTHING already
   // kept. This handles chains of 3+ overlapping spans, which a first-conflict
   // scan does not.
-  const byPriority = [...items].sort((a, b) => {
+  const byPriority = [...safeItems].sort((a, b) => {
     if (b.confidence !== a.confidence) {
       return b.confidence - a.confidence;
     }
@@ -517,35 +578,7 @@ export function redactPII(
 
   let result = text;
   for (const item of sorted) {
-    let replacement: string;
-
-    switch (style) {
-      case "placeholder":
-        replacement = "[REDACTED]";
-        break;
-      case "typed":
-        // FIX (category leak): for sensitive-category types, emit a generic
-        // [REDACTED] — the category name itself would otherwise reveal the
-        // presence of, e.g., medical, passport, or national-ID data.
-        replacement = SENSITIVE_CATEGORY_TYPES.has(item.type)
-          ? "[REDACTED]"
-          : `[${item.type.toUpperCase()}]`;
-        break;
-      case "masked": {
-        // FIX (length leak): a full-length `*` run reveals the exact digit
-        // count of structured PII (SSN, card). Use a fixed-width mask plus
-        // the last 4 chars — the universal receipt convention — so the
-        // output length does not disclose the original value's length.
-        const tail = item.value.length > 4 ? item.value.slice(-4) : "";
-        replacement = `****${tail}`;
-        break;
-      }
-      case "hashed":
-        // FNV-1a hash for referential integrity (not for security)
-        // Same input always produces same hash, useful for audit trails
-        replacement = `[HASH:${fnv1aHash(item.value)}]`;
-        break;
-    }
+    const replacement = buildRedactionReplacement(item, style);
 
     result =
       result.slice(0, item.position.start) +

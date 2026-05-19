@@ -9,13 +9,16 @@
  * ```ts
  * import { emitDevToolsEvent } from '@directive-run/core/plugins'
  *
- * const result = detectPII(text)
- * emitDevToolsEvent({
- *   type: 'guardrail_check',
- *   guardrailName: 'pii-detection',
- *   guardrailType: 'input',
- *   passed: !result.detected,
- * })
+ * // detectPII is async — await it before reading `detected`.
+ * async function check(text: string) {
+ *   const result = await detectPII(text)
+ *   emitDevToolsEvent({
+ *     type: 'guardrail_check',
+ *     guardrailName: 'pii-detection',
+ *     guardrailType: 'input',
+ *     passed: !result.detected,
+ *   })
+ * }
  * ```
  */
 
