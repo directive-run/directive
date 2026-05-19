@@ -4,6 +4,7 @@
 
 import type { Facts, FactsSnapshot } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
+import type { KeySelector } from "./predicate.js";
 import type {
   InferRequirementPayload,
   InferRequirementsFromSchema,
@@ -161,8 +162,13 @@ export interface ResolverDef<
    * - Function: type guard predicate (e.g., `requirement: (req) => req.type === "FETCH_USER"`)
    */
   requirement: string | ((req: Requirement) => req is R);
-  /** Custom key function for deduplication */
-  key?: RequirementKeyFn<R>;
+  /**
+   * Custom dedup key for the resolver. Either:
+   * - a `RequirementKeyFn<R>` function, or
+   * - a {@link KeySelector} array of requirement-payload field names:
+   *   `key: ["type", "to"]` builds a stable dedup key from those fields.
+   */
+  key?: RequirementKeyFn<R> | KeySelector<R>;
   /** Retry policy */
   retry?: RetryPolicy;
   /** Timeout for resolver execution (ms) */

@@ -38,6 +38,24 @@ export type { Facts, FactsSnapshot, FactsStore, FactChange } from "./facts.js";
 export type { DefinitionMeta } from "./meta.js";
 export { freezeMeta, isDerivationWithMeta } from "./meta.js";
 
+// Data-configuration predicates and templates
+export type {
+  ClauseResult,
+  FactPredicate,
+  FactTemplate,
+  KeySelector,
+  OperatorObject,
+  PatchSpec,
+  PayloadRef,
+  PredicateClause,
+  PredicateCombinator,
+  PredicateCombinatorKey,
+  PredicateObject,
+  PredicateOp,
+  PatchValue,
+} from "./predicate.js";
+export { PREDICATE_COMBINATORS, PREDICATE_OPERATORS } from "./predicate.js";
+
 // Derivation types
 export type {
   DerivationDef,

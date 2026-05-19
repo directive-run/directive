@@ -4,7 +4,13 @@
 
 import type { Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
-import type { InferDerivations, ModuleSchema, Schema } from "./schema.js";
+import type { FactPredicate, FactTemplate } from "./predicate.js";
+import type {
+  InferDerivations,
+  InferSchema,
+  ModuleSchema,
+  Schema,
+} from "./schema.js";
 
 // ============================================================================
 // Derivation Types (internal engine use)
@@ -38,7 +44,20 @@ export interface DerivationDefWithMeta<
   T,
   D extends DerivationsDef<S>,
 > {
-  compute: DerivationDef<S, T, D>;
+  /**
+   * The derivation body. Either:
+   * - a function `(facts, derived) => T` (original form), or
+   * - a {@link FactPredicate} data spec — boolean derivations only, or
+   * - a {@link FactTemplate} `{ $template: "..." }` — string derivations only.
+   *
+   * Data forms are normalized to a wrapper function at registration; the
+   * wrapper reads through the facts proxy so existing auto-tracking
+   * captures dependencies.
+   */
+  compute:
+    | DerivationDef<S, T, D>
+    | ([T] extends [boolean] ? FactPredicate<InferSchema<S>> : never)
+    | ([T] extends [string] ? FactTemplate : never);
   meta?: DefinitionMeta;
 }
 

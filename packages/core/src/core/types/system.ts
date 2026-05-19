@@ -8,6 +8,11 @@ import type { Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
+import type {
+  ClauseResult,
+  FactPredicate,
+  KeySelector,
+} from "./predicate.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ResolverStatus } from "./resolvers.js";
 import type { BatchConfig, RetryPolicy } from "./resolvers.js";
@@ -257,6 +262,11 @@ export interface SystemInspection {
     hitCount: number;
     lastActiveAt: number | null;
     meta?: DefinitionMeta;
+    /**
+     * The data-form predicate spec (when the constraint's `when` is declarative),
+     * exposed for devtools and `explain()` rendering.
+     */
+    whenSpec?: FactPredicate<Record<string, unknown>>;
   }>;
   resolvers: Record<string, ResolverStatus>;
   /** All defined resolver names and their requirement types */
@@ -544,9 +554,11 @@ export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
 export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   priority?: number;
   async?: boolean;
-  when: (
-    facts: Readonly<InferSchema<M["facts"]>>,
-  ) => boolean | Promise<boolean>;
+  when:
+    | ((
+        facts: Readonly<InferSchema<M["facts"]>>,
+      ) => boolean | Promise<boolean>)
+    | FactPredicate<InferSchema<M["facts"]>>;
   require:
     | { type: string; [key: string]: unknown }
     | { type: string; [key: string]: unknown }[]
@@ -570,13 +582,24 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
     prev: InferSchema<M["facts"]> | null,
   ) => void | (() => void) | Promise<void | (() => void)>;
   deps?: Array<string & keyof InferSchema<M["facts"]>>;
+  /**
+   * Optional declarative trigger — a {@link FactPredicate} that gates whether
+   * `run()` fires. Mutually exclusive with `deps`.
+   */
+  on?: FactPredicate<InferSchema<M["facts"]>>;
   meta?: DefinitionMeta;
 }
 
 /** Resolver definition for dynamic registration — typed context.facts, relaxed requirement */
 export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   requirement: string;
-  key?: (req: { type: string; [key: string]: unknown }) => string;
+  /**
+   * Custom dedup key. Either a `(req) => string` function, or a
+   * {@link KeySelector} array of requirement-payload field names.
+   */
+  key?:
+    | ((req: { type: string; [key: string]: unknown }) => string)
+    | KeySelector<{ type: string; [key: string]: unknown }>;
   retry?: RetryPolicy;
   timeout?: number;
   batch?: BatchConfig;
@@ -642,7 +665,16 @@ export interface MetaAccessor {
 /** Typed events emitted by system.observe(). */
 export type ObservationEvent =
   | { type: "fact.change"; key: string; prev: unknown; next: unknown }
-  | { type: "constraint.evaluate"; id: string; active: boolean }
+  | {
+      type: "constraint.evaluate";
+      id: string;
+      active: boolean;
+      /**
+       * Per-clause breakdown of a data-form predicate evaluation. Present
+       * only when the constraint's `when` is a {@link FactPredicate}.
+       */
+      whenExplain?: ClauseResult[];
+    }
   | { type: "constraint.error"; id: string; error: unknown }
   | { type: "requirement.created"; id: string; requirementType: string }
   | { type: "requirement.met"; id: string; byResolver: string }

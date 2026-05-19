@@ -11,6 +11,12 @@ import type { DirectiveError } from "./errors.js";
 import type { Facts, FactsSnapshot } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type {
+  FactPredicate,
+  FactTemplate,
+  KeySelector,
+  PatchSpec,
+} from "./predicate.js";
+import type {
   BatchConfig,
   BatchResolveResults,
   RetryPolicy,
@@ -20,6 +26,7 @@ import type {
   EventsSchema,
   InferDerivations,
   InferEventPayloadFromSchema,
+  InferFacts,
   InferRequirementPayloadFromSchema,
   InferRequirements,
   InferSchemaType,
@@ -104,10 +111,23 @@ export type TypedDerivationFn<
  * Typed derivations definition using the module schema.
  * Each derivation key must match schema.derivations and return the declared type.
  */
+type TypedDerivationT<
+  M extends ModuleSchema,
+  K extends keyof GetDerivationsSchema<M>,
+> = InferSchemaType<GetDerivationsSchema<M>[K]>;
+
 export type TypedDerivationsDef<M extends ModuleSchema> = {
   [K in keyof GetDerivationsSchema<M>]:
     | TypedDerivationFn<M, K>
-    | { compute: TypedDerivationFn<M, K>; meta?: DefinitionMeta };
+    | {
+        compute:
+          | TypedDerivationFn<M, K>
+          | ([TypedDerivationT<M, K>] extends [boolean]
+              ? FactPredicate<InferFacts<M>>
+              : never)
+          | ([TypedDerivationT<M, K>] extends [string] ? FactTemplate : never);
+        meta?: DefinitionMeta;
+      };
 };
 
 // ============================================================================
@@ -135,7 +155,20 @@ export type TypedEventHandlerFn<
 export type TypedEventsDef<M extends ModuleSchema> = {
   [K in keyof GetEventsSchema<M>]:
     | TypedEventHandlerFn<M, K>
-    | { handler: TypedEventHandlerFn<M, K>; meta?: DefinitionMeta };
+    | { handler: TypedEventHandlerFn<M, K>; meta?: DefinitionMeta }
+    | {
+        /**
+         * Declarative event body: assigns facts from literals, payload
+         * fields ({@link KeySelector}), or interpolated strings
+         * ({@link FactTemplate}). Use instead of `handler` for simple
+         * "set facts from event payload" events.
+         */
+        patch: PatchSpec<
+          InferFacts<M>,
+          InferEventPayloadFromSchema<GetEventsSchema<M>[K]>
+        >;
+        meta?: DefinitionMeta;
+      };
 };
 
 // ============================================================================
@@ -155,8 +188,14 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   priority?: number;
   /** Mark this constraint as async */
   async?: boolean;
-  /** Condition function */
-  when: (facts: Facts<M["facts"]>) => boolean | Promise<boolean>;
+  /**
+   * Condition the constraint requires. Either a function (sync or async)
+   * `(facts) => boolean`, or a declarative {@link FactPredicate} spec
+   * (e.g. `{ phase: "red", elapsed: { $gte: 30 } }`).
+   */
+  when:
+    | ((facts: Facts<M["facts"]>) => boolean | Promise<boolean>)
+    | FactPredicate<InferFacts<M>>;
   /**
    * Requirement(s) to produce when condition is met.
    */
@@ -166,10 +205,9 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
-   * dispatched by this constraint owns — an external clobber of one of them
-   * drops the resolver's write. Omit for no binding (default). Ignored on
-   * async constraints.
+   * Names the facts the resolver dispatched by this constraint owns — an
+   * external clobber of one of them drops the resolver's write. Omit for no
+   * binding (default). Ignored on async constraints.
    */
   owns?: readonly string[];
   /**
@@ -216,10 +254,14 @@ export interface CrossModuleConstraintDef<
   priority?: number;
   /** Mark this constraint as async */
   async?: boolean;
-  /** Condition function with cross-module facts access */
-  when: (
-    facts: CrossModuleFactsWithSelf<M, Deps>,
-  ) => boolean | Promise<boolean>;
+  /**
+   * Condition the constraint requires. Either a function (sync or async)
+   * with cross-module facts access, or a nested {@link FactPredicate}:
+   * `{ self: { phase: "red" }, auth: { token: { $exists: true } } }`.
+   */
+  when:
+    | ((facts: CrossModuleFactsWithSelf<M, Deps>) => boolean | Promise<boolean>)
+    | FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
   /**
    * Requirement(s) to produce when condition is met.
    */
@@ -231,10 +273,9 @@ export interface CrossModuleConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
-   * dispatched by this constraint owns — an external clobber of one of them
-   * drops the resolver's write. Omit for no binding (default). Ignored on
-   * async constraints.
+   * Names the facts the resolver dispatched by this constraint owns —
+   * an external clobber of one of them drops the resolver's write. Omit
+   * for no binding (default). Ignored on async constraints.
    */
   owns?: readonly string[];
   /**
@@ -281,6 +322,11 @@ export interface CrossModuleEffectDef<
   ) => void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional dependency keys to filter when effect runs */
   deps?: string[];
+  /**
+   * Optional declarative trigger — a {@link FactPredicate} that gates whether
+   * `run()` fires. Mutually exclusive with `deps`.
+   */
+  on?: FactPredicate<CrossModuleFactsWithSelf<M, Deps>>;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }
@@ -319,7 +365,15 @@ export type CrossModuleDerivationsDef<
 > = {
   [K in keyof GetDerivationsSchema<M>]:
     | CrossModuleDerivationFn<M, Deps, K>
-    | { compute: CrossModuleDerivationFn<M, Deps, K>; meta?: DefinitionMeta };
+    | {
+        compute:
+          | CrossModuleDerivationFn<M, Deps, K>
+          | ([TypedDerivationT<M, K>] extends [boolean]
+              ? FactPredicate<CrossModuleFactsWithSelf<M, Deps>>
+              : never)
+          | ([TypedDerivationT<M, K>] extends [string] ? FactTemplate : never);
+        meta?: DefinitionMeta;
+      };
 };
 
 // ============================================================================
@@ -381,8 +435,14 @@ export interface TypedResolverDef<
 > {
   /** Requirement type to handle */
   requirement: T;
-  /** Custom key function for deduplication */
-  key?: (req: ExtractRequirement<M, T>) => string;
+  /**
+   * Custom dedup key. Either a `(req) => string` function, or a
+   * {@link KeySelector} array of requirement-payload field names
+   * (`["type", "to"]`) that builds a stable key from those fields.
+   */
+  key?:
+    | ((req: ExtractRequirement<M, T>) => string)
+    | KeySelector<ExtractRequirement<M, T>>;
   /** Retry policy */
   retry?: RetryPolicy;
   /** Timeout for resolver execution (ms) */

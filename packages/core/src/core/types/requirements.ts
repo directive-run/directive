@@ -4,7 +4,8 @@
 
 import type { Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
-import type { Schema, SchemaType } from "./schema.js";
+import type { FactPredicate } from "./predicate.js";
+import type { InferSchema, Schema, SchemaType } from "./schema.js";
 
 // ============================================================================
 // Requirement Types
@@ -96,8 +97,19 @@ export interface ConstraintDef<
   priority?: number;
   /** Mark this constraint as async (avoids runtime detection) */
   async?: boolean;
-  /** Condition function (sync or async) */
-  when: (facts: Facts<S>) => boolean | Promise<boolean>;
+  /**
+   * Condition the constraint requires. Either:
+   * - a function (sync or async) `(facts) => boolean`, or
+   * - a declarative {@link FactPredicate} spec — serializable, inspectable,
+   *   always synchronous; e.g. `{ phase: "red", elapsed: { $gte: 30 } }`.
+   *
+   * A data `when` is normalized to a wrapper function at registration; the
+   * wrapper still reads through the tracked facts proxy, so auto-tracking
+   * captures both fact and derivation deps correctly.
+   */
+  when:
+    | ((facts: Facts<S>) => boolean | Promise<boolean>)
+    | FactPredicate<InferSchema<S>>;
   /**
    * Requirement(s) to produce when condition is met.
    * - Single requirement: `{ type: "RESTOCK", sku: "ABC" }`
@@ -109,8 +121,8 @@ export interface ConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Resolver constraint-binding (RFC-0003). Names the facts the resolver
-   * dispatched by this constraint *owns*: a write from that resolver to an
+   * Names the facts the resolver dispatched by this constraint *owns*:
+   * a write from that resolver to an
    * owned fact is dropped — and the resolver aborted — if the fact was
    * changed by anything else since the resolver last wrote it. Writes to
    * facts not listed always land; `when()` is not consulted. Omit for no

@@ -104,7 +104,7 @@ describe("regexDetector / detectPII", () => {
   });
 
   it("detects public IP addresses like 8.8.8.8", async () => {
-    // Private/loopback ranges are intentionally filtered (see FIX 8), so this
+    // Private/loopback ranges are intentionally filtered, so this
     // uses a public IP.
     const result = await regexDetector.detect("Server at 8.8.8.8", [
       "ip_address",
@@ -465,7 +465,7 @@ describe("detectPII utility", () => {
 });
 
 // ============================================================================
-// FIX 1 — redactPII overlap dedup
+// redactPII overlap dedup
 // ============================================================================
 
 describe("redactPII overlap dedup", () => {
@@ -524,7 +524,7 @@ describe("redactPII overlap dedup", () => {
 });
 
 // ============================================================================
-// FIX 3 — credit-card 13-19 digit detection
+// Credit-card 13-19 digit detection
 // ============================================================================
 
 describe("credit_card 13-19 digit detection", () => {
@@ -548,7 +548,7 @@ describe("credit_card 13-19 digit detection", () => {
 });
 
 // ============================================================================
-// FIX 4 — national_id keyword detection
+// national_id keyword detection
 // ============================================================================
 
 describe("national_id detection", () => {
@@ -570,7 +570,7 @@ describe("national_id detection", () => {
 });
 
 // ============================================================================
-// FIX 6 — typed redaction hides special-category names
+// Typed redaction hides special-category names
 // ============================================================================
 
 describe("redactPII special-category masking", () => {
@@ -604,7 +604,7 @@ describe("redactPII special-category masking", () => {
 });
 
 // ============================================================================
-// FIX 8 — private/loopback IP false positives
+// Private/loopback IP false positives
 // ============================================================================
 
 describe("ip_address private/loopback filtering", () => {
@@ -632,7 +632,7 @@ describe("ip_address private/loopback filtering", () => {
 });
 
 // ============================================================================
-// FIX 9 — detectAndRedactPII compose helper
+// detectAndRedactPII compose helper
 // ============================================================================
 
 describe("detectAndRedactPII", () => {
@@ -667,7 +667,7 @@ describe("detectAndRedactPII", () => {
 // C2 — keyword-anchored patterns capture the ID value, not the keyword
 // ============================================================================
 
-describe("keyword-anchored value capture (C2)", () => {
+describe("keyword-anchored value capture ", () => {
   it("captures the bank account ID, not the 'account' keyword", async () => {
     const result = await detectPII("account: 12345678", {
       types: ["bank_account"],
@@ -727,7 +727,7 @@ describe("keyword-anchored value capture (C2)", () => {
 // C1 — redactPII dedup handles chains of 3+ overlapping spans
 // ============================================================================
 
-describe("redactPII 3+ overlap chain dedup (C1)", () => {
+describe("redactPII 3+ overlap chain dedup ", () => {
   it("redacts the highest-confidence span and leaks no raw PII from a 3-span chain", () => {
     // Chain: A overlaps B overlaps C, with A and C not overlapping directly.
     //   text indices:  "leak 1234567890123456 tail"
@@ -798,7 +798,7 @@ describe("redactPII 3+ overlap chain dedup (C1)", () => {
 // D1 — typed redaction emits [REDACTED] for passport & driver_license
 // ============================================================================
 
-describe("typed redaction sensitive-category coverage (D1)", () => {
+describe("typed redaction sensitive-category coverage ", () => {
   it("emits [REDACTED] for passport under typed style", () => {
     const items: DetectedPII[] = [
       {
@@ -865,7 +865,7 @@ describe("masked redaction style (M4)", () => {
 });
 
 // ============================================================================
-// FIX 2 — no unhandled rejection from a fast custom detector
+// No unhandled rejection from a fast custom detector
 // ============================================================================
 
 describe("detectPII timeout race hygiene", () => {
@@ -898,7 +898,7 @@ describe("detectPII timeout race hygiene", () => {
 });
 
 // ============================================================================
-// R3 — masked: only credit_card shows a digit-only last-4 tail
+// masked: only credit_card shows a digit-only last-4 tail
 // ============================================================================
 
 describe("R3 masked redaction — credit_card tail vs full mask", () => {
@@ -938,7 +938,7 @@ describe("R3 masked redaction — credit_card tail vs full mask", () => {
 });
 
 // ============================================================================
-// R3 — typed: sensitive categories collapse to [REDACTED]
+// typed: sensitive categories collapse to [REDACTED]
 // ============================================================================
 
 describe("R3 typed redaction — sensitive vs labeled types", () => {
@@ -986,7 +986,7 @@ describe("R3 typed redaction — sensitive vs labeled types", () => {
 });
 
 // ============================================================================
-// R3 — credit_card single capture group: full PAN, no digit fragment leak
+// credit_card single capture group: full PAN, no digit fragment leak
 // ============================================================================
 
 describe("R3 credit_card single-group capture", () => {
@@ -1007,7 +1007,7 @@ describe("R3 credit_card single-group capture", () => {
 });
 
 // ============================================================================
-// R3 — redactPII drops items with malformed position spans
+// redactPII drops items with malformed position spans
 // ============================================================================
 
 describe("R3 redactPII span validation", () => {

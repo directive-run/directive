@@ -495,19 +495,18 @@ function buildRedactionReplacement(
     case "placeholder":
       return "[REDACTED]";
     case "typed":
-      // FIX (category leak): for sensitive-category types, emit a generic
-      // [REDACTED] — the category name itself would otherwise reveal the
-      // presence of, e.g., medical, passport, or national-ID data.
+      // For sensitive-category types, emit a generic [REDACTED] — the
+      // category name itself would otherwise reveal the presence of, e.g.,
+      // medical, passport, or national-ID data.
       return SENSITIVE_CATEGORY_TYPES.has(item.type)
         ? "[REDACTED]"
         : `[${item.type.toUpperCase()}]`;
     case "masked": {
-      // FIX (length leak): a full-length `*` run reveals the exact digit
-      // count of structured PII. Use a fixed-width `****` mask. Only a
-      // credit-card PAN may show a last-4 tail (PCI-permitted for display);
-      // the tail is digit-normalized so separators never leak. Every other
-      // type — SSN especially, whose last 4 are an auth token — is fully
-      // masked.
+      // A full-length `*` run would reveal the exact digit count of
+      // structured PII. Use a fixed-width `****` mask. Only a credit-card
+      // PAN may show a last-4 tail (PCI-permitted for display); the tail
+      // is digit-normalized so separators never leak. Every other type —
+      // SSN especially, whose last 4 are an auth token — is fully masked.
       if (item.type !== "credit_card") {
         return "****";
       }
@@ -534,14 +533,13 @@ export function redactPII(
   // or inverted range would corrupt offsets and could re-expose raw PII.
   const safeItems = items.filter((item) => hasValidSpan(item, text.length));
 
-  // FIX (overlap corruption): the same span can be matched by multiple
-  // patterns (e.g. a 16-digit number flagged as BOTH credit_card and phone).
-  // Splicing overlapping/nested ranges shifts offsets and can leave raw PII
-  // in the output. Dedupe first, order-independently: sort by confidence
-  // (then longer span, then earlier start) so the strongest match claims its
-  // range first, and keep a later item only if it overlaps NOTHING already
-  // kept. This handles chains of 3+ overlapping spans, which a first-conflict
-  // scan does not.
+  // The same span can be matched by multiple patterns (e.g. a 16-digit
+  // number flagged as both credit_card and phone). Splicing overlapping
+  // or nested ranges shifts offsets and can leave raw PII in the output.
+  // Dedupe order-independently: sort by confidence (then longer span,
+  // then earlier start) so the strongest match claims its range first,
+  // and keep a later item only if it overlaps nothing already kept. This
+  // handles chains of three or more overlapping spans.
   const byPriority = [...safeItems].sort((a, b) => {
     if (b.confidence !== a.confidence) {
       return b.confidence - a.confidence;
@@ -705,11 +703,10 @@ export function createEnhancedPIIGuardrail(
       return detectorInstance.detect(text, piiTypes);
     }
 
-    // Custom detectors get a timeout.
-    // FIX (unhandled rejection): whichever promise loses the race still
-    // settles afterwards. Attach a no-op .catch() to each so the loser's
-    // rejection (timeout firing after detector wins, or detector throwing
-    // after timeout wins) never surfaces as an unhandledRejection.
+    // Custom detectors get a timeout. Whichever promise loses the race
+    // still settles afterwards — attach a no-op .catch() to each so the
+    // loser's rejection (timeout firing after detector wins, or detector
+    // throwing after timeout wins) never surfaces as an unhandledRejection.
     let timer: ReturnType<typeof setTimeout>;
     const detectPromise = detectorInstance.detect(text, piiTypes);
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -846,10 +843,10 @@ export async function detectPII(
     // Built-in regex detector is synchronous, no timeout needed
     items = await detectorInstance.detect(text, types);
   } else {
-    // Custom detectors get a timeout.
-    // FIX (unhandled rejection): attach a no-op .catch() to each racer so the
-    // losing promise's rejection (timeout after detector wins, or detector
-    // throwing after timeout wins) never surfaces as an unhandledRejection.
+    // Custom detectors get a timeout. Attach a no-op .catch() to each
+    // racer so the losing promise's rejection (timeout after detector
+    // wins, or detector throwing after timeout wins) never surfaces as
+    // an unhandledRejection.
     let timer: ReturnType<typeof setTimeout>;
     const detectPromise = detectorInstance.detect(text, types);
     const timeoutPromise = new Promise<never>((_, reject) => {

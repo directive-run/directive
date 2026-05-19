@@ -1,17 +1,17 @@
 /**
- * Data-configuration predicates and templates (RFC-0004).
+ * Data-configuration predicates and templates.
  *
  * A {@link FactPredicate} is a declarative, serializable boolean spec over a
  * module's fact + derivation namespace — the data form of a constraint
  * `when`, an effect `on`, or a boolean derivation. A {@link FactTemplate} is
  * the value-producing counterpart: a fact-interpolating string.
  *
- * Sigil discipline: `$` marks an *operator/expression node* inside a
- * predicate or template body (`$eq`, `$gte`, `$all`, `$template`, `$set`,
- * `$ref`). Definition arms (`compute`, `handler`, `patch`) stay sigil-free.
+ * Convention: `$` marks an operator/expression node inside a predicate or
+ * template body (`$eq`, `$gte`, `$all`, `$template`, `$set`, `$ref`).
+ * Definition arms (`compute`, `handler`, `patch`) stay sigil-free.
  *
  * Operators are `$`-prefixed so they can never collide with a fact key —
- * schema keys starting with `$` are already rejected by `engine.validateKeys`.
+ * schema keys starting with `$` are rejected at registration.
  */
 
 // ============================================================================

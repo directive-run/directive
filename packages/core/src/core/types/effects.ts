@@ -4,6 +4,7 @@
 
 import type { Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
+import type { FactPredicate } from "./predicate.js";
 import type { InferSchema, Schema } from "./schema.js";
 
 // ============================================================================
@@ -74,6 +75,15 @@ export interface EffectDef<S extends Schema> {
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
   /** Optional explicit dependencies for optimization */
   deps?: Array<keyof InferSchema<S>>;
+  /**
+   * Optional declarative trigger — a {@link FactPredicate} that gates whether
+   * `run()` fires: even when a dependency changes, the effect runs only if
+   * the predicate currently holds. Mutually exclusive with `deps` — the
+   * predicate supplies its own deps via static extraction.
+   *
+   * @example on: { phase: "red", elapsed: { $gte: 30 } }
+   */
+  on?: FactPredicate<InferSchema<S>>;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
 }

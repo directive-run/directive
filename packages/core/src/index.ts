@@ -82,10 +82,38 @@ export type {
   // Definition Meta
   DefinitionMeta,
   DerivationDefWithMeta,
+  // Data-configuration predicates and templates
+  FactPredicate,
+  FactTemplate,
+  KeySelector,
+  PatchSpec,
+  PayloadRef,
+  PatchValue,
+  OperatorObject,
+  PredicateObject,
+  PredicateClause,
+  PredicateCombinator,
+  PredicateCombinatorKey,
+  PredicateOp,
+  ClauseResult,
   // Distributable Snapshots
   DistributableSnapshot,
   DistributableSnapshotOptions,
 } from "./core/types.js";
+
+// Predicate / template runtime
+export {
+  applyPatch,
+  compilePredicate,
+  evaluateKeySelector,
+  evaluatePredicate,
+  evaluatePredicateExplained,
+  evaluateTemplate,
+  extractDeps,
+  extractTemplateKeys,
+  isPredicateSpec,
+  isTemplate,
+} from "./core/predicate.js";
 
 // ============================================================================
 // Core Classes

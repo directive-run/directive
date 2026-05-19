@@ -1,5 +1,5 @@
 /**
- * Runtime for data-configuration predicates and templates (RFC-0004).
+ * Runtime for data-configuration predicates and templates.
  *
  * Pure module — imports only its own types. Reads facts through whatever
  * object it is handed (the reactive `Facts` proxy in production, a plain
