@@ -298,3 +298,91 @@ screencast, solves a problem every engineer has every week. The
 substrate (typed observation events + virtual clock + serializable
 mutator dispatch) just landed *together* — that's the moment to build
 this.
+
+---
+
+## R3 (AE Loop, PII Guardrails) — Game-Changer Ideas
+
+Surfaced during the 5-round AE review loop on `@directive-run/ai` PII
+guardrails. The detect/redact split turned PII into a composable fact
+stream the constraint engine can react to — every idea below exploits that.
+
+### G1 — `redactionLedger`: reversible, constraint-gated PII vault
+
+**[2 days — viral MAX, compound MAX]**
+
+`redactPII(text, items, { style: 'vault' })` returns redacted text *plus* a
+sealed `RedactionLedger` mapping `[VAULT:abc123] → original`. A resolver
+re-hydrates the original only when a constraint allows it
+(`when: facts.userRole === 'support' && facts.ticketVerified`). The LLM
+never sees raw PII; an authorized human downstream does — the runtime
+decides who gets the truth.
+
+**Demo:** card hits GPT-4 as `[VAULT:7f3a]`, OpenAI logs stay clean; a
+verified support rep sees the real number snap back. Guardrails-AI loses
+the data; NeMo blocks the turn. Directive makes redaction a reversible,
+permissioned fact.
+
+**Compound:** unlocks PII-safe RAG (vault tokens survive vector storage),
+PII-safe eval traces (`redactTimeline()`), audit-trail correlation.
+
+### G2 — `definePIIPolicy`: PII types as facts → constraint-driven routing
+
+**[2 days — viral HIGH, compound MAX]**
+
+`createPIIFactBridge()` feeds `facts.piiSeen = { ssn: 2, credit_card: 1 }`
+into a Directive system every turn. Constraints react to data
+classification: `when: f.piiSeen.medical_id > 0 → require SWITCH_MODEL to
+on-prem`; `when: f.piiSeen.credit_card > 0 && f.region === 'EU' → HALT`.
+Data sensitivity drives control flow declaratively — the pile of `if`
+statements every regulated-industry team hand-rolls becomes constraints.
+
+**Compound:** wires PII into `createConstraintRouter`; compliance mode
+becomes a derivation.
+
+### G3 — `directive pii-diff` + `toLeakNoPII()` CI matcher
+
+**[2 days — viral HIGH, compound HIGH]**
+
+`expect(agentOutput).toLeakNoPII()` and a CLI that scans prompt files /
+recorded timelines: "commit a1b2c3 introduced a template that interpolates
+`user.ssn` into the system prompt — 14/200 sessions leaked." PII safety
+becomes a regression-tested property, not a runtime hope.
+
+### G4 — `streamingPIIGuard`: mid-token-stream redaction
+
+**[3 days — viral MAX, compound HIGH]**
+
+A `StreamingGuardrail` that buffers a sliding token window, runs `detectPII`,
+and rewrites tokens in-flight — a leaked SSN becomes `[REDACTED]` before
+the last digit renders. Handles PII spanning chunk boundaries (the case
+every post-hoc output validator misses).
+
+### G5 — `piiReplay`: redacted, shareable PII-block repro
+
+**[1 day — quick win]**
+
+When a PII guardrail fires, emit a serialized timeline frame with the
+offending input vault-redacted (via G1). `directive replay` reproduces the
+block decision deterministically — debug a guardrail trip with zero real
+PII in the repro. This is the `redactTimeline()` that R2.D's pre-mortem
+flagged as a blocker.
+
+### R3 ranked
+
+| Rank | Idea | Days | Viral | Compound | Tag |
+|---|---|---|---|---|---|
+| 1 | **G1** — reversible constraint-gated vault redaction | 2 | Max | Max | **BUILD CANDIDATE** |
+| 2 | **G2** — PII types as facts → constraint routing | 2 | High | Max | makes "constraint-driven AI safety" real |
+| 3 | **G3** — `pii-diff` + `toLeakNoPII()` CI matcher | 2 | High | High | rides shipped test substrate |
+| 4 | **G4** — mid-stream token-level PII redaction | 3 | Max | High | best demo, edge-case risk |
+| 5 | **G5** — redacted PII-block replay | 1 | Med | High | unblocks R2.D flywheel |
+
+**G1 is the asymmetric pick** — 2 days, the demo writes its own headline
+("I sent a credit card to GPT-4 and it never saw it — but my verified
+support rep still did"), and G4/G5 plus R2.D's `redactTimeline()` all
+compound on the vault-ledger primitive. Suggested arc: G1 → G5 → G2.
+
+**Common thread vs LangChain / NeMo / Guardrails-AI:** they treat PII as a
+lossy, post-hoc, static *filter*. Directive treats PII as a *fact* —
+reversible, permissioned, reactive, replayable, regression-tested.
