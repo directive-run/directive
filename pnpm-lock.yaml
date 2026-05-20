@@ -429,6 +429,19 @@ importers:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@25.2.0)(lightningcss@1.31.1)(sass@1.51.0)
 
+  examples/data-triggers:
+    dependencies:
+      '@directive-run/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   examples/debounce-constraints:
     dependencies:
       '@directive-run/core':

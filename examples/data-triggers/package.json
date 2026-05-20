@@ -1,0 +1,18 @@
+{
+  "name": "@directive-run/example-data-triggers",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "All five Directive definition surfaces as data — a one-file showcase.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@directive-run/core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.0"
+  }
+}
