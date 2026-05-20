@@ -124,8 +124,8 @@ when: { $all: [
 | `$matches`      | `string` (RegExp only — use real `RegExp` instances for flag control) | `{ name: { $matches: /^J/i } }` |
 | `$startsWith`   | `string`              | `{ name: { $startsWith: "Ada" } }`          |
 | `$endsWith`     | `string`              | `{ email: { $endsWith: "@example.com" } }`  |
-| `$contains`     | `string` or array (for `Set`, unwrap to an array first) | `{ tags: { $contains: "admin" } }` |
-| `$exists`       | any                   | `{ token: { $exists: true } }` (value is not `undefined`) |
+| `$contains`     | `string`, array, or `Set` | `{ tags: { $contains: "admin" } }` |
+| `$exists`       | boolean operand       | `{ token: { $exists: true } }` (value is not `undefined`) |
 | `$changed`      | effects only          | `{ phase: { $changed: true } }`             |
 
 > **`$matches` is RegExp-only.** A string operand cannot carry RegExp
@@ -136,9 +136,19 @@ when: { $all: [
 > always compiles flag-less.
 >
 > **`$contains` on `Set` / `Map`.** `$contains` walks a `string`
-> (substring match) or an array (element equality). It does not iterate
-> a `Set` or `Map` directly — unwrap to an array first
-> (`derive: { tagList: (f) => [...f.tags] }` and gate on `tagList`).
+> (substring match), an array (element equality, structural), or a
+> `Set` (native `.has()` — reference-equality for objects, value
+> equality for primitives). `Map` is not yet supported; iterate to an
+> array if you need to gate on `Map` membership.
+>
+> **`$exists` is a boolean.** `{ $exists: true }` requires the fact to
+> be defined (not `undefined`); `{ $exists: false }` requires it to be
+> `undefined`. `null` counts as defined.
+>
+> **`$eq` / `$ne` on `Set` / `Map` facts.** Equality is structural,
+> not by reference: two `Set`s with the same members compare equal
+> regardless of insertion order; two `Map`s compare equal when they
+> have the same key+value pairs.
 
 One operator per object — for two operators on the same fact, use the
 array form or `$all`:

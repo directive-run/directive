@@ -12,7 +12,7 @@ import isDevelopment from "#is-development";
 import {
   applyPatch,
   evaluateTemplate,
-  isPredicateSpec,
+  isPredicate,
   isTemplate,
   memoizePredicate,
 } from "./predicate.js";
@@ -305,7 +305,7 @@ function normalizePredicateDefs(
         continue;
       }
 
-      if (isPredicateSpec(c)) {
+      if (isPredicate(c)) {
         Object.freeze(c as object);
         const memoized = memoizePredicate(c as object);
         const fn = (facts: unknown) =>
@@ -374,7 +374,7 @@ function normalizePredicateDefs(
     const next: Record<string, unknown> = {};
     for (const [key, raw] of Object.entries(effects)) {
       const def = raw as { on?: unknown };
-      if (def.on !== undefined && isPredicateSpec(def.on)) {
+      if (def.on !== undefined && isPredicate(def.on)) {
         next[key] = {
           ...def,
           on: prefixPredicateSpec(def.on, namespace, depNamespaces),

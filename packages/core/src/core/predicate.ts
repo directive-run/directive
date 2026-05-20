@@ -95,12 +95,12 @@ function isOperatorObject(v: unknown): v is Record<string, unknown> {
  *
  * @example
  * ```ts
- * isPredicateSpec({ phase: "red" }); // true
- * isPredicateSpec((f) => f.phase === "red"); // false
- * isPredicateSpec([{ fact: "phase", op: "$eq", value: "red" }]); // true
+ * isPredicate({ phase: "red" }); // true
+ * isPredicate((f) => f.phase === "red"); // false
+ * isPredicate([{ fact: "phase", op: "$eq", value: "red" }]); // true
  * ```
  */
-export function isPredicateSpec(v: unknown): boolean {
+export function isPredicate(v: unknown): boolean {
   if (v === null) {
     return false;
   }
@@ -173,7 +173,12 @@ function deepEqual(a: unknown, b: unknown, seen?: DeepEqualSeen): boolean {
     return a.getTime() === b.getTime();
   }
 
-  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
+  if (
+    typeof a !== "object" ||
+    typeof b !== "object" ||
+    a === null ||
+    b === null
+  ) {
     return false;
   }
 
@@ -267,7 +272,11 @@ function toComparable(v: unknown): number | bigint | string | undefined {
   return undefined;
 }
 
-function relational(op: PredicateOp, actual: unknown, operand: unknown): boolean {
+function relational(
+  op: PredicateOp,
+  actual: unknown,
+  operand: unknown,
+): boolean {
   const a = toComparable(actual);
   const b = toComparable(operand);
   if (a === undefined || b === undefined || typeof a !== typeof b) {
@@ -373,7 +382,7 @@ function applyOperator(
         // string cannot carry flags, so case-insensitive matching is
         // unexpressible). Runtime still compiles the string for one cycle.
         devWarn(
-          `$matches: string operand "${String(operand)}" cannot carry RegExp flags — pass a real RegExp (e.g. /pattern/i) for flag control`,
+          `$matches: string operand "${String(operand)}" cannot express RegExp flags (case-insensitivity, dotall, multiline) — pass a real RegExp instance, e.g. /pattern/i`,
         );
         const re = getCachedRegex(String(operand));
 
@@ -425,11 +434,7 @@ function devWarn(message: string): void {
   }
 }
 
-function evalField(
-  value: unknown,
-  actual: unknown,
-  prev: unknown,
-): boolean {
+function evalField(value: unknown, actual: unknown, prev: unknown): boolean {
   if (isOperatorObject(value)) {
     const keys = Object.keys(value);
     // Type rejects multi-operator objects; the runtime ANDs them on a
@@ -630,7 +635,12 @@ export function evaluatePredicateExplained(
           op: op as PredicateOp,
           expected: value[op],
           actual,
-          pass: applyOperator(op as PredicateOp, actual, value[op], prev?.[key]),
+          pass: applyOperator(
+            op as PredicateOp,
+            actual,
+            value[op],
+            prev?.[key],
+          ),
         });
       }
     } else if (isPlainObject(value)) {
@@ -656,7 +666,10 @@ export function evaluatePredicateExplained(
   return out;
 }
 
-const memoizedCache = new WeakMap<object, (facts: Scope, prev?: Scope) => boolean>();
+const memoizedCache = new WeakMap<
+  object,
+  (facts: Scope, prev?: Scope) => boolean
+>();
 
 /**
  * Memoize a predicate as a reusable evaluation closure.
@@ -723,7 +736,11 @@ export function memoizePredicate(
  * // → Set { "self.phase", "auth.token" }
  * ```
  */
-export function extractDeps(spec: unknown, prefix = "", into?: Set<string>): Set<string> {
+export function extractDeps(
+  spec: unknown,
+  prefix = "",
+  into?: Set<string>,
+): Set<string> {
   const deps = into ?? new Set<string>();
 
   if (Array.isArray(spec)) {
@@ -853,7 +870,9 @@ export function evaluateTemplate(spec: FactTemplate, scope: Scope): string {
       }
       const key = tpl.slice(i + 2, end);
       if (!IDENTIFIER.test(key)) {
-        devWarn(`template: invalid placeholder "\${${key}}" — not an identifier`);
+        devWarn(
+          `template: invalid placeholder "\${${key}}" — not an identifier`,
+        );
       } else {
         // `stringifyValue` dev-warns separately for null vs undefined; here
         // we only warn when the key itself is missing from the scope (vs
@@ -942,9 +961,7 @@ export function evaluateKeySelector(
   selector: readonly string[],
   source: Record<string, unknown>,
 ): string {
-  return selector
-    .map((field) => stableStringify(source?.[field]))
-    .join("|");
+  return selector.map((field) => stableStringify(source?.[field])).join("|");
 }
 
 // ============================================================================

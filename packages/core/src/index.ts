@@ -111,7 +111,7 @@ export {
   evaluateTemplate,
   extractDeps,
   extractTemplateKeys,
-  isPredicateSpec,
+  isPredicate,
   isTemplate,
 } from "./core/predicate.js";
 

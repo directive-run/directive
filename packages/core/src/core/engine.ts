@@ -1758,7 +1758,10 @@ export function createEngine<S extends Schema>(
           // child fails). Drop the fraction for `$not` and let the indented
           // child show its own ✓/✗.
           if (clause.op === "$not") {
-            lines.push(`${indent}${branch} ${mark} $not`);
+            // $not passes when its child fails — annotate so the inverted
+            // mark relative to the child isn't read as a contradiction.
+            const note = clause.pass ? " (child failed)" : " (child passed)";
+            lines.push(`${indent}${branch} ${mark} $not${note}`);
           } else {
             // Combinator header: "$all (2/3)"
             lines.push(

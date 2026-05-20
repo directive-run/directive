@@ -38,7 +38,7 @@
 
 import {
   extractDeps,
-  isPredicateSpec,
+  isPredicate,
   memoizePredicate,
 } from "./predicate.js";
 import { withTracking } from "./tracking.js";
@@ -256,7 +256,7 @@ export function createEffectsManager<S extends Schema>(
       // dep-overlap pre-filter in shouldRun(). A non-predicate value here
       // is a user error and must throw (matches the friendly throw used by
       // constraints/derivations) instead of silently no-op-ing.
-      if (!isPredicateSpec(def.on)) {
+      if (!isPredicate(def.on)) {
         throw new Error(
           `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
         );

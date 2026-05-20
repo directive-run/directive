@@ -7,7 +7,7 @@ import {
   evaluateTemplate,
   extractDeps,
   extractTemplateKeys,
-  isPredicateSpec,
+  isPredicate,
   isTemplate,
   memoizePredicate,
 } from "../predicate.js";
@@ -446,25 +446,25 @@ describe("applyPatch", () => {
 // ============================================================================
 
 describe("discriminators", () => {
-  it("isPredicateSpec is false for functions, true for plain objects/clause arrays", () => {
-    expect(isPredicateSpec(() => true)).toBe(false);
-    expect(isPredicateSpec({ phase: "red" })).toBe(true);
-    expect(isPredicateSpec([])).toBe(true);
+  it("isPredicate is false for functions, true for plain objects/clause arrays", () => {
+    expect(isPredicate(() => true)).toBe(false);
+    expect(isPredicate({ phase: "red" })).toBe(true);
+    expect(isPredicate([])).toBe(true);
     expect(
-      isPredicateSpec([{ fact: "phase", op: "$eq", value: "red" }]),
+      isPredicate([{ fact: "phase", op: "$eq", value: "red" }]),
     ).toBe(true);
   });
 
-  it("isPredicateSpec rejects class instances and built-ins (DX-M8)", () => {
-    expect(isPredicateSpec(new Date())).toBe(false);
-    expect(isPredicateSpec(/re/)).toBe(false);
-    expect(isPredicateSpec(new Map())).toBe(false);
-    expect(isPredicateSpec(new Set())).toBe(false);
-    expect(isPredicateSpec(Promise.resolve(1))).toBe(false);
+  it("isPredicate rejects class instances and built-ins (DX-M8)", () => {
+    expect(isPredicate(new Date())).toBe(false);
+    expect(isPredicate(/re/)).toBe(false);
+    expect(isPredicate(new Map())).toBe(false);
+    expect(isPredicate(new Set())).toBe(false);
+    expect(isPredicate(Promise.resolve(1))).toBe(false);
     class Foo {}
-    expect(isPredicateSpec(new Foo())).toBe(false);
+    expect(isPredicate(new Foo())).toBe(false);
     // Array of non-clause objects is not a clause array.
-    expect(isPredicateSpec([{ phase: "red" }])).toBe(false);
+    expect(isPredicate([{ phase: "red" }])).toBe(false);
   });
 
   it("isTemplate detects { $template }", () => {

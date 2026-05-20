@@ -129,11 +129,15 @@ Operators (the `$`-prefixed keys inside an operator object):
 | `$between`                        | Inclusive range, sugar over `$gte`+`$lte` |
 | `$matches`                        | Regex test against a string fact (`RegExp` only) |
 | `$startsWith`, `$endsWith`        | String prefix / suffix test          |
-| `$contains`                       | Substring / array-element membership |
-| `$exists`                         | Value is not `undefined`             |
+| `$contains`                       | Substring (`string`), array-element membership, or `Set.has` for `Set` facts |
+| `$exists`                         | Boolean operand: `true` requires defined, `false` requires `undefined` |
 | `$changed`                        | Effects only — fact value differs from `prev` |
 
 Combinators: `$all`, `$any`, `$not`.
+
+`$eq` / `$ne` on a `Set` or `Map` fact compares **structurally**: two
+`Set`s with the same members are equal regardless of insertion order;
+two `Map`s are equal when they hold the same key+value pairs.
 
 A plain (non-operator) object value inside a predicate is a **nested
 predicate** — used for cross-module namespaced facts:
@@ -212,6 +216,26 @@ system.explain(requirementId);
 
 `whenExplain` is only emitted for constraints whose `when` is a data
 form; function-form constraints continue to emit just `{ active }`.
+
+### Static-analysis utilities
+
+The runtime also exports three pure utilities for tooling that walks a
+predicate or template tree without evaluating it:
+
+- `extractDeps(spec)` — collect the fact keys (dotted for nested
+  predicates) that a `FactPredicate` reads. Used internally to wire
+  effect-`on` deps without auto-tracking; safe to use from devtools,
+  linters, or codegen.
+- `extractTemplateKeys(spec)` — collect the placeholder identifiers a
+  `FactTemplate` interpolates.
+- `memoizePredicate(spec)` — return a closure that evaluates the spec
+  against any scope. The closure is cached by spec identity in a
+  `WeakMap`; the function does not pre-compile the spec, it only
+  avoids re-allocating the wrapper.
+
+`isPredicate(v)` and `isTemplate(v)` are also exported for plugin
+authors that need to discriminate a definition arm without depending
+on internal heuristics.
 
 ## Cross-module / namespaced predicates
 
