@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyPatch,
   compilePredicate,
@@ -345,10 +345,25 @@ describe("applyPatch", () => {
 // ============================================================================
 
 describe("discriminators", () => {
-  it("isPredicateSpec is false for functions, true for objects/arrays", () => {
+  it("isPredicateSpec is false for functions, true for plain objects/clause arrays", () => {
     expect(isPredicateSpec(() => true)).toBe(false);
     expect(isPredicateSpec({ phase: "red" })).toBe(true);
     expect(isPredicateSpec([])).toBe(true);
+    expect(
+      isPredicateSpec([{ fact: "phase", op: "$eq", value: "red" }]),
+    ).toBe(true);
+  });
+
+  it("isPredicateSpec rejects class instances and built-ins (DX-M8)", () => {
+    expect(isPredicateSpec(new Date())).toBe(false);
+    expect(isPredicateSpec(/re/)).toBe(false);
+    expect(isPredicateSpec(new Map())).toBe(false);
+    expect(isPredicateSpec(new Set())).toBe(false);
+    expect(isPredicateSpec(Promise.resolve(1))).toBe(false);
+    class Foo {}
+    expect(isPredicateSpec(new Foo())).toBe(false);
+    // Array of non-clause objects is not a clause array.
+    expect(isPredicateSpec([{ phase: "red" }])).toBe(false);
   });
 
   it("isTemplate detects { $template }", () => {
@@ -363,5 +378,254 @@ describe("discriminators", () => {
     expect(compilePredicate(spec)).toBe(fn);
     expect(fn({ phase: "red" })).toBe(true);
     expect(fn({ phase: "green" })).toBe(false);
+  });
+
+  it("compilePredicate throws on non-object specs (S-m5)", () => {
+    expect(() =>
+      // @ts-expect-error: testing runtime guard
+      compilePredicate(null),
+    ).toThrow(/spec must be a plain object or array/);
+    expect(() =>
+      // @ts-expect-error: testing runtime guard
+      compilePredicate("string"),
+    ).toThrow(/spec must be a plain object or array/);
+    expect(() =>
+      // @ts-expect-error: testing runtime guard
+      compilePredicate(42),
+    ).toThrow(/spec must be a plain object or array/);
+  });
+});
+
+// ============================================================================
+// Round-1 AE fixes — regression tests
+// ============================================================================
+
+describe("AE-fix: typo'd $-prefixed operator (DX-C1, DX-C2)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("returns false and dev-warns for typo'd op (e.g. $eqq)", () => {
+    expect(
+      evaluatePredicate({ phase: { $eqq: "red" } }, { phase: "red" }),
+    ).toBe(false);
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes('unknown operator "$eqq"'),
+      ),
+    ).toBe(true);
+  });
+
+  it("extractDeps does NOT synthesize phantom 'phase.$eqq' dep", () => {
+    const deps = extractDeps({ phase: { $eqq: "red" } });
+    expect([...deps]).not.toContain("phase.$eqq");
+    expect([...deps]).not.toContain("$eqq");
+  });
+});
+
+describe("AE-fix: deepEqual asymmetric cycle guard (S-M3)", () => {
+  it("does not short-circuit when only one side is cyclic", () => {
+    const cyclic: Record<string, unknown> = { x: 1 };
+    cyclic.self = cyclic;
+    const acyclic: Record<string, unknown> = { x: 1, self: { x: 1 } };
+    // `$eq` routes through deepEqual. With pairwise cycle tracking, the two
+    // distinct structures are NOT treated as equal even though one is cyclic.
+    expect(
+      evaluatePredicate({ a: { $eq: cyclic } }, { a: acyclic }),
+    ).toBe(false);
+  });
+
+  it("identical cyclic pair still equals itself via $eq", () => {
+    const a: Record<string, unknown> = { v: 1 };
+    a.self = a;
+    const b: Record<string, unknown> = { v: 1 };
+    b.self = b;
+    // Same structure on both sides — deepEqual short-circuits on the
+    // re-encountered pair without infinite recursion.
+    expect(() =>
+      evaluatePredicate({ x: { $eq: a } }, { x: b }),
+    ).not.toThrow();
+    expect(evaluatePredicate({ x: { $eq: a } }, { x: b })).toBe(true);
+  });
+});
+
+describe("AE-fix: evaluateKeySelector uses stableStringify (DM-C1)", () => {
+  it("payloads with same fields in different orders produce IDENTICAL keys", () => {
+    const a = { type: "FETCH", payload: { a: 1, b: 2 } };
+    const b = { type: "FETCH", payload: { b: 2, a: 1 } };
+    expect(evaluateKeySelector(["type", "payload"], a)).toBe(
+      evaluateKeySelector(["type", "payload"], b),
+    );
+  });
+
+  it("preserves distinct-value-never-collide property", () => {
+    expect(evaluateKeySelector(["a"], { a: "1" })).not.toBe(
+      evaluateKeySelector(["a"], { a: 1 }),
+    );
+  });
+});
+
+describe("AE-fix: $between reversed pair dev-warn (DM-C3)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("returns false and dev-warns when [min, max] is reversed", () => {
+    expect(evaluatePredicate({ n: { $between: [10, 0] } }, { n: 5 })).toBe(
+      false,
+    );
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes("$between: reversed pair"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT warn on a well-formed pair", () => {
+    evaluatePredicate({ n: { $between: [0, 10] } }, { n: 5 });
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes("$between: reversed pair"),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("AE-fix: $matches ReDoS cache (S-m7, DM-M5)", () => {
+  it("reuses the same compiled RegExp for repeated string operands", () => {
+    // Indirect check: the cached regex preserves lastIndex behavior — but
+    // since we use .test() without /g, lastIndex doesn't apply. Instead,
+    // verify that 1000 evaluations with the same string pattern complete
+    // quickly (would be slow if we recompiled every call).
+    const start = performance.now();
+    for (let i = 0; i < 1000; i++) {
+      evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" });
+    }
+    const elapsed = performance.now() - start;
+    // Loose bound — recompiling 1000 regexes would still be fast, so this is
+    // a smoke test only.
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  it("string and RegExp operands both work", () => {
+    expect(evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" })).toBe(
+      true,
+    );
+    expect(evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" })).toBe(
+      true,
+    );
+  });
+});
+
+describe("AE-fix: evaluatePredicateExplained preserves combinator tree (DM-M12)", () => {
+  it("$any produces a single combinator entry with nested children", () => {
+    const clauses = evaluatePredicateExplained(
+      { $any: [{ phase: "red" }, { phase: "green" }] },
+      { phase: "blue" },
+    );
+    expect(clauses).toHaveLength(1);
+    expect(clauses[0]!.op).toBe("$any");
+    expect(clauses[0]!.children).toBeDefined();
+    expect(clauses[0]!.children).toHaveLength(2);
+    expect(clauses[0]!.pass).toBe(false);
+    expect(clauses[0]!.actual).toBe(0); // 0 children passed
+    expect(clauses[0]!.expected).toBe(2); // out of 2 children
+  });
+
+  it("$all reports pass count", () => {
+    const clauses = evaluatePredicateExplained(
+      { $all: [{ phase: "red" }, { elapsed: 30 }] },
+      { phase: "red", elapsed: 30 },
+    );
+    expect(clauses).toHaveLength(1);
+    expect(clauses[0]!.op).toBe("$all");
+    expect(clauses[0]!.actual).toBe(2);
+    expect(clauses[0]!.pass).toBe(true);
+  });
+
+  it("$not wraps its single child", () => {
+    const clauses = evaluatePredicateExplained(
+      { $not: { phase: "red" } },
+      { phase: "red" },
+    );
+    expect(clauses).toHaveLength(1);
+    expect(clauses[0]!.op).toBe("$not");
+    expect(clauses[0]!.pass).toBe(false);
+    expect(clauses[0]!.children).toHaveLength(1);
+  });
+});
+
+describe("AE-fix: applyPatch missing $ref dev-warn (DX-M14)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("dev-warns when $ref'd key is absent from payload", () => {
+    const facts: Record<string, unknown> = {};
+    applyPatch({ $set: { userId: { $ref: "missing" } } }, facts, {
+      id: 42,
+    });
+    expect(facts.userId).toBeUndefined();
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes("$ref \"missing\" is missing"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT warn when $ref'd key is present", () => {
+    const facts: Record<string, unknown> = {};
+    applyPatch({ $set: { userId: { $ref: "id" } } }, facts, { id: 42 });
+    expect(facts.userId).toBe(42);
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes("is missing from event payload"),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("AE-fix: evaluateTemplate null vs undefined warns (DM-C2)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("dev-warns when an interpolated key is null", () => {
+    expect(
+      evaluateTemplate({ $template: "v=${x}" }, { x: null as unknown }),
+    ).toBe("v=");
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes('null'),
+      ),
+    ).toBe(true);
+  });
+
+  it("dev-warns when an interpolated key is explicitly undefined (present)", () => {
+    expect(
+      evaluateTemplate({ $template: "v=${x}" }, { x: undefined as unknown }),
+    ).toBe("v=");
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes('undefined'),
+      ),
+    ).toBe(true);
   });
 });

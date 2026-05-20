@@ -249,6 +249,11 @@ export function createEffectsManager<S extends Schema>(
       // Declarative trigger — deps are extracted statically from the
       // predicate; the predicate is the gate evaluated after the
       // dep-overlap pre-filter in shouldRun().
+      if (def.on === null || typeof def.on !== "object") {
+        throw new Error(
+          `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof def.on}`,
+        );
+      }
       Object.freeze(def.on);
       dependencies = extractDeps(def.on);
       hasExplicitDeps = true;

@@ -258,38 +258,117 @@ export function createConstraintsManager<S extends Schema>(
   // by inspect()/explain()/devtools to render the predicate structure.
   const whenSpecs = new Map<string, FactPredicate<Record<string, unknown>>>();
 
-  // Normalize any data-form `when` specs into wrapper functions so the
-  // eval-time path keeps calling a `(facts) => boolean` function. The
-  // wrapper reads via the same facts proxy that the function form sees,
-  // so dep tracking (withTracking) captures both fact and derivation deps
-  // automatically — no explicit deps array required.
-  for (const id in definitions) {
-    const def = definitions[id];
-    if (def && typeof def.when !== "function") {
-      const spec = def.when as FactPredicate<Record<string, unknown>>;
-      if (isDevelopment) {
-        if (def.async) {
-          console.warn(
-            `[Directive] constraint "${id}": data \`when\` is always sync; \`async: true\` will be ignored`,
-          );
-        }
-        if (def.deps) {
-          console.warn(
-            `[Directive] constraint "${id}": data \`when\` cannot be combined with explicit \`deps\` — deps are tracked automatically`,
-          );
-        }
-      }
-      Object.freeze(spec);
-      const compiled = compilePredicate(spec as object);
-      (def as { when: unknown }).when = (f: Facts<S>) =>
-        compiled(f as unknown as Record<string, unknown>);
-      whenSpecs.set(id, spec);
-      // Data `when` is structurally sync; clear any async flag so the
-      // engine uses the sync evaluation path.
+  /**
+   * Normalize a single data-form `when` spec into a wrapper function so the
+   * eval-time path keeps calling a `(facts) => boolean` function. Wrapper
+   * reads via the same facts proxy the function form sees, so dep tracking
+   * (`withTracking`) captures both fact and derivation deps automatically —
+   * no explicit deps array required.
+   */
+  function normalizeWhenSpec(
+    id: string,
+    def: ConstraintsDef<S>[string] | undefined,
+  ): void {
+    if (!def || typeof def.when === "function") {
+      return;
+    }
+
+    const spec = def.when as FactPredicate<Record<string, unknown>>;
+    if (isDevelopment) {
       if (def.async) {
-        (def as { async?: boolean }).async = false;
+        console.warn(
+          `[Directive] constraint "${id}": data \`when\` is always sync; \`async: true\` will be ignored`,
+        );
+      }
+      if (def.deps) {
+        console.warn(
+          `[Directive] constraint "${id}": data \`when\` cannot be combined with explicit \`deps\` — deps are tracked automatically`,
+        );
       }
     }
+    // Clear explicit `deps` so the eval-time short-circuit at `if (def.deps)`
+    // does not bypass auto-tracking via `withTracking`. This makes the
+    // runtime behavior match the warning above.
+    if (def.deps) {
+      (def as { deps?: string[] }).deps = undefined;
+    }
+
+    // `$changed` is effects-only — constraints have no prev snapshot. Block
+    // at registration in dev mode so the bug is caught immediately.
+    if (containsChangedOperator(spec)) {
+      const msg = `[Directive] constraint "${id}": \`$changed\` is effects-only; constraint \`when\` has no prev snapshot. Move this clause to an effect's \`on\`.`;
+      console.warn(msg);
+      if (isDevelopment) {
+        throw new Error(msg);
+      }
+    }
+
+    if (spec === null || typeof spec !== "object") {
+      throw new Error(
+        `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof spec}`,
+      );
+    }
+    Object.freeze(spec);
+    const compiled = compilePredicate(spec as object);
+    (def as { when: unknown }).when = (f: Facts<S>) =>
+      compiled(f as unknown as Record<string, unknown>);
+    whenSpecs.set(id, spec);
+    // Data `when` is structurally sync; clear any async flag so the engine
+    // uses the sync evaluation path.
+    if (def.async) {
+      (def as { async?: boolean }).async = false;
+    }
+  }
+
+  /**
+   * Walk a {@link FactPredicate} spec checking for the `$changed` operator.
+   * Used to block its use inside a constraint `when`, where there is no
+   * prev-snapshot to compare against.
+   */
+  function containsChangedOperator(spec: unknown): boolean {
+    if (Array.isArray(spec)) {
+      return spec.some(
+        (clause) =>
+          typeof clause === "object" &&
+          clause !== null &&
+          (clause as { op?: unknown }).op === "$changed",
+      );
+    }
+    if (typeof spec !== "object" || spec === null) {
+      return false;
+    }
+    const obj = spec as Record<string, unknown>;
+    for (const key of Object.keys(obj)) {
+      if (key === "$changed") {
+        return true;
+      }
+      if (key === "$all" || key === "$any") {
+        const list = obj[key];
+        if (Array.isArray(list) && list.some(containsChangedOperator)) {
+          return true;
+        }
+        continue;
+      }
+      if (key === "$not") {
+        if (containsChangedOperator(obj[key])) {
+          return true;
+        }
+        continue;
+      }
+      const value = obj[key];
+      if (typeof value === "object" && value !== null) {
+        if (containsChangedOperator(value)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // Normalize any data-form `when` specs at construction time.
+  for (const id in definitions) {
+    normalizeWhenSpec(id, definitions[id]);
   }
 
   // Internal state for each constraint
@@ -1293,6 +1372,7 @@ export function createConstraintsManager<S extends Schema>(
       let hasAfterDeps = false;
       for (const [key, def] of Object.entries(newDefs)) {
         (definitions as Record<string, unknown>)[key] = def;
+        normalizeWhenSpec(key, definitions[key]);
         initState(key);
         dirtyConstraints.add(key);
         if (def.after?.length) {
@@ -1319,6 +1399,10 @@ export function createConstraintsManager<S extends Schema>(
 
       // Replace definition
       (definitions as Record<string, unknown>)[id] = def;
+      // Drop any prior `whenSpec` — the new def may swap data ↔ function form
+      whenSpecs.delete(id);
+      // Normalize a data-form `when` so eval-time keeps calling a function
+      normalizeWhenSpec(id, definitions[id]);
       // Re-init state for the new definition
       initState(id);
       dirtyConstraints.add(id);

@@ -54,7 +54,7 @@ export type {
   PredicateOp,
   PatchValue,
 } from "./predicate.js";
-export { PREDICATE_COMBINATORS, PREDICATE_OPERATORS } from "./predicate.js";
+// PREDICATE_COMBINATORS / PREDICATE_OPERATORS are @internal — not re-exported.
 
 // Derivation types
 export type {

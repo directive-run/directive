@@ -99,8 +99,14 @@ predicate trees natively rather than function source strings.
 A boolean spec over a fact namespace `F`. Three forms (a value of any
 form satisfies `FactPredicate<F>`):
 
+> **Fact names only.** Predicate keys address **facts**, not derivations.
+> To gate on a derivation, either reference the underlying fact the
+> derivation reads, or fall back to a function `when` / `on`. This is
+> the v1 contract — keeping the namespace minimal lets the deps walker
+> stay structural and avoids derivation-result/predicate-tree races.
+
 ```ts
-// Object form — the common case. Keys ⊆ fact/derivation names.
+// Object form — the common case. Keys ⊆ fact names.
 // Bare value → equality. Operator object → comparison. Multiple keys → AND.
 { phase: "red", elapsed: { $gte: 30 } }
 
@@ -123,7 +129,7 @@ Operators (the `$`-prefixed keys inside an operator object):
 | `$between`                        | Inclusive range, sugar over `$gte`+`$lte` |
 | `$matches`                        | Regex test against a string fact     |
 | `$contains`                       | Substring / array-element membership |
-| `$exists`                         | Key present and not `undefined`      |
+| `$exists`                         | Value is not `undefined`             |
 | `$changed`                        | Effects only — fact value differs from `prev` |
 
 Combinators: `$all`, `$any`, `$not`.
@@ -238,6 +244,13 @@ Consequences:
    when: { elapsed: { $gte: 30 } }     // ✓
    when: { $all: [{ elapsed: { $gte: 30 } }, { elapsed: { $lt: 120 } }] }
    ```
+
+   > **This is by design.** The TYPE is the source of truth: a
+   > multi-key operator object does not type-check. The runtime AND-s
+   > multiple operator keys on a best-effort basis (so an object
+   > literal with `// @ts-expect-error` still behaves predictably),
+   > but the supported, type-checkable form is one operator per object
+   > — combined via the array form or `$all`.
 
 `[V]` tuple-wrapping in `IsOrderable<V>` suppresses distribution over
 union-typed facts, so `t.enum` literals and nullable facts type-check

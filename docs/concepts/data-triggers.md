@@ -25,7 +25,14 @@ import { createModule, t } from "@directive-run/core";
 
 createModule("traffic", {
   schema: {
-    facts: { phase: t.string<"red" | "green">(), elapsed: t.number() },
+    facts: {
+      phase: t.string<"red" | "green">(),
+      elapsed: t.number(),
+      label: t.string(),
+      age: t.number(),
+      firstName: t.string(),
+      lastName: t.string(),
+    },
     derivations: { isAdult: t.boolean(), fullName: t.string() },
     events: { setStatus: { value: t.string(), name: t.string() } },
     requirements: { TRANSITION: { to: t.string() } },
@@ -78,8 +85,14 @@ createModule("traffic", {
 
 ## `FactPredicate` — boolean specs
 
-A predicate is an object whose keys are fact (or derivation) names and
-whose values are either a literal (equality) or an operator object.
+A predicate is an object whose keys are **fact names** and whose values
+are either a literal (equality) or an operator object.
+
+> **Fact names only.** A predicate addresses facts, not derivations. To
+> gate on a derivation, reference the underlying fact the derivation
+> reads, or fall back to a function `when` / `on`. This keeps the
+> deps walker structural and avoids derivation-result/predicate-tree
+> races.
 
 ```ts
 when: { phase: "red", elapsed: { $gte: 30 } }
@@ -108,7 +121,7 @@ when: { $all: [
 | `$between`      | orderable             | `{ elapsed: { $between: [30, 120] } }`      |
 | `$matches`      | `string`              | `{ name: { $matches: /^J/ } }`              |
 | `$contains`     | `string` or array     | `{ tags: { $contains: "admin" } }`          |
-| `$exists`       | any                   | `{ token: { $exists: true } }`              |
+| `$exists`       | any                   | `{ token: { $exists: true } }` (value is not `undefined`) |
 | `$changed`      | effects only          | `{ phase: { $changed: true } }`             |
 
 One operator per object — for two operators on the same fact, use the
@@ -130,6 +143,13 @@ when: { $all: [
   { elapsed: { $lt: 120 } },
 ]}
 ```
+
+> **This is by design.** The TYPE is the source of truth: a multi-key
+> operator object does not type-check. The runtime does AND multiple
+> operator keys on a best-effort basis (so a `// @ts-expect-error`
+> escape hatch is well-defined), but the supported and type-checkable
+> form is one operator per object — combined via the array form or
+> `$all`.
 
 ## `FactTemplate` — fact-interpolating strings
 
@@ -158,8 +178,9 @@ Placeholder keys must match `[A-Za-z_][A-Za-z0-9_]*`.
 ## `KeySelector` — declarative resolver dedup
 
 `key: ["id"]` is equivalent to `key: (req) => stableStringify(req.id)`.
-The order is the declared order; values are JSON-encoded so distinct
-typed values never collide.
+The order is the declared order; values are stable-stringified (object
+keys sorted recursively) so two requirements with the same fields in
+different orders dedupe to the same key.
 
 ```ts
 resolvers: {
@@ -234,6 +255,72 @@ console.log(system.explain(requirementId));
 `whenSpec` is also surfaced on every entry of `system.inspect().constraints[]`
 when the constraint's `when` is a data form — so devtools and any
 custom inspector can render the predicate tree natively.
+
+## Static analysis
+
+Two pure utilities walk a spec without running it — useful for devtools,
+codegen, lint rules, and any "which facts does this read" check:
+
+```ts
+import { extractDeps, extractTemplateKeys } from "@directive-run/core";
+
+extractDeps({ phase: "red", elapsed: { $gte: 30 } });
+// → Set { "phase", "elapsed" }
+
+extractDeps({ self: { phase: "red" }, auth: { token: { $exists: true } } });
+// → Set { "self.phase", "auth.token" }
+
+extractTemplateKeys({ $template: "${firstName} ${lastName}" });
+// → Set { "firstName", "lastName" }
+```
+
+For hot-path evaluation against many fact scopes, pre-compile once:
+
+```ts
+import { compilePredicate } from "@directive-run/core";
+
+const check = compilePredicate({ phase: "red", elapsed: { $gte: 30 } });
+check({ phase: "red", elapsed: 45 }); // → true
+```
+
+## Gotchas
+
+A few sharp edges worth knowing once:
+
+- **`async: true` on a data `when` is ignored.** A data `when` is
+  always sync — the predicate evaluator walks the spec
+  synchronously, so the runtime treats `async: true` paired with a
+  data `when` as a no-op. Use a function `when` for async preconditions.
+- **Explicit `deps` on a data `when` is ignored.** A data spec carries
+  its own deps (extracted structurally), so any `deps: [...]` you add
+  is unused — auto-tracking is exact.
+- **Typo'd `$`-operators dev-warn.** `{ elapsed: { $eqq: 30 } }`
+  triggers a runtime dev warning naming the typo and the known
+  operators; the malformed clause evaluates to `false`.
+- **`$changed` is effects-only.** Constraints have no `prev` snapshot,
+  so `$changed` only makes sense inside an effect `on`. Gate a
+  constraint on "fact changed" with a boolean derivation that watches
+  the change source.
+- **One operator per object.** `{ $gte: 30, $lt: 120 }` does not
+  type-check. Write the array form or `$all` for multi-operator
+  predicates on the same fact.
+
+## Future operators
+
+These are not in v1, but are tracked for future addition:
+
+- `$startsWith`, `$endsWith` — for now use `$matches` with a regex
+  (`{ name: { $matches: /^Ada/ } }`).
+- `$null`, `$nullish` — for now use `$eq: null` or the function
+  escape hatch.
+- `$elemMatch` — match an array element against a sub-predicate; for
+  now use the function form or restructure the fact.
+- `$size` — array-length check; for now use a derivation
+  (`derive: { count: (f) => f.items.length }`) and a relational op
+  on the derived count.
+
+If you hit one of these in real code, file an issue — operator
+coverage is driven by demand.
 
 ## When to use the function form
 

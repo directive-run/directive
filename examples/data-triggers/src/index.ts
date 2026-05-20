@@ -45,7 +45,7 @@ const schema = {
     advanceTo: { value: t.string(), userName: t.string() },
   },
   requirements: {
-    TRANSITION: { to: t.string() },
+    TRANSITION: { to: t.string<"red" | "yellow" | "green">() },
   },
 } satisfies ModuleSchema;
 
@@ -95,7 +95,7 @@ const trafficLight = createModule("traffic", {
       requirement: "TRANSITION",
       key: ["to"],
       resolve: async (req, ctx) => {
-        ctx.facts.phase = req.to as "red" | "yellow" | "green";
+        ctx.facts.phase = req.to;
         ctx.facts.elapsed = 0;
         ctx.facts.transitionCount = ctx.facts.transitionCount + 1;
       },
@@ -147,7 +147,10 @@ console.log(`phase after resolver: ${system.facts.phase}`);
 console.log(`transitionCount:      ${system.facts.transitionCount}`);
 
 // Show explain() on the next emitted requirement (if any), or on a re-fire.
-console.log("\n--- elapsed → 5 (predicate fails) ---");
+// Two writes: phase ← "red" satisfies the first clause; elapsed ← 5 fails the
+// `$gte: 30` clause, so the predicate as a whole is false and the constraint
+// does not fire.
+console.log("\n--- phase = red, elapsed → 5 (predicate fails on elapsed) ---");
 system.facts.phase = "red";
 system.facts.elapsed = 5;
 await settle();

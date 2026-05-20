@@ -386,3 +386,66 @@ describe("data-form introspection", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// AE-fix: $changed in constraint `when` blocks at registration (DX-M6)
+// ============================================================================
+
+describe("constraint `when` — $changed rejected (DX-M6)", () => {
+  it("throws at createSystem time when $changed appears in a constraint `when`", () => {
+    const mod = createModule("trafic", {
+      schema: {
+        facts: { phase: t.string<"red" | "green">() },
+        derivations: {},
+        events: {},
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.phase = "red";
+      },
+      constraints: {
+        bad: {
+          // $changed is effects-only; constraint `when` has no prev snapshot.
+          when: { phase: { $changed: true } } as unknown as (f: unknown) => boolean,
+          require: { type: "GO" },
+        },
+      },
+      resolvers: {
+        go: { requirement: "GO", resolve: async () => {} },
+      },
+    });
+
+    expect(() => createSystem({ module: mod })).toThrow(
+      /effects-only/,
+    );
+  });
+
+  it("throws for $changed nested inside a combinator", () => {
+    const mod = createModule("nested", {
+      schema: {
+        facts: { phase: t.string<"red" | "green">() },
+        derivations: {},
+        events: {},
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.phase = "red";
+      },
+      constraints: {
+        bad: {
+          when: {
+            $all: [{ phase: "red" }, { phase: { $changed: true } }],
+          } as unknown as (f: unknown) => boolean,
+          require: { type: "GO" },
+        },
+      },
+      resolvers: {
+        go: { requirement: "GO", resolve: async () => {} },
+      },
+    });
+
+    expect(() => createSystem({ module: mod })).toThrow(
+      /effects-only/,
+    );
+  });
+});

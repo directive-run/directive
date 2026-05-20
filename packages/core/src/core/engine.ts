@@ -66,6 +66,73 @@ import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 // Engine Implementation
 // ============================================================================
 
+/**
+ * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
+ * handler functions in place, and capture any meta into `eventMeta`. After
+ * this pass, every value in `events` is a bare `(facts, event) => void`
+ * function. Used by both the static merge loop in `createEngine` and the
+ * dynamic `registerModule` path so the two cannot drift.
+ */
+function unwrapEventDefinitions(
+  events: Record<string, unknown>,
+  eventMeta: Map<string, DefinitionMeta>,
+): void {
+  for (const [key, raw] of Object.entries(events)) {
+    if (typeof raw !== "object" || raw === null) {
+      continue;
+    }
+
+    const hasHandler = Object.hasOwn(raw, "handler");
+    const hasPatch = Object.hasOwn(raw, "patch");
+
+    // When both forms are provided, `handler` wins (current silent behavior).
+    // Dev-warn so authors can clean up the conflict.
+    if (hasHandler && hasPatch && isDevelopment) {
+      console.warn(
+        `[Directive] event "${key}": both \`handler\` and \`patch\` provided — using \`handler\` (patch is ignored).`,
+      );
+    }
+
+    if (hasHandler) {
+      const obj = raw as { handler: Function; meta?: DefinitionMeta };
+      events[key] = obj.handler;
+      if (obj.meta) {
+        const frozen = freezeMeta(obj.meta);
+        if (frozen) eventMeta.set(key, frozen);
+      }
+      continue;
+    }
+
+    if (hasPatch) {
+      const obj = raw as {
+        patch: { $set: Record<string, unknown> };
+        meta?: DefinitionMeta;
+      };
+      const spec = obj.patch;
+      // Freeze the spec + $set at registration to match the discipline used
+      // by constraints/derivations — prevents post-registration mutation
+      // from silently changing event behavior.
+      Object.freeze(spec);
+      if (spec.$set) {
+        Object.freeze(spec.$set);
+      }
+      events[key] = (
+        facts: Record<string, unknown>,
+        event: Record<string, unknown> | undefined,
+      ) =>
+        applyPatch(
+          spec as Parameters<typeof applyPatch>[0],
+          facts,
+          event ?? {},
+        );
+      if (obj.meta) {
+        const frozen = freezeMeta(obj.meta);
+        if (frozen) eventMeta.set(key, frozen);
+      }
+    }
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface EngineState<_S extends Schema> {
   isRunning: boolean;
@@ -199,39 +266,10 @@ export function createEngine<S extends Schema>(
 
     Object.assign(mergedSchema, module.schema);
     if (module.events) {
-      // Unwrap object-form events ({ handler, meta } or { patch, meta }) into
-      // bare handler functions before merging.
-      for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null) {
-          if (Object.hasOwn(raw, "handler")) {
-            const obj = raw as { handler: Function; meta?: DefinitionMeta };
-            (module.events as Record<string, unknown>)[key] = obj.handler;
-            if (obj.meta) {
-              const frozen = freezeMeta(obj.meta);
-              if (frozen) eventMeta.set(key, frozen);
-            }
-          } else if (Object.hasOwn(raw, "patch")) {
-            const obj = raw as {
-              patch: { $set: Record<string, unknown> };
-              meta?: DefinitionMeta;
-            };
-            const spec = obj.patch;
-            (module.events as Record<string, unknown>)[key] = (
-              facts: Record<string, unknown>,
-              event: Record<string, unknown> | undefined,
-            ) =>
-              applyPatch(
-                spec as Parameters<typeof applyPatch>[0],
-                facts,
-                event ?? {},
-              );
-            if (obj.meta) {
-              const frozen = freezeMeta(obj.meta);
-              if (frozen) eventMeta.set(key, frozen);
-            }
-          }
-        }
-      }
+      unwrapEventDefinitions(
+        module.events as Record<string, unknown>,
+        eventMeta,
+      );
       Object.assign(mergedEvents, module.events);
     }
     if (module.derive) Object.assign(mergedDerive, module.derive);
@@ -1694,26 +1732,46 @@ export function createEngine<S extends Schema>(
       // If the constraint's `when` was declared as a FactPredicate, render
       // the per-clause ✓/✗ breakdown — only the data form makes this
       // possible, so it's surfaced here as the "why did it fire" view.
+      // Combinator clauses (`$all`, `$any`, `$not`) carry `children` and are
+      // rendered as headers with their children indented.
       const clauses = constraintsManager.explainWhen(req.fromConstraint);
+      const renderClause = (
+        clause: import("./types/predicate.js").ClauseResult,
+        indent: string,
+        isLast: boolean,
+      ): void => {
+        const branch = isLast ? "└─" : "├─";
+        const mark = clause.pass ? "✓" : "✗";
+        if (clause.children) {
+          // Combinator header: "$all (2/3)"
+          lines.push(
+            `${indent}${branch} ${mark} ${clause.op} (${clause.actual}/${clause.expected})`,
+          );
+          const childIndent = `${indent}${isLast ? "   " : "│  "}`;
+          clause.children.forEach((child, i) => {
+            renderClause(child, childIndent, i === clause.children!.length - 1);
+          });
+
+          return;
+        }
+        const expected =
+          typeof clause.expected === "object"
+            ? JSON.stringify(clause.expected)
+            : String(clause.expected);
+        const actual =
+          clause.actual === undefined
+            ? "undefined"
+            : typeof clause.actual === "object"
+              ? JSON.stringify(clause.actual)
+              : String(clause.actual);
+        lines.push(
+          `${indent}${branch} ${mark} ${clause.path} ${clause.op} ${expected} (actual: ${actual})`,
+        );
+      };
       if (clauses && clauses.length > 0) {
         lines.push("├─ Predicate clauses:");
         clauses.forEach((clause, i) => {
-          const isLast = i === clauses.length - 1;
-          const prefix = isLast ? "│  └─" : "│  ├─";
-          const mark = clause.pass ? "✓" : "✗";
-          const expected =
-            typeof clause.expected === "object"
-              ? JSON.stringify(clause.expected)
-              : String(clause.expected);
-          const actual =
-            clause.actual === undefined
-              ? "undefined"
-              : typeof clause.actual === "object"
-                ? JSON.stringify(clause.actual)
-                : String(clause.actual);
-          lines.push(
-            `${prefix} ${mark} ${clause.path} ${clause.op} ${expected} (actual: ${actual})`,
-          );
+          renderClause(clause, "│  ", i === clauses.length - 1);
         });
       }
 
@@ -2251,37 +2309,10 @@ export function createEngine<S extends Schema>(
       if (st._meta) st._meta = freezeMeta(st._meta)!;
     }
     if (module.events) {
-      for (const [key, raw] of Object.entries(module.events)) {
-        if (typeof raw === "object" && raw !== null) {
-          if (Object.hasOwn(raw, "handler")) {
-            const obj = raw as { handler: Function; meta?: DefinitionMeta };
-            (module.events as Record<string, unknown>)[key] = obj.handler;
-            if (obj.meta) {
-              const frozen = freezeMeta(obj.meta);
-              if (frozen) eventMeta.set(key, frozen);
-            }
-          } else if (Object.hasOwn(raw, "patch")) {
-            const obj = raw as {
-              patch: { $set: Record<string, unknown> };
-              meta?: DefinitionMeta;
-            };
-            const spec = obj.patch;
-            (module.events as Record<string, unknown>)[key] = (
-              facts: Record<string, unknown>,
-              event: Record<string, unknown> | undefined,
-            ) =>
-              applyPatch(
-                spec as Parameters<typeof applyPatch>[0],
-                facts,
-                event ?? {},
-              );
-            if (obj.meta) {
-              const frozen = freezeMeta(obj.meta);
-              if (frozen) eventMeta.set(key, frozen);
-            }
-          }
-        }
-      }
+      unwrapEventDefinitions(
+        module.events as Record<string, unknown>,
+        eventMeta,
+      );
       Object.assign(mergedEvents, module.events);
     }
     if (module.derive) {

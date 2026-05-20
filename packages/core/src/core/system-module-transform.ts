@@ -9,6 +9,13 @@
  */
 
 import {
+  applyPatch,
+  compilePredicate,
+  evaluateTemplate,
+  isPredicateSpec,
+  isTemplate,
+} from "./predicate.js";
+import {
   SEPARATOR,
   createCrossModuleFactsProxy,
   createModuleDeriveProxy,
@@ -72,6 +79,229 @@ function createScopedFactsProxy(
 /** Prefix a key with the namespace separator */
 function prefixKey(namespace: string, key: string): string {
   return `${namespace}${SEPARATOR}${key}`;
+}
+
+/** True if a key already includes the namespace separator (cross-module ref). */
+function isAlreadyPrefixed(key: string): boolean {
+  return key.includes(SEPARATOR);
+}
+
+/**
+ * Rewrite a data-form predicate spec so its top-level fact-key references
+ * point at the namespaced flat keyspace (e.g. `phase` → `traffic::phase`).
+ *
+ * Recurses into `$all` / `$any` / `$not` combinators. Array-of-clauses form
+ * has each `fact` field rewritten. Object form keys are rewritten, with
+ * `$`-operator keys and already-prefixed keys passed through unchanged.
+ * Returns a frozen, structurally-identical spec.
+ */
+function prefixPredicateSpec(spec: unknown, namespace: string): unknown {
+  if (Array.isArray(spec)) {
+    const out = spec.map((clause) => {
+      if (
+        clause &&
+        typeof clause === "object" &&
+        typeof (clause as { fact?: unknown }).fact === "string"
+      ) {
+        const fact = (clause as { fact: string }).fact;
+        if (isAlreadyPrefixed(fact)) {
+          return clause;
+        }
+
+        return { ...clause, fact: prefixKey(namespace, fact) };
+      }
+
+      return clause;
+    });
+    Object.freeze(out);
+
+    return out;
+  }
+
+  if (!spec || typeof spec !== "object") {
+    return spec;
+  }
+
+  const src = spec as Record<string, unknown>;
+
+  if ("$all" in src || "$any" in src) {
+    const combinator = "$all" in src ? "$all" : "$any";
+    const list = src[combinator] as unknown[];
+    const out: Record<string, unknown> = {
+      [combinator]: list.map((child) => prefixPredicateSpec(child, namespace)),
+    };
+    Object.freeze(out);
+
+    return out;
+  }
+  if ("$not" in src) {
+    const out = { $not: prefixPredicateSpec(src.$not, namespace) };
+    Object.freeze(out);
+
+    return out;
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const key in src) {
+    if (key.startsWith("$") || isAlreadyPrefixed(key)) {
+      out[key] = src[key];
+      continue;
+    }
+    out[prefixKey(namespace, key)] = src[key];
+  }
+  Object.freeze(out);
+
+  return out;
+}
+
+/**
+ * Convert any data-form definition arm in a module to its function-shape
+ * equivalent, leaving the namespace prefixing to the existing per-arm
+ * prefixers. Returns a shallow-copied module — the caller's input is never
+ * mutated.
+ *
+ * - Constraint `when`: data spec → prefixed spec (still data) so the
+ *   constraints manager normalizes it against the flat keyspace and
+ *   `getWhenSpec()` returns a spec consistent with that keyspace.
+ * - Derivation `compute`: data spec → bare `(facts) => value` function so the
+ *   per-arm prefixer can wrap it with a module-scoped proxy.
+ * - Event `patch`: data spec → `{ handler, meta }` form so the event
+ *   prefixer's existing handler branch wraps it with a module-scoped proxy.
+ * - Effect `on`: data spec → prefixed spec so the effects manager extracts
+ *   prefixed deps and gates against the flat snapshot.
+ */
+function normalizePredicateDefs(
+  mod: ModuleDef<ModuleSchema>,
+  namespace: string,
+): ModuleDef<ModuleSchema> {
+  let constraints = mod.constraints;
+  if (constraints) {
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(constraints)) {
+      const def = raw as { when?: unknown };
+      if (def.when !== undefined && typeof def.when !== "function") {
+        next[key] = { ...def, when: prefixPredicateSpec(def.when, namespace) };
+        changed = true;
+        continue;
+      }
+      next[key] = raw;
+    }
+    if (changed) {
+      constraints = next as typeof constraints;
+    }
+  }
+
+  let derive = mod.derive;
+  if (derive) {
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(derive)) {
+      const obj =
+        raw && typeof raw === "object" && Object.hasOwn(raw, "compute")
+          ? (raw as { compute: unknown; meta?: unknown })
+          : null;
+      if (!obj) {
+        next[key] = raw;
+        continue;
+      }
+
+      const c = obj.compute;
+      if (typeof c === "function") {
+        next[key] = raw;
+        continue;
+      }
+
+      if (isTemplate(c)) {
+        Object.freeze(c);
+        const fn = (facts: unknown) =>
+          evaluateTemplate(c, facts as Record<string, unknown>);
+        next[key] = obj.meta ? { compute: fn, meta: obj.meta } : fn;
+        changed = true;
+        continue;
+      }
+
+      if (isPredicateSpec(c)) {
+        Object.freeze(c as object);
+        const compiled = compilePredicate(c as object);
+        const fn = (facts: unknown) =>
+          compiled(facts as Record<string, unknown>);
+        next[key] = obj.meta ? { compute: fn, meta: obj.meta } : fn;
+        changed = true;
+        continue;
+      }
+
+      next[key] = raw;
+    }
+    if (changed) {
+      derive = next as typeof derive;
+    }
+  }
+
+  let events = mod.events;
+  if (events) {
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(events)) {
+      if (
+        raw &&
+        typeof raw === "object" &&
+        Object.hasOwn(raw, "patch") &&
+        !Object.hasOwn(raw, "handler")
+      ) {
+        const obj = raw as {
+          patch: { $set: Record<string, unknown> };
+          meta?: unknown;
+        };
+        Object.freeze(obj.patch);
+        const handler = (
+          facts: Record<string, unknown>,
+          event: Record<string, unknown> | undefined,
+        ) =>
+          applyPatch(
+            obj.patch as Parameters<typeof applyPatch>[0],
+            facts,
+            event ?? {},
+          );
+        next[key] = obj.meta ? { handler, meta: obj.meta } : handler;
+        changed = true;
+        continue;
+      }
+      next[key] = raw;
+    }
+    if (changed) {
+      events = next as typeof events;
+    }
+  }
+
+  let effects = mod.effects;
+  if (effects) {
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(effects)) {
+      const def = raw as { on?: unknown };
+      if (def.on !== undefined && isPredicateSpec(def.on)) {
+        next[key] = { ...def, on: prefixPredicateSpec(def.on, namespace) };
+        changed = true;
+        continue;
+      }
+      next[key] = raw;
+    }
+    if (changed) {
+      effects = next as typeof effects;
+    }
+  }
+
+  if (
+    constraints === mod.constraints &&
+    derive === mod.derive &&
+    events === mod.events &&
+    effects === mod.effects
+  ) {
+    return mod;
+  }
+
+  return { ...mod, constraints, derive, events, effects };
 }
 
 /** Return a non-empty record or undefined */
@@ -199,7 +429,7 @@ function prefixConstraints(
   const result: Record<string, unknown> = {};
   for (const [key, constraint] of Object.entries(mod.constraints)) {
     const constraintDef = constraint as {
-      when: (facts: unknown) => boolean | Promise<boolean>;
+      when: ((facts: unknown) => boolean | Promise<boolean>) | unknown;
       require: unknown | ((facts: unknown) => unknown);
       priority?: number;
       async?: boolean;
@@ -208,22 +438,32 @@ function prefixConstraints(
       after?: string[];
     };
 
+    const isWhenFn = typeof constraintDef.when === "function";
+
     result[prefixKey(namespace, key)] = {
       ...constraintDef,
       deps: constraintDef.deps?.map((dep) => prefixKey(namespace, dep)),
       after: constraintDef.after?.map((dep) =>
         dep.includes(SEPARATOR) ? dep : prefixKey(namespace, dep),
       ),
-      when: (facts: unknown) => {
-        const factsProxy = createScopedFactsProxy(
-          facts as Record<string, unknown>,
-          namespace,
-          hasCrossModuleDeps,
-          depNamespaces,
-        );
+      // Data-form `when` was rewritten with prefixed keys in
+      // `normalizePredicateDefs`, so the constraints manager can normalize
+      // it against the flat keyspace. Only function-form `when` needs the
+      // module-scoped proxy wrapper.
+      when: isWhenFn
+        ? (facts: unknown) => {
+            const factsProxy = createScopedFactsProxy(
+              facts as Record<string, unknown>,
+              namespace,
+              hasCrossModuleDeps,
+              depNamespaces,
+            );
 
-        return constraintDef.when(factsProxy);
-      },
+            return (
+              constraintDef.when as (facts: unknown) => boolean | Promise<boolean>
+            )(factsProxy);
+          }
+        : constraintDef.when,
       require:
         typeof constraintDef.require === "function"
           ? (facts: unknown) => {
@@ -401,7 +641,13 @@ function prefixHistory(
 export function prefixModuleDefinition(
   options: PrefixModuleOptions,
 ): FlatModuleDefinition {
-  const { mod, namespace, snapshotModulesSet } = options;
+  const { mod: rawMod, namespace, snapshotModulesSet } = options;
+
+  // Normalize data-form definition arms before namespace prefixing so the
+  // per-arm prefixers can assume function-shaped definitions (where they
+  // wrap with module-scoped proxies) or already-prefixed data specs (where
+  // the managers compile against the flat keyspace).
+  const mod = normalizePredicateDefs(rawMod, namespace);
 
   // Compute cross-module deps info once (used by derive, constraints, effects)
   const hasCrossModuleDeps = !!(
