@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { useSuspenseQuery } from "../index";
 
 // Simple module with a derivation that mimics query ResourceState
-function createTestSystem(initialState) {
+function createTestSystem(initialState: unknown) {
   const mod = createModule("test", {
     schema: {
       facts: { queryState: t.object() },

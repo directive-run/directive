@@ -827,10 +827,10 @@ interface UseDirectiveConfig {
  * ```
  */
 function _buildDirectivePlugins(config: UseDirectiveConfig | undefined): {
-  plugins: Plugin<unknown>[];
+  plugins: Plugin<ModuleSchema>[];
   statusPlugin: StatusPlugin | undefined;
 } {
-  const plugins = [...(config?.plugins ?? [])] as Plugin<unknown>[];
+  const plugins = [...(config?.plugins ?? [])] as Plugin<ModuleSchema>[];
   let statusPlugin: StatusPlugin | undefined;
 
   if (config?.status) {
@@ -846,7 +846,7 @@ function _buildDirectivePlugins(config: UseDirectiveConfig | undefined): {
 function _createDirectiveSystem<M extends ModuleSchema>(
   moduleDef: ModuleDef<M>,
   config: UseDirectiveConfig | undefined,
-  plugins: Plugin<unknown>[],
+  plugins: Plugin<ModuleSchema>[],
 ): SingleModuleSystem<M> {
   const systemConfig = {
     module: moduleDef,

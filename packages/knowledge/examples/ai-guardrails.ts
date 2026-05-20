@@ -170,6 +170,83 @@ export const system = createSystem({
 // Analysis Functions
 // ============================================================================
 
+/**
+ * Compliance gate: blocks the message when the active mode forbids the kinds
+ * of PII detected. Emits its own devtools event and returns whether it blocked.
+ */
+function runComplianceCheck(
+  piiResult: PIIDetectionResult,
+  textLength: number,
+): boolean {
+  const mode = system.facts.complianceMode as ComplianceMode;
+  let blocked = false;
+
+  if (mode !== "standard" && piiResult.detected) {
+    // HIPAA Safe Harbor (45 CFR 164.514) enumerates 18 identifier classes —
+    // names, geographic data, dates, contact info, account/certificate/license
+    // numbers, IP addresses, and more. That is effectively every PII type this
+    // detector emits, so under HIPAA *any* detected PII is PHI and blocks.
+    const hasPHI = piiResult.detected;
+    const hasContactInfo = piiResult.items.some(
+      (i) =>
+        i.type === "email" ||
+        i.type === "phone" ||
+        i.type === "name" ||
+        i.type === "date_of_birth" ||
+        i.type === "address",
+    );
+
+    if (mode === "hipaa" && hasPHI) {
+      blocked = true;
+      system.facts.complianceBlocks =
+        (system.facts.complianceBlocks as number) + 1;
+      addTimeline("compliance", "HIPAA: PHI detected", "compliance");
+    }
+
+    if (mode === "gdpr" && hasContactInfo) {
+      blocked = true;
+      system.facts.complianceBlocks =
+        (system.facts.complianceBlocks as number) + 1;
+      addTimeline("compliance", "GDPR: personal data detected", "compliance");
+    }
+  }
+
+  emitDevToolsEvent({
+    type: "guardrail_check",
+    guardrailName: `compliance-${mode}`,
+    guardrailType: "input",
+    passed: !blocked || !piiResult.detected,
+    inputLength: textLength,
+  });
+
+  return blocked;
+}
+
+/**
+ * When redaction is on, never persist raw PII into reactive facts: strip the
+ * plaintext `value` from each detected item before it reaches facts.
+ */
+function toSafePiiResult(
+  piiResult: PIIDetectionResult,
+  redactionEnabled: boolean,
+): PIIDetectionResult | null {
+  if (!piiResult.detected) {
+    return null;
+  }
+
+  if (!redactionEnabled) {
+    return piiResult;
+  }
+
+  return {
+    ...piiResult,
+    items: piiResult.items.map((item) => ({
+      ...item,
+      value: "[redacted]",
+    })),
+  };
+}
+
 export async function analyzeMessage(text: string): Promise<ChatMessage> {
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   let blocked = false;
@@ -215,40 +292,9 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
   });
 
   // 3. Compliance check
-  const mode = system.facts.complianceMode as ComplianceMode;
-  if (mode !== "standard" && piiResult.detected) {
-    const hasPHI = piiResult.items.some(
-      (i) =>
-        i.type === "medical_id" ||
-        i.type === "ssn" ||
-        i.type === "date_of_birth",
-    );
-    const hasContactInfo = piiResult.items.some(
-      (i) => i.type === "email" || i.type === "phone" || i.type === "name",
-    );
-
-    if (mode === "hipaa" && hasPHI) {
-      blocked = true;
-      system.facts.complianceBlocks =
-        (system.facts.complianceBlocks as number) + 1;
-      addTimeline("compliance", "HIPAA: PHI detected", "compliance");
-    }
-
-    if (mode === "gdpr" && hasContactInfo) {
-      blocked = true;
-      system.facts.complianceBlocks =
-        (system.facts.complianceBlocks as number) + 1;
-      addTimeline("compliance", "GDPR: personal data detected", "compliance");
-    }
+  if (runComplianceCheck(piiResult, text.length)) {
+    blocked = true;
   }
-
-  emitDevToolsEvent({
-    type: "guardrail_check",
-    guardrailName: `compliance-${mode}`,
-    guardrailType: "input",
-    passed: !blocked || !piiResult.detected,
-    inputLength: text.length,
-  });
 
   if (blocked) {
     system.facts.blockedCount = (system.facts.blockedCount as number) + 1;
@@ -260,25 +306,12 @@ export async function analyzeMessage(text: string): Promise<ChatMessage> {
 
   const redactedText = piiResult.redactedText ?? text;
 
-  // When redaction is on, never persist raw PII into reactive facts:
-  // store the redacted text in the displayed `text` field, and strip the
-  // plaintext `value` from each detected item before it reaches facts.
-  const safeText = redactionEnabled ? redactedText : text;
-  const safePiiResult: PIIDetectionResult | null = !piiResult.detected
-    ? null
-    : redactionEnabled
-      ? {
-          ...piiResult,
-          items: piiResult.items.map((item) => ({ ...item, value: "[redacted]" })),
-        }
-      : piiResult;
-
   return {
     id,
-    text: safeText,
+    text: redactionEnabled ? redactedText : text,
     blocked,
     redactedText,
     injectionResult: injectionResult.detected ? injectionResult : null,
-    piiResult: safePiiResult,
+    piiResult: toSafePiiResult(piiResult, redactionEnabled),
   };
 }
