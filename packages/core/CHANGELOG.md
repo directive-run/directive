@@ -1,5 +1,116 @@
 # @directive-run/core
 
+## 1.5.0
+
+### Minor Changes
+
+- [`3bbf4d9`](https://github.com/directive-run/directive/commit/3bbf4d96fc880a5abb85a5055b44b35b97b7ef10) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: data-form definitions (`FactPredicate`, `FactTemplate`)
+
+  Every Directive definition can now express its trigger or matcher as a
+  plain data object in addition to the function form. The function form
+  is unchanged; the data form is purely additive.
+
+  ```ts
+  constraints: {
+    transition: {
+      when: { phase: "red", elapsed: { $gte: 30 } },   // NEW — was: (f) => …
+      require: { type: "TRANSITION", to: "green" },
+    },
+  },
+  effects: {
+    ledOn: {
+      on: { phase: "red" },                            // NEW — was: deps: [...]
+      run: () => turnLedOn(),
+    },
+  },
+  resolvers: {
+    fetcher: {
+      requirement: "FETCH",
+      key: ["id"],                                     // NEW — was: (req) => req.id
+      resolve: doFetch,
+    },
+  },
+  events: {
+    setStatus: {
+      patch: {                                         // NEW — alongside handler
+        $set: {
+          status: { $ref: "value" },
+          label:  { $template: "user ${name}" },
+        },
+      },
+    },
+  },
+  derive: {
+    isAdult:  { compute: { age: { $gte: 18 } } },                          // boolean
+    fullName: { compute: { $template: "${firstName} ${lastName}" } },      // string
+  },
+  ```
+
+  Operators: `$eq`, `$ne`, `$in`, `$nin`, `$exists`, `$gt`, `$gte`, `$lt`,
+  `$lte`, `$between`, `$matches`, `$contains`, `$changed` (effects only).
+  Combinators: `$all`, `$any`, `$not`. Nested predicates handle
+  cross-module namespaced facts.
+
+  The data form unlocks introspection that a function form cannot:
+
+  - `system.inspect().constraints[]` exposes `whenSpec` — the original
+    predicate object — for any consumer (devtools, custom inspectors).
+  - The `constraint.evaluate` observation event carries `whenExplain` —
+    a per-clause breakdown showing which clauses passed and which failed.
+  - `system.explain(requirementId)` renders the clause tree:
+    ```
+    ├─ Predicate clauses:
+    │  ├─ ✓ phase $eq red (actual: red)
+    │  └─ ✗ elapsed $gte 30 (actual: 20)
+    ```
+
+  A data `when` is always sync, so the auto-tracking deps capture
+  correctly without an explicit `deps` array. The function escape hatch
+  remains on every surface.
+
+  See `docs/rfcs/0004-data-configuration-triggers.md` and
+  `docs/concepts/data-triggers.md` for the full reference.
+
+- [`ff1121c`](https://github.com/directive-run/directive/commit/ff1121cc2be14fc13dff544a6e142bc2c5b55eff) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: resolver constraint-binding (`owns`)
+
+  Adds opt-in resolver constraint-binding (RFC-0003). A constraint can declare
+  the facts its resolver _owns_; a write from that resolver to an owned fact is
+  dropped — and the resolver aborted — if the fact was changed by anything else
+  since the resolver last wrote it. Eliminates the executor-tail-clobber footgun
+  (an in-flight resolver's tail overwriting a terminal status an event just set)
+  without touching the resolver's other ("data") writes.
+
+  ```ts
+  constraints: {
+    mutate: {
+      when: (f) => f.status === "mutating",
+      require: { type: "EXECUTE_ACTION" },
+      owns: ["status"], // NEW — omit for no binding (default)
+    },
+  }
+  ```
+
+  Semantics:
+
+  - Per owned fact, the binding remembers the value the resolver last wrote or
+    started with. A write to an owned fact lands only if the fact still holds
+    that value; otherwise it is dropped, `ctx.signal` is aborted, and that
+    fact's ownership is lost (one-shot).
+  - Writes to facts not listed in `owns` always land.
+  - The constraint's `when()` predicate is never consulted by the binding.
+    Sync constraints only — `owns` on an async constraint is ignored (the
+    owned-fact snapshot would race the predicate await; dev-mode warning).
+  - A bound resolver is **detached, not cancelled**, when its requirement is
+    removed — it runs to completion so its data writes land (the binding drops
+    only the owned-fact clobber), and the requirement can re-dispatch cleanly.
+  - No-op for `callOne()` and mixed-source batch resolvers.
+
+  This supersedes the `bind: 'auto'` constraint-binding from the reverted
+  v1.4.0 release, which re-evaluated `when()` on every write — that was
+  all-or-nothing (dropped legitimate data writes) and coupled to predicate
+  shape (could freeze a resolver). Migrate `bind: 'auto'` →
+  `owns: [<phase fact>]`. See `docs/upgrade-guides/constraint-binding.md`.
+
 ## 1.4.0
 
 ### Minor Changes

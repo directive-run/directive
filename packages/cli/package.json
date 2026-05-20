@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/cli",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -48,7 +48,9 @@
     "./llms.txt": "./dist/llms.txt"
   },
   "llms": "./dist/llms.txt",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/core",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "imports": {
     "#is-development": {
       "production": "./src/dev-false.ts",
@@ -82,7 +82,9 @@
       "import": "./dist/worker.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
