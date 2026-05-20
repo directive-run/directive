@@ -218,12 +218,12 @@ export function createEngine<S extends Schema>(
             const spec = obj.patch;
             (module.events as Record<string, unknown>)[key] = (
               facts: Record<string, unknown>,
-              event: { payload?: Record<string, unknown> } | undefined,
+              event: Record<string, unknown> | undefined,
             ) =>
               applyPatch(
                 spec as Parameters<typeof applyPatch>[0],
                 facts,
-                event?.payload ?? {},
+                event ?? {},
               );
             if (obj.meta) {
               const frozen = freezeMeta(obj.meta);
@@ -2227,12 +2227,12 @@ export function createEngine<S extends Schema>(
             const spec = obj.patch;
             (module.events as Record<string, unknown>)[key] = (
               facts: Record<string, unknown>,
-              event: { payload?: Record<string, unknown> } | undefined,
+              event: Record<string, unknown> | undefined,
             ) =>
               applyPatch(
                 spec as Parameters<typeof applyPatch>[0],
                 facts,
-                event?.payload ?? {},
+                event ?? {},
               );
             if (obj.meta) {
               const frozen = freezeMeta(obj.meta);
