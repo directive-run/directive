@@ -431,6 +431,71 @@ describe("devtoolsPlugin", () => {
       system.destroy();
     });
 
+    // R2 fix: the data-form clause tree now flows through plugin.emit
+    // (third arg) to bundled plugins, not only via system.observe(). The
+    // devtools event log must carry whenExplain on data-form evaluations.
+    it("records whenExplain on data-form constraint.evaluate events", async () => {
+      const dataMod = createModule("data-constraint", {
+        schema: {
+          facts: { status: t.string(), data: t.string() },
+          derivations: {},
+          events: { setStatus: { value: t.string() } },
+          requirements: { FETCH_DATA: { url: t.string() } },
+        },
+        init: (facts) => {
+          facts.status = "idle";
+          facts.data = "";
+        },
+        events: {
+          setStatus: (facts, { value }) => {
+            facts.status = value;
+          },
+        },
+        constraints: {
+          // Data-form `when` — devtools should receive the clause tree on
+          // every evaluation (the third arg to onConstraintEvaluate).
+          needsData: {
+            when: { status: "loading" },
+            require: { type: "FETCH_DATA", url: "/api/data" },
+          },
+        },
+        resolvers: {
+          fetchData: {
+            requirement: "FETCH_DATA",
+            resolve: async (_req, context) => {
+              context.facts.data = "loaded";
+              context.facts.status = "loaded";
+            },
+          },
+        },
+      });
+
+      const system = createSystem({
+        module: dataMod,
+        plugins: [devtoolsPlugin({ name: "explain-test", trace: true })],
+      });
+      system.start();
+      await system.settle();
+
+      system.events.setStatus({ value: "loading" });
+      await system.settle();
+
+      const events = dt().getEvents("explain-test");
+      const constraintEvent = events.find(
+        (e) =>
+          e.type === "constraint.evaluate" &&
+          (e.data as { whenExplain?: unknown[] }).whenExplain !== undefined,
+      );
+      expect(constraintEvent).toBeDefined();
+      const data = constraintEvent!.data as {
+        whenExplain?: Array<{ path: string; pass: boolean }>;
+      };
+      expect(Array.isArray(data.whenExplain)).toBe(true);
+      expect(data.whenExplain!.length).toBeGreaterThan(0);
+
+      system.destroy();
+    });
+
     it("records requirement and resolver events", async () => {
       const mod = createConstraintModule();
       const system = createSystem({

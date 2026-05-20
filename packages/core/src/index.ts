@@ -104,7 +104,7 @@ export type {
 // Predicate / template runtime
 export {
   applyPatch,
-  compilePredicate,
+  memoizePredicate,
   evaluateKeySelector,
   evaluatePredicate,
   evaluatePredicateExplained,

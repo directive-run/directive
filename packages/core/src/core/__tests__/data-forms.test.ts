@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 
@@ -447,5 +447,79 @@ describe("constraint `when` — $changed rejected (DX-M6)", () => {
     expect(() => createSystem({ module: mod })).toThrow(
       /effects-only/,
     );
+  });
+});
+
+// ============================================================================
+// AE-R2 regression: event { handler + patch } conflict dev-warn
+// ============================================================================
+
+describe("event handler + patch conflict (DX-R2)", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("dev-warns and uses handler (patch is ignored) when both are provided", async () => {
+    const handlerCalled = vi.fn();
+
+    const mod = createModule("status", {
+      schema: {
+        facts: {
+          status: t.string(),
+          handlerSaw: t.string(),
+        },
+        derivations: {},
+        events: {
+          setStatus: { value: t.string() },
+        },
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.status = "idle";
+        facts.handlerSaw = "";
+      },
+      events: {
+        setStatus: {
+          // Both forms provided — the engine must dev-warn and pick `handler`.
+          handler: (facts: Record<string, unknown>, ev: unknown) => {
+            handlerCalled();
+            facts.handlerSaw = (ev as { value: string }).value;
+          },
+          patch: {
+            $set: {
+              // This would set `status` if patch won, but handler wins.
+              status: { $ref: "value" },
+            },
+          },
+        } as unknown as (
+          facts: Record<string, unknown>,
+          event: Record<string, unknown>,
+        ) => void,
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+
+    system.events.setStatus({ value: "active" });
+    await flush();
+
+    expect(handlerCalled).toHaveBeenCalledTimes(1);
+    expect(system.facts.handlerSaw).toBe("active");
+    // patch was ignored → status untouched
+    expect(system.facts.status).toBe("idle");
+    expect(
+      warnSpy.mock.calls.some((call) =>
+        String(call[0] ?? "").includes(
+          "both `handler` and `patch` provided",
+        ),
+      ),
+    ).toBe(true);
+
+    system.destroy();
   });
 });

@@ -192,6 +192,49 @@ function deepEqual(a: unknown, b: unknown, seen?: DeepEqualSeen): boolean {
     return a.every((v, i) => deepEqual(v, b[i], guard));
   }
 
+  // Set equality — same size, every element of `a` has a structurally-equal
+  // counterpart in `b`. Must precede the `Object.keys` fallback below because
+  // `Object.keys(new Set(...))` is always `[]`, which would otherwise let
+  // any two Sets (or any two Maps) compare equal regardless of contents.
+  if (a instanceof Set || b instanceof Set) {
+    if (!(a instanceof Set) || !(b instanceof Set) || a.size !== b.size) {
+      return false;
+    }
+    const bArr = [...b];
+
+    return [...a].every((v) => bArr.some((w) => deepEqual(v, w, guard)));
+  }
+
+  // Map equality — same size, every key in `a` matches a key in `b` with a
+  // structurally-equal value. Greedy match with a used-flag to handle
+  // structural (non-reference) key equality correctly.
+  if (a instanceof Map || b instanceof Map) {
+    if (!(a instanceof Map) || !(b instanceof Map) || a.size !== b.size) {
+      return false;
+    }
+    const bEntries = [...b.entries()];
+    const used = new Array<boolean>(bEntries.length).fill(false);
+    for (const [ka, va] of a) {
+      let found = false;
+      for (let i = 0; i < bEntries.length; i++) {
+        if (used[i]) {
+          continue;
+        }
+        const [kb, vb] = bEntries[i]!;
+        if (deepEqual(ka, kb, guard) && deepEqual(va, vb, guard)) {
+          used[i] = true;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   const ak = Object.keys(a as object);
   const bk = Object.keys(b as object);
   if (ak.length !== bk.length) {
@@ -325,17 +368,45 @@ function applyOperator(
       if (typeof actual !== "string") {
         return false;
       }
-      const re =
-        operand instanceof RegExp ? operand : getCachedRegex(String(operand));
+      if (!(operand instanceof RegExp)) {
+        // String operand is deprecated — the type no longer accepts it (a
+        // string cannot carry flags, so case-insensitive matching is
+        // unexpressible). Runtime still compiles the string for one cycle.
+        devWarn(
+          `$matches: string operand "${String(operand)}" cannot carry RegExp flags — pass a real RegExp (e.g. /pattern/i) for flag control`,
+        );
+        const re = getCachedRegex(String(operand));
 
-      return re.test(actual);
+        return re.test(actual);
+      }
+
+      return operand.test(actual);
     }
+    case "$startsWith":
+      if (typeof actual !== "string") {
+        return false;
+      }
+
+      return actual.startsWith(String(operand));
+    case "$endsWith":
+      if (typeof actual !== "string") {
+        return false;
+      }
+
+      return actual.endsWith(String(operand));
     case "$contains":
       if (typeof actual === "string") {
         return actual.includes(String(operand));
       }
       if (Array.isArray(actual)) {
         return actual.some((v) => deepEqual(v, operand));
+      }
+      // Set membership — uses `.has()` which is reference-equality for
+      // objects (matches native Set semantics) and value-equality for
+      // primitives. Map `$contains` is deferred to v2; users who need it
+      // today can fall back to a function-form predicate.
+      if (actual instanceof Set) {
+        return actual.has(operand);
       }
 
       return false;
@@ -360,7 +431,16 @@ function evalField(
   prev: unknown,
 ): boolean {
   if (isOperatorObject(value)) {
-    for (const op of Object.keys(value)) {
+    const keys = Object.keys(value);
+    // Type rejects multi-operator objects; the runtime ANDs them on a
+    // best-effort basis but dev-warns so the author knows to switch to the
+    // array form or `$all`.
+    if (keys.length > 1) {
+      devWarn(
+        `predicate: operator object has ${keys.length} operators (${keys.join(", ")}) — write the array form or $all instead. The runtime ANDs them as a best-effort fallback.`,
+      );
+    }
+    for (const op of keys) {
       if (!applyOperator(op as PredicateOp, actual, value[op], prev)) {
         return false;
       }
@@ -576,46 +656,52 @@ export function evaluatePredicateExplained(
   return out;
 }
 
-const compiledCache = new WeakMap<object, (facts: Scope, prev?: Scope) => boolean>();
+const memoizedCache = new WeakMap<object, (facts: Scope, prev?: Scope) => boolean>();
 
 /**
- * Compile a predicate into a reusable evaluation closure.
+ * Memoize a predicate as a reusable evaluation closure.
  *
  * The returned function accepts any `facts` scope (the reactive proxy in
  * production, a plain object in tests) plus an optional `prev` snapshot for
- * `$changed`. The closure is cached **by spec identity** in a `WeakMap`, so
- * passing the same `spec` reference repeatedly is allocation-free; cleanup is
- * automatic once the spec is no longer reachable.
+ * `$changed`. The closure is cached **by predicate identity** in a
+ * `WeakMap`, so passing the same `predicate` reference repeatedly is
+ * allocation-free; cleanup is automatic once the predicate is no longer
+ * reachable.
  *
- * Intended for advanced users who want to pre-compute a predicate for
- * hot-path evaluation (custom devtools, batched analyses). Regular module
- * code does not need to call this — the engine wraps data-form `when` / `on`
- * specs automatically at registration.
+ * Note: no actual compilation happens — the returned closure re-walks the
+ * spec on every call via `evaluatePredicate`. The name reflects what the
+ * function does (closure memoization keyed by predicate identity), not a
+ * bytecode/AST compile step.
+ *
+ * Intended for advanced users who want a stable function reference per
+ * predicate (custom devtools, batched analyses). Regular module code does
+ * not need to call this — the engine wraps data-form `when` / `on` specs
+ * automatically at registration.
  *
  * @example
  * ```ts
- * const spec = { phase: "red", elapsed: { $gte: 30 } };
- * const check = compilePredicate(spec);
+ * const predicate = { phase: "red", elapsed: { $gte: 30 } };
+ * const check = memoizePredicate(predicate);
  * check({ phase: "red", elapsed: 45 }); // → true
  * check({ phase: "red", elapsed: 5  }); // → false
  * ```
  */
-export function compilePredicate(
-  spec: object,
+export function memoizePredicate(
+  predicate: object,
 ): (facts: Scope, prev?: Scope) => boolean {
-  if (spec === null || typeof spec !== "object") {
+  if (predicate === null || typeof predicate !== "object") {
     throw new Error(
-      `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof spec}`,
+      `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof predicate}`,
     );
   }
-  const cached = compiledCache.get(spec);
+  const cached = memoizedCache.get(predicate);
   if (cached) {
     return cached;
   }
 
   const fn = (facts: Scope, prev?: Scope): boolean =>
-    evaluatePredicate(spec, facts, prev);
-  compiledCache.set(spec, fn);
+    evaluatePredicate(predicate, facts, prev);
+  memoizedCache.set(predicate, fn);
 
   return fn;
 }
@@ -901,7 +987,11 @@ export function applyPatch(
       typeof value.$ref === "string"
     ) {
       const refKey = value.$ref;
-      if (!(refKey in safePayload)) {
+      // Use Object.hasOwn rather than `in` — tightens defense against
+      // prototype-chain lookups so a payload `__proto__` shape can't smuggle
+      // an inherited property into the fact assignment. The proxy already
+      // blocks writes to dangerous keys, but this keeps the read symmetric.
+      if (!Object.hasOwn(safePayload, refKey)) {
         devWarn(
           `applyPatch: $ref "${refKey}" is missing from event payload — assigning undefined to fact "${key}"`,
         );

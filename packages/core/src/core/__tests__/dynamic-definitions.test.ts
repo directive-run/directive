@@ -1167,3 +1167,48 @@ describe("Resolver assign triggers reconciliation", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// 14. AE-R2 regression: assign() chain fn → data → fn keeps whenSpec coherent
+// ============================================================================
+
+describe("AE-R2 regression: constraints.assign chain swaps whenSpec correctly", () => {
+  it("function-form → data-form → function-form correctly adds/removes whenSpec", async () => {
+    const system = createStartedSystem();
+    await flushMicrotasks();
+
+    // Initial form: function (createTestModule sets `autoIncrement` to a fn).
+    let inspection = system.inspect();
+    let entry = inspection.constraints.find((c) => c.id === "autoIncrement");
+    expect(entry?.whenSpec).toBeUndefined();
+
+    // Swap to a data form — assign should stash the predicate.
+    system.constraints.assign("autoIncrement", {
+      when: { count: { $gte: 10 } },
+      require: { type: "INCREMENT" },
+    });
+    inspection = system.inspect();
+    entry = inspection.constraints.find((c) => c.id === "autoIncrement");
+    expect(entry?.whenSpec).toEqual({ count: { $gte: 10 } });
+
+    // Swap back to a function form — whenSpec must be cleared.
+    system.constraints.assign("autoIncrement", {
+      when: (facts) => (facts.count as number) > 1000,
+      require: { type: "INCREMENT" },
+    });
+    inspection = system.inspect();
+    entry = inspection.constraints.find((c) => c.id === "autoIncrement");
+    expect(entry?.whenSpec).toBeUndefined();
+
+    // Swap to a different data form — new predicate replaces the old one.
+    system.constraints.assign("autoIncrement", {
+      when: { count: { $lt: 0 } },
+      require: { type: "INCREMENT" },
+    });
+    inspection = system.inspect();
+    entry = inspection.constraints.find((c) => c.id === "autoIncrement");
+    expect(entry?.whenSpec).toEqual({ count: { $lt: 0 } });
+
+    system.destroy();
+  });
+});

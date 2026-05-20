@@ -16,7 +16,9 @@ Three things you cannot do with a function but can do with data:
   archives. A function does not.
 - **Get free deps.** A data predicate is structural — the engine knows
   which facts it reads without running it. Async constraints lose their
-  explicit-`deps` footgun because a data `when` is always sync.
+  explicit-`deps` footgun because a data `when` is always sync, and the
+  engine clears any `async: true` on the def at registration to make
+  the runtime behavior match.
 
 ## Quick reference
 
@@ -83,7 +85,7 @@ createModule("traffic", {
 });
 ```
 
-## `FactPredicate` — boolean specs
+## `FactPredicate` — boolean predicates
 
 A predicate is an object whose keys are **fact names** and whose values
 are either a literal (equality) or an operator object.
@@ -119,10 +121,24 @@ when: { $all: [
 | `$in` / `$nin`  | any                   | `{ phase: { $in: ["red", "yellow"] } }`     |
 | `$gt`, `$gte`, `$lt`, `$lte` | `number`, `bigint`, `Date`, `string` | `{ elapsed: { $gte: 30 } }` |
 | `$between`      | orderable             | `{ elapsed: { $between: [30, 120] } }`      |
-| `$matches`      | `string`              | `{ name: { $matches: /^J/ } }`              |
-| `$contains`     | `string` or array     | `{ tags: { $contains: "admin" } }`          |
+| `$matches`      | `string` (RegExp only — use real `RegExp` instances for flag control) | `{ name: { $matches: /^J/i } }` |
+| `$startsWith`   | `string`              | `{ name: { $startsWith: "Ada" } }`          |
+| `$endsWith`     | `string`              | `{ email: { $endsWith: "@example.com" } }`  |
+| `$contains`     | `string` or array (for `Set`, unwrap to an array first) | `{ tags: { $contains: "admin" } }` |
 | `$exists`       | any                   | `{ token: { $exists: true } }` (value is not `undefined`) |
 | `$changed`      | effects only          | `{ phase: { $changed: true } }`             |
+
+> **`$matches` is RegExp-only.** A string operand cannot carry RegExp
+> flags (case-insensitivity, dotall, multiline), so the type rejects it
+> and the runtime dev-warns. Pass a real `RegExp` instance —
+> `/^Ada/i`, not `"^Ada"` — when you need flag control. The runtime
+> still accepts a string operand for one cycle for back-compat, but it
+> always compiles flag-less.
+>
+> **`$contains` on `Set` / `Map`.** `$contains` walks a `string`
+> (substring match) or an array (element equality). It does not iterate
+> a `Set` or `Map` directly — unwrap to an array first
+> (`derive: { tagList: (f) => [...f.tags] }` and gate on `tagList`).
 
 One operator per object — for two operators on the same fact, use the
 array form or `$all`:
@@ -258,8 +274,9 @@ custom inspector can render the predicate tree natively.
 
 ## Static analysis
 
-Two pure utilities walk a spec without running it — useful for devtools,
-codegen, lint rules, and any "which facts does this read" check:
+Two pure utilities walk a predicate without running it — useful for
+devtools, codegen, lint rules, and any "which facts does this read"
+check:
 
 ```ts
 import { extractDeps, extractTemplateKeys } from "@directive-run/core";
@@ -274,26 +291,35 @@ extractTemplateKeys({ $template: "${firstName} ${lastName}" });
 // → Set { "firstName", "lastName" }
 ```
 
-For hot-path evaluation against many fact scopes, pre-compile once:
+For a stable function reference per predicate (custom devtools, batched
+analyses), wrap it once with `memoizePredicate`:
 
 ```ts
-import { compilePredicate } from "@directive-run/core";
+import { memoizePredicate } from "@directive-run/core";
 
-const check = compilePredicate({ phase: "red", elapsed: { $gte: 30 } });
+const check = memoizePredicate({ phase: "red", elapsed: { $gte: 30 } });
 check({ phase: "red", elapsed: 45 }); // → true
 ```
+
+`memoizePredicate` caches the returned closure in a `WeakMap` keyed by
+predicate identity — the same predicate object always gets the same
+closure back. No actual compilation happens (the closure re-walks the
+predicate on every call via `evaluatePredicate`); the name reflects the
+identity-keyed memoization, not a bytecode/AST compile step.
 
 ## Gotchas
 
 A few sharp edges worth knowing once:
 
 - **`async: true` on a data `when` is ignored.** A data `when` is
-  always sync — the predicate evaluator walks the spec
+  always sync — the predicate evaluator walks the predicate
   synchronously, so the runtime treats `async: true` paired with a
-  data `when` as a no-op. Use a function `when` for async preconditions.
-- **Explicit `deps` on a data `when` is ignored.** A data spec carries
-  its own deps (extracted structurally), so any `deps: [...]` you add
-  is unused — auto-tracking is exact.
+  data `when` as a no-op AND clears `def.async` at registration so the
+  engine takes the sync evaluation path. Use a function `when` for
+  async preconditions.
+- **Explicit `deps` on a data `when` is ignored.** A data predicate
+  carries its own deps (extracted structurally), so any `deps: [...]`
+  you add is unused — auto-tracking is exact.
 - **Typo'd `$`-operators dev-warn.** `{ elapsed: { $eqq: 30 } }`
   triggers a runtime dev warning naming the typo and the known
   operators; the malformed clause evaluates to `false`.
@@ -309,8 +335,6 @@ A few sharp edges worth knowing once:
 
 These are not in v1, but are tracked for future addition:
 
-- `$startsWith`, `$endsWith` — for now use `$matches` with a regex
-  (`{ name: { $matches: /^Ada/ } }`).
 - `$null`, `$nullish` — for now use `$eq: null` or the function
   escape hatch.
 - `$elemMatch` — match an array element against a sub-predicate; for

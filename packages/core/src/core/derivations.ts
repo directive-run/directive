@@ -10,9 +10,9 @@
  */
 
 import {
-  compilePredicate,
   evaluateTemplate,
   isTemplate,
+  memoizePredicate,
 } from "./predicate.js";
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
@@ -137,14 +137,14 @@ export function createDerivationsManager<
       fn = (facts) =>
         evaluateTemplate(c, facts as Record<string, unknown>);
     } else if (typeof c === "object" && c !== null) {
-      // Defensive: compilePredicate also throws on non-object specs, but a
+      // Defensive: memoizePredicate also throws on non-object predicates, but a
       // guard here keeps the failure adjacent to the registration site.
       Object.freeze(c);
-      const compiled = compilePredicate(c);
-      fn = (facts) => compiled(facts as Record<string, unknown>);
+      const memoized = memoizePredicate(c);
+      fn = (facts) => memoized(facts as Record<string, unknown>);
     } else if (c !== undefined) {
       throw new Error(
-        `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof c}`,
+        `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof c}`,
       );
     }
 

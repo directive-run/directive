@@ -559,7 +559,14 @@ export function createEngine<S extends Schema>(
     facts,
     requirementKeys,
     onEvaluate: (id, active) => {
-      if (hasPlugins()) pluginManager.emitConstraintEvaluate(id, active);
+      if (hasPlugins()) {
+        // For data-form `when` constraints, pass the per-clause breakdown
+        // through to every plugin (devtools, logging, observers) so they
+        // can render which clauses passed/failed. Function-form `when`
+        // returns `undefined`, which the typed hook treats as "no explain".
+        const whenExplain = constraintsManager.explainWhen(id);
+        pluginManager.emitConstraintEvaluate(id, active, whenExplain);
+      }
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("constraint", id, error);
@@ -1282,12 +1289,15 @@ export function createEngine<S extends Schema>(
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
           observer({ type: "fact.change", key, prev, next: value }),
-        onConstraintEvaluate: (id: string, active: boolean) => {
-          // For data-form `when` constraints, include the per-clause
-          // breakdown so observers (devtools, explain) can render which
-          // clauses passed and which failed.
-          const whenExplain = constraintsManager.explainWhen(id);
-
+        onConstraintEvaluate: (
+          id: string,
+          active: boolean,
+          whenExplain?: import("./types/predicate.js").ClauseResult[],
+        ) => {
+          // The engine's onEvaluate forwards whenExplain through the plugin
+          // manager — observers receive it as a third arg. Function-form
+          // `when` gives `undefined`, which the typed event treats as
+          // "no explain available".
           observer(
             whenExplain
               ? { type: "constraint.evaluate", id, active, whenExplain }
@@ -1743,10 +1753,18 @@ export function createEngine<S extends Schema>(
         const branch = isLast ? "└─" : "├─";
         const mark = clause.pass ? "✓" : "✗";
         if (clause.children) {
-          // Combinator header: "$all (2/3)"
-          lines.push(
-            `${indent}${branch} ${mark} ${clause.op} (${clause.actual}/${clause.expected})`,
-          );
+          // `$not` always wraps exactly one child — rendering "0/1" or "1/1"
+          // for a unary inversion is paradoxical (the parent passes when the
+          // child fails). Drop the fraction for `$not` and let the indented
+          // child show its own ✓/✗.
+          if (clause.op === "$not") {
+            lines.push(`${indent}${branch} ${mark} $not`);
+          } else {
+            // Combinator header: "$all (2/3)"
+            lines.push(
+              `${indent}${branch} ${mark} ${clause.op} (${clause.actual}/${clause.expected})`,
+            );
+          }
           const childIndent = `${indent}${isLast ? "   " : "│  "}`;
           clause.children.forEach((child, i) => {
             renderClause(child, childIndent, i === clause.children!.length - 1);

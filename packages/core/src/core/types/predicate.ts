@@ -31,6 +31,8 @@ export type PredicateOp =
   | "$lte"
   | "$between"
   | "$matches"
+  | "$startsWith"
+  | "$endsWith"
   | "$contains"
   | "$changed";
 
@@ -54,6 +56,8 @@ export const PREDICATE_OPERATORS: ReadonlySet<string> = new Set<string>([
   "$lte",
   "$between",
   "$matches",
+  "$startsWith",
+  "$endsWith",
   "$contains",
   "$changed",
 ]);
@@ -93,11 +97,18 @@ type IsOrderable<V> = [V] extends [number | bigint | Date]
  * One operator per object — for two operators on the same fact, write the
  * array form or `$all`. This is by design (the type is the source of truth).
  *
+ * `$matches` accepts a `RegExp` only — string operands cannot express flags
+ * (case-insensitivity, dotall, etc.), so the type rejects them. Pass a real
+ * `RegExp` instance for flag control. (The runtime still accepts a string
+ * operand for one cycle for back-compat, but emits a dev-warn.)
+ *
  * @example
  * ```ts
  * const op1: OperatorObject<number> = { $gte: 30 };
- * const op2: OperatorObject<string> = { $matches: /^J/ };
+ * const op2: OperatorObject<string> = { $matches: /^J/i };
  * const op3: OperatorObject<string> = { $in: ["red", "yellow"] };
+ * const op4: OperatorObject<string> = { $startsWith: "Ada" };
+ * const op5: OperatorObject<string> = { $endsWith: ".com" };
  * ```
  */
 export type OperatorObject<V> =
@@ -116,7 +127,11 @@ export type OperatorObject<V> =
           | { $between: readonly [V, V] }
       : never)
   | ([V] extends [string]
-      ? { $matches: RegExp | string } | { $contains: string }
+      ?
+          | { $matches: RegExp }
+          | { $contains: string }
+          | { $startsWith: string }
+          | { $endsWith: string }
       : never)
   | ([V] extends [readonly (infer E)[]] ? { $contains: E } : never);
 

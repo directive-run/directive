@@ -8,12 +8,13 @@
  * @internal
  */
 
+import isDevelopment from "#is-development";
 import {
   applyPatch,
-  compilePredicate,
   evaluateTemplate,
   isPredicateSpec,
   isTemplate,
+  memoizePredicate,
 } from "./predicate.js";
 import {
   SEPARATOR,
@@ -93,9 +94,24 @@ function isAlreadyPrefixed(key: string): boolean {
  * Recurses into `$all` / `$any` / `$not` combinators. Array-of-clauses form
  * has each `fact` field rewritten. Object form keys are rewritten, with
  * `$`-operator keys and already-prefixed keys passed through unchanged.
+ *
+ * Recognizes **namespace pivot** keys — a top-level key that equals `"self"`
+ * or any declared cross-module dep namespace name is unwrapped one level:
+ * its child predicate's keys are then prefixed with the appropriate
+ * namespace. So `{ self: { phase: "red" } }` in module `traffic` becomes
+ * `{ "traffic::phase": "red" }`, and `{ auth: { token: { $exists: true } } }`
+ * with declared dep `auth` becomes `{ "auth::token": { $exists: true } }`.
+ *
+ * Operator keys (`$eq`, `$gte`, etc.) inside the nested object pass through
+ * unchanged.
+ *
  * Returns a frozen, structurally-identical spec.
  */
-function prefixPredicateSpec(spec: unknown, namespace: string): unknown {
+function prefixPredicateSpec(
+  spec: unknown,
+  selfNamespace: string,
+  depNamespaces: ReadonlySet<string>,
+): unknown {
   if (Array.isArray(spec)) {
     const out = spec.map((clause) => {
       if (
@@ -108,7 +124,7 @@ function prefixPredicateSpec(spec: unknown, namespace: string): unknown {
           return clause;
         }
 
-        return { ...clause, fact: prefixKey(namespace, fact) };
+        return { ...clause, fact: prefixKey(selfNamespace, fact) };
       }
 
       return clause;
@@ -128,31 +144,89 @@ function prefixPredicateSpec(spec: unknown, namespace: string): unknown {
     const combinator = "$all" in src ? "$all" : "$any";
     const list = src[combinator] as unknown[];
     const out: Record<string, unknown> = {
-      [combinator]: list.map((child) => prefixPredicateSpec(child, namespace)),
+      [combinator]: list.map((child) =>
+        prefixPredicateSpec(child, selfNamespace, depNamespaces),
+      ),
     };
     Object.freeze(out);
 
     return out;
   }
   if ("$not" in src) {
-    const out = { $not: prefixPredicateSpec(src.$not, namespace) };
+    const out = {
+      $not: prefixPredicateSpec(src.$not, selfNamespace, depNamespaces),
+    };
     Object.freeze(out);
 
     return out;
   }
 
+  /**
+   * Re-prefix one level of a pivot's nested predicate against a target
+   * namespace. The child shape is the same as the parent spec — combinators,
+   * array form, or `{ key: value }` map — so we recurse with a swapped
+   * `selfNamespace`. The pivot's own depNamespaces are not re-checked one
+   * level deeper (cross-module pivots cannot themselves contain further
+   * cross-module pivots).
+   */
+  function prefixPivot(
+    child: unknown,
+    targetNamespace: string,
+  ): unknown {
+    return prefixPredicateSpec(
+      child,
+      targetNamespace,
+      EMPTY_DEP_SET,
+    );
+  }
+
   const out: Record<string, unknown> = {};
-  for (const key in src) {
+  for (const key of Object.keys(src)) {
     if (key.startsWith("$") || isAlreadyPrefixed(key)) {
       out[key] = src[key];
       continue;
     }
-    out[prefixKey(namespace, key)] = src[key];
+    if (key === "self") {
+      // Namespace pivot — flatten one level against the self namespace.
+      const child = src[key];
+      if (child && typeof child === "object") {
+        const flattened = prefixPivot(child, selfNamespace);
+        if (flattened && typeof flattened === "object" && !Array.isArray(flattened)) {
+          for (const [k, v] of Object.entries(
+            flattened as Record<string, unknown>,
+          )) {
+            out[k] = v;
+          }
+          continue;
+        }
+      }
+      // Fall through to default behavior if child isn't a usable object.
+    }
+    if (depNamespaces.has(key)) {
+      // Namespace pivot — flatten one level against the declared dep namespace.
+      const child = src[key];
+      if (child && typeof child === "object") {
+        const flattened = prefixPivot(child, key);
+        if (flattened && typeof flattened === "object" && !Array.isArray(flattened)) {
+          for (const [k, v] of Object.entries(
+            flattened as Record<string, unknown>,
+          )) {
+            out[k] = v;
+          }
+          continue;
+        }
+      }
+      // Fall through to default behavior if child isn't a usable object.
+    }
+    out[prefixKey(selfNamespace, key)] = src[key];
   }
   Object.freeze(out);
 
   return out;
 }
+
+/** Shared empty set used when recursing into a pivot (no nested pivots). */
+const EMPTY_DEP_SET: ReadonlySet<string> = new Set<string>();
 
 /**
  * Convert any data-form definition arm in a module to its function-shape
@@ -174,6 +248,13 @@ function normalizePredicateDefs(
   mod: ModuleDef<ModuleSchema>,
   namespace: string,
 ): ModuleDef<ModuleSchema> {
+  // Cross-module dep namespaces declared by this module — used by
+  // prefixPredicateSpec to detect namespace pivots like `auth` in
+  // `when: { auth: { token: { $exists: true } } }`.
+  const depNamespaces: ReadonlySet<string> = mod.crossModuleDeps
+    ? new Set(Object.keys(mod.crossModuleDeps))
+    : EMPTY_DEP_SET;
+
   let constraints = mod.constraints;
   if (constraints) {
     let changed = false;
@@ -181,7 +262,10 @@ function normalizePredicateDefs(
     for (const [key, raw] of Object.entries(constraints)) {
       const def = raw as { when?: unknown };
       if (def.when !== undefined && typeof def.when !== "function") {
-        next[key] = { ...def, when: prefixPredicateSpec(def.when, namespace) };
+        next[key] = {
+          ...def,
+          when: prefixPredicateSpec(def.when, namespace, depNamespaces),
+        };
         changed = true;
         continue;
       }
@@ -223,9 +307,9 @@ function normalizePredicateDefs(
 
       if (isPredicateSpec(c)) {
         Object.freeze(c as object);
-        const compiled = compilePredicate(c as object);
+        const memoized = memoizePredicate(c as object);
         const fn = (facts: unknown) =>
-          compiled(facts as Record<string, unknown>);
+          memoized(facts as Record<string, unknown>);
         next[key] = obj.meta ? { compute: fn, meta: obj.meta } : fn;
         changed = true;
         continue;
@@ -243,29 +327,39 @@ function normalizePredicateDefs(
     let changed = false;
     const next: Record<string, unknown> = {};
     for (const [key, raw] of Object.entries(events)) {
-      if (
-        raw &&
-        typeof raw === "object" &&
-        Object.hasOwn(raw, "patch") &&
-        !Object.hasOwn(raw, "handler")
-      ) {
-        const obj = raw as {
-          patch: { $set: Record<string, unknown> };
-          meta?: unknown;
-        };
-        Object.freeze(obj.patch);
-        const handler = (
-          facts: Record<string, unknown>,
-          event: Record<string, unknown> | undefined,
-        ) =>
-          applyPatch(
-            obj.patch as Parameters<typeof applyPatch>[0],
-            facts,
-            event ?? {},
+      if (raw && typeof raw === "object") {
+        const hasHandler = Object.hasOwn(raw, "handler");
+        const hasPatch = Object.hasOwn(raw, "patch");
+
+        // Both forms provided — mirror engine.ts unwrapEventDefinitions:
+        // dev-warn once at registration so namespaced authors see the same
+        // diagnostic as the single-module path. Keep the existing implicit
+        // behavior of preferring the handler (skip patch conversion).
+        if (hasHandler && hasPatch && isDevelopment) {
+          console.warn(
+            `[Directive] event "${key}": both \`handler\` and \`patch\` provided — using \`handler\` (patch is ignored).`,
           );
-        next[key] = obj.meta ? { handler, meta: obj.meta } : handler;
-        changed = true;
-        continue;
+        }
+
+        if (hasPatch && !hasHandler) {
+          const obj = raw as {
+            patch: { $set: Record<string, unknown> };
+            meta?: unknown;
+          };
+          Object.freeze(obj.patch);
+          const handler = (
+            facts: Record<string, unknown>,
+            event: Record<string, unknown> | undefined,
+          ) =>
+            applyPatch(
+              obj.patch as Parameters<typeof applyPatch>[0],
+              facts,
+              event ?? {},
+            );
+          next[key] = obj.meta ? { handler, meta: obj.meta } : handler;
+          changed = true;
+          continue;
+        }
       }
       next[key] = raw;
     }
@@ -281,7 +375,10 @@ function normalizePredicateDefs(
     for (const [key, raw] of Object.entries(effects)) {
       const def = raw as { on?: unknown };
       if (def.on !== undefined && isPredicateSpec(def.on)) {
-        next[key] = { ...def, on: prefixPredicateSpec(def.on, namespace) };
+        next[key] = {
+          ...def,
+          on: prefixPredicateSpec(def.on, namespace, depNamespaces),
+        };
         changed = true;
         continue;
       }

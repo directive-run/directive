@@ -717,9 +717,16 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       }
     },
 
-    onConstraintEvaluate: (id, active) => {
+    onConstraintEvaluate: (id, active, whenExplain) => {
       const label = state.system?.meta?.constraint(id)?.label;
-      const payload = label ? { id, active, label } : { id, active };
+      // whenExplain is supplied for data-form `when` only; carry it through
+      // to the recorded event log so devtools can render the clause tree
+      // alongside the active flag. Function-form `when` gives `undefined`
+      // and is omitted from the payload to keep events compact.
+      const basePayload = label ? { id, active, label } : { id, active };
+      const payload = whenExplain
+        ? { ...basePayload, whenExplain }
+        : basePayload;
       addEvent("constraint.evaluate", payload);
       recordEvent("constraint.evaluate", payload);
       if (active) {

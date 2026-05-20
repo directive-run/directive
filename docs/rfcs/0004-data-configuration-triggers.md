@@ -14,7 +14,7 @@ statically analyzed, or explained clause-by-clause.
 This RFC adds an optional **declarative data form** alongside each function
 form. Two primitives:
 
-- **`FactPredicate`** — a boolean spec over a fact namespace
+- **`FactPredicate`** — a boolean predicate over a fact namespace
   (`{ phase: "red", elapsed: { $gte: 30 } }`). Drop-in replacement for a
   constraint `when`, effect `on`, or boolean derivation `compute`.
 - **`FactTemplate`** — a fact-interpolating string expression
@@ -96,8 +96,8 @@ predicate trees natively rather than function source strings.
 
 ### `FactPredicate`
 
-A boolean spec over a fact namespace `F`. Three forms (a value of any
-form satisfies `FactPredicate<F>`):
+A boolean predicate over a fact namespace `F`. Three forms (a value of
+any form satisfies `FactPredicate<F>`):
 
 > **Fact names only.** Predicate keys address **facts**, not derivations.
 > To gate on a derivation, either reference the underlying fact the
@@ -127,7 +127,8 @@ Operators (the `$`-prefixed keys inside an operator object):
 | `$in`, `$nin`                     | Membership in an array of literals   |
 | `$gt`, `$gte`, `$lt`, `$lte`      | Relational (number / bigint / Date / string) |
 | `$between`                        | Inclusive range, sugar over `$gte`+`$lte` |
-| `$matches`                        | Regex test against a string fact     |
+| `$matches`                        | Regex test against a string fact (`RegExp` only) |
+| `$startsWith`, `$endsWith`        | String prefix / suffix test          |
 | `$contains`                       | Substring / array-element membership |
 | `$exists`                         | Value is not `undefined`             |
 | `$changed`                        | Effects only — fact value differs from `prev` |
@@ -165,9 +166,9 @@ string in production.
 
 Every surface accepts `function | data`. Discrimination happens **once at
 registration** (or at engine wiring time for `system.constraints.register()`):
-a function passes through, a data spec is wrapped into the same function
-shape the eval-time code already expects. The hot path never branches on
-form.
+a function passes through, a data form (predicate / template / patch)
+is wrapped into the same function shape the eval-time code already
+expects. The hot path never branches on form.
 
 | Surface              | Type widening                                                | Runtime                                                        |
 | -------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |

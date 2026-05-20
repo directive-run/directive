@@ -504,3 +504,337 @@ describe("dynamic constraint register — data-form when", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// AE-R2 regression: effect `$changed` under a namespaced system
+// ============================================================================
+
+describe("namespaced effect `$changed` operator", () => {
+  it("fires when the watched fact transitions between values; not on first run", async () => {
+    const ran = vi.fn();
+
+    const led = createModule("led", {
+      schema: {
+        facts: {
+          phase: t.string<"red" | "green" | "yellow">(),
+          brightness: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.phase = "red";
+        facts.brightness = 0;
+      },
+      effects: {
+        onPhaseChange: {
+          // Data-form `on` — predicate uses `$changed` against the module's
+          // own (unprefixed) `phase` fact. Effects DO carry a prev snapshot.
+          on: { phase: { $changed: true } },
+          run: (facts) => {
+            ran(facts.phase);
+          },
+        },
+      },
+    });
+
+    const sensor = createModule("sensor", {
+      schema: {
+        facts: { readings: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.readings = 0;
+      },
+    });
+
+    const system = createSystem({ modules: { led, sensor } });
+    system.start();
+    await flush();
+
+    // After start: ignore any initial-run fires.
+    ran.mockClear();
+
+    // Touching another module's fact does not fire (predicate references led.phase).
+    system.facts.sensor.readings = 5;
+    await flush();
+    expect(ran).not.toHaveBeenCalled();
+
+    // Touching brightness (different fact in same module) does not fire.
+    system.facts.led.brightness = 50;
+    await flush();
+    expect(ran).not.toHaveBeenCalled();
+
+    // Flip phase — $changed predicate matches.
+    system.facts.led.phase = "green";
+    await flush();
+    expect(ran).toHaveBeenCalledWith("green");
+
+    // Same-value write (still "green") — predicate does not match.
+    ran.mockClear();
+    system.facts.led.phase = "green";
+    await flush();
+    expect(ran).not.toHaveBeenCalled();
+
+    // Another transition.
+    system.facts.led.phase = "yellow";
+    await flush();
+    expect(ran).toHaveBeenCalledWith("yellow");
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// AE R2 fix: namespace-pivot nested form in data-form `when`
+// ============================================================================
+
+// Before R2, the cross-module RFC nested form (`when: { self: {...}, auth:
+// {...} }`) was mangled by `prefixPredicateSpec` — `self` was treated as a
+// regular fact and prefixed to `<ns>::self`, which is unreachable. The
+// prefixer now recognizes "self" and declared `crossModuleDeps` namespaces
+// as pivot keys and flattens them one level.
+describe("namespace-pivot `self` and dep-namespace forms", () => {
+  it("constraint when: { self: { phase } } evaluates and fires", async () => {
+    const onResolve = vi.fn(async () => {});
+
+    const traffic = createModule("traffic", {
+      schema: {
+        facts: {
+          phase: t.string<"red" | "green">(),
+          elapsed: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: { TRANSITION: { to: t.string() } },
+      },
+      init: (facts) => {
+        facts.phase = "red";
+        facts.elapsed = 0;
+      },
+      constraints: {
+        // Nested-form `self` pivot — should flatten to `traffic::phase` /
+        // `traffic::elapsed`, NOT `traffic::self`.
+        transition: {
+          when: { self: { phase: "red", elapsed: { $gte: 30 } } } as never,
+          require: { type: "TRANSITION", to: "green" },
+        },
+      },
+      resolvers: {
+        transition: { requirement: "TRANSITION", resolve: onResolve },
+      },
+    });
+
+    const audit = createModule("audit", {
+      schema: {
+        facts: { entries: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.entries = 0;
+      },
+    });
+
+    const system = createSystem({ modules: { traffic, audit } });
+    system.start();
+
+    system.facts.traffic.elapsed = 30;
+    await flush();
+    expect(onResolve).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+
+  it("constraint with crossModuleDeps fires for `self` + dep pivots together", async () => {
+    const onResolve = vi.fn(async () => {});
+
+    const authSchema = {
+      facts: { token: t.string() },
+      derivations: {},
+      events: {},
+      requirements: {},
+    };
+
+    const auth = createModule("auth", {
+      schema: authSchema,
+      init: (facts) => {
+        facts.token = "";
+      },
+    });
+
+    const traffic = createModule("traffic", {
+      schema: {
+        facts: { phase: t.string<"red" | "green">() },
+        derivations: {},
+        events: {},
+        requirements: { TRANSITION: { to: t.string() } },
+      },
+      crossModuleDeps: { auth: authSchema },
+      init: (facts: { phase: "red" | "green" }) => {
+        facts.phase = "red";
+      },
+      constraints: {
+        // Combined pivot — `self` flattens against `traffic`, `auth` flattens
+        // against the declared dep namespace `auth`. The constraint should
+        // fire only when both pivot clauses hold.
+        transition: {
+          when: {
+            self: { phase: "red" },
+            auth: { token: { $ne: "" } },
+          } as never,
+          require: { type: "TRANSITION", to: "green" },
+        },
+      },
+      resolvers: {
+        transition: { requirement: "TRANSITION", resolve: onResolve },
+      },
+    } as never);
+
+    const system = createSystem({ modules: { auth, traffic } });
+    system.start();
+    await flush();
+    expect(onResolve).not.toHaveBeenCalled();
+
+    // Setting the dep token causes both pivot clauses to hold.
+    system.facts.auth.token = "abc";
+    await flush();
+    expect(onResolve).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+
+  it("already-prefixed keys in `$all` pass through unchanged", async () => {
+    const onResolve = vi.fn(async () => {});
+
+    const authSchema = {
+      facts: { token: t.string() },
+      derivations: {},
+      events: {},
+      requirements: {},
+    };
+
+    const auth = createModule("auth", {
+      schema: authSchema,
+      init: (facts) => {
+        facts.token = "";
+      },
+    });
+
+    const traffic = createModule("traffic", {
+      schema: {
+        facts: { phase: t.string<"red" | "green">() },
+        derivations: {},
+        events: {},
+        requirements: { TRANSITION: { to: t.string() } },
+      },
+      crossModuleDeps: { auth: authSchema },
+      init: (facts: { phase: "red" | "green" }) => {
+        facts.phase = "red";
+      },
+      constraints: {
+        // Mixed: an already-prefixed key + an unprefixed key in `$all`. The
+        // prefixer must pass `auth::token` through verbatim and prefix
+        // `phase` to `traffic::phase`.
+        transition: {
+          when: {
+            $all: [
+              { "auth::token": { $ne: "" } },
+              { phase: "red" },
+            ],
+          } as never,
+          require: { type: "TRANSITION", to: "green" },
+        },
+      },
+      resolvers: {
+        transition: { requirement: "TRANSITION", resolve: onResolve },
+      },
+    } as never);
+
+    const system = createSystem({ modules: { auth, traffic } });
+    system.start();
+    await flush();
+    expect(onResolve).not.toHaveBeenCalled();
+
+    system.facts.auth.token = "abc";
+    await flush();
+    expect(onResolve).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// AE R2 fix: namespaced events both `handler` AND `patch` dev-warn
+// ============================================================================
+
+// Before R2 the engine's single-module path warned when both `handler` and
+// `patch` were provided, but the namespaced path silently kept the handler
+// without warning. The normalizer now mirrors the engine's diagnostic so
+// authors of namespaced systems see the same friendly message.
+describe("namespaced event handler + patch — dev warn", () => {
+  it("dev-warns when both `handler` and `patch` are provided, keeps the handler", async () => {
+    const handler = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const status = createModule("status", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { setStatus: { value: t.string() } },
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.status = "idle";
+      },
+      events: {
+        // Both forms present — handler wins, patch is ignored.
+        setStatus: {
+          handler,
+          patch: { $set: { status: { $ref: "value" } } },
+        } as never,
+      },
+    });
+
+    const audit = createModule("audit", {
+      schema: {
+        facts: { entries: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.entries = 0;
+      },
+    });
+
+    const system = createSystem({ modules: { status, audit } });
+    system.start();
+
+    expect(
+      warn.mock.calls.some((args) =>
+        String(args[0]).includes('event "setStatus"'),
+      ),
+    ).toBe(true);
+    expect(
+      warn.mock.calls.some((args) =>
+        String(args[0]).includes("both `handler` and `patch` provided"),
+      ),
+    ).toBe(true);
+
+    system.events.status.setStatus({ value: "active" });
+    await flush();
+
+    // Handler ran (the patch was ignored — status stays "idle" because the
+    // vi.fn handler doesn't mutate facts).
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(system.facts.status.status).toBe("idle");
+
+    warn.mockRestore();
+    system.destroy();
+  });
+});

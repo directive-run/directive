@@ -10,7 +10,7 @@
 
 import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
-import { compilePredicate, evaluatePredicateExplained } from "./predicate.js";
+import { evaluatePredicateExplained, memoizePredicate } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
 import type {
@@ -305,13 +305,13 @@ export function createConstraintsManager<S extends Schema>(
 
     if (spec === null || typeof spec !== "object") {
       throw new Error(
-        `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof spec}`,
+        `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof spec}`,
       );
     }
     Object.freeze(spec);
-    const compiled = compilePredicate(spec as object);
+    const memoized = memoizePredicate(spec as object);
     (def as { when: unknown }).when = (f: Facts<S>) =>
-      compiled(f as unknown as Record<string, unknown>);
+      memoized(f as unknown as Record<string, unknown>);
     whenSpecs.set(id, spec);
     // Data `when` is structurally sync; clear any async flag so the engine
     // uses the sync evaluation path.
@@ -367,7 +367,7 @@ export function createConstraintsManager<S extends Schema>(
   }
 
   // Normalize any data-form `when` specs at construction time.
-  for (const id in definitions) {
+  for (const id of Object.keys(definitions)) {
     normalizeWhenSpec(id, definitions[id]);
   }
 

@@ -92,7 +92,11 @@ export interface PluginManager<_S extends Schema = any> {
   emitReconcileEnd(result: ReconcileResult): void;
 
   // Constraint hooks
-  emitConstraintEvaluate(id: string, active: boolean): void;
+  emitConstraintEvaluate(
+    id: string,
+    active: boolean,
+    whenExplain?: import("./types/predicate.js").ClauseResult[],
+  ): void;
   emitConstraintError(id: string, error: unknown): void;
 
   // Requirement hooks

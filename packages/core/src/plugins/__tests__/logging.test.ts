@@ -408,6 +408,41 @@ describe("loggingPlugin", () => {
         );
       });
 
+      // R2 fix: the bundled plugins now receive whenExplain as a third arg
+      // when the constraint's `when` is data-form. Logging summarizes it as
+      // a compact pass/fail breakdown so tailing the log shows which
+      // clauses tripped without spinning up devtools.
+      it("onConstraintEvaluate logs a clause summary when whenExplain is provided", () => {
+        const logger = createMockLogger();
+        const plugin = loggingPlugin({ logger, level: "debug" });
+
+        plugin.onConstraintEvaluate!("mustAuth", false, [
+          {
+            path: "token",
+            op: "$exists",
+            expected: true,
+            actual: undefined,
+            pass: false,
+          },
+          {
+            path: "phase",
+            op: "$eq",
+            expected: "red",
+            actual: "red",
+            pass: true,
+          },
+        ] as never);
+
+        expect(logger.debug).toHaveBeenCalledWith(
+          "[Directive] constraint.evaluate",
+          {
+            id: "mustAuth",
+            active: false,
+            clauses: { total: 2, passed: 1 },
+          },
+        );
+      });
+
       it("onRequirementCreated logs at debug", () => {
         const logger = createMockLogger();
         const plugin = loggingPlugin({ logger, level: "debug" });

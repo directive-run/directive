@@ -15,6 +15,7 @@ function setup(
     {
       run: (...args: any[]) => any;
       deps?: string[];
+      on?: unknown;
     }
   > = {},
   callbacks: {
@@ -618,6 +619,44 @@ describe("effects", () => {
           run: () => {},
         } as never),
       ).toThrow(/does not exist/);
+    });
+
+    // R2 fix: onGates leaked across assignDefinition. A data-form `on`
+    // effect's compiled gate persisted in shouldRun after a swap to a
+    // function-form effect, gating runs that should now be unconditional.
+    it("clears a stale `on` gate when swapping to a function-form effect", async () => {
+      const newRun = vi.fn();
+      const { facts, manager } = setup({
+        gated: {
+          on: { name: "alice" } as never,
+          run: () => {},
+        },
+      });
+
+      // Swap from data-form `on` to function-form (no `on`, no `deps`).
+      manager.assignDefinition("gated", { run: newRun } as never);
+
+      // Mutate an unrelated fact that doesn't match the old gate. With the
+      // leak, the stale gate would evaluate against the new facts and
+      // suppress the run; with the fix, the function-form effect runs on
+      // any change.
+      facts.count = 1;
+      await manager.runEffects(new Set(["count"]));
+
+      expect(newRun).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a non-predicate `on` value with a friendly throw", () => {
+      const { manager } = setup({
+        log: { deps: ["count"], run: () => {} },
+      });
+
+      expect(() =>
+        manager.assignDefinition("log", {
+          on: 42 as never,
+          run: () => {},
+        } as never),
+      ).toThrow(/effect on must be a FactPredicate spec/);
     });
   });
 

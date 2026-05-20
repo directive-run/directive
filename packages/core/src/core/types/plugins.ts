@@ -4,6 +4,7 @@
 
 import type { DirectiveError, RecoveryStrategy } from "./errors.js";
 import type { FactChange, FactsSnapshot } from "./facts.js";
+import type { ClauseResult } from "./predicate.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ModuleSchema } from "./schema.js";
 import type { System, TraceEntry } from "./system.js";
@@ -144,8 +145,15 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * Called after a constraint's `when` function is evaluated.
    * @param id - The constraint ID
    * @param active - Whether the constraint is active (when returned true)
+   * @param whenExplain - For data-form constraints, the per-clause breakdown
+   *   (which clauses passed, which failed, against what fact values). Omitted
+   *   for function-form `when`.
    */
-  onConstraintEvaluate?: (id: string, active: boolean) => void;
+  onConstraintEvaluate?: (
+    id: string,
+    active: boolean,
+    whenExplain?: ClauseResult[],
+  ) => void;
 
   /**
    * Called when a constraint's `when` function throws an error.

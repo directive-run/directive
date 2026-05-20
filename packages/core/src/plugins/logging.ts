@@ -122,7 +122,21 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
       });
     },
 
-    onConstraintEvaluate: (id, active) => {
+    onConstraintEvaluate: (id, active, whenExplain) => {
+      // For data-form `when`, log a compact pass/fail summary alongside the
+      // active flag so users tailing the log can see which clauses tripped
+      // without flipping on a separate devtools session. Function-form
+      // `when` omits the summary.
+      if (whenExplain) {
+        const passed = whenExplain.filter((c) => c.pass).length;
+        log("debug", "constraint.evaluate", {
+          id,
+          active,
+          clauses: { total: whenExplain.length, passed },
+        });
+
+        return;
+      }
       log("debug", "constraint.evaluate", { id, active });
     },
 

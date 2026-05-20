@@ -37,9 +37,9 @@
  */
 
 import {
-  compilePredicate,
   extractDeps,
   isPredicateSpec,
+  memoizePredicate,
 } from "./predicate.js";
 import { withTracking } from "./tracking.js";
 import type {
@@ -239,25 +239,37 @@ export function createEffectsManager<S extends Schema>(
       throw new Error(`[Directive] Unknown effect: ${id}`);
     }
 
+    // Always clear any stale gate from a previous registration of this id
+    // before re-installing. Without this, swapping a data-form `on` effect
+    // for a function-form one would leave the old gate active in shouldRun().
+    onGates.delete(id);
+
     let dependencies: Set<string> | null = null;
     let hasExplicitDeps = false;
 
     if (def.deps) {
       dependencies = new Set(def.deps as string[]);
       hasExplicitDeps = true;
-    } else if (def.on && isPredicateSpec(def.on)) {
+    } else if (def.on !== undefined) {
       // Declarative trigger — deps are extracted statically from the
       // predicate; the predicate is the gate evaluated after the
-      // dep-overlap pre-filter in shouldRun().
+      // dep-overlap pre-filter in shouldRun(). A non-predicate value here
+      // is a user error and must throw (matches the friendly throw used by
+      // constraints/derivations) instead of silently no-op-ing.
+      if (!isPredicateSpec(def.on)) {
+        throw new Error(
+          `[Directive] effect on must be a FactPredicate spec; got ${typeof def.on}`,
+        );
+      }
       if (def.on === null || typeof def.on !== "object") {
         throw new Error(
-          `[Directive] compilePredicate: spec must be a plain object or array; got ${typeof def.on}`,
+          `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof def.on}`,
         );
       }
       Object.freeze(def.on);
       dependencies = extractDeps(def.on);
       hasExplicitDeps = true;
-      onGates.set(id, compilePredicate(def.on as object));
+      onGates.set(id, memoizePredicate(def.on as object));
     }
 
     const state: EffectState = {
@@ -599,6 +611,7 @@ export function createEffectsManager<S extends Schema>(
       // Remove from all maps
       delete (definitions as Record<string, unknown>)[id];
       states.delete(id);
+      onGates.delete(id);
     },
 
     async callOne(id: string): Promise<void> {
