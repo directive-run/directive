@@ -386,3 +386,156 @@ compound on the vault-ledger primitive. Suggested arc: G1 → G5 → G2.
 **Common thread vs LangChain / NeMo / Guardrails-AI:** they treat PII as a
 lossy, post-hoc, static *filter*. Directive treats PII as a *fact* —
 reversible, permissioned, reactive, replayable, regression-tested.
+
+---
+
+## R4 (AE Loop, RFC-0004 Data-Form Predicates) — Game-Changer Ideas
+
+Surfaced during the 4-round AE review loop on RFC-0004. Each idea exists
+*only because* the predicate is now serializable data with `whenSpec` and
+`whenExplain` exposed on `inspect()` / `observe()` / `explain()`.
+
+### R4.A — `system.predict()`: the "what's holding this back" oracle
+
+**[3 days — viral MAX, compound MAX, the asymmetric pick]**
+
+`system.predict("transition")` walks a constraint's `whenSpec` against the
+current facts and returns the smallest fact diff that would make it fire —
+plus which constraints become reachable in the cascade:
+
+```ts
+system.predict("transition")
+// {
+//   willFireWhen: [{ path: "elapsed", op: "$gte", expected: 30, actual: 20, delta: "+10" }],
+//   thenUnlocks: ["greenPhase", "yellowPhase"],
+//   blockedBy:   ["paused (currently true)"],
+// }
+```
+
+**Headline:** *"The state library that tells you which fact you need to
+change to make your app do the next thing."* No other state library on npm
+has this — Redux/Zustand have no constraints; XState guards are functions.
+Symbolic execution for free, because the predicate is data.
+
+**Compound:** powers a devtools panel ("hover any idle constraint → see
+the literal change required"); seeds R4.B unreachability proofs (predict()
+over empty fact set); foundation for R4.D AI repair-loops.
+
+### R4.B — `directive doctor`: contradiction + unreachability static analysis
+
+**[4 days — viral MAX, compound MAX, formal-methods endorsement bait]**
+
+A CLI that walks all registered constraints, runs SMT-lite reasoning over
+the predicate trees, and emits warnings:
+
+- *"Constraints `pauseAll` and `transition` have contradictory `when`
+  clauses on `paused` — `transition` can never fire while `pauseAll` is
+  active."*
+- *"`emergencyStop` is unreachable: no fact path leads to
+  `priority > 9999`."*
+- *"`require: { to: "red" }` is impossible — no resolver handles
+  `TRANSITION{to:"red"}`."*
+
+**Headline:** *"The first JS state library that proves your state machine
+has no dead branches."* Pitches as "TLA+ lite, free, built-in." Real
+formal verification you didn't ask for. HN/TLA+ community endorsement
+bait.
+
+**Compound:** becomes a `directive lint` CI rule; lets `predict()` reason
+over future fact states; enables "constraint coverage" — what % of clause
+combinations were exercised by tests/replays.
+
+### R4.C — `@directive-run/visual-editor`: bidirectional predicate ⇆ React node-graph
+
+**[5 days — viral MAX, compound HIGH]**
+
+```tsx
+<PredicateEditor
+  whenSpec={system.inspect().constraints[0].whenSpec}
+  schema={moduleSchema}
+  onChange={(next) => system.constraints.assign("transition", { when: next })}
+/>
+```
+
+A React component that renders a `FactPredicate` as a drag-and-drop node
+graph (à la n8n / Retool's filter builder) and emits a valid
+`FactPredicate` back. Round-trip is loss-free because the spec *is* the
+data form.
+
+**Headline:** *"The state library where product managers ship constraints."*
+A 30-second screencast of a PM editing a feature-flag predicate live, no
+code. The no-code primitive Retool/Zapier have been faking for 5 years —
+here it's actually typed and actually-the-runtime-form.
+
+**Compound:** SaaS angle (`directive.run/playground`); AI plugin ("rewrite
+in plain English" → LLM emits next `FactPredicate` JSON); live editing in
+devtools.
+
+### R4.D — `predicateFromIntent()`: LLM writes typed predicates as data
+
+**[3 days — viral MAX, compound MAX]**
+
+```ts
+predicateFromIntent({
+  intent: "block checkout if cart is empty or user is unverified",
+  schema: moduleSchema,
+}) // → FactPredicate (typed against the schema)
+```
+
+The LLM emits a JSON predicate (not code — *data*). The runtime
+type-checks the operator set against the schema (`$gte` on a boolean fact
+→ rejected before execution) AND `directive doctor` (R4.B) verifies it
+doesn't contradict existing constraints AND `predict()` (R4.A) tells you
+which facts must change to make it fire.
+
+**Headline:** *"LLM writes a rule. Type-checker says no. LLM tries again.
+Two turns later, the rule is in production — and the runtime never
+executed unsafe code."* The first state library where an LLM can safely
+modify the running rules, because the output surface is a structurally
+validated data form, not arbitrary code. Compare to tool-use-with-eval.
+
+**Compound:** publishes a tool-spec preset for OpenAI / Anthropic
+function-calling; closes the loop with R4.B (doctor verifies) and R4.A
+(predict previews impact); foundation for self-modifying applications
+bounded by the constraint system.
+
+### R4.E — `directive coverage`: per-clause branch coverage for state logic
+
+**[2 days — viral HIGH, compound HIGH, quick-win vitest reporter]**
+
+Run vitest with the timeline recorder on; aggregate every `whenExplain`
+payload across all tests; emit a per-clause coverage report:
+
+```
+paused $eq true        evaluated 0 times   — no test exercised this branch
+elapsed $gte 30        evaluated 47 times  — 12 pass / 35 fail
+```
+
+**Headline:** *"Test coverage for state logic, not just lines of code.
+lcov is 30 years old and still only knows about JS branches; Directive
+knows about business branches."*
+
+**Compound:** CI gate ("PRs must hit ≥N% clause coverage"); pairs with
+R2.E fuzzer + R4.B doctor; drives users toward data-form predicates
+(function `when` can't be measured this way).
+
+### R4 ranked
+
+| Rank | Idea | Days | Viral | Compound | Note |
+|---|---|---|---|---|---|
+| 1 | **R4.A** `predict()` | 3 | Max | Max | Asymmetric pick. Substrate already shipped. |
+| 2 | **R4.D** LLM emits typed predicates | 3 | Max | Max | Karpathy bait. Rides RFC-0004 directly. |
+| 3 | **R4.B** `directive doctor` static analysis | 4 | Max | Max | TLA+/HN endorsement bait. |
+| 4 | **R4.E** `directive coverage` reporter | 2 | High | High | Quick win + vitest reporter. |
+| 5 | **R4.C** `<PredicateEditor>` bidirectional UI | 5 | Max | High | Best PM-facing demo; SaaS hook. |
+
+**Suggested arc:** R4.A (3d, foundation) → R4.E (2d, instant CI value) →
+R4.D (3d, AI angle ships) → R4.B (4d, formal-methods headline) → R4.C
+(5d, PM demo). Total: ~17 days for the entire R4 wave, all stacked on
+substrate that landed with RFC-0004.
+
+**R4 thesis:** RFC-0004 turned the predicate into a *data structure*.
+R4.A treats it as a *solvable equation*. R4.B treats it as a *theorem*.
+R4.C treats it as a *UI*. R4.D treats it as an *LLM output format*. R4.E
+treats it as a *coverage target*. Five framings of the same JSON object —
+none possible while `when` was a function.
