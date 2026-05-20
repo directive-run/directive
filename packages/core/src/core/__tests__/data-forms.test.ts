@@ -279,3 +279,110 @@ describe("derivation compute — data forms", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Introspection — inspect() / explain() / observe() surface the data form
+// ============================================================================
+
+describe("data-form introspection", () => {
+  function makeTrafficSystem() {
+    const mod = createModule("traffic", {
+      schema: {
+        facts: {
+          phase: t.string<"red" | "green">(),
+          elapsed: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: {
+          TRANSITION: { to: t.string() },
+        },
+      },
+      init: (facts) => {
+        facts.phase = "red";
+        facts.elapsed = 0;
+      },
+      constraints: {
+        transition: {
+          when: { phase: "red", elapsed: { $gte: 30 } },
+          require: { type: "TRANSITION", to: "green" },
+        },
+      },
+      resolvers: {
+        transition: {
+          requirement: "TRANSITION",
+          resolve: async () => {},
+        },
+      },
+    });
+
+    return createSystem({ module: mod });
+  }
+
+  it("inspect() exposes the predicate spec on constraints with a data `when`", async () => {
+    const system = makeTrafficSystem();
+    system.start();
+    await flush();
+
+    const info = system.inspect();
+    const constraint = info.constraints.find((c) => c.id === "transition");
+    expect(constraint?.whenSpec).toEqual({
+      phase: "red",
+      elapsed: { $gte: 30 },
+    });
+
+    system.destroy();
+  });
+
+  it("observe() emits whenExplain for a data-form constraint evaluation", async () => {
+    const system = makeTrafficSystem();
+    const events: Array<{
+      type: string;
+      whenExplain?: Array<{ path: string; pass: boolean }>;
+    }> = [];
+
+    const unsubscribe = system.observe((event) => {
+      if (event.type === "constraint.evaluate") {
+        events.push({
+          type: event.type,
+          whenExplain: event.whenExplain?.map((c) => ({
+            path: c.path,
+            pass: c.pass,
+          })),
+        });
+      }
+    });
+
+    system.start();
+    system.facts.elapsed = 30;
+    await flush();
+
+    const evalEvents = events.filter((e) => e.whenExplain);
+    expect(evalEvents.length).toBeGreaterThan(0);
+    const last = evalEvents[evalEvents.length - 1]!;
+    expect(last.whenExplain).toEqual([
+      { path: "phase", pass: true },
+      { path: "elapsed", pass: true },
+    ]);
+
+    unsubscribe();
+    system.destroy();
+  });
+
+  it("explain(requirementId) renders the predicate clause tree with ✓/✗", async () => {
+    const system = makeTrafficSystem();
+    system.start();
+    system.facts.elapsed = 30;
+    await flush();
+
+    const unmet = system.inspect().unmet;
+    expect(unmet.length).toBeGreaterThan(0);
+
+    const explanation = system.explain(unmet[0]!.id);
+    expect(explanation).toContain("Predicate clauses:");
+    expect(explanation).toMatch(/✓\s+phase\s+\$eq\s+red/);
+    expect(explanation).toMatch(/✓\s+elapsed\s+\$gte\s+30/);
+
+    system.destroy();
+  });
+});

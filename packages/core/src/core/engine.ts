@@ -1244,8 +1244,18 @@ export function createEngine<S extends Schema>(
         onDestroy: () => observer({ type: "system.destroy" }),
         onFactSet: (key: string, value: unknown, prev: unknown) =>
           observer({ type: "fact.change", key, prev, next: value }),
-        onConstraintEvaluate: (id: string, active: boolean) =>
-          observer({ type: "constraint.evaluate", id, active }),
+        onConstraintEvaluate: (id: string, active: boolean) => {
+          // For data-form `when` constraints, include the per-clause
+          // breakdown so observers (devtools, explain) can render which
+          // clauses passed and which failed.
+          const whenExplain = constraintsManager.explainWhen(id);
+
+          observer(
+            whenExplain
+              ? { type: "constraint.evaluate", id, active, whenExplain }
+              : { type: "constraint.evaluate", id, active },
+          );
+        },
         onConstraintError: (id: string, error: unknown) =>
           observer({ type: "constraint.error", id, error }),
         onRequirementCreated: (req: {
@@ -1592,15 +1602,20 @@ export function createEngine<S extends Schema>(
           name,
           meta: eventMeta.get(name),
         })),
-        constraints: constraintsManager.getAllStates().map((s) => ({
-          id: s.id,
-          active: s.lastResult ?? false,
-          disabled: constraintsManager.isDisabled(s.id),
-          priority: s.priority,
-          hitCount: s.hitCount,
-          lastActiveAt: s.lastActiveAt,
-          meta: mergedConstraints[s.id]?.meta,
-        })),
+        constraints: constraintsManager.getAllStates().map((s) => {
+          const whenSpec = constraintsManager.getWhenSpec(s.id);
+
+          return {
+            id: s.id,
+            active: s.lastResult ?? false,
+            disabled: constraintsManager.isDisabled(s.id),
+            priority: s.priority,
+            hitCount: s.hitCount,
+            lastActiveAt: s.lastActiveAt,
+            meta: mergedConstraints[s.id]?.meta,
+            ...(whenSpec ? { whenSpec } : {}),
+          };
+        }),
         resolvers: Object.fromEntries(
           resolversManager
             .getInflight()
@@ -1674,6 +1689,32 @@ export function createEngine<S extends Schema>(
 
       if (constraintDef?.meta?.description) {
         lines.push(`├─ Description: ${constraintDef.meta.description}`);
+      }
+
+      // If the constraint's `when` was declared as a FactPredicate, render
+      // the per-clause ✓/✗ breakdown — only the data form makes this
+      // possible, so it's surfaced here as the "why did it fire" view.
+      const clauses = constraintsManager.explainWhen(req.fromConstraint);
+      if (clauses && clauses.length > 0) {
+        lines.push("├─ Predicate clauses:");
+        clauses.forEach((clause, i) => {
+          const isLast = i === clauses.length - 1;
+          const prefix = isLast ? "│  └─" : "│  ├─";
+          const mark = clause.pass ? "✓" : "✗";
+          const expected =
+            typeof clause.expected === "object"
+              ? JSON.stringify(clause.expected)
+              : String(clause.expected);
+          const actual =
+            clause.actual === undefined
+              ? "undefined"
+              : typeof clause.actual === "object"
+                ? JSON.stringify(clause.actual)
+                : String(clause.actual);
+          lines.push(
+            `${prefix} ${mark} ${clause.path} ${clause.op} ${expected} (actual: ${actual})`,
+          );
+        });
       }
 
       // Add requirement details

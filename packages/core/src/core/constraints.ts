@@ -10,7 +10,7 @@
 
 import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
-import { compilePredicate } from "./predicate.js";
+import { compilePredicate, evaluatePredicateExplained } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
 import type {
@@ -168,6 +168,19 @@ export interface ConstraintsManager<_S extends Schema> {
    * @param requirementType - The requirement type string to remove.
    */
   removeRequirementKey(requirementType: string): void;
+  /**
+   * Return the original {@link FactPredicate} spec a constraint was declared
+   * with — present only when the constraint's `when` was provided as data.
+   * Used by `system.inspect()` / `system.explain()` and devtools to render
+   * the clause structure.
+   */
+  getWhenSpec(id: string): FactPredicate<Record<string, unknown>> | undefined;
+  /**
+   * Evaluate a data-form `when` and return the per-clause breakdown
+   * (which clauses passed, which failed, against what fact values).
+   * Returns `undefined` for constraints whose `when` is a function.
+   */
+  explainWhen(id: string): import("./types/predicate.js").ClauseResult[] | undefined;
 }
 
 /**
@@ -1396,6 +1409,22 @@ export function createConstraintsManager<S extends Schema>(
 
     removeRequirementKey(requirementType: string): void {
       delete requirementKeys[requirementType];
+    },
+
+    getWhenSpec(id: string) {
+      return whenSpecs.get(id);
+    },
+
+    explainWhen(id: string) {
+      const spec = whenSpecs.get(id);
+      if (!spec) {
+        return undefined;
+      }
+
+      return evaluatePredicateExplained(
+        spec,
+        facts as unknown as Record<string, unknown>,
+      );
     },
   };
 
