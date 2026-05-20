@@ -169,15 +169,8 @@ function prefixPredicateSpec(
    * level deeper (cross-module pivots cannot themselves contain further
    * cross-module pivots).
    */
-  function prefixPivot(
-    child: unknown,
-    targetNamespace: string,
-  ): unknown {
-    return prefixPredicateSpec(
-      child,
-      targetNamespace,
-      EMPTY_DEP_SET,
-    );
+  function prefixPivot(child: unknown, targetNamespace: string): unknown {
+    return prefixPredicateSpec(child, targetNamespace, EMPTY_DEP_SET);
   }
 
   const out: Record<string, unknown> = {};
@@ -191,7 +184,11 @@ function prefixPredicateSpec(
       const child = src[key];
       if (child && typeof child === "object") {
         const flattened = prefixPivot(child, selfNamespace);
-        if (flattened && typeof flattened === "object" && !Array.isArray(flattened)) {
+        if (
+          flattened &&
+          typeof flattened === "object" &&
+          !Array.isArray(flattened)
+        ) {
           for (const [k, v] of Object.entries(
             flattened as Record<string, unknown>,
           )) {
@@ -207,7 +204,11 @@ function prefixPredicateSpec(
       const child = src[key];
       if (child && typeof child === "object") {
         const flattened = prefixPivot(child, key);
-        if (flattened && typeof flattened === "object" && !Array.isArray(flattened)) {
+        if (
+          flattened &&
+          typeof flattened === "object" &&
+          !Array.isArray(flattened)
+        ) {
           for (const [k, v] of Object.entries(
             flattened as Record<string, unknown>,
           )) {
@@ -557,7 +558,9 @@ function prefixConstraints(
             );
 
             return (
-              constraintDef.when as (facts: unknown) => boolean | Promise<boolean>
+              constraintDef.when as (
+                facts: unknown,
+              ) => boolean | Promise<boolean>
             )(factsProxy);
           }
         : constraintDef.when,

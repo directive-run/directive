@@ -742,10 +742,7 @@ describe("namespace-pivot `self` and dep-namespace forms", () => {
         // `phase` to `traffic::phase`.
         transition: {
           when: {
-            $all: [
-              { "auth::token": { $ne: "" } },
-              { phase: "red" },
-            ],
+            $all: [{ "auth::token": { $ne: "" } }, { phase: "red" }],
           } as never,
           require: { type: "TRANSITION", to: "green" },
         },

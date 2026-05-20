@@ -537,7 +537,10 @@ export function createEngine<S extends Schema>(
       const selector = key as readonly string[];
 
       return (req) =>
-        evaluateKeySelector(selector, req as unknown as Record<string, unknown>);
+        evaluateKeySelector(
+          selector,
+          req as unknown as Record<string, unknown>,
+        );
     }
 
     return key as RequirementKeyFn;

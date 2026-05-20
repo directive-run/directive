@@ -55,20 +55,30 @@ describe("evaluatePredicate — operators", () => {
   });
 
   it("$between", () => {
-    expect(evaluatePredicate({ elapsed: { $between: [0, 60] } }, facts)).toBe(true);
-    expect(evaluatePredicate({ elapsed: { $between: [40, 60] } }, facts)).toBe(false);
+    expect(evaluatePredicate({ elapsed: { $between: [0, 60] } }, facts)).toBe(
+      true,
+    );
+    expect(evaluatePredicate({ elapsed: { $between: [40, 60] } }, facts)).toBe(
+      false,
+    );
   });
 
   it("$in / $nin", () => {
-    expect(evaluatePredicate({ phase: { $in: ["red", "green"] } }, facts)).toBe(true);
+    expect(evaluatePredicate({ phase: { $in: ["red", "green"] } }, facts)).toBe(
+      true,
+    );
     expect(evaluatePredicate({ phase: { $nin: ["green"] } }, facts)).toBe(true);
     expect(evaluatePredicate({ phase: { $nin: ["red"] } }, facts)).toBe(false);
   });
 
   it("$exists", () => {
     expect(evaluatePredicate({ phase: { $exists: true } }, facts)).toBe(true);
-    expect(evaluatePredicate({ missing: { $exists: false } }, facts)).toBe(true);
-    expect(evaluatePredicate({ missing: { $exists: true } }, facts)).toBe(false);
+    expect(evaluatePredicate({ missing: { $exists: false } }, facts)).toBe(
+      true,
+    );
+    expect(evaluatePredicate({ missing: { $exists: true } }, facts)).toBe(
+      false,
+    );
   });
 
   it("$matches", () => {
@@ -174,10 +184,18 @@ describe("evaluatePredicate — nested", () => {
 describe("evaluatePredicate — $changed", () => {
   it("true when the fact differs from prev", () => {
     expect(
-      evaluatePredicate({ phase: { $changed: true } }, { phase: "red" }, { phase: "green" }),
+      evaluatePredicate(
+        { phase: { $changed: true } },
+        { phase: "red" },
+        { phase: "green" },
+      ),
     ).toBe(true);
     expect(
-      evaluatePredicate({ phase: { $changed: true } }, { phase: "red" }, { phase: "red" }),
+      evaluatePredicate(
+        { phase: { $changed: true } },
+        { phase: "red" },
+        { phase: "red" },
+      ),
     ).toBe(false);
   });
 
@@ -220,7 +238,9 @@ describe("evaluatePredicate — edge cases", () => {
   });
 
   it("mixed operator + fact keys fail closed", () => {
-    expect(evaluatePredicate({ $eq: 1, phase: "red" }, { phase: "red" })).toBe(false);
+    expect(evaluatePredicate({ $eq: 1, phase: "red" }, { phase: "red" })).toBe(
+      false,
+    );
   });
 });
 
@@ -234,17 +254,14 @@ describe("evaluatePredicate — edge cases", () => {
 // against Set/Map facts.
 describe("AE-R2: deepEqual handles Set and Map (S-R2-Set)", () => {
   it("two empty Sets compare equal", () => {
-    expect(
-      evaluatePredicate({ s: { $eq: new Set() } }, { s: new Set() }),
-    ).toBe(true);
+    expect(evaluatePredicate({ s: { $eq: new Set() } }, { s: new Set() })).toBe(
+      true,
+    );
   });
 
   it("Sets with different elements are unequal", () => {
     expect(
-      evaluatePredicate(
-        { s: { $eq: new Set([1, 2]) } },
-        { s: new Set([1]) },
-      ),
+      evaluatePredicate({ s: { $eq: new Set([1, 2]) } }, { s: new Set([1]) }),
     ).toBe(false);
   });
 
@@ -259,10 +276,7 @@ describe("AE-R2: deepEqual handles Set and Map (S-R2-Set)", () => {
 
   it("$ne against Sets is symmetric", () => {
     expect(
-      evaluatePredicate(
-        { s: { $ne: new Set([1]) } },
-        { s: new Set([1, 2]) },
-      ),
+      evaluatePredicate({ s: { $ne: new Set([1]) } }, { s: new Set([1, 2]) }),
     ).toBe(true);
     expect(
       evaluatePredicate(
@@ -273,9 +287,9 @@ describe("AE-R2: deepEqual handles Set and Map (S-R2-Set)", () => {
   });
 
   it("two empty Maps compare equal; same-content Maps compare equal", () => {
-    expect(
-      evaluatePredicate({ m: { $eq: new Map() } }, { m: new Map() }),
-    ).toBe(true);
+    expect(evaluatePredicate({ m: { $eq: new Map() } }, { m: new Map() })).toBe(
+      true,
+    );
     expect(
       evaluatePredicate(
         {
@@ -352,10 +366,9 @@ describe("evaluatePredicateExplained", () => {
 
 describe("extractDeps", () => {
   it("collects object-form keys", () => {
-    expect([...extractDeps({ phase: "red", elapsed: { $gte: 30 } })].sort()).toEqual([
-      "elapsed",
-      "phase",
-    ]);
+    expect(
+      [...extractDeps({ phase: "red", elapsed: { $gte: 30 } })].sort(),
+    ).toEqual(["elapsed", "phase"]);
   });
 
   it("collects array-clause facts", () => {
@@ -366,7 +379,9 @@ describe("extractDeps", () => {
 
   it("walks combinators and nested predicates with dotted keys", () => {
     expect(
-      [...extractDeps({ $all: [{ phase: "red" }, { auth: { token: "x" } }] })].sort(),
+      [
+        ...extractDeps({ $all: [{ phase: "red" }, { auth: { token: "x" } }] }),
+      ].sort(),
     ).toEqual(["auth.token", "phase"]);
   });
 });
@@ -378,10 +393,13 @@ describe("extractDeps", () => {
 describe("evaluateTemplate", () => {
   it("interpolates placeholders", () => {
     expect(
-      evaluateTemplate({ $template: "Phase ${phase} for ${elapsed}s" }, {
-        phase: "red",
-        elapsed: 30,
-      }),
+      evaluateTemplate(
+        { $template: "Phase ${phase} for ${elapsed}s" },
+        {
+          phase: "red",
+          elapsed: 30,
+        },
+      ),
     ).toBe("Phase red for 30s");
   });
 
@@ -450,9 +468,9 @@ describe("discriminators", () => {
     expect(isPredicate(() => true)).toBe(false);
     expect(isPredicate({ phase: "red" })).toBe(true);
     expect(isPredicate([])).toBe(true);
-    expect(
-      isPredicate([{ fact: "phase", op: "$eq", value: "red" }]),
-    ).toBe(true);
+    expect(isPredicate([{ fact: "phase", op: "$eq", value: "red" }])).toBe(
+      true,
+    );
   });
 
   it("isPredicate rejects class instances and built-ins (DX-M8)", () => {
@@ -536,9 +554,9 @@ describe("AE-fix: deepEqual asymmetric cycle guard (S-M3)", () => {
     const acyclic: Record<string, unknown> = { x: 1, self: { x: 1 } };
     // `$eq` routes through deepEqual. With pairwise cycle tracking, the two
     // distinct structures are NOT treated as equal even though one is cyclic.
-    expect(
-      evaluatePredicate({ a: { $eq: cyclic } }, { a: acyclic }),
-    ).toBe(false);
+    expect(evaluatePredicate({ a: { $eq: cyclic } }, { a: acyclic })).toBe(
+      false,
+    );
   });
 
   it("identical cyclic pair still equals itself via $eq", () => {
@@ -548,9 +566,7 @@ describe("AE-fix: deepEqual asymmetric cycle guard (S-M3)", () => {
     b.self = b;
     // Same structure on both sides — deepEqual short-circuits on the
     // re-encountered pair without infinite recursion.
-    expect(() =>
-      evaluatePredicate({ x: { $eq: a } }, { x: b }),
-    ).not.toThrow();
+    expect(() => evaluatePredicate({ x: { $eq: a } }, { x: b })).not.toThrow();
     expect(evaluatePredicate({ x: { $eq: a } }, { x: b })).toBe(true);
   });
 });
@@ -627,12 +643,12 @@ describe("AE-fix: $matches ReDoS cache (S-m7, DM-M5)", () => {
   });
 
   it("string and RegExp operands both work", () => {
-    expect(evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" })).toBe(
-      true,
-    );
-    expect(evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" })).toBe(
-      true,
-    );
+    expect(
+      evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" }),
+    ).toBe(true);
+    expect(
+      evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" }),
+    ).toBe(true);
   });
 });
 
@@ -691,7 +707,7 @@ describe("AE-fix: applyPatch missing $ref dev-warn (DX-M14)", () => {
     expect(facts.userId).toBeUndefined();
     expect(
       warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes("$ref \"missing\" is missing"),
+        String(call[0] ?? "").includes('$ref "missing" is missing'),
       ),
     ).toBe(true);
   });
@@ -722,9 +738,7 @@ describe("AE-fix: evaluateTemplate null vs undefined warns (DM-C2)", () => {
       evaluateTemplate({ $template: "v=${x}" }, { x: null as unknown }),
     ).toBe("v=");
     expect(
-      warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes('null'),
-      ),
+      warnSpy.mock.calls.some((call) => String(call[0] ?? "").includes("null")),
     ).toBe(true);
   });
 
@@ -734,7 +748,7 @@ describe("AE-fix: evaluateTemplate null vs undefined warns (DM-C2)", () => {
     ).toBe("v=");
     expect(
       warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes('undefined'),
+        String(call[0] ?? "").includes("undefined"),
       ),
     ).toBe(true);
   });
@@ -747,23 +761,35 @@ describe("AE-fix: evaluateTemplate null vs undefined warns (DM-C2)", () => {
 describe("AE-R2: $startsWith / $endsWith operators", () => {
   it("$startsWith returns true when the actual string starts with operand", () => {
     expect(
-      evaluatePredicate({ name: { $startsWith: "Ada" } }, { name: "Ada Lovelace" }),
+      evaluatePredicate(
+        { name: { $startsWith: "Ada" } },
+        { name: "Ada Lovelace" },
+      ),
     ).toBe(true);
     expect(
-      evaluatePredicate({ name: { $startsWith: "Ada" } }, { name: "Grace Hopper" }),
+      evaluatePredicate(
+        { name: { $startsWith: "Ada" } },
+        { name: "Grace Hopper" },
+      ),
     ).toBe(false);
   });
 
   it("$endsWith returns true when the actual string ends with operand", () => {
     expect(
-      evaluatePredicate({ email: { $endsWith: "@example.com" } }, {
-        email: "ada@example.com",
-      }),
+      evaluatePredicate(
+        { email: { $endsWith: "@example.com" } },
+        {
+          email: "ada@example.com",
+        },
+      ),
     ).toBe(true);
     expect(
-      evaluatePredicate({ email: { $endsWith: "@example.com" } }, {
-        email: "ada@other.org",
-      }),
+      evaluatePredicate(
+        { email: { $endsWith: "@example.com" } },
+        {
+          email: "ada@other.org",
+        },
+      ),
     ).toBe(false);
   });
 
@@ -771,16 +797,23 @@ describe("AE-R2: $startsWith / $endsWith operators", () => {
     expect(evaluatePredicate({ x: { $startsWith: "1" } }, { x: 123 })).toBe(
       false,
     );
-    expect(evaluatePredicate({ x: { $endsWith: "3" } }, { x: 123 })).toBe(false);
+    expect(evaluatePredicate({ x: { $endsWith: "3" } }, { x: 123 })).toBe(
+      false,
+    );
     expect(
       evaluatePredicate({ x: { $startsWith: "a" } }, { x: undefined }),
     ).toBe(false);
   });
 
   it("extractDeps walks $startsWith / $endsWith just like other operators", () => {
-    expect([
-      ...extractDeps({ name: { $startsWith: "Ada" }, email: { $endsWith: ".com" } }),
-    ].sort()).toEqual(["email", "name"]);
+    expect(
+      [
+        ...extractDeps({
+          name: { $startsWith: "Ada" },
+          email: { $endsWith: ".com" },
+        }),
+      ].sort(),
+    ).toEqual(["email", "name"]);
   });
 
   it("empty operand string is a valid prefix/suffix (always true)", () => {
@@ -803,9 +836,9 @@ describe("AE-R2: $matches dev-warn for string operand", () => {
   });
 
   it("RegExp operand does NOT warn", () => {
-    expect(evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" })).toBe(
-      true,
-    );
+    expect(
+      evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" }),
+    ).toBe(true);
     expect(
       warnSpy.mock.calls.some((call) =>
         String(call[0] ?? "").includes("$matches: string operand"),
@@ -814,9 +847,9 @@ describe("AE-R2: $matches dev-warn for string operand", () => {
   });
 
   it("string operand dev-warns recommending a RegExp", () => {
-    expect(evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" })).toBe(
-      true,
-    );
+    expect(
+      evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" }),
+    ).toBe(true);
     expect(
       warnSpy.mock.calls.some((call) =>
         String(call[0] ?? "").includes("$matches: string operand"),

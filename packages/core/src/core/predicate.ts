@@ -11,8 +11,8 @@ import { stableStringify } from "../utils/utils.js";
 import {
   type ClauseResult,
   type FactTemplate,
-  type PatchSpec,
   PREDICATE_OPERATORS,
+  type PatchSpec,
   type PredicateOp,
 } from "./types/predicate.js";
 

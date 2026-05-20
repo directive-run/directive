@@ -164,7 +164,11 @@ export type PredicateObject<F> = {
 
 /** Array form — explicit clauses, AND-ed. The codegen/devtools-friendly form. */
 export type PredicateClause<F> = {
-  [K in keyof F]: { readonly fact: K; readonly op: PredicateOp; readonly value: unknown };
+  [K in keyof F]: {
+    readonly fact: K;
+    readonly op: PredicateOp;
+    readonly value: unknown;
+  };
 }[keyof F];
 
 /** Combinator node — exactly one of `$all` / `$any` / `$not`. */

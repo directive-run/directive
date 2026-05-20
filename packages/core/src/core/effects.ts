@@ -36,11 +36,7 @@
  * ```
  */
 
-import {
-  extractDeps,
-  isPredicate,
-  memoizePredicate,
-} from "./predicate.js";
+import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
 import { withTracking } from "./tracking.js";
 import type {
   EffectsDef,
@@ -230,7 +226,10 @@ export function createEffectsManager<S extends Schema>(
   let stopped = false;
 
   // Compiled predicate gate per effect (only effects with a data `on` field).
-  const onGates = new Map<string, (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean>();
+  const onGates = new Map<
+    string,
+    (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean
+  >();
 
   /** Initialize state for an effect */
   function initState(id: string): EffectState {

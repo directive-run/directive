@@ -9,11 +9,7 @@
  * - Lazy evaluation
  */
 
-import {
-  evaluateTemplate,
-  isTemplate,
-  memoizePredicate,
-} from "./predicate.js";
+import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
   DefinitionMeta,
@@ -123,7 +119,11 @@ export function createDerivationsManager<
    * Mutates `definitions[key]` to a bare function and stores any meta.
    */
   function unwrapDerivationAt(key: string, raw: unknown): void {
-    if (typeof raw !== "object" || raw === null || !Object.hasOwn(raw, "compute")) {
+    if (
+      typeof raw !== "object" ||
+      raw === null ||
+      !Object.hasOwn(raw, "compute")
+    ) {
       return;
     }
     const obj = raw as { compute: unknown; meta?: DefinitionMeta };
@@ -134,8 +134,7 @@ export function createDerivationsManager<
       fn = c as (facts: unknown, derived: unknown) => unknown;
     } else if (isTemplate(c)) {
       Object.freeze(c);
-      fn = (facts) =>
-        evaluateTemplate(c, facts as Record<string, unknown>);
+      fn = (facts) => evaluateTemplate(c, facts as Record<string, unknown>);
     } else if (typeof c === "object" && c !== null) {
       // Defensive: memoizePredicate also throws on non-object predicates, but a
       // guard here keeps the failure adjacent to the registration site.

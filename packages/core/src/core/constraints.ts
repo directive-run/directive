@@ -16,8 +16,8 @@ import { withTracking } from "./tracking.js";
 import type {
   ConstraintState,
   ConstraintsDef,
-  Facts,
   FactPredicate,
+  Facts,
   Requirement,
   RequirementKeyFn,
   RequirementWithId,
@@ -180,7 +180,9 @@ export interface ConstraintsManager<_S extends Schema> {
    * (which clauses passed, which failed, against what fact values).
    * Returns `undefined` for constraints whose `when` is a function.
    */
-  explainWhen(id: string): import("./types/predicate.js").ClauseResult[] | undefined;
+  explainWhen(
+    id: string,
+  ): import("./types/predicate.js").ClauseResult[] | undefined;
 }
 
 /**

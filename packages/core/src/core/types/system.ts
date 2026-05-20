@@ -8,11 +8,7 @@ import type { Facts } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
 import type { ModuleDef } from "./module.js";
 import type { Plugin, Snapshot } from "./plugins.js";
-import type {
-  ClauseResult,
-  FactPredicate,
-  KeySelector,
-} from "./predicate.js";
+import type { ClauseResult, FactPredicate, KeySelector } from "./predicate.js";
 import type { RequirementWithId } from "./requirements.js";
 import type { ResolverStatus } from "./resolvers.js";
 import type { BatchConfig, RetryPolicy } from "./resolvers.js";
@@ -555,9 +551,7 @@ export interface DynamicConstraintDef<M extends ModuleSchema = ModuleSchema> {
   priority?: number;
   async?: boolean;
   when:
-    | ((
-        facts: Readonly<InferSchema<M["facts"]>>,
-      ) => boolean | Promise<boolean>)
+    | ((facts: Readonly<InferSchema<M["facts"]>>) => boolean | Promise<boolean>)
     | FactPredicate<InferSchema<M["facts"]>>;
   require:
     | { type: string; [key: string]: unknown }

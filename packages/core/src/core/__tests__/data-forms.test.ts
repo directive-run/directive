@@ -406,7 +406,9 @@ describe("constraint `when` — $changed rejected (DX-M6)", () => {
       constraints: {
         bad: {
           // $changed is effects-only; constraint `when` has no prev snapshot.
-          when: { phase: { $changed: true } } as unknown as (f: unknown) => boolean,
+          when: { phase: { $changed: true } } as unknown as (
+            f: unknown,
+          ) => boolean,
           require: { type: "GO" },
         },
       },
@@ -415,9 +417,7 @@ describe("constraint `when` — $changed rejected (DX-M6)", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      /effects-only/,
-    );
+    expect(() => createSystem({ module: mod })).toThrow(/effects-only/);
   });
 
   it("throws for $changed nested inside a combinator", () => {
@@ -444,9 +444,7 @@ describe("constraint `when` — $changed rejected (DX-M6)", () => {
       },
     });
 
-    expect(() => createSystem({ module: mod })).toThrow(
-      /effects-only/,
-    );
+    expect(() => createSystem({ module: mod })).toThrow(/effects-only/);
   });
 });
 
@@ -514,9 +512,7 @@ describe("event handler + patch conflict (DX-R2)", () => {
     expect(system.facts.status).toBe("idle");
     expect(
       warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes(
-          "both `handler` and `patch` provided",
-        ),
+        String(call[0] ?? "").includes("both `handler` and `patch` provided"),
       ),
     ).toBe(true);
 
