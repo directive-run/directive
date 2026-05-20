@@ -1,5 +1,12 @@
 # @directive-run/cli
 
+## 1.5.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.5.0
+
 ## 1.4.0
 
 ### Minor Changes
