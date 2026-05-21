@@ -11,9 +11,9 @@
  *   - derive    `compute: { ... }` (predicate + template)
  *
  * And the introspection that only a data form makes possible:
- *   - `system.inspect().constraints[].whenSpec`
- *   - `constraint.evaluate` observer event with `whenExplain`
- *   - `system.explain()` rendering a clause-by-clause ✓/✗ tree.
+ *   - `system.inspect().constraints[].whenSpec` — the raw predicate
+ *   - `constraint.evaluate` observer event with `whenExplain`, rendered
+ *     below as a clause-by-clause ✓/✗ tree
  */
 
 import {
@@ -146,7 +146,6 @@ await settle();
 console.log(`phase after resolver: ${system.facts.phase}`);
 console.log(`transitionCount:      ${system.facts.transitionCount}`);
 
-// Show explain() on the next emitted requirement (if any), or on a re-fire.
 // Two writes: phase ← "red" satisfies the first clause; elapsed ← 5 fails the
 // `$gte: 30` clause, so the predicate as a whole is false and the constraint
 // does not fire.

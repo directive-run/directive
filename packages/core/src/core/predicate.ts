@@ -71,7 +71,6 @@ function isOperatorObject(v: unknown): v is Record<string, unknown> {
 
   let count = 0;
   let hasDollarKey = false;
-  let allKnown = true;
   for (const k of Object.keys(v)) {
     if (k.startsWith("$")) {
       hasDollarKey = true;
@@ -79,7 +78,6 @@ function isOperatorObject(v: unknown): v is Record<string, unknown> {
         devWarn(
           `predicate: unknown operator "${k}" — looks like a typo. Known operators: ${[...PREDICATE_OPERATORS].join(", ")}`,
         );
-        allKnown = false;
       }
     } else if (hasDollarKey || count === 0) {
       // Mixed $/non-$ keys aren't an operator object; let the caller treat
@@ -95,10 +93,7 @@ function isOperatorObject(v: unknown): v is Record<string, unknown> {
   }
 
   // All keys are `$`-prefixed: this is an operator object, even if some keys
-  // are typos. Unknown ops cause applyOperator() to return false (DX-C1).
-  // `allKnown` is read but not consumed externally — left for future use.
-  void allKnown;
-
+  // are typos. An unknown op makes applyOperator() return false.
   return count > 0;
 }
 
