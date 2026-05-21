@@ -36,12 +36,8 @@
  * ```
  */
 
-import {
-  deepFreeze,
-  extractDeps,
-  isPredicate,
-  memoizePredicate,
-} from "./predicate.js";
+import { freezeSpec } from "../utils/utils.js";
+import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
 import { withTracking } from "./tracking.js";
 import type {
   EffectsDef,
@@ -270,7 +266,7 @@ export function createEffectsManager<S extends Schema>(
           `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof def.on}`,
         );
       }
-      deepFreeze(def.on);
+      freezeSpec(def.on);
       dependencies = extractDeps(def.on);
       hasExplicitDeps = true;
       onGates.set(id, memoizePredicate(def.on as object));

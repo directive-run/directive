@@ -686,6 +686,19 @@ export type ObservationEvent =
       requirementId: string;
       error: unknown;
     }
+  | {
+      /**
+       * Emitted when a bound resolver's owned-fact write is dropped because
+       * the fact was changed by something outside the resolver between the
+       * resolver's baseline and its next write (RFC-0003 clobber detection).
+       */
+      type: "resolver.clobber";
+      resolver: string;
+      requirementId: string;
+      fact: string;
+      expected: unknown;
+      actual: unknown;
+    }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   | { type: "derivation.compute"; id: string; value: unknown }

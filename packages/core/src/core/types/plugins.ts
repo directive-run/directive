@@ -239,6 +239,27 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    */
   onResolverCancel?: (resolver: string, req: RequirementWithId) => void;
 
+  /**
+   * Called when a bound resolver (RFC-0003) drops a write to an owned fact
+   * because the fact was changed by something outside the resolver between
+   * the resolver's baseline and its next write. The resolver's
+   * `AbortController` is aborted in the same step. See
+   * {@link createBoundFacts} for the per-fact optimistic concurrency model.
+   *
+   * @param resolver - The resolver ID
+   * @param req - The requirement whose resolver detected the clobber
+   * @param fact - The owned fact key that was clobbered
+   * @param expected - The value the resolver expected to see
+   * @param actual - The value actually present in the store
+   */
+  onResolverClobber?: (
+    resolver: string,
+    req: RequirementWithId,
+    fact: string,
+    expected: unknown,
+    actual: unknown,
+  ) => void;
+
   // ============================================================================
   // Effect Hooks
   // ============================================================================

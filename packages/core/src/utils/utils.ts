@@ -2,6 +2,60 @@
  * Shared utilities for Directive
  */
 
+// ============================================================================
+// Deep freeze
+// ============================================================================
+
+/**
+ * Recursively `Object.freeze` an object including nested objects, arrays, and
+ * array elements. Uses a `WeakSet` to handle cycles. Skips primitives and
+ * already-frozen values to avoid wasted work.
+ *
+ * Used at definition-registration sites (constraints, derivations, effects,
+ * events, prefixed specs) so post-registration mutation of a nested operand
+ * cannot silently change the compiled closure's behavior. Prefer
+ * {@link freezeSpec} at registration sites — it documents the convention.
+ */
+export function deepFreeze<T>(
+  value: T,
+  seen: WeakSet<object> = new WeakSet(),
+): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const obj = value as unknown as object;
+  if (seen.has(obj) || Object.isFrozen(obj)) {
+    return value;
+  }
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      deepFreeze(item, seen);
+    }
+  } else {
+    for (const key of Object.keys(obj)) {
+      deepFreeze((obj as Record<string, unknown>)[key], seen);
+    }
+  }
+
+  Object.freeze(obj);
+  return value;
+}
+
+/**
+ * Freeze a definition spec at registration. Centralizes the deepFreeze
+ * convention so a new definition arm cannot forget it — every constraint,
+ * derivation, effect, event, and prefixed-spec registration funnels through
+ * this single helper.
+ *
+ * @param spec - The definition spec to freeze (mutated in place, returned)
+ * @returns The same `spec` value, now deeply frozen
+ */
+export function freezeSpec<T>(spec: T): T {
+  return deepFreeze(spec);
+}
+
 /**
  * Execute a promise with a timeout, properly cleaning up the timer.
  * Used by both constraints and resolvers for timeout handling.

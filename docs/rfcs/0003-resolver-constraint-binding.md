@@ -169,3 +169,20 @@ under it — typically a single `status`/`phase`/`mode` fact. The constraint's
   *not* viable — it gates discriminant facts the resolver legitimately
   clears (e.g. `pendingAction`), re-creating the freeze. The author must
   name the phase fact explicitly.
+
+## Single-process scope (v1.5)
+
+The clobber detection described in this RFC uses an in-memory `Map` per
+process (the `expected` map inside `createBoundFacts`). It guards against
+sibling resolvers in the same reconcile tick and out-of-band event mutations
+within the same process — that's the only race surface a single-process
+Directive runtime has.
+
+Multi-process Directive (planned v2) will introduce a `ClobberDetector`
+interface to abstract the per-fact owned-value lookup. Single-process
+implementations will plug into the same surface today's `createBoundFacts`
+uses internally — no resolver-author-visible change. Distributed
+implementations (Redis, Postgres advisory locks, durable execution
+backends) will satisfy the same interface so the binding semantics
+carry across processes. Architectural design is deferred until the
+v2 cross-process story lands.

@@ -9,9 +9,9 @@
  */
 
 import isDevelopment from "#is-development";
+import { freezeSpec } from "../utils/utils.js";
 import {
   applyPatch,
-  deepFreeze,
   evaluateTemplate,
   isPredicate,
   isTemplate,
@@ -130,7 +130,7 @@ function prefixPredicateSpec(
 
       return clause;
     });
-    deepFreeze(out);
+    freezeSpec(out);
 
     return out;
   }
@@ -149,7 +149,7 @@ function prefixPredicateSpec(
         prefixPredicateSpec(child, selfNamespace, depNamespaces),
       ),
     };
-    deepFreeze(out);
+    freezeSpec(out);
 
     return out;
   }
@@ -157,7 +157,7 @@ function prefixPredicateSpec(
     const out = {
       $not: prefixPredicateSpec(src.$not, selfNamespace, depNamespaces),
     };
-    deepFreeze(out);
+    freezeSpec(out);
 
     return out;
   }
@@ -222,7 +222,7 @@ function prefixPredicateSpec(
     }
     out[prefixKey(selfNamespace, key)] = src[key];
   }
-  deepFreeze(out);
+  freezeSpec(out);
 
   return out;
 }
@@ -299,7 +299,7 @@ function normalizePredicateDefs(
       }
 
       if (isTemplate(c)) {
-        deepFreeze(c);
+        freezeSpec(c);
         const fn = (facts: unknown) =>
           evaluateTemplate(c, facts as Record<string, unknown>);
         next[key] = obj.meta ? { compute: fn, meta: obj.meta } : fn;
@@ -308,7 +308,7 @@ function normalizePredicateDefs(
       }
 
       if (isPredicate(c)) {
-        deepFreeze(c as object);
+        freezeSpec(c as object);
         const memoized = memoizePredicate(c as object);
         const fn = (facts: unknown) =>
           memoized(facts as Record<string, unknown>);
@@ -348,7 +348,7 @@ function normalizePredicateDefs(
             patch: { $set: Record<string, unknown> };
             meta?: unknown;
           };
-          deepFreeze(obj.patch);
+          freezeSpec(obj.patch);
           const handler = (
             facts: Record<string, unknown>,
             event: Record<string, unknown> | undefined,

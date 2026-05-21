@@ -893,6 +893,19 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       panelEvent("resolver.cancel", { resolver });
     },
 
+    onResolverClobber: (resolver, req, fact, expected, actual) => {
+      const payload = {
+        resolver,
+        requirementId: req.id,
+        fact,
+        expected,
+        actual,
+      };
+      addEvent("resolver.clobber", payload);
+      recordEvent("resolver.clobber", payload);
+      panelEvent("resolver.clobber", { resolver, fact });
+    },
+
     onEffectRun: (id) => {
       const label = state.system?.meta?.effect(id)?.label;
       const payload = label ? { id, label } : { id };

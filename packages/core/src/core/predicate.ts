@@ -21,37 +21,11 @@ import {
 // ============================================================================
 
 /**
- * Recursively `Object.freeze` an object including nested objects, arrays, and
- * array elements. Uses a `WeakSet` to handle cycles. Skips primitives and
- * already-frozen values to avoid wasted work.
- *
- * Used at definition-registration sites (constraints, derivations, effects,
- * events, prefixed specs) so post-registration mutation of a nested operand
- * cannot silently change the compiled closure's behavior.
+ * Re-exported for back-compat. `deepFreeze` now lives in `utils/utils.ts`
+ * alongside `stableStringify` and the rest of the spec-freezing utilities.
+ * Prefer `freezeSpec` at registration sites — it documents the convention.
  */
-export function deepFreeze<T>(value: T, seen: WeakSet<object> = new WeakSet()): T {
-  if (value === null || typeof value !== "object") {
-    return value;
-  }
-  const obj = value as unknown as object;
-  if (seen.has(obj) || Object.isFrozen(obj)) {
-    return value;
-  }
-  seen.add(obj);
-
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      deepFreeze(item, seen);
-    }
-  } else {
-    for (const key of Object.keys(obj)) {
-      deepFreeze((obj as Record<string, unknown>)[key], seen);
-    }
-  }
-
-  Object.freeze(obj);
-  return value;
-}
+export { deepFreeze } from "../utils/utils.js";
 
 // ============================================================================
 // Discriminators
@@ -151,6 +125,61 @@ export function isPredicate(v: unknown): boolean {
   }
 
   return isPlainObjectStrict(v);
+}
+
+/**
+ * True when `v` structurally passes {@link isPredicate} but contains no
+ * operators, no combinators, and no fact-clause entries that resolve to a
+ * primitive/operator leaf — i.e. an empty `{}` or a deeply-nested object
+ * tree that never bottoms out in a leaf value. Used by the dynamic
+ * `register()` / `assign()` paths to dev-warn when a config object is
+ * passed where a predicate (or function) was expected.
+ *
+ * Returns `false` for arrays — array-form predicates with `fact`+`op`
+ * clauses are handled by the structural `isPredicate` check upstream.
+ *
+ * @example
+ * ```ts
+ * isEmptyOrConfigPredicate({}); // true (empty — config-object misuse)
+ * isEmptyOrConfigPredicate({ phase: "red" }); // false (real fact clause)
+ * isEmptyOrConfigPredicate({ $eq: 5 }); // false (operator)
+ * isEmptyOrConfigPredicate({ count: { $gt: 5 } }); // false (operator clause)
+ * ```
+ *
+ * @internal
+ */
+export function isEmptyOrConfigPredicate(v: unknown): boolean {
+  if (!isPlainObjectStrict(v)) {
+    return false;
+  }
+  const keys = Object.keys(v);
+  if (keys.length === 0) {
+    return true;
+  }
+  // Any operator/combinator key short-circuits — it's a predicate body.
+  for (const k of keys) {
+    if (k.startsWith("$")) {
+      return false;
+    }
+  }
+  // Every key is a plain field name. Recurse into each value: if any value
+  // is a primitive (the fact-clause leaf shape), the spec is a real
+  // predicate. If every value is itself an empty-or-config object, the
+  // entire spec is a config tree with no predicate semantics.
+  for (const k of keys) {
+    const child = (v as Record<string, unknown>)[k];
+    // Primitive / null / array / function / class instance — real leaf.
+    if (child === null || typeof child !== "object") {
+      return false;
+    }
+    if (Array.isArray(child)) {
+      return false;
+    }
+    if (!isEmptyOrConfigPredicate(child)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

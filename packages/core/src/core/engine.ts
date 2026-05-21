@@ -15,7 +15,7 @@ import {
   createDisabledHistory,
   createHistoryManager,
 } from "../utils/history.js";
-import { hashObject, isPrototypeSafe } from "../utils/utils.js";
+import { freezeSpec, hashObject, isPrototypeSafe } from "../utils/utils.js";
 import {
   type ConstraintsManager,
   createConstraintsManager,
@@ -37,7 +37,7 @@ import {
 } from "./errors.js";
 import { createFacts } from "./facts.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
-import { applyPatch, deepFreeze, evaluateKeySelector } from "./predicate.js";
+import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { BLOCKED_PROPS } from "./tracking.js";
@@ -112,7 +112,7 @@ function unwrapEventDefinitions(
       // Deep-freeze the spec + nested $set values at registration so post-
       // registration mutation cannot silently change event behavior (matches
       // the discipline used by constraints/derivations/effects).
-      deepFreeze(spec);
+      freezeSpec(spec);
       events[key] = (
         facts: Record<string, unknown>,
         event: Record<string, unknown> | undefined,
@@ -720,6 +720,11 @@ export function createEngine<S extends Schema>(
         traceManager.decrementInflight(req.id);
       }
     },
+    onClobber: (resolver, req, fact, expected, actual) => {
+      if (hasPlugins()) {
+        pluginManager.emitResolverClobber(resolver, req, fact, expected, actual);
+      }
+    },
     onResolutionComplete: () => {
       // After a resolver completes, schedule another reconcile
       notifySettlementChange();
@@ -984,8 +989,32 @@ export function createEngine<S extends Schema>(
       // race: the first lands its write, the second's `expected` map (seeded
       // from live `rawFacts`) inherits that write, and the second silently
       // clobbers the first.
-      const factsBaseline =
-        added.length > 0 ? (store.toObject() as Record<string, unknown>) : undefined;
+      //
+      // Perf: only snapshot the *owned* fact keys across this tick's bound
+      // requirements. With 10k facts and one binding on field "A", a full
+      // `store.toObject()` would copy all 10k slots per reconcile tick. We
+      // build the smallest possible baseline; if no `added` requirement has
+      // a binding, baseline stays `undefined` and `createBoundFacts` uses
+      // its live-rawFacts fallback path.
+      let factsBaseline: Record<string, unknown> | undefined;
+      if (added.length > 0) {
+        const ownedKeysThisTick = new Set<string>();
+        for (const req of added) {
+          if (!req.fromConstraint) continue;
+          const binding = getConstraintBinding(req.fromConstraint);
+          if (!binding) continue;
+          for (const k of binding.fields) {
+            ownedKeysThisTick.add(k);
+          }
+        }
+        if (ownedKeysThisTick.size > 0) {
+          factsBaseline = Object.create(null) as Record<string, unknown>;
+          for (const k of ownedKeysThisTick) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            factsBaseline[k] = store.get(k as any);
+          }
+        }
+      }
       for (const req of added) {
         resolversManager.resolve(req, { factsBaseline });
       }
@@ -1350,6 +1379,21 @@ export function createEngine<S extends Schema>(
             resolver,
             requirementId: req.id,
             error,
+          }),
+        onResolverClobber: (
+          resolver: string,
+          req: { id: string },
+          fact: string,
+          expected: unknown,
+          actual: unknown,
+        ) =>
+          observer({
+            type: "resolver.clobber",
+            resolver,
+            requirementId: req.id,
+            fact,
+            expected,
+            actual,
           }),
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>

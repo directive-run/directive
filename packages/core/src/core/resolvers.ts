@@ -197,10 +197,12 @@ interface BatchState {
   resolverId: string;
   requirements: RequirementWithId[];
   /**
-   * Per-requirement pre-dispatch baselines. The first non-null baseline seen
-   * across the batch wins when the resolver actually fires (batched resolvers
-   * share one ctx, so we cannot thread distinct baselines into a single proxy
-   * — but they're all from the same reconcile tick anyway).
+   * Per-requirement pre-dispatch baselines, one slot per add (positional
+   * with `requirements`). At flush time `processBatch` uses the LAST
+   * non-undefined baseline — the freshest view of owned facts, which
+   * matters when the batch window spans multiple reconcile ticks.
+   * Batched resolvers share one ctx, so only one baseline can be threaded
+   * into the proxy; the last add wins.
    */
   baselines: Array<Readonly<Record<string, unknown>> | undefined>;
   timer: ReturnType<typeof setTimeout> | null;
@@ -260,6 +262,19 @@ export interface CreateResolversOptions<S extends Schema> {
   onRetry?: (resolver: string, req: RequirementWithId, attempt: number) => void;
   /** Called when a resolver is canceled via {@link ResolversManager.cancel | cancel}. */
   onCancel?: (resolver: string, req: RequirementWithId) => void;
+  /**
+   * Called when a bound resolver's owned-fact write is dropped because the
+   * fact was changed by something outside the resolver (RFC-0003 clobber).
+   * Fires once per dropped write; the resolver's `AbortController` is also
+   * aborted in the same step. Wired to plugins for observability.
+   */
+  onClobber?: (
+    resolver: string,
+    req: RequirementWithId,
+    fact: string,
+    expected: unknown,
+    actual: unknown,
+  ) => void;
   /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
   onResolutionComplete?: () => void;
   /**
@@ -466,6 +481,7 @@ export function createResolversManager<S extends Schema>(
     onError,
     onRetry,
     onCancel,
+    onClobber,
     onResolutionComplete,
     onRequeue,
   } = options;
@@ -658,6 +674,11 @@ export function createResolversManager<S extends Schema>(
     binding: ConstraintBindingInfo,
     controller: AbortController,
     baseline?: Readonly<Record<string, unknown>>,
+    onClobberDetected?: (
+      fact: string,
+      expectedValue: unknown,
+      actualValue: unknown,
+    ) => void,
   ): Facts<S> {
     const rawFacts = facts as Record<string, unknown>;
     const owned = new Set(binding.fields);
@@ -675,11 +696,16 @@ export function createResolversManager<S extends Schema>(
     const lost = new Set<string>();
 
     // Returns true if the resolver may still write `prop`. On a detected
-    // external clobber, marks the fact lost and aborts the resolver.
+    // external clobber, marks the fact lost, emits the clobber observation
+    // event, and aborts the resolver.
     function ownedWriteAllowed(prop: string): boolean {
       if (lost.has(prop)) return false;
       if (Object.is(rawFacts[prop], expected.get(prop))) return true;
       lost.add(prop);
+      // Emit BEFORE abort so listeners see the unaborted resolver state.
+      if (onClobberDetected) {
+        onClobberDetected(prop, expected.get(prop), rawFacts[prop]);
+      }
       controller.abort();
       return false;
     }
@@ -761,10 +787,23 @@ export function createResolversManager<S extends Schema>(
     binding?: ConstraintBindingInfo | null,
     controller?: AbortController,
     baseline?: Readonly<Record<string, unknown>>,
+    clobberAttribution?: {
+      resolverId: string;
+      requirements: readonly RequirementWithId[];
+    },
   ): ResolverContext<S> {
+    const onClobberDetected =
+      onClobber && clobberAttribution
+        ? (fact: string, expectedValue: unknown, actualValue: unknown) => {
+            const { resolverId, requirements } = clobberAttribution;
+            for (const r of requirements) {
+              onClobber(resolverId, r, fact, expectedValue, actualValue);
+            }
+          }
+        : undefined;
     const ctxFacts =
       binding && controller
-        ? createBoundFacts(binding, controller, baseline)
+        ? createBoundFacts(binding, controller, baseline, onClobberDetected)
         : facts;
     return {
       facts: ctxFacts,
@@ -863,7 +902,10 @@ export function createResolversManager<S extends Schema>(
     store.batch(() => {
       resolvePromise = def.resolve!(
         req.requirement as Parameters<NonNullable<typeof def.resolve>>[0],
-        createContext(signal, [req.id], binding, controller, baseline),
+        createContext(signal, [req.id], binding, controller, baseline, {
+          resolverId,
+          requirements: [req],
+        }),
       ) as Promise<void>;
     });
 
@@ -1182,6 +1224,7 @@ export function createResolversManager<S extends Schema>(
       batchBinding,
       controller,
       baseline,
+      { resolverId, requirements },
     );
     const reqPayloads = requirements.map((r) => r.requirement);
 
@@ -1387,9 +1430,19 @@ export function createResolversManager<S extends Schema>(
     if (!batch || batch.requirements.length === 0) return;
 
     const requirements = [...batch.requirements];
-    // Pick the first non-undefined baseline; all reqs in a batch are dispatched
-    // in the same reconcile tick so any baseline from that tick is acceptable.
-    const baseline = batch.baselines.find((b) => b !== undefined);
+    // Use the LAST non-undefined baseline (most recent add). A batch's
+    // `windowMs` can span multiple reconcile ticks (default 50ms), so the
+    // last addition's baseline is the freshest view of the owned facts at
+    // flush time. Picking the first baseline would let a stale snapshot
+    // from an earlier tick mask clobbers that happened between ticks.
+    let baseline: Readonly<Record<string, unknown>> | undefined;
+    for (let i = batch.baselines.length - 1; i >= 0; i--) {
+      const b = batch.baselines[i];
+      if (b !== undefined) {
+        baseline = b;
+        break;
+      }
+    }
     batch.requirements = [];
     batch.baselines = [];
     batch.timer = null;

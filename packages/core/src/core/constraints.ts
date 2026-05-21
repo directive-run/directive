@@ -9,10 +9,10 @@
  */
 
 import isDevelopment from "#is-development";
-import { withTimeout } from "../utils/utils.js";
+import { freezeSpec, withTimeout } from "../utils/utils.js";
 import {
-  deepFreeze,
   evaluatePredicateExplained,
+  isEmptyOrConfigPredicate,
   memoizePredicate,
 } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
@@ -313,7 +313,12 @@ export function createConstraintsManager<S extends Schema>(
         `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof spec}`,
       );
     }
-    deepFreeze(spec);
+    if (isDevelopment && isEmptyOrConfigPredicate(spec)) {
+      console.warn(
+        `[Directive] constraint '${id}': data spec has no operators, combinators, or clauses — looks like a config object passed by mistake. Either pass a predicate like { phase: 'red' } or a function.`,
+      );
+    }
+    freezeSpec(spec);
     const memoized = memoizePredicate(spec as object);
     (def as { when: unknown }).when = (f: Facts<S>) =>
       memoized(f as unknown as Record<string, unknown>);
