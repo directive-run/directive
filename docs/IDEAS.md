@@ -606,6 +606,8 @@ not just lines of code."*
 
 ### R4.G — `directive replay-under <new-spec> --history <recorded.json>`: counterfactual rule replay
 
+**[✅ SHIPPED 2026-05-21 — `replayUnder()` in @directive-run/core + `directive replay-under` CLI. See docs/concepts/replay-under.md]**
+
 **[3 days — viral MAX, compound MAX, the R2.A-shaped asymmetric pick]**
 
 Given (a) a recorded fact-mutation history from the timeline plugin and
@@ -829,7 +831,7 @@ arguing — and tells you why."*
 
 | Rank | Idea | Days | Viral | Compound | Note |
 |---|---|---|---|---|---|
-| 1 | **R4.G** `replay-under` counterfactual rule replay | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
+| 1 | **R4.G** `replay-under` counterfactual rule replay — **✅ SHIPPED 2026-05-21** | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
 | 2 | **R4.F** `directive rules-diff` PR-review tool | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
 | 3 | **R4.H** `predicateToSQL` isomorphic predicates | 3 | High | Max | The "one truth, three targets" article writes itself. Drizzle/Prisma envy. |
 | 4 | **R4.I** GDPR-grade audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |

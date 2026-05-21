@@ -116,6 +116,15 @@ export {
   validatePredicate,
 } from "./core/predicate.js";
 
+// Counterfactual rule replay
+export { replayUnder } from "./core/replay-under.js";
+export type {
+  CounterfactualReport,
+  ReplayDiffSample,
+  ReplayFrame,
+  ReplayUnderOptions,
+} from "./core/replay-under.js";
+
 // ============================================================================
 // Core Classes
 // ============================================================================

@@ -14,6 +14,7 @@ import { graphCommand } from "./commands/graph.js";
 import { initCommand } from "./commands/init.js";
 import { inspectCommand } from "./commands/inspect.js";
 import { newModuleCommand, newOrchestratorCommand } from "./commands/new.js";
+import { replayUnderCommand } from "./commands/replay-under.js";
 import { replayCommand } from "./commands/replay.js";
 import { timelineDiffCommand } from "./commands/timeline-diff.js";
 import { CLI_NAME } from "./lib/constants.js";
@@ -38,6 +39,8 @@ Commands:
   examples copy <name>          Extract example to project
   replay <timeline.json>        Replay a serialized Directive timeline
                                 (paired with @directive-run/timeline)
+  replay-under --history ...    Counterfactual rule replay — diff a
+                                proposed predicate against recorded history
   bisect <timeline.json>        Binary-search a timeline for the first
                                 frame that triggers a failing assertion
   timeline diff <a> <b>         Semantic causal-graph diff between two
@@ -200,6 +203,11 @@ async function main() {
 
     case "replay": {
       await replayCommand(args.slice(1));
+      break;
+    }
+
+    case "replay-under": {
+      await replayUnderCommand(args.slice(1));
       break;
     }
 
