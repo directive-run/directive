@@ -49,8 +49,9 @@ directive replay-under --history sessions.json \
 ```
 
 History JSON is accepted as a bare array of frames, an object with a
-`frames` array, or a bare array of fact objects. `--entity-key` reports
-distinct-entity counts; `--json` emits the full `PredicateBacktestReport`.
+`frames` array, a bare array of fact objects, or a `system.history.export()`
+file. `--entity-key` reports distinct-entity counts; `--json` emits the
+full `PredicateBacktestReport`.
 
 This builds directly on the RFC-0004 data-form predicate runtime — a
 predicate is data, so it can be re-evaluated against history a function
