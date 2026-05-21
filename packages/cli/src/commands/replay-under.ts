@@ -1,17 +1,18 @@
 /**
  * `directive replay-under --history <frames.json> --proposed <spec.json>`
  *
- * Counterfactual rule replay. Given a recorded history of fact-state frames
- * and a proposed replacement for a constraint's `when` predicate, replay the
- * frames through both the original and the proposed predicate and report how
- * their match sets differ — the "how many users would this rule change have
- * affected?" question, answered against real recorded history.
+ * Predicate backtest — rule-change impact. Given a recorded history of
+ * fact-state frames and a proposed replacement for a constraint's `when`
+ * predicate, re-score the frames against both the original and the proposed
+ * predicate and report how their match sets differ — how many recorded
+ * frames the proposed rule would have matched differently, answered against
+ * real recorded history.
  *
  * History JSON is accepted in three shapes:
  *   1. A bare array of frames:        [{ id, timestamp?, facts }, ...]
  *   2. An object wrapping them:       { frames: [{ id, ..., facts }, ...] }
  *   3. A bare array of fact objects:  [{ phase: "red", ... }, ...]
- *      — each element is wrapped as a frame keyed by its index.
+ *      — each element is wrapped as a frame keyed by a `#`-prefixed index.
  *
  * The proposed (and original) predicate files each contain a single
  * FactPredicate object as JSON.
@@ -25,9 +26,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  type CounterfactualReport,
+  type FactPredicate,
+  type PredicateBacktestReport,
   type ReplayFrame,
   replayUnder,
+  toReplayFrames,
 } from "@directive-run/core";
 import pc from "picocolors";
 
@@ -36,6 +39,7 @@ interface ReplayUnderCliOptions {
   proposedPath?: string;
   originalPath?: string;
   maxSamples: number;
+  entityKey?: string;
   json: boolean;
 }
 
@@ -45,8 +49,7 @@ function parseArgs(args: string[]): ReplayUnderCliOptions {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
-      case "--history":
-      case "-h": {
+      case "--history": {
         const val = args[++i];
         if (val) {
           opts.historyPath = val;
@@ -77,6 +80,13 @@ function parseArgs(args: string[]): ReplayUnderCliOptions {
         }
         break;
       }
+      case "--entity-key": {
+        const val = args[++i];
+        if (val) {
+          opts.entityKey = val;
+        }
+        break;
+      }
       case "--json":
         opts.json = true;
         break;
@@ -92,20 +102,23 @@ Usage: directive replay-under --history <frames.json> --proposed <spec.json>
 
 Replay a recorded fact-frame history through a proposed constraint
 predicate and report how its match set differs from the original.
+This is a static predicate backtest — the engine is not re-run.
 
 Options:
   --history <path>        Recorded frames JSON (required)
   --proposed <path>       Proposed predicate JSON (required)
   --original <path>       Original predicate JSON (required in v1)
   --max-samples <n>       Diff frames sampled per bucket (default 20)
-  --json                  Emit the CounterfactualReport as JSON
+  --entity-key <fact>     Fact key identifying an entity — also reports
+                          distinct-entity counts (e.g. userId, sessionId)
+  --json                  Emit the PredicateBacktestReport as JSON
   --help                  Show this help
 
 Examples:
   directive replay-under --history sessions.json \\
     --original current-rule.json --proposed tightened-rule.json
   directive replay-under --history sessions.json \\
-    --original a.json --proposed b.json --json
+    --original a.json --proposed b.json --entity-key userId --json
 `);
 }
 
@@ -127,40 +140,28 @@ function readJsonFile(path: string, label: string): unknown {
   }
 }
 
-/** Normalize a parsed history JSON into a `ReplayFrame[]`. */
+/**
+ * Normalize a parsed history JSON into a `ReplayFrame[]` — a thin wrapper
+ * over the core `toReplayFrames` helper that turns its thrown error into a
+ * clean CLI message and exit.
+ */
 function loadFrames(raw: unknown): ReplayFrame[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : raw && typeof raw === "object" && Array.isArray((raw as { frames?: unknown }).frames)
-      ? ((raw as { frames: unknown[] }).frames)
-      : null;
-
-  if (!list) {
-    console.error(
-      pc.red(
-        "error: --history must be a JSON array of frames, or an object with a `frames` array",
-      ),
-    );
+  try {
+    return toReplayFrames(raw);
+  } catch (err) {
+    console.error(pc.red(`error: ${(err as Error).message}`));
     process.exit(1);
   }
+}
 
-  return list.map((entry, index) => {
-    if (entry && typeof entry === "object" && "facts" in entry) {
-      const frame = entry as { id?: string | number; timestamp?: number; facts: unknown };
-      const out: ReplayFrame = {
-        id: frame.id ?? index,
-        facts: (frame.facts ?? {}) as Record<string, unknown>,
-      };
-      if (typeof frame.timestamp === "number") {
-        out.timestamp = frame.timestamp;
-      }
-
-      return out;
-    }
-
-    // A bare fact object — wrap it, keyed by index.
-    return { id: index, facts: (entry ?? {}) as Record<string, unknown> };
-  });
+/** True when a parsed spec is the always-true empty predicate `{}`. */
+function isEmptyPredicate(spec: unknown): boolean {
+  return (
+    spec !== null &&
+    typeof spec === "object" &&
+    !Array.isArray(spec) &&
+    Object.keys(spec as object).length === 0
+  );
 }
 
 /** Compact one-line preview of a frame's facts. */
@@ -173,7 +174,10 @@ function previewFacts(facts: Record<string, unknown>): string {
   return parts.join(" ") + (extra > 0 ? pc.dim(` +${extra} more`) : "");
 }
 
-function printReport(report: CounterfactualReport): void {
+function printReport(
+  report: PredicateBacktestReport,
+  entityKey: string | undefined,
+): void {
   const { original, proposed, delta } = report;
   const deltaStr =
     delta > 0
@@ -182,12 +186,28 @@ function printReport(report: CounterfactualReport): void {
         ? pc.red(`${delta}`)
         : pc.dim("±0");
 
-  console.log(`\n${pc.bold("replay-under")} — counterfactual rule replay\n`);
+  console.log(`\n${pc.bold("replay-under")} — predicate backtest\n`);
   console.log(`  frames evaluated   ${report.framesEvaluated}`);
   console.log(`  original spec      matched ${original.matched} frames`);
   console.log(
-    `  proposed spec      matched ${proposed.matched} frames   (${deltaStr})\n`,
+    `  proposed spec      matched ${proposed.matched} frames   (${deltaStr})`,
   );
+
+  // Distinct-entity counts — only present when --entity-key was supplied.
+  if (
+    entityKey &&
+    original.matchedEntities !== undefined &&
+    proposed.matchedEntities !== undefined
+  ) {
+    console.log(
+      `\n  original spec      matched across ${original.matchedEntities} ${entityKey}s`,
+    );
+    console.log(
+      `  proposed spec      matched across ${proposed.matchedEntities} ${entityKey}s`,
+    );
+  }
+
+  console.log("");
   console.log(
     `  ${pc.green(`+${report.newMatchCount}`)} new matches    ${pc.dim("frames that now match the rule")}`,
   );
@@ -249,12 +269,38 @@ export async function replayUnderCommand(args: string[]): Promise<void> {
   const original = readJsonFile(opts.originalPath, "--original");
   const proposed = readJsonFile(opts.proposedPath, "--proposed");
 
-  const report = replayUnder({
-    frames,
-    original,
-    proposed,
-    maxSamples: opts.maxSamples,
-  });
+  // An empty predicate `{}` is valid but always-true — warn so a confident
+  // "matched every frame" report is not mistaken for a meaningful result.
+  if (isEmptyPredicate(original)) {
+    console.error(
+      pc.yellow("warning: --original is an empty predicate {} — it matches every frame"),
+    );
+  }
+  if (isEmptyPredicate(proposed)) {
+    console.error(
+      pc.yellow("warning: --proposed is an empty predicate {} — it matches every frame"),
+    );
+  }
+
+  let report: PredicateBacktestReport;
+  try {
+    // `original` / `proposed` are JSON-parsed `unknown` — replayUnder
+    // validates their structure at runtime and throws a clear error on a
+    // bad spec, so the cast here is the documented boundary.
+    report = replayUnder({
+      frames,
+      original: original as FactPredicate<Record<string, unknown>>,
+      proposed: proposed as FactPredicate<Record<string, unknown>>,
+      maxSamples: opts.maxSamples,
+      entityKey: opts.entityKey,
+    });
+  } catch (err) {
+    // replayUnder throws a clear `[Directive] replayUnder:` error on an
+    // invalid spec or an over-limit history — surface the message, never a
+    // raw stack trace.
+    console.error(pc.red(`error: ${(err as Error).message}`));
+    process.exit(1);
+  }
 
   if (opts.json) {
     console.log(JSON.stringify(report, null, 2));
@@ -262,5 +308,5 @@ export async function replayUnderCommand(args: string[]): Promise<void> {
     return;
   }
 
-  printReport(report);
+  printReport(report, opts.entityKey);
 }

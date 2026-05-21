@@ -634,8 +634,12 @@ has had the same question: *"How many users would this have affected last
 month?"* The answer today is a JIRA ticket to data science, a 2-week
 turnaround, and a SQL query that's wrong because it doesn't model
 constraint cascades. R4.G answers the question in **30 seconds**, against
-the actual recorded fact history, with cascade modeling built in (because
-replay re-runs the engine).
+the actual recorded fact history. What shipped is a *static predicate
+backtest* — each recorded frame is re-scored against the proposed spec;
+the engine is not re-run, so downstream constraint cascades are not
+modeled. A full engine-re-run cascade simulation (restore each frame,
+replay forward under the proposed spec, model the resulting requirement /
+resolver / fact changes) is a deferred future variant.
 
 **Compound effect:**
 - Pairs with R4.F (above): diff a rule, then click "replay under change"
@@ -862,6 +866,348 @@ demo writes itself, the headline writes itself, and the value is
 unambiguous in the first 5 seconds of the screencast. "Replay last month's
 production against any rule change before you merge it" is the kind of
 sentence that gets retweeted with no commentary.
+
+---
+
+## R5 Game-Changer Ideas (Round 5 — compound on shipped `replayUnder()`)
+
+Surfaced during the R5 innovation pass, **after `replayUnder()` + `directive
+replay-under` shipped** (R4.G, 2026-05-21). R4.G itself is the *one rule, one
+pair, before-merge* case. But the thing that actually landed is a **pure
+replay engine** — `frames + two predicates → CounterfactualReport`, zero
+engine dependency — plus a new first-class input: **recorded fact-frame
+history**. R4.F-J treat the predicate as a document / signal / witness /
+target / counterfactual. R5 treats the *replay engine itself* as a
+**substrate**: a thing you sweep, optimize against, run live, walk through
+git, and close an AI loop around. None of these are "replay one rule" —
+they are "what does owning a replay engine unlock."
+
+### R5.A — `sweepUnder()` / `directive tune <constraint>`: the rule-threshold optimizer
+
+**[2 days — viral MAX, compound MAX — the asymmetric pick of R5]**
+
+`replayUnder` diffs *one* proposed predicate against the original.
+`sweepUnder` takes a **predicate template with a free variable** and a
+recorded history, then replays the history once per candidate value and
+returns the whole response curve:
+
+```ts
+sweepUnder({
+  frames: recordedSessions,
+  original: { cartTotal: { $gte: 100 } },
+  // a hole in the predicate + the values to sweep
+  template: { cartTotal: { $gte: { $hole: "threshold" } } },
+  sweep: { threshold: [25, 50, 75, 100, 125, 150, 200] },
+  // optional: an objective to rank by
+  objective: (report) => report.proposed.matched,
+});
+// → [
+//     { threshold: 25,  matched: 9210, delta: +4993, ... },
+//     { threshold: 50,  matched: 6610, delta: +2393, ... },
+//     { threshold: 100, matched: 4217, delta:    0, ... },  ← current
+//     { threshold: 200, matched: 1488, delta: -2729, ... },
+//   ]  + the argmax under `objective`
+```
+
+`directive tune blockCheckout --history sessions.json --sweep cartTotal:25..200:25`
+prints the curve as an ASCII sparkline and names the optimum.
+
+**Why it's Sherlock:** R4.G answers *"what would THIS change do?"* — you
+still have to guess the number. `sweepUnder` answers *"what is the BEST
+number?"* It turns rule-writing from guess-and-check into a **one-command
+optimization** against real traffic. Every paywall threshold, fraud
+score cutoff, rate-limit ceiling, and discount-eligibility floor in every
+app is a hand-tuned magic number that nobody has ever swept. This is the
+first tool that sweeps them. The replay engine is already pure and
+allocation-light; running it N times over the same frames is free.
+
+**Compound effect:**
+- Pairs with R4.A `predict()` — the sweep curve *is* the sensitivity
+  analysis predict() approximates for a single point
+- Pairs with R4.E coverage — flag swept thresholds no test exercises
+- Foundation for R5.D's AI loop — the LLM proposes a *template*, the
+  sweep returns the optimum, no human picks the number
+- Multi-hole sweep (grid search) is a trivial extension → "tune all
+  three fraud thresholds at once"
+
+**Viral demo (30s):** Terminal. `directive tune paywall --sweep
+freeArticles:1..10`. An ASCII curve renders; the optimum row glows.
+*"matched 6,610 sessions at threshold 3 — +2,393 vs current. Set it?"*
+Quote-tweet: *"My state library just grid-searched my paywall against
+last month's traffic and told me the optimal number. One command."*
+
+**Headline:** *"Stop guessing your magic numbers. Replay last month's
+production and let the runtime grid-search the optimum."*
+
+### R5.B — `shadowReplay()`: live shadow evaluation — every rule ships with its successor running silently
+
+**[3 days — viral MAX, compound MAX]**
+
+`replayUnder` is a *batch, before-merge* tool. `shadowReplay` runs the
+**same diff online, in production**. Register a `shadow` predicate
+alongside a live constraint; on every real fact frame the engine
+evaluates *both*, acts only on the live one, and streams the agreement /
+disagreement to a sink:
+
+```ts
+system.constraints.shadow("blockCheckout", {
+  proposed: { cartTotal: { $gte: 50 } },   // candidate, never acts
+  sink: "directive:metrics",
+});
+// live dashboard, updating in real time:
+// blockCheckout — live fired 4,217×  ·  shadow would fire 9,884×
+//   agreement 71%  ·  newMatches 5,667  ·  lostMatches 0
+```
+
+It is `replayUnder` with the frame stream being **the live present**
+instead of recorded history — the exact same evaluate-both-diff-the-bit
+core, pointed at `system.observe()` instead of a JSON file.
+
+**Why it's Sherlock:** This is **dark launching for business rules**, and
+nobody has it. Feature flags dark-launch *code paths*; nobody dark-launches
+a *predicate* and watches it diverge from the incumbent in real time. The
+PM proposes a stricter fraud rule, ships it as a shadow, and a week later
+has a real-traffic confidence interval — no replay file to capture, no
+data-science ticket, zero user impact. Then `system.constraints.promote()`
+swaps shadow → live in one call. Replay engine *was* the hard part; it's
+already shipped and pure.
+
+**Compound effect:**
+- Closes the loop on R4.G: replay-before-merge → shadow-after-merge →
+  promote. The full lifecycle of a rule change.
+- Pairs with R4.I audit ledger — shadow disagreements become a logged,
+  queryable event class ("the rule we were about to ship would have
+  blocked these 5,667 sessions")
+- Pairs with R5.A — sweep offline to pick the candidate, shadow it live
+  to confirm the offline estimate holds
+- The shadow/live agreement % is a derivation → constraints can react to
+  *their own future selves* ("auto-promote when 30-day agreement > 95%")
+
+**Viral demo (30s):** Split-screen prod dashboard. Left: live rule firing.
+Right: shadow rule, same traffic, a different number ticking up. A
+disagreement flashes with the offending fact snapshot. *"This rule isn't
+live. It's auditioning."* Quote-tweet: *"Dark launches, but for business
+rules — every rule ships with its replacement running silently beside it."*
+
+**Headline:** *"The state library where every rule ships with its
+successor shadow-running in production."*
+
+### R5.C — `directive rule-blame <constraint> --since <ref>`: git-archaeology over rule behavior
+
+**[2 days — viral HIGH, compound MAX]**
+
+R4.F (`rules-diff`) shows *what changed* between two refs structurally.
+R4.G replays history under *one* proposed spec. R5.C fuses them: walk the
+**git history of a constraint's `whenSpec`**, extract the predicate at
+every commit that touched it, then `replayUnder` a fixed recorded history
+through each successive version — producing a **behavioral blame timeline**:
+
+```
+blockCheckout — behavior across 6 commits (history: 30d, 14,902 sessions)
+
+  a1b2c3  2026-01-04  matched  3,001   baseline
+  d4e5f6  2026-02-11  matched  3,002   +1     (label only — no behavior change)
+  88fd322  2026-03-09  matched  9,884   +6,882 ⚠ 3.3× expansion  ← here
+  9dd2848  2026-04-02  matched  9,610   -274
+  f5498ac  2026-05-01  matched  4,217   -5,393  rollback of 88fd322's intent
+```
+
+**Why it's Sherlock:** `git blame` tells you *who* wrote a line and *when*.
+It cannot tell you *which commit changed how the rule actually behaves* —
+a pure-refactor commit and a 3× blast-radius commit look identical in
+`blame`. R5.C is **`git blame` for business outcomes**: "conversion dropped
+in March — which of the 40 commits to the checkout module actually changed
+the rule's behavior?" The answer is one command, and it's exact, because
+each version is replayed against identical recorded traffic. This is the
+post-mortem tool every team improvises with spreadsheets.
+
+**Compound effect:**
+- Pairs with R2.A bisect — bisect *rule versions* by behavior delta, not
+  code; R5.C is the linear scan, bisect is the log-n search
+- Pairs with R4.I audit ledger — "the rule was version 88fd322 at the
+  time this user was blocked" becomes cryptographically provable
+- Pairs with R5.A — once R5.C names the regressing commit, sweep it to
+  find the threshold that *should* have shipped
+- Auto-emits a `RULES_BEHAVIOR.md` — behavioral changelog, not structural
+
+**Viral demo (30s):** `directive rule-blame fraudScore --since v1.0`.
+A timeline renders; one row glows red: *"commit 88fd322 — fraudScore
+match count jumped 3.3×. Author, date, diff attached."* Quote-tweet:
+*"git blame tells you who changed the line. This tells you who changed
+the behavior — replayed against real traffic, commit by commit."*
+
+**Headline:** *"git blame for business outcomes — find the exact commit
+that changed how your rule behaves, not just how it reads."*
+
+### R5.D — `tuneFromIntent()`: the closed-loop AI rule optimizer — LLM proposes, replay scores, LLM iterates
+
+**[1 week — viral MAX, compound MAX]**
+
+R4.D has the LLM *emit* a typed predicate. R4.G *validates one* against
+history. Neither closes the loop — a human still picks between candidates.
+`tuneFromIntent` makes **the replay report the LLM's reward signal**:
+
+```ts
+tuneFromIntent({
+  intent: "cut checkout fraud roughly in half without blocking more than
+           5% of legitimate high-value carts",
+  constraint: "blockCheckout",
+  schema: moduleSchema,
+  history: recordedSessions,        // the replay corpus IS the eval set
+  labels: { fraud: fraudLabels },   // optional ground truth per frame
+  rounds: 5,
+});
+// round 1: LLM emits predicate P1 → replayUnder → fraud -38%, FP +9%  ✗
+// round 2: report fed back → P2  → fraud -51%, FP +6%  ✗ (close)
+// round 3: report fed back → P3  → fraud -49%, FP +4%  ✓  accepted
+// → { predicate: P3, report, transcript: [...] }
+```
+
+The LLM never runs code. It emits a `FactPredicate` (data); `replayUnder`
+scores it against real history; the structured `CounterfactualReport`
+(newMatches / lostMatches / per-clause explain) goes *back into the
+prompt* as a precise, numeric critique. The loop iterates until the
+objective is met — **structurally validated at every step, scored on real
+traffic at every step.**
+
+**Why it's Sherlock:** This is **gradient descent on business rules with a
+human-readable intent as the loss function** — and it is *only* safe
+because every artifact in the loop is data, never code. R4.D let an LLM
+*write* a rule; R5.D lets an LLM *tune* a rule against production reality,
+with a hard structural type-check and a real-traffic scorer as
+guardrails. "I described the fraud trade-off I wanted in English; five
+replay rounds later, the runtime had a rule that hit it — and never once
+executed model-generated code." That is the Karpathy quote-tweet.
+
+**Compound effect:**
+- The capstone of the predicate-as-data thesis: R4.D (emit) + R4.B
+  (verify) + R4.A (predict) + R5.A (sweep) + R4.G (replay) all become
+  *steps inside R5.D's loop*
+- The `transcript` is an audit artifact — R4.I logs *why the rule is what
+  it is*, with the LLM's reasoning attached
+- Foundation for self-tuning production apps: nightly job re-runs
+  `tuneFromIntent` against the last 30 days, opens a PR with the new
+  predicate + the replay report as the PR body
+- Publishes a function-calling tool-spec preset (OpenAI / Anthropic) —
+  "the replay-scored rule-tuning tool"
+
+**Viral demo (30s):** Type one English sentence into a CLI prompt. Watch
+five rounds scroll — each shows the LLM's predicate JSON and the replay
+score improving. Round 5 lands inside the target. *"I never wrote the
+rule. I never picked a number. I described the outcome."* Quote-tweet:
+*"I told my app the fraud trade-off I wanted in plain English. It
+gradient-descended a rule against last month's traffic. Zero generated
+code ran."*
+
+**Headline:** *"Gradient descent for business rules — describe the
+outcome in English, the runtime tunes the rule against real traffic, no
+generated code ever runs."*
+
+### R5.E — `@directive-run/replay-corpus`: recorded fact-history as a shareable, versioned fixture standard
+
+**[2 days — viral MED-HIGH, compound MAX]**
+
+`replayUnder` quietly minted a new data type: the **`ReplayFrame[]`
+history** — a portable, JSON-clean, engine-free record of how facts moved.
+R5.E makes that a **first-class, versioned, shareable artifact**: capture
+it from the timeline plugin, redact it (R3.G1 vault), hash it, sign it,
+diff it, and check it into the repo as a `*.replay.json` fixture.
+
+```ts
+// capture from a live (or test) system
+const corpus = captureReplayCorpus(system, { window: "30d" });
+await corpus.save("fixtures/checkout.replay.json", { redact: "vault" });
+
+// in CI — the contract test
+test("blockCheckout regression", () => {
+  const corpus = loadReplayCorpus("fixtures/checkout.replay.json");
+  const report = replayUnder({
+    frames: corpus.frames,
+    original: corpus.recordedSpec("blockCheckout"),  // spec at capture time
+    proposed: system.inspect().constraints.blockCheckout.whenSpec,
+  });
+  expect(report.delta).toBe(0);          // current code must not drift
+  expect(report).toMatchReplaySnapshot(); // golden-master the behavior
+});
+```
+
+A `*.replay.json` is the **golden master for business behavior**:
+behavior is pinned to a corpus + a spec, drift fails CI. It is the one
+exchange format that already feeds R4.G (replay), R5.A (sweep), R5.C
+(blame), R5.D (tune), and R2.A (bisect) — R5.E just gives it a name, a
+schema version, a redaction story, and a capture tool.
+
+**Why it's Sherlock:** Snapshot testing pins *output*; it tells you a
+component's HTML changed. Nothing pins *behavior* — "the checkout rule
+still matches the same sessions it did at v1.4." A `*.replay.json`
+fixture makes behavioral regression a `git diff`-able, reviewable,
+PR-blocking artifact. And because the corpus is portable, **bug reports
+become replay corpora**: a user attaches `bug.replay.json`, you `replayUnder`
+your fix, the diff *is* the proof. It is the standardized exchange format
+the whole replay ecosystem has been informally passing around — promoted
+to a real package with a spec.
+
+**Compound effect:**
+- The single exchange format under R4.G / R5.A / R5.C / R5.D / R2.A —
+  one schema, six consumers (the same payoff R2.E noted, now realized)
+- `toMatchReplaySnapshot()` is a vitest matcher → joins the R1.B /
+  R4.E test-substrate family
+- Pairs with R3.G1 vault — corpora ship redacted, safe to commit and
+  share publicly (open-source rule-tuning datasets become possible)
+- Pairs with R2.D Sentry flywheel — prod errors arrive *as* `.replay.json`
+  corpora, not as ad-hoc breadcrumbs
+- A public corpus registry (`directive.run/corpora`) seeds community
+  benchmarks — "tune your fraud rule against the standard e-commerce
+  corpus"
+
+**Viral demo (30s):** Open a PR that edits one constraint. CI fails:
+*"`checkout.replay.json`: blockCheckout behavior drifted — 312 sessions
+now match that didn't at fixture capture. Review the diff."* Click → the
+312 sessions render. Quote-tweet: *"Snapshot tests pin your HTML. This
+pins your business behavior — and fails the PR when a rule silently
+changes who it affects."*
+
+**Headline:** *"Snapshot testing for business behavior — check your rules'
+real-world effect into git, and fail the build when it drifts."*
+
+### R5 ranked
+
+| Rank | Idea | Days | Viral | Compound | Note |
+|---|---|---|---|---|---|
+| 1 | **R5.A** `sweepUnder` / `directive tune` — threshold optimizer | 2 | Max | Max | **Asymmetric pick.** Replay run N× over the same frames is free. Turns magic numbers into a one-command grid search. Demo is an ASCII curve. |
+| 2 | **R5.D** `tuneFromIntent` — closed-loop AI rule optimizer | 7 | Max | Max | The Karpathy capstone. Replay report = the LLM's reward signal. Every prior R4/R5 idea becomes a step inside its loop. |
+| 3 | **R5.B** `shadowReplay` — live shadow rule evaluation | 3 | Max | Max | Dark launching for business rules. Same evaluate-both core, pointed at the live present. Completes replay→shadow→promote. |
+| 4 | **R5.C** `directive rule-blame` — git-archaeology over behavior | 2 | High | Max | `git blame` for business outcomes. The post-mortem tool every team fakes with spreadsheets. |
+| 5 | **R5.E** `@directive-run/replay-corpus` — fixture standard | 2 | Med-High | Max | Names the exchange format under all of R4.G/R5.A/C/D + R2.A. Snapshot testing for behavior. The least flashy, the highest leverage. |
+
+**Suggested arc:** **R5.A (2d, instant optimizer demo)** → **R5.E (2d,
+names the corpus the rest stand on)** → **R5.C (2d, git-blame headline)**
+→ **R5.B (3d, the live-prod magnet)** → **R5.D (7d, the AI capstone)**.
+Total: ~16 days. R5.E should land *early* despite its low flash — it is
+the schema every other R5 idea (and R4.G, R2.A) wants to share.
+
+**R5 thesis:** R4 rounds 1 and 2 mined the *predicate* — ten framings of
+one JSON object. R5 mines the **replay engine** that R4.G shipped to
+*consume* that JSON. R4.G replays one rule, one pair, once, before merge.
+R5.A replays it **N times** (sweep → optimizer). R5.B replays it
+**continuously** (live present → shadow launch). R5.C replays it **across
+git history** (version walk → behavioral blame). R5.D replays it **inside
+an LLM loop** (report → reward signal → closed-loop tuner). R5.E names the
+**corpus** all of them replay against (fixture → exchange standard). The
+substrate was never just "the predicate is data." It is now: **the replay
+engine is a pure function, recorded history is a portable value, and
+together they form a behavior simulator you can sweep, stream, walk, and
+optimize against.** That is the thing no other state library on npm has —
+and it shipped on 2026-05-21.
+
+**Why R5.A is the asymmetric pick:** it needs zero new substrate — it is
+literally `replayUnder` in a `for` loop over candidate values, plus an
+argmax. Two days, and the demo is unambiguous in five seconds: an ASCII
+response curve with the optimum glowing. Every engineer who has ever
+hard-coded a threshold and wondered if it was right — which is all of
+them — gets it instantly. It also de-risks R5.D (the sweep *is* the
+inner optimizer the AI loop calls) and confirms the replay engine's
+re-run cost is negligible.
 
 ---
 

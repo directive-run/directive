@@ -39,8 +39,8 @@ Commands:
   examples copy <name>          Extract example to project
   replay <timeline.json>        Replay a serialized Directive timeline
                                 (paired with @directive-run/timeline)
-  replay-under --history ...    Counterfactual rule replay — diff a
-                                proposed predicate against recorded history
+  replay-under --history ...    Predicate backtest — diff a proposed
+                                predicate against recorded history
   bisect <timeline.json>        Binary-search a timeline for the first
                                 frame that triggers a failing assertion
   timeline diff <a> <b>         Semantic causal-graph diff between two
@@ -83,12 +83,20 @@ examples options:
 async function main() {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
+  // Only treat `--help` / `-h` as a request for *global* help when there is
+  // no command, or the first arg is itself the help flag. When a command is
+  // present (`directive replay-under --help`), routing wins and the command
+  // prints its own help — otherwise a command's `-h` alias and its own
+  // `--help` handling would be unreachable.
+  const first = args[0];
+  const wantsGlobalHelp =
+    args.length === 0 || first === "--help" || first === "-h";
+  if (wantsGlobalHelp) {
     console.log(HELP);
     process.exit(0);
   }
 
-  if (args.includes("--version") || args.includes("-v")) {
+  if (first === "--version" || first === "-v") {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");

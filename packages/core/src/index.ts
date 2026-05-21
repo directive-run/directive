@@ -116,10 +116,16 @@ export {
   validatePredicate,
 } from "./core/predicate.js";
 
-// Counterfactual rule replay
-export { replayUnder } from "./core/replay-under.js";
+// Predicate backtest — rule-change impact replay
+export {
+  MAX_REPLAY_FRAMES,
+  framesFromHistory,
+  framesFromSnapshots,
+  replayUnder,
+  toReplayFrames,
+} from "./core/replay-under.js";
 export type {
-  CounterfactualReport,
+  PredicateBacktestReport,
   ReplayDiffSample,
   ReplayFrame,
   ReplayUnderOptions,

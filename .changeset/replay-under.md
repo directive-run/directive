@@ -3,7 +3,7 @@
 "@directive-run/cli": minor
 ---
 
-feat: counterfactual rule replay (`replayUnder` + `directive replay-under`)
+feat: predicate backtest (`replayUnder` + `directive replay-under`)
 
 Replay a recorded fact-state history through a *proposed* change to a
 constraint's `when` predicate and get a before-you-merge impact report:
@@ -26,12 +26,20 @@ report.delta;            // -2
 report.lostMatches;      // sampled frames, with per-clause explain
 ```
 
-The mechanism is pure — each recorded frame is evaluated against both
-predicates with `evaluatePredicate`, and the boolean is diffed. The
-previous frame's facts are threaded as `prev`, so a replayed effect
-`on` predicate using `$changed` replays correctly too. Diff frames
-carry an `evaluatePredicateExplained` breakdown so you can see which
-clause flipped.
+The mechanism is a static backtest — each recorded frame is re-scored
+against both predicates with `evaluatePredicate`, and the boolean is
+diffed. The engine is **not** re-run: downstream cascades are not
+modeled, so treat the numbers as a divergence scan, not a forecast. The
+previous frame's facts are threaded as `prev`, so a replayed effect `on`
+predicate using `$changed` replays correctly too. Diff frames carry an
+`evaluatePredicateExplained` breakdown so you can see which clause
+flipped.
+
+Both predicates are validated up front — a malformed spec throws a clear
+`[Directive] replayUnder:` error naming which spec failed. Histories are
+capped at `MAX_REPLAY_FRAMES`. Pass `entityKey` to also count distinct
+entities (not just frames). `framesFromHistory` / `framesFromSnapshots`
+convert a live system's recorded history into replay frames.
 
 The CLI wraps it:
 
@@ -41,8 +49,8 @@ directive replay-under --history sessions.json \
 ```
 
 History JSON is accepted as a bare array of frames, an object with a
-`frames` array, or a bare array of fact objects. `--json` emits the
-full `CounterfactualReport`.
+`frames` array, or a bare array of fact objects. `--entity-key` reports
+distinct-entity counts; `--json` emits the full `PredicateBacktestReport`.
 
 This builds directly on the RFC-0004 data-form predicate runtime — a
 predicate is data, so it can be re-evaluated against history a function

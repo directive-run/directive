@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_REPLAY_FRAMES,
   type ReplayFrame,
+  framesFromHistory,
+  framesFromSnapshots,
   replayUnder,
+  toReplayFrames,
 } from "../replay-under.js";
 
 /** A traffic-light history: phase + elapsed seconds. */
@@ -245,5 +249,264 @@ describe("replayUnder", () => {
     // Frame 3: "green" vs "green" -> false.
     expect(report.proposed.matched).toBe(2);
     assertInvariant(report);
+  });
+});
+
+describe("replayUnder — spec validation", () => {
+  it("throws a clear error when the proposed spec has a string $matches operand", () => {
+    expect(() =>
+      replayUnder({
+        frames: HISTORY,
+        original: { phase: "red" },
+        // A JSON-loaded predicate can never carry a RegExp — a $matches
+        // clause with a string operand must fail loud, not stack-trace.
+        proposed: { phase: { $matches: "^r" } } as never,
+      }),
+    ).toThrow(/\[Directive\] replayUnder: the proposed predicate is invalid/);
+  });
+
+  it("identifies the original spec when it is the invalid one", () => {
+    expect(() =>
+      replayUnder({
+        frames: HISTORY,
+        original: { phase: { $matches: "^r" } } as never,
+        proposed: { phase: "red" },
+      }),
+    ).toThrow(/\[Directive\] replayUnder: the original predicate is invalid/);
+  });
+
+  it("throws on a non-predicate spec (string)", () => {
+    expect(() =>
+      replayUnder({
+        frames: HISTORY,
+        original: { phase: "red" },
+        proposed: "hello" as never,
+      }),
+    ).toThrow(
+      /\[Directive\] replayUnder: the proposed predicate is not a valid FactPredicate/,
+    );
+  });
+
+  it("throws on a non-predicate spec (number)", () => {
+    expect(() =>
+      replayUnder({
+        frames: HISTORY,
+        original: 42 as never,
+        proposed: { phase: "red" },
+      }),
+    ).toThrow(
+      /\[Directive\] replayUnder: the original predicate is not a valid FactPredicate/,
+    );
+  });
+
+  it("throws on an unknown operator", () => {
+    expect(() =>
+      replayUnder({
+        frames: HISTORY,
+        original: { phase: "red" },
+        proposed: { phase: { $frobnicate: "red" } } as never,
+      }),
+    ).toThrow(
+      /\[Directive\] replayUnder: the proposed predicate uses an unknown operator "\$frobnicate"/,
+    );
+  });
+
+  it("allows an empty object {} as an always-true predicate", () => {
+    const report = replayUnder({
+      frames: HISTORY,
+      original: {},
+      proposed: { phase: "red" },
+    });
+
+    // {} matches every frame.
+    expect(report.original.matched).toBe(HISTORY.length);
+    assertInvariant(report);
+  });
+
+  it("throws when the history exceeds MAX_REPLAY_FRAMES", () => {
+    // A sparse fake array — length over the cap, no real allocation.
+    const huge = { length: MAX_REPLAY_FRAMES + 1 } as unknown as ReplayFrame[];
+    expect(() =>
+      replayUnder({
+        frames: huge,
+        original: { phase: "red" },
+        proposed: { phase: "green" },
+      }),
+    ).toThrow(/exceeds the MAX_REPLAY_FRAMES limit \(1000000\)/);
+  });
+});
+
+describe("replayUnder — entityKey grouping", () => {
+  it("counts distinct entities among matched frames", () => {
+    // 6 frames, 3 distinct users. user-a polled 3× (all red), user-b 2×
+    // (all red), user-c 1× (green).
+    const frames: ReplayFrame[] = [
+      { id: 0, facts: { userId: "a", phase: "red" } },
+      { id: 1, facts: { userId: "a", phase: "red" } },
+      { id: 2, facts: { userId: "a", phase: "red" } },
+      { id: 3, facts: { userId: "b", phase: "red" } },
+      { id: 4, facts: { userId: "b", phase: "red" } },
+      { id: 5, facts: { userId: "c", phase: "green" } },
+    ];
+
+    const report = replayUnder({
+      frames,
+      original: { phase: "red" },
+      proposed: { phase: "green" },
+      entityKey: "userId",
+    });
+
+    // 5 matched frames under original, but only 2 distinct users.
+    expect(report.original.matched).toBe(5);
+    expect(report.original.matchedEntities).toBe(2);
+    // 1 matched frame under proposed, 1 distinct user.
+    expect(report.proposed.matched).toBe(1);
+    expect(report.proposed.matchedEntities).toBe(1);
+    assertInvariant(report);
+  });
+
+  it("omits matchedEntities when entityKey is not supplied", () => {
+    const report = replayUnder({
+      frames: HISTORY,
+      original: { phase: "red" },
+      proposed: { phase: "green" },
+    });
+
+    expect(report.original.matchedEntities).toBeUndefined();
+    expect(report.proposed.matchedEntities).toBeUndefined();
+  });
+});
+
+describe("toReplayFrames", () => {
+  it("normalizes a bare array of frames", () => {
+    const frames = toReplayFrames([
+      { id: "s1", facts: { phase: "red" } },
+      { id: "s2", timestamp: 99, facts: { phase: "green" } },
+    ]);
+
+    expect(frames).toEqual([
+      { id: "s1", facts: { phase: "red" } },
+      { id: "s2", timestamp: 99, facts: { phase: "green" } },
+    ]);
+  });
+
+  it("normalizes a { frames: [...] } wrapper", () => {
+    const frames = toReplayFrames({
+      frames: [{ id: "s1", facts: { phase: "red" } }],
+    });
+
+    expect(frames).toEqual([{ id: "s1", facts: { phase: "red" } }]);
+  });
+
+  it("normalizes a bare array of fact objects, keyed by #index", () => {
+    const frames = toReplayFrames([{ phase: "red" }, { phase: "green" }]);
+
+    expect(frames).toEqual([
+      { id: "#0", facts: { phase: "red" } },
+      { id: "#1", facts: { phase: "green" } },
+    ]);
+  });
+
+  it("keeps explicit ids and prefixes fallback ids in a mixed history", () => {
+    // A history mixing explicit-id frames with id-less frames. An explicit
+    // numeric id 1 and an index-fallback frame at index 1 must not collide.
+    const frames = toReplayFrames([
+      { id: 1, facts: { phase: "red" } }, // explicit id 1
+      { facts: { phase: "green" } }, // id-less -> "#1"
+      { id: "s3", facts: { phase: "yellow" } }, // explicit string id
+    ]);
+
+    expect(frames.map((f) => f.id)).toEqual([1, "#1", "s3"]);
+    // No duplicate ids.
+    expect(new Set(frames.map((f) => f.id)).size).toBe(3);
+  });
+
+  it("throws on bad input", () => {
+    expect(() => toReplayFrames("not an array")).toThrow(
+      /\[Directive\] toReplayFrames: history must be a JSON array/,
+    );
+    expect(() => toReplayFrames(42)).toThrow(/toReplayFrames/);
+    expect(() => toReplayFrames({ notFrames: [] })).toThrow(/toReplayFrames/);
+  });
+});
+
+describe("framesFromHistory / framesFromSnapshots", () => {
+  it("converts a history-manager export object into frames", () => {
+    const exportObj = {
+      version: 1,
+      currentIndex: 1,
+      snapshots: [
+        { id: 1, timestamp: 100, facts: { phase: "red" }, trigger: "init" },
+        { id: 2, timestamp: 200, facts: { phase: "green" }, trigger: "tick" },
+      ],
+    };
+
+    const frames = framesFromHistory(exportObj);
+    expect(frames).toEqual([
+      { id: 1, timestamp: 100, facts: { phase: "red" } },
+      { id: 2, timestamp: 200, facts: { phase: "green" } },
+    ]);
+  });
+
+  it("accepts the export as a raw JSON string", () => {
+    const json = JSON.stringify({
+      version: 1,
+      currentIndex: 0,
+      snapshots: [
+        { id: 7, timestamp: 1, facts: { phase: "red" }, trigger: "init" },
+      ],
+    });
+
+    const frames = framesFromHistory(json);
+    expect(frames).toEqual([{ id: 7, timestamp: 1, facts: { phase: "red" } }]);
+  });
+
+  it("throws on a non-history-export value", () => {
+    expect(() => framesFromHistory({ nope: true })).toThrow(
+      /\[Directive\] framesFromHistory: expected a history export object/,
+    );
+  });
+
+  it("converts an array of getSnapshot()-style snapshots", () => {
+    // SystemSnapshot is { facts, version? } — no id, so frames get #index ids.
+    const snapshots = [
+      { facts: { phase: "red" } },
+      { facts: { phase: "green" } },
+    ];
+
+    const frames = framesFromSnapshots(snapshots);
+    expect(frames).toEqual([
+      { id: "#0", facts: { phase: "red" } },
+      { id: "#1", facts: { phase: "green" } },
+    ]);
+  });
+
+  it("a history-export round-trips through replayUnder", () => {
+    const exportObj = {
+      version: 1,
+      currentIndex: 2,
+      snapshots: [
+        { id: 1, timestamp: 1, facts: { phase: "red" }, trigger: "init" },
+        { id: 2, timestamp: 2, facts: { phase: "red" }, trigger: "tick" },
+        { id: 3, timestamp: 3, facts: { phase: "green" }, trigger: "tick" },
+      ],
+    };
+
+    const report = replayUnder({
+      frames: framesFromHistory(exportObj),
+      original: { phase: "red" },
+      proposed: { phase: "green" },
+    });
+
+    expect(report.framesEvaluated).toBe(3);
+    expect(report.original.matched).toBe(2);
+    expect(report.proposed.matched).toBe(1);
+    assertInvariant(report);
+  });
+
+  it("throws on a non-array snapshots argument", () => {
+    expect(() => framesFromSnapshots("nope" as unknown)).toThrow(
+      /\[Directive\] framesFromSnapshots: expected an array/,
+    );
   });
 });
