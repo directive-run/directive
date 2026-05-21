@@ -226,16 +226,26 @@ The same event is delivered to plugins through the `onResolverWriteRejected`
 hook:
 
 ```ts
+type ResolverWriteRejected =
+  | {
+      kind: "rejection";
+      resolver: string;
+      requirementId: string;
+      reason: "clobbered";
+      fact: string;
+      expected: unknown;
+      actual: unknown;
+    }
+  | {
+      kind: "summary";
+      resolver: string;
+      requirementId: string;
+      reason: "clobbered";
+      dropped: number;
+    };
+
 interface Plugin {
-  onResolverWriteRejected?: (event: {
-    resolver: string;
-    req: RequirementWithId;
-    reason: "clobbered";
-    fact?: string;
-    expected?: unknown;
-    actual?: unknown;
-    dropped?: number;
-  }) => void;
+  onResolverWriteRejected?: (event: ResolverWriteRejected) => void;
 }
 ```
 
