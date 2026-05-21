@@ -8,11 +8,13 @@
  * frames the proposed rule would have matched differently, answered against
  * real recorded history.
  *
- * History JSON is accepted in three shapes:
+ * History JSON is accepted in four shapes:
  *   1. A bare array of frames:        [{ id, timestamp?, facts }, ...]
  *   2. An object wrapping them:       { frames: [{ id, ..., facts }, ...] }
  *   3. A bare array of fact objects:  [{ phase: "red", ... }, ...]
  *      — each element is wrapped as a frame keyed by a `#`-prefixed index.
+ *   4. A history-manager export:      { version, snapshots, currentIndex }
+ *      — `system.history.export()` written to a file, read directly.
  *
  * The proposed (and original) predicate files each contain a single
  * FactPredicate object as JSON.
@@ -105,7 +107,9 @@ predicate and report how its match set differs from the original.
 This is a static predicate backtest — the engine is not re-run.
 
 Options:
-  --history <path>        Recorded frames JSON (required)
+  --history <path>        Recorded frames JSON (required) — a frame array,
+                          a { frames } object, a bare fact-object array, or
+                          a system.history.export() file
   --proposed <path>       Proposed predicate JSON (required)
   --original <path>       Original predicate JSON (required in v1)
   --max-samples <n>       Diff frames sampled per bucket (default 20)

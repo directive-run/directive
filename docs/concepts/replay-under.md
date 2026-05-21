@@ -238,7 +238,7 @@ With `--entity-key`, the report adds a distinct-entity line — "matched
 
 ### History JSON formats
 
-The `--history` file is accepted in three shapes:
+The `--history` file is accepted in four shapes:
 
 ```jsonc
 // 1. A bare array of frames
@@ -249,7 +249,16 @@ The `--history` file is accepted in three shapes:
 
 // 3. A bare array of fact objects — each is wrapped, keyed by index
 [{ "phase": "red" }, { "phase": "green" }, ...]
+
+// 4. A history-manager export — `system.history.export()` written to a
+//    file. The CLI reads the `snapshots` directly, no conversion needed.
+{ "version": 1, "snapshots": [ ... ], "currentIndex": 3 }
 ```
+
+Shape 4 means the [history-manager recipe](#from-the-history-manager)
+works for the CLI too: capture with `history: true`, write
+`system.history.export()` to a file, and pass it straight to
+`directive replay-under --history`.
 
 A frame that supplies its own `id` keeps it. A frame missing an `id`
 (and every bare-fact frame) gets a `#`-prefixed index id (`"#0"`,
