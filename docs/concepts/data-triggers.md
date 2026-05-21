@@ -428,23 +428,27 @@ The data form covers the common cases of comparison, membership, and
 
 The two forms compose cleanly — mix them freely in the same module.
 
-## Observing clobbers
+## Observing rejected writes
 
 When a bound resolver's owned-fact write is dropped because the fact was
-changed by something else mid-flight, Directive emits a `resolver.clobber`
-observation event:
+changed by something else mid-flight, Directive emits a
+`resolver.write.rejected` observation event with `reason: "clobbered"`:
 
 ```ts
 system.observe((e) => {
-  if (e.type === "resolver.clobber") {
+  if (e.type === "resolver.write.rejected") {
     console.warn(
-      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+      `[${e.reason}] resolver ${e.resolver} dropped ${e.fact}: ` +
         `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
     );
   }
 });
 ```
 
+The `reason` field keeps the event backend-neutral — clobber detection is the
+in-memory implementation today; future write-rejecting backends can report
+other reasons under the same event type. When `e.dropped` is set, the event is
+the per-resolver suppression summary (emitted once after the per-instance cap).
 Devtools and the logging plugin surface this event by default.
 
 ## See also

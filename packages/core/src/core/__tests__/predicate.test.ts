@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
-import { deepFreeze, freezeSpec } from "../../utils/utils.js";
+import { attributeError, freezeSpec } from "../../utils/utils.js";
 import {
   applyPatch,
-  deepFreeze as deepFreezeFromPredicate,
   evaluateKeySelector,
   evaluatePredicate,
   evaluatePredicateExplained,
@@ -13,8 +12,10 @@ import {
   isEmptyOrConfigPredicate,
   isPredicate,
   isTemplate,
+  MAX_PREDICATE_DEPTH,
   memoizePredicate,
   validatePredicate,
+  walkPredicate,
 } from "../predicate.js";
 
 // ============================================================================
@@ -388,6 +389,75 @@ describe("extractDeps", () => {
         ...extractDeps({ $all: [{ phase: "red" }, { auth: { token: "x" } }] }),
       ].sort(),
     ).toEqual(["auth.token", "phase"]);
+  });
+});
+
+// ============================================================================
+// walkPredicate — shared structural visitor (R5 FIX 4)
+// ============================================================================
+
+describe("walkPredicate", () => {
+  it("MAX_PREDICATE_DEPTH is a bounded constant", () => {
+    expect(MAX_PREDICATE_DEPTH).toBe(64);
+  });
+
+  it("visits operator clauses with dotted fact paths", () => {
+    const ops: Array<[string, string]> = [];
+    walkPredicate(
+      { phase: "red", auth: { token: { $exists: true } } },
+      {
+        operator(factPath, op) {
+          ops.push([factPath, op]);
+        },
+        literal(factPath) {
+          ops.push([factPath, "$eq"]);
+        },
+      },
+    );
+    expect(ops.sort()).toEqual([
+      ["auth.token", "$exists"],
+      ["phase", "$eq"],
+    ]);
+  });
+
+  it("visits combinator nodes and descends unless skipped", () => {
+    const kinds: string[] = [];
+    walkPredicate(
+      { $any: [{ phase: "red" }, { phase: "green" }] },
+      {
+        combinator(kind) {
+          kinds.push(kind);
+        },
+      },
+    );
+    expect(kinds).toEqual(["$any"]);
+  });
+
+  it("surfaces a stray $-key at fact position", () => {
+    const stray: string[] = [];
+    walkPredicate(
+      { $eqq: 1 },
+      {
+        strayOperatorKey(key) {
+          stray.push(key);
+        },
+      },
+    );
+    expect(stray).toEqual(["$eqq"]);
+  });
+
+  it("is cycle-safe and depth-bounded — no stack overflow", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const cyclic: Record<string, unknown> = { phase: "red" };
+    cyclic.self = cyclic;
+    expect(() => walkPredicate(cyclic, {})).not.toThrow(/Maximum call stack/);
+
+    let deep: Record<string, unknown> = { leaf: "x" };
+    for (let i = 0; i < 500; i++) {
+      deep = { nested: deep };
+    }
+    expect(() => walkPredicate(deep, {})).not.toThrow(/Maximum call stack/);
+    warn.mockRestore();
   });
 });
 
@@ -1080,10 +1150,10 @@ describe("evaluateTemplate prototype walk hardening", () => {
 });
 
 // ============================================================================
-// R2 — deepFreeze move + freezeSpec helper
+// R2 — freezeSpec helper
 // ============================================================================
 
-describe("R2 — deepFreeze move + freezeSpec helper", () => {
+describe("R2 — freezeSpec helper", () => {
   it("freezeSpec deeply freezes a nested object", () => {
     const spec = { a: { b: { c: 1 } }, arr: [{ x: 2 }] };
     const out = freezeSpec(spec);
@@ -1095,10 +1165,6 @@ describe("R2 — deepFreeze move + freezeSpec helper", () => {
     expect(Object.isFrozen(spec.arr[0])).toBe(true);
   });
 
-  it("deepFreeze re-exported from predicate.ts matches the utils export", () => {
-    expect(deepFreezeFromPredicate).toBe(deepFreeze);
-  });
-
   it("freezeSpec handles primitives, null, undefined, and cycles", () => {
     expect(freezeSpec(5)).toBe(5);
     expect(freezeSpec(null)).toBe(null);
@@ -1107,6 +1173,50 @@ describe("R2 — deepFreeze move + freezeSpec helper", () => {
     a.self = a;
     expect(() => freezeSpec(a)).not.toThrow();
     expect(Object.isFrozen(a)).toBe(true);
+  });
+});
+
+// ============================================================================
+// attributeError — shared owner-attribution wrap
+// ============================================================================
+
+describe("attributeError", () => {
+  it("passes a non-throwing call through untouched", () => {
+    const wrapped = attributeError("constraint", "c1", (n: number) => n * 2);
+    expect(wrapped(21)).toBe(42);
+  });
+
+  it("re-attributes a [Directive]-prefixed throw and preserves the original as cause", () => {
+    const original = new Error("[Directive] $matches: operand must be a RegExp");
+    const wrapped = attributeError("derivation", "d1", () => {
+      throw original;
+    });
+
+    let caught: unknown;
+    try {
+      wrapped();
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(Error);
+    const err = caught as Error;
+    expect(err.message).toBe(
+      "[Directive] derivation 'd1': $matches: operand must be a RegExp",
+    );
+    // The original throw is preserved as `cause`, with its throw-site stack.
+    expect(err.cause).toBe(original);
+    expect(typeof (err.cause as Error).stack).toBe("string");
+    expect((err.cause as Error).stack).toContain("predicate.test.ts");
+  });
+
+  it("lets a non-[Directive] error pass through unchanged", () => {
+    const native = new TypeError("plain user error");
+    const wrapped = attributeError("effect", "e1", () => {
+      throw native;
+    });
+
+    expect(() => wrapped()).toThrow(native);
   });
 });
 

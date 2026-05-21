@@ -36,7 +36,7 @@
  * ```
  */
 
-import { freezeSpec } from "../utils/utils.js";
+import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
 import { withTracking } from "./tracking.js";
 import type {
@@ -270,23 +270,12 @@ export function createEffectsManager<S extends Schema>(
       dependencies = extractDeps(def.on);
       hasExplicitDeps = true;
       const memoized = memoizePredicate(def.on as object);
-      onGates.set(id, (facts, prev) => {
-        try {
-          return memoized(facts, prev);
-        } catch (e) {
-          // Attribute a Directive-prefixed throw (e.g. `$matches: string`)
-          // to the owning effect so the stack trace points at user code.
-          if (
-            e instanceof Error &&
-            e.message.startsWith("[Directive] ")
-          ) {
-            throw new Error(
-              `[Directive] effect '${id}': ${e.message.slice("[Directive] ".length)}`,
-            );
-          }
-          throw e;
-        }
-      });
+      // Attribute a Directive-prefixed throw (e.g. `$matches: string`) to the
+      // owning effect so the stack trace points at user config.
+      onGates.set(
+        id,
+        attributeError("effect", id, (facts, prev) => memoized(facts, prev)),
+      );
     }
 
     const state: EffectState = {

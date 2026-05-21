@@ -221,24 +221,26 @@ untrusted pattern through a ReDoS linter before constructing the
 [RFC 0004 — Security: untrusted predicate sources](../rfcs/0004-data-configuration-triggers.md#security-untrusted-predicate-sources)
 section.
 
-## Observing clobbers in v1.5
+## Observing rejected writes
 
 When the binding drops an owned-fact write, Directive emits a
-`resolver.clobber` observation event so you can surface the drop in tests,
-devtools, or production logging:
+`resolver.write.rejected` observation event with `reason: "clobbered"` so you
+can surface the drop in tests, devtools, or production logging:
 
 ```ts
 system.observe((e) => {
-  if (e.type === "resolver.clobber") {
+  if (e.type === "resolver.write.rejected") {
     console.warn(
-      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+      `[${e.reason}] resolver ${e.resolver} dropped ${e.fact}: ` +
         `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
     );
   }
 });
 ```
 
-The same event is delivered to plugins through the `onResolverClobber` hook
-— devtools and the logging plugin handle it by default. See
-[RFC-0003](../rfcs/0003-resolver-constraint-binding.md#observing-clobbers)
+The same event is delivered to plugins through the `onResolverWriteRejected`
+hook — devtools and the logging plugin handle it by default. The `reason`
+field keeps the event backend-neutral; when `e.dropped` is set, the event is
+the per-resolver suppression summary. See
+[RFC-0003](../rfcs/0003-resolver-constraint-binding.md#observing-rejected-writes)
 for the full event surface.

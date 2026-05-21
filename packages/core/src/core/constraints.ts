@@ -9,11 +9,12 @@
  */
 
 import isDevelopment from "#is-development";
-import { freezeSpec, withTimeout } from "../utils/utils.js";
+import { attributeError, freezeSpec, withTimeout } from "../utils/utils.js";
 import {
   evaluatePredicateExplained,
   isEmptyOrConfigPredicate,
   memoizePredicate,
+  walkPredicate,
 } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
@@ -320,23 +321,13 @@ export function createConstraintsManager<S extends Schema>(
     }
     freezeSpec(spec);
     const memoized = memoizePredicate(spec as object);
-    (def as { when: unknown }).when = (f: Facts<S>) => {
-      try {
-        return memoized(f as unknown as Record<string, unknown>);
-      } catch (e) {
-        // Attribute a Directive-prefixed throw (e.g. `$matches: string`)
-        // to the owning constraint so the stack trace points at user code.
-        if (
-          e instanceof Error &&
-          e.message.startsWith("[Directive] ")
-        ) {
-          throw new Error(
-            `[Directive] constraint '${id}': ${e.message.slice("[Directive] ".length)}`,
-          );
-        }
-        throw e;
-      }
-    };
+    // Attribute a Directive-prefixed throw (e.g. `$matches: string`) to the
+    // owning constraint so the stack trace points at user config.
+    (def as { when: unknown }).when = attributeError(
+      "constraint",
+      id,
+      (f: Facts<S>) => memoized(f as unknown as Record<string, unknown>),
+    );
     whenSpecs.set(id, spec);
     // Data `when` is structurally sync; clear any async flag so the engine
     // uses the sync evaluation path.
@@ -350,75 +341,26 @@ export function createConstraintsManager<S extends Schema>(
    * Used to block its use inside a constraint `when`, where there is no
    * prev-snapshot to compare against.
    *
-   * `seen` cycle-guards against self-referential specs; `depth` caps the
-   * recursion so a pathologically deep (or cyclic) spec cannot overflow
-   * the stack at registration time.
+   * Delegates the depth-guarded, cycle-guarded structural traversal to
+   * {@link walkPredicate} — a `$changed` surfaces as an operator clause
+   * (object or array form) or as a stray `$changed` key.
    */
-  function containsChangedOperator(
-    spec: unknown,
-    seen: WeakSet<object> = new WeakSet(),
-    depth = 0,
-  ): boolean {
-    if (depth > 100) {
-      if (isDevelopment) {
-        console.warn(
-          "[Directive] containsChangedOperator: predicate spec exceeds depth limit (100) — likely cyclic",
-        );
-      }
-
-      return false;
-    }
-    if (Array.isArray(spec)) {
-      return spec.some(
-        (clause) =>
-          typeof clause === "object" &&
-          clause !== null &&
-          (clause as { op?: unknown }).op === "$changed",
-      );
-    }
-    if (typeof spec !== "object" || spec === null) {
-      return false;
-    }
-    if (seen.has(spec)) {
-      if (isDevelopment) {
-        console.warn(
-          "[Directive] containsChangedOperator: cyclic predicate spec",
-        );
-      }
-
-      return false;
-    }
-    seen.add(spec);
-    const obj = spec as Record<string, unknown>;
-    for (const key of Object.keys(obj)) {
-      if (key === "$changed") {
-        return true;
-      }
-      if (key === "$all" || key === "$any") {
-        const list = obj[key];
-        if (
-          Array.isArray(list) &&
-          list.some((c) => containsChangedOperator(c, seen, depth + 1))
-        ) {
-          return true;
+  function containsChangedOperator(spec: unknown): boolean {
+    let found = false;
+    walkPredicate(spec, {
+      operator(_factPath, op) {
+        if (op === "$changed") {
+          found = true;
         }
-        continue;
-      }
-      if (key === "$not") {
-        if (containsChangedOperator(obj[key], seen, depth + 1)) {
-          return true;
+      },
+      strayOperatorKey(key) {
+        if (key === "$changed") {
+          found = true;
         }
-        continue;
-      }
-      const value = obj[key];
-      if (typeof value === "object" && value !== null) {
-        if (containsChangedOperator(value, seen, depth + 1)) {
-          return true;
-        }
-      }
-    }
+      },
+    });
 
-    return false;
+    return found;
   }
 
   // Normalize any data-form `when` specs at construction time.

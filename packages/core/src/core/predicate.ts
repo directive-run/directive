@@ -17,15 +17,18 @@ import {
 } from "./types/predicate.js";
 
 // ============================================================================
-// Deep freeze
+// Recursion bound
 // ============================================================================
 
 /**
- * Re-exported for back-compat. `deepFreeze` now lives in `utils/utils.ts`
- * alongside `stableStringify` and the rest of the spec-freezing utilities.
- * Prefer `freezeSpec` at registration sites — it documents the convention.
+ * Maximum predicate-AST recursion depth. Legitimate cross-module predicates
+ * nest fewer than ~15 levels; 64 is generous but bounded — past it the runtime
+ * dev-warns and bails rather than risking a stack overflow on a cyclic or
+ * pathologically deep spec. Shared by every structural predicate walker
+ * ({@link walkPredicate}, {@link evaluatePredicate}) so the cap lives in one
+ * place.
  */
-export { deepFreeze } from "../utils/utils.js";
+export const MAX_PREDICATE_DEPTH = 64;
 
 // ============================================================================
 // Discriminators
@@ -127,6 +130,187 @@ export function isPredicate(v: unknown): boolean {
   return isPlainObjectStrict(v);
 }
 
+// ============================================================================
+// Structural traversal
+// ============================================================================
+
+/**
+ * Visitor passed to {@link walkPredicate}. Every callback is optional; a
+ * walker implements only the arms it cares about.
+ */
+export interface PredicateVisitor {
+  /**
+   * A leaf operator clause: a fact + a `$`-operator + its operand. Fires once
+   * per operator in a multi-operator object.
+   *
+   * @param factPath - Dotted path to the fact (`elapsed`, `auth.token`).
+   * @param op - The operator key (`$gte`, `$matches`, …).
+   * @param operand - The operator's operand value.
+   * @param operandPath - Dotted path to the operand for diagnostics
+   *   (`elapsed.$gte`, `value` / `[0].value` for the array-clause form).
+   */
+  operator?(
+    factPath: string,
+    op: string,
+    operand: unknown,
+    operandPath: string,
+  ): void;
+  /**
+   * A bare-value (equality) clause — a fact mapped to a non-object literal,
+   * an array, or a non-plain class instance (Date, RegExp, Set, …).
+   *
+   * @param factPath - Dotted path to the fact.
+   * @param value - The equality operand.
+   */
+  literal?(factPath: string, value: unknown): void;
+  /**
+   * A combinator node (`$all` / `$any` / `$not`), called before descending.
+   * Return `false` to skip its children.
+   */
+  combinator?(kind: "$all" | "$any" | "$not"): boolean | void;
+  /**
+   * A nested-object (cross-module pivot) key, called before descending.
+   * Return `false` to skip its children.
+   */
+  nested?(key: string): boolean | void;
+  /**
+   * A `$`-prefixed key appearing where a fact key was expected — either an
+   * unknown/typo operator, or an operator mixed with fact keys at predicate
+   * top level.
+   *
+   * @param key - The stray `$`-key.
+   * @param factPath - Dotted path to the stray key.
+   */
+  strayOperatorKey?(key: string, factPath: string): void;
+  /**
+   * Called when traversal bails out early — a cycle was re-encountered or
+   * the depth cap was hit. The subtree below the bail point is NOT visited.
+   */
+  bail?(reason: "cycle" | "depth"): void;
+}
+
+/**
+ * Single depth-guarded, cycle-guarded structural traversal of a predicate
+ * AST. The pure structural walkers — dependency extraction, `$changed`
+ * detection, empty/config detection, serialization validation — share this
+ * so a new operator or combinator is threaded through one place.
+ *
+ * Handles the object form, the array-clause form, combinator nodes, nested
+ * cross-module objects, operator objects, and bare-value literals. It does
+ * **not** evaluate — see {@link evaluatePredicate} for that.
+ *
+ * @internal
+ */
+export function walkPredicate(
+  spec: unknown,
+  visitor: PredicateVisitor,
+  path = "",
+  seen: WeakSet<object> = new WeakSet(),
+  depth = 0,
+): void {
+  if (depth > MAX_PREDICATE_DEPTH) {
+    if (isDevelopment) {
+      console.warn(
+        `[Directive] walkPredicate: depth limit exceeded (${MAX_PREDICATE_DEPTH}) — likely cyclic predicate spec`,
+      );
+    }
+    visitor.bail?.("depth");
+
+    return;
+  }
+
+  // Array-clause form — each `{ fact, op, value }` clause is a leaf operator.
+  if (Array.isArray(spec)) {
+    spec.forEach((clause, i) => {
+      if (!isPlainObject(clause)) {
+        return;
+      }
+      const c = clause as Record<string, unknown>;
+      if (typeof c.fact === "string" && typeof c.op === "string") {
+        const clausePath = path ? `${path}[${i}]` : `[${i}]`;
+        visitor.operator?.(
+          path ? `${path}.${c.fact}` : c.fact,
+          c.op,
+          c.value,
+          `${clausePath}.value`,
+        );
+      }
+    });
+
+    return;
+  }
+
+  if (!isPlainObject(spec)) {
+    return;
+  }
+  if (seen.has(spec)) {
+    if (isDevelopment) {
+      console.warn("[Directive] walkPredicate: cyclic predicate spec");
+    }
+    visitor.bail?.("cycle");
+
+    return;
+  }
+  seen.add(spec);
+
+  const obj = spec as Record<string, unknown>;
+
+  // Combinator node — descend into children unless the visitor opts out.
+  for (const kind of ["$all", "$any", "$not"] as const) {
+    if (kind in obj) {
+      const descend = visitor.combinator?.(kind);
+      if (descend === false) {
+        return;
+      }
+      const children =
+        kind === "$not" ? [obj.$not] : ((obj[kind] as unknown[]) ?? []);
+      for (const child of children) {
+        walkPredicate(child, visitor, path, seen, depth + 1);
+      }
+
+      return;
+    }
+  }
+
+  // Object form — one entry per key.
+  for (const key of Object.keys(obj)) {
+    const childPath = path ? `${path}.${key}` : key;
+
+    if (key.startsWith("$")) {
+      // A `$`-key at fact position — typo operator or top-level operator
+      // mixed with fact keys. Surface it; do not descend.
+      visitor.strayOperatorKey?.(key, childPath);
+      continue;
+    }
+
+    const value = obj[key];
+
+    if (isOperatorObject(value)) {
+      const opObj = value as Record<string, unknown>;
+      for (const op of Object.keys(opObj)) {
+        visitor.operator?.(childPath, op, opObj[op], `${childPath}.${op}`);
+      }
+      continue;
+    }
+
+    // Only a strict plain object (`{}` / `Object.create(null)`) recurses as
+    // a nested cross-module predicate. A Set, Map, or class instance is a
+    // bare-value leaf — surfacing it as `literal` lets a walker inspect its
+    // runtime class (e.g. validatePredicate's JSON-serializability check).
+    if (isPlainObjectStrict(value)) {
+      const descend = visitor.nested?.(key);
+      if (descend === false) {
+        continue;
+      }
+      walkPredicate(value, visitor, childPath, seen, depth + 1);
+      continue;
+    }
+
+    // Bare value — equality leaf (also array / Set / Map / class instances).
+    visitor.literal?.(childPath, value);
+  }
+}
+
 /**
  * True when `v` structurally passes {@link isPredicate} but contains no
  * operators, no combinators, and no fact-clause entries that resolve to a
@@ -148,62 +332,38 @@ export function isPredicate(v: unknown): boolean {
  *
  * @internal
  */
-export function isEmptyOrConfigPredicate(
-  v: unknown,
-  seen: WeakSet<object> = new WeakSet(),
-  depth = 0,
-): boolean {
-  if (depth > 100) {
-    if (isDevelopment) {
-      console.warn(
-        "[Directive] isEmptyOrConfigPredicate: depth limit exceeded — likely cyclic predicate spec",
-      );
-    }
-
-    return false;
-  }
+export function isEmptyOrConfigPredicate(v: unknown): boolean {
+  // Arrays and non-plain-object specs are never "empty config objects".
   if (!isPlainObjectStrict(v)) {
     return false;
   }
-  if (seen.has(v as object)) {
-    if (isDevelopment) {
-      console.warn(
-        "[Directive] isEmptyOrConfigPredicate: cyclic predicate spec",
-      );
-    }
 
-    return false;
-  }
-  seen.add(v as object);
-  const keys = Object.keys(v);
-  if (keys.length === 0) {
-    return true;
-  }
-  // Any operator/combinator key short-circuits — it's a predicate body.
-  for (const k of keys) {
-    if (k.startsWith("$")) {
-      return false;
-    }
-  }
-  // Every key is a plain field name. Recurse into each value: if any value
-  // is a primitive (the fact-clause leaf shape), the spec is a real
-  // predicate. If every value is itself an empty-or-config object, the
-  // entire spec is a config tree with no predicate semantics.
-  for (const k of keys) {
-    const child = (v as Record<string, unknown>)[k];
-    // Primitive / null / array / function / class instance — real leaf.
-    if (child === null || typeof child !== "object") {
-      return false;
-    }
-    if (Array.isArray(child)) {
-      return false;
-    }
-    if (!isEmptyOrConfigPredicate(child, seen, depth + 1)) {
-      return false;
-    }
-  }
+  // A spec is a config tree only when walkPredicate fires NONE of the
+  // predicate-semantic callbacks — no operator, no combinator, no literal
+  // leaf, no stray `$`-key. Nested plain objects are descended; an empty
+  // `{}` or a tree of empty `{}` fires nothing and stays "config". A cycle
+  // or depth-cap bail is treated as "not a config object" (can't determine
+  // — fail safe so the dev-warn is not spuriously emitted).
+  let isPredicateBody = false;
+  walkPredicate(v, {
+    operator() {
+      isPredicateBody = true;
+    },
+    literal() {
+      isPredicateBody = true;
+    },
+    combinator() {
+      isPredicateBody = true;
+    },
+    strayOperatorKey() {
+      isPredicateBody = true;
+    },
+    bail() {
+      isPredicateBody = true;
+    },
+  });
 
-  return true;
+  return !isPredicateBody;
 }
 
 /**
@@ -260,10 +420,33 @@ export function isTemplate(v: unknown): v is FactTemplate {
  * ```
  */
 export function validatePredicate(spec: unknown, path = ""): void {
-  if (spec === null || typeof spec !== "object") {
-    return;
+  /** Throw on a JSON-unrehydratable operand value. */
+  function checkOperand(value: unknown, op: string, at: string): void {
+    if (typeof value === "bigint") {
+      throw new Error(
+        `[Directive] validatePredicate: bigint operand at "${at}" is not JSON-serializable (JSON.stringify throws on bigint).`,
+      );
+    }
+    if (value instanceof Set) {
+      throw new Error(
+        `[Directive] validatePredicate: Set operand at "${at}" is not JSON-serializable (serializes to {} and loses all members).`,
+      );
+    }
+    if (value instanceof Map) {
+      throw new Error(
+        `[Directive] validatePredicate: Map operand at "${at}" is not JSON-serializable (serializes to {} and loses all entries).`,
+      );
+    }
+    if (op === "$matches" && !(value instanceof RegExp)) {
+      throw new Error(
+        `[Directive] validatePredicate: $matches operand at "${at}" must be a RegExp; got ${value === null ? "null" : typeof value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
+      );
+    }
   }
 
+  // Top-level Set / Map node — a regex / set / map handed in directly as the
+  // whole spec. walkPredicate would treat it as an empty object, so check
+  // the entry node here.
   if (spec instanceof Set) {
     throw new Error(
       `[Directive] validatePredicate: Set operand${path ? ` at "${path}"` : ""} is not JSON-serializable (serializes to {} and loses all members).`,
@@ -275,61 +458,17 @@ export function validatePredicate(spec: unknown, path = ""): void {
     );
   }
 
-  if (Array.isArray(spec)) {
-    spec.forEach((child, i) => validatePredicate(child, `${path}[${i}]`));
-
-    return;
-  }
-
-  // Array-clause form — `{ fact, op, value }`. The operand lives under the
-  // `value` key, so the `$matches`-by-key check below does not see it; check
-  // it here against the clause's `op`.
-  const clause = spec as Record<string, unknown>;
-  if (
-    typeof clause.fact === "string" &&
-    typeof clause.op === "string" &&
-    "value" in clause
-  ) {
-    const clauseFieldPath = path ? `${path}.value` : "value";
-    if (typeof clause.value === "bigint") {
-      throw new Error(
-        `[Directive] validatePredicate: bigint operand at "${clauseFieldPath}" is not JSON-serializable (JSON.stringify throws on bigint).`,
-      );
-    }
-    if (clause.op === "$matches" && !(clause.value instanceof RegExp)) {
-      throw new Error(
-        `[Directive] validatePredicate: $matches operand at "${clauseFieldPath}" must be a RegExp; got ${clause.value === null ? "null" : typeof clause.value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
-      );
-    }
-  }
-
-  for (const key of Object.keys(spec)) {
-    const value = (spec as Record<string, unknown>)[key];
-    const childPath = path ? `${path}.${key}` : key;
-
-    if (typeof value === "bigint") {
-      throw new Error(
-        `[Directive] validatePredicate: bigint operand at "${childPath}" is not JSON-serializable (JSON.stringify throws on bigint).`,
-      );
-    }
-
-    if (key === "$matches") {
-      if (!(value instanceof RegExp)) {
-        throw new Error(
-          `[Directive] validatePredicate: $matches operand at "${childPath}" must be a RegExp; got ${value === null ? "null" : typeof value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
-        );
-      }
-      // A RegExp operand is itself valid; do not recurse into it.
-      continue;
-    }
-
-    if (value !== null && typeof value === "object") {
-      if (value instanceof RegExp || value instanceof Date) {
-        continue;
-      }
-      validatePredicate(value, childPath);
-    }
-  }
+  // Single structural traversal — every operator clause and equality leaf is
+  // checked for a JSON-unrehydratable operand. The walker threads the dotted
+  // operand path so error messages point at the offending clause.
+  walkPredicate(spec, {
+    operator(_factPath, op, operand, operandPath) {
+      checkOperand(operand, op, path ? `${path}.${operandPath}` : operandPath);
+    },
+    literal(factPath, value) {
+      checkOperand(value, "", path ? `${path}.${factPath}` : factPath);
+    },
+  });
 }
 
 // ============================================================================
@@ -666,9 +805,9 @@ export function evaluatePredicate(
   // `freezeSpec` permits cycles (it uses a WeakSet seen-guard), so a
   // registered spec can be self-referential. Cap recursion to defend the
   // reconcile loop against a stack overflow at evaluation time.
-  if (depth > 100) {
+  if (depth > MAX_PREDICATE_DEPTH) {
     devWarn(
-      "evaluatePredicate: depth limit exceeded — likely cyclic predicate spec",
+      `evaluatePredicate: depth limit exceeded (${MAX_PREDICATE_DEPTH}) — likely cyclic predicate spec`,
     );
 
     return false;
@@ -925,59 +1064,30 @@ export function memoizePredicate(
  * // → Set { "self.phase", "auth.token" }
  * ```
  */
-export function extractDeps(
-  spec: unknown,
-  prefix = "",
-  into?: Set<string>,
-): Set<string> {
-  const deps = into ?? new Set<string>();
+export function extractDeps(spec: unknown, prefix = ""): Set<string> {
+  const deps = new Set<string>();
 
-  if (Array.isArray(spec)) {
-    for (const clause of spec) {
-      if (isPlainObject(clause) && typeof clause.fact === "string") {
-        deps.add(prefix + clause.fact);
+  // Single structural traversal — every operator clause and equality leaf
+  // contributes its dotted fact path. Combinators and nested objects are
+  // descended automatically; stray `$`-keys never synthesize phantom deps.
+  walkPredicate(spec, {
+    operator(factPath) {
+      deps.add(prefix + factPath);
+    },
+    literal(factPath) {
+      deps.add(prefix + factPath);
+    },
+    strayOperatorKey(key) {
+      // A `$`-key at fact position never synthesizes a phantom dep. A typo'd
+      // operator (e.g. `$eqq`) additionally dev-warns; a known operator
+      // mixed with fact keys is skipped silently (evaluatePredicate warns).
+      if (!PREDICATE_OPERATORS.has(key)) {
+        devWarn(
+          `extractDeps: unknown operator "${key}" — skipping. Known operators: ${[...PREDICATE_OPERATORS].join(", ")}`,
+        );
       }
-    }
-
-    return deps;
-  }
-
-  if (!isPlainObject(spec)) {
-    return deps;
-  }
-
-  if ("$all" in spec || "$any" in spec) {
-    const list = (spec.$all ?? spec.$any) as unknown[];
-    for (const child of list) {
-      extractDeps(child, prefix, deps);
-    }
-
-    return deps;
-  }
-  if ("$not" in spec) {
-    return extractDeps(spec.$not, prefix, deps);
-  }
-
-  for (const key of Object.keys(spec)) {
-    if (PREDICATE_OPERATORS.has(key)) {
-      continue;
-    }
-    // A typo'd `$`-prefixed operator (e.g. `$eqq`) must NOT synthesize a
-    // phantom dep like `"phase.$eqq"`. Skip the clause and dev-warn — the
-    // operator-object detection emits its own warn on first eval.
-    if (key.startsWith("$")) {
-      devWarn(
-        `extractDeps: unknown operator "${key}" — skipping. Known operators: ${[...PREDICATE_OPERATORS].join(", ")}`,
-      );
-      continue;
-    }
-    const value = spec[key];
-    if (isPlainObject(value) && !isOperatorObject(value)) {
-      extractDeps(value, `${prefix}${key}.`, deps);
-    } else {
-      deps.add(prefix + key);
-    }
-  }
+    },
+  });
 
   return deps;
 }

@@ -188,34 +188,45 @@ A function `when` that returns a Promise is promoted to async at runtime —
 The workaround is a **data-form `when`** (always sync — the binding works)
 or a sync function `when` that pushes the async dependency into a derivation.
 
-## Observing clobbers
+## Observing rejected writes
 
 When the binding drops an owned-fact write, Directive emits a
-`resolver.clobber` observation event so devtools, the logging plugin, and
-user-installed observers can surface the drop:
+`resolver.write.rejected` observation event with `reason: "clobbered"` so
+devtools, the logging plugin, and user-installed observers can surface the
+drop. The `reason` field keeps the observation protocol backend-neutral —
+clobber detection is the in-memory implementation; future write-rejecting
+backends can report other reasons under the same event type.
 
 ```ts
 system.observe((e) => {
-  if (e.type === "resolver.clobber") {
+  if (e.type === "resolver.write.rejected") {
     console.warn(
-      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+      `[${e.reason}] resolver ${e.resolver} dropped ${e.fact}: ` +
         `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
     );
   }
 });
 ```
 
-The same event is delivered to plugins through the `onResolverClobber` hook:
+When `e.dropped` is set the event is the per-resolver suppression summary —
+emitted once when a single resolver instance exceeds the per-instance
+write-rejection cap (10), with `dropped` reporting how many per-write events
+were suppressed.
+
+The same event is delivered to plugins through the `onResolverWriteRejected`
+hook:
 
 ```ts
 interface Plugin {
-  onResolverClobber?: (
-    resolverId: string,
-    requirementId: string,
-    fact: string,
-    expected: unknown,
-    actual: unknown,
-  ) => void;
+  onResolverWriteRejected?: (event: {
+    resolver: string;
+    req: RequirementWithId;
+    reason: "clobbered";
+    fact?: string;
+    expected?: unknown;
+    actual?: unknown;
+    dropped?: number;
+  }) => void;
 }
 ```
 

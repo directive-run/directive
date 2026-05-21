@@ -733,12 +733,24 @@ export function createEngine<S extends Schema>(
     },
     onClobber: (resolver, req, fact, expected, actual) => {
       if (hasPlugins()) {
-        pluginManager.emitResolverClobber(resolver, req, fact, expected, actual);
+        pluginManager.emitResolverWriteRejected({
+          resolver,
+          req,
+          reason: "clobbered",
+          fact,
+          expected,
+          actual,
+        });
       }
     },
     onClobberSuppressed: (resolver, req, dropped) => {
       if (hasPlugins()) {
-        pluginManager.emitResolverClobberSuppressed(resolver, req, dropped);
+        pluginManager.emitResolverWriteRejected({
+          resolver,
+          req,
+          reason: "clobbered",
+          dropped,
+        });
       }
     },
     onResolutionComplete: () => {
@@ -1396,31 +1408,24 @@ export function createEngine<S extends Schema>(
             requirementId: req.id,
             error,
           }),
-        onResolverClobber: (
-          resolver: string,
-          req: { id: string },
-          fact: string,
-          expected: unknown,
-          actual: unknown,
-        ) =>
+        onResolverWriteRejected: (event: {
+          resolver: string;
+          req: { id: string };
+          reason: "clobbered";
+          fact?: string;
+          expected?: unknown;
+          actual?: unknown;
+          dropped?: number;
+        }) =>
           observer({
-            type: "resolver.clobber",
-            resolver,
-            requirementId: req.id,
-            fact,
-            expected,
-            actual,
-          }),
-        onResolverClobberSuppressed: (
-          resolver: string,
-          req: { id: string },
-          dropped: number,
-        ) =>
-          observer({
-            type: "resolver.clobber.suppressed",
-            resolver,
-            requirementId: req.id,
-            dropped,
+            type: "resolver.write.rejected",
+            resolver: event.resolver,
+            requirementId: event.req.id,
+            reason: event.reason,
+            fact: event.fact,
+            expected: event.expected,
+            actual: event.actual,
+            dropped: event.dropped,
           }),
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>

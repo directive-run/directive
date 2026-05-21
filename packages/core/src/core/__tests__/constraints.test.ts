@@ -710,5 +710,13 @@ describe("owner attribution on predicate throws", () => {
     const err = errorSpy.mock.calls[0]![1] as Error;
     expect(err.message).toMatch(/constraint 'badMatch'/);
     expect(err.message).toMatch(/operand must be a RegExp/);
+
+    // The re-thrown error preserves the original throw as `cause` so the
+    // original throw site survives the owner-attribution wrap.
+    expect(err.cause).toBeInstanceOf(Error);
+    const cause = err.cause as Error;
+    expect(cause.message).toMatch(/operand must be a RegExp/);
+    expect(cause.message.startsWith("[Directive] ")).toBe(true);
+    expect(typeof cause.stack).toBe("string");
   });
 });

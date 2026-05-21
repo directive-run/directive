@@ -65,6 +65,42 @@ export function freezeSpec<T>(spec: T): T {
 }
 
 /**
+ * Wrap a synthesized definition function so a `[Directive]`-prefixed error
+ * thrown from inside it is re-thrown with the owning definition's category +
+ * id injected, and the original error preserved as `cause`. Non-`[Directive]`
+ * errors (user code, native) pass through untouched.
+ *
+ * Centralizes the owner-attribution wrap shared by the data-form `when`
+ * (constraints), `on` (effects), and `compute` (derivations) closures — a
+ * `[Directive]`-prefixed throw (e.g. `$matches: string`) is re-pointed at the
+ * owning definition so the stack trace blames user config, not the runtime.
+ *
+ * @param category - The owning definition kind, used in the re-thrown message.
+ * @param id - The owning definition's id.
+ * @param fn - The synthesized function to wrap.
+ * @returns A function with identical signature that re-attributes Directive errors.
+ */
+export function attributeError<A extends unknown[], R>(
+  category: "constraint" | "effect" | "derivation",
+  id: string,
+  fn: (...args: A) => R,
+): (...args: A) => R {
+  return (...args: A): R => {
+    try {
+      return fn(...args);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("[Directive] ")) {
+        throw new Error(
+          `[Directive] ${category} '${id}': ${e.message.slice("[Directive] ".length)}`,
+          { cause: e },
+        );
+      }
+      throw e;
+    }
+  };
+}
+
+/**
  * Execute a promise with a timeout, properly cleaning up the timer.
  * Used by both constraints and resolvers for timeout handling.
  *

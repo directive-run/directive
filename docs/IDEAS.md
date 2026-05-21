@@ -780,8 +780,8 @@ box, because it already knows why every fact changed."*
 
 **[1 day — quick win, viral MED-HIGH, compound HIGH]**
 
-`resolver.clobber` events fire the moment ownership drops. Aggregate them
-in a small ring buffer (per-fact, time-windowed) and emit a **structured
+`resolver.write.rejected` events fire the moment ownership drops. Aggregate
+them in a small ring buffer (per-fact, time-windowed) and emit a **structured
 warning the instant a clobber loop exceeds threshold**:
 
 ```

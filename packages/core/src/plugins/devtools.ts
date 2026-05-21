@@ -893,17 +893,27 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       panelEvent("resolver.cancel", { resolver });
     },
 
-    onResolverClobber: (resolver, req, fact, expected, actual) => {
+    onResolverWriteRejected: ({
+      resolver,
+      req,
+      reason,
+      fact,
+      expected,
+      actual,
+      dropped,
+    }) => {
       const payload = {
         resolver,
         requirementId: req.id,
+        reason,
         fact,
         expected,
         actual,
+        dropped,
       };
-      addEvent("resolver.clobber", payload);
-      recordEvent("resolver.clobber", payload);
-      panelEvent("resolver.clobber", { resolver, fact });
+      addEvent("resolver.write.rejected", payload);
+      recordEvent("resolver.write.rejected", payload);
+      panelEvent("resolver.write.rejected", { resolver, fact, dropped });
     },
 
     onEffectRun: (id) => {

@@ -688,38 +688,38 @@ export type ObservationEvent =
     }
   | {
       /**
-       * Emitted when a bound resolver's owned-fact write is dropped because
-       * the fact was changed by something outside the resolver between the
-       * resolver's baseline and its next write (RFC-0003 clobber detection).
+       * Emitted when a resolver's write is rejected by the runtime. The only
+       * `reason` today is `"clobbered"`: a bound resolver's owned-fact write
+       * was dropped because the fact was changed by something outside the
+       * resolver between the resolver's baseline and its next write (RFC-0003
+       * optimistic-concurrency check). `reason` keeps the observation protocol
+       * backend-neutral — future write-rejecting backends can report other
+       * reasons without a new event type.
+       *
+       * When `dropped` is set, this is the per-resolver suppression summary:
+       * emitted once when a single resolver instance exceeds the per-instance
+       * write-rejection cap (10). Further per-write events for that instance
+       * are dropped; `dropped` reports how many were suppressed, and
+       * `fact`/`expected`/`actual` describe the last drop (or are omitted).
        *
        * @example
        * ```ts
        * system.observe((event) => {
-       *   if (event.type === "resolver.clobber") {
-       *     console.warn(`[clobber] ${event.resolver} dropped ${event.fact}`);
+       *   if (event.type === "resolver.write.rejected") {
+       *     console.warn(`[${event.reason}] ${event.resolver} dropped ${event.fact}`);
        *   }
        * });
        * ```
        */
-      type: "resolver.clobber";
+      type: "resolver.write.rejected";
       resolver: string;
       requirementId: string;
-      fact: string;
-      expected: unknown;
-      actual: unknown;
-    }
-  | {
-      /**
-       * Emitted once when a single resolver instance exceeds the per-instance
-       * clobber-event cap (10). Further `resolver.clobber` events for that
-       * instance are dropped — this summary reports how many were suppressed,
-       * preventing a buggy or hostile resolver loop from amplifying clobber
-       * events to every plugin.
-       */
-      type: "resolver.clobber.suppressed";
-      resolver: string;
-      requirementId: string;
-      dropped: number;
+      reason: "clobbered";
+      fact?: string;
+      expected?: unknown;
+      actual?: unknown;
+      /** Present on the suppression summary — count of dropped per-write events. */
+      dropped?: number;
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }

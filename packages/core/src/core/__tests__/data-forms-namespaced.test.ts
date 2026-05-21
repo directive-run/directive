@@ -914,8 +914,8 @@ describe("namespaced constraint owns — clobber detection", () => {
     await flush();
 
     const clobbers = events.filter(
-      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
-        e.type === "resolver.clobber",
+      (e): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
+        e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBeGreaterThanOrEqual(1);
     // The clobbered fact name is namespace-prefixed.
@@ -1002,8 +1002,8 @@ describe("namespaced constraint owns — clobber detection", () => {
     await flush();
 
     const clobbers = events.filter(
-      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
-        e.type === "resolver.clobber",
+      (e): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
+        e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBe(1);
     expect(clobbers[0]!.fact).toBe("one::value");

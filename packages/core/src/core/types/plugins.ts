@@ -240,51 +240,45 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onResolverCancel?: (resolver: string, req: RequirementWithId) => void;
 
   /**
-   * Called when a bound resolver (RFC-0003) drops a write to an owned fact
-   * because the fact was changed by something outside the resolver between
-   * the resolver's baseline and its next write. The resolver's
-   * `AbortController` is aborted in the same step. See
-   * {@link createBoundFacts} for the per-fact optimistic concurrency model.
+   * Called when a resolver's write is rejected by the runtime. The only
+   * `reason` today is `"clobbered"`: a bound resolver (RFC-0003) dropped a
+   * write to an owned fact because the fact was changed by something outside
+   * the resolver between the resolver's baseline and its next write — the
+   * resolver's `AbortController` is aborted in the same step. See
+   * {@link createBoundFacts} for the per-fact optimistic-concurrency model.
+   * `reason` keeps the hook backend-neutral.
    *
-   * @param resolver - The resolver ID
-   * @param req - The requirement whose resolver detected the clobber
-   * @param fact - The owned fact key that was clobbered
-   * @param expected - The value the resolver expected to see
-   * @param actual - The value actually present in the store
+   * When `dropped` is set, this is the per-resolver suppression summary:
+   * emitted once when a single resolver instance exceeds the per-instance
+   * write-rejection cap (10). Further per-write events for that instance are
+   * dropped; `dropped` reports how many were suppressed, and
+   * `fact`/`expected`/`actual` are omitted on the summary.
+   *
+   * @param event - The write-rejection event.
    *
    * @example
    * ```ts
    * const myPlugin: Plugin = {
-   *   name: "clobber-logger",
-   *   onResolverClobber({ resolverId, requirementId, fact, expected, actual }) {
-   *     console.warn(`[clobber] ${resolverId}: ${fact} expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`);
+   *   name: "write-rejection-logger",
+   *   onResolverWriteRejected({ resolver, fact, expected, actual, dropped }) {
+   *     if (dropped !== undefined) {
+   *       console.warn(`[${resolver}] suppressed ${dropped} write rejections`);
+   *       return;
+   *     }
+   *     console.warn(`[clobber] ${resolver}: ${fact} expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`);
    *   },
    * };
    * ```
    */
-  onResolverClobber?: (
-    resolver: string,
-    req: RequirementWithId,
-    fact: string,
-    expected: unknown,
-    actual: unknown,
-  ) => void;
-
-  /**
-   * Called once when a single resolver instance exceeds the per-instance
-   * clobber-event cap (RFC-0003). Further `onResolverClobber` events for
-   * that instance are dropped — this summary reports how many were
-   * suppressed, rate-limiting clobber-event amplification.
-   *
-   * @param resolver - The resolver ID
-   * @param req - The requirement whose resolver hit the cap
-   * @param dropped - Number of clobber events suppressed
-   */
-  onResolverClobberSuppressed?: (
-    resolver: string,
-    req: RequirementWithId,
-    dropped: number,
-  ) => void;
+  onResolverWriteRejected?: (event: {
+    resolver: string;
+    req: RequirementWithId;
+    reason: "clobbered";
+    fact?: string;
+    expected?: unknown;
+    actual?: unknown;
+    dropped?: number;
+  }) => void;
 
   // ============================================================================
   // Effect Hooks

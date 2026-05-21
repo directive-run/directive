@@ -2101,7 +2101,7 @@ describe("R2 — factsBaseline lazy perf", () => {
 // ============================================================================
 
 describe("R2 — clobber observability via system.observe", () => {
-  it("emits resolver.clobber on a dropped owned-fact write", async () => {
+  it("emits resolver.write.rejected on a dropped owned-fact write", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -2162,12 +2162,13 @@ describe("R2 — clobber observability via system.observe", () => {
     await flushSettle();
 
     const clobbers = events.filter(
-      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
-        e.type === "resolver.clobber",
+      (e): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
+        e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBeGreaterThanOrEqual(1);
     const evt = clobbers[0]!;
     expect(evt.resolver).toBe("run");
+    expect(evt.reason).toBe("clobbered");
     expect(evt.fact).toBe("status");
     expect(evt.actual).toBe("left");
     expect(evt.expected).toBe("mutating");
