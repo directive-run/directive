@@ -110,9 +110,34 @@ export function stableStringify(value: unknown, maxDepth = 50): string {
       return '"[max depth exceeded]"';
     }
 
+    // BigInt is not JSON-serializable; encode with a trailing 'n' to remain
+    // distinct from numeric strings.
+    if (typeof val === "bigint") {
+      return `${val.toString()}n`;
+    }
+
     const primitive = stringifyPrimitive(val);
     if (primitive !== undefined) {
       return primitive;
+    }
+
+    // Typed-value branches: each prefix is bare (no outer quotes) so it can
+    // never collide with a JSON-encoded string. `JSON.stringify("D:...")`
+    // emits `"D:..."` (the wrapping quotes ARE part of the output string),
+    // whereas the Date branch emits `D:...` (no quotes). Distinct outputs.
+    if (val instanceof Date) {
+      return `D:${val.toISOString()}`;
+    }
+    if (val instanceof RegExp) {
+      return `R:${val.source}:${val.flags}`;
+    }
+    if (val instanceof Map) {
+      const entries = [...val.entries()].sort();
+      return `M:${stringify(entries, depth + 1)}`;
+    }
+    if (val instanceof Set) {
+      const items = [...val].sort();
+      return `S:${stringify(items, depth + 1)}`;
     }
 
     if (Array.isArray(val)) {

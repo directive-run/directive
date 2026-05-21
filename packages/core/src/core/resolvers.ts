@@ -61,8 +61,17 @@ export interface ResolversManager<_S extends Schema> {
    * for batch processing instead of being resolved immediately.
    *
    * @param req - The requirement (with a stable identity ID) to resolve.
+   * @param options.factsBaseline - Optional pre-dispatch facts snapshot
+   *   shared by every resolver dispatched in the same reconcile tick. Used
+   *   by RFC-1 constraint-binding to seed each resolver's `expected` map
+   *   from a value that pre-dates any sibling resolver's writes, preventing
+   *   the sibling-clobber gap where resolver 2 silently overwrites
+   *   resolver 1's owned write.
    */
-  resolve(req: RequirementWithId): void;
+  resolve(
+    req: RequirementWithId,
+    options?: { factsBaseline?: Readonly<Record<string, unknown>> },
+  ): void;
   /**
    * Cancel an in-flight or batch-queued resolver by requirement ID.
    *
@@ -187,6 +196,13 @@ interface ResolverState {
 interface BatchState {
   resolverId: string;
   requirements: RequirementWithId[];
+  /**
+   * Per-requirement pre-dispatch baselines. The first non-null baseline seen
+   * across the batch wins when the resolver actually fires (batched resolvers
+   * share one ctx, so we cannot thread distinct baselines into a single proxy
+   * — but they're all from the same reconcile tick anyway).
+   */
+  baselines: Array<Readonly<Record<string, unknown>> | undefined>;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -628,19 +644,32 @@ export function createResolversManager<S extends Schema>(
    * `when()` is never consulted here — it remains purely the constraint
    * trigger. The binding works with async constraints too.
    *
+   * @param baseline - Optional pre-dispatch facts snapshot. When provided,
+   *   `expected` for each owned fact seeds from the baseline rather than the
+   *   live `rawFacts` slot. This prevents the "sibling clobber" race where
+   *   two resolvers run in the same reconcile tick and overlap on owned
+   *   facts — without a shared pre-dispatch baseline, the second resolver
+   *   would observe the first's writes already-landed and silently allow
+   *   the clobber.
+   *
    * @internal
    */
   function createBoundFacts(
     binding: ConstraintBindingInfo,
     controller: AbortController,
+    baseline?: Readonly<Record<string, unknown>>,
   ): Facts<S> {
     const rawFacts = facts as Record<string, unknown>;
     const owned = new Set(binding.fields);
     // The value each owned fact had when this resolver last wrote or observed
-    // it. Snapshotted at resolver dispatch; updated on each landed owned write.
+    // it. Seeded from `baseline` (a snapshot taken before any sibling resolver
+    // in this dispatch tick ran) when provided, falling back to the live
+    // `rawFacts` slot. Updated to the resolver's intended value on each
+    // landed owned write.
     const expected = new Map<string, unknown>();
     for (const field of owned) {
-      expected.set(field, rawFacts[field]);
+      const seed = baseline ? baseline[field] : rawFacts[field];
+      expected.set(field, seed);
     }
     // Owned facts whose ownership was lost to an external writer (one-shot).
     const lost = new Set<string>();
@@ -665,9 +694,23 @@ export function createResolversManager<S extends Schema>(
           return Reflect.set(facts as object, prop, value);
         }
         if (!ownedWriteAllowed(prop)) return true;
+        // Stage the resolver's intended value into `expected` BEFORE
+        // delegating to the store. If a listener fires synchronously during
+        // the store write and mutates the same owned fact, the listener's
+        // value lands in `rawFacts` — but `expected` still reflects the
+        // resolver's intended value, so the next write detects the clobber
+        // (rawFacts !== expected) and aborts. Without this ordering, a
+        // post-Reflect.set re-read would silently transfer ownership to
+        // the listener's value.
+        const previousExpected = expected.get(prop);
+        expected.set(prop, value);
         const ok = Reflect.set(facts as object, prop, value);
-        // Re-read so `expected` matches whatever the store actually holds.
-        expected.set(prop, rawFacts[prop]);
+        if (!ok) {
+          // Store rejected the write — roll `expected` back so we don't
+          // mistake the resolver's intended-but-unwritten value for the
+          // store's truth.
+          expected.set(prop, previousExpected);
+        }
         return ok;
       },
       deleteProperty(_target, prop) {
@@ -675,8 +718,12 @@ export function createResolversManager<S extends Schema>(
           return Reflect.deleteProperty(facts as object, prop);
         }
         if (!ownedWriteAllowed(prop)) return true;
+        const previousExpected = expected.get(prop);
+        expected.set(prop, undefined);
         const ok = Reflect.deleteProperty(facts as object, prop);
-        expected.set(prop, rawFacts[prop]);
+        if (!ok) {
+          expected.set(prop, previousExpected);
+        }
         return ok;
       },
       has(_target, prop) {
@@ -705,15 +752,20 @@ export function createResolversManager<S extends Schema>(
    *   {@link ConstraintBindingInfo} and {@link createBoundFacts}.
    * @param controller - The AbortController owning `signal`. Required when
    *   `binding` is present so the proxy can abort on a dropped write.
+   * @param baseline - Optional pre-dispatch facts snapshot, threaded into
+   *   `createBoundFacts` to defeat the sibling-clobber race.
    */
   function createContext(
     signal: AbortSignal,
     requirementIds: readonly string[],
     binding?: ConstraintBindingInfo | null,
     controller?: AbortController,
+    baseline?: Readonly<Record<string, unknown>>,
   ): ResolverContext<S> {
     const ctxFacts =
-      binding && controller ? createBoundFacts(binding, controller) : facts;
+      binding && controller
+        ? createBoundFacts(binding, controller, baseline)
+        : facts;
     return {
       facts: ctxFacts,
       signal,
@@ -798,6 +850,7 @@ export function createResolversManager<S extends Schema>(
     req: RequirementWithId,
     signal: AbortSignal,
     controller: AbortController,
+    baseline?: Readonly<Record<string, unknown>>,
   ): Promise<void> {
     if (!def.resolve) {
       return;
@@ -810,7 +863,7 @@ export function createResolversManager<S extends Schema>(
     store.batch(() => {
       resolvePromise = def.resolve!(
         req.requirement as Parameters<NonNullable<typeof def.resolve>>[0],
-        createContext(signal, [req.id], binding, controller),
+        createContext(signal, [req.id], binding, controller, baseline),
       ) as Promise<void>;
     });
 
@@ -914,6 +967,7 @@ export function createResolversManager<S extends Schema>(
     resolverId: string,
     req: RequirementWithId,
     controller: AbortController,
+    baseline?: Readonly<Record<string, unknown>>,
   ): Promise<void> {
     const def = definitions[resolverId];
     if (!def) {
@@ -938,6 +992,7 @@ export function createResolversManager<S extends Schema>(
           req,
           controller.signal,
           controller,
+          baseline,
         );
         recordSuccess(resolverId, req, startedAt);
 
@@ -1105,6 +1160,7 @@ export function createResolversManager<S extends Schema>(
     timeout: number | undefined,
     startedAt: number,
     attempt: number,
+    baseline?: Readonly<Record<string, unknown>>,
   ): Promise<"done" | "retry"> {
     // Resolve binding for the batch (RFC-1). Binding only applies when
     // every requirement in the batch shares the same source constraint —
@@ -1125,6 +1181,7 @@ export function createResolversManager<S extends Schema>(
       requirements.map((r) => r.id),
       batchBinding,
       controller,
+      baseline,
     );
     const reqPayloads = requirements.map((r) => r.requirement);
 
@@ -1172,6 +1229,7 @@ export function createResolversManager<S extends Schema>(
     requirements: RequirementWithId[],
     retryPolicy: RetryPolicy & { attempts: number; backoff: string },
     timeout: number | undefined,
+    baseline?: Readonly<Record<string, unknown>>,
   ): Promise<Error | null> {
     const controller = new AbortController();
     const startedAt = Date.now();
@@ -1192,6 +1250,7 @@ export function createResolversManager<S extends Schema>(
           timeout,
           startedAt,
           attempt,
+          baseline,
         );
         if (outcome === "done") {
           return null;
@@ -1219,6 +1278,7 @@ export function createResolversManager<S extends Schema>(
   async function executeBatch(
     resolverId: string,
     requirements: RequirementWithId[],
+    baseline?: Readonly<Record<string, unknown>>,
   ): Promise<void> {
     const def = definitions[resolverId];
     if (!def) {
@@ -1241,6 +1301,7 @@ export function createResolversManager<S extends Schema>(
       requirements,
       retryPolicy,
       timeout,
+      baseline,
     );
 
     if (lastError) {
@@ -1270,6 +1331,7 @@ export function createResolversManager<S extends Schema>(
       batches.set(resolverId, {
         resolverId,
         requirements: [],
+        baselines: [],
         timer: null,
       });
     }
@@ -1278,7 +1340,11 @@ export function createResolversManager<S extends Schema>(
   }
 
   /** Add a requirement to a batch */
-  function addToBatch(resolverId: string, req: RequirementWithId): void {
+  function addToBatch(
+    resolverId: string,
+    req: RequirementWithId,
+    baseline?: Readonly<Record<string, unknown>>,
+  ): void {
     const def = definitions[resolverId];
     if (!def) {
       return;
@@ -1295,6 +1361,7 @@ export function createResolversManager<S extends Schema>(
     }
 
     batch.requirements.push(req);
+    batch.baselines.push(baseline);
 
     // Flush immediately if maxSize reached
     if (
@@ -1320,17 +1387,24 @@ export function createResolversManager<S extends Schema>(
     if (!batch || batch.requirements.length === 0) return;
 
     const requirements = [...batch.requirements];
+    // Pick the first non-undefined baseline; all reqs in a batch are dispatched
+    // in the same reconcile tick so any baseline from that tick is acceptable.
+    const baseline = batch.baselines.find((b) => b !== undefined);
     batch.requirements = [];
+    batch.baselines = [];
     batch.timer = null;
 
     // Execute batch
-    executeBatch(resolverId, requirements).then(() => {
+    executeBatch(resolverId, requirements, baseline).then(() => {
       onResolutionComplete?.();
     });
   }
 
   const manager: ResolversManager<S> = {
-    resolve(req: RequirementWithId): void {
+    resolve(
+      req: RequirementWithId,
+      options?: { factsBaseline?: Readonly<Record<string, unknown>> },
+    ): void {
       // Already resolving?
       if (inflight.has(req.id)) {
         return;
@@ -1352,7 +1426,7 @@ export function createResolversManager<S extends Schema>(
 
       // Check if this is a batched resolver
       if (def.batch?.enabled) {
-        addToBatch(resolverId, req);
+        addToBatch(resolverId, req, options?.factsBaseline);
         return;
       }
 
@@ -1378,7 +1452,7 @@ export function createResolversManager<S extends Schema>(
       onStart?.(resolverId, req);
 
       // Execute asynchronously
-      executeResolve(resolverId, req, controller).finally(() => {
+      executeResolve(resolverId, req, controller, options?.factsBaseline).finally(() => {
         // Only fire onResolutionComplete if we're the first to clean up.
         // If cancel() already removed us from inflight, skip to avoid
         // spurious double-notifications.
@@ -1413,6 +1487,7 @@ export function createResolversManager<S extends Schema>(
         const idx = batch.requirements.findIndex((r) => r.id === requirementId);
         if (idx !== -1) {
           const [removed] = batch.requirements.splice(idx, 1);
+          batch.baselines.splice(idx, 1);
 
           statuses.set(requirementId, {
             state: "canceled",

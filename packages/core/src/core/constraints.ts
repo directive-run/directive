@@ -10,7 +10,11 @@
 
 import isDevelopment from "#is-development";
 import { withTimeout } from "../utils/utils.js";
-import { evaluatePredicateExplained, memoizePredicate } from "./predicate.js";
+import {
+  deepFreeze,
+  evaluatePredicateExplained,
+  memoizePredicate,
+} from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
 import { withTracking } from "./tracking.js";
 import type {
@@ -295,14 +299,13 @@ export function createConstraintsManager<S extends Schema>(
       (def as { deps?: string[] }).deps = undefined;
     }
 
-    // `$changed` is effects-only — constraints have no prev snapshot. Block
-    // at registration in dev mode so the bug is caught immediately.
+    // `$changed` is effects-only — constraints have no prev snapshot. Throw
+    // unconditionally at registration so production cannot silently collapse
+    // this clause to a defined-check (which would have wrong semantics).
     if (containsChangedOperator(spec)) {
-      const msg = `[Directive] constraint "${id}": \`$changed\` is effects-only; constraint \`when\` has no prev snapshot. Move this clause to an effect's \`on\`.`;
-      console.warn(msg);
-      if (isDevelopment) {
-        throw new Error(msg);
-      }
+      throw new Error(
+        `[Directive] constraint "${id}": $changed is effects-only — constraint when has no prev snapshot. Move the change-detection to an effect, or use a boolean derivation as a synthetic prev.`,
+      );
     }
 
     if (spec === null || typeof spec !== "object") {
@@ -310,7 +313,7 @@ export function createConstraintsManager<S extends Schema>(
         `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof spec}`,
       );
     }
-    Object.freeze(spec);
+    deepFreeze(spec);
     const memoized = memoizePredicate(spec as object);
     (def as { when: unknown }).when = (f: Facts<S>) =>
       memoized(f as unknown as Record<string, unknown>);

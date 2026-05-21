@@ -9,7 +9,12 @@
  * - Lazy evaluation
  */
 
-import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
+import {
+  deepFreeze,
+  evaluateTemplate,
+  isTemplate,
+  memoizePredicate,
+} from "./predicate.js";
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
   DefinitionMeta,
@@ -133,12 +138,12 @@ export function createDerivationsManager<
     if (typeof c === "function") {
       fn = c as (facts: unknown, derived: unknown) => unknown;
     } else if (isTemplate(c)) {
-      Object.freeze(c);
+      deepFreeze(c);
       fn = (facts) => evaluateTemplate(c, facts as Record<string, unknown>);
     } else if (typeof c === "object" && c !== null) {
       // Defensive: memoizePredicate also throws on non-object predicates, but a
       // guard here keeps the failure adjacent to the registration site.
-      Object.freeze(c);
+      deepFreeze(c);
       const memoized = memoizePredicate(c);
       fn = (facts) => memoized(facts as Record<string, unknown>);
     } else if (c !== undefined) {

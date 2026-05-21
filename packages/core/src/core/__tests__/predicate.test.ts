@@ -83,7 +83,7 @@ describe("evaluatePredicate — operators", () => {
 
   it("$matches", () => {
     expect(evaluatePredicate({ phase: { $matches: /^r/ } }, facts)).toBe(true);
-    expect(evaluatePredicate({ phase: { $matches: "ed$" } }, facts)).toBe(true);
+    expect(evaluatePredicate({ phase: { $matches: /ed$/ } }, facts)).toBe(true);
     expect(evaluatePredicate({ phase: { $matches: /x/ } }, facts)).toBe(false);
   });
 
@@ -617,38 +617,35 @@ describe("AE-fix: $between reversed pair dev-warn (DM-C3)", () => {
   });
 });
 
-describe("AE-fix: $matches ReDoS cache (S-m7, DM-M5)", () => {
-  // Suppress the back-compat dev-warn for string $matches operands.
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-  afterEach(() => {
-    warnSpy.mockRestore();
-  });
-
-  it("reuses the same compiled RegExp for repeated string operands", () => {
-    // Indirect check: the cached regex preserves lastIndex behavior — but
-    // since we use .test() without /g, lastIndex doesn't apply. Instead,
-    // verify that 1000 evaluations with the same string pattern complete
-    // quickly (would be slow if we recompiled every call).
-    const start = performance.now();
-    for (let i = 0; i < 1000; i++) {
-      evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" });
-    }
-    const elapsed = performance.now() - start;
-    // Loose bound — recompiling 1000 regexes would still be fast, so this is
-    // a smoke test only.
-    expect(elapsed).toBeLessThan(500);
-  });
-
-  it("string and RegExp operands both work", () => {
-    expect(
+describe("$matches operand must be RegExp (ReDoS hardening)", () => {
+  it("throws when operand is a string (no longer back-compat compiled)", () => {
+    expect(() =>
       evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" }),
-    ).toBe(true);
+    ).toThrow(/operand must be a RegExp/);
+  });
+
+  it("throws for numeric / object / null operands too", () => {
+    expect(() =>
+      evaluatePredicate(
+        { s: { $matches: 123 as unknown as RegExp } },
+        { s: "foobar" },
+      ),
+    ).toThrow(/operand must be a RegExp/);
+    expect(() =>
+      evaluatePredicate(
+        { s: { $matches: {} as unknown as RegExp } },
+        { s: "foobar" },
+      ),
+    ).toThrow(/operand must be a RegExp/);
+  });
+
+  it("RegExp operand still works", () => {
     expect(
       evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" }),
     ).toBe(true);
+    expect(evaluatePredicate({ s: { $matches: /^foo/i } }, { s: "FOOBAR" })).toBe(
+      true,
+    );
   });
 });
 
@@ -826,40 +823,17 @@ describe("AE-R2: $startsWith / $endsWith operators", () => {
   });
 });
 
-describe("AE-R2: $matches dev-warn for string operand", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-  afterEach(() => {
-    warnSpy.mockRestore();
-  });
-
-  it("RegExp operand does NOT warn", () => {
+describe("$matches: string operand rejected at evaluation", () => {
+  it("RegExp operand evaluates without throwing", () => {
     expect(
       evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" }),
     ).toBe(true);
-    expect(
-      warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes("$matches: string operand"),
-      ),
-    ).toBe(false);
   });
 
-  it("string operand dev-warns recommending a RegExp", () => {
-    expect(
+  it("string operand throws (no longer back-compat)", () => {
+    expect(() =>
       evaluatePredicate({ s: { $matches: "^foo" } }, { s: "foobar" }),
-    ).toBe(true);
-    expect(
-      warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes("$matches: string operand"),
-      ),
-    ).toBe(true);
-    expect(
-      warnSpy.mock.calls.some((call) =>
-        String(call[0] ?? "").includes("real RegExp"),
-      ),
-    ).toBe(true);
+    ).toThrow(/operand must be a RegExp/);
   });
 });
 
@@ -964,5 +938,138 @@ describe("AE-R2: evaluateTemplate distinct warns for unknown-key / null / undefi
       }
     }
     expect(seen.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ============================================================================
+// AE R1 fix: deep freeze (FactPredicate specs frozen recursively)
+// ============================================================================
+
+describe("predicate registration deep-freezes nested operand objects", () => {
+  it("nested operand inside a memoized predicate is frozen and evaluation still uses the original value", () => {
+    const spec: Record<string, unknown> = {
+      phase: "red",
+      elapsed: { $gte: 30 },
+    };
+
+    // Match what the constraint normalizer does at registration: deep-freeze
+    // then memoize. Asserting via memoizePredicate directly so we don't need
+    // to spin up a system — the freezing happens in constraints.ts /
+    // derivations.ts / effects.ts / engine.ts at registration sites.
+    Object.freeze(spec);
+    Object.freeze(spec.elapsed as object); // simulate deepFreeze of nested op
+    const compiled = memoizePredicate(spec);
+
+    // Attempt to mutate the nested operand — strict mode throws, non-strict
+    // silently no-ops. Either way, the compiled closure must NOT pick up
+    // the would-be mutation.
+    expect(() => {
+      (spec.elapsed as { $gte: number }).$gte = 999;
+    }).toThrow(TypeError);
+
+    expect(compiled({ phase: "red", elapsed: 30 })).toBe(true);
+    expect(compiled({ phase: "red", elapsed: 5 })).toBe(false);
+  });
+});
+
+// ============================================================================
+// AE R1 fix: evaluateKeySelector typed-value handling (no collisions)
+// ============================================================================
+
+describe("evaluateKeySelector typed-value handling", () => {
+  it("distinguishes distinct BigInts", () => {
+    expect(evaluateKeySelector(["id"], { id: 1n })).not.toBe(
+      evaluateKeySelector(["id"], { id: 2n }),
+    );
+  });
+
+  it("distinguishes distinct Dates", () => {
+    const a = new Date("2026-01-01T00:00:00Z");
+    const b = new Date("2026-06-15T00:00:00Z");
+    expect(evaluateKeySelector(["when"], { when: a })).not.toBe(
+      evaluateKeySelector(["when"], { when: b }),
+    );
+  });
+
+  it("distinguishes RegExps with different flags", () => {
+    expect(evaluateKeySelector(["re"], { re: /foo/ })).not.toBe(
+      evaluateKeySelector(["re"], { re: /foo/i }),
+    );
+  });
+
+  it("distinguishes RegExps with different source", () => {
+    expect(evaluateKeySelector(["re"], { re: /foo/ })).not.toBe(
+      evaluateKeySelector(["re"], { re: /bar/ }),
+    );
+  });
+
+  it("distinguishes Sets with different members", () => {
+    expect(evaluateKeySelector(["s"], { s: new Set([1, 2]) })).not.toBe(
+      evaluateKeySelector(["s"], { s: new Set([1, 3]) }),
+    );
+  });
+
+  it("distinguishes Maps with different entries", () => {
+    const a = new Map<string, number>([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    const b = new Map<string, number>([
+      ["a", 1],
+      ["b", 3],
+    ]);
+    expect(evaluateKeySelector(["m"], { m: a })).not.toBe(
+      evaluateKeySelector(["m"], { m: b }),
+    );
+  });
+
+  it("typed-value prefixes don't collide with string values", () => {
+    // The Date branch emits `"D:2026-01-01T00:00:00.000Z"` (one JSON-encoded
+    // string), while a literal string `"D:2026-01-01T00:00:00.000Z"` emits
+    // `"\"D:2026-...\""` (double-quoted escape) — distinct keys.
+    const date = new Date("2026-01-01T00:00:00Z");
+    const strKey = evaluateKeySelector(["k"], {
+      k: `D:${date.toISOString()}`,
+    });
+    const dateKey = evaluateKeySelector(["k"], { k: date });
+    expect(strKey).not.toBe(dateKey);
+  });
+});
+
+// ============================================================================
+// AE R1 fix: evaluateTemplate uses Object.hasOwn (no prototype walk)
+// ============================================================================
+
+describe("evaluateTemplate prototype walk hardening", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("does NOT interpolate inherited Object.prototype keys (toString)", () => {
+    const out = evaluateTemplate({ $template: "v=${toString}" }, {});
+    // Should be empty (unknown-key path) — NOT the source of Object.prototype.toString.
+    expect(out).toBe("v=");
+    expect(
+      warnSpy.mock.calls.some((c) =>
+        String(c[0] ?? "").includes('unknown key "toString"'),
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT interpolate constructor", () => {
+    const out = evaluateTemplate({ $template: "v=${constructor}" }, {});
+    expect(out).toBe("v=");
+  });
+
+  it("own properties still interpolate", () => {
+    expect(
+      evaluateTemplate({ $template: "v=${toString}" }, {
+        toString: "own-value",
+      } as unknown as Record<string, unknown>),
+    ).toBe("v=own-value");
   });
 });

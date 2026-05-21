@@ -1782,3 +1782,174 @@ describe("constraint-binding (RFC-1)", () => {
     expect(observedStatus).toBe("mutating");
   });
 });
+
+// ============================================================================
+// AE R1 fix: bound resolver post-await ownership escape
+// ============================================================================
+
+describe("bound resolver — listener-triggered ownership escape", () => {
+  it("the resolver's intended value (not the listener's) owns the slot", async () => {
+    const bindingSchema = {
+      status: t.string(),
+      progress: t.number(),
+      tail: t.string(),
+    };
+    const { store, facts } = createFacts({ schema: bindingSchema });
+    facts.status = "mutating";
+    facts.progress = 0;
+    facts.tail = "";
+
+    // Listener on `status` mutates the same fact synchronously during the
+    // resolver's write. Without the fix, after the resolver writes A=v1,
+    // the post-Reflect.set re-read pulls the listener's value into
+    // `expected`, silently transferring ownership.
+    const unsubscribe = store.subscribe(["status"], () => {
+      const current = store.get("status");
+      if (current === "step1") {
+        // Mid-set listener mutation — simulates an event handler firing
+        // while the resolver is mid-write.
+        store.set("status", "listener-clobber");
+      }
+    });
+
+    const manager = createResolversManager({
+      definitions: {
+        execute: {
+          requirement: "EXECUTE",
+          resolve: async (_req, ctx) => {
+            ctx.facts.status = "step1"; // listener clobbers to "listener-clobber"
+            // Yield so the deferred notification can drain
+            await Promise.resolve();
+            // Owned write to A again — should be detected as clobbered
+            // (rawFacts.status !== expected.status which is "step1").
+            ctx.facts.status = "step2";
+          },
+        },
+      },
+      facts,
+      store,
+      getConstraintBinding: (id) =>
+        id === "mutate" ? { fields: ["status"] } : undefined,
+    });
+
+    const req = makeReq("EXECUTE", {}, "mutate");
+    manager.resolve(req);
+    await flush(20);
+    unsubscribe();
+
+    // The second write must NOT land — the listener's mid-set mutation
+    // counts as an external clobber. Without the fix, expected would have
+    // been re-read as "listener-clobber", so the second write to "step2"
+    // would have been allowed (since at that moment rawFacts == expected).
+    expect(facts.status).toBe("listener-clobber");
+  });
+});
+
+// ============================================================================
+// AE R1 fix: sibling bound-resolver clobber gap (pre-dispatch baseline)
+// ============================================================================
+
+describe("bound resolver — sibling clobber gap (factsBaseline)", () => {
+  it("two resolvers in one tick share a baseline; the second's owned write is clobber-detected", async () => {
+    const bindingSchema = {
+      status: t.string(),
+      progress: t.number(),
+      tail: t.string(),
+    };
+    const { store, facts } = createFacts({ schema: bindingSchema });
+    facts.status = "initial";
+    facts.progress = 0;
+    facts.tail = "";
+
+    let r1Aborted = false;
+    let r2Aborted = false;
+
+    const manager = createResolversManager({
+      definitions: {
+        resolverA: {
+          requirement: "WRITE_A",
+          resolve: async (_req, ctx) => {
+            ctx.facts.status = "v1";
+            await Promise.resolve();
+            r1Aborted = ctx.signal.aborted;
+          },
+        },
+        resolverB: {
+          requirement: "WRITE_B",
+          resolve: async (_req, ctx) => {
+            // Sibling resolver also owns `status` — without a shared
+            // baseline it would see rawFacts.status == v1 (from resolverA)
+            // and silently overwrite. With the shared baseline, expected
+            // is "initial" and rawFacts is "v1" → clobber detected.
+            ctx.facts.status = "v2";
+            r2Aborted = ctx.signal.aborted;
+          },
+        },
+      },
+      facts,
+      store,
+      getConstraintBinding: (id) =>
+        id === "c1" || id === "c2" ? { fields: ["status"] } : undefined,
+    });
+
+    // Engine-style: take one snapshot, then dispatch both resolvers with the
+    // same baseline.
+    const factsBaseline = store.toObject() as Record<string, unknown>;
+    const reqA = makeReq("WRITE_A", {}, "c1");
+    const reqB = makeReq("WRITE_B", {}, "c2");
+    manager.resolve(reqA, { factsBaseline });
+    manager.resolve(reqB, { factsBaseline });
+    await flush(20);
+
+    // Resolver A's write must land; resolver B's owned write must be dropped
+    // (signal aborted on dispatch of the dropped write).
+    expect(facts.status).toBe("v1");
+    expect(r2Aborted).toBe(true);
+    expect(r1Aborted).toBe(false);
+  });
+
+  it("without baseline (back-compat) — second resolver still clobbers (regression guard)", async () => {
+    const bindingSchema = {
+      status: t.string(),
+      progress: t.number(),
+      tail: t.string(),
+    };
+    const { store, facts } = createFacts({ schema: bindingSchema });
+    facts.status = "initial";
+    facts.progress = 0;
+    facts.tail = "";
+
+    const manager = createResolversManager({
+      definitions: {
+        resolverA: {
+          requirement: "WRITE_A",
+          resolve: async (_req, ctx) => {
+            ctx.facts.status = "v1";
+          },
+        },
+        resolverB: {
+          requirement: "WRITE_B",
+          resolve: async (_req, ctx) => {
+            // Synchronous write before any await — exercises the bound proxy
+            // even without baseline threading.
+            ctx.facts.status = "v2";
+          },
+        },
+      },
+      facts,
+      store,
+      getConstraintBinding: (id) =>
+        id === "c1" || id === "c2" ? { fields: ["status"] } : undefined,
+    });
+
+    // No baseline passed — fall back to per-resolver seeding from rawFacts.
+    // Documents the historical behavior (the bug): second resolver wins.
+    const reqA = makeReq("WRITE_A", {}, "c1");
+    const reqB = makeReq("WRITE_B", {}, "c2");
+    manager.resolve(reqA);
+    manager.resolve(reqB);
+    await flush(20);
+
+    expect(facts.status).toBe("v2");
+  });
+});

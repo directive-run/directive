@@ -223,6 +223,45 @@ function validateResolverRequirements(
   }
 }
 
+/**
+ * Throw when a module's fact key conflicts with the namespace pivot in data-
+ * form predicates (`{ self: {...} }` or `{ <depNamespace>: {...} }`). Without
+ * this guard, `prefixPredicateSpec` would mis-route the pivot's nested
+ * predicate against the pivot's namespace instead of treating it as a literal
+ * fact lookup.
+ *
+ * Thrown unconditionally — this is a structural integrity check, not a dev
+ * convenience. Production users running into this would otherwise see silent
+ * mis-routing.
+ */
+function validatePivotNameConflicts<M extends ModuleSchema>(
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): void {
+  const facts = (config.schema?.facts ?? {}) as Record<string, unknown>;
+  const factKeys = Object.keys(facts);
+  if (factKeys.length === 0) {
+    return;
+  }
+  const reserved = new Set<string>(["self"]);
+  const deps =
+    "crossModuleDeps" in config && config.crossModuleDeps
+      ? Object.keys(
+          config.crossModuleDeps as Record<string, unknown>,
+        )
+      : [];
+  for (const depName of deps) {
+    reserved.add(depName);
+  }
+  for (const key of factKeys) {
+    if (reserved.has(key)) {
+      throw new Error(
+        `[Directive] module "${id}": fact key "${key}" conflicts with the cross-module pivot namespace — rename the fact (e.g. ${key}_).`,
+      );
+    }
+  }
+}
+
 /** Run all dev-mode validations for a module config */
 function validateModuleConfig<M extends ModuleSchema>(
   id: string,
@@ -392,6 +431,10 @@ export function createModule<const M extends ModuleSchema>(
   id: string,
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): ModuleDef<M> {
+  // Pivot-name conflicts are a structural integrity check, not a dev
+  // convenience — run unconditionally.
+  validatePivotNameConflicts(id, config);
+
   if (isDevelopment) {
     validateModuleConfig(id, config);
   }

@@ -37,7 +37,7 @@ import {
 } from "./errors.js";
 import { createFacts } from "./facts.js";
 import { type PluginManager, createPluginManager } from "./plugins.js";
-import { applyPatch, evaluateKeySelector } from "./predicate.js";
+import { applyPatch, deepFreeze, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { BLOCKED_PROPS } from "./tracking.js";
@@ -109,13 +109,10 @@ function unwrapEventDefinitions(
         meta?: DefinitionMeta;
       };
       const spec = obj.patch;
-      // Freeze the spec + $set at registration to match the discipline used
-      // by constraints/derivations — prevents post-registration mutation
-      // from silently changing event behavior.
-      Object.freeze(spec);
-      if (spec.$set) {
-        Object.freeze(spec.$set);
-      }
+      // Deep-freeze the spec + nested $set values at registration so post-
+      // registration mutation cannot silently change event behavior (matches
+      // the discipline used by constraints/derivations/effects).
+      deepFreeze(spec);
       events[key] = (
         facts: Record<string, unknown>,
         event: Record<string, unknown> | undefined,
@@ -980,9 +977,17 @@ export function createEngine<S extends Schema>(
         }
       }
 
-      // Start resolvers for new requirements
+      // Start resolvers for new requirements. Snapshot facts ONCE before the
+      // dispatch loop so every resolver in this reconcile tick observes the
+      // same pre-dispatch values for its owned facts. Without a shared
+      // baseline, two bound resolvers that overlap on an owned fact would
+      // race: the first lands its write, the second's `expected` map (seeded
+      // from live `rawFacts`) inherits that write, and the second silently
+      // clobbers the first.
+      const factsBaseline =
+        added.length > 0 ? (store.toObject() as Record<string, unknown>) : undefined;
       for (const req of added) {
-        resolversManager.resolve(req);
+        resolversManager.resolve(req, { factsBaseline });
       }
 
       // Capture resolver starts for trace

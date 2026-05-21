@@ -391,7 +391,7 @@ describe("data-form introspection", () => {
 // AE-fix: $changed in constraint `when` blocks at registration (DX-M6)
 // ============================================================================
 
-describe("constraint `when` — $changed rejected (DX-M6)", () => {
+describe("constraint `when` — $changed rejected unconditionally", () => {
   it("throws at createSystem time when $changed appears in a constraint `when`", () => {
     const mod = createModule("trafic", {
       schema: {
@@ -418,6 +418,35 @@ describe("constraint `when` — $changed rejected (DX-M6)", () => {
     });
 
     expect(() => createSystem({ module: mod })).toThrow(/effects-only/);
+  });
+
+  it("throw message mentions the fix (move to effect or boolean derivation)", () => {
+    const mod = createModule("hint", {
+      schema: {
+        facts: { phase: t.string<"red" | "green">() },
+        derivations: {},
+        events: {},
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.phase = "red";
+      },
+      constraints: {
+        bad: {
+          when: { phase: { $changed: true } } as unknown as (
+            f: unknown,
+          ) => boolean,
+          require: { type: "GO" },
+        },
+      },
+      resolvers: {
+        go: { requirement: "GO", resolve: async () => {} },
+      },
+    });
+
+    expect(() => createSystem({ module: mod })).toThrow(
+      /Move the change-detection to an effect|boolean derivation as a synthetic prev/,
+    );
   });
 
   it("throws for $changed nested inside a combinator", () => {

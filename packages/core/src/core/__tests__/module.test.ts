@@ -307,3 +307,69 @@ describe("createModuleFactory", () => {
     expect(a.id).not.toBe(b.id);
   });
 });
+
+// ---------------------------------------------------------------------------
+// AE R1 fix: namespace-pivot fact-name conflict
+// ---------------------------------------------------------------------------
+
+describe("createModule — pivot-name conflict", () => {
+  it("throws when a fact key is literally named 'self'", () => {
+    expect(() =>
+      createModule("conflict", {
+        schema: {
+          facts: { self: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).toThrow(/fact key "self" conflicts with the cross-module pivot namespace/);
+  });
+
+  it("throws when a fact key collides with a declared crossModuleDep namespace", () => {
+    const authSchema = {
+      facts: { token: { _type: "" } },
+      derivations: {},
+      events: {},
+      requirements: {},
+    };
+    expect(() =>
+      // biome-ignore lint/suspicious/noExplicitAny: testing cross-module deps shape
+      createModule("data", {
+        schema: {
+          facts: { auth: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        crossModuleDeps: { auth: authSchema },
+      } as any),
+    ).toThrow(/fact key "auth" conflicts with the cross-module pivot namespace/);
+  });
+
+  it("error message suggests a rename (e.g. <key>_)", () => {
+    expect(() =>
+      createModule("conflict", {
+        schema: {
+          facts: { self: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).toThrow(/rename the fact \(e\.g\. self_\)/);
+  });
+
+  it("does NOT throw when fact keys do not collide", () => {
+    expect(() =>
+      createModule("ok", {
+        schema: {
+          facts: { mine: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).not.toThrow();
+  });
+});

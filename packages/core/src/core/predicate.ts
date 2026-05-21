@@ -17,6 +17,43 @@ import {
 } from "./types/predicate.js";
 
 // ============================================================================
+// Deep freeze
+// ============================================================================
+
+/**
+ * Recursively `Object.freeze` an object including nested objects, arrays, and
+ * array elements. Uses a `WeakSet` to handle cycles. Skips primitives and
+ * already-frozen values to avoid wasted work.
+ *
+ * Used at definition-registration sites (constraints, derivations, effects,
+ * events, prefixed specs) so post-registration mutation of a nested operand
+ * cannot silently change the compiled closure's behavior.
+ */
+export function deepFreeze<T>(value: T, seen: WeakSet<object> = new WeakSet()): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  const obj = value as unknown as object;
+  if (seen.has(obj) || Object.isFrozen(obj)) {
+    return value;
+  }
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      deepFreeze(item, seen);
+    }
+  } else {
+    for (const key of Object.keys(obj)) {
+      deepFreeze((obj as Record<string, unknown>)[key], seen);
+    }
+  }
+
+  Object.freeze(obj);
+  return value;
+}
+
+// ============================================================================
 // Discriminators
 // ============================================================================
 
@@ -297,31 +334,6 @@ function relational(
   }
 }
 
-/**
- * Bounded cache of compiled regexes for string `$matches` operands. Capped at
- * `REGEX_CACHE_MAX` entries with FIFO eviction so a runaway constraint can't
- * pin unbounded memory. Operand strings should not include unbounded
- * backtracking; users may pass a RegExp directly to control flags.
- */
-const REGEX_CACHE_MAX = 256;
-const regexCache = new Map<string, RegExp>();
-function getCachedRegex(pattern: string): RegExp {
-  const cached = regexCache.get(pattern);
-  if (cached) {
-    return cached;
-  }
-  const re = new RegExp(pattern);
-  if (regexCache.size >= REGEX_CACHE_MAX) {
-    const first = regexCache.keys().next().value;
-    if (first !== undefined) {
-      regexCache.delete(first);
-    }
-  }
-  regexCache.set(pattern, re);
-
-  return re;
-}
-
 /** Apply one operator. `prevValue` is supplied only for `$changed`. */
 function applyOperator(
   op: PredicateOp,
@@ -374,19 +386,17 @@ function applyOperator(
       );
     }
     case "$matches": {
+      if (!(operand instanceof RegExp)) {
+        // String operands are not accepted — a string cannot carry flags
+        // (case-insensitivity, dotall, multiline) and would also enable a
+        // ReDoS surface for data-loaded predicates. Throw immediately so
+        // the bug surfaces at the point of use.
+        throw new Error(
+          "[Directive] $matches: operand must be a RegExp (string operands are no longer accepted; pass /pattern/flags directly).",
+        );
+      }
       if (typeof actual !== "string") {
         return false;
-      }
-      if (!(operand instanceof RegExp)) {
-        // String operand is deprecated — the type no longer accepts it (a
-        // string cannot carry flags, so case-insensitive matching is
-        // unexpressible). Runtime still compiles the string for one cycle.
-        devWarn(
-          `$matches: string operand "${String(operand)}" cannot express RegExp flags (case-insensitivity, dotall, multiline) — pass a real RegExp instance, e.g. /pattern/i`,
-        );
-        const re = getCachedRegex(String(operand));
-
-        return re.test(actual);
       }
 
       return operand.test(actual);
@@ -876,9 +886,11 @@ export function evaluateTemplate(spec: FactTemplate, scope: Scope): string {
       } else {
         // `stringifyValue` dev-warns separately for null vs undefined; here
         // we only warn when the key itself is missing from the scope (vs
-        // present-but-null), so users see distinct diagnostics.
-        const present = scope != null && key in scope;
-        const value = scope?.[key];
+        // present-but-null), so users see distinct diagnostics. Use
+        // Object.hasOwn rather than `in` so prototype-chain keys (e.g.
+        // `toString`, `constructor`) are never interpolated.
+        const present = scope != null && Object.hasOwn(scope, key);
+        const value = present ? scope[key] : undefined;
         if (!present) {
           devWarn(`template: unknown key "${key}"`);
           out += stringifyValueQuiet(value);
