@@ -2169,6 +2169,10 @@ describe("R2 — clobber observability via system.observe", () => {
     const evt = clobbers[0]!;
     expect(evt.resolver).toBe("run");
     expect(evt.reason).toBe("clobbered");
+    expect(evt.kind).toBe("rejection");
+    if (evt.kind !== "rejection") {
+      throw new Error("expected a rejection-kind event");
+    }
     expect(evt.fact).toBe("status");
     expect(evt.actual).toBe("left");
     expect(evt.expected).toBe("mutating");

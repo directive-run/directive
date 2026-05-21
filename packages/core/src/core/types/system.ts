@@ -688,38 +688,52 @@ export type ObservationEvent =
     }
   | {
       /**
-       * Emitted when a resolver's write is rejected by the runtime. The only
-       * `reason` today is `"clobbered"`: a bound resolver's owned-fact write
-       * was dropped because the fact was changed by something outside the
+       * A real per-write rejection. A bound resolver's owned-fact write was
+       * dropped because the fact was changed by something outside the
        * resolver between the resolver's baseline and its next write (RFC-0003
        * optimistic-concurrency check). `reason` keeps the observation protocol
        * backend-neutral — future write-rejecting backends can report other
        * reasons without a new event type.
        *
-       * When `dropped` is set, this is the per-resolver suppression summary:
-       * emitted once when a single resolver instance exceeds the per-instance
-       * write-rejection cap (10). Further per-write events for that instance
-       * are dropped; `dropped` reports how many were suppressed, and
-       * `fact`/`expected`/`actual` describe the last drop (or are omitted).
+       * `kind` discriminates this `"rejection"` arm from the `"summary"` arm:
+       * `fact`/`expected`/`actual` exist only here; `dropped` only on the
+       * summary. TypeScript forces the narrow.
        *
        * @example
        * ```ts
-       * system.observe((event) => {
-       *   if (event.type === "resolver.write.rejected") {
-       *     console.warn(`[${event.reason}] ${event.resolver} dropped ${event.fact}`);
+       * system.observe((e) => {
+       *   if (e.type === "resolver.write.rejected") {
+       *     if (e.kind === "summary") {
+       *       console.warn(`[rejected] ${e.resolver}: ${e.dropped} more writes dropped`);
+       *     } else {
+       *       console.warn(`[rejected] ${e.resolver} dropped ${e.fact}`);
+       *     }
        *   }
        * });
        * ```
        */
       type: "resolver.write.rejected";
+      kind: "rejection";
       resolver: string;
       requirementId: string;
       reason: "clobbered";
-      fact?: string;
-      expected?: unknown;
-      actual?: unknown;
-      /** Present on the suppression summary — count of dropped per-write events. */
-      dropped?: number;
+      fact: string;
+      expected: unknown;
+      actual: unknown;
+    }
+  | {
+      /**
+       * The per-resolver suppression summary: emitted once when a single
+       * resolver instance exceeds the per-instance write-rejection cap (10).
+       * Further per-write `"rejection"` events for that instance are dropped;
+       * `dropped` reports how many were suppressed.
+       */
+      type: "resolver.write.rejected";
+      kind: "summary";
+      resolver: string;
+      requirementId: string;
+      reason: "clobbered";
+      dropped: number;
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }

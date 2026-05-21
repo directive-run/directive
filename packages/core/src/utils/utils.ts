@@ -85,6 +85,10 @@ export function attributeError<A extends unknown[], R>(
   id: string,
   fn: (...args: A) => R,
 ): (...args: A) => R {
+  // Synchronous by design: the wrapped definition functions (memoized
+  // predicate `when`/`on` closures, template closures) always return
+  // synchronously. A `try/catch` only re-attributes a synchronous throw — an
+  // async-returning fn's rejected promise would escape un-re-attributed.
   return (...args: A): R => {
     try {
       return fn(...args);

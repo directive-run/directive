@@ -918,9 +918,14 @@ describe("namespaced constraint owns — clobber detection", () => {
         e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBeGreaterThanOrEqual(1);
+    const clob = clobbers[0]!;
+    expect(clob.kind).toBe("rejection");
+    if (clob.kind !== "rejection") {
+      throw new Error("expected a rejection-kind event");
+    }
     // The clobbered fact name is namespace-prefixed.
-    expect(clobbers[0]!.fact).toBe("counter::status");
-    expect(clobbers[0]!.actual).toBe("external");
+    expect(clob.fact).toBe("counter::status");
+    expect(clob.actual).toBe("external");
     // The dropped owned write never landed.
     expect(system.facts.counter.status).toBe("external");
 
@@ -1006,7 +1011,12 @@ describe("namespaced constraint owns — clobber detection", () => {
         e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBe(1);
-    expect(clobbers[0]!.fact).toBe("one::value");
+    const clob = clobbers[0]!;
+    expect(clob.kind).toBe("rejection");
+    if (clob.kind !== "rejection") {
+      throw new Error("expected a rejection-kind event");
+    }
+    expect(clob.fact).toBe("one::value");
     expect(system.facts.one.value).toBe("intruder");
 
     unsub();

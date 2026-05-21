@@ -248,37 +248,48 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * {@link createBoundFacts} for the per-fact optimistic-concurrency model.
    * `reason` keeps the hook backend-neutral.
    *
-   * When `dropped` is set, this is the per-resolver suppression summary:
-   * emitted once when a single resolver instance exceeds the per-instance
-   * write-rejection cap (10). Further per-write events for that instance are
-   * dropped; `dropped` reports how many were suppressed, and
-   * `fact`/`expected`/`actual` are omitted on the summary.
+   * The `event` is a discriminated union on `kind`:
+   * - `"rejection"` — a real per-write rejection; carries
+   *   `fact`/`expected`/`actual`.
+   * - `"summary"` — the per-resolver suppression summary, emitted once when a
+   *   single resolver instance exceeds the per-instance write-rejection cap
+   *   (10); carries `dropped` (the count of suppressed `"rejection"` events).
    *
-   * @param event - The write-rejection event.
+   * @param event - The write-rejection event (discriminated on `kind`).
    *
    * @example
    * ```ts
    * const myPlugin: Plugin = {
    *   name: "write-rejection-logger",
-   *   onResolverWriteRejected({ resolver, fact, expected, actual, dropped }) {
-   *     if (dropped !== undefined) {
-   *       console.warn(`[${resolver}] suppressed ${dropped} write rejections`);
+   *   onResolverWriteRejected(event) {
+   *     if (event.kind === "summary") {
+   *       console.warn(`[${event.resolver}] suppressed ${event.dropped} write rejections`);
    *       return;
    *     }
-   *     console.warn(`[clobber] ${resolver}: ${fact} expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`);
+   *     console.warn(`[clobber] ${event.resolver}: ${event.fact} expected=${JSON.stringify(event.expected)} actual=${JSON.stringify(event.actual)}`);
    *   },
    * };
    * ```
    */
-  onResolverWriteRejected?: (event: {
-    resolver: string;
-    req: RequirementWithId;
-    reason: "clobbered";
-    fact?: string;
-    expected?: unknown;
-    actual?: unknown;
-    dropped?: number;
-  }) => void;
+  onResolverWriteRejected?: (
+    event:
+      | {
+          kind: "rejection";
+          resolver: string;
+          req: RequirementWithId;
+          reason: "clobbered";
+          fact: string;
+          expected: unknown;
+          actual: unknown;
+        }
+      | {
+          kind: "summary";
+          resolver: string;
+          req: RequirementWithId;
+          reason: "clobbered";
+          dropped: number;
+        },
+  ) => void;
 
   // ============================================================================
   // Effect Hooks

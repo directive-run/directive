@@ -358,6 +358,12 @@ after hydration completes.
   `whenSpec` and `whenExplain` data on `inspect()` and the observation
   event; the `devtools-panel` widget and `directive explain` CLI
   consume the same data. Their visual layer follows in a separate change.
+- **Predicate depth cap.** Every predicate traversal — evaluation,
+  dependency extraction, JSON-safety validation — is capped at 64 levels
+  of structural nesting. Past the cap the runtime dev-warns and bails to
+  defend against a cyclic or pathologically deep spec. A predicate that
+  legitimately approaches the cap must be flattened or split into
+  multiple constraints.
 
 ## Lab-soak decision
 

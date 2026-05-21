@@ -197,21 +197,30 @@ drop. The `reason` field keeps the observation protocol backend-neutral —
 clobber detection is the in-memory implementation; future write-rejecting
 backends can report other reasons under the same event type.
 
+The event is a discriminated union on `kind`: branch on it before reading
+the arm-specific fields.
+
 ```ts
 system.observe((e) => {
   if (e.type === "resolver.write.rejected") {
-    console.warn(
-      `[${e.reason}] resolver ${e.resolver} dropped ${e.fact}: ` +
-        `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
-    );
+    if (e.kind === "summary") {
+      console.warn(
+        `[rejected] ${e.resolver}: ${e.dropped} further writes dropped (rate-limited)`,
+      );
+    } else {
+      console.warn(
+        `[rejected] ${e.resolver} dropped ${e.fact}: ` +
+          `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
+      );
+    }
   }
 });
 ```
 
-When `e.dropped` is set the event is the per-resolver suppression summary —
-emitted once when a single resolver instance exceeds the per-instance
-write-rejection cap (10), with `dropped` reporting how many per-write events
-were suppressed.
+The `"summary"` arm is the per-resolver suppression summary — emitted once
+when a single resolver instance exceeds the per-instance write-rejection cap
+(10), with `dropped` reporting how many per-write events were suppressed.
+`fact`/`expected`/`actual` exist only on the `"rejection"` arm.
 
 The same event is delivered to plugins through the `onResolverWriteRejected`
 hook:

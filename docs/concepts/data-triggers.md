@@ -211,6 +211,16 @@ when: { $all: [
 > form is one operator per object — combined via the array form or
 > `$all`.
 
+### Predicate depth limit
+
+Every predicate traversal — evaluation, dependency extraction, and the
+JSON-safety validator — is capped at **64 levels of structural nesting**.
+Past the cap the runtime dev-warns and bails rather than risking a stack
+overflow on a cyclic or pathologically deep spec. Legitimate predicates
+nest far fewer than 64 levels; a deeply nested combinator tree (`$all` /
+`$any` / `$not`) that approaches the cap should be flattened or split into
+multiple constraints.
+
 ## `FactTemplate` — fact-interpolating strings
 
 A string with `${ident}` placeholders. Escape `${` with `$${`. Unknown
@@ -434,22 +444,32 @@ When a bound resolver's owned-fact write is dropped because the fact was
 changed by something else mid-flight, Directive emits a
 `resolver.write.rejected` observation event with `reason: "clobbered"`:
 
+The event is a discriminated union on `kind` — branch on it before reading
+the arm-specific fields:
+
 ```ts
 system.observe((e) => {
   if (e.type === "resolver.write.rejected") {
-    console.warn(
-      `[${e.reason}] resolver ${e.resolver} dropped ${e.fact}: ` +
-        `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
-    );
+    if (e.kind === "summary") {
+      console.warn(
+        `[rejected] ${e.resolver}: ${e.dropped} further writes dropped (rate-limited)`,
+      );
+    } else {
+      console.warn(
+        `[rejected] ${e.resolver} dropped ${e.fact}: ` +
+          `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
+      );
+    }
   }
 });
 ```
 
 The `reason` field keeps the event backend-neutral — clobber detection is the
 in-memory implementation today; future write-rejecting backends can report
-other reasons under the same event type. When `e.dropped` is set, the event is
-the per-resolver suppression summary (emitted once after the per-instance cap).
-Devtools and the logging plugin surface this event by default.
+other reasons under the same event type. The `"summary"` arm is the
+per-resolver suppression summary (emitted once after the per-instance cap);
+`fact`/`expected`/`actual` exist only on the `"rejection"` arm. Devtools and
+the logging plugin surface this event by default.
 
 ## See also
 

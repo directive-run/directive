@@ -893,27 +893,33 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       panelEvent("resolver.cancel", { resolver });
     },
 
-    onResolverWriteRejected: ({
-      resolver,
-      req,
-      reason,
-      fact,
-      expected,
-      actual,
-      dropped,
-    }) => {
-      const payload = {
-        resolver,
-        requirementId: req.id,
-        reason,
-        fact,
-        expected,
-        actual,
-        dropped,
-      };
+    onResolverWriteRejected: (event) => {
+      const payload =
+        event.kind === "summary"
+          ? {
+              kind: event.kind,
+              resolver: event.resolver,
+              requirementId: event.req.id,
+              reason: event.reason,
+              dropped: event.dropped,
+            }
+          : {
+              kind: event.kind,
+              resolver: event.resolver,
+              requirementId: event.req.id,
+              reason: event.reason,
+              fact: event.fact,
+              expected: event.expected,
+              actual: event.actual,
+            };
       addEvent("resolver.write.rejected", payload);
       recordEvent("resolver.write.rejected", payload);
-      panelEvent("resolver.write.rejected", { resolver, fact, dropped });
+      panelEvent(
+        "resolver.write.rejected",
+        event.kind === "summary"
+          ? { resolver: event.resolver, dropped: event.dropped }
+          : { resolver: event.resolver, fact: event.fact },
+      );
     },
 
     onEffectRun: (id) => {

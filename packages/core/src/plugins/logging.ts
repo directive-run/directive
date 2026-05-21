@@ -191,24 +191,28 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
       log("debug", "resolver.cancel", { resolver, requirementId: req.id });
     },
 
-    onResolverWriteRejected: ({
-      resolver,
-      req,
-      reason,
-      fact,
-      expected,
-      actual,
-      dropped,
-    }) => {
-      log("warn", "resolver.write.rejected", {
-        resolver,
-        requirementId: req.id,
-        reason,
-        fact,
-        expected,
-        actual,
-        dropped,
-      });
+    onResolverWriteRejected: (event) => {
+      log(
+        "warn",
+        "resolver.write.rejected",
+        event.kind === "summary"
+          ? {
+              kind: event.kind,
+              resolver: event.resolver,
+              requirementId: event.req.id,
+              reason: event.reason,
+              dropped: event.dropped,
+            }
+          : {
+              kind: event.kind,
+              resolver: event.resolver,
+              requirementId: event.req.id,
+              reason: event.reason,
+              fact: event.fact,
+              expected: event.expected,
+              actual: event.actual,
+            },
+      );
     },
 
     onEffectRun: (id) => {

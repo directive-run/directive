@@ -211,7 +211,7 @@ export function walkPredicate(
   if (depth > MAX_PREDICATE_DEPTH) {
     if (isDevelopment) {
       console.warn(
-        `[Directive] walkPredicate: depth limit exceeded (${MAX_PREDICATE_DEPTH}) — likely cyclic predicate spec`,
+        `[Directive] predicate depth limit (${MAX_PREDICATE_DEPTH}) exceeded — flatten the predicate or split it into multiple constraints. If this is unexpected, check for a cyclic spec object.`,
       );
     }
     visitor.bail?.("depth");
@@ -420,6 +420,70 @@ export function isTemplate(v: unknown): v is FactTemplate {
  * ```
  */
 export function validatePredicate(spec: unknown, path = ""): void {
+  /**
+   * Recursively walk an operand's object/array structure, throwing on any
+   * value that cannot survive a JSON round-trip — `bigint`, `Set`, `Map`, or
+   * a nested `RegExp`. Depth- and cycle-guarded. A top-level operand is
+   * inspected by the operator-specific {@link checkOperand} (which permits a
+   * `RegExp` as the direct `$matches` operand); this helper handles values
+   * nested *inside* a plain-object or array operand, where a `RegExp` is just
+   * as JSON-unsafe as a `Set`.
+   */
+  function checkValueJsonSafe(
+    value: unknown,
+    at: string,
+    seen: WeakSet<object>,
+    depth: number,
+  ): void {
+    if (typeof value === "bigint") {
+      throw new Error(
+        `[Directive] validatePredicate: bigint operand at "${at}" is not JSON-serializable (JSON.stringify throws on bigint).`,
+      );
+    }
+    if (value instanceof Set) {
+      throw new Error(
+        `[Directive] validatePredicate: Set operand at "${at}" is not JSON-serializable (serializes to {} and loses all members).`,
+      );
+    }
+    if (value instanceof Map) {
+      throw new Error(
+        `[Directive] validatePredicate: Map operand at "${at}" is not JSON-serializable (serializes to {} and loses all entries).`,
+      );
+    }
+    if (value instanceof RegExp) {
+      throw new Error(
+        `[Directive] validatePredicate: RegExp operand at "${at}" is not JSON-serializable (a regex lost to JSON.parse becomes {}). Only a direct $matches operand may be a RegExp.`,
+      );
+    }
+    if (value === null || typeof value !== "object") {
+      return;
+    }
+    if (depth > MAX_PREDICATE_DEPTH) {
+      return;
+    }
+    if (seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach((el, i) => {
+        checkValueJsonSafe(el, `${at}[${i}]`, seen, depth + 1);
+      });
+
+      return;
+    }
+
+    for (const k of Object.keys(value as Record<string, unknown>)) {
+      checkValueJsonSafe(
+        (value as Record<string, unknown>)[k],
+        at ? `${at}.${k}` : k,
+        seen,
+        depth + 1,
+      );
+    }
+  }
+
   /** Throw on a JSON-unrehydratable operand value. */
   function checkOperand(value: unknown, op: string, at: string): void {
     if (typeof value === "bigint") {
@@ -441,6 +505,20 @@ export function validatePredicate(spec: unknown, path = ""): void {
       throw new Error(
         `[Directive] validatePredicate: $matches operand at "${at}" must be a RegExp; got ${value === null ? "null" : typeof value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
       );
+    }
+    // A plain-object / array operand (e.g. `$eq: { ... }`, `$in: [ ... ]`)
+    // can carry a `bigint`, `Set`, `Map`, or nested `RegExp` arbitrarily deep
+    // — `checkOperand` only sees the operand's top type, so recurse into its
+    // structure. The direct `$matches` RegExp is handled above and never
+    // reaches this branch (a RegExp is not a plain object / array).
+    if (Array.isArray(value)) {
+      value.forEach((el, i) => {
+        checkValueJsonSafe(el, `${at}[${i}]`, new WeakSet(), 1);
+      });
+    } else if (isPlainObjectStrict(value)) {
+      for (const k of Object.keys(value)) {
+        checkValueJsonSafe(value[k], `${at}.${k}`, new WeakSet(), 1);
+      }
     }
   }
 
@@ -807,7 +885,7 @@ export function evaluatePredicate(
   // reconcile loop against a stack overflow at evaluation time.
   if (depth > MAX_PREDICATE_DEPTH) {
     devWarn(
-      `evaluatePredicate: depth limit exceeded (${MAX_PREDICATE_DEPTH}) — likely cyclic predicate spec`,
+      `predicate depth limit (${MAX_PREDICATE_DEPTH}) exceeded — flatten the predicate or split it into multiple constraints. If this is unexpected, check for a cyclic spec object.`,
     );
 
     return false;

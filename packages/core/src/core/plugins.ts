@@ -122,15 +122,25 @@ export interface PluginManager<_S extends Schema = any> {
     attempt: number,
   ): void;
   emitResolverCancel(resolver: string, req: RequirementWithId): void;
-  emitResolverWriteRejected(event: {
-    resolver: string;
-    req: RequirementWithId;
-    reason: "clobbered";
-    fact?: string;
-    expected?: unknown;
-    actual?: unknown;
-    dropped?: number;
-  }): void;
+  emitResolverWriteRejected(
+    event:
+      | {
+          kind: "rejection";
+          resolver: string;
+          req: RequirementWithId;
+          reason: "clobbered";
+          fact: string;
+          expected: unknown;
+          actual: unknown;
+        }
+      | {
+          kind: "summary";
+          resolver: string;
+          req: RequirementWithId;
+          reason: "clobbered";
+          dropped: number;
+        },
+  ): void;
 
   // Effect hooks
   emitEffectRun(id: string): void;

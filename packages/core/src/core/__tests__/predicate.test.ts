@@ -1353,6 +1353,55 @@ describe("validatePredicate", () => {
       validatePredicate([{ fact: "name", op: "$matches", value: {} }]),
     ).toThrow(/\$matches operand .* must be a RegExp/);
   });
+
+  // R6 FIX 1 — operand recursion. R5's walkPredicate hands the whole operand
+  // opaquely to the operator callback; checkOperand must recurse into a
+  // plain-object / array operand to catch a bigint/Set/Map/RegExp nested
+  // anywhere inside it (the R4 standalone validator did this).
+  it("throws on a Set nested inside an $eq object operand", () => {
+    expect(() =>
+      validatePredicate({ f: { $eq: { nested: new Set() } } }),
+    ).toThrow(/Set operand .* not JSON-serializable/);
+  });
+
+  it("throws on a bigint nested inside an $in array operand", () => {
+    expect(() => validatePredicate({ f: { $in: [{ x: 1n }] } })).toThrow(
+      /bigint operand .* not JSON-serializable/,
+    );
+  });
+
+  it("throws on a Map nested deep inside an $eq object operand", () => {
+    expect(() =>
+      validatePredicate({ f: { $eq: { a: { b: new Map() } } } }),
+    ).toThrow(/Map operand .* not JSON-serializable/);
+  });
+
+  it("throws on a RegExp nested inside an $eq object operand", () => {
+    expect(() => validatePredicate({ f: { $eq: { x: /re/ } } })).toThrow(
+      /RegExp operand .* not JSON-serializable/,
+    );
+  });
+
+  it("does not throw on a JSON-safe nested $eq object operand", () => {
+    expect(() =>
+      validatePredicate({ f: { $eq: { ok: "string" } } }),
+    ).not.toThrow();
+  });
+
+  it("does not throw on a JSON-safe nested $in array operand", () => {
+    expect(() =>
+      validatePredicate({ f: { $in: [{ id: 1 }, { id: 2 }] } }),
+    ).not.toThrow();
+  });
+
+  it("does not stack-overflow on a cyclic operand object", () => {
+    const cyclic: Record<string, unknown> = { ok: 1 };
+    cyclic.self = cyclic;
+
+    expect(() => validatePredicate({ f: { $eq: cyclic } })).not.toThrow(
+      /Maximum call stack/,
+    );
+  });
 });
 
 // ============================================================================
@@ -1470,7 +1519,7 @@ describe("predicate spec cycle/depth guards", () => {
     expect(result).toBe(false);
     expect(
       warnSpy.mock.calls.some((args) =>
-        String(args[0]).includes("depth limit exceeded"),
+        String(args[0]).includes("predicate depth limit (64) exceeded"),
       ),
     ).toBe(true);
   });

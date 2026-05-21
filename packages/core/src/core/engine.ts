@@ -734,6 +734,7 @@ export function createEngine<S extends Schema>(
     onClobber: (resolver, req, fact, expected, actual) => {
       if (hasPlugins()) {
         pluginManager.emitResolverWriteRejected({
+          kind: "rejection",
           resolver,
           req,
           reason: "clobbered",
@@ -746,6 +747,7 @@ export function createEngine<S extends Schema>(
     onClobberSuppressed: (resolver, req, dropped) => {
       if (hasPlugins()) {
         pluginManager.emitResolverWriteRejected({
+          kind: "summary",
           resolver,
           req,
           reason: "clobbered",
@@ -1408,25 +1410,49 @@ export function createEngine<S extends Schema>(
             requirementId: req.id,
             error,
           }),
-        onResolverWriteRejected: (event: {
-          resolver: string;
-          req: { id: string };
-          reason: "clobbered";
-          fact?: string;
-          expected?: unknown;
-          actual?: unknown;
-          dropped?: number;
-        }) =>
+        onResolverWriteRejected: (
+          event:
+            | {
+                kind: "rejection";
+                resolver: string;
+                req: { id: string };
+                reason: "clobbered";
+                fact: string;
+                expected: unknown;
+                actual: unknown;
+              }
+            | {
+                kind: "summary";
+                resolver: string;
+                req: { id: string };
+                reason: "clobbered";
+                dropped: number;
+              },
+        ) => {
+          if (event.kind === "summary") {
+            observer({
+              type: "resolver.write.rejected",
+              kind: "summary",
+              resolver: event.resolver,
+              requirementId: event.req.id,
+              reason: event.reason,
+              dropped: event.dropped,
+            });
+
+            return;
+          }
+
           observer({
             type: "resolver.write.rejected",
+            kind: "rejection",
             resolver: event.resolver,
             requirementId: event.req.id,
             reason: event.reason,
             fact: event.fact,
             expected: event.expected,
             actual: event.actual,
-            dropped: event.dropped,
-          }),
+          });
+        },
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
