@@ -281,6 +281,67 @@ Consequences:
 union-typed facts, so `t.enum` literals and nullable facts type-check
 correctly.
 
+## Security: untrusted predicate sources
+
+A data-form predicate is a plain object, so it is tempting to load one
+from JSON — a config file, a database row, an LLM tool-call response.
+The security posture of doing so:
+
+### Operator allow-list
+
+Operators are an allow-list (the `PREDICATE_OPERATORS` Set in
+`predicate.ts`). No path through predicate evaluation reaches `eval` or
+`Function` — evaluation is a structural walk that dispatches on a fixed
+operator set. Loading a predicate from JSON is therefore structurally
+safe: an unknown `$`-key dev-warns and evaluates to `false`, it cannot
+execute arbitrary code.
+
+### Regex sources
+
+`$matches` requires `RegExp` instances. `JSON.parse` will not
+reconstruct a `RegExp` — a serialized regex becomes `{}`. If you accept
+JSON-form predicates, reify regex operands with
+`new RegExp(pattern, flags)` before installing the predicate. Caution:
+an attacker-supplied pattern is still subject to catastrophic
+backtracking (ReDoS); keep `$matches` for code-form predicates only, or
+run untrusted operands through a regex linter (e.g. a ReDoS-detection
+pass) before constructing the `RegExp`.
+
+### Template injection
+
+`$template` placeholders are restricted to the identifier grammar
+`[A-Za-z_][A-Za-z0-9_]*`. Values are coerced via `String(...)` — there
+is no executable path through template interpolation. A `$template`
+loaded from untrusted JSON is safe against template injection.
+
+## Serialization
+
+A data-form predicate is a plain object, so most predicates round-trip
+through `JSON.stringify` / `JSON.parse` unchanged. The fidelity table:
+
+- ✅ **Survives:** string / number / boolean / null / array / plain
+  object operands; bare equality predicates; combinator nodes
+  (`$all` / `$any` / `$not`); `KeySelector` arrays; `FactTemplate`.
+- ❌ **Lost:** `RegExp` operands (become `{}`), `bigint` operands
+  (throws on `JSON.stringify`), `Set` / `Map` operands.
+- ⚠️ **Lossy:** `Date` operands (serialize as an ISO string; the
+  `instanceof Date` check fails after `JSON.parse`, so relational
+  operators silently mistype the operand).
+
+Recommendation: for full-fidelity persistence of predicates, use a
+custom replacer/reviver or stick to JSON-clean operand types. A
+first-class `serializePredicate` / `hydratePredicate` pair is planned
+for v1.6+. In the meantime, `validatePredicate(spec)` (exported from
+`@directive-run/core`) throws on unrehydratable operands — call it
+after `JSON.parse` to fail loud rather than silently mis-evaluate.
+
+## `$changed` first-run on hydration
+
+On engine restart / hydration, `prev` resets to `undefined`. Every
+`$changed` effect treats the post-hydration state as "first run" and
+fires once. To suppress, gate the effect on a `hydrated` fact set
+after hydration completes.
+
 ## Limitations and deferred work
 
 - **`$changed` in constraints.** Constraints have no `prev` snapshot;

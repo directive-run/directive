@@ -742,6 +742,12 @@ export function createFactsProxy<S extends Schema>(
     },
 
     getOwnPropertyDescriptor(_, prop: string | symbol) {
+      // Keep `getOwnPropertyDescriptor` consistent with the `get` trap, which
+      // blocks these — otherwise `Object.hasOwn(facts, "__proto__")` would
+      // return true while `facts.__proto__` returns undefined.
+      if (typeof prop === "string" && BLOCKED_PROPS.has(prop)) {
+        return undefined;
+      }
       if (prop === "$store" || prop === "$snapshot") {
         return { configurable: true, enumerable: false, writable: false };
       }

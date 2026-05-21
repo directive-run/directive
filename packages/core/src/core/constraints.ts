@@ -349,8 +349,25 @@ export function createConstraintsManager<S extends Schema>(
    * Walk a {@link FactPredicate} spec checking for the `$changed` operator.
    * Used to block its use inside a constraint `when`, where there is no
    * prev-snapshot to compare against.
+   *
+   * `seen` cycle-guards against self-referential specs; `depth` caps the
+   * recursion so a pathologically deep (or cyclic) spec cannot overflow
+   * the stack at registration time.
    */
-  function containsChangedOperator(spec: unknown): boolean {
+  function containsChangedOperator(
+    spec: unknown,
+    seen: WeakSet<object> = new WeakSet(),
+    depth = 0,
+  ): boolean {
+    if (depth > 100) {
+      if (isDevelopment) {
+        console.warn(
+          "[Directive] containsChangedOperator: predicate spec exceeds depth limit (100) — likely cyclic",
+        );
+      }
+
+      return false;
+    }
     if (Array.isArray(spec)) {
       return spec.some(
         (clause) =>
@@ -362,6 +379,16 @@ export function createConstraintsManager<S extends Schema>(
     if (typeof spec !== "object" || spec === null) {
       return false;
     }
+    if (seen.has(spec)) {
+      if (isDevelopment) {
+        console.warn(
+          "[Directive] containsChangedOperator: cyclic predicate spec",
+        );
+      }
+
+      return false;
+    }
+    seen.add(spec);
     const obj = spec as Record<string, unknown>;
     for (const key of Object.keys(obj)) {
       if (key === "$changed") {
@@ -369,20 +396,23 @@ export function createConstraintsManager<S extends Schema>(
       }
       if (key === "$all" || key === "$any") {
         const list = obj[key];
-        if (Array.isArray(list) && list.some(containsChangedOperator)) {
+        if (
+          Array.isArray(list) &&
+          list.some((c) => containsChangedOperator(c, seen, depth + 1))
+        ) {
           return true;
         }
         continue;
       }
       if (key === "$not") {
-        if (containsChangedOperator(obj[key])) {
+        if (containsChangedOperator(obj[key], seen, depth + 1)) {
           return true;
         }
         continue;
       }
       const value = obj[key];
       if (typeof value === "object" && value !== null) {
-        if (containsChangedOperator(value)) {
+        if (containsChangedOperator(value, seen, depth + 1)) {
           return true;
         }
       }

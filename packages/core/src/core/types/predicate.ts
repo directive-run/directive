@@ -223,6 +223,9 @@ export interface FactTemplate {
 // ============================================================================
 
 /**
+ * *Note: despite the "Selector" name, this does not select from facts — it
+ * projects fields of the requirement payload for stable-stringification.*
+ *
  * A resolver dedup key written as data: an ordered list of requirement-payload
  * field names. `key: ["type", "to"]` dedupes requirements by those fields.
  *
@@ -240,6 +243,10 @@ export interface FactTemplate {
 export type KeySelector<R> = readonly (keyof R & string)[];
 
 /**
+ * *Note: Directive's `$ref` is **not** a JSON Pointer or JSON Schema `$ref`.
+ * It is a payload field copy — equivalent to `event.payload[key]`. Renaming
+ * to `$from` is tracked as a possible v1.6+ additive alias.*
+ *
  * A typed single-field copy from an event payload. Lives in the patch-spec
  * namespace — used inside a {@link PatchSpec} `$set` value.
  *

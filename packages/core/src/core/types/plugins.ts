@@ -270,6 +270,22 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
     actual: unknown,
   ) => void;
 
+  /**
+   * Called once when a single resolver instance exceeds the per-instance
+   * clobber-event cap (RFC-0003). Further `onResolverClobber` events for
+   * that instance are dropped — this summary reports how many were
+   * suppressed, rate-limiting clobber-event amplification.
+   *
+   * @param resolver - The resolver ID
+   * @param req - The requirement whose resolver hit the cap
+   * @param dropped - Number of clobber events suppressed
+   */
+  onResolverClobberSuppressed?: (
+    resolver: string,
+    req: RequirementWithId,
+    dropped: number,
+  ) => void;
+
   // ============================================================================
   // Effect Hooks
   // ============================================================================

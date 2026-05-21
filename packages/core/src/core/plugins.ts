@@ -129,6 +129,11 @@ export interface PluginManager<_S extends Schema = any> {
     expected: unknown,
     actual: unknown,
   ): void;
+  emitResolverClobberSuppressed(
+    resolver: string,
+    req: RequirementWithId,
+    dropped: number,
+  ): void;
 
   // Effect hooks
   emitEffectRun(id: string): void;
@@ -281,6 +286,7 @@ export function createPluginManager<
     emitResolverRetry: broadcast("onResolverRetry"),
     emitResolverCancel: broadcast("onResolverCancel"),
     emitResolverClobber: broadcast("onResolverClobber"),
+    emitResolverClobberSuppressed: broadcast("onResolverClobberSuppressed"),
 
     // Effect hooks
     emitEffectRun: broadcast("onEffectRun"),

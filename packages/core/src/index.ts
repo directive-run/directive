@@ -113,6 +113,7 @@ export {
   extractTemplateKeys,
   isPredicate,
   isTemplate,
+  validatePredicate,
 } from "./core/predicate.js";
 
 // ============================================================================

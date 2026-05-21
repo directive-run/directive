@@ -189,6 +189,38 @@ The reverted v1 used `bind: 'auto'` and gated every write by re-evaluating
 
 Pick the fact(s) the resolver re-asserts in its tail. No change to `when()`.
 
+## Migrating from `$matches: string` (pre-v1.5)
+
+Before v1.5, the `$matches` operator accepted a string operand and
+compiled it to a `RegExp` at runtime. v1.5 requires a `RegExp` literal —
+a string operand throws at evaluation. The change is type-safe (flags
+are now explicit) and ReDoS-aware (no implicit `new RegExp` over
+arbitrary strings).
+
+```ts
+// Before (pre-v1.5, ran at runtime)
+when: { name: { $matches: "^foo" } }
+
+// After (v1.5+, type-safe and ReDoS-aware)
+when: { name: { $matches: /^foo/ } }
+```
+
+If you persisted predicate specs to storage before v1.5, walk them at
+load time and convert the string operand to a `RegExp`:
+
+```ts
+if (typeof spec.$matches === "string") {
+  spec.$matches = new RegExp(spec.$matches);
+}
+```
+
+Caution: an attacker-supplied pattern is still subject to catastrophic
+backtracking. Keep `$matches` for code-form predicates, or run an
+untrusted pattern through a ReDoS linter before constructing the
+`RegExp`. See the
+[RFC 0004 — Security: untrusted predicate sources](../rfcs/0004-data-configuration-triggers.md#security-untrusted-predicate-sources)
+section.
+
 ## Observing clobbers in v1.5
 
 When the binding drops an owned-fact write, Directive emits a

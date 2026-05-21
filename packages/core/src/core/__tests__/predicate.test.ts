@@ -14,6 +14,7 @@ import {
   isPredicate,
   isTemplate,
   memoizePredicate,
+  validatePredicate,
 } from "../predicate.js";
 
 // ============================================================================
@@ -1184,3 +1185,241 @@ describe("R2 — isEmptyOrConfigPredicate", () => {
     sys.destroy();
   });
 });
+
+// ============================================================================
+// validatePredicate — load-time round-trip check (EC-1)
+// ============================================================================
+
+describe("validatePredicate", () => {
+  it("throws on a $matches operand that is not a RegExp (empty object)", () => {
+    expect(() => validatePredicate({ phase: { $matches: {} } })).toThrow(
+      /\$matches operand .* must be a RegExp/,
+    );
+  });
+
+  it("throws on a $matches operand that is a string", () => {
+    expect(() => validatePredicate({ name: { $matches: "^foo" } })).toThrow(
+      /\$matches operand .* must be a RegExp/,
+    );
+  });
+
+  it("throws on a bigint operand", () => {
+    expect(() => validatePredicate({ count: { $gte: 5n } })).toThrow(
+      /bigint operand .* not JSON-serializable/,
+    );
+  });
+
+  it("throws on a Set operand", () => {
+    expect(() =>
+      validatePredicate({ tags: { $in: [] }, set: new Set([1]) }),
+    ).toThrow(/Set operand .* not JSON-serializable/);
+  });
+
+  it("throws on a Map operand", () => {
+    expect(() => validatePredicate({ m: new Map([["k", 1]]) })).toThrow(
+      /Map operand .* not JSON-serializable/,
+    );
+  });
+
+  it("accepts a JSON-clean predicate", () => {
+    expect(() =>
+      validatePredicate({ phase: "red", elapsed: { $gte: 30 } }),
+    ).not.toThrow();
+  });
+
+  it("accepts a real RegExp $matches operand", () => {
+    expect(() =>
+      validatePredicate({ name: { $matches: /^foo/i } }),
+    ).not.toThrow();
+  });
+
+  it("walks combinators and array forms", () => {
+    expect(() =>
+      validatePredicate({
+        $all: [{ phase: "red" }, { name: { $matches: {} } }],
+      }),
+    ).toThrow(/\$matches operand .* must be a RegExp/);
+    expect(() =>
+      validatePredicate([{ fact: "name", op: "$matches", value: {} }]),
+    ).toThrow(/\$matches operand .* must be a RegExp/);
+  });
+});
+
+// ============================================================================
+// Cycle / depth guards — predicate spec recursion (R4 FIX 2/3/4)
+// ============================================================================
+
+describe("predicate spec cycle/depth guards", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("containsChangedOperator: cyclic constraint when does not stack-overflow", () => {
+    // A self-referential `when` spec — the constraints manager walks it via
+    // containsChangedOperator at registration. Must not blow the stack.
+    const cyclic: Record<string, unknown> = { phase: "red" };
+    cyclic.cycle = cyclic;
+
+    expect(() => {
+      const mod = createModule("cyc-changed", {
+        schema: {
+          facts: { phase: t.string() },
+          derivations: {},
+          events: {},
+          requirements: { X: {} },
+        },
+        init: (f) => {
+          f.phase = "red";
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: cyclic test spec
+          c1: { when: cyclic as any, require: { type: "X" } },
+        },
+      });
+      createSystem({ module: mod }).destroy();
+    }).not.toThrow(/Maximum call stack/);
+    // The cycle is detected and dev-warned.
+    expect(
+      warnSpy.mock.calls.some((args) =>
+        String(args[0]).includes("cyclic predicate spec"),
+      ),
+    ).toBe(true);
+  });
+
+  it("containsChangedOperator: pathologically deep spec does not stack-overflow", () => {
+    // Build a 500-level-deep nested object — exceeds the depth cap of 100.
+    let deep: Record<string, unknown> = { phase: "red" };
+    for (let i = 0; i < 500; i++) {
+      deep = { nested: deep };
+    }
+
+    expect(() => {
+      const mod = createModule("deep-changed", {
+        schema: {
+          facts: { phase: t.string() },
+          derivations: {},
+          events: {},
+          requirements: { X: {} },
+        },
+        init: (f) => {
+          f.phase = "red";
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: deep test spec
+          c1: { when: deep as any, require: { type: "X" } },
+        },
+      });
+      createSystem({ module: mod }).destroy();
+    }).not.toThrow(/Maximum call stack/);
+  });
+
+  it("isEmptyOrConfigPredicate: cyclic spec returns false without stack-overflow", () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    let result!: boolean;
+    expect(() => {
+      result = isEmptyOrConfigPredicate(cyclic);
+    }).not.toThrow(/Maximum call stack/);
+    expect(result).toBe(false);
+    expect(
+      warnSpy.mock.calls.some((args) =>
+        String(args[0]).includes("cyclic predicate spec"),
+      ),
+    ).toBe(true);
+  });
+
+  it("isEmptyOrConfigPredicate: deep spec returns false without stack-overflow", () => {
+    let deep: Record<string, unknown> = {};
+    for (let i = 0; i < 500; i++) {
+      deep = { nested: deep };
+    }
+
+    let result!: boolean;
+    expect(() => {
+      result = isEmptyOrConfigPredicate(deep);
+    }).not.toThrow(/Maximum call stack/);
+    expect(result).toBe(false);
+  });
+
+  it("evaluatePredicate: cyclic spec evaluates to false instead of stack-overflowing", () => {
+    // freezeSpec permits cycles (WeakSet seen-guard), so a registered spec
+    // can be self-referential. Evaluation must not overflow the stack.
+    const cyclic: Record<string, unknown> = {};
+    cyclic.nested = cyclic;
+    freezeSpec(cyclic);
+
+    let result!: boolean;
+    expect(() => {
+      result = evaluatePredicate(cyclic, { nested: { nested: {} } });
+    }).not.toThrow(/Maximum call stack/);
+    expect(result).toBe(false);
+    expect(
+      warnSpy.mock.calls.some((args) =>
+        String(args[0]).includes("depth limit exceeded"),
+      ),
+    ).toBe(true);
+  });
+
+  it("evaluatePredicate: deep nested spec evaluates to false past the depth cap", () => {
+    let deep: Record<string, unknown> = { leaf: "x" };
+    for (let i = 0; i < 500; i++) {
+      deep = { nested: deep };
+    }
+
+    let result!: boolean;
+    expect(() => {
+      result = evaluatePredicate(deep, {});
+    }).not.toThrow(/Maximum call stack/);
+    expect(result).toBe(false);
+  });
+
+  it("evaluatePredicate: cyclic $not spec does not stack-overflow", () => {
+    const inner: Record<string, unknown> = {};
+    const cyclic: Record<string, unknown> = { $not: inner };
+    inner.$not = cyclic;
+    freezeSpec(cyclic);
+
+    expect(() => evaluatePredicate(cyclic, {})).not.toThrow(
+      /Maximum call stack/,
+    );
+  });
+
+  it("a cyclic spec passes registration but evaluates to false", async () => {
+    // R4-FIX2 made containsChangedOperator cycle-safe, so registration
+    // succeeds. R4-FIX4's depth cap then defends evaluation.
+    const cyclic: Record<string, unknown> = { active: true };
+    cyclic.loop = cyclic;
+
+    const mod = createModule("cyc-eval", {
+      schema: {
+        facts: { active: t.boolean() },
+        derivations: {},
+        events: {},
+        requirements: { X: {} },
+      },
+      init: (f) => {
+        f.active = true;
+      },
+      constraints: {
+        // biome-ignore lint/suspicious/noExplicitAny: cyclic test spec
+        c1: { when: cyclic as any, require: { type: "X" } },
+      },
+    });
+
+    // Registration (createModule + createSystem) must not throw.
+    const system = createSystem({ module: mod });
+
+    // Reconcile (evaluation) must not overflow either.
+    expect(() => {
+      system.start();
+    }).not.toThrow(/Maximum call stack/);
+
+    system.destroy();
+  });
+});
+

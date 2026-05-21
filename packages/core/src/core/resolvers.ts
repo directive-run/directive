@@ -275,6 +275,16 @@ export interface CreateResolversOptions<S extends Schema> {
     expected: unknown,
     actual: unknown,
   ) => void;
+  /**
+   * Called once when a single resolver instance exceeds the per-instance
+   * clobber-event cap. `dropped` is the number of per-clobber events
+   * suppressed. Rate-limits clobber-event amplification (RFC-0003).
+   */
+  onClobberSuppressed?: (
+    resolver: string,
+    req: RequirementWithId,
+    dropped: number,
+  ) => void;
   /** Called after any resolver finishes (success, error, or batch completion) to trigger reconciliation. */
   onResolutionComplete?: () => void;
   /**
@@ -482,6 +492,7 @@ export function createResolversManager<S extends Schema>(
     onRetry,
     onCancel,
     onClobber,
+    onClobberSuppressed,
     onResolutionComplete,
     onRequeue,
   } = options;
@@ -679,9 +690,19 @@ export function createResolversManager<S extends Schema>(
       expectedValue: unknown,
       actualValue: unknown,
     ) => void,
+    onClobberSuppressed?: (dropped: number) => void,
   ): Facts<S> {
     const rawFacts = facts as Record<string, unknown>;
     const owned = new Set(binding.fields);
+    // Per-instance clobber-event rate-limit. A buggy or hostile resolver
+    // loop can clobber repeatedly; each emit broadcasts to every plugin.
+    // After CLOBBER_EMIT_CAP per-clobber events, drop further per-clobber
+    // emits and fire a single summary. Resolver instances are short-lived
+    // (one per requirement) so the cap rate-limits without permanently
+    // silencing future resolvers.
+    const CLOBBER_EMIT_CAP = 10;
+    let clobberCount = 0;
+    let clobberSuppressedFired = false;
     // The value each owned fact had when this resolver last wrote or observed
     // it. Seeded from `baseline` (a snapshot taken before any sibling resolver
     // in this dispatch tick ran) when provided, falling back to the live
@@ -703,8 +724,18 @@ export function createResolversManager<S extends Schema>(
       if (Object.is(rawFacts[prop], expected.get(prop))) return true;
       lost.add(prop);
       // Emit BEFORE abort so listeners see the unaborted resolver state.
-      if (onClobberDetected) {
-        onClobberDetected(prop, expected.get(prop), rawFacts[prop]);
+      clobberCount++;
+      if (clobberCount <= CLOBBER_EMIT_CAP) {
+        if (onClobberDetected) {
+          onClobberDetected(prop, expected.get(prop), rawFacts[prop]);
+        }
+      } else if (!clobberSuppressedFired) {
+        // Past the cap — emit one summary then stop emitting for this
+        // resolver instance's life.
+        clobberSuppressedFired = true;
+        if (onClobberSuppressed) {
+          onClobberSuppressed(clobberCount - CLOBBER_EMIT_CAP);
+        }
       }
       controller.abort();
       return false;
@@ -801,9 +832,24 @@ export function createResolversManager<S extends Schema>(
             }
           }
         : undefined;
+    const onClobberSuppressedForCtx =
+      onClobberSuppressed && clobberAttribution
+        ? (dropped: number) => {
+            const { resolverId, requirements } = clobberAttribution;
+            for (const r of requirements) {
+              onClobberSuppressed(resolverId, r, dropped);
+            }
+          }
+        : undefined;
     const ctxFacts =
       binding && controller
-        ? createBoundFacts(binding, controller, baseline, onClobberDetected)
+        ? createBoundFacts(
+            binding,
+            controller,
+            baseline,
+            onClobberDetected,
+            onClobberSuppressedForCtx,
+          )
         : facts;
     return {
       facts: ctxFacts,

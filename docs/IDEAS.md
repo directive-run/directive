@@ -539,3 +539,337 @@ R4.A treats it as a *solvable equation*. R4.B treats it as a *theorem*.
 R4.C treats it as a *UI*. R4.D treats it as an *LLM output format*. R4.E
 treats it as a *coverage target*. Five framings of the same JSON object —
 none possible while `when` was a function.
+
+---
+
+## R4 Game-Changer Ideas (Round 4 — compound on shipped predicate + clobber + whenExplain)
+
+Surfaced during the R4 innovation pass on RFC-0003 (`owns:` ownership) +
+RFC-0004 (`FactPredicate` / `FactTemplate`) **after they shipped together**.
+R4.A-E (predict / doctor / PredicateEditor / predicateFromIntent / coverage)
+treat the predicate as data. The five below treat the predicate as a
+**document, a signal, a target, a witness, a query** — five new framings,
+each only possible because predicates are now structurally analyzable AND
+clobber events ship the moment ownership drops AND `whenExplain` ships the
+moment a clause flips.
+
+### R4.F — `directive rules-diff <git-ref-a> <git-ref-b>`: business-logic PR review for predicate changes
+
+**[2 days — viral MAX, compound MAX — the asymmetric pick of R4 round 2]**
+
+A CLI that walks two git refs, extracts every `whenSpec` from `inspect()`
+output (or re-imports each module under a sandboxed `createSystem` for a
+snapshot), and renders a **semantic clause-level diff**:
+
+```
+constraint: blockCheckout
+  - clause REMOVED:  user.verified $eq true
+  + clause ADDED:    user.verified $eq true OR user.kycLevel $gte 2
+  ~ clause RELAXED:  cart.total $gte 100  →  cart.total $gte 50
+
+constraint: rateLimit
+  ! REACHABILITY CHANGED: was reachable in 14 fact configurations,
+                          now reachable in 119 (8.5× expansion)
+```
+
+Not `git diff` over JSON. A **structural diff** that understands AND/OR
+trees, relaxation vs tightening of numeric thresholds, and combinator
+flattening. Output: GitHub PR check + Markdown comment + optional Mermaid
+sequence diagram of the rule graph.
+
+**Why it's Sherlock:** Every regulated team (finance, healthcare, ad-tech)
+hand-rolls a "what changed in our business rules" Notion doc and lies about
+keeping it current. Auditors ask "show me the diff between Q2 and Q3
+checkout rules" and engineers screenshot if/else statements. This is the
+first tool that *actually answers the question* — because Directive's
+runtime form of a rule is finally a structured document. Not "lines of code
+changed" — "clauses added, clauses removed, thresholds relaxed, reachable
+configurations expanded 8×."
+
+**Compound effect:**
+- Pairs with R4.E coverage → "this PR added a clause that no test
+  exercises"
+- Pairs with R4.B doctor → "this PR introduced an unreachable branch"
+- Seeds R4.G replay (below) — *given a diff, replay history under both
+  versions and show divergent outcomes*
+- The structured-diff output IS the changelog. Auto-emit to
+  `RULES_CHANGELOG.md` on every release.
+
+**Viral demo (30s):** Open a PR that changes one line in a constraint
+file. CI bot replies with: *"⚠ Rule `blockCheckout` now fires in 8.5× more
+fact configurations. Test coverage of new clause: 0%. Click to inspect."*
+Quote-tweet: *"Your business rules now have a code review tool that knows
+what a business rule is."*
+
+**Headline:** *"The first PR-review tool that understands business logic,
+not just lines of code."*
+
+### R4.G — `directive replay-under <new-spec> --history <recorded.json>`: counterfactual rule replay
+
+**[3 days — viral MAX, compound MAX, the R2.A-shaped asymmetric pick]**
+
+Given (a) a recorded fact-mutation history from the timeline plugin and
+(b) an edited `whenSpec` for an existing constraint, replay the fact
+history through the *new* spec and emit a **counterfactual report**:
+
+```
+constraint: blockCheckout (proposed change)
+  fired 3× in original history
+  WOULD HAVE FIRED 47× under proposed spec
+  WOULD NOT HAVE FIRED in: 2 sessions (cart abandonment → revenue impact)
+  NEW FIRES IN: 44 sessions — sample timestamps + fact snapshots attached
+```
+
+The mechanism: history is a frame stream. Every frame restores
+`factsBaseline`. For each frame, run `evaluatePredicateExplained` once
+under the *original* whenSpec and once under the *proposed* whenSpec. Diff
+the pass/fail bit. The product is **before-you-merge causal impact
+estimation for any rule change.**
+
+**Why it's Sherlock:** Every product manager who has ever proposed
+tightening a fraud rule, relaxing a paywall, or changing an A/B threshold
+has had the same question: *"How many users would this have affected last
+month?"* The answer today is a JIRA ticket to data science, a 2-week
+turnaround, and a SQL query that's wrong because it doesn't model
+constraint cascades. R4.G answers the question in **30 seconds**, against
+the actual recorded fact history, with cascade modeling built in (because
+replay re-runs the engine).
+
+**Compound effect:**
+- Pairs with R4.F (above): diff a rule, then click "replay under change"
+  for one-click counterfactual
+- Pairs with R4.D `predicateFromIntent`: LLM proposes a rule → counterfactual
+  replay validates it against real history → ship or iterate
+- Pairs with R2.A bisect: bisect across rule versions instead of code
+  versions ("which rule change caused the regression in conversion rate?")
+- Enables **predicate A/B testing**: ship two `whenSpec`s, route 50/50,
+  diff the realized outcome against the replayed counterfactual to detect
+  novelty effects
+
+**Viral demo (30s):** PM opens a PR that loosens an eligibility rule.
+GitHub bot comments: *"Under last 30 days of recorded sessions: rule fires
+4,217× currently, 9,884× under your change. Estimated +$47K MRR @ current
+conversion. Click for sample sessions newly eligible."*
+Quote-tweet: *"What if you could replay last month's production traffic
+against any rule change before you merge it?"*
+
+**Headline:** *"Replay last month's production against your proposed rule
+change. Before you merge."* (Sub: "This is what Optimizely never built.")
+
+### R4.H — `predicateToSQL` / `predicateToMongoQuery` / `predicateToPGRest`: same predicate, client AND server
+
+**[3 days — viral HIGH, compound MAX]**
+
+A pure transformation: `FactPredicate<F>` → parameterized SQL `WHERE`
+clause (and Mongo query, and PostgREST querystring). Because the predicate
+operator set (`$eq`, `$gte`, `$in`, `$matches`, `$between`, `$contains`,
+`$all`/`$any`/`$not`) is a **proper subset of SQL/Mongo's query
+algebra**, the translation is total and trivial:
+
+```ts
+const adultUsers = { age: { $gte: 18 }, status: { $in: ["active", "pending"] } };
+
+// Client (Directive):
+const isAdult = (facts: Facts) => evaluatePredicate(adultUsers, facts);
+
+// Server (Postgres):
+predicateToSQL(adultUsers, "users");
+// → { sql: "SELECT * FROM users WHERE age >= $1 AND status = ANY($2)",
+//     params: [18, ["active", "pending"]] }
+
+// Server (MongoDB):
+predicateToMongo(adultUsers);
+// → { age: { $gte: 18 }, status: { $in: ["active", "pending"] } }
+//   (literally identical — Mongo already speaks the dialect)
+
+// Edge (PostgREST):
+predicateToPGRest(adultUsers);
+// → "users?age=gte.18&status=in.(active,pending)"
+```
+
+**Why it's Sherlock:** *Isomorphic predicates* solve the dual-write hell
+every full-stack app suffers. Today's reality: write a `WHERE` clause in
+SQL for the API. Write the *same* logic as TypeScript `filter()` in the
+client. Write it *again* as a Zod refinement for validation. Three sources
+of truth, three places to break. Directive's predicate is **the canonical
+form** — derived to SQL on the server, evaluated directly on the client,
+fed into Zod refinements where useful. **One JSON, three targets, zero
+drift.** Drizzle/Prisma never delivered this. tRPC moved validation but
+not query semantics.
+
+**Compound effect:**
+- Pairs with `@directive-run/query`: server filters use the same predicate
+  the client component uses to render filter pills
+- Pairs with R4.D LLM-emit-predicate: chatbot generates a predicate, runtime
+  type-checks it, server executes it as parameterized SQL with zero string
+  concatenation (also closes a whole SQLi attack class for AI-generated
+  queries)
+- Pairs with RFC-0004 templates: `WHERE name LIKE ${pattern}` from
+  `{ $template: "${pattern}" }`
+- Pairs with edge-runtime predicates → Cloudflare Workers can evaluate
+  predicates server-side with zero cold-start cost
+
+**Viral demo (30s):** Side-by-side editor. Top half: a `FactPredicate`
+declaration. Bottom half left: live SQL query. Bottom half right: live
+React filter component. User edits one field in the predicate — all three
+update. Quote-tweet: *"One predicate. Compiled to SQL on the server,
+evaluated directly on the client. The end of dual-write hell."*
+
+**Headline:** *"The state library that doubles as your ORM's query AST."*
+
+### R4.I — `factsBaseline` audit log: GDPR-grade query-the-history
+
+**[2 days — viral HIGH (regulated industries), compound MAX]**
+
+Every constraint fire and every resolver clobber already carries the
+`factsBaseline` (per RFC-0003 + RFC-0004). Pipe those into a structured
+append-only ledger (SQLite/Parquet/Loki — pluggable):
+
+```ts
+const ledger = createAuditLedger(system, { sink: "sqlite:./audit.db" });
+
+// Six months later. GDPR data request:
+ledger.query({
+  factPath: "user.email",
+  changedBetween: ["2026-01-01", "2026-06-01"],
+});
+// → [
+//     { ts, constraint: "emailVerified", whenSpec: {...},
+//       priorValue: "old@x.com", newValue: "new@x.com",
+//       clauseExplain: [{ path: "verified", op: "$eq", actual: true, pass: true }],
+//       causedBy: { trigger: "user-action", eventId: "..." } },
+//     ...
+//   ]
+```
+
+Each entry contains: *the predicate that fired, the clause-level explain
+that justified it, the facts before, the facts after, and the chain of
+upstream causes*. **A queryable, cryptographically-hashable, append-only
+explanation of every state change a regulator could ask about.**
+
+**Why it's Sherlock:** Compliance teams ask three questions: (1) *show me
+every write to PII* (R3.G1 vault handles values; R4.I handles
+causality); (2) *show me why this user got that decision*; (3) *prove the
+decision logic matches our policy document*. **No state library on npm can
+answer any of these.** Datadog/Sentry log *events*, not *why*. Directive's
+`whenSpec` + `factsBaseline` + `whenExplain` is already the witness — it
+just needs a queryable sink. SOC2/HIPAA/PCI/GDPR all collapse from
+"build a custom audit pipeline" to "enable the plugin."
+
+**Compound effect:**
+- Pairs with R3.G1 vault: PII values are vault-tokens in the audit log,
+  ledger query stays compliant
+- Pairs with R4.F rules-diff: audit log proves rule R was in effect at time
+  T (cryptographic proof of policy adherence)
+- Pairs with R4.G replay: regulator asks "would this user have been blocked
+  under the prior rule?" — replay the relevant frame
+- Foundation for **regulator-facing dashboards** as a SaaS layer (the first
+  "compliance as a state library plugin")
+
+**Viral demo (30s):** Production app. User changes their email. Pop open
+the audit ledger UI — show the predicate that fired, the clause-level pass
+breakdown, the prior/new value, the resolver that wrote it, the chain back
+to the user-action event. Quote-tweet: *"Every state change in production
+now ships with a court-admissible explanation. Built-in. No custom
+pipeline."*
+
+**Headline:** *"The first state library that's GDPR-compliant out of the
+box, because it already knows why every fact changed."*
+
+### R4.J — `clobber-loop` detector: real-time ownership-thrash alarms
+
+**[1 day — quick win, viral MED-HIGH, compound HIGH]**
+
+`resolver.clobber` events fire the moment ownership drops. Aggregate them
+in a small ring buffer (per-fact, time-windowed) and emit a **structured
+warning the instant a clobber loop exceeds threshold**:
+
+```
+[directive] CLOBBER LOOP DETECTED on fact `cart.discount`
+  resolver `applyCoupon` and resolver `applyLoyaltyDiscount` clobbered
+  each other 8 times in 412ms.
+  Predicates that fire together:
+    - applyCoupon.when:  { coupon: { $exists: true } }
+    - applyLoyaltyDiscount.when: { user.loyaltyTier: { $gte: 2 } }
+  Both fire whenever a logged-in user has a coupon. Add `priority:` or
+  combine into a single resolver. View timeline frame 4217.
+```
+
+Pure derived signal — no new instrumentation. The clobber event is already
+there; the analysis is "did the same pair clobber > N times in M ms with
+overlapping whenSpec?" The output is *actionable* because the whenSpec is
+data: the loop detector can **prove the two predicates overlap** (set
+intersection over clause space) rather than just count events.
+
+**Why it's Sherlock:** Every "why does this fact keep flipping back and
+forth?" bug becomes a one-line config from the runtime. Today: stick
+`console.log` in five resolvers, scroll devtools for 20 minutes. R4.J:
+*"hey, your applyCoupon and applyLoyaltyDiscount are arguing — here's the
+overlap proof and the fix."*
+
+**Compound effect:**
+- Foundation for R4.B doctor's CI rule ("static-detect overlapping owns:
+  predicates before they ship")
+- Pairs with R4.A predict: when a clobber loop is detected, predict() tells
+  you the minimum priority bump or whenSpec narrowing to break the loop
+- Same loop-detection signal feeds R4.I audit log as a higher-severity
+  event class
+
+**Viral demo (30s):** Stage a two-resolver clobber loop. App console
+suddenly emits: *"⚠ CLOBBER LOOP. Resolver A and Resolver B clobbered
+`cart.discount` 8× in 412ms — predicates overlap on
+{user.loyaltyTier: { $gte: 2 } AND coupon.$exists}. Fix: add priority or
+merge."* Quote-tweet: *"My state library just diagnosed a bug I haven't
+written yet."*
+
+**Headline:** *"The state library that notices when two of your rules are
+arguing — and tells you why."*
+
+### R4 (Round 2) ranked
+
+| Rank | Idea | Days | Viral | Compound | Note |
+|---|---|---|---|---|---|
+| 1 | **R4.G** `replay-under` counterfactual rule replay | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
+| 2 | **R4.F** `directive rules-diff` PR-review tool | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
+| 3 | **R4.H** `predicateToSQL` isomorphic predicates | 3 | High | Max | The "one truth, three targets" article writes itself. Drizzle/Prisma envy. |
+| 4 | **R4.I** GDPR-grade audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |
+| 5 | **R4.J** clobber-loop detector | 1 | Med-High | High | One-day quick win. Diagnoses a bug class that has no name yet. |
+
+**Suggested arc:** **R4.J (1d, quick win)** → **R4.F (2d, PR-comment
+viral)** → **R4.G (3d, the PM-magnet)** → **R4.H (3d, isomorphic SQL)** →
+**R4.I (2d, regulated-industry magnet)**. Total: ~11 days for the entire
+second R4 wave. Every one of these is **impossible without** the predicate
+being data, `whenSpec` being inspectable, and clobber being observable.
+
+**R4 (Round 2) thesis:** Round 1 (R4.A-E) treated the predicate as **a
+solvable equation / theorem / UI / LLM output / coverage target** — five
+framings of "the predicate is data, and data can be analyzed." Round 2
+treats the predicate as **a document (R4.F diff), a signal (R4.J loop
+detector), a witness (R4.I audit log), a target (R4.H multi-platform
+codegen), a counterfactual (R4.G replay-under)** — five framings of "the
+predicate is data, and data can be *exchanged between systems and across
+time*." Together: ten viral framings of one JSON object. The substrate is
+not just the predicate. The substrate is *every system the predicate can
+travel to and from* — the database, the regulator, the LLM, the audit
+trail, the past, the alternate future.
+
+**Why R4.G is the asymmetric pick of Round 2:** every other entry needs a
+custom audience (PR reviewers, compliance teams, SQL nerds, devtools
+power-users). R4.G needs only **one audience: product managers**. The
+demo writes itself, the headline writes itself, and the value is
+unambiguous in the first 5 seconds of the screencast. "Replay last month's
+production against any rule change before you merge it" is the kind of
+sentence that gets retweeted with no commentary.
+
+---
+
+## Backward-compatible additive aliases (v1.6+ candidates)
+
+Naming refinements that cannot land as renames (v1.5 already shipped the
+original names) but can land as **parallel aliases** — both names work,
+the original is soft-deprecated in docs.
+
+- **`$from` alias for `$ref`** — In v1.6, add `$from` as a parallel name;
+  deprecate `$ref` for patches (but keep working). Removes the JSON
+  Schema / JSON Pointer collision (`$ref` reads as a document reference;
+  Directive's `$ref` is a payload field copy) without breaking v1.5.

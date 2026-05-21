@@ -20,6 +20,23 @@ Three things you cannot do with a function but can do with data:
   engine clears any `async: true` on the def at registration to make
   the runtime behavior match.
 
+## Migrating from XState guards
+
+XState's `cond` / `guards` express the same thing as a Directive data
+`when` — a boolean precondition over facts. The shape is different but
+the translation is mechanical:
+
+| XState                                            | Directive                                  |
+| ------------------------------------------------- | ------------------------------------------ |
+| `cond: (ctx) => ctx.count > 5`                    | `when: { count: { $gt: 5 } }`              |
+| `guards: { isReady: (ctx) => ctx.ready }`         | `when: { ready: true }`                    |
+| `cond: (ctx) => ctx.phase === "red"`              | `when: { phase: "red" }`                   |
+| guards + multiple conditions                      | `when: { $all: [ ... ] }`                  |
+| async guards                                      | function `when` (data form is sync-only)   |
+
+If your XState guard reads multiple contexts and computes — use the
+function form. If it compares facts to values — use the data form.
+
 ## Quick reference
 
 ```ts
@@ -143,10 +160,29 @@ when: { $all: [
 > be defined (not `undefined`); `{ $exists: false }` requires it to be
 > `undefined`. `null` counts as defined.
 >
+> **`$exists` diverges from MongoDB.** MongoDB's `$exists` tests field
+> *presence in the document*. Directive's `$exists` tests
+> `value !== undefined` (so `null` counts as defined). If you need
+> "fact-key missing entirely", wrap the fact in `t.optional(...)` and
+> check for `undefined`.
+>
 > **`$eq` / `$ne` on `Set` / `Map` facts.** Equality is structural,
 > not by reference: two `Set`s with the same members compare equal
 > regardless of insertion order; two `Map`s compare equal when they
 > have the same key+value pairs.
+
+### Empty list semantics
+
+Combinators and membership operators have well-defined behavior on
+empty operands — chosen to match MongoDB's query algebra:
+
+| Spec                  | Result  | Note                                  |
+| --------------------- | ------- | ------------------------------------- |
+| `{ $any: [] }`        | `false` | No member to satisfy                  |
+| `{ $all: [] }`        | `true`  | Vacuous truth — match MongoDB         |
+| `{ $not: {} }`        | `false` | Equivalent to `$not: true`            |
+| `{ x: { $in: [] } }`  | `false` | No value in empty set                 |
+| `{ x: { $nin: [] } }` | `true`  | Every value is not in empty set       |
 
 One operator per object — for two operators on the same fact, use the
 array form or `$all`:
@@ -315,6 +351,26 @@ closure back. No actual compilation happens (the closure re-walks the
 predicate on every call via `evaluatePredicate`); the name reflects the
 identity-keyed memoization, not a bytecode/AST compile step.
 
+### Validating a predicate loaded from JSON
+
+A data predicate is a plain object, so it is tempting to load one from
+JSON. Most operands survive `JSON.stringify` / `JSON.parse` — but
+`RegExp`, `bigint`, `Set`, and `Map` operands do not (see
+[RFC 0004 — Serialization](../rfcs/0004-data-configuration-triggers.md#serialization)).
+`validatePredicate(spec)` throws on exactly those unrehydratable
+operands — call it after `JSON.parse` to fail loud rather than silently
+mis-evaluate:
+
+```ts
+import { validatePredicate } from "@directive-run/core";
+
+const spec = JSON.parse(stored);
+validatePredicate(spec); // throws if a RegExp/bigint/Set/Map operand is present
+```
+
+It is an opt-in helper — the engine does not call it automatically.
+Users who never persist predicates do not need it.
+
 ## Gotchas
 
 A few sharp edges worth knowing once:
@@ -354,17 +410,21 @@ These are not in v1, but are tracked for future addition:
 If you hit one of these in real code, file an issue — operator
 coverage is driven by demand.
 
-## When to use the function form
+## Data vs function vs derivation — decision matrix
 
 The data form covers the common cases of comparison, membership, and
-"set from payload". The function form is the right pick when you need:
+"set from payload". Use this matrix to pick the right form:
 
-- Cross-fact comparisons (`facts.a > facts.b`).
-- Computed values (`url.startsWith(scheme)`).
-- Any string method, regex group, or side computation beyond
-  `$matches`.
-- An async `when` (data `when` is always sync by design).
-- A derivation that composes other derivations (`(facts, derived) => …`).
+| Need                                       | Use                                                         |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| Single-fact equality/comparison            | data `when`                                                 |
+| Cross-fact comparison (`a > b`)            | derivation + data `when` on the derived value               |
+| String prefix/suffix/contains              | data `when` (`$startsWith` / `$endsWith` / `$contains`)     |
+| Async precondition                         | function `when` (data is always sync)                       |
+| Regex flag control                         | data `when` with a `RegExp` literal                         |
+| Conditional branches / complex logic       | function `when`                                             |
+| Effect runs on fact change                 | data `on` with `$changed: true`                             |
+| Effect runs on derived value               | function `on` (data `on` is fact-keyed)                     |
 
 The two forms compose cleanly — mix them freely in the same module.
 

@@ -323,7 +323,39 @@ describe("createModule — pivot-name conflict", () => {
           requirements: {},
         },
       }),
-    ).toThrow(/fact key 'self' conflicts with the cross-module pivot namespace/);
+    ).toThrow(
+      /fact key 'self' conflicts with a reserved namespace pivot or evaluation alias/,
+    );
+  });
+
+  it("throws when a fact key is literally named 'prev'", () => {
+    expect(() =>
+      createModule("conflict", {
+        schema: {
+          facts: { prev: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).toThrow(
+      /fact key 'prev' conflicts with a reserved namespace pivot or evaluation alias/,
+    );
+  });
+
+  it("throws when a fact key is literally named 'current'", () => {
+    expect(() =>
+      createModule("conflict", {
+        schema: {
+          facts: { current: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).toThrow(
+      /fact key 'current' conflicts with a reserved namespace pivot or evaluation alias/,
+    );
   });
 
   it("throws when a fact key collides with a declared crossModuleDep namespace", () => {
@@ -344,7 +376,9 @@ describe("createModule — pivot-name conflict", () => {
         },
         crossModuleDeps: { auth: authSchema },
       } as any),
-    ).toThrow(/fact key 'auth' conflicts with the cross-module pivot namespace/);
+    ).toThrow(
+      /fact key 'auth' conflicts with a reserved namespace pivot or evaluation alias/,
+    );
   });
 
   it("error message suggests a rename (e.g. <key>_)", () => {
@@ -381,6 +415,117 @@ describe("createModule — pivot-name conflict", () => {
           derivations: {},
           events: {},
           requirements: {},
+        },
+      }),
+    ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createModule — reserved `owns` keys (R4 FIX 6)
+// ---------------------------------------------------------------------------
+
+describe("createModule — reserved owns keys", () => {
+  it("throws when a constraint owns '__proto__'", () => {
+    expect(() =>
+      createModule("owns-proto", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            owns: ["__proto__"],
+          } as any,
+        },
+      }),
+    ).toThrow(/owns key '__proto__' is reserved/);
+  });
+
+  it("throws when a constraint owns 'constructor'", () => {
+    expect(() =>
+      createModule("owns-ctor", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            owns: ["constructor"],
+          } as any,
+        },
+      }),
+    ).toThrow(/owns key 'constructor' is reserved/);
+  });
+
+  it("throws when a constraint owns a $-prefixed key", () => {
+    expect(() =>
+      createModule("owns-dollar", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            owns: ["$store"],
+          } as any,
+        },
+      }),
+    ).toThrow(/owns key '\$store' is reserved/);
+  });
+
+  it("names the offending module and constraint in the error", () => {
+    expect(() =>
+      createModule("billing", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          chargeCard: {
+            when: () => true,
+            require: { type: "X" },
+            owns: ["prototype"],
+          } as any,
+        },
+      }),
+    ).toThrow(/module 'billing' constraint 'chargeCard'/);
+  });
+
+  it("does NOT throw for an ordinary fact key in owns", () => {
+    expect(() =>
+      createModule("owns-ok", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing owns key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            owns: ["count"],
+          } as any,
         },
       }),
     ).not.toThrow();

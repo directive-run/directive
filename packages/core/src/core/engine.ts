@@ -736,6 +736,11 @@ export function createEngine<S extends Schema>(
         pluginManager.emitResolverClobber(resolver, req, fact, expected, actual);
       }
     },
+    onClobberSuppressed: (resolver, req, dropped) => {
+      if (hasPlugins()) {
+        pluginManager.emitResolverClobberSuppressed(resolver, req, dropped);
+      }
+    },
     onResolutionComplete: () => {
       // After a resolver completes, schedule another reconcile
       notifySettlementChange();
@@ -1405,6 +1410,17 @@ export function createEngine<S extends Schema>(
             fact,
             expected,
             actual,
+          }),
+        onResolverClobberSuppressed: (
+          resolver: string,
+          req: { id: string },
+          dropped: number,
+        ) =>
+          observer({
+            type: "resolver.clobber.suppressed",
+            resolver,
+            requirementId: req.id,
+            dropped,
           }),
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>

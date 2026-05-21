@@ -2178,6 +2178,141 @@ describe("R2 — clobber observability via system.observe", () => {
 });
 
 // ============================================================================
+// R4 FIX 7 — clobber-event amplification rate-limit
+// ============================================================================
+
+describe("R4 — clobber-event rate-limit", () => {
+  it("caps per-instance clobber events at 10 + one suppressed summary", async () => {
+    // A single resolver owns 100 facts. An external write clobbers every
+    // one, then the resolver tries to write all 100 — without a rate-limit
+    // that would broadcast 100 clobber events to every plugin.
+    const FACT_COUNT = 100;
+    const factKeys = Array.from({ length: FACT_COUNT }, (_, i) => `f${i}`);
+
+    const factSchema: Record<string, ReturnType<typeof t.string>> = {};
+    for (const k of factKeys) {
+      factSchema[k] = t.string();
+    }
+    const { store, facts } = createFacts({ schema: factSchema });
+    for (const k of factKeys) {
+      facts[k] = "owned";
+    }
+
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const clobberEvents: Array<{ fact: string }> = [];
+    const suppressedEvents: Array<{ dropped: number }> = [];
+
+    const manager = createResolversManager({
+      definitions: {
+        bulk: {
+          requirement: "BULK",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            // Every owned write is clobbered (external write changed them).
+            for (const k of factKeys) {
+              (ctx.facts as Record<string, unknown>)[k] = "resolver";
+            }
+          },
+        },
+      },
+      facts,
+      store,
+      getConstraintBinding: (constraintId) =>
+        constraintId === "bulkC" ? { fields: factKeys } : undefined,
+      onClobber: (_resolver, _req, fact) => {
+        clobberEvents.push({ fact });
+      },
+      onClobberSuppressed: (_resolver, _req, dropped) => {
+        suppressedEvents.push({ dropped });
+      },
+    });
+
+    const req = makeReq("BULK", {}, "bulkC");
+    manager.resolve(req);
+    await flush(5);
+
+    // External clobber of every owned fact.
+    for (const k of factKeys) {
+      facts[k] = "external";
+    }
+    release();
+    await flush(30);
+
+    // At most 10 per-clobber events, then exactly one summary.
+    expect(clobberEvents.length).toBeLessThanOrEqual(10);
+    expect(clobberEvents.length).toBe(10);
+    expect(suppressedEvents.length).toBe(1);
+    // Total observed events stay capped at 11.
+    expect(clobberEvents.length + suppressedEvents.length).toBeLessThanOrEqual(
+      11,
+    );
+    // The summary reports a positive dropped count.
+    expect(suppressedEvents[0]!.dropped).toBeGreaterThan(0);
+  });
+
+  it("under the cap, every clobber emits and no summary fires", async () => {
+    const factKeys = ["a", "b", "c"];
+    const factSchema: Record<string, ReturnType<typeof t.string>> = {};
+    for (const k of factKeys) {
+      factSchema[k] = t.string();
+    }
+    const { store, facts } = createFacts({ schema: factSchema });
+    for (const k of factKeys) {
+      facts[k] = "owned";
+    }
+
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const clobberEvents: string[] = [];
+    let suppressedFired = false;
+
+    const manager = createResolversManager({
+      definitions: {
+        few: {
+          requirement: "FEW",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            for (const k of factKeys) {
+              (ctx.facts as Record<string, unknown>)[k] = "resolver";
+            }
+          },
+        },
+      },
+      facts,
+      store,
+      getConstraintBinding: (constraintId) =>
+        constraintId === "fewC" ? { fields: factKeys } : undefined,
+      onClobber: (_resolver, _req, fact) => {
+        clobberEvents.push(fact);
+      },
+      onClobberSuppressed: () => {
+        suppressedFired = true;
+      },
+    });
+
+    const req = makeReq("FEW", {}, "fewC");
+    manager.resolve(req);
+    await flush(5);
+    for (const k of factKeys) {
+      facts[k] = "external";
+    }
+    release();
+    await flush(30);
+
+    // 3 owned facts clobbered → 3 events, no summary (under the cap of 10).
+    expect(clobberEvents.length).toBe(3);
+    expect(suppressedFired).toBe(false);
+  });
+});
+
+// ============================================================================
 // R2 — Batch baseline staleness
 // ============================================================================
 

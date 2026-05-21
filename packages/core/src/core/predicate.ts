@@ -148,10 +148,33 @@ export function isPredicate(v: unknown): boolean {
  *
  * @internal
  */
-export function isEmptyOrConfigPredicate(v: unknown): boolean {
+export function isEmptyOrConfigPredicate(
+  v: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+  depth = 0,
+): boolean {
+  if (depth > 100) {
+    if (isDevelopment) {
+      console.warn(
+        "[Directive] isEmptyOrConfigPredicate: depth limit exceeded — likely cyclic predicate spec",
+      );
+    }
+
+    return false;
+  }
   if (!isPlainObjectStrict(v)) {
     return false;
   }
+  if (seen.has(v as object)) {
+    if (isDevelopment) {
+      console.warn(
+        "[Directive] isEmptyOrConfigPredicate: cyclic predicate spec",
+      );
+    }
+
+    return false;
+  }
+  seen.add(v as object);
   const keys = Object.keys(v);
   if (keys.length === 0) {
     return true;
@@ -175,10 +198,11 @@ export function isEmptyOrConfigPredicate(v: unknown): boolean {
     if (Array.isArray(child)) {
       return false;
     }
-    if (!isEmptyOrConfigPredicate(child)) {
+    if (!isEmptyOrConfigPredicate(child, seen, depth + 1)) {
       return false;
     }
   }
+
   return true;
 }
 
@@ -197,6 +221,115 @@ export function isTemplate(v: unknown): v is FactTemplate {
     Object.hasOwn(v, "$template") &&
     typeof (v as { $template: unknown }).$template === "string"
   );
+}
+
+// ============================================================================
+// Load-time validation
+// ============================================================================
+
+/**
+ * Throw when a predicate spec contains an operand that cannot survive a
+ * JSON round-trip — i.e. that would silently mis-evaluate if the spec was
+ * loaded from `JSON.parse`.
+ *
+ * Three failure classes are detected:
+ *
+ * - **Lost `RegExp` operand.** A `$matches` operand that is not a
+ *   `RegExp` instance. `JSON.parse` reconstructs a serialized regex as
+ *   `{}`, so a `$matches` clause with an empty-object operand is the
+ *   signature of a regex that did not survive serialization. Reify it
+ *   with `new RegExp(pattern, flags)` before installing the predicate.
+ * - **`bigint` operand.** `JSON.stringify` throws on `bigint`, so a
+ *   `bigint` operand cannot have been produced by a JSON pipeline and
+ *   cannot be persisted by one either.
+ * - **`Set` / `Map` operand.** Both serialize to `{}` and lose all
+ *   members; a predicate carrying one is not JSON-safe.
+ *
+ * This is an opt-in helper — the engine does not call it automatically.
+ * Users who load predicates from JSON should call it after `JSON.parse`
+ * to fail loud rather than silently mis-evaluate. See the
+ * "Serialization" section of RFC-0004.
+ *
+ * @example
+ * ```ts
+ * validatePredicate({ phase: { $matches: {} } });
+ * // throws — empty object where a RegExp is required
+ *
+ * validatePredicate({ phase: "red", elapsed: { $gte: 30 } });
+ * // ok — JSON-clean operands
+ * ```
+ */
+export function validatePredicate(spec: unknown, path = ""): void {
+  if (spec === null || typeof spec !== "object") {
+    return;
+  }
+
+  if (spec instanceof Set) {
+    throw new Error(
+      `[Directive] validatePredicate: Set operand${path ? ` at "${path}"` : ""} is not JSON-serializable (serializes to {} and loses all members).`,
+    );
+  }
+  if (spec instanceof Map) {
+    throw new Error(
+      `[Directive] validatePredicate: Map operand${path ? ` at "${path}"` : ""} is not JSON-serializable (serializes to {} and loses all entries).`,
+    );
+  }
+
+  if (Array.isArray(spec)) {
+    spec.forEach((child, i) => validatePredicate(child, `${path}[${i}]`));
+
+    return;
+  }
+
+  // Array-clause form — `{ fact, op, value }`. The operand lives under the
+  // `value` key, so the `$matches`-by-key check below does not see it; check
+  // it here against the clause's `op`.
+  const clause = spec as Record<string, unknown>;
+  if (
+    typeof clause.fact === "string" &&
+    typeof clause.op === "string" &&
+    "value" in clause
+  ) {
+    const clauseFieldPath = path ? `${path}.value` : "value";
+    if (typeof clause.value === "bigint") {
+      throw new Error(
+        `[Directive] validatePredicate: bigint operand at "${clauseFieldPath}" is not JSON-serializable (JSON.stringify throws on bigint).`,
+      );
+    }
+    if (clause.op === "$matches" && !(clause.value instanceof RegExp)) {
+      throw new Error(
+        `[Directive] validatePredicate: $matches operand at "${clauseFieldPath}" must be a RegExp; got ${clause.value === null ? "null" : typeof clause.value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
+      );
+    }
+  }
+
+  for (const key of Object.keys(spec)) {
+    const value = (spec as Record<string, unknown>)[key];
+    const childPath = path ? `${path}.${key}` : key;
+
+    if (typeof value === "bigint") {
+      throw new Error(
+        `[Directive] validatePredicate: bigint operand at "${childPath}" is not JSON-serializable (JSON.stringify throws on bigint).`,
+      );
+    }
+
+    if (key === "$matches") {
+      if (!(value instanceof RegExp)) {
+        throw new Error(
+          `[Directive] validatePredicate: $matches operand at "${childPath}" must be a RegExp; got ${value === null ? "null" : typeof value}. A regex lost to JSON.parse becomes {} — reify with new RegExp(pattern, flags) before installing.`,
+        );
+      }
+      // A RegExp operand is itself valid; do not recurse into it.
+      continue;
+    }
+
+    if (value !== null && typeof value === "object") {
+      if (value instanceof RegExp || value instanceof Date) {
+        continue;
+      }
+      validatePredicate(value, childPath);
+    }
+  }
 }
 
 // ============================================================================
@@ -473,7 +606,12 @@ function devWarn(message: string): void {
   }
 }
 
-function evalField(value: unknown, actual: unknown, prev: unknown): boolean {
+function evalField(
+  value: unknown,
+  actual: unknown,
+  prev: unknown,
+  depth: number,
+): boolean {
   if (isOperatorObject(value)) {
     const keys = Object.keys(value);
     // Type rejects multi-operator objects; the runtime ANDs them on a
@@ -499,6 +637,7 @@ function evalField(value: unknown, actual: unknown, prev: unknown): boolean {
       value,
       isPlainObject(actual) ? actual : Object.create(null),
       isPlainObject(prev) ? prev : undefined,
+      depth + 1,
     );
   }
 
@@ -522,7 +661,18 @@ export function evaluatePredicate(
   spec: unknown,
   facts: Scope,
   prev?: Scope,
+  depth = 0,
 ): boolean {
+  // `freezeSpec` permits cycles (it uses a WeakSet seen-guard), so a
+  // registered spec can be self-referential. Cap recursion to defend the
+  // reconcile loop against a stack overflow at evaluation time.
+  if (depth > 100) {
+    devWarn(
+      "evaluatePredicate: depth limit exceeded — likely cyclic predicate spec",
+    );
+
+    return false;
+  }
   // Array form — clauses AND-ed.
   if (Array.isArray(spec)) {
     return spec.every((clause) => {
@@ -546,16 +696,16 @@ export function evaluatePredicate(
   // Combinator node.
   if ("$all" in spec) {
     return (spec.$all as unknown[]).every((p) =>
-      evaluatePredicate(p, facts, prev),
+      evaluatePredicate(p, facts, prev, depth + 1),
     );
   }
   if ("$any" in spec) {
     return (spec.$any as unknown[]).some((p) =>
-      evaluatePredicate(p, facts, prev),
+      evaluatePredicate(p, facts, prev, depth + 1),
     );
   }
   if ("$not" in spec) {
-    return !evaluatePredicate(spec.$not, facts, prev);
+    return !evaluatePredicate(spec.$not, facts, prev, depth + 1);
   }
 
   // Object form — every key AND-ed.
@@ -567,7 +717,7 @@ export function evaluatePredicate(
 
       return false;
     }
-    if (!evalField(spec[key], facts?.[key], prev?.[key])) {
+    if (!evalField(spec[key], facts?.[key], prev?.[key], depth)) {
       return false;
     }
   }

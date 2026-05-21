@@ -708,6 +708,19 @@ export type ObservationEvent =
       expected: unknown;
       actual: unknown;
     }
+  | {
+      /**
+       * Emitted once when a single resolver instance exceeds the per-instance
+       * clobber-event cap (10). Further `resolver.clobber` events for that
+       * instance are dropped — this summary reports how many were suppressed,
+       * preventing a buggy or hostile resolver loop from amplifying clobber
+       * events to every plugin.
+       */
+      type: "resolver.clobber.suppressed";
+      resolver: string;
+      requirementId: string;
+      dropped: number;
+    }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
   | { type: "derivation.compute"; id: string; value: unknown }

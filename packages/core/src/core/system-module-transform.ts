@@ -535,6 +535,7 @@ function prefixConstraints(
       timeout?: number;
       deps?: string[];
       after?: string[];
+      owns?: readonly string[];
     };
 
     const isWhenFn = typeof constraintDef.when === "function";
@@ -544,6 +545,14 @@ function prefixConstraints(
       deps: constraintDef.deps?.map((dep) => prefixKey(namespace, dep)),
       after: constraintDef.after?.map((dep) =>
         dep.includes(SEPARATOR) ? dep : prefixKey(namespace, dep),
+      ),
+      // RFC-0003: prefix `owns` fact keys so clobber-detection compares
+      // against the namespaced fact slots that the resolver actually writes.
+      // Without this, the bound proxy's `owned.has(prop)` check fails for
+      // every namespaced owned write and the entire clobber-detection
+      // feature silently no-ops in any namespaced system.
+      owns: constraintDef.owns?.map((k) =>
+        k.includes(SEPARATOR) ? k : prefixKey(namespace, k),
       ),
       // Data-form `when` was rewritten with prefixed keys in
       // `normalizePredicateDefs`, so the constraints manager can normalize

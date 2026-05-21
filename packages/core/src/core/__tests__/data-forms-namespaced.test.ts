@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { ObservationEvent } from "../../index.js";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 
@@ -832,6 +833,183 @@ describe("namespaced event handler + patch — dev warn", () => {
     expect(system.facts.status.status).toBe("idle");
 
     warn.mockRestore();
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// RFC-0003 clobber detection — namespaced `owns`
+// ============================================================================
+
+describe("namespaced constraint owns — clobber detection", () => {
+  it("prefixes owns keys so clobber detection fires in a multi-module system", async () => {
+    let releaseA!: () => void;
+    const blockerA = new Promise<void>((r) => {
+      releaseA = r;
+    });
+
+    const counter = createModule("counter", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { go: {}, clobberIt: {} },
+        requirements: { TICK: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        go: (f) => {
+          f.status = "ticking";
+        },
+        clobberIt: (f) => {
+          f.status = "external";
+        },
+      },
+      constraints: {
+        tick: {
+          when: (f) => f.status === "ticking",
+          require: { type: "TICK" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        tick: {
+          requirement: "TICK",
+          resolve: async (_req, ctx) => {
+            await blockerA;
+            // Owned write — should be dropped because `clobberIt` mutated
+            // `counter::status` while the resolver was awaiting.
+            ctx.facts.status = "resolved";
+          },
+        },
+      },
+    });
+
+    const audit = createModule("audit", {
+      schema: {
+        facts: { entries: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.entries = 0;
+      },
+    });
+
+    const system = createSystem({ modules: { counter, audit } });
+    system.start();
+    await flush();
+
+    const events: ObservationEvent[] = [];
+    const unsub = system.observe((e) => events.push(e));
+
+    system.events.counter.go();
+    await flush();
+    // External mutation of the owned fact while the resolver is blocked.
+    system.events.counter.clobberIt();
+    await flush();
+    releaseA();
+    await flush();
+
+    const clobbers = events.filter(
+      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
+        e.type === "resolver.clobber",
+    );
+    expect(clobbers.length).toBeGreaterThanOrEqual(1);
+    // The clobbered fact name is namespace-prefixed.
+    expect(clobbers[0]!.fact).toBe("counter::status");
+    expect(clobbers[0]!.actual).toBe("external");
+    // The dropped owned write never landed.
+    expect(system.facts.counter.status).toBe("external");
+
+    unsub();
+    system.destroy();
+  });
+
+  it("each module's owns is scoped to its own namespace", async () => {
+    let releaseOne!: () => void;
+    const blockerOne = new Promise<void>((r) => {
+      releaseOne = r;
+    });
+
+    // Distinct requirement types per module — requirement `type` is a global
+    // identity, so each namespaced module needs its own.
+    const makeModule = (slot: "one" | "two", reqType: string) =>
+      createModule(slot, {
+        schema: {
+          facts: { value: t.string() },
+          derivations: {},
+          events: { start: {}, intrude: {} },
+          requirements: { [reqType]: {} },
+        },
+        init: (f) => {
+          f.value = "init";
+        },
+        events: {
+          start: (f) => {
+            f.value = "working";
+          },
+          intrude: (f) => {
+            f.value = "intruder";
+          },
+        },
+        constraints: {
+          act: {
+            when: (f) => f.value === "working",
+            require: { type: reqType },
+            owns: ["value"],
+          },
+        },
+        resolvers: {
+          act: {
+            requirement: reqType,
+            resolve: async (_req, ctx) => {
+              if (slot === "one") {
+                await blockerOne;
+              }
+              ctx.facts.value = "done";
+            },
+          },
+        },
+      });
+
+    const system = createSystem({
+      modules: {
+        one: makeModule("one", "ACT_ONE"),
+        two: makeModule("two", "ACT_TWO"),
+      },
+    });
+    system.start();
+    await flush();
+
+    const events: ObservationEvent[] = [];
+    const unsub = system.observe((e) => events.push(e));
+
+    // Module two resolves cleanly — no clobber.
+    system.events.two.start();
+    await flush();
+    await flush();
+    expect(system.facts.two.value).toBe("done");
+
+    // Module one is clobbered while its resolver awaits.
+    system.events.one.start();
+    await flush();
+    system.events.one.intrude();
+    await flush();
+    releaseOne();
+    await flush();
+
+    const clobbers = events.filter(
+      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
+        e.type === "resolver.clobber",
+    );
+    expect(clobbers.length).toBe(1);
+    expect(clobbers[0]!.fact).toBe("one::value");
+    expect(system.facts.one.value).toBe("intruder");
+
+    unsub();
     system.destroy();
   });
 });

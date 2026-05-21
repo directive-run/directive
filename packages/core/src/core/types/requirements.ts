@@ -121,12 +121,15 @@ export interface ConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Names the facts the resolver dispatched by this constraint *owns*:
-   * a write from that resolver to an
-   * owned fact is dropped — and the resolver aborted — if the fact was
-   * changed by anything else since the resolver last wrote it. Writes to
-   * facts not listed always land; `when()` is not consulted. Omit for no
-   * binding (default). Ignored on async constraints.
+   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
+   * these facts land only if they still hold the snapshot value taken at
+   * resolver dispatch; otherwise the write is dropped and the resolver
+   * aborted.
+   *
+   * This is value-based per-fact compare-and-swap with one-shot
+   * fact-level poisoning — not a lock, not document versioning. Writes
+   * to facts not listed always land; `when()` is not consulted. Omit for
+   * no binding (default). Ignored on async constraints.
    *
    * @example
    * ```ts

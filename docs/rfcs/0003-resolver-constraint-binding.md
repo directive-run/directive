@@ -63,6 +63,13 @@ check, not a predicate re-evaluation.
 
 ## Design
 
+> `owns` is **value-based per-fact compare-and-swap**, with one-shot
+> fact-level poisoning. It is *not*: HTTP If-Match (header-driven,
+> request-level), Postgres row locks (pessimistic), Mongoose `__v`
+> (whole-document versioning), or RxJS `share` (multicast). The closest
+> concept is STM's optimistic per-cell retry — but Directive **drops**
+> the write instead of retrying.
+
 `owns` names the facts the resolver owns. The resolver's `ctx.facts`
 is a proxy that, per owned fact, remembers the value the resolver last wrote
 or started with (snapshotted at resolver dispatch). A write to an owned fact:
@@ -221,6 +228,12 @@ process (the `expected` map inside `createBoundFacts`). It guards against
 sibling resolvers in the same reconcile tick and out-of-band event mutations
 within the same process — that's the only race surface a single-process
 Directive runtime has.
+
+`owns` is a per-process Map. In multi-tab same-origin scenarios with a
+shared backing store (e.g., IndexedDB via `BroadcastChannel`), each tab
+has its own clobber detection — cross-tab writes are not caught. For
+multi-tab safety, serialize writes through a single coordinator tab or
+wait for v2's distributed `ClobberDetector`.
 
 Multi-process Directive (planned v2) will introduce a `ClobberDetector`
 interface to abstract the per-fact owned-value lookup. Single-process

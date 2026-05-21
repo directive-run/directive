@@ -205,9 +205,10 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Names the facts the resolver dispatched by this constraint owns — an
-   * external clobber of one of them drops the resolver's write. Omit for no
-   * binding (default). Ignored on async constraints.
+   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
+   * these facts land only if they still hold the snapshot value taken at
+   * resolver dispatch; otherwise the write is dropped and the resolver
+   * aborted. Omit for no binding (default). Ignored on async constraints.
    */
   owns?: readonly string[];
   /**
@@ -273,9 +274,10 @@ export interface CrossModuleConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Names the facts the resolver dispatched by this constraint owns —
-   * an external clobber of one of them drops the resolver's write. Omit
-   * for no binding (default). Ignored on async constraints.
+   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
+   * these facts land only if they still hold the snapshot value taken at
+   * resolver dispatch; otherwise the write is dropped and the resolver
+   * aborted. Omit for no binding (default). Ignored on async constraints.
    */
   owns?: readonly string[];
   /**

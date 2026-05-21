@@ -572,6 +572,30 @@ describe("createFactsProxy", () => {
       expect("constructor" in facts).toBe(false);
       expect("prototype" in facts).toBe(false);
     });
+
+    it("Object.hasOwn returns false for blocked props (R4 FIX 5)", () => {
+      const { facts } = makeProxy();
+
+      // getOwnPropertyDescriptor must stay consistent with the get trap —
+      // otherwise Object.hasOwn reports true while the value is undefined.
+      expect(Object.hasOwn(facts, "__proto__")).toBe(false);
+      expect(Object.hasOwn(facts, "constructor")).toBe(false);
+      expect(Object.hasOwn(facts, "prototype")).toBe(false);
+    });
+
+    it("getOwnPropertyDescriptor returns undefined for blocked props", () => {
+      const { facts } = makeProxy();
+
+      expect(
+        Object.getOwnPropertyDescriptor(facts, "__proto__"),
+      ).toBeUndefined();
+      expect(
+        Object.getOwnPropertyDescriptor(facts, "constructor"),
+      ).toBeUndefined();
+      expect(
+        Object.getOwnPropertyDescriptor(facts, "prototype"),
+      ).toBeUndefined();
+    });
   });
 
   describe("symbol properties", () => {

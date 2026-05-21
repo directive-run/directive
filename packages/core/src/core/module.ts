@@ -5,6 +5,7 @@
  */
 
 import isDevelopment from "#is-development";
+import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   CrossModuleConstraintsDef,
   CrossModuleDeps,
@@ -224,11 +225,16 @@ function validateResolverRequirements(
 }
 
 /**
- * Throw when a module's fact key conflicts with the namespace pivot in data-
- * form predicates (`{ self: {...} }` or `{ <depNamespace>: {...} }`). Without
- * this guard, `prefixPredicateSpec` would mis-route the pivot's nested
- * predicate against the pivot's namespace instead of treating it as a literal
- * fact lookup.
+ * Throw when a module's fact key conflicts with a reserved namespace pivot
+ * or evaluation alias used by the data-form predicate runtime. Two classes:
+ *
+ * - The cross-module namespace pivots — `self` and every declared
+ *   `crossModuleDeps` namespace. A fact named after a pivot would make
+ *   `prefixPredicateSpec` mis-route the pivot's nested predicate against
+ *   the pivot's namespace instead of treating it as a literal fact lookup.
+ * - The evaluation aliases `prev` and `current` — reserved for the
+ *   previous/live snapshot scopes (`$changed`, clobber baselines). A fact
+ *   with one of these names would shadow the alias in those scopes.
  *
  * Thrown unconditionally — this is a structural integrity check, not a dev
  * convenience. Production users running into this would otherwise see silent
@@ -243,7 +249,7 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
   if (factKeys.length === 0) {
     return;
   }
-  const reserved = new Set<string>(["self"]);
+  const reserved = new Set<string>(["self", "prev", "current"]);
   const deps =
     "crossModuleDeps" in config && config.crossModuleDeps
       ? Object.keys(
@@ -256,11 +262,43 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
   for (const key of factKeys) {
     if (reserved.has(key)) {
       throw new Error(
-        `[Directive] module '${id}': fact key '${key}' conflicts with the cross-module pivot namespace. Three fixes:\n` +
+        `[Directive] module '${id}': fact key '${key}' conflicts with a reserved namespace pivot or evaluation alias (self / prev / current / a crossModuleDep namespace). Three fixes:\n` +
           `  1. Rename the fact (e.g. ${key}_)\n` +
           `  2. Remove '${key}' from this module's crossModuleDeps if it's not actually needed\n` +
           `  3. Move the fact under a wrapping namespace (t.object({ inner: ... }))`,
       );
+    }
+  }
+}
+
+/**
+ * Reject constraint `owns` entries that name a reserved property — a
+ * `BLOCKED_PROPS` key (`__proto__`, `constructor`, `prototype`) or a
+ * `$`-prefixed key. Such names can never be owned fact slots, so the
+ * clobber-detection binding would silently no-op. A structural integrity
+ * check — runs unconditionally, not just in dev.
+ */
+function validateOwnsKeys<M extends ModuleSchema>(
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): void {
+  const constraints = config.constraints as
+    | Record<string, { owns?: readonly string[] }>
+    | undefined;
+  if (!constraints) {
+    return;
+  }
+  for (const [cid, constraint] of Object.entries(constraints)) {
+    const owns = constraint?.owns;
+    if (!owns) {
+      continue;
+    }
+    for (const key of owns) {
+      if (BLOCKED_PROPS.has(key) || key.startsWith("$")) {
+        throw new Error(
+          `[Directive] module '${id}' constraint '${cid}': owns key '${key}' is reserved (BLOCKED_PROPS or $-prefixed)`,
+        );
+      }
     }
   }
 }
@@ -437,6 +475,10 @@ export function createModule<const M extends ModuleSchema>(
   // Pivot-name conflicts are a structural integrity check, not a dev
   // convenience — run unconditionally.
   validatePivotNameConflicts(id, config);
+
+  // Reserved `owns` keys would silently disable clobber-detection — a
+  // structural integrity check, run unconditionally.
+  validateOwnsKeys(id, config);
 
   if (isDevelopment) {
     validateModuleConfig(id, config);
