@@ -97,10 +97,7 @@ type IsOrderable<V> = [V] extends [number | bigint | Date]
  * One operator per object — for two operators on the same fact, write the
  * array form or `$all`. This is by design (the type is the source of truth).
  *
- * `$matches` accepts a `RegExp` only — string operands cannot express flags
- * (case-insensitivity, dotall, etc.), so the type rejects them. Pass a real
- * `RegExp` instance for flag control. (The runtime still accepts a string
- * operand for one cycle for back-compat, but emits a dev-warn.)
+ * `$matches` requires `RegExp`. The runtime throws on string operands.
  *
  * @example
  * ```ts

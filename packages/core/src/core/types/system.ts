@@ -691,6 +691,15 @@ export type ObservationEvent =
        * Emitted when a bound resolver's owned-fact write is dropped because
        * the fact was changed by something outside the resolver between the
        * resolver's baseline and its next write (RFC-0003 clobber detection).
+       *
+       * @example
+       * ```ts
+       * system.observe((event) => {
+       *   if (event.type === "resolver.clobber") {
+       *     console.warn(`[clobber] ${event.resolver} dropped ${event.fact}`);
+       *   }
+       * });
+       * ```
        */
       type: "resolver.clobber";
       resolver: string;

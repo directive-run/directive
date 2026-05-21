@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createModule, createSystem, t } from "../../index.js";
+import { deepFreeze, freezeSpec } from "../../utils/utils.js";
 import {
   applyPatch,
+  deepFreeze as deepFreezeFromPredicate,
   evaluateKeySelector,
   evaluatePredicate,
   evaluatePredicateExplained,
   evaluateTemplate,
   extractDeps,
   extractTemplateKeys,
+  isEmptyOrConfigPredicate,
   isPredicate,
   isTemplate,
   memoizePredicate,
@@ -1071,5 +1075,112 @@ describe("evaluateTemplate prototype walk hardening", () => {
         toString: "own-value",
       } as unknown as Record<string, unknown>),
     ).toBe("v=own-value");
+  });
+});
+
+// ============================================================================
+// R2 — deepFreeze move + freezeSpec helper
+// ============================================================================
+
+describe("R2 — deepFreeze move + freezeSpec helper", () => {
+  it("freezeSpec deeply freezes a nested object", () => {
+    const spec = { a: { b: { c: 1 } }, arr: [{ x: 2 }] };
+    const out = freezeSpec(spec);
+    expect(out).toBe(spec);
+    expect(Object.isFrozen(spec)).toBe(true);
+    expect(Object.isFrozen(spec.a)).toBe(true);
+    expect(Object.isFrozen(spec.a.b)).toBe(true);
+    expect(Object.isFrozen(spec.arr)).toBe(true);
+    expect(Object.isFrozen(spec.arr[0])).toBe(true);
+  });
+
+  it("deepFreeze re-exported from predicate.ts matches the utils export", () => {
+    expect(deepFreezeFromPredicate).toBe(deepFreeze);
+  });
+
+  it("freezeSpec handles primitives, null, undefined, and cycles", () => {
+    expect(freezeSpec(5)).toBe(5);
+    expect(freezeSpec(null)).toBe(null);
+    expect(freezeSpec(undefined)).toBe(undefined);
+    const a: { self?: unknown } = {};
+    a.self = a;
+    expect(() => freezeSpec(a)).not.toThrow();
+    expect(Object.isFrozen(a)).toBe(true);
+  });
+});
+
+// ============================================================================
+// R2 — isEmptyOrConfigPredicate
+// ============================================================================
+
+describe("R2 — isEmptyOrConfigPredicate", () => {
+  it("returns true for empty `{}`", () => {
+    expect(isEmptyOrConfigPredicate({})).toBe(true);
+  });
+
+  it("returns false for a real predicate with primitives", () => {
+    expect(isEmptyOrConfigPredicate({ phase: "red" })).toBe(false);
+  });
+
+  it("returns false for operator objects", () => {
+    expect(isEmptyOrConfigPredicate({ $eq: 5 })).toBe(false);
+    expect(isEmptyOrConfigPredicate({ count: { $gt: 5 } })).toBe(false);
+  });
+
+  it("returns false for combinator objects", () => {
+    expect(isEmptyOrConfigPredicate({ $all: [{ a: 1 }] })).toBe(false);
+  });
+
+  it("returns false for arrays", () => {
+    expect(isEmptyOrConfigPredicate([])).toBe(false);
+    expect(
+      isEmptyOrConfigPredicate([{ fact: "a", op: "$eq", value: 1 }]),
+    ).toBe(false);
+  });
+
+  it("returns true for a deeply-nested config object that never bottoms out in a primitive", () => {
+    expect(isEmptyOrConfigPredicate({ a: { b: {} } })).toBe(true);
+  });
+
+  it("isPredicate still accepts empty `{}` (structural-only check)", () => {
+    // The empty-spec warn is a DX layer above isPredicate — isPredicate
+    // itself remains permissive (existing behavior, callers depend on it).
+    expect(isPredicate({})).toBe(true);
+  });
+
+  it("dev-warns when constraints.register is given a `when: {}`", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const m = createModule("warnTest", {
+      schema: {
+        facts: { phase: t.string() },
+        derivations: {},
+        events: {},
+        requirements: { X: {} },
+      },
+      init: (f) => {
+        f.phase = "red";
+      },
+    });
+    const sys = createSystem({ module: m });
+    sys.start();
+
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic register accepts unknown
+    (sys.constraints as any).register("oops", {
+      // biome-ignore lint/suspicious/noExplicitAny: intentionally bad shape
+      when: {} as any,
+      require: { type: "X" },
+    });
+
+    const calls = warn.mock.calls.map((c) => String(c[0] ?? ""));
+    const matched = calls.find(
+      (c) =>
+        c.includes("data spec has no operators") ||
+        c.includes("config object passed by mistake"),
+    );
+    expect(matched).toBeDefined();
+
+    warn.mockRestore();
+    sys.destroy();
   });
 });

@@ -170,6 +170,50 @@ under it — typically a single `status`/`phase`/`mode` fact. The constraint's
   clears (e.g. `pendingAction`), re-creating the freeze. The author must
   name the phase fact explicitly.
 
+### Runtime async detection
+
+A function `when` that returns a Promise is promoted to async at runtime —
+*even when `async: true` was not set*. The engine then silently disables
+`owns` for that constraint and logs:
+
+> `[Directive] constraint '<id>': owns binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+
+The workaround is a **data-form `when`** (always sync — the binding works)
+or a sync function `when` that pushes the async dependency into a derivation.
+
+## Observing clobbers
+
+When the binding drops an owned-fact write, Directive emits a
+`resolver.clobber` observation event so devtools, the logging plugin, and
+user-installed observers can surface the drop:
+
+```ts
+system.observe((e) => {
+  if (e.type === "resolver.clobber") {
+    console.warn(
+      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+        `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
+    );
+  }
+});
+```
+
+The same event is delivered to plugins through the `onResolverClobber` hook:
+
+```ts
+interface Plugin {
+  onResolverClobber?: (
+    resolverId: string,
+    requirementId: string,
+    fact: string,
+    expected: unknown,
+    actual: unknown,
+  ) => void;
+}
+```
+
+Devtools and the logging plugin handle this event by default.
+
 ## Single-process scope (v1.5)
 
 The clobber detection described in this RFC uses an in-memory `Map` per

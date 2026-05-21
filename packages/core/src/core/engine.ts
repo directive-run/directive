@@ -605,10 +605,21 @@ export function createEngine<S extends Schema>(
     const state = constraintsManager.getState(constraintId);
     if (state?.isAsync || def.async) {
       if (isDevelopment) {
-        console.warn(
-          `[Directive] Constraint "${constraintId}" has \`owns\` but is async. ` +
-            "Binding is disabled — async constraints cannot be bound.",
-        );
+        // If the engine promoted this constraint to async at runtime (its
+        // when() returned a Promise) the user almost certainly didn't realize.
+        // Call that out explicitly — the workaround is a data-form when (always
+        // sync) or an explicit `async: true` opt-in that accepts the loss of
+        // owns.
+        if (state?.isAsync && !def.async) {
+          console.warn(
+            `[Directive] constraint '${constraintId}': owns binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
+          );
+        } else {
+          console.warn(
+            `[Directive] Constraint "${constraintId}" has \`owns\` but is async. ` +
+              "Binding is disabled — async constraints cannot be bound.",
+          );
+        }
       }
       return undefined;
     }

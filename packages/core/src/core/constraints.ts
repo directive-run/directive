@@ -320,8 +320,23 @@ export function createConstraintsManager<S extends Schema>(
     }
     freezeSpec(spec);
     const memoized = memoizePredicate(spec as object);
-    (def as { when: unknown }).when = (f: Facts<S>) =>
-      memoized(f as unknown as Record<string, unknown>);
+    (def as { when: unknown }).when = (f: Facts<S>) => {
+      try {
+        return memoized(f as unknown as Record<string, unknown>);
+      } catch (e) {
+        // Attribute a Directive-prefixed throw (e.g. `$matches: string`)
+        // to the owning constraint so the stack trace points at user code.
+        if (
+          e instanceof Error &&
+          e.message.startsWith("[Directive] ")
+        ) {
+          throw new Error(
+            `[Directive] constraint '${id}': ${e.message.slice("[Directive] ".length)}`,
+          );
+        }
+        throw e;
+      }
+    };
     whenSpecs.set(id, spec);
     // Data `when` is structurally sync; clear any async flag so the engine
     // uses the sync evaluation path.

@@ -128,12 +128,10 @@ when: { $all: [
 | `$exists`       | boolean operand       | `{ token: { $exists: true } }` (value is not `undefined`) |
 | `$changed`      | effects only          | `{ phase: { $changed: true } }`             |
 
-> **`$matches` is RegExp-only.** A string operand cannot carry RegExp
-> flags (case-insensitivity, dotall, multiline), so the type rejects it
-> and the runtime dev-warns. Pass a real `RegExp` instance —
-> `/^Ada/i`, not `"^Ada"` — when you need flag control. The runtime
-> still accepts a string operand for one cycle for back-compat, but it
-> always compiles flag-less.
+> **`$matches` requires a `RegExp`.** Pass `/pattern/flags` directly —
+> string operands cannot express flags (case-insensitivity, dotall,
+> multiline) and were never structurally safe against ReDoS, so a
+> non-RegExp operand throws at evaluation.
 >
 > **`$contains` on `Set` / `Map`.** `$contains` walks a `string`
 > (substring match), an array (element equality, structural), or a
@@ -369,6 +367,25 @@ The data form covers the common cases of comparison, membership, and
 - A derivation that composes other derivations (`(facts, derived) => …`).
 
 The two forms compose cleanly — mix them freely in the same module.
+
+## Observing clobbers
+
+When a bound resolver's owned-fact write is dropped because the fact was
+changed by something else mid-flight, Directive emits a `resolver.clobber`
+observation event:
+
+```ts
+system.observe((e) => {
+  if (e.type === "resolver.clobber") {
+    console.warn(
+      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+        `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
+    );
+  }
+});
+```
+
+Devtools and the logging plugin surface this event by default.
 
 ## See also
 

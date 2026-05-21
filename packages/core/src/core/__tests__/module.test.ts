@@ -323,7 +323,7 @@ describe("createModule — pivot-name conflict", () => {
           requirements: {},
         },
       }),
-    ).toThrow(/fact key "self" conflicts with the cross-module pivot namespace/);
+    ).toThrow(/fact key 'self' conflicts with the cross-module pivot namespace/);
   });
 
   it("throws when a fact key collides with a declared crossModuleDep namespace", () => {
@@ -344,7 +344,7 @@ describe("createModule — pivot-name conflict", () => {
         },
         crossModuleDeps: { auth: authSchema },
       } as any),
-    ).toThrow(/fact key "auth" conflicts with the cross-module pivot namespace/);
+    ).toThrow(/fact key 'auth' conflicts with the cross-module pivot namespace/);
   });
 
   it("error message suggests a rename (e.g. <key>_)", () => {
@@ -357,7 +357,20 @@ describe("createModule — pivot-name conflict", () => {
           requirements: {},
         },
       }),
-    ).toThrow(/rename the fact \(e\.g\. self_\)/);
+    ).toThrow(/Rename the fact \(e\.g\. self_\)/);
+  });
+
+  it("error message lists the three fixes (rename / remove dep / wrap)", () => {
+    expect(() =>
+      createModule("conflict", {
+        schema: {
+          facts: { self: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+      }),
+    ).toThrow(/Three fixes:[\s\S]+Rename the fact[\s\S]+Remove 'self'[\s\S]+wrapping namespace/);
   });
 
   it("does NOT throw when fact keys do not collide", () => {

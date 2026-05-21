@@ -256,7 +256,10 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
   for (const key of factKeys) {
     if (reserved.has(key)) {
       throw new Error(
-        `[Directive] module "${id}": fact key "${key}" conflicts with the cross-module pivot namespace — rename the fact (e.g. ${key}_).`,
+        `[Directive] module '${id}': fact key '${key}' conflicts with the cross-module pivot namespace. Three fixes:\n` +
+          `  1. Rename the fact (e.g. ${key}_)\n` +
+          `  2. Remove '${key}' from this module's crossModuleDeps if it's not actually needed\n` +
+          `  3. Move the fact under a wrapping namespace (t.object({ inner: ... }))`,
       );
     }
   }

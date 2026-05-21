@@ -137,6 +137,23 @@ dispatched; an async constraint `await`s between predicate evaluation and
 dispatch, so an event could move an owned fact before the snapshot is taken.
 `owns` on an async constraint is ignored (dev-mode warning).
 
+### Runtime async detection
+
+A function `when` that **returns a Promise** is promoted to async at runtime
+even if you did not set `async: true`. That promotion silently disables the
+`owns` binding for that constraint — the engine logs:
+
+> `[Directive] constraint '<id>': owns binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+
+The fix is one of:
+
+1. Convert the `when` to a synchronous predicate (move the async work to a
+   derivation that watches the dependency it would have `await`ed).
+2. Use a **data-form `when`** — data predicates are structurally sync and the
+   binding works.
+3. Mark the constraint `async: true` explicitly if you genuinely need an async
+   predicate and accept that the binding will be off.
+
 ### `callOne()` and out-of-band invocations
 
 No-op. `callOne` has no source constraint, so there is nothing to bind.
@@ -171,3 +188,25 @@ The reverted v1 used `bind: 'auto'` and gated every write by re-evaluating
 ```
 
 Pick the fact(s) the resolver re-asserts in its tail. No change to `when()`.
+
+## Observing clobbers in v1.5
+
+When the binding drops an owned-fact write, Directive emits a
+`resolver.clobber` observation event so you can surface the drop in tests,
+devtools, or production logging:
+
+```ts
+system.observe((e) => {
+  if (e.type === "resolver.clobber") {
+    console.warn(
+      `[clobber] resolver ${e.resolverId} dropped ${e.fact}: ` +
+        `expected=${JSON.stringify(e.expected)} actual=${JSON.stringify(e.actual)}`,
+    );
+  }
+});
+```
+
+The same event is delivered to plugins through the `onResolverClobber` hook
+— devtools and the logging plugin handle it by default. See
+[RFC-0003](../rfcs/0003-resolver-constraint-binding.md#observing-clobbers)
+for the full event surface.

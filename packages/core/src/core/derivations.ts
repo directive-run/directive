@@ -145,7 +145,23 @@ export function createDerivationsManager<
       // guard here keeps the failure adjacent to the registration site.
       freezeSpec(c);
       const memoized = memoizePredicate(c);
-      fn = (facts) => memoized(facts as Record<string, unknown>);
+      fn = (facts) => {
+        try {
+          return memoized(facts as Record<string, unknown>);
+        } catch (e) {
+          // Attribute a Directive-prefixed throw (e.g. `$matches: string`)
+          // to the owning derivation so the stack trace points at user code.
+          if (
+            e instanceof Error &&
+            e.message.startsWith("[Directive] ")
+          ) {
+            throw new Error(
+              `[Directive] derivation '${key}': ${e.message.slice("[Directive] ".length)}`,
+            );
+          }
+          throw e;
+        }
+      };
     } else if (c !== undefined) {
       throw new Error(
         `[Directive] memoizePredicate: predicate must be a plain object or array; got ${typeof c}`,

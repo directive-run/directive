@@ -251,6 +251,16 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    * @param fact - The owned fact key that was clobbered
    * @param expected - The value the resolver expected to see
    * @param actual - The value actually present in the store
+   *
+   * @example
+   * ```ts
+   * const myPlugin: Plugin = {
+   *   name: "clobber-logger",
+   *   onResolverClobber({ resolverId, requirementId, fact, expected, actual }) {
+   *     console.warn(`[clobber] ${resolverId}: ${fact} expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`);
+   *   },
+   * };
+   * ```
    */
   onResolverClobber?: (
     resolver: string,

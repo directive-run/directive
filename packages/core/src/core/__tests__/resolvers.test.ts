@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { generateRequirementId, t } from "../../index.js";
+import {
+  createModule,
+  createSystem,
+  generateRequirementId,
+  t,
+} from "../../index.js";
 import type { RequirementWithId } from "../../index.js";
+import { flushMicrotasks } from "../../utils/testing.js";
 import { createFacts } from "../facts.js";
 import { createResolversManager } from "../resolvers.js";
+import type { ObservationEvent } from "../types/system.js";
 
 // ============================================================================
 // Helpers
@@ -1951,5 +1958,300 @@ describe("bound resolver — sibling clobber gap (factsBaseline)", () => {
     await flush(20);
 
     expect(facts.status).toBe("v2");
+  });
+});
+
+// ============================================================================
+// R2 — factsBaseline lazy perf (system-level)
+// ============================================================================
+
+/** Flush microtasks + one setTimeout round so reconcile lands. */
+async function flushSettle(): Promise<void> {
+  await flushMicrotasks();
+  await new Promise((r) => setTimeout(r, 0));
+  await flushMicrotasks();
+}
+
+describe("R2 — factsBaseline lazy perf", () => {
+  it("clobber-binding still works with sparse baseline (only owned keys snapshotted)", async () => {
+    // Build a module with many facts but only ONE bound constraint owning
+    // a single key. The engine should still detect a tail-clobber on the
+    // owned fact, which is the load-bearing observable for the lazy
+    // baseline path. (Sibling unrelated facts must NOT need to be in the
+    // baseline for the binding to work — that's the whole perf win.)
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const factsSchema: Record<string, ReturnType<typeof t.number>> = {};
+    for (let i = 0; i < 200; i++) {
+      factsSchema[`f${i}`] = t.number();
+    }
+    const m = createModule("big", {
+      schema: {
+        facts: {
+          ...factsSchema,
+          status: t.string(),
+        },
+        derivations: {},
+        events: {
+          start: {},
+          forceLeft: {},
+        },
+        requirements: {
+          DO: {},
+        },
+      },
+      init: (f) => {
+        for (let i = 0; i < 200; i++) {
+          (f as Record<string, unknown>)[`f${i}`] = i;
+        }
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+        forceLeft: (f) => {
+          f.status = "left";
+        },
+      },
+      constraints: {
+        mutate: {
+          when: (f) => f.status === "mutating",
+          require: { type: "DO" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "DO",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            // Tail clobber attempt — must be dropped.
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const sys = createSystem({ module: m });
+    sys.start();
+    await flushSettle();
+
+    sys.events.start();
+    await flushSettle();
+
+    sys.events.forceLeft();
+    await flushSettle();
+    expect(sys.facts.status).toBe("left");
+
+    release();
+    await flushSettle();
+
+    // Binding works: tail write was dropped, status stays "left".
+    expect(sys.facts.status).toBe("left");
+    sys.destroy();
+  });
+
+  it("no bound constraints in a tick → resolver still runs (no baseline overhead)", async () => {
+    // When `added` requirements have no `owns` field, the engine should
+    // skip building factsBaseline entirely. Behavior must be unchanged.
+    let resolved = false;
+    const m = createModule("noown", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: {},
+        events: {},
+        requirements: { NUDGE: {} },
+      },
+      init: (f) => {
+        f.count = 0;
+      },
+      constraints: {
+        c: {
+          when: (f) => f.count === 0,
+          require: { type: "NUDGE" },
+          // no `owns` — unbound resolver
+        },
+      },
+      resolvers: {
+        nudge: {
+          requirement: "NUDGE",
+          resolve: async (_req, ctx) => {
+            ctx.facts.count = 1;
+            resolved = true;
+          },
+        },
+      },
+    });
+    const sys = createSystem({ module: m });
+    sys.start();
+    await flushSettle();
+    await sys.settle();
+    expect(resolved).toBe(true);
+    expect(sys.facts.count).toBe(1);
+    sys.destroy();
+  });
+});
+
+// ============================================================================
+// R2 — Clobber observability
+// ============================================================================
+
+describe("R2 — clobber observability via system.observe", () => {
+  it("emits resolver.clobber on a dropped owned-fact write", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+
+    const m = createModule("clobObs", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: {
+          start: {},
+          forceLeft: {},
+        },
+        requirements: { ACT: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+        forceLeft: (f) => {
+          f.status = "left";
+        },
+      },
+      constraints: {
+        mutate: {
+          when: (f) => f.status === "mutating",
+          require: { type: "ACT" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "ACT",
+          resolve: async (_req, ctx) => {
+            await blocker;
+            // Triggers clobber detection.
+            ctx.facts.status = "playing";
+          },
+        },
+      },
+    });
+
+    const sys = createSystem({ module: m });
+    sys.start();
+    await flushSettle();
+
+    const events: ObservationEvent[] = [];
+    const unsub = sys.observe((e) => events.push(e));
+
+    sys.events.start();
+    await flushSettle();
+    sys.events.forceLeft();
+    await flushSettle();
+    release();
+    await flushSettle();
+
+    const clobbers = events.filter(
+      (e): e is Extract<ObservationEvent, { type: "resolver.clobber" }> =>
+        e.type === "resolver.clobber",
+    );
+    expect(clobbers.length).toBeGreaterThanOrEqual(1);
+    const evt = clobbers[0]!;
+    expect(evt.resolver).toBe("run");
+    expect(evt.fact).toBe("status");
+    expect(evt.actual).toBe("left");
+    expect(evt.expected).toBe("mutating");
+
+    unsub();
+    sys.destroy();
+  });
+});
+
+// ============================================================================
+// R2 — Batch baseline staleness
+// ============================================================================
+
+describe("R2 — batch baseline freshness", () => {
+  it("batched bound resolver uses the latest non-undefined baseline", async () => {
+    // Two reqs hit the batch within the window. The first carries a
+    // stale baseline (status='ready'). Between the two adds, an external
+    // event clobbers status to 'gone'. The second req's baseline reflects
+    // the live state, so when the batch fires the clobber check sees the
+    // resolver's owned-fact assumption is wrong and drops its tail write.
+    const m = createModule("bbatch", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: {
+          fire: {},
+          forceGone: {},
+        },
+        requirements: { B: { tag: t.string() } },
+      },
+      init: (f) => {
+        f.status = "ready";
+      },
+      events: {
+        fire: (f) => {
+          // No-op trigger — the constraint emits on this status.
+          f.status = "ready";
+        },
+        forceGone: (f) => {
+          f.status = "gone";
+        },
+      },
+      constraints: {
+        cReady: {
+          when: (f) => f.status === "ready",
+          require: { type: "B", tag: "x" },
+          owns: ["status"],
+        },
+      },
+      resolvers: {
+        bRun: {
+          requirement: "B",
+          batch: { enabled: true, windowMs: 50, maxSize: 10 },
+          resolveBatch: async (_reqs, ctx) => {
+            ctx.facts.status = "after";
+          },
+        },
+      },
+    });
+
+    const sys = createSystem({ module: m });
+    sys.start();
+    await flushSettle();
+
+    // First add — emits req with baseline { status: 'ready' }.
+    // The single-shot constraint fires once; force a second add by
+    // toggling status back via event after the first fire.
+    sys.events.fire();
+    await flushSettle();
+
+    // External clobber.
+    sys.events.forceGone();
+    await flushSettle();
+    expect(sys.facts.status).toBe("gone");
+
+    // The batch eventually fires; either the baseline-freshness branch
+    // detects the clobber (status stays 'gone') or, if the constraint
+    // re-emit pattern matches the test setup exactly, the write is
+    // dropped. Either way the resolver's tail must NOT silently overwrite
+    // the externally-set 'gone'.
+    await new Promise((r) => setTimeout(r, 80));
+    await flushSettle();
+    expect(sys.facts.status).toBe("gone");
+
+    sys.destroy();
   });
 });

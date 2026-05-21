@@ -51,6 +51,14 @@ export function deepFreeze<T>(
  *
  * @param spec - The definition spec to freeze (mutated in place, returned)
  * @returns The same `spec` value, now deeply frozen
+ *
+ * @example
+ * ```ts
+ * // At registration time, freeze user-supplied specs so post-registration
+ * // mutation cannot silently change the compiled closure's behavior.
+ * const spec = freezeSpec(userPredicate);
+ * memoizePredicate(spec);
+ * ```
  */
 export function freezeSpec<T>(spec: T): T {
   return deepFreeze(spec);

@@ -680,3 +680,35 @@ describe("normalize requirements", () => {
     expect(types).toContain("SECOND");
   });
 });
+
+// ============================================================================
+// Owner attribution on predicate throws
+// ============================================================================
+
+describe("owner attribution on predicate throws", () => {
+  it("rethrows a `$matches: string` throw with the constraint ID", async () => {
+    const schema = { phase: t.string() };
+    const { facts } = createFacts({ schema });
+    facts.phase = "abc";
+    const errorSpy = vi.fn();
+
+    const manager = createConstraintsManager({
+      definitions: {
+        badMatch: {
+          // biome-ignore lint/suspicious/noExplicitAny: intentionally bad shape — $matches requires RegExp
+          when: { phase: { $matches: "abc" } } as any,
+          require: { type: "X" },
+        },
+      },
+      facts,
+      onError: errorSpy,
+    });
+
+    await manager.evaluate();
+
+    expect(errorSpy).toHaveBeenCalledWith("badMatch", expect.any(Error));
+    const err = errorSpy.mock.calls[0]![1] as Error;
+    expect(err.message).toMatch(/constraint 'badMatch'/);
+    expect(err.message).toMatch(/operand must be a RegExp/);
+  });
+});
