@@ -2,9 +2,9 @@
  * Data-configuration predicates and templates.
  *
  * A {@link FactPredicate} is a declarative, serializable boolean spec over a
- * module's fact + derivation namespace — the data form of a constraint
- * `when`, an effect `on`, or a boolean derivation. A {@link FactTemplate} is
- * the value-producing counterpart: a fact-interpolating string.
+ * module's fact namespace — the data form of a constraint `when`, an effect
+ * `on`, or a boolean derivation. A {@link FactTemplate} is the value-producing
+ * counterpart: a fact-interpolating string.
  *
  * Convention: `$` marks an operator/expression node inside a predicate or
  * template body (`$eq`, `$gte`, `$all`, `$template`, `$set`, `$ref`).
@@ -150,7 +150,7 @@ type PredicateField<V> =
 // ============================================================================
 
 /**
- * Object form — every key is a fact/derivation name, every value a
+ * Object form — every key is a fact name, every value a
  * {@link PredicateField}. Multiple keys are AND-ed. A nested object value
  * recurses (partial match), which is how cross-module namespaced predicates
  * (`{ self: { phase: "red" }, auth: { token: { $exists: true } } }`) work.
