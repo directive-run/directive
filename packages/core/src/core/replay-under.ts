@@ -203,6 +203,18 @@ function validateReplaySpec(
  * ```
  */
 export function toReplayFrames(raw: unknown): ReplayFrame[] {
+  // A history-manager export ({ version, snapshots, currentIndex }) is a
+  // valid input shape — route it through framesFromHistory so the CLI and
+  // the library accept the same files.
+  if (
+    raw &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    Array.isArray((raw as { snapshots?: unknown }).snapshots)
+  ) {
+    return framesFromHistory(raw);
+  }
+
   const list: unknown[] | null = Array.isArray(raw)
     ? raw
     : raw &&
@@ -213,7 +225,15 @@ export function toReplayFrames(raw: unknown): ReplayFrame[] {
 
   if (!list) {
     throw new Error(
-      "[Directive] toReplayFrames: history must be a JSON array of frames, or an object with a `frames` array",
+      "[Directive] toReplayFrames: history must be a JSON array of frames, an object with a `frames` array, or a history export with a `snapshots` array",
+    );
+  }
+
+  // Enforce the frame cap on `length` before `.map()` materializes a second
+  // array — the cap must bound memory, not just the evaluation loop.
+  if (list.length > MAX_REPLAY_FRAMES) {
+    throw new Error(
+      `[Directive] toReplayFrames: history has ${list.length} frames, exceeds the MAX_REPLAY_FRAMES limit (${MAX_REPLAY_FRAMES}) — split or down-sample the history`,
     );
   }
 
@@ -267,21 +287,34 @@ export function framesFromHistory(historyExport: unknown): ReplayFrame[] {
       ? (JSON.parse(historyExport) as unknown)
       : historyExport;
 
-  const snapshots: unknown[] | null = Array.isArray(parsed)
-    ? parsed
-    : parsed &&
-        typeof parsed === "object" &&
-        Array.isArray((parsed as { snapshots?: unknown }).snapshots)
-      ? (parsed as { snapshots: unknown[] }).snapshots
-      : null;
+  // A bare snapshot array is accepted directly.
+  if (Array.isArray(parsed)) {
+    return framesFromSnapshots(parsed);
+  }
 
-  if (!snapshots) {
+  if (!parsed || typeof parsed !== "object") {
     throw new Error(
       "[Directive] framesFromHistory: expected a history export object with a `snapshots` array (from system.history.export())",
     );
   }
 
-  return framesFromSnapshots(snapshots);
+  const exportObj = parsed as { version?: unknown; snapshots?: unknown };
+
+  // Mirror history.ts import(): only version 1 is understood. A bump in the
+  // export format must fail loud here, not silently yield wrong frames.
+  if (exportObj.version !== undefined && exportObj.version !== 1) {
+    throw new Error(
+      `[Directive] framesFromHistory: unsupported history export version ${JSON.stringify(exportObj.version)} — expected 1`,
+    );
+  }
+
+  if (!Array.isArray(exportObj.snapshots)) {
+    throw new Error(
+      "[Directive] framesFromHistory: expected a history export object with a `snapshots` array (from system.history.export())",
+    );
+  }
+
+  return framesFromSnapshots(exportObj.snapshots);
 }
 
 /**
@@ -305,6 +338,23 @@ export function framesFromSnapshots(snapshots: unknown): ReplayFrame[] {
     throw new Error(
       "[Directive] framesFromSnapshots: expected an array of fact-state snapshots",
     );
+  }
+
+  if (snapshots.length > MAX_REPLAY_FRAMES) {
+    throw new Error(
+      `[Directive] framesFromSnapshots: history has ${snapshots.length} snapshots, exceeds the MAX_REPLAY_FRAMES limit (${MAX_REPLAY_FRAMES}) — split or down-sample the history`,
+    );
+  }
+
+  // A snapshot is always a { facts, ... } object — reject a garbage array
+  // before it is silently wrapped into empty-fact frames.
+  for (let i = 0; i < snapshots.length; i++) {
+    const s = snapshots[i];
+    if (!s || typeof s !== "object" || !("facts" in s)) {
+      throw new Error(
+        `[Directive] framesFromSnapshots: snapshot at index ${i} is not a { facts, ... } object`,
+      );
+    }
   }
 
   return toReplayFrames(snapshots);

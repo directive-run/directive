@@ -323,9 +323,10 @@ describe("replayUnder — spec validation", () => {
     assertInvariant(report);
   });
 
-  it("throws when the history exceeds MAX_REPLAY_FRAMES", () => {
-    // A sparse fake array — length over the cap, no real allocation.
-    const huge = { length: MAX_REPLAY_FRAMES + 1 } as unknown as ReplayFrame[];
+  it("replayUnder throws when the history exceeds MAX_REPLAY_FRAMES", () => {
+    // A real (sparse) array — Array.isArray is true and .length is honest,
+    // but the holes cost no memory.
+    const huge = new Array(MAX_REPLAY_FRAMES + 1) as ReplayFrame[];
     expect(() =>
       replayUnder({
         frames: huge,
@@ -333,6 +334,13 @@ describe("replayUnder — spec validation", () => {
         proposed: { phase: "green" },
       }),
     ).toThrow(/exceeds the MAX_REPLAY_FRAMES limit \(1000000\)/);
+  });
+
+  it("toReplayFrames enforces the cap on length before materializing", () => {
+    const huge = new Array(MAX_REPLAY_FRAMES + 1);
+    expect(() => toReplayFrames(huge)).toThrow(
+      /exceeds the MAX_REPLAY_FRAMES limit \(1000000\)/,
+    );
   });
 });
 
@@ -508,5 +516,33 @@ describe("framesFromHistory / framesFromSnapshots", () => {
     expect(() => framesFromSnapshots("nope" as unknown)).toThrow(
       /\[Directive\] framesFromSnapshots: expected an array/,
     );
+  });
+
+  it("toReplayFrames accepts a history-export { snapshots } shape", () => {
+    const exportObj = {
+      version: 1,
+      currentIndex: 1,
+      snapshots: [
+        { id: 1, timestamp: 1, facts: { phase: "red" }, trigger: "init" },
+        { id: 2, timestamp: 2, facts: { phase: "green" }, trigger: "tick" },
+      ],
+    };
+
+    expect(toReplayFrames(exportObj)).toEqual([
+      { id: 1, timestamp: 1, facts: { phase: "red" } },
+      { id: 2, timestamp: 2, facts: { phase: "green" } },
+    ]);
+  });
+
+  it("framesFromHistory rejects an unsupported export version", () => {
+    expect(() => framesFromHistory({ version: 2, snapshots: [] })).toThrow(
+      /unsupported history export version 2/,
+    );
+  });
+
+  it("framesFromSnapshots rejects a snapshot with no facts field", () => {
+    expect(() =>
+      framesFromSnapshots([{ facts: { a: 1 } }, { notFacts: true }]),
+    ).toThrow(/snapshot at index 1 is not a \{ facts/);
   });
 });

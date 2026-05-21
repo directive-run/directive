@@ -604,7 +604,7 @@ what a business rule is."*
 **Headline:** *"The first PR-review tool that understands business logic,
 not just lines of code."*
 
-### R4.G — `directive replay-under <new-spec> --history <recorded.json>`: counterfactual rule replay
+### R4.G — `directive replay-under <new-spec> --history <recorded.json>`: predicate backtest for rule changes
 
 **[✅ SHIPPED 2026-05-21 — `replayUnder()` in @directive-run/core + `directive replay-under` CLI. See docs/concepts/replay-under.md]**
 
@@ -612,7 +612,7 @@ not just lines of code."*
 
 Given (a) a recorded fact-mutation history from the timeline plugin and
 (b) an edited `whenSpec` for an existing constraint, replay the fact
-history through the *new* spec and emit a **counterfactual report**:
+history through the *new* spec and emit a **predicate backtest report**:
 
 ```
 constraint: blockCheckout (proposed change)
@@ -643,13 +643,13 @@ resolver / fact changes) is a deferred future variant.
 
 **Compound effect:**
 - Pairs with R4.F (above): diff a rule, then click "replay under change"
-  for one-click counterfactual
-- Pairs with R4.D `predicateFromIntent`: LLM proposes a rule → counterfactual
+  for a one-click backtest
+- Pairs with R4.D `predicateFromIntent`: LLM proposes a rule → backtest
   replay validates it against real history → ship or iterate
 - Pairs with R2.A bisect: bisect across rule versions instead of code
   versions ("which rule change caused the regression in conversion rate?")
 - Enables **predicate A/B testing**: ship two `whenSpec`s, route 50/50,
-  diff the realized outcome against the replayed counterfactual to detect
+  diff the realized outcome against the replayed backtest to detect
   novelty effects
 
 **Viral demo (30s):** PM opens a PR that loosens an eligibility rule.
@@ -835,7 +835,7 @@ arguing — and tells you why."*
 
 | Rank | Idea | Days | Viral | Compound | Note |
 |---|---|---|---|---|---|
-| 1 | **R4.G** `replay-under` counterfactual rule replay — **✅ SHIPPED 2026-05-21** | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
+| 1 | **R4.G** `replay-under` predicate-backtest rule replay — **✅ SHIPPED 2026-05-21** | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
 | 2 | **R4.F** `directive rules-diff` PR-review tool | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
 | 3 | **R4.H** `predicateToSQL` isomorphic predicates | 3 | High | Max | The "one truth, three targets" article writes itself. Drizzle/Prisma envy. |
 | 4 | **R4.I** GDPR-grade audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |
@@ -852,7 +852,7 @@ solvable equation / theorem / UI / LLM output / coverage target** — five
 framings of "the predicate is data, and data can be analyzed." Round 2
 treats the predicate as **a document (R4.F diff), a signal (R4.J loop
 detector), a witness (R4.I audit log), a target (R4.H multi-platform
-codegen), a counterfactual (R4.G replay-under)** — five framings of "the
+codegen), a backtest subject (R4.G replay-under)** — five framings of "the
 predicate is data, and data can be *exchanged between systems and across
 time*." Together: ten viral framings of one JSON object. The substrate is
 not just the predicate. The substrate is *every system the predicate can
@@ -874,10 +874,10 @@ sentence that gets retweeted with no commentary.
 Surfaced during the R5 innovation pass, **after `replayUnder()` + `directive
 replay-under` shipped** (R4.G, 2026-05-21). R4.G itself is the *one rule, one
 pair, before-merge* case. But the thing that actually landed is a **pure
-replay engine** — `frames + two predicates → CounterfactualReport`, zero
+replay engine** — `frames + two predicates → PredicateBacktestReport`, zero
 engine dependency — plus a new first-class input: **recorded fact-frame
 history**. R4.F-J treat the predicate as a document / signal / witness /
-target / counterfactual. R5 treats the *replay engine itself* as a
+target / backtest subject. R5 treats the *replay engine itself* as a
 **substrate**: a thing you sweep, optimize against, run live, walk through
 git, and close an AI loop around. None of these are "replay one rule" —
 they are "what does owning a replay engine unlock."
@@ -1064,7 +1064,7 @@ tuneFromIntent({
 ```
 
 The LLM never runs code. It emits a `FactPredicate` (data); `replayUnder`
-scores it against real history; the structured `CounterfactualReport`
+scores it against real history; the structured `PredicateBacktestReport`
 (newMatches / lostMatches / per-clause explain) goes *back into the
 prompt* as a precise, numeric critique. The loop iterates until the
 objective is met — **structurally validated at every step, scored on real
