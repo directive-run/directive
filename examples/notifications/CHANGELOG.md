@@ -1,5 +1,13 @@
 # @directive-run/example-notifications
 
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [[`fa51447`](https://github.com/directive-run/directive/commit/fa514479e397d1223aeb0e76b01fb88b9af29f49)]:
+  - @directive-run/core@1.7.0
+  - @directive-run/el@1.0.0
+
 ## 0.0.29
 
 ### Patch Changes
