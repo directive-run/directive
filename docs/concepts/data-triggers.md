@@ -2,7 +2,7 @@
 
 Most Directive definitions can be written two ways: as a function (the
 original form) or as a plain data object (the "data form"). The data
-form is purely additive — function definitions keep working unchanged,
+form is purely additive – function definitions keep working unchanged,
 and every surface accepts either.
 
 ## Why bother
@@ -14,7 +14,7 @@ Three things you cannot do with a function but can do with data:
 - **Carry the trigger across a wire.** A predicate is JSON-safe, so it
   survives the devtools transport, web-worker boundaries, and replay
   archives. A function does not.
-- **Get free deps.** A data predicate is structural — the engine knows
+- **Get free deps.** A data predicate is structural – the engine knows
   which facts it reads without running it. Async constraints lose their
   explicit-`deps` footgun because a data `when` is always sync, and the
   engine clears any `async: true` on the def at registration to make
@@ -23,7 +23,7 @@ Three things you cannot do with a function but can do with data:
 ## Migrating from XState guards
 
 XState's `cond` / `guards` express the same thing as a Directive data
-`when` — a boolean precondition over facts. The shape is different but
+`when` – a boolean precondition over facts. The shape is different but
 the translation is mechanical:
 
 | XState                                            | Directive                                  |
@@ -34,8 +34,8 @@ the translation is mechanical:
 | guards + multiple conditions                      | `when: { $all: [ ... ] }`                  |
 | async guards                                      | function `when` (data form is sync-only)   |
 
-If your XState guard reads multiple contexts and computes — use the
-function form. If it compares facts to values — use the data form.
+If your XState guard reads multiple contexts and computes – use the
+function form. If it compares facts to values – use the data form.
 
 ## Quick reference
 
@@ -57,7 +57,7 @@ createModule("traffic", {
     requirements: { TRANSITION: { to: t.string() } },
   },
 
-  // Constraint — declarative boolean trigger.
+  // Constraint – declarative boolean trigger.
   constraints: {
     transition: {
       when: { phase: "red", elapsed: { $gte: 30 } },
@@ -65,7 +65,7 @@ createModule("traffic", {
     },
   },
 
-  // Effect — runs when a referenced fact changes AND the predicate holds.
+  // Effect – runs when a referenced fact changes AND the predicate holds.
   effects: {
     blink: {
       on: { phase: "red" },
@@ -73,7 +73,7 @@ createModule("traffic", {
     },
   },
 
-  // Resolver — declarative dedup key.
+  // Resolver – declarative dedup key.
   resolvers: {
     transition: {
       requirement: "TRANSITION",
@@ -82,7 +82,7 @@ createModule("traffic", {
     },
   },
 
-  // Event — declarative patch instead of a handler.
+  // Event – declarative patch instead of a handler.
   events: {
     setStatus: {
       patch: {
@@ -94,7 +94,7 @@ createModule("traffic", {
     },
   },
 
-  // Derivation — predicate (boolean) or template (string).
+  // Derivation – predicate (boolean) or template (string).
   derive: {
     isAdult:  { compute: { age: { $gte: 18 } } },
     fullName: { compute: { $template: "${firstName} ${lastName}" } },
@@ -102,7 +102,7 @@ createModule("traffic", {
 });
 ```
 
-## `FactPredicate` — boolean predicates
+## `FactPredicate` – boolean predicates
 
 A predicate is an object whose keys are **fact names** and whose values
 are either a literal (equality) or an operator object.
@@ -138,21 +138,21 @@ when: { $all: [
 | `$in` / `$nin`  | any                   | `{ phase: { $in: ["red", "yellow"] } }`     |
 | `$gt`, `$gte`, `$lt`, `$lte` | `number`, `bigint`, `Date`, `string` | `{ elapsed: { $gte: 30 } }` |
 | `$between`      | orderable             | `{ elapsed: { $between: [30, 120] } }`      |
-| `$matches`      | `string` (RegExp only — use real `RegExp` instances for flag control) | `{ name: { $matches: /^J/i } }` |
+| `$matches`      | `string` (RegExp only – use real `RegExp` instances for flag control) | `{ name: { $matches: /^J/i } }` |
 | `$startsWith`   | `string`              | `{ name: { $startsWith: "Ada" } }`          |
 | `$endsWith`     | `string`              | `{ email: { $endsWith: "@example.com" } }`  |
 | `$contains`     | `string`, array, or `Set` | `{ tags: { $contains: "admin" } }` |
 | `$exists`       | boolean operand       | `{ token: { $exists: true } }` (value is not `undefined`) |
 | `$changed`      | effects only          | `{ phase: { $changed: true } }`             |
 
-> **`$matches` requires a `RegExp`.** Pass `/pattern/flags` directly —
+> **`$matches` requires a `RegExp`.** Pass `/pattern/flags` directly –
 > string operands cannot express flags (case-insensitivity, dotall,
 > multiline) and were never structurally safe against ReDoS, so a
 > non-RegExp operand throws at evaluation.
 >
 > **`$contains` on `Set` / `Map`.** `$contains` walks a `string`
 > (substring match), an array (element equality, structural), or a
-> `Set` (native `.has()` — reference-equality for objects, value
+> `Set` (native `.has()` – reference-equality for objects, value
 > equality for primitives). `Map` is not yet supported; iterate to an
 > array if you need to gate on `Map` membership.
 >
@@ -174,17 +174,17 @@ when: { $all: [
 ### Empty list semantics
 
 Combinators and membership operators have well-defined behavior on
-empty operands — chosen to match MongoDB's query algebra:
+empty operands – chosen to match MongoDB's query algebra:
 
 | Spec                  | Result  | Note                                  |
 | --------------------- | ------- | ------------------------------------- |
 | `{ $any: [] }`        | `false` | No member to satisfy                  |
-| `{ $all: [] }`        | `true`  | Vacuous truth — match MongoDB         |
+| `{ $all: [] }`        | `true`  | Vacuous truth – match MongoDB         |
 | `{ $not: {} }`        | `false` | Equivalent to `$not: true`            |
 | `{ x: { $in: [] } }`  | `false` | No value in empty set                 |
 | `{ x: { $nin: [] } }` | `true`  | Every value is not in empty set       |
 
-One operator per object — for two operators on the same fact, use the
+One operator per object – for two operators on the same fact, use the
 array form or `$all`:
 
 ```ts
@@ -208,20 +208,20 @@ when: { $all: [
 > operator object does not type-check. The runtime does AND multiple
 > operator keys on a best-effort basis (so a `// @ts-expect-error`
 > escape hatch is well-defined), but the supported and type-checkable
-> form is one operator per object — combined via the array form or
+> form is one operator per object – combined via the array form or
 > `$all`.
 
 ### Predicate depth limit
 
-Every predicate traversal — evaluation, dependency extraction, and the
-JSON-safety validator — is capped at **64 levels of structural nesting**.
+Every predicate traversal – evaluation, dependency extraction, and the
+JSON-safety validator – is capped at **64 levels of structural nesting**.
 Past the cap the runtime dev-warns and bails rather than risking a stack
 overflow on a cyclic or pathologically deep spec. Legitimate predicates
 nest far fewer than 64 levels; a deeply nested combinator tree (`$all` /
 `$any` / `$not`) that approaches the cap should be flattened or split into
 multiple constraints.
 
-## `FactTemplate` — fact-interpolating strings
+## `FactTemplate` – fact-interpolating strings
 
 A string with `${ident}` placeholders. Escape `${` with `$${`. Unknown
 keys yield an empty string and dev-warn.
@@ -245,7 +245,7 @@ constraints: {
 
 Placeholder keys must match `[A-Za-z_][A-Za-z0-9_]*`.
 
-## `KeySelector` — declarative resolver dedup
+## `KeySelector` – declarative resolver dedup
 
 `key: ["id"]` is equivalent to `key: (req) => stableStringify(req.id)`.
 The order is the declared order; values are stable-stringified (object
@@ -262,7 +262,7 @@ resolvers: {
 },
 ```
 
-## `PatchSpec` — declarative event handlers
+## `PatchSpec` – declarative event handlers
 
 `patch` replaces the `handler` arm of an event for the common case of
 "set facts from the dispatched payload":
@@ -323,12 +323,12 @@ console.log(system.explain(requirementId));
 ```
 
 `whenSpec` is also surfaced on every entry of `system.inspect().constraints[]`
-when the constraint's `when` is a data form — so devtools and any
+when the constraint's `when` is a data form – so devtools and any
 custom inspector can render the predicate tree natively.
 
 ## Static analysis
 
-Two pure utilities walk a predicate without running it — useful for
+Two pure utilities walk a predicate without running it – useful for
 devtools, codegen, lint rules, and any "which facts does this read"
 check:
 
@@ -356,7 +356,7 @@ check({ phase: "red", elapsed: 45 }); // → true
 ```
 
 `memoizePredicate` caches the returned closure in a `WeakMap` keyed by
-predicate identity — the same predicate object always gets the same
+predicate identity – the same predicate object always gets the same
 closure back. No actual compilation happens (the closure re-walks the
 predicate on every call via `evaluatePredicate`); the name reflects the
 identity-keyed memoization, not a bytecode/AST compile step.
@@ -364,11 +364,11 @@ identity-keyed memoization, not a bytecode/AST compile step.
 ### Validating a predicate loaded from JSON
 
 A data predicate is a plain object, so it is tempting to load one from
-JSON. Most operands survive `JSON.stringify` / `JSON.parse` — but
+JSON. Most operands survive `JSON.stringify` / `JSON.parse` – but
 `RegExp`, `bigint`, `Set`, and `Map` operands do not (see
-[RFC 0004 — Serialization](../rfcs/0004-data-configuration-triggers.md#serialization)).
+[RFC 0004 – Serialization](../rfcs/0004-data-configuration-triggers.md#serialization)).
 `validatePredicate(spec)` throws on exactly those unrehydratable
-operands — call it after `JSON.parse` to fail loud rather than silently
+operands – call it after `JSON.parse` to fail loud rather than silently
 mis-evaluate:
 
 ```ts
@@ -378,7 +378,7 @@ const spec = JSON.parse(stored);
 validatePredicate(spec); // throws if a RegExp/bigint/Set/Map operand is present
 ```
 
-It is an opt-in helper — the engine does not call it automatically.
+It is an opt-in helper – the engine does not call it automatically.
 Users who never persist predicates do not need it.
 
 ## Gotchas
@@ -386,14 +386,14 @@ Users who never persist predicates do not need it.
 A few sharp edges worth knowing once:
 
 - **`async: true` on a data `when` is ignored.** A data `when` is
-  always sync — the predicate evaluator walks the predicate
+  always sync – the predicate evaluator walks the predicate
   synchronously, so the runtime treats `async: true` paired with a
   data `when` as a no-op AND clears `def.async` at registration so the
   engine takes the sync evaluation path. Use a function `when` for
   async preconditions.
 - **Explicit `deps` on a data `when` is ignored.** A data predicate
   carries its own deps (extracted structurally), so any `deps: [...]`
-  you add is unused — auto-tracking is exact.
+  you add is unused – auto-tracking is exact.
 - **Typo'd `$`-operators dev-warn.** `{ elapsed: { $eqq: 30 } }`
   triggers a runtime dev warning naming the typo and the known
   operators; the malformed clause evaluates to `false`.
@@ -409,18 +409,18 @@ A few sharp edges worth knowing once:
 
 These are not in v1, but are tracked for future addition:
 
-- `$null`, `$nullish` — for now use `$eq: null` or the function
+- `$null`, `$nullish` – for now use `$eq: null` or the function
   escape hatch.
-- `$elemMatch` — match an array element against a sub-predicate; for
+- `$elemMatch` – match an array element against a sub-predicate; for
   now use the function form or restructure the fact.
-- `$size` — array-length check; for now use a derivation
+- `$size` – array-length check; for now use a derivation
   (`derive: { count: (f) => f.items.length }`) and a relational op
   on the derived count.
 
-If you hit one of these in real code, file an issue — operator
+If you hit one of these in real code, file an issue – operator
 coverage is driven by demand.
 
-## Data vs function vs derivation — decision matrix
+## Data vs function vs derivation – decision matrix
 
 The data form covers the common cases of comparison, membership, and
 "set from payload". Use this matrix to pick the right form:
@@ -436,7 +436,7 @@ The data form covers the common cases of comparison, membership, and
 | Effect runs on fact change                 | data `on` with `$changed: true`                             |
 | Effect runs on derived value               | function `on` (data `on` is fact-keyed)                     |
 
-The two forms compose cleanly — mix them freely in the same module.
+The two forms compose cleanly – mix them freely in the same module.
 
 ## Observing rejected writes
 
@@ -444,7 +444,7 @@ When a bound resolver's owned-fact write is dropped because the fact was
 changed by something else mid-flight, Directive emits a
 `resolver.write.rejected` observation event with `reason: "clobbered"`:
 
-The event is a discriminated union on `kind` — branch on it before reading
+The event is a discriminated union on `kind` – branch on it before reading
 the arm-specific fields:
 
 ```ts
@@ -464,7 +464,7 @@ system.observe((e) => {
 });
 ```
 
-The `reason` field keeps the event backend-neutral — clobber detection is the
+The `reason` field keeps the event backend-neutral – clobber detection is the
 in-memory implementation today; future write-rejecting backends can report
 other reasons under the same event type. The `"summary"` arm is the
 per-resolver suppression summary (emitted once after the per-instance cap);
@@ -473,4 +473,4 @@ the logging plugin surface this event by default.
 
 ## See also
 
-- [RFC 0004 — Data-configuration triggers](../rfcs/0004-data-configuration-triggers.md)
+- [RFC 0004 – Data-configuration triggers](../rfcs/0004-data-configuration-triggers.md)

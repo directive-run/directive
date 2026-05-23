@@ -1,32 +1,32 @@
-# RFC 0004 — Data-configuration triggers (`FactPredicate` / `FactTemplate`)
+# RFC 0004 – Data-configuration triggers (`FactPredicate` / `FactTemplate`)
 
 - **Status:** Draft (2026-05-19)
 - **Author:** Jason Comes
-- **Related:** [RFC 0003 — Resolver constraint-binding (`owns`)](./0003-resolver-constraint-binding.md)
+- **Related:** [RFC 0003 – Resolver constraint-binding (`owns`)](./0003-resolver-constraint-binding.md)
 
 ## Summary
 
 Every Directive definition expresses its *trigger* or *matcher* as an opaque
 function: a constraint's `when`, a resolver's `key`, an effect's deps, a
-derivation's `compute`. A function is a black box — it cannot be serialized,
+derivation's `compute`. A function is a black box – it cannot be serialized,
 statically analyzed, or explained clause-by-clause.
 
 This RFC adds an optional **declarative data form** alongside each function
 form. Two primitives:
 
-- **`FactPredicate`** — a boolean predicate over a fact namespace
+- **`FactPredicate`** – a boolean predicate over a fact namespace
   (`{ phase: "red", elapsed: { $gte: 30 } }`). Drop-in replacement for a
   constraint `when`, effect `on`, or boolean derivation `compute`.
-- **`FactTemplate`** — a fact-interpolating string expression
-  (`{ $template: "Phase ${phase}" }`). The value-producing counterpart —
+- **`FactTemplate`** – a fact-interpolating string expression
+  (`{ $template: "Phase ${phase}" }`). The value-producing counterpart –
   usable as a string derivation, in `require` field values, and in event
   `patch` values.
 
 Plus two narrow selectors that round out the data forms:
 
-- **`KeySelector`** — `["type", "to"]` builds a stable resolver dedup key
+- **`KeySelector`** – `["type", "to"]` builds a stable resolver dedup key
   from requirement-payload fields.
-- **`PatchSpec`** — `{ $set: { status: { $ref: "value" }, label: { $template: "user ${name}" } } }`
+- **`PatchSpec`** – `{ $set: { status: { $ref: "value" }, label: { $template: "user ${name}" } } }`
   is a declarative event handler.
 
 The function escape hatch remains on every surface. The data form is purely
@@ -72,15 +72,15 @@ derive: {
 
 Four properties only a data form can deliver:
 
-1. **Serializable.** A predicate is a plain object — it survives the
+1. **Serializable.** A predicate is a plain object – it survives the
    devtools wire, web-worker transfer, SSR hydration, and replay archives.
    A function does not.
 2. **Introspectable.** `system.explain()` can render the per-clause
    `✓/✗` breakdown of *why* a constraint fired (or didn't):
    `phase ✓ red · elapsed ✗ 20, needs ≥ 30`. With a function, the
    evaluator returns one bit (`true`/`false`); the *structure* is hidden.
-3. **Statically analyzable.** Dep extraction is structural — walk the
-   tree, collect fact keys — which eliminates the explicit-`deps`
+3. **Statically analyzable.** Dep extraction is structural – walk the
+   tree, collect fact keys – which eliminates the explicit-`deps`
    footgun on async constraints (a data `when` is always sync, so
    auto-tracking always captures the deps correctly).
 4. **Less typing.** The common cases (`phase === "red"`,
@@ -88,7 +88,7 @@ Four properties only a data form can deliver:
    closures. The function form stays available for everything else.
 
 The data form is also where future analysis-oriented features become
-tractable — contradictory-constraint detection, unreachable-constraint
+tractable – contradictory-constraint detection, unreachable-constraint
 warnings, time-travel-friendly definitions, devtools panels that render
 predicate trees natively rather than function source strings.
 
@@ -102,19 +102,19 @@ any form satisfies `FactPredicate<F>`):
 > **Fact names only.** Predicate keys address **facts**, not derivations.
 > To gate on a derivation, either reference the underlying fact the
 > derivation reads, or fall back to a function `when` / `on`. This is
-> the v1 contract — keeping the namespace minimal lets the deps walker
+> the v1 contract – keeping the namespace minimal lets the deps walker
 > stay structural and avoids derivation-result/predicate-tree races.
 
 ```ts
-// Object form — the common case. Keys ⊆ fact names.
+// Object form – the common case. Keys ⊆ fact names.
 // Bare value → equality. Operator object → comparison. Multiple keys → AND.
 { phase: "red", elapsed: { $gte: 30 } }
 
-// Array form — explicit clauses, AND-ed. Useful for codegen and devtools.
+// Array form – explicit clauses, AND-ed. Useful for codegen and devtools.
 [{ fact: "phase", op: "$eq", value: "red" },
  { fact: "elapsed", op: "$gte", value: 30 }]
 
-// Combinator node — one of $all / $any / $not, nestable.
+// Combinator node – one of $all / $any / $not, nestable.
 { $any: [{ phase: "red" }, { phase: "yellow" }] }
 { $not: { paused: true } }
 ```
@@ -131,7 +131,7 @@ Operators (the `$`-prefixed keys inside an operator object):
 | `$startsWith`, `$endsWith`        | String prefix / suffix test          |
 | `$contains`                       | Substring (`string`), array-element membership, or `Set.has` for `Set` facts |
 | `$exists`                         | Boolean operand: `true` requires defined, `false` requires `undefined` |
-| `$changed`                        | Effects only — fact value differs from `prev` |
+| `$changed`                        | Effects only – fact value differs from `prev` |
 
 Combinators: `$all`, `$any`, `$not`.
 
@@ -140,7 +140,7 @@ Combinators: `$all`, `$any`, `$not`.
 two `Map`s are equal when they hold the same key+value pairs.
 
 A plain (non-operator) object value inside a predicate is a **nested
-predicate** — used for cross-module namespaced facts:
+predicate** – used for cross-module namespaced facts:
 
 ```ts
 when: {
@@ -176,7 +176,7 @@ expects. The hot path never branches on form.
 
 | Surface              | Type widening                                                | Runtime                                                        |
 | -------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
-| Constraint `when`    | `Fn \| FactPredicate<F>`                                     | Wrapped into a sync `Fn`; reads through the tracked proxy so deps are captured automatically. Data `when` is always sync — `async: true` and explicit `deps` on a data `when` dev-warn and are ignored. |
+| Constraint `when`    | `Fn \| FactPredicate<F>`                                     | Wrapped into a sync `Fn`; reads through the tracked proxy so deps are captured automatically. Data `when` is always sync – `async: true` and explicit `deps` on a data `when` dev-warn and are ignored. |
 | Effect `on`          | `EffectDef.on?: FactPredicate<F>` (mutually exclusive with `deps`) | `extractDeps(on)` populates `state.dependencies`; `shouldRun` evaluates the predicate after the dep-overlap pre-filter. `$changed` reads the previous snapshot (treated as "changed" on first run). |
 | Resolver `key`       | `RequirementKeyFn<R> \| KeySelector<R>`                      | Array form is wrapped into a `RequirementKeyFn` that JSON-encodes the selected fields in declared order. |
 | Event `patch`        | New sigil-free `{ patch: PatchSpec, meta? }` arm             | Synthesized into a handler that calls `applyPatch` over the dispatched event. `$ref` copies a payload field; `$template` interpolates over the event. |
@@ -185,13 +185,13 @@ expects. The hot path never branches on form.
 `require` and `patch` `$set` values may also contain `{ $template }` and
 `{ $ref }` nodes. Discrimination is conservative: a value is treated as
 a template / ref only when it is an object whose **sole own key** is
-`$template` / `$ref` — so user data shaped like `{ $template: 0 }`
+`$template` / `$ref` – so user data shaped like `{ $template: 0 }`
 (unusual but possible) is unambiguous from a template node.
 
 ## Introspection (the "why did it fire" view)
 
 A data-form `when` is structured, so the engine can render *why* a
-constraint did or did not fire — at runtime, without instrumentation.
+constraint did or did not fire – at runtime, without instrumentation.
 
 ```ts
 system.inspect().constraints
@@ -222,13 +222,13 @@ form; function-form constraints continue to emit just `{ active }`.
 The runtime also exports three pure utilities for tooling that walks a
 predicate or template tree without evaluating it:
 
-- `extractDeps(spec)` — collect the fact keys (dotted for nested
+- `extractDeps(spec)` – collect the fact keys (dotted for nested
   predicates) that a `FactPredicate` reads. Used internally to wire
   effect-`on` deps without auto-tracking; safe to use from devtools,
   linters, or codegen.
-- `extractTemplateKeys(spec)` — collect the placeholder identifiers a
+- `extractTemplateKeys(spec)` – collect the placeholder identifiers a
   `FactTemplate` interpolates.
-- `memoizePredicate(spec)` — return a closure that evaluates the spec
+- `memoizePredicate(spec)` – return a closure that evaluates the spec
   against any scope. The closure is cached by spec identity in a
   `WeakMap`; the function does not pre-compile the spec, it only
   avoids re-allocating the wrapper.
@@ -263,7 +263,7 @@ Consequences:
 2. A relational operator on a non-orderable fact (`$gt: 1` against a
    `boolean` fact) resolves to `never` → compile error.
 3. Multiple operators on the same fact (`{ $gte: 30, $lt: 120 }`) are
-   intentionally **not** expressible in one operator object — write
+   intentionally **not** expressible in one operator object – write
    them as the array form or `$all`:
    ```ts
    when: { elapsed: { $gte: 30 } }     // ✓
@@ -275,7 +275,7 @@ Consequences:
    > multiple operator keys on a best-effort basis (so an object
    > literal with `// @ts-expect-error` still behaves predictably),
    > but the supported, type-checkable form is one operator per object
-   > — combined via the array form or `$all`.
+   > – combined via the array form or `$all`.
 
 `[V]` tuple-wrapping in `IsOrderable<V>` suppresses distribution over
 union-typed facts, so `t.enum` literals and nullable facts type-check
@@ -284,14 +284,14 @@ correctly.
 ## Security: untrusted predicate sources
 
 A data-form predicate is a plain object, so it is tempting to load one
-from JSON — a config file, a database row, an LLM tool-call response.
+from JSON – a config file, a database row, an LLM tool-call response.
 The security posture of doing so:
 
 ### Operator allow-list
 
 Operators are an allow-list (the `PREDICATE_OPERATORS` Set in
 `predicate.ts`). No path through predicate evaluation reaches `eval` or
-`Function` — evaluation is a structural walk that dispatches on a fixed
+`Function` – evaluation is a structural walk that dispatches on a fixed
 operator set. Loading a predicate from JSON is therefore structurally
 safe: an unknown `$`-key dev-warns and evaluates to `false`, it cannot
 execute arbitrary code.
@@ -299,7 +299,7 @@ execute arbitrary code.
 ### Regex sources
 
 `$matches` requires `RegExp` instances. `JSON.parse` will not
-reconstruct a `RegExp` — a serialized regex becomes `{}`. If you accept
+reconstruct a `RegExp` – a serialized regex becomes `{}`. If you accept
 JSON-form predicates, reify regex operands with
 `new RegExp(pattern, flags)` before installing the predicate. Caution:
 an attacker-supplied pattern is still subject to catastrophic
@@ -310,7 +310,7 @@ pass) before constructing the `RegExp`.
 ### Template injection
 
 `$template` placeholders are restricted to the identifier grammar
-`[A-Za-z_][A-Za-z0-9_]*`. Values are coerced via `String(...)` — there
+`[A-Za-z_][A-Za-z0-9_]*`. Values are coerced via `String(...)` – there
 is no executable path through template interpolation. A `$template`
 loaded from untrusted JSON is safe against template injection.
 
@@ -332,7 +332,7 @@ Recommendation: for full-fidelity persistence of predicates, use a
 custom replacer/reviver or stick to JSON-clean operand types. A
 first-class `serializePredicate` / `hydratePredicate` pair is planned
 for v1.6+. In the meantime, `validatePredicate(spec)` (exported from
-`@directive-run/core`) throws on unrehydratable operands — call it
+`@directive-run/core`) throws on unrehydratable operands – call it
 after `JSON.parse` to fail loud rather than silently mis-evaluate.
 
 ## `$changed` first-run on hydration
@@ -347,7 +347,7 @@ after hydration completes.
 - **`$changed` in constraints.** Constraints have no `prev` snapshot;
   `$changed` is effects-only. To gate a constraint on "fact changed",
   use a boolean derivation that itself watches the change source.
-- **Codemod.** A function `when` → data `when` codemod is deferred —
+- **Codemod.** A function `when` → data `when` codemod is deferred –
   function bodies are arbitrary and only a narrow subset is mechanically
   convertible. A best-effort transformer is on the roadmap.
 - **Definition snapshotting.** The data form is *inherently* serializable
@@ -358,8 +358,8 @@ after hydration completes.
   `whenSpec` and `whenExplain` data on `inspect()` and the observation
   event; the `devtools-panel` widget and `directive explain` CLI
   consume the same data. Their visual layer follows in a separate change.
-- **Predicate depth cap.** Every predicate traversal — evaluation,
-  dependency extraction, JSON-safety validation — is capped at 64 levels
+- **Predicate depth cap.** Every predicate traversal – evaluation,
+  dependency extraction, JSON-safety validation – is capped at 64 levels
   of structural nesting. Past the cap the runtime dev-warns and bails to
   defend against a cyclic or pathologically deep spec. A predicate that
   legitimately approaches the cap must be flattened or split into
@@ -373,13 +373,13 @@ Lifecycle") would normally soak a primitive of this size as
 `.lab.ts` for one minor before promoting to core. This RFC
 intentionally skips the soak, with the following rationale recorded:
 
-- The feature is **purely additive** — every existing function form
+- The feature is **purely additive** – every existing function form
   keeps working unchanged. There is no migration burden.
 - The function escape hatch is always available, so any rough edge
   in the operator set has a zero-cost workaround.
 - The operator set follows MongoDB's well-known conventions; users
   arriving from query DSLs find it familiar.
-- The introspection payoff (`whenExplain`) is core-grade — gating it
+- The introspection payoff (`whenExplain`) is core-grade – gating it
   behind a lab import would significantly diminish the user-facing
   value of the RFC at landing.
 
@@ -392,7 +392,7 @@ promotion-from-lab event.
 - Sigil-prefixed (`$eq`, `$gte`, `$all`, `$any`, `$not`, `$template`,
   `$set`, `$ref`) marks an *expression/operator node inside a predicate
   or template body*.
-- Sigil-free (`compute`, `handler`, `patch`) marks a *definition arm* —
+- Sigil-free (`compute`, `handler`, `patch`) marks a *definition arm* –
   consistent with the existing `{ compute, meta }` and
   `{ handler, meta }` object forms.
 - `$`-prefixed schema keys are rejected at registration, so no fact
@@ -405,7 +405,7 @@ promotion-from-lab event.
   operator key from a constrained set" via mapped types; the per-operator
   union is the only form that produces the compile-time errors the data
   form needs (typo'd operator, non-orderable comparison).
-- **JSON-schema matchers.** Rejected as too generic — schema-matching
+- **JSON-schema matchers.** Rejected as too generic – schema-matching
   semantics differ from predicate semantics in subtle ways (e.g. shape
   vs. value, present vs. equal), and the operator surface needed for
   constraint `when` is narrower than JSON Schema's.
@@ -423,4 +423,4 @@ promotion-from-lab event.
 - Should the `$changed` operator be available on string-template
   derivations (recompute only when a referenced fact changes)?
   Currently the auto-tracked derivation invalidator already covers
-  this — the operator is unnecessary at the derivation level.
+  this – the operator is unnecessary at the derivation level.
