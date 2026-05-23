@@ -17,6 +17,7 @@ import { newModuleCommand, newOrchestratorCommand } from "./commands/new.js";
 import { replayUnderCommand } from "./commands/replay-under.js";
 import { replayCommand } from "./commands/replay.js";
 import { timelineDiffCommand } from "./commands/timeline-diff.js";
+import { tuneCommand } from "./commands/tune.js";
 import { CLI_NAME } from "./lib/constants.js";
 
 const HELP = `
@@ -39,6 +40,8 @@ Commands:
   examples copy <name>          Extract example to project
   replay <timeline.json>        Replay a serialized Directive timeline
                                 (paired with @directive-run/timeline)
+  tune --history ...            Grid-search a predicate template's $hole
+                                parameters against recorded history
   replay-under --history ...    Predicate backtest — diff a proposed
                                 predicate against recorded history
   bisect <timeline.json>        Binary-search a timeline for the first
@@ -216,6 +219,11 @@ async function main() {
 
     case "replay-under": {
       await replayUnderCommand(args.slice(1));
+      break;
+    }
+
+    case "tune": {
+      await tuneCommand(args.slice(1));
       break;
     }
 

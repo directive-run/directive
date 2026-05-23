@@ -884,6 +884,8 @@ they are "what does owning a replay engine unlock."
 
 ### R5.A — `sweepUnder()` / `directive tune <constraint>`: the rule-threshold optimizer
 
+**[✅ SHIPPED 2026-05-23 — `sweepUnder()` in @directive-run/core + `directive tune` CLI. See docs/concepts/tune.md]**
+
 **[2 days — viral MAX, compound MAX — the asymmetric pick of R5]**
 
 `replayUnder` diffs *one* proposed predicate against the original.
@@ -1174,7 +1176,7 @@ real-world effect into git, and fail the build when it drifts."*
 
 | Rank | Idea | Days | Viral | Compound | Note |
 |---|---|---|---|---|---|
-| 1 | **R5.A** `sweepUnder` / `directive tune` — threshold optimizer | 2 | Max | Max | **Asymmetric pick.** Replay run N× over the same frames is free. Turns magic numbers into a one-command grid search. Demo is an ASCII curve. |
+| 1 | **R5.A** `sweepUnder` / `directive tune` — threshold optimizer — **✅ SHIPPED 2026-05-23** | 2 | Max | Max | **Asymmetric pick.** Replay run N× over the same frames is free. Turns magic numbers into a one-command grid search. Demo is an ASCII curve. |
 | 2 | **R5.D** `tuneFromIntent` — closed-loop AI rule optimizer | 7 | Max | Max | The Karpathy capstone. Replay report = the LLM's reward signal. Every prior R4/R5 idea becomes a step inside its loop. |
 | 3 | **R5.B** `shadowReplay` — live shadow rule evaluation | 3 | Max | Max | Dark launching for business rules. Same evaluate-both core, pointed at the live present. Completes replay→shadow→promote. |
 | 4 | **R5.C** `directive rule-blame` — git-archaeology over behavior | 2 | High | Max | `git blame` for business outcomes. The post-mortem tool every team fakes with spreadsheets. |

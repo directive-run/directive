@@ -131,6 +131,15 @@ export type {
   ReplayUnderOptions,
 } from "./core/replay-under.js";
 
+// Parameter sweep — grid-search predicate templates against recorded history
+export { MAX_SWEEP_POINTS, sweepUnder } from "./core/sweep-under.js";
+export type {
+  SweepHole,
+  SweepPoint,
+  SweepReport,
+  SweepUnderOptions,
+} from "./core/sweep-under.js";
+
 // ============================================================================
 // Core Classes
 // ============================================================================
