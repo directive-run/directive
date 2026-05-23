@@ -1,1 +1,2 @@
-export default true;
+export default typeof process !== "undefined" &&
+  process.env?.NODE_ENV !== "production";

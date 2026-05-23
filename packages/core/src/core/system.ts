@@ -929,7 +929,10 @@ function warnIfNotStarted(
   // biome-ignore lint/suspicious/noExplicitAny: System type
   system: any,
 ): void {
-  if (isDevelopment && process.env.NODE_ENV !== "test") {
+  if (
+    isDevelopment &&
+    (typeof process === "undefined" || process.env?.NODE_ENV !== "test")
+  ) {
     setTimeout(() => {
       if (!system.isRunning && !system.isInitialized) {
         console.warn(
