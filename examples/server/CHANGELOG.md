@@ -1,5 +1,14 @@
 # @directive-run/example-server
 
+## 1.0.35
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.12.0
+  - @directive-run/ai@1.12.0
+  - @directive-run/el@1.0.0
+
 ## 1.0.34
 
 ### Patch Changes

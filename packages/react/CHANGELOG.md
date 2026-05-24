@@ -1,5 +1,7 @@
 # @directive-run/react
 
+## 1.12.0
+
 ## 1.11.0
 
 ### Minor Changes
