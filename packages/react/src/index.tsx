@@ -83,6 +83,55 @@ import isDevelopment from "#is-development";
 export type { RequirementTypeStatus, InspectState, ConstraintInfo };
 export { shallowEqual };
 
+// ============================================================================
+// useAuditLedger — live ledger entries with filter (R4.I + Ship 4)
+// ============================================================================
+
+import type {
+  AuditEntry,
+  AuditLedger,
+  QueryFilter,
+} from "@directive-run/core";
+
+/**
+ * Subscribe to an audit ledger and return the latest entries matching
+ * `filter`. Re-renders whenever a new matching entry lands.
+ *
+ * @example
+ * ```tsx
+ * const entries = useAuditLedger(ledger, { kind: "constraint.evaluate", limit: 20 });
+ * return (
+ *   <ul>
+ *     {entries.map(e => <li key={e.seq}>{e.kind} @ {new Date(e.ts).toISOString()}</li>)}
+ *   </ul>
+ * );
+ * ```
+ *
+ * The hook polls via a small interval (default 250 ms) because the
+ * v1 ledger sink doesn't expose a pub/sub channel. Override with
+ * `pollMs` if you need higher fidelity (e.g. 50ms for a live demo).
+ */
+export function useAuditLedger(
+  ledger: AuditLedger,
+  filter: QueryFilter = {},
+  opts: { pollMs?: number } = {},
+): readonly AuditEntry[] {
+  const pollMs = opts.pollMs ?? 250;
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), pollMs);
+
+    return () => clearInterval(id);
+  }, [pollMs]);
+
+  // Re-query on every tick — cheap O(N) walk against the in-memory ring.
+  // `tick` is the dep; `filter` is captured by closure (caller passes the
+  // same object identity unless they intend a refresh).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => ledger.query(filter), [ledger, tick, filter]);
+}
+
 /** Type for the requirement status plugin return value */
 export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
 

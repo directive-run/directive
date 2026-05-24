@@ -395,7 +395,7 @@ Surfaced during the 4-round AE review loop on RFC-0004. Each idea exists
 *only because* the predicate is now serializable data with `whenSpec` and
 `whenExplain` exposed on `inspect()` / `observe()` / `explain()`.
 
-### R4.A — `system.predict()`: the "what's holding this back" oracle
+### R4.A — `system.predict()`: the "what's holding this back" oracle — **SHIPPED v1.11.0 (minimal slice)**
 
 **[3 days — viral MAX, compound MAX, the asymmetric pick]**
 
@@ -421,7 +421,7 @@ Symbolic execution for free, because the predicate is data.
 the literal change required"); seeds R4.B unreachability proofs (predict()
 over empty fact set); foundation for R4.D AI repair-loops.
 
-### R4.B — `directive doctor`: contradiction + unreachability static analysis
+### R4.B — `directive doctor`: contradiction + unreachability static analysis — **SHIPPED v1.11.0 (structural stub; full SMT deferred)**
 
 **[4 days — viral MAX, compound MAX, formal-methods endorsement bait]**
 
@@ -471,7 +471,7 @@ here it's actually typed and actually-the-runtime-form.
 in plain English" → LLM emits next `FactPredicate` JSON); live editing in
 devtools.
 
-### R4.D — `predicateFromIntent()`: LLM writes typed predicates as data
+### R4.D — `predicateFromIntent()`: LLM writes typed predicates as data — **SHIPPED v1.11.0**
 
 **[3 days — viral MAX, compound MAX]**
 
@@ -725,7 +725,7 @@ evaluated directly on the client. The end of dual-write hell."*
 
 **Headline:** *"The state library that doubles as your ORM's query AST."*
 
-### R4.I — `factsBaseline` audit log: GDPR-grade query-the-history
+### R4.I — `factsBaseline` audit log: GDPR-grade query-the-history — **SHIPPED v1.11.0 (memory sink + djb2 chain; SQLite + SHA-256 strong verify deferred)**
 
 **[2 days — viral HIGH (regulated industries), compound MAX]**
 

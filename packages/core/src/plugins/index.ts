@@ -2,6 +2,16 @@
  * Built-in Plugins for Directive
  */
 
+export {
+  createAuditLedger,
+  memorySink,
+  type AuditEntry,
+  type AuditEntryKind,
+  type AuditLedger,
+  type AuditLedgerOptions,
+  type AuditLedgerSink,
+  type QueryFilter,
+} from "./audit-ledger.js";
 export { loggingPlugin, type LoggingPluginOptions } from "./logging.js";
 export {
   devtoolsPlugin,

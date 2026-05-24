@@ -545,6 +545,18 @@ export {
   type SafeParseResult,
 } from "./structured-output.js";
 
+// LLM-emit-predicate — typed FactPredicate from natural-language intent
+export {
+  predicateFromIntent,
+  predicateFromIntentRaw,
+  predicateToolSpec,
+  PredicateFromIntentError,
+  type PredicateFromIntentOptions,
+  type PredicateFromIntentDiagnostics,
+  type PredicateToolSpec,
+  type PredicateToolSpecOptions,
+} from "./predicate-from-intent.js";
+
 // Batch Queue
 export {
   createBatchQueue,

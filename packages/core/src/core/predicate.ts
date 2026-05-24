@@ -545,6 +545,143 @@ export function validatePredicate(spec: unknown, path = ""): void {
 }
 
 // ============================================================================
+// Schema-aware validation (semantic — operator on kind, operator-count cap)
+// ============================================================================
+
+import {
+  getOperatorsForKind,
+  type SchemaKindNode,
+} from "./schema-introspection.js";
+
+export interface SchemaValidationError {
+  /** Dotted path to the failing clause (e.g. `cartTotal`, `auth.token.$gte`). */
+  readonly path: string;
+  /** The operator that failed (or the literal-equality marker `$eq`). */
+  readonly op: string;
+  /** The kind of the fact at this path, or `undefined` when the fact wasn't in the kind map. */
+  readonly kind?: SchemaKindNode;
+  /** The operators that ARE allowed for this fact's kind. */
+  readonly allowedOps?: readonly string[];
+  /** Human-readable failure reason (suitable for feeding back to an LLM). */
+  readonly reason: string;
+}
+
+export interface SchemaValidationOptions {
+  /** Reject predicates with more than this many operator clauses (DoS guard). Default unbounded. */
+  readonly maxOperatorCount?: number;
+}
+
+export type SchemaValidationResult =
+  | { ok: true; operatorCount: number }
+  | { ok: false; errors: readonly SchemaValidationError[]; operatorCount: number };
+
+/**
+ * Cross-check an LLM-emitted (or otherwise externally-sourced) predicate
+ * against a schema's runtime kind map. Catches errors that
+ * {@link validatePredicate} cannot — operator-on-wrong-kind (`$gte` on a
+ * boolean fact), unknown fact paths, and (optionally) operator-count
+ * exhaustion DoS attempts.
+ *
+ * Pair with {@link validatePredicate} (structural / JSON safety) for full
+ * coverage. Use {@link getSchemaFieldKinds} to derive `kindMap` from a
+ * module schema.
+ *
+ * Designed for the LLM-emit retry loop: returns a list of errors with
+ * structured `{path, op, kind, allowedOps, reason}` rather than throwing,
+ * so the caller can feed the errors back to the model.
+ *
+ * @example
+ * ```ts
+ * const kindMap = getSchemaFieldKinds({ facts: { cartTotal: t.number(), active: t.boolean() } });
+ * const result = validatePredicateAgainstSchema(
+ *   { cartTotal: { $gte: 50 }, active: { $gte: true } },
+ *   kindMap,
+ * );
+ * // → { ok: false, errors: [{ path: "active", op: "$gte", reason: "..." }], operatorCount: 2 }
+ * ```
+ */
+export function validatePredicateAgainstSchema(
+  spec: unknown,
+  kindMap: Map<string, SchemaKindNode>,
+  opts: SchemaValidationOptions = {},
+): SchemaValidationResult {
+  const errors: SchemaValidationError[] = [];
+  let operatorCount = 0;
+  const maxOperatorCount = opts.maxOperatorCount;
+
+  walkPredicate(spec, {
+    operator(factPath, op, _operand, _operandPath) {
+      operatorCount++;
+      if (
+        maxOperatorCount !== undefined &&
+        operatorCount > maxOperatorCount
+      ) {
+        // Don't pile up identical errors past the cap; one is enough.
+        if (
+          !errors.some((e) => e.reason.includes("maxOperatorCount"))
+        ) {
+          errors.push({
+            path: factPath,
+            op,
+            reason: `Predicate exceeds maxOperatorCount=${maxOperatorCount} — too many clauses (DoS guard).`,
+          });
+        }
+
+        return;
+      }
+
+      const kind = kindMap.get(factPath);
+      if (!kind) {
+        errors.push({
+          path: factPath,
+          op,
+          reason: `Unknown fact "${factPath}" — not in schema. Known facts: ${
+            kindMap.size === 0
+              ? "(empty schema)"
+              : Array.from(kindMap.keys()).join(", ")
+          }`,
+        });
+
+        return;
+      }
+
+      const allowedOps = getOperatorsForKind(kind);
+      if (!allowedOps.includes(op as never)) {
+        errors.push({
+          path: factPath,
+          op,
+          kind,
+          allowedOps,
+          reason: `Operator "${op}" is not allowed on fact "${factPath}" of kind "${kind.kind}". Allowed operators for this kind: ${allowedOps.join(", ")}.`,
+        });
+      }
+    },
+    literal(factPath, _value) {
+      operatorCount++;
+      // Bare-value (equality) — always permitted as long as fact exists.
+      if (!kindMap.has(factPath)) {
+        errors.push({
+          path: factPath,
+          op: "$eq",
+          reason: `Unknown fact "${factPath}" — not in schema.`,
+        });
+      }
+    },
+    strayOperatorKey(key, factPath) {
+      errors.push({
+        path: factPath,
+        op: key,
+        reason: `Stray operator key "${key}" at "${factPath}" — operators must live inside a fact's operator object, not at the predicate top level.`,
+      });
+    },
+  });
+
+  if (errors.length === 0) return { ok: true, operatorCount };
+
+  return { ok: false, errors, operatorCount };
+}
+
+// ============================================================================
 // Equality
 // ============================================================================
 

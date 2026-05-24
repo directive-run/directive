@@ -153,6 +153,48 @@ export type {
   RulesMapInput,
 } from "./core/rules-diff.js";
 
+// Schema introspection — runtime kind discriminant + operator matrix
+export {
+  getKind,
+  getOperatorsForKind,
+  getSchemaFieldKinds,
+  listAllPredicateOperators,
+} from "./core/schema-introspection.js";
+export type { SchemaKind, SchemaKindNode } from "./core/schema-introspection.js";
+export { validatePredicateAgainstSchema } from "./core/predicate.js";
+export type {
+  SchemaValidationError,
+  SchemaValidationOptions,
+  SchemaValidationResult,
+} from "./core/predicate.js";
+
+// predict — "would this predicate fire, and if not, which facts must change?"
+export { predict } from "./core/predict.js";
+export type { PredictMissingChange, PredictResult } from "./core/predict.js";
+
+// doctor — structural contradiction detection between a candidate predicate and existing constraints
+export { doctor } from "./core/doctor.js";
+export type {
+  CheckAgainstResult,
+  Contradiction,
+  ContradictionType,
+  ExistingConstraint,
+} from "./core/doctor.js";
+
+// createAuditLedger — append-only, queryable, cryptographically-chained audit log
+export {
+  createAuditLedger,
+  memorySink,
+} from "./plugins/audit-ledger.js";
+export type {
+  AuditEntry,
+  AuditEntryKind,
+  AuditLedger,
+  AuditLedgerOptions,
+  AuditLedgerSink,
+  QueryFilter,
+} from "./plugins/audit-ledger.js";
+
 // Predicate codegen — one predicate, run on client AND server
 export { predicateToSQL, predicateToWhere } from "./core/predicate-to-sql.js";
 export type {
