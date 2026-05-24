@@ -664,7 +664,7 @@ against any rule change before you merge it?"*
 **Headline:** *"Replay last month's production against your proposed rule
 change. Before you merge."* (Sub: "This is what Optimizely never built.")
 
-### R4.H — `predicateToSQL` / `predicateToMongoQuery` / `predicateToPGRest`: same predicate, client AND server
+### R4.H — `predicateToSQL` / `predicateToMongoQuery` / `predicateToPGRest`: same predicate, client AND server — **SHIPPED v1.9.0**
 
 **[3 days — viral HIGH, compound MAX]**
 

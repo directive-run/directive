@@ -153,6 +153,17 @@ export type {
   RulesMapInput,
 } from "./core/rules-diff.js";
 
+// Predicate codegen — one predicate, run on client AND server
+export { predicateToSQL, predicateToWhere } from "./core/predicate-to-sql.js";
+export type {
+  PredicateToSqlOptions,
+  PredicateToSqlResult,
+} from "./core/predicate-to-sql.js";
+export { predicateToMongo } from "./core/predicate-to-mongo.js";
+export type { PredicateToMongoOptions } from "./core/predicate-to-mongo.js";
+export { predicateToPostgrest } from "./core/predicate-to-pgrest.js";
+export type { PredicateToPostgrestOptions } from "./core/predicate-to-pgrest.js";
+
 // ============================================================================
 // Core Classes
 // ============================================================================
