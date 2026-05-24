@@ -5,6 +5,7 @@
  * Imported by devtools.ts; depends only on devtools-types.ts.
  */
 
+import type { ClauseResult } from "../core/types/predicate.js";
 import type { ModuleSchema, System } from "../core/types.js";
 import {
   type DevtoolsPluginOptions,
@@ -348,6 +349,38 @@ export function createPanel(
   timelineDetails.appendChild(timelineSvg);
   container.appendChild(timelineDetails);
 
+  // Constraints section — per-clause whenExplain tree (R4.E)
+  const constraintsSectionRefs = (() => {
+    const details = document.createElement("details");
+    details.style.marginBottom = "4px";
+    const summary = document.createElement("summary");
+    Object.assign(summary.style, {
+      cursor: "pointer",
+      color: S.accent,
+      marginBottom: "4px",
+    });
+    const countSpan = document.createElement("span");
+    countSpan.textContent = "0";
+    summary.textContent = "Constraints (";
+    summary.appendChild(countSpan);
+    summary.appendChild(document.createTextNode(")"));
+    details.appendChild(summary);
+    const body = document.createElement("div");
+    Object.assign(body.style, { fontSize: "11px" });
+    // Empty state
+    const empty = document.createElement("div");
+    empty.style.color = S.muted;
+    empty.style.padding = "4px";
+    empty.style.fontStyle = "italic";
+    empty.textContent = "Waiting for first evaluation…";
+    empty.className = "dt-constraints-empty";
+    body.appendChild(empty);
+    details.appendChild(body);
+    container.appendChild(details);
+
+    return { details, body, countSpan };
+  })();
+
   // Events section
   let eventsSection: HTMLDetailsElement;
   let eventsList: HTMLDivElement;
@@ -566,6 +599,9 @@ export function createPanel(
       traceHint,
       recordBtn,
       exportBtn,
+      constraintsSection: constraintsSectionRefs.details,
+      constraintsBody: constraintsSectionRefs.body,
+      constraintsCount: constraintsSectionRefs.countSpan,
     },
     destroy,
     isOpen: () => panelOpen,
@@ -892,4 +928,212 @@ export function setupHistoryButtons(
       system.history.goForward(1);
     }
   });
+}
+
+// ============================================================================
+// Constraint whenExplain rendering (R4.E)
+// ============================================================================
+
+/**
+ * Human-readable symbols for predicate operators. Prototype-null map +
+ * Object.hasOwn guard so a malicious / buggy `clause.op` of `__proto__`
+ * or `constructor` can't return `Object.prototype` / a function ref.
+ */
+const OP_SYMBOL: Record<string, string> = Object.assign(Object.create(null), {
+  $eq: "=",
+  $ne: "≠",
+  $gt: ">",
+  $gte: "≥",
+  $lt: "<",
+  $lte: "≤",
+  $in: "∈",
+  $nin: "∉",
+  $exists: "exists",
+  $between: "in",
+  $startsWith: "starts with",
+  $endsWith: "ends with",
+  $contains: "contains",
+  $matches: "matches",
+  $changed: "changed",
+});
+
+function opSymbol(op: string): string {
+  return Object.hasOwn(OP_SYMBOL, op) ? OP_SYMBOL[op]! : op;
+}
+
+/**
+ * Format a clause operand for display. RegExp's `JSON.stringify` → `{}`,
+ * which `formatValue` would emit verbatim; `String(re)` gives `/foo/i`.
+ * Otherwise defer to the shared `formatValue` (which truncates strings,
+ * stringifies objects, etc).
+ */
+function formatClauseValue(v: unknown): string {
+  if (v instanceof RegExp) {
+    return truncate(String(v), 40);
+  }
+
+  return formatValue(v);
+}
+
+const COMBINATOR_OPS = new Set(["$all", "$any", "$not"]);
+
+/**
+ * Render a single clause as a list item. Recurses into combinator
+ * children. Failed clauses include the actual value for quick diff.
+ */
+function renderClauseLi(clause: ClauseResult): HTMLLIElement {
+  const li = document.createElement("li");
+  const mark = clause.pass ? "✓" : "✗";
+  li.style.color = clause.pass ? S.green : S.red;
+  li.style.listStyle = "none";
+
+  if (COMBINATOR_OPS.has(clause.op)) {
+    const path = clause.path ? ` @ ${clause.path}` : "";
+    li.textContent = `${mark} ${clause.op}${path}`;
+    if (clause.children && clause.children.length > 0) {
+      const sub = document.createElement("ul");
+      Object.assign(sub.style, {
+        margin: "0",
+        paddingLeft: "14px",
+        listStyle: "none",
+      });
+      for (const c of clause.children) {
+        sub.appendChild(renderClauseLi(c));
+      }
+      li.appendChild(sub);
+    }
+  } else {
+    const symbol = opSymbol(clause.op);
+    const expected = formatClauseValue(clause.expected);
+    if (clause.pass) {
+      li.textContent = `${mark} ${clause.path} ${symbol} ${expected}`;
+    } else {
+      const actual = formatClauseValue(clause.actual);
+      li.textContent = `${mark} ${clause.path} ${symbol} ${expected}  (actual: ${actual})`;
+    }
+  }
+
+  return li;
+}
+
+/**
+ * Remove a constraint row from the panel — called when the engine
+ * emits `definition.unregister` for a constraint so stale rows don't
+ * linger after `disable()` / removeModule.
+ *
+ * @internal
+ */
+export function removeConstraintRow(
+  refs: PanelRefs,
+  rowMap: Map<string, HTMLDivElement>,
+  id: string,
+): void {
+  const row = rowMap.get(id);
+  if (row) {
+    row.remove();
+    rowMap.delete(id);
+    refs.constraintsCount.textContent = String(rowMap.size);
+  }
+  // Restore empty state if we just emptied the list.
+  if (rowMap.size === 0 && !refs.constraintsBody.querySelector(".dt-constraints-empty")) {
+    const empty = document.createElement("div");
+    empty.style.color = S.muted;
+    empty.style.padding = "4px";
+    empty.style.fontStyle = "italic";
+    empty.textContent = "Waiting for first evaluation…";
+    empty.className = "dt-constraints-empty";
+    refs.constraintsBody.appendChild(empty);
+  }
+}
+
+/**
+ * Refine the Constraints section's empty-state text after we know how
+ * many constraints the system actually declares. A system with zero
+ * constraints would otherwise sit on "Waiting…" forever — say so plainly.
+ *
+ * @internal
+ */
+export function setConstraintsEmptyState(
+  refs: PanelRefs,
+  hasAnyConstraints: boolean,
+): void {
+  const empty = refs.constraintsBody.querySelector(".dt-constraints-empty");
+  if (!empty) return;
+  empty.textContent = hasAnyConstraints
+    ? "Waiting for first evaluation…"
+    : "This system has no constraints";
+}
+
+/**
+ * Upsert a constraint row in the Constraints section. Renders the
+ * per-clause `whenExplain` tree when provided (data-form `when`).
+ * Function-form constraints render the header alone with a small
+ * "function-form" note.
+ *
+ * The row map persists across calls so the same constraint updates
+ * in place rather than appending duplicates.
+ *
+ * @internal
+ */
+export function renderConstraintRow(
+  refs: PanelRefs,
+  rowMap: Map<string, HTMLDivElement>,
+  id: string,
+  active: boolean,
+  whenExplain?: readonly ClauseResult[],
+  label?: string,
+): void {
+  // Drop empty-state placeholder on first row.
+  const empty = refs.constraintsBody.querySelector(".dt-constraints-empty");
+  if (empty) {
+    empty.remove();
+  }
+
+  let row = rowMap.get(id);
+  if (!row) {
+    row = document.createElement("div");
+    Object.assign(row.style, {
+      marginBottom: "6px",
+      paddingBottom: "4px",
+      borderBottom: `1px solid ${S.rowBorder}`,
+    });
+    rowMap.set(id, row);
+    refs.constraintsBody.appendChild(row);
+    refs.constraintsCount.textContent = String(rowMap.size);
+  }
+
+  // Rebuild contents — simpler than diffing the clause tree.
+  row.replaceChildren();
+
+  const header = document.createElement("div");
+  Object.assign(header.style, {
+    fontWeight: "bold",
+    color: active ? S.green : S.muted,
+  });
+  const mark = active ? "✓" : "✗";
+  header.textContent = label ? `${mark} ${id}  (${label})` : `${mark} ${id}`;
+  row.appendChild(header);
+
+  if (whenExplain && whenExplain.length > 0) {
+    const tree = document.createElement("ul");
+    Object.assign(tree.style, {
+      margin: "2px 0 0 0",
+      paddingLeft: "14px",
+      listStyle: "none",
+    });
+    for (const clause of whenExplain) {
+      tree.appendChild(renderClauseLi(clause));
+    }
+    row.appendChild(tree);
+  } else if (!whenExplain) {
+    const note = document.createElement("div");
+    Object.assign(note.style, {
+      color: S.muted,
+      fontSize: "10px",
+      fontStyle: "italic",
+      paddingLeft: "14px",
+    });
+    note.textContent = "function-form when (no clause tree)";
+    row.appendChild(note);
+  }
 }

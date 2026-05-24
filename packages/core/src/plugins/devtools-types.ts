@@ -419,4 +419,8 @@ export interface PanelRefs {
   traceHint: HTMLDivElement;
   recordBtn: HTMLButtonElement;
   exportBtn: HTMLButtonElement;
+  // Constraints section — per-clause whenExplain tree (R4.E)
+  constraintsSection: HTMLDetailsElement;
+  constraintsBody: HTMLDivElement;
+  constraintsCount: HTMLSpanElement;
 }
