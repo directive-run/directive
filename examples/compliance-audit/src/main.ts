@@ -1,0 +1,411 @@
+/**
+ * Compliance-audit demo — eight tools, one screen.
+ *
+ *  - data-form `when:` constraint
+ *  - predicateFromIntent (LLM emits)
+ *  - doctor.checkAgainst (contradiction gate)
+ *  - predict() (what facts must change)
+ *  - predicateToSQL (server compile)
+ *  - createAuditLedger (append-only log + hash chain + TAMPER/VERIFY)
+ *  - evaluatePredicateExplained (per-clause ✓/✗)
+ *
+ * Mock LLM runner so the demo works in StackBlitz without an API key.
+ */
+
+import {
+  createAuditLedger,
+  createSystem,
+  doctor,
+  evaluatePredicateExplained,
+  predict,
+  predicateToSQL,
+  type AuditEntry,
+  type FactPredicate,
+} from "@directive-run/core";
+import { predicateFromIntent } from "@directive-run/ai";
+
+import { checkoutModule } from "./module.js";
+import { mockPredicateRunner } from "./mock-runner.js";
+
+// ============================================================================
+// System setup with ledger
+// ============================================================================
+
+const ledger = createAuditLedger({ capturePII: false });
+const system = createSystem({
+  module: checkoutModule,
+  plugins: [ledger.plugin],
+});
+system.start();
+
+// ============================================================================
+// DOM helpers
+// ============================================================================
+
+const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing #${id}`);
+
+  return el as T;
+};
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fmtTs(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleTimeString("en-US", { hour12: false }) + "." +
+    String(d.getMilliseconds()).padStart(3, "0");
+}
+
+// ============================================================================
+// Top panel — Facts editor
+// ============================================================================
+
+const factsEl = $("facts");
+
+function renderFacts(): void {
+  const facts = system.facts.$store.toObject();
+  factsEl.innerHTML = `
+    <label class="fact-row">
+      <span class="fact-key">cartTotal</span>
+      <input type="number" id="fact-cartTotal" value="${facts.cartTotal as number}" />
+    </label>
+    <label class="fact-row">
+      <span class="fact-key">region</span>
+      <select id="fact-region">
+        ${["US", "EU", "ASIA", "OTHER"]
+          .map(
+            (r) =>
+              `<option value="${r}" ${r === facts.region ? "selected" : ""}>${r}</option>`,
+          )
+          .join("")}
+      </select>
+    </label>
+    <label class="fact-row">
+      <span class="fact-key">tier <small>(PII)</small></span>
+      <select id="fact-tier">
+        ${["free", "pro", "enterprise"]
+          .map(
+            (t) =>
+              `<option value="${t}" ${t === facts.tier ? "selected" : ""}>${t}</option>`,
+          )
+          .join("")}
+      </select>
+    </label>
+  `;
+
+  $<HTMLInputElement>("fact-cartTotal").addEventListener("input", (e) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (Number.isFinite(v)) system.facts.cartTotal = v;
+    refreshAll();
+  });
+  $<HTMLSelectElement>("fact-region").addEventListener("change", (e) => {
+    system.facts.region = (e.target as HTMLSelectElement)
+      .value as "US" | "EU" | "ASIA" | "OTHER";
+    refreshAll();
+  });
+  $<HTMLSelectElement>("fact-tier").addEventListener("change", (e) => {
+    system.facts.tier = (e.target as HTMLSelectElement)
+      .value as "free" | "pro" | "enterprise";
+    refreshAll();
+  });
+}
+
+// ============================================================================
+// Top panel — Intent → predicate
+// ============================================================================
+
+let lastEmittedPredicate: FactPredicate<Record<string, unknown>> | null = null;
+
+async function onEmit(): Promise<void> {
+  const intent = $<HTMLInputElement>("intent-input").value;
+  const out = $("intent-output");
+  out.innerHTML = `<div class="muted">…calling mock LLM…</div>`;
+  try {
+    const predicate = await predicateFromIntent({
+      intent,
+      schema: checkoutModule.schema,
+      runner: mockPredicateRunner,
+      maxRetries: 2,
+    });
+    lastEmittedPredicate = predicate as FactPredicate<Record<string, unknown>>;
+    out.innerHTML = `
+      <div class="label">Emitted predicate (validated):</div>
+      <pre class="json">${escapeHtml(JSON.stringify(predicate, null, 2))}</pre>
+      <div id="doctor-verdict"></div>
+      <div id="predict-verdict"></div>
+      <div id="sql-output"></div>
+    `;
+    renderDoctor(predicate);
+    renderPredict(predicate);
+    renderSQL(predicate);
+  } catch (err) {
+    out.innerHTML = `<div class="error">Rejected after retries: ${escapeHtml(
+      (err as Error).message,
+    )}</div>`;
+    lastEmittedPredicate = null;
+  }
+}
+
+function renderDoctor(candidate: FactPredicate<Record<string, unknown>>): void {
+  const verdict = $("doctor-verdict");
+  const inspect = system.inspect();
+  const result = doctor.checkAgainst(
+    candidate,
+    inspect.constraints as Array<{ id: string; whenSpec?: unknown }>,
+  );
+  if (result.contradictions.length === 0 && result.warnings.length === 0) {
+    verdict.innerHTML = `<div class="ok">✓ doctor: no contradictions</div>`;
+    return;
+  }
+  verdict.innerHTML = `
+    <div class="label">doctor verdicts:</div>
+    ${result.contradictions
+      .map(
+        (c) =>
+          `<div class="error">✗ ${escapeHtml(c.type)} vs <code>${escapeHtml(c.constraintId)}</code>: ${escapeHtml(c.reason)}</div>`,
+      )
+      .join("")}
+    ${result.warnings
+      .map(
+        (c) =>
+          `<div class="warn">⚠ ${escapeHtml(c.type)} vs <code>${escapeHtml(c.constraintId)}</code>: ${escapeHtml(c.reason)}</div>`,
+      )
+      .join("")}
+  `;
+}
+
+function renderPredict(candidate: FactPredicate<Record<string, unknown>>): void {
+  const verdict = $("predict-verdict");
+  const facts = system.facts.$store.toObject();
+  const result = predict(candidate, facts as Record<string, unknown>);
+  if (result.wouldFire) {
+    verdict.innerHTML = `<div class="ok">✓ predict: would fire against current facts</div>`;
+    return;
+  }
+  verdict.innerHTML = `
+    <div class="label">predict: would NOT fire. Missing changes:</div>
+    <ul class="suggestions">
+      ${result.missingChanges
+        .map((m) => `<li>${escapeHtml(m.suggestion)}</li>`)
+        .join("")}
+    </ul>
+  `;
+}
+
+function renderSQL(candidate: FactPredicate<Record<string, unknown>>): void {
+  const out = $("sql-output");
+  try {
+    const sql = predicateToSQL(candidate, {
+      table: "checkouts",
+      allowedKeys: ["cartTotal", "region", "tier"],
+    });
+    out.innerHTML = `
+      <div class="label">predicateToSQL (server-ready, parameterized):</div>
+      <pre class="json">${escapeHtml(sql.sql)}
+params: ${escapeHtml(JSON.stringify(sql.params))}</pre>
+    `;
+  } catch (err) {
+    out.innerHTML = `<div class="error">SQL codegen error: ${escapeHtml((err as Error).message)}</div>`;
+  }
+}
+
+// ============================================================================
+// Middle panel — live whenExplain on the existing constraint
+// ============================================================================
+
+function renderExplain(): void {
+  const out = $("explain-out");
+  const facts = system.facts.$store.toObject();
+  const whenSpec = (system.inspect().constraints[0] as { whenSpec?: unknown })
+    ?.whenSpec;
+  if (!whenSpec) {
+    out.innerHTML = `<div class="muted">No data-form whenSpec</div>`;
+    return;
+  }
+  const explained = evaluatePredicateExplained(
+    whenSpec,
+    facts as Record<string, unknown>,
+  );
+  const active = explained.every((c) => c.pass);
+  out.innerHTML = `
+    <div class="constraint-header ${active ? "ok" : "fail"}">
+      ${active ? "✓" : "✗"} canCheckout — ${active ? "would fire" : "blocked"}
+    </div>
+    <ul class="clauses">
+      ${explained
+        .map(
+          (c) =>
+            `<li class="${c.pass ? "ok" : "fail"}">
+              ${c.pass ? "✓" : "✗"} ${escapeHtml(c.path)} ${escapeHtml(c.op)} ${escapeHtml(JSON.stringify(c.expected))}
+              ${c.pass ? "" : ` <span class="muted">(actual: ${escapeHtml(JSON.stringify(c.actual))})</span>`}
+            </li>`,
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
+// ============================================================================
+// Bottom panel — audit ledger w/ TAMPER + VERIFY
+// ============================================================================
+
+function renderLedger(): void {
+  const out = $("ledger-out");
+  const entries = ledger.recent(50);
+  if (entries.length === 0) {
+    out.innerHTML = `<div class="muted">No entries yet — mutate a fact to populate.</div>`;
+    return;
+  }
+  out.innerHTML = entries
+    .slice()
+    .reverse()
+    .map((e) => renderLedgerEntry(e))
+    .join("");
+}
+
+function renderLedgerEntry(e: AuditEntry): string {
+  const ts = fmtTs(e.ts);
+  switch (e.kind) {
+    case "constraint.evaluate":
+      return `<div class="entry ${e.active ? "ok" : "fail"}">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">constraint</span>
+        <span>${escapeHtml(e.constraintId)} ${e.active ? "✓ active" : "✗ inactive"}</span>
+      </div>`;
+    case "fact.change":
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">fact</span>
+        <span>${escapeHtml(e.key)}: ${escapeHtml(JSON.stringify(e.prior))} → ${escapeHtml(JSON.stringify(e.next))}</span>
+      </div>`;
+    case "resolver.complete":
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">resolver</span>
+        <span>${escapeHtml(e.resolverId)} done in ${e.duration}ms</span>
+      </div>`;
+    case "resolver.write.rejected":
+      return `<div class="entry fail">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">write rejected</span>
+        <span>${escapeHtml(e.resolverId)}: ${escapeHtml(e.reason)}</span>
+      </div>`;
+    case "resolver.error":
+      return `<div class="entry fail">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">resolver error</span>
+        <span>${escapeHtml(e.resolverId)}: ${escapeHtml(e.error)}</span>
+      </div>`;
+    default:
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">${escapeHtml(e.kind)}</span>
+      </div>`;
+  }
+}
+
+function onTamper(): void {
+  // Reach into the ledger snapshot and mutate one entry to demonstrate
+  // the hash chain catching it. This is a demo-only operation; you'd
+  // never do this in production.
+  const snap = ledger.toJSON();
+  if (snap.entries.length < 2) {
+    setVerifyStatus("warn", "Need at least 2 entries before tampering.");
+    return;
+  }
+  const target = snap.entries[Math.floor(snap.entries.length / 2)] as {
+    kind: string;
+  };
+  const originalKind = target.kind;
+  target.kind = "fact.change"; // wrong kind
+  setVerifyStatus(
+    "warn",
+    `Tampered entry #${(target as unknown as { seq: number }).seq} (was kind=${originalKind}, now kind=fact.change). Click VERIFY.`,
+  );
+  renderLedger();
+}
+
+function onVerify(): void {
+  const result = ledger.verify();
+  if (result instanceof Promise) {
+    result.then((r) => setVerifyResult(r));
+    return;
+  }
+  setVerifyResult(result);
+}
+
+function setVerifyResult(
+  result:
+    | { valid: true; entryCount: number }
+    | {
+        valid: false;
+        brokenAt: number;
+        expectedHash: string;
+        actualHash: string;
+      },
+): void {
+  if (result.valid) {
+    setVerifyStatus(
+      "ok",
+      `✓ chain valid — ${result.entryCount} entries, no tamper detected`,
+    );
+    return;
+  }
+  setVerifyStatus(
+    "fail",
+    `✗ TAMPER DETECTED at entry index ${result.brokenAt}. ` +
+      `Expected prevHash: ${result.expectedHash.slice(0, 16)}…  ` +
+      `Actual prevHash: ${result.actualHash.slice(0, 16)}…`,
+  );
+}
+
+function setVerifyStatus(
+  klass: "ok" | "warn" | "fail",
+  msg: string,
+): void {
+  const el = $("verify-status");
+  el.className = `verify-status ${klass}`;
+  el.textContent = msg;
+}
+
+// ============================================================================
+// Wire-up
+// ============================================================================
+
+function refreshAll(): void {
+  renderExplain();
+  renderLedger();
+}
+
+renderFacts();
+refreshAll();
+
+$("intent-emit").addEventListener("click", () => {
+  void onEmit();
+});
+$("intent-input").addEventListener("keydown", (e) => {
+  if ((e as KeyboardEvent).key === "Enter") {
+    void onEmit();
+  }
+});
+$("tamper-btn").addEventListener("click", onTamper);
+$("verify-btn").addEventListener("click", onVerify);
+
+// Re-render the ledger every 500ms — the rest of the UI re-renders on
+// user input, but the ledger grows asynchronously.
+setInterval(() => {
+  renderLedger();
+}, 500);

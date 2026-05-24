@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compliance Audit Demo — Directive</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --raised: #1e293b;
+      --border: #334155;
+      --text: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-faint: #64748b;
+      --primary: #5ba3a3;
+      --ok: #6dab72;
+      --fail: #e8836f;
+      --warn: #c4c07a;
+      --pii: #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text);
+      padding: 1rem; min-height: 100vh; line-height: 1.4;
+    }
+    .container { max-width: 1100px; margin: 0 auto; display: grid; gap: 1rem; }
+    h1 { font-size: 1rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; text-transform: uppercase; }
+    .demo-badge {
+      display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.4rem;
+      background: rgba(167, 139, 250, 0.15); color: var(--pii);
+      border-radius: 4px; font-size: 0.65rem; vertical-align: middle;
+    }
+    .panel { background: var(--raised); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem; }
+    .panel-header { font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; }
+
+    /* Facts editor */
+    .fact-row { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; font-size: 0.8rem; }
+    .fact-key { color: var(--text-muted); font-family: ui-monospace, monospace; }
+    .fact-key small { color: var(--pii); font-family: -apple-system, sans-serif; font-size: 0.6rem; margin-left: 0.3rem; }
+    .fact-row input, .fact-row select {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      padding: 0.3rem 0.5rem; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 0.75rem;
+    }
+
+    /* Intent input */
+    .intent-row { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .intent-row input {
+      flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
+    }
+    .intent-row button {
+      background: var(--primary); color: white; border: none;
+      padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: 500;
+    }
+    .intent-row button:hover { background: #4d8f8f; }
+
+    .intent-suggestions { color: var(--text-faint); font-size: 0.7rem; margin-bottom: 0.5rem; }
+    .intent-suggestions code { color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 0.05rem 0.3rem; border-radius: 3px; }
+
+    pre.json { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem; font-size: 0.7rem; overflow-x: auto; line-height: 1.4; }
+    .label { font-size: 0.65rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 0.5rem; margin-bottom: 0.2rem; }
+    .muted { color: var(--text-faint); font-style: italic; font-size: 0.75rem; }
+    .ok { color: var(--ok); }
+    .fail, .error { color: var(--fail); }
+    .warn { color: var(--warn); }
+
+    /* whenExplain panel */
+    .constraint-header { font-size: 0.85rem; font-weight: 600; padding: 0.3rem 0; }
+    ul.clauses { list-style: none; padding-left: 1rem; }
+    ul.clauses li { font-family: ui-monospace, monospace; font-size: 0.75rem; padding: 0.15rem 0; }
+    ul.clauses li.ok { color: var(--ok); }
+    ul.clauses li.fail { color: var(--fail); }
+
+    ul.suggestions { padding-left: 1.2rem; font-size: 0.75rem; color: var(--text); }
+    ul.suggestions li { padding: 0.1rem 0; }
+
+    /* Ledger entries */
+    .ledger-controls { display: flex; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .ledger-controls button {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      padding: 0.3rem 0.7rem; border-radius: 4px; cursor: pointer; font-size: 0.7rem;
+    }
+    .ledger-controls button.tamper { color: var(--fail); border-color: rgba(232, 131, 111, 0.3); }
+    .ledger-controls button.verify { background: var(--primary); color: white; border-color: var(--primary); }
+
+    .verify-status { padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.5rem; min-height: 1.5rem; font-family: ui-monospace, monospace; }
+    .verify-status.ok { background: rgba(109, 171, 114, 0.15); color: var(--ok); }
+    .verify-status.fail { background: rgba(232, 131, 111, 0.15); color: var(--fail); }
+    .verify-status.warn { background: rgba(196, 192, 122, 0.15); color: var(--warn); }
+
+    #ledger-out { max-height: 350px; overflow-y: auto; }
+    .entry {
+      display: grid;
+      grid-template-columns: 100px 50px 110px 1fr;
+      gap: 0.4rem;
+      padding: 0.3rem 0.5rem;
+      font-family: ui-monospace, monospace; font-size: 0.7rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+    }
+    .entry.ok { border-left: 3px solid var(--ok); }
+    .entry.fail { border-left: 3px solid var(--fail); }
+    .entry .ts { color: var(--text-faint); }
+    .entry .seq { color: var(--text-faint); }
+    .entry .kind { color: var(--primary); }
+
+    .footer-note { font-size: 0.7rem; color: var(--text-faint); padding: 0.75rem 0.85rem; }
+    .footer-note strong { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Compliance Audit Demo <span class="demo-badge">DEMO MODE — mock LLM</span></h1>
+
+    <!-- Top: Facts + Intent → predicate -->
+    <div class="panel">
+      <div class="panel-header">Facts <small style="color: var(--text-faint); text-transform: none; margin-left: 0.5rem">— mutate to see whenExplain + ledger update live</small></div>
+      <div id="facts"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">predicateFromIntent — LLM emits a rule, runtime validates</div>
+      <div class="intent-row">
+        <input id="intent-input" placeholder="e.g. 'unblock checkout when cart total is at least 50 and region is US or EU'" value="unblock checkout when cart is at least 100 and region is US or EU" />
+        <button id="intent-emit">Emit</button>
+      </div>
+      <div class="intent-suggestions">
+        Try: <code>cart at least 50</code>, <code>cart at least 100</code>, <code>cart is empty</code>, <code>tier enterprise</code>
+      </div>
+      <div id="intent-output"></div>
+    </div>
+
+    <!-- Middle: whenExplain on the existing constraint -->
+    <div class="panel">
+      <div class="panel-header">Live whenExplain — canCheckout against current facts</div>
+      <div id="explain-out"></div>
+    </div>
+
+    <!-- Bottom: Audit ledger -->
+    <div class="panel">
+      <div class="panel-header">Audit Ledger — every state change, hash-chained</div>
+      <div class="ledger-controls">
+        <button id="tamper-btn" class="tamper">⚠ TAMPER (mutate an entry)</button>
+        <button id="verify-btn" class="verify">✓ VERIFY chain</button>
+      </div>
+      <div id="verify-status" class="verify-status"></div>
+      <div id="ledger-out"></div>
+    </div>
+
+    <div class="footer-note">
+      <strong>Eight tools, one screen:</strong>
+      data-form <code>when:</code> constraint &middot;
+      <code>predicateFromIntent</code> (mock LLM) &middot;
+      <code>doctor.checkAgainst</code> &middot;
+      <code>predict</code> &middot;
+      <code>predicateToSQL</code> &middot;
+      <code>createAuditLedger</code> (hash chain + tamper detection + PII redact for <code>tier</code>) &middot;
+      <code>evaluatePredicateExplained</code>.
+      All from one JSON predicate.
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

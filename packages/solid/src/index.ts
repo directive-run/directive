@@ -1053,3 +1053,49 @@ export function useHydratedSystem<S extends ModuleSchema>(
   return useDirective(moduleDef, { ...config, initialFacts: mergedFacts })
     .system;
 }
+
+// ============================================================================
+// useAuditLedger — live ledger entries with filter (R4.I parity)
+// ============================================================================
+
+import type {
+  AuditEntry,
+  AuditLedger,
+  QueryFilter,
+} from "@directive-run/core";
+
+/**
+ * Subscribe to an audit ledger and return the latest entries matching
+ * `filter` as a Solid `Accessor`. Re-evaluates on each poll tick
+ * (default 250 ms — override with `pollMs`).
+ *
+ * @example
+ * ```tsx
+ * import { useAuditLedger } from "@directive-run/solid";
+ *
+ * function AuditLog(props: { ledger: AuditLedger }) {
+ *   const entries = useAuditLedger(props.ledger, { kind: "constraint.evaluate", limit: 20 });
+ *   return (
+ *     <ul>
+ *       <For each={entries()}>
+ *         {(e) => <li>{e.kind} @ {new Date(e.ts).toISOString()}</li>}
+ *       </For>
+ *     </ul>
+ *   );
+ * }
+ * ```
+ */
+export function useAuditLedger(
+  ledger: AuditLedger,
+  filter: QueryFilter = {},
+  opts: { pollMs?: number } = {},
+): Accessor<readonly AuditEntry[]> {
+  const pollMs = opts.pollMs ?? 250;
+  const [entries, setEntries] = createSignal<readonly AuditEntry[]>(
+    ledger.query(filter),
+  );
+  const id = setInterval(() => setEntries(() => ledger.query(filter)), pollMs);
+  onCleanup(() => clearInterval(id));
+
+  return entries;
+}

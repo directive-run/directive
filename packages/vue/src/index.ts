@@ -1190,3 +1190,53 @@ export function useHydratedSystem<S extends ModuleSchema>(
 
   return system;
 }
+
+// ============================================================================
+// useAuditLedger — live ledger entries with filter (R4.I parity)
+// ============================================================================
+
+import type {
+  AuditEntry,
+  AuditLedger,
+  QueryFilter,
+} from "@directive-run/core";
+import { onMounted, onBeforeUnmount } from "vue";
+
+/**
+ * Subscribe to an audit ledger and return the latest entries matching
+ * `filter` as a reactive `Ref`. Re-evaluates on each poll tick (default
+ * 250 ms — override with `pollMs`).
+ *
+ * @example
+ * ```vue
+ * <script setup>
+ * import { useAuditLedger } from "@directive-run/vue";
+ * const entries = useAuditLedger(ledger, { kind: "constraint.evaluate", limit: 20 });
+ * </script>
+ * <template>
+ *   <ul>
+ *     <li v-for="e in entries" :key="e.seq">{{ e.kind }} @ {{ e.ts }}</li>
+ *   </ul>
+ * </template>
+ * ```
+ */
+export function useAuditLedger(
+  ledger: AuditLedger,
+  filter: QueryFilter = {},
+  opts: { pollMs?: number } = {},
+): ShallowRef<readonly AuditEntry[]> {
+  const pollMs = opts.pollMs ?? 250;
+  const entries = shallowRef<readonly AuditEntry[]>(ledger.query(filter));
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  onMounted(() => {
+    intervalId = setInterval(() => {
+      entries.value = ledger.query(filter);
+    }, pollMs);
+  });
+  onBeforeUnmount(() => {
+    if (intervalId !== null) clearInterval(intervalId);
+  });
+
+  return entries;
+}

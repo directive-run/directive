@@ -1230,3 +1230,82 @@ export class HydrationController implements ReactiveController {
     return system;
   }
 }
+
+// ============================================================================
+// AuditLedgerController — live ledger entries with filter (R4.I parity)
+// ============================================================================
+
+import type {
+  AuditEntry,
+  AuditLedger,
+  QueryFilter,
+} from "@directive-run/core";
+
+/**
+ * Reactive controller exposing the latest audit-ledger entries matching
+ * `filter` as `.value`. Polls (default 250 ms — override with `pollMs`)
+ * and re-renders the host on each tick that brings new matches.
+ *
+ * @example
+ * ```ts
+ * import { AuditLedgerController } from "@directive-run/lit";
+ *
+ * class AuditLog extends LitElement {
+ *   private ledgerCtrl = new AuditLedgerController(
+ *     this,
+ *     ledger,
+ *     { kind: "constraint.evaluate", limit: 20 },
+ *   );
+ *
+ *   render() {
+ *     return html`<ul>
+ *       ${this.ledgerCtrl.value.map(e => html`<li>${e.kind} @ ${e.ts}</li>`)}
+ *     </ul>`;
+ *   }
+ * }
+ * ```
+ */
+export class AuditLedgerController implements ReactiveController {
+  private host: ReactiveControllerHost;
+  private ledger: AuditLedger;
+  private filter: QueryFilter;
+  private pollMs: number;
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+
+  value: readonly AuditEntry[];
+
+  constructor(
+    host: ReactiveControllerHost,
+    ledger: AuditLedger,
+    filter: QueryFilter = {},
+    opts: { pollMs?: number } = {},
+  ) {
+    this.host = host;
+    this.ledger = ledger;
+    this.filter = filter;
+    this.pollMs = opts.pollMs ?? 250;
+    this.value = ledger.query(filter);
+    host.addController(this);
+  }
+
+  hostConnected(): void {
+    this.intervalId = setInterval(() => {
+      const next = this.ledger.query(this.filter);
+      // Only request update if entry count changed — avoids a wasted
+      // render every poll tick when nothing has happened.
+      if (next.length !== this.value.length) {
+        this.value = next;
+        this.host.requestUpdate();
+      } else {
+        this.value = next;
+      }
+    }, this.pollMs);
+  }
+
+  hostDisconnected(): void {
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+}

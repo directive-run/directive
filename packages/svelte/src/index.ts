@@ -1040,3 +1040,44 @@ export function useHydratedSystem<S extends ModuleSchema>(
   return useDirective(moduleDef, { ...config, initialFacts: mergedFacts })
     .system;
 }
+
+// ============================================================================
+// createAuditLedgerStore — live ledger entries with filter (R4.I parity)
+// ============================================================================
+
+import type {
+  AuditEntry,
+  AuditLedger,
+  QueryFilter,
+} from "@directive-run/core";
+
+/**
+ * Create a Svelte readable store that holds the latest audit-ledger
+ * entries matching `filter`. Re-emits on each poll tick (default
+ * 250 ms — override with `pollMs`).
+ *
+ * @example
+ * ```svelte
+ * <script>
+ *   import { createAuditLedgerStore } from "@directive-run/svelte";
+ *   const entries = createAuditLedgerStore(ledger, { kind: "constraint.evaluate", limit: 20 });
+ * </script>
+ *
+ * <ul>
+ *   {#each $entries as e (e.seq)}
+ *     <li>{e.kind} @ {new Date(e.ts).toISOString()}</li>
+ *   {/each}
+ * </ul>
+ * ```
+ */
+export function createAuditLedgerStore(
+  ledger: AuditLedger,
+  filter: QueryFilter = {},
+  opts: { pollMs?: number } = {},
+): Readable<readonly AuditEntry[]> {
+  const pollMs = opts.pollMs ?? 250;
+  return readable<readonly AuditEntry[]>(ledger.query(filter), (set) => {
+    const id = setInterval(() => set(ledger.query(filter)), pollMs);
+    return () => clearInterval(id);
+  });
+}
