@@ -555,6 +555,8 @@ moment a clause flips.
 
 ### R4.F — `directive rules-diff <git-ref-a> <git-ref-b>`: business-logic PR review for predicate changes
 
+**[✅ SHIPPED 2026-05-23 — `diffRules()` in @directive-run/core + `directive rules-diff` CLI. See docs/concepts/rules-diff.md]**
+
 **[2 days — viral MAX, compound MAX — the asymmetric pick of R4 round 2]**
 
 A CLI that walks two git refs, extracts every `whenSpec` from `inspect()`
@@ -836,7 +838,7 @@ arguing — and tells you why."*
 | Rank | Idea | Days | Viral | Compound | Note |
 |---|---|---|---|---|---|
 | 1 | **R4.G** `replay-under` predicate-backtest rule replay — **✅ SHIPPED 2026-05-21** | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
-| 2 | **R4.F** `directive rules-diff` PR-review tool | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
+| 2 | **R4.F** `directive rules-diff` PR-review tool – **✅ SHIPPED 2026-05-23** | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
 | 3 | **R4.H** `predicateToSQL` isomorphic predicates | 3 | High | Max | The "one truth, three targets" article writes itself. Drizzle/Prisma envy. |
 | 4 | **R4.I** GDPR-grade audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |
 | 5 | **R4.J** clobber-loop detector | 1 | Med-High | High | One-day quick win. Diagnoses a bug class that has no name yet. |

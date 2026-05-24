@@ -140,6 +140,19 @@ export type {
   SweepUnderOptions,
 } from "./core/sweep-under.js";
 
+// Rules diff — structural diff of constraint whenSpec across two snapshots
+export { diffClauses, diffRules, flattenPredicate, toRulesMap } from "./core/rules-diff.js";
+export type {
+  Change,
+  ChangeKind,
+  ConstraintDiff,
+  ConstraintStatus,
+  DiffRulesOptions,
+  LeafClause,
+  RulesDiffReport,
+  RulesMapInput,
+} from "./core/rules-diff.js";
+
 // ============================================================================
 // Core Classes
 // ============================================================================

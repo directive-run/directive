@@ -16,6 +16,7 @@ import { inspectCommand } from "./commands/inspect.js";
 import { newModuleCommand, newOrchestratorCommand } from "./commands/new.js";
 import { replayUnderCommand } from "./commands/replay-under.js";
 import { replayCommand } from "./commands/replay.js";
+import { rulesDiffCommand } from "./commands/rules-diff.js";
 import { timelineDiffCommand } from "./commands/timeline-diff.js";
 import { tuneCommand } from "./commands/tune.js";
 import { CLI_NAME } from "./lib/constants.js";
@@ -42,6 +43,9 @@ Commands:
                                 (paired with @directive-run/timeline)
   tune --history ...            Grid-search a predicate template's $hole
                                 parameters against recorded history
+  rules-diff --before ...       Structural diff between two whenSpec
+                                snapshots — added/removed clauses,
+                                relaxed/tightened thresholds
   replay-under --history ...    Predicate backtest — diff a proposed
                                 predicate against recorded history
   bisect <timeline.json>        Binary-search a timeline for the first
@@ -224,6 +228,11 @@ async function main() {
 
     case "tune": {
       await tuneCommand(args.slice(1));
+      break;
+    }
+
+    case "rules-diff": {
+      await rulesDiffCommand(args.slice(1));
       break;
     }
 
