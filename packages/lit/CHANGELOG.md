@@ -1,5 +1,48 @@
 # @directive-run/lit
 
+## 1.12.0
+
+### Minor Changes
+
+- [`2f9da6c`](https://github.com/directive-run/directive/commit/2f9da6c05e2aa2f24f0383a805dcc5507a1cd06d) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: useAuditLedger parity across Vue / Svelte / Solid / Lit
+
+  Matches the React hook shipped in v1.11.0, idiomatic to each framework:
+
+  - **Vue:** `useAuditLedger(ledger, filter)` returns a `ShallowRef<readonly AuditEntry[]>`
+  - **Svelte:** `createAuditLedgerStore(ledger, filter)` returns a `Readable<readonly AuditEntry[]>`
+  - **Solid:** `useAuditLedger(ledger, filter)` returns an `Accessor<readonly AuditEntry[]>`
+  - **Lit:** `AuditLedgerController` — a `ReactiveController` exposing `.value`
+
+  All four poll the ledger (default 250 ms, override with `pollMs`) and surface the latest entries matching the filter. The compliance-audit example now has a one-line install path on every supported framework.
+
+  ```ts
+  // Vue
+  const entries = useAuditLedger(ledger, {
+    kind: "constraint.evaluate",
+    limit: 20,
+  });
+
+  // Svelte
+  const entries = createAuditLedgerStore(ledger, {
+    kind: "constraint.evaluate",
+    limit: 20,
+  });
+
+  // Solid
+  const entries = useAuditLedger(ledger, {
+    kind: "constraint.evaluate",
+    limit: 20,
+  });
+
+  // Lit
+  class AuditLog extends LitElement {
+    private ctrl = new AuditLedgerController(this, ledger, {
+      kind: "constraint.evaluate",
+      limit: 20,
+    });
+  }
+  ```
+
 ## 1.11.0
 
 ## 1.10.0
