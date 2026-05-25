@@ -12,10 +12,10 @@ describe("predict — happy path", () => {
     expect(result.whenExplain.every((c) => c.pass)).toBe(true);
   });
 
-  it("returns the predicate it was passed (for telemetry)", () => {
+  it("does not leak the input predicate reference on the result (M15)", () => {
     const p = { cartTotal: { $gte: 50 } };
     const result = predict(p, { cartTotal: 75 });
-    expect(result.predicate).toBe(p);
+    expect(result).not.toHaveProperty("predicate");
   });
 });
 
@@ -155,5 +155,35 @@ describe("predict — prev/$changed", () => {
     );
     expect(result.wouldFire).toBe(false);
     expect(result.missingChanges[0]?.suggestion).toContain("required to differ");
+  });
+
+  it("M10: $changed without prev → synthetic warning entry per $changed clause", () => {
+    const result = predict(
+      { phase: { $changed: true }, status: { $changed: true } },
+      { phase: "green", status: "ok" },
+      // prev intentionally omitted
+    );
+
+    const synthetics = result.missingChanges.filter(
+      (m) => m.op === "$changed" && m.suggestion.includes("`prev` snapshot"),
+    );
+    expect(synthetics.length).toBe(2);
+    expect(synthetics.map((m) => m.path).sort()).toEqual(["phase", "status"]);
+    for (const s of synthetics) {
+      expect(s.actual).toBeUndefined();
+      expect(s.expected).toBe(true);
+    }
+  });
+
+  it("M10: $changed without prev and nested in $any → still synthetically reported", () => {
+    const result = predict(
+      { $any: [{ phase: { $changed: true } }, { status: { $eq: "ok" } }] },
+      { phase: "green", status: "no" },
+    );
+    const synthetic = result.missingChanges.find(
+      (m) => m.op === "$changed" && m.path === "phase",
+    );
+    expect(synthetic).toBeDefined();
+    expect(synthetic?.suggestion).toContain("`prev` snapshot");
   });
 });

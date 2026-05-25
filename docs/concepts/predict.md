@@ -67,7 +67,36 @@ For combinators (`$all`, `$any`, `$not`), `predict()` recurses into children and
 
 - **Not a SAT solver** — `predict()` reports failing leaves, not the *minimal* set of fact changes that satisfy the rule. For `$any: [A, B]` with both failed, it lists both — you pick which to change.
 - **Doesn't mutate facts** — pure read.
-- **Doesn't honor `$changed` without a `prev`** — pass `predict(predicate, facts, prev)` if your predicate uses `$changed`.
+
+## `$changed` and the `prev` snapshot (M10)
+
+The `$changed` operator compares the current value against the previous one. Without a `prev` snapshot, the clause cannot be evaluated meaningfully.
+
+**`predict()` makes this loud**: when the predicate contains a `$changed` clause AND you didn't pass `prev`, the result's `missingChanges` array includes a synthetic warning per `$changed` clause:
+
+```ts
+predict({ phase: { $changed: true } }, { phase: "green" });
+// → {
+//     wouldFire: false,
+//     missingChanges: [
+//       { path: "phase", op: "$changed", expected: true, actual: undefined,
+//         suggestion: "$changed clause at \"phase\" cannot be evaluated without a `prev` snapshot — pass predict(predicate, facts, prev)." }
+//     ],
+//   }
+```
+
+Always pass `prev` (a snapshot of the prior facts) when your predicate uses `$changed`:
+
+```ts
+predict({ phase: { $changed: true } }, { phase: "green" }, { phase: "red" });
+// → wouldFire: true
+```
+
+## Result shape
+
+`PredictResult` carries `wouldFire`, `whenExplain`, and `missingChanges`. It does **not** include the input `predicate` (the caller already has it — keep the reference at the call site if you need to display "what we predicted" alongside the result).
+
+Pure read; does not mutate facts.
 
 ## Reference
 

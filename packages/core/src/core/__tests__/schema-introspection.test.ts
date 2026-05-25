@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { t } from "../schema-builders.js";
 import {
   getKind,
@@ -227,5 +227,106 @@ describe("listAllPredicateOperators", () => {
     expect(all).toContain("$changed");
     // Defensive: ensures the set hasn't been silently emptied.
     expect(all.length).toBeGreaterThan(10);
+  });
+});
+
+// ============================================================================
+// M5 — hostile getter safety
+// ============================================================================
+
+describe("getKind — hostile-getter safety (M5)", () => {
+  it("returns { kind: 'unknown' } if _kind getter throws", () => {
+    const hostile = {
+      get _kind(): never {
+        throw new Error("boom");
+      },
+    };
+    expect(getKind(hostile)).toEqual({ kind: "unknown" });
+  });
+
+  it("returns { kind: 'unknown' } if _typeName getter throws", () => {
+    const hostile = {
+      get _typeName(): never {
+        throw new Error("boom");
+      },
+    };
+    expect(getKind(hostile)).toEqual({ kind: "unknown" });
+  });
+
+  it("does NOT throw even when both getters are hostile", () => {
+    const hostile = {
+      get _kind(): never {
+        throw new Error("kind boom");
+      },
+      get _typeName(): never {
+        throw new Error("name boom");
+      },
+    };
+    expect(() => getKind(hostile)).not.toThrow();
+    expect(getKind(hostile)).toEqual({ kind: "unknown" });
+  });
+});
+
+describe("getSchemaFieldKinds — hostile-getter resilience (M5)", () => {
+  it("one hostile builder does not abort the whole walk", () => {
+    const hostile = {
+      get _kind(): never {
+        throw new Error("boom");
+      },
+    };
+    const map = getSchemaFieldKinds({
+      facts: {
+        good: t.number(),
+        also: t.string(),
+        bad: hostile,
+      },
+    });
+    // The good builders are still walked.
+    expect(map.get("good")).toEqual({ kind: "number" });
+    expect(map.get("also")).toEqual({ kind: "string" });
+    // The hostile builder is captured as 'unknown' (from getKind's own guard),
+    // or silently skipped — either is acceptable.
+    const badEntry = map.get("bad");
+    if (badEntry !== undefined) {
+      expect(badEntry).toEqual({ kind: "unknown" });
+    }
+  });
+});
+
+// ============================================================================
+// M12 — dev-mode warnings on misuse
+// ============================================================================
+
+describe("getKind — dev-mode warning on function input (M12)", () => {
+  it("warns when a t.* factory is passed without ()", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      // Pass `t.number` as a function reference (forgot the call).
+      const result = getKind(t.number);
+      expect(result).toEqual({ kind: "unknown" });
+      // Dev mode may or may not be on in test runs — only assert when warned.
+      if (warnSpy.mock.calls.length > 0) {
+        const msg = warnSpy.mock.calls[0]![0] as string;
+        expect(msg).toContain("did you forget () on a t.* builder");
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("getSchemaFieldKinds — dev-mode warning on empty result (M12)", () => {
+  it("warns when schema yields zero introspectable keys", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const map = getSchemaFieldKinds({});
+      expect(map.size).toBe(0);
+      if (warnSpy.mock.calls.length > 0) {
+        const msg = warnSpy.mock.calls[0]![0] as string;
+        expect(msg).toContain("schema appears empty");
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

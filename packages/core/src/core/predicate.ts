@@ -569,6 +569,69 @@ export interface SchemaValidationError {
 export interface SchemaValidationOptions {
   /** Reject predicates with more than this many operator clauses (DoS guard). Default unbounded. */
   readonly maxOperatorCount?: number;
+  /**
+   * Reject `$in` / `$nin` operands that contain more than this many elements
+   * (query-planner DoS guard). Default unbounded. A typical safe cap is 1000
+   * — beyond that, a downstream query compiler may degrade quadratically.
+   */
+  readonly maxArrayOperandLength?: number;
+}
+
+/**
+ * Heuristic: flag a regex source string that has obvious nested quantifiers
+ * (e.g. `(.+)+`, `(.*)*`, `(\w+)+`, `(a|a)+`) — the classic ReDoS shapes.
+ * Not a full ReDoS prover; intentionally conservative so a string-rehydrated
+ * `$matches` operand can be rejected before it ever reaches `RegExp.test`.
+ *
+ * Callers MUST NOT treat a `false` result as "safe" — a determined adversary
+ * can craft patterns this heuristic misses. The right answer for untrusted
+ * regex is "don't accept untrusted regex"; this helper exists to catch the
+ * obvious foot-guns.
+ *
+ * @example
+ * ```ts
+ * dangerousRegex("(a+)+");      // → true
+ * dangerousRegex("(.*)*");      // → true
+ * dangerousRegex("(\\w+)+");    // → true
+ * dangerousRegex("^[a-z]+$");   // → false
+ * ```
+ */
+export function dangerousRegex(source: string): boolean {
+  if (typeof source !== "string" || source.length === 0) {
+    return false;
+  }
+  // Nested quantifiers — a group ending in `*` or `+` (or `{n,}`) immediately
+  // followed by another `*` / `+` / `{n,}` quantifier. Allow `?` between
+  // (lazy) since `(...)?+` is still pathological. Also catch `{n,m}` upper
+  // bounds when they wrap a quantified group.
+  //
+  // Patterns flagged:
+  //   (.+)+     (.*)*     (.+)*     (.*)+
+  //   (\w+)+    (\d*)+    ([abc]+)+
+  //   (a|a)+    (a|b|c)*   ((x))+    (?:x+)+
+  //
+  // The check looks for a closing `)` preceded by a quantifier-bearing token
+  // (`+`, `*`, `}` from `{n,m}`, or `+?` / `*?` lazy) and followed by another
+  // quantifier (`+`, `*`, or `{n,`).
+  const nestedQuantifier = /\)(?:[+*]\??|\{\d+,?\d*\})\s*[+*?]\s*[+*]/;
+  if (nestedQuantifier.test(source)) {
+    return true;
+  }
+  // Group whose inner content already has a `+` / `*` / `{n,}` quantifier on
+  // a character class or token, and the group is then itself quantified.
+  // E.g. `(a+)+`, `(\w+)+`, `(.*)*`, `([abc]+)*`.
+  const groupedQuantified =
+    /\(([^()]*?[+*]|[^()]*?\{\d+,?\d*\})[^()]*\)\s*[+*]/;
+  if (groupedQuantified.test(source)) {
+    return true;
+  }
+  // Alternation of identical branches: `(a|a)+`, `(foo|foo)*`.
+  const sameBranchAlt = /\(\??:?([^()|]+)\|\1\)\s*[+*]/;
+  if (sameBranchAlt.test(source)) {
+    return true;
+  }
+
+  return false;
 }
 
 export type SchemaValidationResult =
@@ -608,9 +671,10 @@ export function validatePredicateAgainstSchema(
   const errors: SchemaValidationError[] = [];
   let operatorCount = 0;
   const maxOperatorCount = opts.maxOperatorCount;
+  const maxArrayOperandLength = opts.maxArrayOperandLength;
 
   walkPredicate(spec, {
-    operator(factPath, op, _operand, _operandPath) {
+    operator(factPath, op, operand, _operandPath) {
       operatorCount++;
       if (
         maxOperatorCount !== undefined &&
@@ -628,6 +692,49 @@ export function validatePredicateAgainstSchema(
         }
 
         return;
+      }
+
+      // M1: $in / $nin operand length cap — too-large array operands choke
+      // downstream query planners and OR-tree compilers.
+      if (
+        maxArrayOperandLength !== undefined &&
+        (op === "$in" || op === "$nin") &&
+        Array.isArray(operand) &&
+        operand.length > maxArrayOperandLength
+      ) {
+        errors.push({
+          path: factPath,
+          op,
+          reason: `Operator ${op} operand exceeds maxArrayOperandLength=${maxArrayOperandLength} (got ${operand.length}) — too large for a query planner.`,
+        });
+
+        return;
+      }
+
+      // M2: $matches operand ReDoS heuristic — flag obvious nested
+      // quantifiers in either a RegExp or a string-form pattern. String-form
+      // patterns are rejected at evaluation time (see applyOperator), but
+      // a static check here catches them before they ever load.
+      //
+      // WARNING: don't rehydrate LLM-emitted string-form regex without your
+      // own complexity audit; `dangerousRegex()` is a foot-gun catcher, not
+      // a ReDoS prover.
+      if (op === "$matches") {
+        let regexSource: string | undefined;
+        if (operand instanceof RegExp) {
+          regexSource = operand.source;
+        } else if (typeof operand === "string") {
+          regexSource = operand;
+        }
+        if (regexSource !== undefined && dangerousRegex(regexSource)) {
+          errors.push({
+            path: factPath,
+            op,
+            reason: `Operator $matches operand at "${factPath}" contains nested quantifiers (ReDoS risk: ${JSON.stringify(regexSource)}). Reject untrusted regex or rewrite without nested + / *.`,
+          });
+
+          return;
+        }
       }
 
       const kind = kindMap.get(factPath);

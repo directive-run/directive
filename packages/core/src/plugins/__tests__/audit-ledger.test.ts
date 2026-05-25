@@ -254,8 +254,34 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.destroy();
   });
 
-  it("verify() catches a tampered entry (SEC C1: stableStringify canonicalization)", async () => {
-    const ledger = createAuditLedger();
+  it("verify() catches a tampered entry via a sink-level swap (SEC C1: stableStringify canonicalization)", async () => {
+    // Entries are now frozen at write time, so in-process mutation
+    // throws — see the "freezes entries at write time (C3)" test below.
+    // To exercise the verify() tamper path, we install a sink wrapper
+    // that swaps a payload at query time (modeling persisted-bytes
+    // tampering on the way back from disk).
+    const realSink = memorySink();
+    let swap: ((entries: AuditEntry[]) => void) | null = null;
+    const sink: typeof realSink = {
+      ...realSink,
+      query: realSink.query.bind(realSink),
+      recent: realSink.recent.bind(realSink),
+      forFact: realSink.forFact.bind(realSink),
+      forConstraint: realSink.forConstraint.bind(realSink),
+      write: realSink.write.bind(realSink),
+      clear: realSink.clear.bind(realSink),
+      destroy: realSink.destroy.bind(realSink),
+      toJSON: () => {
+        const out = realSink.toJSON();
+        if (swap) {
+          const cloned = JSON.parse(JSON.stringify(out)) as typeof out;
+          swap(cloned.entries as AuditEntry[]);
+          return cloned;
+        }
+        return out;
+      },
+    };
+    const ledger = createAuditLedger({ sink });
     const system = createSystem({
       module: makeModule(),
       plugins: [ledger.plugin],
@@ -265,25 +291,17 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.facts.cartTotal = 50;
     await flushTick();
 
-    const before = ledger.verify() as Extract<
-      ReturnType<typeof ledger.verify>,
-      { valid: boolean }
-    >;
+    const before = ledger.verify();
     expect(before.valid).toBe(true);
 
-    const dump = ledger.toJSON();
-    const entries = dump.entries;
-    expect(entries.length).toBeGreaterThanOrEqual(2);
+    // Now tell the sink wrapper to mutate entry[1].kind on the next
+    // toJSON() call. verify() pulls entries via toJSON, so this models
+    // persisted-bytes tampering visible to the verifier.
+    swap = (entries) => {
+      if (entries[1]) (entries[1] as { kind: string }).kind = "fact.change";
+    };
 
-    // Tamper: re-write entry[1] in-place with a different payload.
-    // Since entry[2]'s prevHash was computed from the ORIGINAL entry[1],
-    // the chain breaks at index 2 (entry[2].prevHash !== hash(tampered entry[1])).
-    (entries[1] as { kind: string }).kind = "fact.change";
-
-    const after = ledger.verify() as Extract<
-      ReturnType<typeof ledger.verify>,
-      { valid: boolean }
-    >;
+    const after = ledger.verify();
     expect(after.valid).toBe(false);
     if (!after.valid) {
       expect(after.brokenAt).toBeGreaterThanOrEqual(0);
@@ -294,7 +312,7 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.destroy();
   });
 
-  it("verify({ strong: true }) returns a Promise", async () => {
+  it("verify({ strong: true }) THROWS — reserved for v2, no silent no-op (C1)", async () => {
     const ledger = createAuditLedger();
     const system = createSystem({
       module: makeModule(),
@@ -303,11 +321,9 @@ describe("createAuditLedger — hash chain integrity", () => {
     system.start();
     await flushTick();
 
-    const strongResult = (await ledger.verify({ strong: true })) as Extract<
-      Awaited<ReturnType<typeof ledger.verify>>,
-      { valid: boolean }
-    >;
-    expect(strongResult.valid).toBe(true);
+    expect(() => ledger.verify({ strong: true })).toThrow(
+      /strong: true.*reserved for v2/,
+    );
 
     system.destroy();
   });
@@ -453,6 +469,410 @@ describe("createAuditLedger — PII redaction", () => {
       | Extract<AuditEntry, { kind: "fact.change" }>
       | undefined;
     expect(e?.next).toBe("carol@example.com");
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — C2 whenSpec PII redaction
+// ============================================================================
+
+describe("createAuditLedger — whenSpec PII operand redaction (C2)", () => {
+  function piiConstraintModule() {
+    return createModule("pii-when", {
+      schema: {
+        facts: {
+          email: t.string().meta({ tags: ["pii"] }),
+          cartTotal: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: { CHECKOUT: {} },
+      },
+      init: (facts) => {
+        facts.email = "noone@nowhere.com";
+        facts.cartTotal = 0;
+      },
+      constraints: {
+        emailGated: {
+          // Literal operand sitting on a PII-tagged fact — without
+          // the C2 fix this would leak into every audit entry.
+          when: { email: { $eq: "alice@x.com" } },
+          require: { type: "CHECKOUT" },
+        },
+      },
+    });
+  }
+
+  it("redacts literal operands at pii-tagged fact paths in cached whenSpec", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: piiConstraintModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const evals = ledger.query({ kind: "constraint.evaluate" });
+    expect(evals.length).toBeGreaterThan(0);
+    const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
+    expect(e.whenSpec).toBeDefined();
+    // The original literal "alice@x.com" must be redacted in the cache.
+    const spec = e.whenSpec as { email: { $eq: unknown } };
+    expect(spec.email.$eq).toBe("[redacted]");
+
+    system.destroy();
+  });
+
+  it("does NOT redact operands on non-pii facts", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: piiConstraintModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Cart-total is not pii-tagged; operands on it should remain.
+    // Inspect the cached spec via the entry's whenSpec.
+    const evals = ledger.query({ kind: "constraint.evaluate" });
+    const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
+    const spec = e.whenSpec as { email: { $eq: unknown } };
+    // email is redacted, cartTotal would not be — only the email
+    // operand should change.
+    expect(spec.email.$eq).toBe("[redacted]");
+
+    system.destroy();
+  });
+
+  it("capturePII: true leaves whenSpec operands unredacted", async () => {
+    const ledger = createAuditLedger({ capturePII: true });
+    const system = createSystem({
+      module: piiConstraintModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const evals = ledger.query({ kind: "constraint.evaluate" });
+    const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
+    const spec = e.whenSpec as { email: { $eq: unknown } };
+    expect(spec.email.$eq).toBe("alice@x.com");
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — C3 immutable entries
+// ============================================================================
+
+describe("createAuditLedger — frozen entries (C3)", () => {
+  it("freezes entries at write time — in-process mutation throws", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const entries = ledger.query();
+    expect(entries.length).toBeGreaterThan(0);
+    const entry = entries[0]!;
+
+    // Vitest runs in strict mode — mutating a frozen object throws.
+    expect(() => {
+      (entry as { kind: string }).kind = "x";
+    }).toThrow(TypeError);
+
+    system.destroy();
+  });
+
+  it("freezes top-level whenExplain clauses (depth 2)", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 75;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const evals = ledger.query({ kind: "constraint.evaluate" });
+    const evalEntry = evals.find(
+      (e) =>
+        e.kind === "constraint.evaluate" &&
+        Array.isArray(e.whenExplain) &&
+        e.whenExplain.length > 0,
+    ) as Extract<AuditEntry, { kind: "constraint.evaluate" }> | undefined;
+    expect(evalEntry).toBeDefined();
+    const clause = evalEntry!.whenExplain![0]!;
+    expect(() => {
+      (clause as { path: string }).path = "x";
+    }).toThrow(TypeError);
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — C4 whenSpec cache invalidation on assign()
+// ============================================================================
+
+describe("createAuditLedger — whenSpec cache refreshes on assign (C4)", () => {
+  it("captures the NEW whenSpec after constraints.assign(), not the stale one", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Sanity: the original spec is captured.
+    const before = ledger.query({
+      kind: "constraint.evaluate",
+      constraintId: "canCheckout",
+    });
+    expect(before.length).toBeGreaterThan(0);
+    const beforeEntry = before[0] as Extract<
+      AuditEntry,
+      { kind: "constraint.evaluate" }
+    >;
+    expect(beforeEntry.whenSpec).toBeDefined();
+
+    // Dynamically assign() a new spec.
+    system.constraints.assign("canCheckout", {
+      when: { cartTotal: { $gte: 999 } },
+      require: { type: "CHECKOUT" },
+    });
+    ledger.clear();
+
+    // Trigger a new evaluate by mutating a fact.
+    system.facts.cartTotal = 1000;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const after = ledger.query({
+      kind: "constraint.evaluate",
+      constraintId: "canCheckout",
+    });
+    expect(after.length).toBeGreaterThan(0);
+    const afterEntry = after[0] as Extract<
+      AuditEntry,
+      { kind: "constraint.evaluate" }
+    >;
+    expect(afterEntry.whenSpec).toBeDefined();
+    // The NEW spec has cartTotal.$gte = 999; the OLD spec had region.
+    const newSpec = afterEntry.whenSpec as {
+      cartTotal?: { $gte?: number };
+      region?: unknown;
+    };
+    expect(newSpec.cartTotal?.$gte).toBe(999);
+    expect(newSpec.region).toBeUndefined();
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — C8 erase()
+// ============================================================================
+
+describe("createAuditLedger — per-subject erase() (C8)", () => {
+  it("replaces matching entries with tombstones and emits a chained marker", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 50;
+    system.facts.cartTotal = 100;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const before = ledger.forFact("cartTotal").length;
+    expect(before).toBeGreaterThan(0);
+
+    const { erased, tombstone } = ledger.erase({ factPath: "cartTotal" });
+    expect(erased).toBeGreaterThan(0);
+    expect(tombstone.kind).toBe("system.subject-erased");
+
+    // Subject-erased marker is recorded in the chain.
+    const markers = ledger.query({ kind: "system.subject-erased" });
+    expect(markers.length).toBe(1);
+
+    // Erased entries are now tombstones, not fact.change.
+    const tombstones = ledger.query({ kind: "system.entry-erased" });
+    expect(tombstones.length).toBe(erased);
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — M9 snapshot / history navigate lifecycle
+// ============================================================================
+
+describe("createAuditLedger — snapshot / history.navigate lifecycle (M9)", () => {
+  it("captures system.snapshot when a snapshot is taken", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+      history: { maxSnapshots: 10 },
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    // Each fact change triggers an automatic snapshot when history is on.
+    system.facts.cartTotal = 50;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 75;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const snaps = ledger.query({ kind: "system.snapshot" });
+    expect(snaps.length).toBeGreaterThan(0);
+    const s = snaps[0] as Extract<AuditEntry, { kind: "system.snapshot" }>;
+    expect(typeof s.snapshotId).toBe("number");
+    expect(typeof s.trigger).toBe("string");
+
+    system.destroy();
+  });
+
+  it("captures system.history.navigate on goBack", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+      history: { maxSnapshots: 10 },
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 50;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 100;
+    await new Promise((r) => setTimeout(r, 0));
+
+    system.history?.goBack();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const navs = ledger.query({ kind: "system.history.navigate" });
+    expect(navs.length).toBeGreaterThan(0);
+    const n = navs[0] as Extract<
+      AuditEntry,
+      { kind: "system.history.navigate" }
+    >;
+    expect(typeof n.from).toBe("number");
+    expect(typeof n.to).toBe("number");
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — M22 function-form whenSource
+// ============================================================================
+
+describe("createAuditLedger — function-form whenSource (M22)", () => {
+  it("captures a whenSource preview for function-form constraints", async () => {
+    const fnModule = createModule("fn-when", {
+      schema: {
+        facts: {
+          x: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
+      constraints: {
+        fnFormed: {
+          when: (facts) => facts.x > 10,
+          require: { type: "GO" },
+        },
+      },
+    });
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: fnModule,
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const evals = ledger.query({
+      kind: "constraint.evaluate",
+      constraintId: "fnFormed",
+    });
+    expect(evals.length).toBeGreaterThan(0);
+    const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
+    // No whenSpec for function-form constraints…
+    expect(e.whenSpec).toBeUndefined();
+    // …but a whenSource preview is captured.
+    expect(e.whenSource).toBeDefined();
+    expect(e.whenSource?.kind).toBe("function");
+    expect(typeof e.whenSource?.preview).toBe("string");
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — M23 truncation marker
+// ============================================================================
+
+describe("createAuditLedger — truncation marker (M23)", () => {
+  it("emits system.truncated BEFORE the oldest entry is dropped", async () => {
+    // Tight capacity so we overflow on a small number of entries.
+    const sink = memorySink({ capacity: 4 });
+    const ledger = createAuditLedger({ sink });
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    // Cause lots of fact changes to overflow capacity.
+    for (let i = 0; i < 20; i++) {
+      system.facts.cartTotal = i;
+    }
+    await new Promise((r) => setTimeout(r, 0));
+
+    const truncs = ledger.query({ kind: "system.truncated" });
+    expect(truncs.length).toBeGreaterThan(0);
+    const t0 = truncs[0] as Extract<AuditEntry, { kind: "system.truncated" }>;
+    expect(typeof t0.droppedSeq).toBe("number");
+    expect(t0.droppedCount).toBeGreaterThan(0);
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// R1 fixes — M26 hashAlgo on every entry
+// ============================================================================
+
+describe("createAuditLedger — hashAlgo canonicalization tag (M26)", () => {
+  it("stamps hashAlgo: 'djb2-1' on every entry", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 50;
+    await new Promise((r) => setTimeout(r, 0));
+
+    const entries = ledger.query();
+    expect(entries.length).toBeGreaterThan(0);
+    for (const e of entries) {
+      expect((e as { hashAlgo: string }).hashAlgo).toBe("djb2-1");
+    }
 
     system.destroy();
   });

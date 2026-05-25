@@ -21,17 +21,41 @@ doctor.checkAgainst(candidate, system.inspect().constraints);
 //         candidate: { op: "$gte", value: 100 },
 //         existing: { op: "$lt", value: 50 } }
 //     ],
-//     warnings: []
+//     warnings: [
+//       { constraintId: "applyDiscount",
+//         type: "subset",
+//         reason: "Candidate's lower bound on cartTotal (100) is stricter than the existing rule's (50) — candidate is a subset." }
+//     ]
 //   }
 ```
 
-Three contradiction types:
+Three finding types, two buckets:
 
-| Type | When |
-| --- | --- |
-| `direct` | The two rules cannot both fire. `$gte 100` vs `$lt 50`, `$eq "a"` vs `$ne "a"`, two disjoint `$in` sets. |
-| `subset` | The candidate's range is strictly within the existing rule's range. Candidate is redundant; the existing rule already covers it. |
-| `overlap` | The two rules touch the same fact with non-trivial intersection. Surfaced as a **warning**, not a hard error — they *can* coexist. |
+| Type | Bucket | When |
+| --- | --- | --- |
+| `direct` | `contradictions` | The two rules cannot both fire. `$gte 100` vs `$lt 50`, `$eq "a"` vs `$ne "a"`, two disjoint `$in` sets. |
+| `subset` | `warnings` | The candidate's range is strictly within the existing rule's range. The candidate is **redundant**, not in conflict — surfaced as a warning. |
+| `overlap` | `warnings` | The two rules touch the same fact with non-trivial intersection. Surfaced as a warning — they *can* coexist. |
+
+> **M17 — subset is a warning, not a contradiction.** A subset rule co-fires with its parent; it's noise (the existing rule already covers it), not a conflict. Prior versions bucketed `subset` under `contradictions` — if you're upgrading, move your assertions accordingly.
+
+## `doctor.checkOwns` — owns:/bind: collision check
+
+`checkAgainst` only inspects predicate **logic**. To flag a candidate that would *write* to a field already owned by another constraint's resolver, use `doctor.checkOwns`:
+
+```ts
+doctor.checkOwns(candidate, system.inspect());
+// → {
+//     findings: [
+//       { constraintId: "applyDiscount",
+//         candidatePath: "cartTotal",
+//         source: "owns",
+//         reason: "Constraint applyDiscount already owns cartTotal — candidate would race or shadow its writes." }
+//     ]
+//   }
+```
+
+> **v1 LIMITATION (M4):** `checkOwns` only reports findings when `system.inspect()` exposes `owns:` / `bind:` metadata on each constraint snapshot. Older inspect payloads lack that field, in which case `checkOwns` returns `{ findings: [] }` — no false positives. Wiring resolver-ownership through `inspect()` automatically is on the v2 roadmap.
 
 ## Use cases
 
@@ -51,6 +75,6 @@ This is a structural v1. It does **NOT** check:
 
 ## Reference
 
-- API: `doctor`, `CheckAgainstResult`, `Contradiction`, `ContradictionType`
+- API: `doctor.checkAgainst`, `doctor.checkOwns`, `CheckAgainstResult`, `CheckOwnsResult`, `CheckOwnsFinding`, `Contradiction`, `ContradictionType`
 - Underlying: [`diffRules`](./rules-diff.md) (used to flatten predicates for comparison)
 - Pairs with: [`predicateFromIntent`](./predicate-from-intent.md), [`predict`](./predict.md)

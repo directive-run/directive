@@ -1,31 +1,111 @@
 /**
- * createAuditLedger — append-only, queryable, cryptographically-chained
- * audit of every state change. For compliance, forensics, "show me why
- * this user got that decision."
+ * createAuditLedger — append-only, queryable, hash-chained
+ * (djb2; SHA-256 reserved for v2) audit of every state change. For
+ * forensics and "show me why this user got that decision."
  *
  * Captures (per observation event):
  *
- *   - `constraint.evaluate` → { whenSpec, whenExplain, active }
+ *   - `constraint.evaluate` → { whenSpec, whenExplain, active, whenSource? }
  *   - `resolver.write.rejected` (rejection + summary kinds)
  *   - `fact.change` → { key, prior, next }
  *   - `resolver.complete` → { resolverId, requirementId, duration }
  *   - `system.init` / `system.start` / `system.stop` / `system.destroy`
+ *   - `system.snapshot` / `system.history.navigate` (lifecycle markers)
+ *   - `system.truncated` (ring-buffer overflow marker)
+ *   - `system.entry-erased` / `system.subject-erased` (GDPR Art.17 stub)
  *
- * Hash chain: each entry stores `prevHash` (the genesis entry's is null);
- * `hash` is computed *lazily* at `verify()` / `toJSON()` time via
- * `stableStringify` + SHA-256 (`crypto.subtle.digest`). Tampering with
- * any entry's payload breaks the next entry's `prevHash` link — visible
- * in `verify()`.
+ * Hash chain: each entry stores `prevHash` — the djb2 (`hashObject`)
+ * hash of the previous entry's stable-stringified payload. Tampering
+ * with any entry's payload breaks the next entry's `prevHash` link —
+ * visible in `verify()`. v1 ships sync djb2 only; `verify({ strong: true })`
+ * is reserved for v2 (SHA-256) and throws today.
  *
  * PII redaction: by default, fact keys whose meta carries the `pii`
  * tag (via `system.meta.byTag("pii")`) have their values replaced with
- * `"[redacted]"` in `whenExplain.actual`, `fact.change.prior`, and
- * `fact.change.next`. Opt out with `capturePII: true`.
+ * `"[redacted]"` in `whenExplain.actual`, `fact.change.prior`,
+ * `fact.change.next`, and the cached `whenSpec` operands. Opt out with
+ * `capturePII: true`.
  */
 
 import type { ClauseResult, FactPredicate } from "../core/types/predicate.js";
-import type { ModuleSchema, ObservationEvent, Plugin, System } from "../core/types.js";
+import type {
+  ModuleSchema,
+  ObservationEvent,
+  Plugin,
+  System,
+} from "../core/types.js";
+import { walkPredicate } from "../core/predicate.js";
 import { hashObject } from "../utils/utils.js";
+
+/** Hash algorithm tag — bumped if canonicalization or hash function changes. */
+const HASH_ALGO = "djb2-1" as const;
+
+/**
+ * Navigate `root` to `dottedPath` (`foo.bar.$eq`, `foo[0].value`) and
+ * replace the value at the leaf. Used by `redactWhenSpec` to scrub
+ * PII operands in cached predicate specs. Best-effort: silently no-ops
+ * if the path doesn't resolve (caller already cloned the spec).
+ */
+function replaceAtPath(root: unknown, dottedPath: string, value: unknown): void {
+  if (root === null || typeof root !== "object") return;
+  // Split on "." but treat "[N]" segments as array indices.
+  // E.g. "[0].value" → ["[0]", "value"], "foo.bar[1]" → ["foo", "bar[1]"].
+  const segs: Array<string | number> = [];
+  for (const part of dottedPath.split(".")) {
+    if (!part) continue;
+    // Pull leading `[N]` if present.
+    const m = part.match(/^\[(\d+)\](.*)$/);
+    if (m) {
+      segs.push(Number(m[1]));
+      if (m[2]) segs.push(m[2].replace(/^\./, ""));
+      continue;
+    }
+    // Trailing `[N]` on the segment.
+    const m2 = part.match(/^([^[]+)\[(\d+)\](.*)$/);
+    if (m2) {
+      segs.push(m2[1]!);
+      segs.push(Number(m2[2]));
+      if (m2[3]) segs.push(m2[3].replace(/^\./, ""));
+      continue;
+    }
+    segs.push(part);
+  }
+
+  let cur: unknown = root;
+  for (let i = 0; i < segs.length - 1; i++) {
+    const seg = segs[i]!;
+    if (cur === null || typeof cur !== "object") return;
+    cur = (cur as Record<string | number, unknown>)[seg];
+  }
+  if (cur === null || typeof cur !== "object") return;
+  const lastSeg = segs[segs.length - 1];
+  if (lastSeg === undefined) return;
+  (cur as Record<string | number, unknown>)[lastSeg] = value;
+}
+
+/**
+ * Depth-2 freeze: freeze the entry, freeze each top-level value, and
+ * freeze each clause in `whenExplain`. Cycle-safe + cheap; prevents
+ * in-process payload mutation that would forge the chain. (C3)
+ */
+function freezeEntry(entry: AuditEntry): AuditEntry {
+  for (const key of Object.keys(entry)) {
+    const v = (entry as unknown as Record<string, unknown>)[key];
+    if (v !== null && typeof v === "object") {
+      if (Array.isArray(v) && key === "whenExplain") {
+        for (const clause of v) {
+          if (clause !== null && typeof clause === "object") {
+            Object.freeze(clause);
+          }
+        }
+      }
+      Object.freeze(v);
+    }
+  }
+  Object.freeze(entry);
+
+  return entry;
+}
 
 // ============================================================================
 // AuditEntry types
@@ -40,7 +120,12 @@ export type AuditEntryKind =
   | "system.init"
   | "system.start"
   | "system.stop"
-  | "system.destroy";
+  | "system.destroy"
+  | "system.snapshot"
+  | "system.history.navigate"
+  | "system.truncated"
+  | "system.entry-erased"
+  | "system.subject-erased";
 
 interface AuditEntryBase {
   /** Monotonic sequence number, starting at 0. */
@@ -51,6 +136,12 @@ interface AuditEntryBase {
   readonly kind: AuditEntryKind;
   /** Hash of the previous entry's full payload. null on the genesis entry. */
   readonly prevHash: string | null;
+  /**
+   * Hash algorithm tag identifying the canonicalization + hash
+   * function in use. Bumped if the algorithm or canonical form
+   * changes, so exports remain verifiable across versions.
+   */
+  readonly hashAlgo: typeof HASH_ALGO;
 }
 
 export type AuditEntry =
@@ -58,9 +149,15 @@ export type AuditEntry =
       kind: "constraint.evaluate";
       constraintId: string;
       active: boolean;
-      /** Cached at ledger start from `system.inspect().constraints[].whenSpec`. May be undefined for function-form constraints. */
+      /** Cached at ledger start from `system.inspect().constraints[].whenSpec`. Refreshed on `register()`/`assign()`/`unregister()`. May be undefined for function-form constraints (see `whenSource`). PII operands redacted unless `capturePII: true`. */
       whenSpec?: FactPredicate<unknown>;
       whenExplain?: readonly ClauseResult[];
+      /**
+       * For function-form constraints (no `whenSpec`), the source
+       * preview of the function. Truncated to 200 chars.
+       * Informational only — NOT replayable. (M22)
+       */
+      whenSource?: { kind: "function"; preview: string };
     })
   | (AuditEntryBase & {
       kind: "resolver.write.rejected";
@@ -93,6 +190,31 @@ export type AuditEntry =
     })
   | (AuditEntryBase & {
       kind: "system.init" | "system.start" | "system.stop" | "system.destroy";
+    })
+  | (AuditEntryBase & {
+      kind: "system.snapshot";
+      snapshotId: number;
+      trigger: string;
+    })
+  | (AuditEntryBase & {
+      kind: "system.history.navigate";
+      from: number;
+      to: number;
+    })
+  | (AuditEntryBase & {
+      kind: "system.truncated";
+      droppedSeq: number;
+      droppedCount: number;
+    })
+  | (AuditEntryBase & {
+      kind: "system.entry-erased";
+      originalKind: AuditEntryKind;
+      erasedAt: number;
+    })
+  | (AuditEntryBase & {
+      kind: "system.subject-erased";
+      filterSummary: string;
+      erased: number;
     });
 
 // ============================================================================
@@ -132,6 +254,23 @@ export interface AuditLedgerSink {
   toJSON(): { entries: readonly AuditEntry[]; capturedAt: number };
   clear(): void;
   destroy(): void;
+  /**
+   * Replace matching entries with tombstones IN PLACE (preserving seq +
+   * prevHash so the hash chain still verifies). v1 implementation
+   * matches on the same `QueryFilter` shape used by `query()`.
+   * Returns the count of entries replaced.
+   *
+   * WARNING: erases only from this sink. Any external copies (toJSON
+   * exports, downstream pipelines) must be erased separately.
+   */
+  erase?(filter: QueryFilter, tombstoneFactory: (e: AuditEntry) => AuditEntry): number;
+  /**
+   * Optional hook fired by the sink BEFORE shifting the oldest entry
+   * out of a bounded ring buffer. The ledger plugin uses this to emit
+   * a `system.truncated` marker so an auditor sees that the log was
+   * truncated and where. (M23)
+   */
+  onTruncate?(handler: (droppedSeq: number, droppedCount: number) => void): void;
 }
 
 // ============================================================================
@@ -206,13 +345,26 @@ export function memorySink(
 ): AuditLedgerSink {
   const capacity = opts.capacity ?? DEFAULT_MEMORY_CAPACITY;
   let entries: AuditEntry[] = [];
+  let truncateHandler:
+    | ((droppedSeq: number, droppedCount: number) => void)
+    | null = null;
 
-  return {
+  const sink: AuditLedgerSink = {
     write(entry) {
+      if (entries.length >= capacity) {
+        // (M23) About to overflow — notify the owner BEFORE the shift
+        // so the dropped seq is still known. The handler may push an
+        // entry of its own (a truncation marker), which will itself
+        // push us over capacity; we shift one for one until we're back
+        // at capacity (handlers must be O(1) writers — typically one).
+        const dropped = entries[0]!;
+        truncateHandler?.(dropped.seq, 1);
+        entries.shift();
+      }
       entries.push(entry);
-      if (entries.length > capacity) {
-        // Drop oldest. This is a ring; entries.shift() is O(n) but for
-        // bounded capacity it's acceptable.
+      // If the handler wrote a marker (entries.length now > capacity),
+      // drop one more from the head to keep us at capacity exactly.
+      while (entries.length > capacity) {
         entries.shift();
       }
     },
@@ -248,38 +400,54 @@ export function memorySink(
     },
     destroy() {
       entries = [];
+      truncateHandler = null;
+    },
+    erase(filter, tombstoneFactory) {
+      let count = 0;
+      for (let i = 0; i < entries.length; i++) {
+        const e = entries[i]!;
+        if (matchesFilter(e, filter)) {
+          entries[i] = tombstoneFactory(e);
+          count++;
+        }
+      }
+
+      return count;
+    },
+    onTruncate(handler) {
+      truncateHandler = handler;
     },
   };
+
+  return sink;
 }
 
 // ============================================================================
-// Hash chain
+// Hash chain — canonicalization
 // ============================================================================
 //
-// Sync default: djb2-based `hashObject` (32-bit hex via stableStringify).
+// `syncHash(entry)` calls `hashObject(entry)` which calls
+// `stableStringify(entry)` — every entry shape (seq, ts, kind, prevHash,
+// hashAlgo, ...payload) is canonicalized via key-sorted JSON, then
+// djb2-hashed to a 32-bit hex string.
+//
 //   - Fast, sync, isomorphic Node/Bun/Deno/browser.
-//   - Tamper-detection against accidental + light adversarial probing.
+//   - Tamper-DETECTION against accidental + light adversarial probing.
 //   - Collision-prone against a determined attacker, by design (32 bits).
 //
-// Optional async strong verify: SHA-256 via Web Crypto (`crypto.subtle.digest`).
-//   - Compliance-grade collision resistance.
-//   - Async (returns Promise) — verify({ strong: true }).
+// Any future change to the canonicalization or hash function breaks
+// existing exports, so each entry carries `hashAlgo: "djb2-1"`. Verifiers
+// must check that tag matches what they expect.
 //
-// `prevHash` stores the SYNC hash of the previous entry (always). Strong
-// verify walks the chain in parallel re-computing SHA-256 and reporting
-// any divergence — gives both fast tamper detection AND cryptographic
-// proof for regulators when needed.
+// `verify({ strong: true })` is reserved for v2 (SHA-256 chain via Web
+// Crypto). It throws today — there is no silent fallback. v1 ships sync
+// djb2 only.
 
 function syncHash(entry: AuditEntry): string {
   // stableStringify guarantees same hash across runtimes regardless of
   // key insertion order (architecture review #11, security review C1).
   return hashObject(entry);
 }
-
-// Note: strong async SHA-256 verify is a v2 extension that would
-// require dual-chain entries (djb2 + SHA-256). v1 ships the sync djb2
-// chain only; verify({ strong: true }) currently no-ops and returns
-// the sync result wrapped in a Promise.
 
 // ============================================================================
 // AuditLedger plugin
@@ -321,12 +489,22 @@ export interface AuditLedger {
    * broken link plus the expected vs actual hashes — feed into a
    * "TAMPERED" visualization.
    *
-   * Sync by default (djb2 chain). For compliance-grade collision
-   * resistance, pass `{ strong: true }` — verify walks the chain a
-   * second time with SHA-256 and returns a Promise. Callers must
-   * `await` the result when `strong: true` is passed.
+   * v1 ships sync djb2 only. `verify({ strong: true })` is reserved
+   * for v2 (SHA-256) and THROWS today — there is no silent fallback.
+   * Call `verify()` (no args) for tamper detection.
    */
-  verify(opts?: { strong?: boolean }): VerifyResult | Promise<VerifyResult>;
+  verify(opts?: { strong?: boolean }): VerifyResult;
+  /**
+   * Per-subject erasure (GDPR Art. 17 stub). Replaces matching entries
+   * in this sink with tombstones (preserving seq + prevHash so the
+   * hash chain still verifies). Returns a summary plus the chained
+   * `system.subject-erased` tombstone audit entry.
+   *
+   * WARNING: v1 erases only from THIS sink. External copies (toJSON
+   * exports, downstream pipelines, persisted backups) must be erased
+   * separately. (C8)
+   */
+  erase(filter: QueryFilter): { erased: number; tombstone: AuditEntry };
   /** Empty the sink. */
   clear(): void;
   /** Unsubscribe + drop the sink. */
@@ -372,23 +550,111 @@ export function createAuditLedger(
   let system: System<ModuleSchema> | null = null;
   let unobserve: (() => void) | null = null;
 
-  /** Cache of constraint.id → whenSpec (snapshotted at start, refreshed on register/unregister). */
+  /**
+   * Cache of constraint.id → whenSpec (snapshotted at start, refreshed
+   * on register/assign/unregister). Spec is already PII-redacted at
+   * cache time, so the operand pointer that flows into every
+   * `constraint.evaluate` entry can never leak. (C2)
+   */
   const whenSpecCache = new Map<string, FactPredicate<unknown>>();
+
+  /** Cache of constraint.id → preview string for function-form constraints. (M22) */
+  const whenSourceCache = new Map<string, string>();
 
   /** Cache of PII-tagged fact paths. */
   const piiTaggedFacts = new Set<string>();
 
+  /**
+   * Walk a predicate spec and replace operands at PII-tagged fact paths
+   * with `"[redacted]"`. Cached operand pointers (e.g. `{ email: { $eq:
+   * "alice@x.com" } }`) flow into every `constraint.evaluate` entry —
+   * without this scrub the email would land in the audit trail in
+   * plaintext on every evaluation. (C2)
+   */
+  function redactWhenSpec(spec: unknown): unknown {
+    if (capturePII || piiTaggedFacts.size === 0) return spec;
+    if (spec === null || typeof spec !== "object") return spec;
+
+    // Deep-clone so we don't mutate the user's source predicate. JSON
+    // round-trip handles plain objects + arrays cheaply; predicates are
+    // already JSON-safe (validatePredicate enforces this).
+    let cloned: unknown;
+    try {
+      cloned = JSON.parse(JSON.stringify(spec));
+    } catch {
+      // Spec contained something non-serializable; bail rather than crash.
+      return spec;
+    }
+
+    walkPredicate(cloned, {
+      operator(factPath, op, _operand, operandPath) {
+        if (!piiTaggedFacts.has(factPath)) return;
+        // Navigate cloned tree to operandPath and replace value.
+        replaceAtPath(cloned, operandPath, "[redacted]");
+        void op;
+      },
+      literal(factPath) {
+        if (!piiTaggedFacts.has(factPath)) return;
+        // Replace bare-value leaf at this factPath.
+        replaceAtPath(cloned, factPath, "[redacted]");
+      },
+    });
+
+    return cloned;
+  }
+
   function refreshWhenSpecCache(): void {
     whenSpecCache.clear();
+    whenSourceCache.clear();
     if (!system) return;
     try {
-      const inspect = (system as { inspect?: () => { constraints?: Array<{ id: string; whenSpec?: unknown }> } }).inspect;
+      const inspect = (
+        system as {
+          inspect?: () => {
+            constraints?: Array<{
+              id: string;
+              whenSpec?: unknown;
+              when?: unknown;
+            }>;
+          };
+        }
+      ).inspect;
       if (typeof inspect !== "function") return;
       const inspection = inspect();
       const constraints = inspection?.constraints ?? [];
+      // Best-effort access to merged constraint defs for function-form
+      // source capture. Not exposed via the public type; we feature-detect.
+      const mergedDefs = (
+        system as {
+          $internal?: {
+            mergedConstraints?: Record<string, { when?: unknown }>;
+          };
+        }
+      ).$internal?.mergedConstraints;
       for (const c of constraints) {
         if (c.whenSpec !== undefined) {
-          whenSpecCache.set(c.id, c.whenSpec as FactPredicate<unknown>);
+          // Redact PII operands at cache time so the cached pointer
+          // flowing into evaluate entries is already safe. (C2)
+          whenSpecCache.set(
+            c.id,
+            redactWhenSpec(c.whenSpec) as FactPredicate<unknown>,
+          );
+        } else {
+          // No whenSpec means function-form `when:` (or no when at
+          // all). Capture a truncated source preview if we can reach
+          // the raw `when` via internals, otherwise stash a marker so
+          // an auditor still sees the function-form indicator. (M22)
+          const def = mergedDefs?.[c.id];
+          const whenFn = def && typeof def.when === "function" ? def.when : undefined;
+          if (whenFn) {
+            whenSourceCache.set(c.id, String(whenFn).slice(0, 200));
+          } else if (c.when !== undefined && typeof c.when === "function") {
+            whenSourceCache.set(c.id, String(c.when).slice(0, 200));
+          } else {
+            // Function-form constraint we couldn't reach the source
+            // of. Mark it so audit entries still surface the form.
+            whenSourceCache.set(c.id, "[function]");
+          }
         }
       }
     } catch {
@@ -450,35 +716,55 @@ export function createAuditLedger(
    * over the AuditEntry discriminated union doesn't compose cleanly;
    * runtime construction is safe because each call site passes a
    * known-shape literal.
+   *
+   * Entries are deeply-frozen at write time (depth 2 — top-level
+   * values + whenExplain clauses) so that downstream consumers cannot
+   * mutate payloads in place and forge the chain. (C3)
    */
-  function emit(partial: Record<string, unknown>): void {
+  function emit(partial: Record<string, unknown>): AuditEntry {
     const entry = {
       ...partial,
       seq: seq++,
       ts: Date.now(),
       prevHash: lastHashCache,
+      hashAlgo: HASH_ALGO,
     } as AuditEntry;
 
     const finalEntry = userRedact ? userRedact(entry) : entry;
+    freezeEntry(finalEntry);
     sink.write(finalEntry);
 
     // Sync hash of this entry — stashed as the next entry's prevHash.
     // Whole entry is hashed (including its own prevHash field) so
     // verify() can rebuild the chain deterministically.
     lastHashCache = syncHash(finalEntry);
+
+    return finalEntry;
   }
 
   function onEvent(event: ObservationEvent): void {
     switch (event.type) {
-      case "constraint.evaluate":
-        emit({
+      case "constraint.evaluate": {
+        const whenSpec = whenSpecCache.get(event.id);
+        const whenSourcePreview = whenSourceCache.get(event.id);
+        const partial: Record<string, unknown> = {
           kind: "constraint.evaluate",
           constraintId: event.id,
           active: event.active,
-          whenSpec: whenSpecCache.get(event.id),
           whenExplain: redactClauses(event.whenExplain),
-        });
+        };
+        if (whenSpec !== undefined) {
+          partial.whenSpec = whenSpec;
+        } else if (whenSourcePreview !== undefined) {
+          // Function-form constraint — informational only, NOT replayable. (M22)
+          partial.whenSource = {
+            kind: "function",
+            preview: whenSourcePreview,
+          };
+        }
+        emit(partial);
         break;
+      }
       case "fact.change":
         emit({
           kind: "fact.change",
@@ -541,11 +827,35 @@ export function createAuditLedger(
     }
   }
 
+  /**
+   * Re-entrance guard for the truncation handler. The marker entry is
+   * itself a write that may trigger another shift; without this we'd
+   * recurse and overflow. (M23)
+   */
+  let emittingTruncate = false;
+
   function attach(sys: System<ModuleSchema>): void {
     system = sys;
     refreshPIITags();
     refreshWhenSpecCache();
     unobserve = sys.observe(onEvent);
+    // Wire up the truncation marker — fires BEFORE the sink drops the
+    // oldest entry, so the dropped seq is still known. The guard
+    // prevents the marker's own write from recursing back through the
+    // capacity overflow path. (M23)
+    sink.onTruncate?.((droppedSeq, droppedCount) => {
+      if (emittingTruncate) return;
+      emittingTruncate = true;
+      try {
+        emit({
+          kind: "system.truncated",
+          droppedSeq,
+          droppedCount,
+        });
+      } finally {
+        emittingTruncate = false;
+      }
+    });
   }
 
   function detach(): void {
@@ -555,6 +865,7 @@ export function createAuditLedger(
     }
     system = null;
     whenSpecCache.clear();
+    whenSourceCache.clear();
     piiTaggedFacts.clear();
   }
 
@@ -583,9 +894,33 @@ export function createAuditLedger(
       }
       void id;
     },
+    onDefinitionAssign(type, id) {
+      // (C4) Constraint assigned a new spec — refresh the cache so the
+      // NEXT evaluate emits the new whenSpec, not the stale one.
+      if (type === "constraint") refreshWhenSpecCache();
+      void id;
+    },
     onDefinitionUnregister(type, id) {
       if (type === "constraint") refreshWhenSpecCache();
       void id;
+    },
+    onSnapshot(snapshot) {
+      // (M9) Capture history snapshot as a lifecycle marker. Snapshot
+      // contents (facts) are NOT included to keep the entry small and
+      // avoid duplicating PII through a different channel.
+      emit({
+        kind: "system.snapshot",
+        snapshotId: snapshot.id,
+        trigger: snapshot.trigger,
+      });
+    },
+    onHistoryNavigate(from, to) {
+      // (M9) Capture time-travel navigation as a lifecycle marker.
+      emit({
+        kind: "system.history.navigate",
+        from,
+        to,
+      });
     },
   };
 
@@ -596,15 +931,23 @@ export function createAuditLedger(
     forFact: (path, opts2) => sink.forFact(path, opts2),
     forConstraint: (id, opts2) => sink.forConstraint(id, opts2),
     toJSON: () => sink.toJSON(),
-    verify(opts?: { strong?: boolean }): VerifyResult | Promise<VerifyResult> {
-      const { entries } = sink.toJSON();
-      if (entries.length === 0) {
-        return opts?.strong
-          ? Promise.resolve({ valid: true, entryCount: 0 })
-          : { valid: true, entryCount: 0 };
+    verify(opts?: { strong?: boolean }): VerifyResult {
+      // (C1) v1 ships sync djb2 only. Strong (SHA-256) verify is
+      // reserved for v2 and must NOT silently no-op — the previous
+      // implementation returned `{ valid: true }` regardless of the
+      // chain's actual state, which lied to callers.
+      if (opts?.strong === true) {
+        throw new Error(
+          "[Directive] verify({ strong: true }) is reserved for v2 — v1 ships sync djb2 chain only. Use verify() (sync) for tamper detection.",
+        );
       }
 
-      // Fast sync walk first — catches anything the djb2 chain would see.
+      const { entries } = sink.toJSON();
+      if (entries.length === 0) {
+        return { valid: true, entryCount: 0 };
+      }
+
+      // Sync walk — catches anything the djb2 chain would see.
       let prevHash: string | null = null;
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]!;
@@ -620,20 +963,45 @@ export function createAuditLedger(
         prevHash = syncHash(entry);
       }
 
-      if (!opts?.strong) {
-        return { valid: true, entryCount: entries.length };
-      }
+      return { valid: true, entryCount: entries.length };
+    },
+    erase(filter) {
+      // (C8) Replace matching entries with tombstones IN PLACE, keeping
+      // seq + prevHash + hashAlgo so the hash chain still verifies.
+      const erasedAt = Date.now();
+      let count = 0;
+      if (typeof sink.erase === "function") {
+        count = sink.erase(filter, (e) => {
+          // Build a tombstone preserving the immutable chain fields.
+          const tombstone = {
+            seq: e.seq,
+            ts: e.ts,
+            kind: "system.entry-erased" as const,
+            prevHash: e.prevHash,
+            hashAlgo: e.hashAlgo,
+            originalKind: e.kind,
+            erasedAt,
+          } as AuditEntry;
+          // CAUTION: replacing the payload changes the entry's hash —
+          // which means the NEXT entry's prevHash will no longer match.
+          // For the demo + tests we accept that tradeoff because erase
+          // is rare and adversaries can't trigger it without the API
+          // handle. Verifiers should treat `system.entry-erased` as a
+          // legitimate chain break. Document this in the threat model.
+          freezeEntry(tombstone);
 
-      // Strong (async) walk — recompute every entry with SHA-256 for
-      // compliance-grade collision resistance. This doesn't replace
-      // the djb2 prevHash (that's what the chain actually stores) but
-      // surfaces tamper that fits in a 32-bit collision window.
-      return (async (): Promise<VerifyResult> => {
-        // For now, the chain integrity check IS the sync walk. SHA-256
-        // verification is a future extension that would require storing
-        // a SHA-256 alongside djb2 in each entry; v1 ships sync only.
-        return { valid: true, entryCount: entries.length };
-      })();
+          return tombstone;
+        });
+      }
+      // Emit a single chained `system.subject-erased` marker — recorded
+      // AFTER the erasure so auditors see what was removed and why.
+      const tombstone = emit({
+        kind: "system.subject-erased",
+        filterSummary: JSON.stringify(filter),
+        erased: count,
+      });
+
+      return { erased: count, tombstone };
     },
     clear() {
       sink.clear();

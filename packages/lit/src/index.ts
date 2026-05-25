@@ -1246,6 +1246,10 @@ import type {
  * `filter` as `.value`. Polls (default 250 ms — override with `pollMs`)
  * and re-renders the host on each tick that brings new matches.
  *
+ * **Polling floor:** `pollMs` is clamped to a minimum of 50 ms to prevent
+ * accidental DoS from typos like `pollMs: 5`. Values below the floor are
+ * silently clamped in production; dev mode logs a warning.
+ *
  * @example
  * ```ts
  * import { AuditLedgerController } from "@directive-run/lit";
@@ -1283,7 +1287,25 @@ export class AuditLedgerController implements ReactiveController {
     this.host = host;
     this.ledger = ledger;
     this.filter = filter;
-    this.pollMs = opts.pollMs ?? 250;
+    const requestedPollMs = opts.pollMs ?? 250;
+    this.pollMs = Math.max(50, requestedPollMs);
+
+    if (isDevelopment) {
+      if (opts.pollMs !== undefined && opts.pollMs < 50) {
+        console.warn(
+          `[Directive] AuditLedgerController pollMs=${opts.pollMs} is below the 50 ms floor; clamped to 50 ms.`,
+        );
+      }
+      if (this.pollMs < 100) {
+        const entryCount = ledger.toJSON().entries.length;
+        if (entryCount > 1000) {
+          console.warn(
+            `[Directive] AuditLedgerController polling every ${this.pollMs} ms against a ${entryCount}-entry ledger — that's a lot of CPU per tick. Consider raising pollMs or tightening the filter.`,
+          );
+        }
+      }
+    }
+
     this.value = ledger.query(filter);
     host.addController(this);
   }
@@ -1291,13 +1313,19 @@ export class AuditLedgerController implements ReactiveController {
   hostConnected(): void {
     this.intervalId = setInterval(() => {
       const next = this.ledger.query(this.filter);
-      // Only request update if entry count changed — avoids a wasted
-      // render every poll tick when nothing has happened.
-      if (next.length !== this.value.length) {
-        this.value = next;
+      // Always replace the array reference so consumers reading
+      // `.value` see the latest snapshot, but only request a render
+      // when the seq-window actually moved. At steady-state capacity
+      // (e.g. 10k entries rolling over) the length is constant — using
+      // length-diff alone misses every change. Compare the first and
+      // last seq instead. (R4.C7)
+      const moved =
+        next[0]?.seq !== this.value[0]?.seq ||
+        next[next.length - 1]?.seq !==
+          this.value[this.value.length - 1]?.seq;
+      this.value = next;
+      if (moved) {
         this.host.requestUpdate();
-      } else {
-        this.value = next;
       }
     }, this.pollMs);
   }

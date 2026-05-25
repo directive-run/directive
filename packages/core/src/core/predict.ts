@@ -12,6 +12,7 @@
 
 import {
   evaluatePredicateExplained,
+  walkPredicate,
 } from "./predicate.js";
 import type { ClauseResult, FactPredicate } from "./types/predicate.js";
 
@@ -32,7 +33,7 @@ export interface PredictMissingChange {
   readonly suggestion: string;
 }
 
-export interface PredictResult<F> {
+export interface PredictResult<_F = unknown> {
   /** True iff the predicate would fire against `facts`. */
   readonly wouldFire: boolean;
   /** Full clause-by-clause result (reuses the whenExplain payload). */
@@ -41,10 +42,12 @@ export interface PredictResult<F> {
    * List of failing clauses, each with a `suggestion` describing the
    * smallest concrete change to `facts` that would make that clause pass.
    * Empty when `wouldFire === true`.
+   *
+   * If the predicate contains a `$changed` clause AND `prev` was not
+   * passed, a synthetic warning is included here (the `$changed` clause
+   * cannot be evaluated without a `prev` snapshot).
    */
   readonly missingChanges: readonly PredictMissingChange[];
-  /** Reference to the predicate evaluated, for telemetry. */
-  readonly predicate: FactPredicate<F>;
 }
 
 // ============================================================================
@@ -163,6 +166,12 @@ function collectFailedLeaves(
  * Designed for the LLM-iteration loop and for "preview the impact of this
  * rule" UIs.
  *
+ * **`$changed` and `prev`:** the `$changed` operator compares the current
+ * value of a fact against the `prev` snapshot. If the predicate uses
+ * `$changed` and `prev` is not supplied, the missing-changes list includes
+ * a synthetic warning indicating that the clause cannot be evaluated —
+ * pass `predict(predicate, facts, prev)` to get a real result.
+ *
  * @example
  * ```ts
  * const predicate = { cartTotal: { $gte: 50 }, region: { $in: ["US", "EU"] } };
@@ -176,7 +185,6 @@ function collectFailedLeaves(
  * //       { path: "cartTotal", op: "$gte", expected: 50, actual: 30,
  * //         suggestion: "set cartTotal to at least 50 (currently 30)" },
  * //     ],
- * //     predicate: { cartTotal: { $gte: 50 }, region: { $in: ["US", "EU"] } },
  * //   }
  * ```
  */
@@ -197,10 +205,32 @@ export function predict<F = Record<string, unknown>>(
     collectFailedLeaves(whenExplain, missingChanges);
   }
 
+  // M10: $changed clause needs a `prev` snapshot. If the caller omitted
+  // `prev`, evaluation silently treats every `$changed` clause as failing —
+  // surface a synthetic warning so the caller sees the real cause.
+  if (prev === undefined) {
+    const changedPaths: string[] = [];
+    walkPredicate(predicate as unknown, {
+      operator(factPath, op) {
+        if (op === "$changed") {
+          changedPaths.push(factPath);
+        }
+      },
+    });
+    for (const path of changedPaths) {
+      missingChanges.push({
+        path,
+        op: "$changed",
+        expected: true,
+        actual: undefined,
+        suggestion: `$changed clause at "${path}" cannot be evaluated without a \`prev\` snapshot — pass predict(predicate, facts, prev).`,
+      });
+    }
+  }
+
   return {
     wouldFire,
     whenExplain,
     missingChanges,
-    predicate,
   };
 }

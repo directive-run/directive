@@ -1179,6 +1179,64 @@ describe("Factory functions", () => {
 });
 
 // ============================================================================
+// AuditLedgerController — seq-window diff (R4.C7)
+// ============================================================================
+
+describe("AuditLedgerController — seq-window diff (R4.C7)", () => {
+  it("requests updates when entries roll over at steady-state capacity", async () => {
+    const { createAuditLedger, memorySink } = await import(
+      "@directive-run/core"
+    );
+    const { AuditLedgerController } = await import("../index");
+
+    // Tight capacity so a few writes overflow.
+    const sink = memorySink({ capacity: 3 });
+    const ledger = createAuditLedger({ sink });
+    const moduleDef = createModule("ledger-host", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (facts) => {
+        facts.n = 0;
+      },
+    });
+    const system = createSystem({
+      module: moduleDef,
+      plugins: [ledger.plugin],
+    });
+    system.start();
+
+    // Pre-fill so the controller starts at capacity.
+    for (let i = 0; i < 10; i++) {
+      system.facts.n = i;
+    }
+    await new Promise((r) => setTimeout(r, 0));
+
+    const host = createMockHost();
+    const ctrl = new AuditLedgerController(host, ledger, {}, { pollMs: 20 });
+    ctrl.hostConnected();
+
+    const startCount = host.updateCount;
+    const startSeqLast = ctrl.value[ctrl.value.length - 1]?.seq;
+
+    // Mutate a fact — new entries should land, seq-window moves, host
+    // re-renders even though length stays at capacity.
+    system.facts.n = 999;
+    await new Promise((r) => setTimeout(r, 80));
+
+    const endSeqLast = ctrl.value[ctrl.value.length - 1]?.seq;
+    expect(endSeqLast).not.toBe(startSeqLast);
+    expect(host.updateCount).toBeGreaterThan(startCount);
+
+    ctrl.hostDisconnected();
+    system.destroy();
+  });
+});
+
+// ============================================================================
 // shallowEqual
 // ============================================================================
 

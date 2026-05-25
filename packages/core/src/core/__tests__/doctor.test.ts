@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { doctor } from "../doctor.js";
+import { flattenPredicate } from "../rules-diff.js";
 
 describe("doctor.checkAgainst — direct contradictions", () => {
   it("$gte vs $lt with no overlap → direct", () => {
@@ -50,30 +51,33 @@ describe("doctor.checkAgainst — direct contradictions", () => {
   });
 });
 
-describe("doctor.checkAgainst — subset", () => {
-  it("candidate $gte 100 vs existing $gte 50 → subset", () => {
+describe("doctor.checkAgainst — subset (M17: now a warning, not a contradiction)", () => {
+  it("candidate $gte 100 vs existing $gte 50 → subset in warnings", () => {
     const result = doctor.checkAgainst(
       { cartTotal: { $gte: 100 } },
       [{ id: "discount", whenSpec: { cartTotal: { $gte: 50 } } }],
     );
-    expect(result.contradictions).toHaveLength(1);
-    expect(result.contradictions[0]?.type).toBe("subset");
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.type).toBe("subset");
   });
 
-  it("two identical $eq clauses → subset (candidate redundant)", () => {
+  it("two identical $eq clauses → subset in warnings (candidate redundant)", () => {
     const result = doctor.checkAgainst(
       { status: { $eq: "active" } },
       [{ id: "echo", whenSpec: { status: { $eq: "active" } } }],
     );
-    expect(result.contradictions[0]?.type).toBe("subset");
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings[0]?.type).toBe("subset");
   });
 
-  it("candidate $in [US] vs existing $in [US,EU] → subset", () => {
+  it("candidate $in [US] vs existing $in [US,EU] → subset in warnings", () => {
     const result = doctor.checkAgainst(
       { region: { $in: ["US"] } },
       [{ id: "geo", whenSpec: { region: { $in: ["US", "EU"] } } }],
     );
-    expect(result.contradictions[0]?.type).toBe("subset");
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings[0]?.type).toBe("subset");
   });
 });
 
@@ -143,5 +147,85 @@ describe("doctor.checkAgainst — reason quality", () => {
     expect(reason).toContain("100");
     expect(reason).toContain("50");
     expect(reason).toContain("cartTotal");
+  });
+});
+
+// ============================================================================
+// M4 — doctor.checkOwns (owns:/bind: awareness)
+// ============================================================================
+
+describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
+  it("flags a candidate path that matches a constraint's owns:", () => {
+    const result = doctor.checkOwns(
+      { cartTotal: { $gte: 100 }, region: { $eq: "US" } },
+      [
+        {
+          id: "applyDiscount",
+          whenSpec: { cartTotal: { $gte: 50 } },
+          owns: ["cartTotal"],
+        },
+      ],
+    );
+    expect(result.findings).toHaveLength(1);
+    const f = result.findings[0]!;
+    expect(f.constraintId).toBe("applyDiscount");
+    expect(f.candidatePath).toBe("cartTotal");
+    expect(f.source).toBe("owns");
+    expect(f.reason).toContain("applyDiscount");
+    expect(f.reason).toContain("cartTotal");
+  });
+
+  it("flags a candidate path that matches a constraint's bind:", () => {
+    const result = doctor.checkOwns(
+      { phase: { $eq: "red" } },
+      [{ id: "lock", bind: ["phase"] }],
+    );
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.source).toBe("bind");
+  });
+
+  it("no findings when constraints expose no owns:/bind: metadata", () => {
+    const result = doctor.checkOwns(
+      { cartTotal: { $gte: 100 } },
+      [{ id: "noMeta", whenSpec: { cartTotal: { $lt: 50 } } }],
+    );
+    expect(result.findings).toEqual([]);
+  });
+
+  it("no findings when candidate paths are disjoint from owners", () => {
+    const result = doctor.checkOwns(
+      { region: { $eq: "US" } },
+      [{ id: "x", owns: ["cartTotal"] }],
+    );
+    expect(result.findings).toEqual([]);
+  });
+
+  it("accepts the inspect()-style { constraints: [...] } wrapper", () => {
+    const result = doctor.checkOwns(
+      { cartTotal: { $gte: 100 } },
+      { constraints: [{ id: "owner", owns: ["cartTotal"] }] },
+    );
+    expect(result.findings).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// M11 — doctor contract on flattenPredicate leaf shape
+// ============================================================================
+
+describe("doctor — flattenPredicate leaf shape contract (M11)", () => {
+  it("flattenPredicate emits { path, op, value } LeafClause shape", () => {
+    const out = flattenPredicate({ x: { $gte: 5 } });
+    expect(out).toEqual([{ path: "x", op: "$gte", value: 5 }]);
+  });
+
+  it("LeafClause shape is preserved across combinator nesting", () => {
+    const out = flattenPredicate({
+      $all: [{ x: { $gte: 5 } }, { y: { $eq: "z" } }],
+    });
+    const keys = out.map((leaf) => Object.keys(leaf).sort());
+    for (const k of keys) {
+      expect(k).toEqual(["op", "path", "value"]);
+    }
   });
 });

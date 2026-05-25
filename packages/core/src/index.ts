@@ -161,7 +161,7 @@ export {
   listAllPredicateOperators,
 } from "./core/schema-introspection.js";
 export type { SchemaKind, SchemaKindNode } from "./core/schema-introspection.js";
-export { validatePredicateAgainstSchema } from "./core/predicate.js";
+export { validatePredicateAgainstSchema, dangerousRegex } from "./core/predicate.js";
 export type {
   SchemaValidationError,
   SchemaValidationOptions,
@@ -176,12 +176,14 @@ export type { PredictMissingChange, PredictResult } from "./core/predict.js";
 export { doctor } from "./core/doctor.js";
 export type {
   CheckAgainstResult,
+  CheckOwnsFinding,
+  CheckOwnsResult,
   Contradiction,
   ContradictionType,
   ExistingConstraint,
 } from "./core/doctor.js";
 
-// createAuditLedger — append-only, queryable, cryptographically-chained audit log
+// createAuditLedger — append-only, queryable, hash-chained audit log (djb2; SHA-256 reserved for v2)
 export {
   createAuditLedger,
   memorySink,
@@ -194,6 +196,10 @@ export type {
   AuditLedgerSink,
   QueryFilter,
 } from "./plugins/audit-ledger.js";
+
+// describePredicate — render any FactPredicate as English / algebraic prose
+export { describePredicate } from "./core/predicate-describe.js";
+export type { DescribeOptions } from "./core/predicate-describe.js";
 
 // Predicate codegen — one predicate, run on client AND server
 export { predicateToSQL, predicateToWhere } from "./core/predicate-to-sql.js";

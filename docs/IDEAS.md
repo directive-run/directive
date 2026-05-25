@@ -1225,3 +1225,50 @@ the original is soft-deprecated in docs.
   deprecate `$ref` for patches (but keep working). Removes the JSON
   Schema / JSON Pointer collision (`$ref` reads as a document reference;
   Directive's `$ref` is a payload field copy) without breaking v1.5.
+
+
+---
+
+## R6 — AE Round 1 Game-Changers (post-v1.12 sprint review)
+
+Surfaced by the R1 AE innovation review on top of the eight tools shipped in v1.9–v1.12. All compound on existing substrate; none require new infrastructure.
+
+### R6.A — `ledger.replayUnder()`: regulator backtests last quarter's traffic against a proposed rule
+
+**[2 days — viral MAX, compound MAX]**
+
+The audit ledger captured every fact-change + the predicate that fired. `replayUnder` already runs a candidate predicate against historical frames. Adapter is one method:
+
+```ts
+const report = ledger.replayUnder({
+  candidate: { cartTotal: { $gte: 50 } },
+  baseline:  { cartTotal: { $gte: 100 } },
+  range: "last-30-days",
+});
+// → { samples: 4_293_017, before: { trueFrames: 18_402 },
+//     after: { trueFrames: 31_204 },
+//     drift: { newlyTrue: 12_801, newlyFalse: 0 } }
+```
+
+**Headline:** *"Regulators can now replay last quarter's production against your proposed rule change — directly from the audit log."*
+
+### R6.B — `predicate.describe()`: English round-trip on every predicate — **IN PROGRESS R1**
+
+**[1 day — viral MAX, compound MAX]** **(keystone)**
+
+Pure tree walker. `predicate.describe({ cartTotal: { $gte: 50 }, region: { $in: ["US", "EU"] } })` → *"cart total is at least 50 AND region is one of [US, EU]"*. Closes the LLM-emit round-trip (intent → predicate → describe → reprompt). Feeds:
+- `predicateFromIntent` — show the user the rule they're about to install in English
+- `rules-diff` — render prose deltas instead of JSON
+- `whenExplain` panel — hover-tooltip prose
+- `audit-ledger` — regulator-readable entries
+- `doctor` — contradiction reasons in English
+
+**Headline:** *"Every Directive rule now reads itself back to you in English. Round-trip with the LLM in one line."*
+
+### R6.C — `predicateToZod` / `predicateToJSONSchema` / `predicateToTypeScript`: the type-system bridge
+
+**[1.5 days — viral HIGH, compound MAX]**
+
+Predicate as Zod refinement, JSON Schema validator, conditional TypeScript narrower. The same predicate that drives the runtime also validates API payloads and narrows types at compile time. Eight tools become eleven without new substrate.
+
+**Headline:** *"One predicate, five compile targets. Your runtime rule is now also your Zod schema, your OpenAPI doc, and your TypeScript narrower."*

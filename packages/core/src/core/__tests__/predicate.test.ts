@@ -3,6 +3,7 @@ import { createModule, createSystem, t } from "../../index.js";
 import { attributeError, freezeSpec } from "../../utils/utils.js";
 import {
   applyPatch,
+  dangerousRegex,
   evaluateKeySelector,
   evaluatePredicate,
   evaluatePredicateExplained,
@@ -15,8 +16,10 @@ import {
   MAX_PREDICATE_DEPTH,
   memoizePredicate,
   validatePredicate,
+  validatePredicateAgainstSchema,
   walkPredicate,
 } from "../predicate.js";
+import { getSchemaFieldKinds } from "../schema-introspection.js";
 
 // ============================================================================
 // evaluatePredicate — operators
@@ -1579,6 +1582,124 @@ describe("predicate spec cycle/depth guards", () => {
     }).not.toThrow(/Maximum call stack/);
 
     system.destroy();
+  });
+});
+
+// ============================================================================
+// M1 — validatePredicateAgainstSchema maxArrayOperandLength
+// ============================================================================
+
+describe("validatePredicateAgainstSchema — $in / $nin maxArrayOperandLength (M1)", () => {
+  const kindMap = getSchemaFieldKinds({
+    facts: {
+      region: t.string(),
+      cartTotal: t.number(),
+    },
+  });
+
+  it("rejects a $in operand longer than maxArrayOperandLength (1001-element)", () => {
+    const huge = Array.from({ length: 1001 }, (_, i) => `r${i}`);
+    const result = validatePredicateAgainstSchema(
+      { region: { $in: huge } },
+      kindMap,
+      { maxArrayOperandLength: 1000 },
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.errors.some((e) => e.reason.includes("maxArrayOperandLength")),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects a $nin operand over the cap", () => {
+    const huge = Array.from({ length: 1001 }, (_, i) => `r${i}`);
+    const result = validatePredicateAgainstSchema(
+      { region: { $nin: huge } },
+      kindMap,
+      { maxArrayOperandLength: 1000 },
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts a $in operand at exactly the cap", () => {
+    const ok = Array.from({ length: 1000 }, (_, i) => `r${i}`);
+    const result = validatePredicateAgainstSchema(
+      { region: { $in: ok } },
+      kindMap,
+      { maxArrayOperandLength: 1000 },
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("with no cap, even huge $in operands pass", () => {
+    const huge = Array.from({ length: 5000 }, (_, i) => `r${i}`);
+    const result = validatePredicateAgainstSchema(
+      { region: { $in: huge } },
+      kindMap,
+    );
+    expect(result.ok).toBe(true);
+  });
+});
+
+// ============================================================================
+// M2 — dangerousRegex + $matches ReDoS rejection
+// ============================================================================
+
+describe("dangerousRegex — nested-quantifier heuristic (M2)", () => {
+  it("flags (a+)+", () => {
+    expect(dangerousRegex("(a+)+")).toBe(true);
+  });
+  it("flags (.*)*", () => {
+    expect(dangerousRegex("(.*)*")).toBe(true);
+  });
+  it("flags (.+)*", () => {
+    expect(dangerousRegex("(.+)*")).toBe(true);
+  });
+  it("flags (\\w+)+", () => {
+    expect(dangerousRegex("(\\w+)+")).toBe(true);
+  });
+  it("flags (a|a)+", () => {
+    expect(dangerousRegex("(a|a)+")).toBe(true);
+  });
+  it("does NOT flag a benign anchored class", () => {
+    expect(dangerousRegex("^[a-z]+$")).toBe(false);
+  });
+  it("does NOT flag a single-quantified group", () => {
+    expect(dangerousRegex("(abc)+")).toBe(false);
+  });
+});
+
+describe("validatePredicateAgainstSchema — $matches ReDoS rejection (M2)", () => {
+  const kindMap = getSchemaFieldKinds({
+    facts: { name: t.string() },
+  });
+
+  it("rejects a RegExp operand with nested quantifiers", () => {
+    const result = validatePredicateAgainstSchema(
+      { name: { $matches: /(a+)+/ } },
+      kindMap,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors[0]?.reason).toContain("nested quantifiers");
+    }
+  });
+
+  it("rejects a string-form pattern with nested quantifiers", () => {
+    const result = validatePredicateAgainstSchema(
+      { name: { $matches: "(.*)*" } },
+      kindMap,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts a benign RegExp", () => {
+    const result = validatePredicateAgainstSchema(
+      { name: { $matches: /^[A-Z][a-z]+$/ } },
+      kindMap,
+    );
+    expect(result.ok).toBe(true);
   });
 });
 

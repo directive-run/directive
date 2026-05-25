@@ -1200,12 +1200,20 @@ import type {
   AuditLedger,
   QueryFilter,
 } from "@directive-run/core";
-import { onMounted, onBeforeUnmount } from "vue";
 
 /**
  * Subscribe to an audit ledger and return the latest entries matching
  * `filter` as a reactive `Ref`. Re-evaluates on each poll tick (default
  * 250 ms — override with `pollMs`).
+ *
+ * **Polling floor:** `pollMs` is clamped to a minimum of 50 ms to prevent
+ * accidental DoS from typos like `pollMs: 5`. Values below the floor are
+ * silently clamped in production; dev mode logs a warning.
+ *
+ * **First-paint freshness:** the interval starts immediately at setup
+ * time (not gated on `onMounted`), so the first ledger query lands
+ * before the component paints. Cleanup uses `onScopeDispose`, which
+ * is correct for both component scopes and ad-hoc effect scopes.
  *
  * @example
  * ```vue
@@ -1225,17 +1233,32 @@ export function useAuditLedger(
   filter: QueryFilter = {},
   opts: { pollMs?: number } = {},
 ): ShallowRef<readonly AuditEntry[]> {
-  const pollMs = opts.pollMs ?? 250;
-  const entries = shallowRef<readonly AuditEntry[]>(ledger.query(filter));
-  let intervalId: ReturnType<typeof setInterval> | null = null;
+  const requestedPollMs = opts.pollMs ?? 250;
+  const pollMs = Math.max(50, requestedPollMs);
 
-  onMounted(() => {
-    intervalId = setInterval(() => {
-      entries.value = ledger.query(filter);
-    }, pollMs);
-  });
-  onBeforeUnmount(() => {
-    if (intervalId !== null) clearInterval(intervalId);
+  if (isDevelopment) {
+    if (opts.pollMs !== undefined && opts.pollMs < 50) {
+      console.warn(
+        `[Directive] useAuditLedger() pollMs=${opts.pollMs} is below the 50 ms floor; clamped to 50 ms.`,
+      );
+    }
+    if (pollMs < 100) {
+      const entryCount = ledger.toJSON().entries.length;
+      if (entryCount > 1000) {
+        console.warn(
+          `[Directive] useAuditLedger() polling every ${pollMs} ms against a ${entryCount}-entry ledger — that's a lot of CPU per tick. Consider raising pollMs or tightening the filter.`,
+        );
+      }
+    }
+  }
+
+  const entries = shallowRef<readonly AuditEntry[]>(ledger.query(filter));
+  const intervalId = setInterval(() => {
+    entries.value = ledger.query(filter);
+  }, pollMs);
+
+  onScopeDispose(() => {
+    clearInterval(intervalId);
   });
 
   return entries;

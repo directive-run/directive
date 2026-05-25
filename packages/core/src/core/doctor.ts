@@ -6,9 +6,11 @@
  *
  *   - **direct contradiction:** same fact path, opposite-direction
  *     comparison (`$gte 50` vs `$lt 50` — they cannot both fire).
+ *     Reported under `contradictions`.
  *   - **subset:** candidate's range is a strict subset of an existing
  *     constraint's range (candidate `$gte 100` when existing already
- *     has `$gte 50`; the new rule never fires independently of the old).
+ *     has `$gte 50`; the new rule is redundant). Reported under
+ *     `warnings` — a redundant rule is not a contradiction, just noise.
  *   - **overlap:** shares ≥1 fact path with non-trivial intersection —
  *     a warning, not a hard error.
  *
@@ -23,6 +25,16 @@
  * can't see). False positives (contradiction reported where none
  * exists) are NOT acceptable — every reported contradiction must be
  * defensible.
+ *
+ * **v1 scope LIMITATION (M4):** `checkAgainst` operates on predicate
+ * logic only. It does NOT consult `bind:` / `owns:` resolver metadata —
+ * a candidate that would *write* to a fact owned by another constraint
+ * will not be flagged here. Use `doctor.checkOwns()` for that gate.
+ *
+ * **INVARIANT (M11):** `checkAgainst` depends on `flattenPredicate`
+ * emitting `{ path, op, value }` LeafClause shape — if that shape ever
+ * changes, every comparison below silently breaks. See
+ * `doctor-leaf-shape.contract.test.ts`.
  *
  * Pure, sync, no engine dependency.
  */
@@ -52,9 +64,16 @@ export interface Contradiction {
 }
 
 export interface CheckAgainstResult {
-  /** Hard contradictions — candidate never co-fires with existing rule. */
+  /**
+   * Hard contradictions — candidate never co-fires with existing rule.
+   * Includes only `type: "direct"` findings. Redundancy (`type: "subset"`)
+   * lives under `warnings` — a redundant rule is noise, not a conflict.
+   */
   readonly contradictions: readonly Contradiction[];
-  /** Soft overlaps — shared facts with non-trivial intersection. */
+  /**
+   * Soft findings — shared facts with non-trivial intersection
+   * (`type: "overlap"`) AND subset redundancy (`type: "subset"`).
+   */
   readonly warnings: readonly Contradiction[];
 }
 
@@ -62,6 +81,29 @@ export interface CheckAgainstResult {
 export interface ExistingConstraint {
   readonly id: string;
   readonly whenSpec?: unknown;
+  /**
+   * Fact paths the constraint's resolver(s) write to, if exposed by the
+   * inspect API. Consulted by {@link doctor.checkOwns} to flag candidates
+   * that would write to fields owned elsewhere. Optional — older inspect
+   * payloads omit it.
+   */
+  readonly owns?: readonly string[];
+  /** Same as {@link owns} but for the bind: side of binding metadata. */
+  readonly bind?: readonly string[];
+}
+
+/** Returned by {@link doctor.checkOwns}. */
+export interface CheckOwnsFinding {
+  readonly constraintId: string;
+  /** The fact path on the candidate predicate that triggered the finding. */
+  readonly candidatePath: string;
+  /** The owner side it would collide with: "owns" or "bind". */
+  readonly source: "owns" | "bind";
+  readonly reason: string;
+}
+
+export interface CheckOwnsResult {
+  readonly findings: readonly CheckOwnsFinding[];
 }
 
 // ============================================================================
@@ -347,7 +389,10 @@ export const doctor = {
             candidate: { op: cand.op, value: cand.value },
             existing: { op: exi.op, value: exi.value },
           };
-          if (verdict.type === "overlap") {
+          // M17: subset findings are redundancy warnings, not contradictions.
+          // A candidate whose range is a strict subset of an existing rule's
+          // range can still co-fire — it's noise, not a conflict.
+          if (verdict.type === "overlap" || verdict.type === "subset") {
             warnings.push(finding);
           } else {
             contradictions.push(finding);
@@ -357,5 +402,77 @@ export const doctor = {
     }
 
     return { contradictions, warnings };
+  },
+
+  /**
+   * Flag a candidate predicate whose referenced fact paths overlap with
+   * fields *owned* (or `bind:`-bound) by an existing constraint's
+   * resolvers. A v1 stub: relies on `inspect()` exposing `owns:` / `bind:`
+   * on each constraint snapshot. When that metadata is absent, this
+   * returns `{ findings: [] }` — no false positives.
+   *
+   * **TODO (v2):** wire the engine's resolver-ownership graph through
+   * `system.inspect()` so this returns real findings without manual
+   * `owns:` annotations on inspect payloads.
+   *
+   * @example
+   * ```ts
+   * doctor.checkOwns(
+   *   { cartTotal: { $gte: 100 } },
+   *   system.inspect(),
+   * );
+   * // → { findings: [
+   * //     { constraintId: "applyDiscount", candidatePath: "cartTotal",
+   * //       source: "owns",
+   * //       reason: "Constraint applyDiscount already owns cartTotal." }
+   * //   ] }
+   * ```
+   */
+  checkOwns<F = Record<string, unknown>>(
+    candidate: FactPredicate<F>,
+    existing:
+      | readonly ExistingConstraint[]
+      | { constraints: readonly ExistingConstraint[] },
+  ): CheckOwnsResult {
+    const constraints: readonly ExistingConstraint[] = Array.isArray(existing)
+      ? existing
+      : "constraints" in existing && Array.isArray(existing.constraints)
+        ? existing.constraints
+        : [];
+
+    const candidateLeaves = flattenPredicate(candidate);
+    if (candidateLeaves.length === 0) {
+      return { findings: [] };
+    }
+    const candidatePaths = new Set(candidateLeaves.map((l) => l.path));
+
+    const findings: CheckOwnsFinding[] = [];
+    for (const c of constraints) {
+      if (!isExistingConstraint(c)) continue;
+      const owns = Array.isArray(c.owns) ? c.owns : [];
+      const bind = Array.isArray(c.bind) ? c.bind : [];
+      for (const path of owns) {
+        if (candidatePaths.has(path)) {
+          findings.push({
+            constraintId: c.id,
+            candidatePath: path,
+            source: "owns",
+            reason: `Constraint "${c.id}" already owns "${path}" — candidate would race or shadow its writes.`,
+          });
+        }
+      }
+      for (const path of bind) {
+        if (candidatePaths.has(path)) {
+          findings.push({
+            constraintId: c.id,
+            candidatePath: path,
+            source: "bind",
+            reason: `Constraint "${c.id}" binds "${path}" — candidate would write to a bound field.`,
+          });
+        }
+      }
+    }
+
+    return { findings };
   },
 };

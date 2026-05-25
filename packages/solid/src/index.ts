@@ -1069,6 +1069,10 @@ import type {
  * `filter` as a Solid `Accessor`. Re-evaluates on each poll tick
  * (default 250 ms — override with `pollMs`).
  *
+ * **Polling floor:** `pollMs` is clamped to a minimum of 50 ms to prevent
+ * accidental DoS from typos like `pollMs: 5`. Values below the floor are
+ * silently clamped in production; dev mode logs a warning.
+ *
  * @example
  * ```tsx
  * import { useAuditLedger } from "@directive-run/solid";
@@ -1090,7 +1094,25 @@ export function useAuditLedger(
   filter: QueryFilter = {},
   opts: { pollMs?: number } = {},
 ): Accessor<readonly AuditEntry[]> {
-  const pollMs = opts.pollMs ?? 250;
+  const requestedPollMs = opts.pollMs ?? 250;
+  const pollMs = Math.max(50, requestedPollMs);
+
+  if (isDevelopment) {
+    if (opts.pollMs !== undefined && opts.pollMs < 50) {
+      console.warn(
+        `[Directive] useAuditLedger() pollMs=${opts.pollMs} is below the 50 ms floor; clamped to 50 ms.`,
+      );
+    }
+    if (pollMs < 100) {
+      const entryCount = ledger.toJSON().entries.length;
+      if (entryCount > 1000) {
+        console.warn(
+          `[Directive] useAuditLedger() polling every ${pollMs} ms against a ${entryCount}-entry ledger — that's a lot of CPU per tick. Consider raising pollMs or tightening the filter.`,
+        );
+      }
+    }
+  }
+
   const [entries, setEntries] = createSignal<readonly AuditEntry[]>(
     ledger.query(filter),
   );

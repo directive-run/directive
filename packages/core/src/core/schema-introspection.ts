@@ -15,6 +15,7 @@
  * introspecting caller asks for it.
  */
 
+import isDevelopment from "#is-development";
 import { PREDICATE_OPERATORS, type PredicateOp } from "./types/predicate.js";
 
 /**
@@ -159,6 +160,14 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
  * parsing the freeform `_typeName` string for legacy / third-party
  * builders that don't set `_kind`.
  *
+ * Hostile-getter safe: `_kind` / `_typeName` reads are wrapped — a builder
+ * that throws on property access returns `{ kind: "unknown" }` instead of
+ * propagating the throw to introspecting callers.
+ *
+ * In dev mode, a function input (`typeof schema === "function"`) emits a
+ * warning — common foot-gun where the caller forgot to invoke a builder
+ * factory (e.g. wrote `t.number` instead of `t.number()`).
+ *
  * @example
  * ```ts
  * getKind(t.number())              // → { kind: "number" }
@@ -167,11 +176,37 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
  * ```
  */
 export function getKind(schema: unknown): SchemaKindNode {
-  if (!schema || typeof schema !== "object") return { kind: "unknown" };
-  const s = schema as IntrospectableSchema;
-  if (s._kind) return s._kind;
+  if (schema === null || schema === undefined) return { kind: "unknown" };
+  if (typeof schema === "function") {
+    if (isDevelopment) {
+      console.warn(
+        "[Directive] getKind: received a function — did you forget () on a t.* builder? Example: write `t.number()`, not `t.number`.",
+      );
+    }
 
-  return parseTypeName(s._typeName);
+    return { kind: "unknown" };
+  }
+  if (typeof schema !== "object") return { kind: "unknown" };
+  const s = schema as IntrospectableSchema;
+
+  // Hostile-getter guard: a third-party builder that throws on `_kind` /
+  // `_typeName` reads must not crash an introspecting caller.
+  let kindNode: SchemaKindNode | undefined;
+  try {
+    kindNode = s._kind;
+  } catch {
+    return { kind: "unknown" };
+  }
+  if (kindNode) return kindNode;
+
+  let typeName: string | undefined;
+  try {
+    typeName = s._typeName;
+  } catch {
+    return { kind: "unknown" };
+  }
+
+  return parseTypeName(typeName);
 }
 
 // ============================================================================
@@ -187,6 +222,14 @@ export function getKind(schema: unknown): SchemaKindNode {
  * Passing a top-level schema directly (without the `facts:` wrapper)
  * also works — anything iterable as `Record<string, ExtendedSchemaType>`
  * is acceptable.
+ *
+ * Hostile-getter safe: a builder whose `_kind` / `_typeName` throws is
+ * silently skipped (treated as `{ kind: "unknown" }` for that field)
+ * rather than aborting the whole walk.
+ *
+ * In dev mode, a top-level schema that yields an empty map (no
+ * introspectable keys) emits a warning — common foot-gun where the
+ * caller passed `myModule` instead of `myModule.schema`.
  */
 export function getSchemaFieldKinds(
   schema: unknown,
@@ -202,7 +245,14 @@ export function getSchemaFieldKinds(
 
   for (const [key, builder] of Object.entries(facts)) {
     if (!builder || typeof builder !== "object") continue;
-    const node = getKind(builder);
+    let node: SchemaKindNode;
+    try {
+      node = getKind(builder);
+    } catch {
+      // A pathological builder whose getter throws past getKind's own
+      // guards — skip the field but keep walking the rest.
+      continue;
+    }
     out.set(key, node);
 
     // Flatten nested object shapes one level — matches OperatorObject<V>'s
@@ -212,6 +262,12 @@ export function getSchemaFieldKinds(
         out.set(`${key}.${innerKey}`, innerNode);
       }
     }
+  }
+
+  if (out.size === 0 && isDevelopment) {
+    console.warn(
+      "[Directive] getSchemaFieldKinds: schema appears empty (no introspectable keys). Did you pass the module instead of its schema? Pass `myModule.schema`, not `myModule`.",
+    );
   }
 
   return out;

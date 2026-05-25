@@ -549,11 +549,18 @@ export {
 export {
   predicateFromIntent,
   predicateFromIntentRaw,
+  predicateFromIntentWithProvenance,
   predicateToolSpec,
+  predicateToolSpecAnthropic,
+  predicateToolSpecOpenAI,
   PredicateFromIntentError,
   type PredicateFromIntentOptions,
   type PredicateFromIntentDiagnostics,
+  type PredicateFromIntentProvenance,
+  type PredicateFromIntentWithProvenanceResult,
   type PredicateToolSpec,
+  type PredicateToolSpecAnthropic,
+  type PredicateToolSpecOpenAI,
   type PredicateToolSpecOptions,
 } from "./predicate-from-intent.js";
 

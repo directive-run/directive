@@ -140,10 +140,17 @@
     <div class="panel">
       <div class="panel-header">Audit Ledger — every state change, hash-chained</div>
       <div class="ledger-controls">
-        <button id="tamper-btn" class="tamper">⚠ TAMPER (mutate an entry)</button>
+        <button id="tamper-btn" class="tamper">⚠ TAMPER (simulate on a clone)</button>
         <button id="verify-btn" class="verify">✓ VERIFY chain</button>
       </div>
       <div id="verify-status" class="verify-status"></div>
+      <small class="muted" style="display:block; margin-bottom:0.5rem;">
+        djb2 32-bit chain — detects accidental + light-adversarial tamper.
+        <strong>NOT cryptographic.</strong> For production, pair with WORM
+        storage + signing keys (v2). Tamper button simulates on a JSON
+        clone — live entries are <code>Object.freeze</code>d at write
+        time, so in-process mutation throws.
+      </small>
       <div id="ledger-out"></div>
     </div>
 

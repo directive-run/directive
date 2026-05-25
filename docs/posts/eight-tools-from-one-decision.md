@@ -4,7 +4,7 @@
 
 Two weeks ago we said six tools fell out of one decision: rules-as-data. We were behind. The total is eight.
 
-This post is the update. Tool seven is LLMs writing rules safely. Tool eight is every state change shipping with a court-admissible explanation. Both shipped this week. Both fall out of the same JSON predicate. Both were an afternoon of code.
+This post is the update. Tool seven is LLMs writing rules safely. Tool eight is every state change shipping with an auditable, hash-chained tamper-detection record. Both shipped this week. Both fall out of the same JSON predicate. Both were an afternoon of code.
 
 ---
 
@@ -41,7 +41,7 @@ That's not a future state. That's two weeks of code, on top of the predicate typ
 
 ---
 
-## Tool 8 — Every state change is a court-admissible audit entry
+## Tool 8 — Every state change is an auditable entry with hash-chained tamper-detection
 
 ```ts
 import { createAuditLedger } from "@directive-run/core/plugins";
@@ -69,9 +69,11 @@ Three things to notice:
 
 **The rule that was in effect is in the entry.** Not the constraint ID. The actual `whenSpec` JSON, the per-clause `whenExplain` payload. The auditor doesn't read your source code to find out which version of the rule fired; the rule fired, the rule was logged, the rule is right there in the entry.
 
-**PII is redacted by default.** Any fact tagged `meta({ tags: ["pii"] })` ships `"[redacted]"` to the ledger instead of the raw value. Opt out with `capturePII: true`. No one accidentally ships a GDPR violation because they forgot to wrap the ledger in a redactor.
+**PII-tagged fact values redact by default.** Any fact tagged `meta({ tags: ["pii"] })` ships `"[redacted]"` to the ledger instead of the raw value — in `fact.change` payloads, in `whenExplain.actual`, AND in the cached `whenSpec` operands that flow into every `constraint.evaluate` entry. Opt out with `capturePII: true`. The default-on redaction is one defensive layer, not the whole compliance story — see the [Threat model](/docs/audit-ledger#threat-model) for what v1 is and isn't.
 
-The ledger is hash-chained. Every entry's `prevHash` is the hash of the previous entry. `ledger.verify()` walks the chain and reports the first broken link with `expectedHash` and `actualHash` so a UI can highlight which entry was tampered with. The threat model is *detection*, not *prevention* — pair with append-only storage for that. But the detection is the part nobody was building.
+The ledger is hash-chained (djb2; SHA-256 reserved for v2). Every entry's `prevHash` is the djb2 hash of the previous entry, plus a `hashAlgo: "djb2-1"` tag so future algorithm changes don't silently break old exports. `ledger.verify()` walks the chain and reports the first broken link with `expectedHash` and `actualHash` so a UI can highlight which entry was tampered with. The threat model is *detection*, not *prevention* — pair with append-only storage, signed off-site copies, or an RFC 3161 trusted timestamping authority for evidentiary use.
+
+**What v1 is NOT.** Detection-only, not prevention. 32-bit djb2 hash, not SHA-256 (collision-prone against a determined attacker — that's a v2 promise). No per-subject erasure across external storage (`ledger.erase()` reaches only the in-memory sink). No signing keys, no key rotation, no trusted timestamps. The runtime catches accidental + casual-probe mutation cleanly; for adversary-resistant evidence, layer the v1 chain underneath append-only WORM storage and an external TSA.
 
 Eleven hundred LOC for the data layer + plugin + React hook. Two days. Same predicate, third consumer.
 
@@ -102,7 +104,7 @@ We kept the changeset honest about what didn't ship:
 
 - **SQLite / Parquet / Loki sinks** — `memorySink` is the v1 reference. The sink interface is open; anyone with a `better-sqlite3` dependency can ship a Postgres-backed audit log this afternoon.
 - **Full SMT-lite `doctor`** — z3.wasm-based satisfiability is the real-deal. The structural v1 catches the obvious contradictions; the SMT version catches the subtle ones.
-- **Strong async SHA-256 verify** — the v1 djb2 chain is fast, sync, isomorphic, and catches accidental + light-adversarial tamper. SHA-256 for cryptographic-grade collision resistance lands when someone actually needs it.
+- **Strong async SHA-256 verify** — `verify({ strong: true })` THROWS today (no silent fallback). The v1 djb2 chain is fast, sync, isomorphic, and catches accidental + casual-probe tamper. SHA-256 is the v2 promise — it lands when someone actually needs it.
 - **Audit-ledger devtools panel** — the `useAuditLedger` hook ships; the in-floating-panel render is a follow-up.
 
 None of these are blockers for the headline. All of them are an afternoon of code each, *because the substrate already exists*. That's the dividend.

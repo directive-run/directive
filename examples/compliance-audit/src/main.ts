@@ -317,34 +317,108 @@ function renderLedgerEntry(e: AuditEntry): string {
   }
 }
 
+// Entries are frozen at write time (defense against in-process forgery)
+// so we can't actually mutate the live ledger. Instead, simulate a
+// tamper: clone the snapshot, mutate the clone, and rerun verify()
+// against the cloned chain. The clone shows what a verifier WOULD see
+// if persisted bytes were swapped on disk.
+let tamperedClone:
+  | { entries: import("@directive-run/core").AuditEntry[]; capturedAt: number }
+  | null = null;
+
 function onTamper(): void {
-  // Reach into the ledger snapshot and mutate one entry to demonstrate
-  // the hash chain catching it. This is a demo-only operation; you'd
-  // never do this in production.
   const snap = ledger.toJSON();
   if (snap.entries.length < 2) {
     setVerifyStatus("warn", "Need at least 2 entries before tampering.");
     return;
   }
-  const target = snap.entries[Math.floor(snap.entries.length / 2)] as {
-    kind: string;
+  // Deep-clone via JSON so we can mutate freely.
+  const cloned = JSON.parse(JSON.stringify(snap)) as {
+    entries: import("@directive-run/core").AuditEntry[];
+    capturedAt: number;
   };
+  const idx = Math.floor(cloned.entries.length / 2);
+  const target = cloned.entries[idx] as { kind: string; seq: number };
   const originalKind = target.kind;
   target.kind = "fact.change"; // wrong kind
+  tamperedClone = cloned;
   setVerifyStatus(
     "warn",
-    `Tampered entry #${(target as unknown as { seq: number }).seq} (was kind=${originalKind}, now kind=fact.change). Click VERIFY.`,
+    `Tamper simulated on a CLONE of entry #${target.seq} (was kind=${originalKind}, now kind=fact.change). The live ledger is untouched — entries are frozen at write time. Click VERIFY to see what an auditor would see if the persisted bytes had been swapped.`,
   );
   renderLedger();
 }
 
+function verifyClone(
+  clone: {
+    entries: import("@directive-run/core").AuditEntry[];
+    capturedAt: number;
+  },
+):
+  | { valid: true; entryCount: number }
+  | {
+      valid: false;
+      brokenAt: number;
+      expectedHash: string;
+      actualHash: string;
+    } {
+  // Re-implement the sync djb2 walk locally so we can verify the clone.
+  // Pull hashObject from utils via the public surface — the ledger uses
+  // it internally; if your bundle doesn't expose it, the simplest
+  // pattern is to keep a copy of the chain in a sink that survives
+  // the clone.
+  const entries = clone.entries;
+  if (entries.length === 0) return { valid: true, entryCount: 0 };
+  // Minimal djb2 reimpl over stable-stringify-shaped JSON — matches the
+  // core implementation closely enough for the demo verdict.
+  const stableStringify = (v: unknown): string => {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return `[${v.map(stableStringify).join(",")}]`;
+    const obj = v as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(",")}}`;
+  };
+  const djb2 = (s: string): string => {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    }
+    return (h >>> 0).toString(16).padStart(8, "0");
+  };
+  let prevHash: string | null = null;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]!;
+    if (e.prevHash !== prevHash) {
+      return {
+        valid: false,
+        brokenAt: i,
+        expectedHash: prevHash ?? "<genesis>",
+        actualHash: e.prevHash ?? "<genesis>",
+      };
+    }
+    prevHash = djb2(stableStringify(e));
+  }
+  return { valid: true, entryCount: entries.length };
+}
+
 function onVerify(): void {
-  const result = ledger.verify();
-  if (result instanceof Promise) {
-    result.then((r) => setVerifyResult(r));
+  if (tamperedClone) {
+    const result = verifyClone(tamperedClone);
+    setVerifyResult(result, "clone");
     return;
   }
-  setVerifyResult(result);
+  // v1 ledger.verify() is sync — but the type from the compiled dist
+  // may still include Promise<…> until the package is rebuilt. Narrow
+  // defensively.
+  const result = ledger.verify() as
+    | { valid: true; entryCount: number }
+    | {
+        valid: false;
+        brokenAt: number;
+        expectedHash: string;
+        actualHash: string;
+      };
+  setVerifyResult(result, "live");
 }
 
 function setVerifyResult(
@@ -356,17 +430,19 @@ function setVerifyResult(
         expectedHash: string;
         actualHash: string;
       },
+  source: "live" | "clone",
 ): void {
+  const label = source === "clone" ? " (tampered clone)" : "";
   if (result.valid) {
     setVerifyStatus(
       "ok",
-      `✓ chain valid — ${result.entryCount} entries, no tamper detected`,
+      `✓ chain valid${label} — ${result.entryCount} entries, no tamper detected`,
     );
     return;
   }
   setVerifyStatus(
     "fail",
-    `✗ TAMPER DETECTED at entry index ${result.brokenAt}. ` +
+    `✗ TAMPER DETECTED${label} at entry index ${result.brokenAt}. ` +
       `Expected prevHash: ${result.expectedHash.slice(0, 16)}…  ` +
       `Actual prevHash: ${result.actualHash.slice(0, 16)}…`,
   );
