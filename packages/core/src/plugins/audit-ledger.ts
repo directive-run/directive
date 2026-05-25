@@ -153,11 +153,18 @@ export type AuditEntry =
       whenSpec?: FactPredicate<unknown>;
       whenExplain?: readonly ClauseResult[];
       /**
-       * For function-form constraints (no `whenSpec`), the source
-       * preview of the function. Truncated to 200 chars.
-       * Informational only — NOT replayable. (M22)
+       * For function-form constraints (no `whenSpec`), a tamper-evident
+       * identity for the function. We DO NOT capture the raw source —
+       * closures routinely reference secrets, API keys, or PII (e.g.
+       * `if (apiKey === "sk-live-xxx")`) and a preview would leak them
+       * into the audit log. Instead, we capture a djb2 hash of the
+       * stringified function (`hashObject(String(fn))`). Auditors can
+       * detect "the function changed between deploys" by comparing
+       * hashes across entries, without ever seeing the function body.
+       *
+       * Informational only — NOT replayable. (N5, M22)
        */
-      whenSource?: { kind: "function"; preview: string };
+      whenSource?: { kind: "function"; sourceHash: string };
     })
   | (AuditEntryBase & {
       kind: "resolver.write.rejected";
@@ -213,7 +220,22 @@ export type AuditEntry =
     })
   | (AuditEntryBase & {
       kind: "system.subject-erased";
-      filterSummary: string;
+      /**
+       * djb2 hash of the filter (via `hashObject(filter)`). PII-safe —
+       * the raw filter values never land in the ledger. Pair with
+       * `filterShape` to see which filter fields were used. (N2)
+       */
+      filterHash: string;
+      /**
+       * Stripped-values shape of the filter — captures WHICH fields were
+       * present without recording their values. (N2)
+       */
+      filterShape: {
+        factPath: boolean;
+        constraintId: boolean;
+        kind: AuditEntryKind | readonly AuditEntryKind[] | undefined;
+        changedBetween: "[range]" | undefined;
+      };
       erased: number;
     });
 
@@ -234,9 +256,24 @@ export interface QueryFilter {
   limit?: number;
 }
 
-/** Verify result — chain valid OR a break with full context for tamper visualization. */
+/**
+ * Verify result — chain valid OR a break with full context for tamper visualization.
+ *
+ * Erased entries (via `ledger.erase()`) appear as legitimate chain breaks —
+ * `verify()` reports them in `erasedAt` and continues the walk from the
+ * tombstone's own hash. Real tamper still surfaces as `valid: false`.
+ */
 export type VerifyResult =
-  | { valid: true; entryCount: number }
+  | {
+      valid: true;
+      entryCount: number;
+      /**
+       * Sequence numbers of entries that were legitimately broken by
+       * `erase()` tombstones. Empty unless the chain contains erasures.
+       * (N1 + M1)
+       */
+      erasedAt?: number[];
+    }
   | {
       valid: false;
       brokenAt: number;
@@ -449,6 +486,25 @@ function syncHash(entry: AuditEntry): string {
   return hashObject(entry);
 }
 
+/**
+ * Dispatch to the right hash function based on the entry's `hashAlgo`
+ * discriminator. v1 has a single arm (`djb2-1`); the switch is in
+ * place so v2 can add `"sha256-1"` without touching call sites. (N5)
+ *
+ * v2 promise: when SHA-256 lands, this becomes `case "sha256-1": return
+ * await asyncSha256(entry);` — verify() will become async accordingly.
+ */
+function hashForEntry(entry: AuditEntry): string {
+  switch (entry.hashAlgo) {
+    case "djb2-1":
+      return syncHash(entry);
+    default:
+      throw new Error(
+        `[Directive] audit-ledger: unknown hashAlgo "${String((entry as { hashAlgo: unknown }).hashAlgo)}" on entry seq=${entry.seq}. Cannot verify chain integrity. Known algorithms: "djb2-1".`,
+      );
+  }
+}
+
 // ============================================================================
 // AuditLedger plugin
 // ============================================================================
@@ -489,6 +545,11 @@ export interface AuditLedger {
    * broken link plus the expected vs actual hashes — feed into a
    * "TAMPERED" visualization.
    *
+   * Erased entries (via `ledger.erase()`) appear as legitimate chain
+   * breaks — `verify()` reports them in `erasedAt` and continues the
+   * walk from the tombstone's actual hash. Real tamper still surfaces
+   * as `valid: false`. (N1 + M1)
+   *
    * v1 ships sync djb2 only. `verify({ strong: true })` is reserved
    * for v2 (SHA-256) and THROWS today — there is no silent fallback.
    * Call `verify()` (no args) for tamper detection.
@@ -496,15 +557,19 @@ export interface AuditLedger {
   verify(opts?: { strong?: boolean }): VerifyResult;
   /**
    * Per-subject erasure (GDPR Art. 17 stub). Replaces matching entries
-   * in this sink with tombstones (preserving seq + prevHash so the
-   * hash chain still verifies). Returns a summary plus the chained
-   * `system.subject-erased` tombstone audit entry.
+   * in this sink with `system.entry-erased` tombstones (preserving
+   * seq + prevHash so verify() can resync), then appends a chained
+   * `system.subject-erased` marker entry that summarises the erasure.
+   *
+   * Returns `{ erased, markerEntry }` — `markerEntry` is the chained
+   * `system.subject-erased` summary (the N per-entry tombstones live
+   * in the sink, not on the return value). (M7)
    *
    * WARNING: v1 erases only from THIS sink. External copies (toJSON
    * exports, downstream pipelines, persisted backups) must be erased
    * separately. (C8)
    */
-  erase(filter: QueryFilter): { erased: number; tombstone: AuditEntry };
+  erase(filter: QueryFilter): { erased: number; markerEntry: AuditEntry };
   /** Empty the sink. */
   clear(): void;
   /** Unsubscribe + drop the sink. */
@@ -558,7 +623,18 @@ export function createAuditLedger(
    */
   const whenSpecCache = new Map<string, FactPredicate<unknown>>();
 
-  /** Cache of constraint.id → preview string for function-form constraints. (M22) */
+  /**
+   * Cache of constraint.id → sourceHash for function-form constraints.
+   * (N5, M22)
+   *
+   * We hash the stringified function rather than store any preview of
+   * its source. Closures frequently reference secrets in scope
+   * (`apiKey`, `dbPassword`, customer PII pulled from outer state) and
+   * a preview would land those in the audit trail in plaintext. The
+   * hash is a tamper-evident identity — auditors can verify "this
+   * constraint's source has not changed across these entries" without
+   * ever seeing the source itself.
+   */
   const whenSourceCache = new Map<string, string>();
 
   /** Cache of PII-tagged fact paths. */
@@ -641,19 +717,22 @@ export function createAuditLedger(
           );
         } else {
           // No whenSpec means function-form `when:` (or no when at
-          // all). Capture a truncated source preview if we can reach
-          // the raw `when` via internals, otherwise stash a marker so
-          // an auditor still sees the function-form indicator. (M22)
+          // all). Capture a HASH of the function source rather than
+          // the source itself — closures may reference secrets in
+          // scope, and any preview would leak them into the audit
+          // trail. (N5, M22)
           const def = mergedDefs?.[c.id];
           const whenFn = def && typeof def.when === "function" ? def.when : undefined;
           if (whenFn) {
-            whenSourceCache.set(c.id, String(whenFn).slice(0, 200));
+            whenSourceCache.set(c.id, hashObject(String(whenFn)));
           } else if (c.when !== undefined && typeof c.when === "function") {
-            whenSourceCache.set(c.id, String(c.when).slice(0, 200));
+            whenSourceCache.set(c.id, hashObject(String(c.when)));
           } else {
             // Function-form constraint we couldn't reach the source
             // of. Mark it so audit entries still surface the form.
-            whenSourceCache.set(c.id, "[function]");
+            // We hash the marker string for consistency with the
+            // sourceHash field shape.
+            whenSourceCache.set(c.id, hashObject("[function]"));
           }
         }
       }
@@ -737,7 +816,7 @@ export function createAuditLedger(
     // Sync hash of this entry — stashed as the next entry's prevHash.
     // Whole entry is hashed (including its own prevHash field) so
     // verify() can rebuild the chain deterministically.
-    lastHashCache = syncHash(finalEntry);
+    lastHashCache = hashForEntry(finalEntry);
 
     return finalEntry;
   }
@@ -746,7 +825,7 @@ export function createAuditLedger(
     switch (event.type) {
       case "constraint.evaluate": {
         const whenSpec = whenSpecCache.get(event.id);
-        const whenSourcePreview = whenSourceCache.get(event.id);
+        const whenSourceHash = whenSourceCache.get(event.id);
         const partial: Record<string, unknown> = {
           kind: "constraint.evaluate",
           constraintId: event.id,
@@ -755,11 +834,13 @@ export function createAuditLedger(
         };
         if (whenSpec !== undefined) {
           partial.whenSpec = whenSpec;
-        } else if (whenSourcePreview !== undefined) {
-          // Function-form constraint — informational only, NOT replayable. (M22)
+        } else if (whenSourceHash !== undefined) {
+          // Function-form constraint — sourceHash is informational and
+          // NOT replayable. We deliberately do NOT include any source
+          // preview because closures may reference secrets in scope. (N5, M22)
           partial.whenSource = {
             kind: "function",
-            preview: whenSourcePreview,
+            sourceHash: whenSourceHash,
           };
         }
         emit(partial);
@@ -948,10 +1029,38 @@ export function createAuditLedger(
       }
 
       // Sync walk — catches anything the djb2 chain would see.
+      // (N1 + M1) Erased-entry tombstones (kind: "system.entry-erased")
+      // legitimately break the chain — the tombstone's payload differs
+      // from the original entry it replaced, so the NEXT entry's
+      // prevHash no longer matches. When we detect a break whose
+      // PREVIOUS entry is a tombstone (or the broken entry itself is
+      // one), record the seq in `erasedAt` and resync the walk from
+      // the tombstone's own hash.
+      const erasedAt: number[] = [];
       let prevHash: string | null = null;
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]!;
         if (entry.prevHash !== prevHash) {
+          // Legitimate break? Either:
+          //   (a) the entry itself is the tombstone, or
+          //   (b) the previous entry was the tombstone whose payload
+          //       was rewritten by erase().
+          const prevEntry = i > 0 ? entries[i - 1]! : null;
+          const brokenByErasure =
+            entry.kind === "system.entry-erased" ||
+            prevEntry?.kind === "system.entry-erased";
+          if (brokenByErasure) {
+            // Record the seq of the tombstone that broke the chain and
+            // resync the walk by hashing this entry as our new pointer
+            // for the next iteration.
+            const tombstoneEntry =
+              entry.kind === "system.entry-erased" ? entry : prevEntry!;
+            erasedAt.push(tombstoneEntry.seq);
+            prevHash = hashForEntry(entry);
+
+            continue;
+          }
+
           return {
             valid: false,
             brokenAt: i,
@@ -960,14 +1069,22 @@ export function createAuditLedger(
             entry,
           };
         }
-        prevHash = syncHash(entry);
+        prevHash = hashForEntry(entry);
       }
 
-      return { valid: true, entryCount: entries.length };
+      const result: { valid: true; entryCount: number; erasedAt?: number[] } = {
+        valid: true,
+        entryCount: entries.length,
+      };
+      if (erasedAt.length > 0) {
+        result.erasedAt = erasedAt;
+      }
+
+      return result;
     },
     erase(filter) {
       // (C8) Replace matching entries with tombstones IN PLACE, keeping
-      // seq + prevHash + hashAlgo so the hash chain still verifies.
+      // seq + prevHash + hashAlgo so verify() can resync the chain.
       const erasedAt = Date.now();
       let count = 0;
       if (typeof sink.erase === "function") {
@@ -984,24 +1101,37 @@ export function createAuditLedger(
           } as AuditEntry;
           // CAUTION: replacing the payload changes the entry's hash —
           // which means the NEXT entry's prevHash will no longer match.
-          // For the demo + tests we accept that tradeoff because erase
-          // is rare and adversaries can't trigger it without the API
-          // handle. Verifiers should treat `system.entry-erased` as a
-          // legitimate chain break. Document this in the threat model.
+          // verify() recognises `system.entry-erased` as a legitimate
+          // chain break and reports it in `erasedAt` rather than as
+          // tamper. (N1 + M1)
           freezeEntry(tombstone);
 
           return tombstone;
         });
       }
+      // (N2) Don't store the raw filter — PII can land in the values
+      // (e.g. `factPath: "alice@x.com"`). Capture a hash + a shape
+      // descriptor so an auditor sees WHICH fields were used without
+      // exposing the values.
+      const filterShape = {
+        factPath: filter.factPath !== undefined,
+        constraintId: filter.constraintId !== undefined,
+        kind: filter.kind,
+        changedBetween:
+          filter.changedBetween !== undefined
+            ? ("[range]" as const)
+            : undefined,
+      };
       // Emit a single chained `system.subject-erased` marker — recorded
       // AFTER the erasure so auditors see what was removed and why.
-      const tombstone = emit({
+      const markerEntry = emit({
         kind: "system.subject-erased",
-        filterSummary: JSON.stringify(filter),
+        filterHash: hashObject(filter),
+        filterShape,
         erased: count,
       });
 
-      return { erased: count, tombstone };
+      return { erased: count, markerEntry };
     },
     clear() {
       sink.clear();

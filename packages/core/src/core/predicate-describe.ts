@@ -28,6 +28,36 @@ import { MAX_PREDICATE_DEPTH } from "./predicate.js";
 import isDevelopment from "#is-development";
 
 // ============================================================================
+// Internal helpers
+// ============================================================================
+
+/**
+ * Per-locale `Intl.NumberFormat` cache. `Intl.NumberFormat` construction is
+ * surprisingly expensive — describing a predicate with N numeric operands
+ * used to allocate N formatters. Cached lookup is O(1) after first call.
+ *
+ * Invalid locales (e.g. user-supplied garbage) fall back to `"en-US"`.
+ *
+ * @internal Exported for tests; do not import from application code.
+ */
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+
+/** @internal */
+export function getNumberFormat(locale: string): Intl.NumberFormat {
+  let fmt = numberFormatCache.get(locale);
+  if (!fmt) {
+    try {
+      fmt = new Intl.NumberFormat(locale);
+    } catch {
+      fmt = new Intl.NumberFormat("en-US"); // fallback for invalid locales
+    }
+    numberFormatCache.set(locale, fmt);
+  }
+
+  return fmt;
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -51,6 +81,13 @@ export interface DescribeOptions {
 
 /**
  * Render a {@link FactPredicate} as a precise human-readable sentence.
+ *
+ * Renders a `FactPredicate` as English by default (`style: 'natural'`);
+ * pass `style: 'formal'` for algebraic notation (`≥`, `∈`, `∧`, etc.).
+ *
+ * @remarks
+ * Exported as `describePredicate` (not `describe`) to avoid collision with
+ * vitest's `describe()`.
  *
  * @example
  * ```ts
@@ -541,7 +578,7 @@ function formatValue(v: unknown, ctx: Ctx): string {
       return String(v);
     }
     try {
-      return new Intl.NumberFormat(ctx.locale).format(v);
+      return getNumberFormat(ctx.locale).format(v);
     } catch {
       return String(v);
     }

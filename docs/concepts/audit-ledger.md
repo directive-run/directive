@@ -1,6 +1,6 @@
 # `createAuditLedger` — tamper-evident audit, built-in
 
-> An append-only, queryable, hash-chained (djb2; SHA-256 reserved for v2)
+> An append-only, queryable, hash-chained (djb2 32-bit; SHA-256 reserved for v2)
 > log of every state change a Directive system makes. The auditor's
 > "why did this user get that decision?" question now has a one-line
 > answer.
@@ -91,7 +91,7 @@ Filter shape:
 
 | Kind | Payload includes |
 | --- | --- |
-| `constraint.evaluate` | `constraintId`, `active`, `whenSpec` (PII operands redacted) or `whenSource` (function-form preview), `whenExplain` |
+| `constraint.evaluate` | `constraintId`, `active`, `whenSpec` (PII operands redacted) or `whenSource` (function-form `sourceHash`), `whenExplain` |
 | `fact.change` | `key`, `prior`, `next` |
 | `resolver.write.rejected` | `resolverId`, `fact`, `expected`, `actual` (rejection) or `dropped` (summary) |
 | `resolver.complete` | `resolverId`, `requirementId`, `duration` |
@@ -101,11 +101,35 @@ Filter shape:
 | `system.history.navigate` | `from`, `to` (time-travel navigation marker) |
 | `system.truncated` | `droppedSeq`, `droppedCount` (ring-buffer overflow marker; emitted BEFORE the oldest entry is dropped) |
 | `system.entry-erased` | `originalKind`, `erasedAt` (per-entry tombstone, replaces an erased entry in place) |
-| `system.subject-erased` | `filterSummary`, `erased` (chained marker recording why an erasure ran and how many entries it touched) |
+| `system.subject-erased` | `filterHash`, `filterShape`, `erased` (chained marker; raw filter values never land in the ledger — see [Erasure](#erasure-gdpr-art-17-stub)) |
+
+### Function-form constraints — `whenSource` is informational only (N5)
+
+For **predicate-form** constraints (`when: { cartTotal: { $gte: 50 } }`), the ledger captures the full `whenSpec` — replayable, queryable, and (with PII redaction) safe to persist.
+
+For **function-form** constraints (`when: (facts) => facts.cartTotal >= 50`), the ledger captures only:
+
+```ts
+whenSource: { kind: "function"; sourceHash: "a1b2c3d4" }
+```
+
+`sourceHash` is a djb2 hash of the stringified function. **The raw source is never captured**, because closures routinely reference secrets in their lexical scope:
+
+```ts
+const apiKey = process.env.STRIPE_KEY;
+constraints: {
+  enabled: {
+    when: (facts) => apiKey === "sk-live-..." && facts.x > 0, // ← would leak
+    require: { type: "GO" },
+  },
+}
+```
+
+A pre-v1.13 ledger captured a `preview: String(fn).slice(0, 200)` field, which surfaced any inline literal — including credentials — in every `constraint.evaluate` entry. **The current `sourceHash` field reveals nothing about the source**; auditors can use it to detect *when* a function-form constraint changes between deploys (different deploys → different hash) without ever seeing what changed. Function-form constraints are therefore **informational only** in the ledger — they are not replayable from the audit trail. If you need full audit replayability, prefer the predicate form (`when: { … }`) wherever feasible.
 
 ## Hash chain — tamper detection
 
-Every entry stores `prevHash`, the djb2 hash (`hashObject`) of the previous entry's canonical JSON, plus a `hashAlgo: "djb2-1"` tag identifying the algorithm. To detect tampering:
+Every entry stores `prevHash`, the djb2 32-bit hash (`hashObject`) of the previous entry's canonical JSON, plus a `hashAlgo: "djb2-1"` tag identifying the algorithm. To detect tampering:
 
 ```ts
 const result = ledger.verify();
@@ -118,7 +142,20 @@ if (!result.valid) {
 }
 ```
 
-v1 ships sync djb2 only. `verify({ strong: true })` is reserved for v2 (SHA-256 chain) and **THROWS** today — there is no silent fallback. Call `verify()` (no args) for tamper detection.
+v1 ships sync djb2 32-bit only. `verify({ strong: true })` is reserved for v2 (SHA-256 chain) and **THROWS** today — there is no silent fallback. Call `verify()` (no args) for tamper detection.
+
+**Erased entries appear as legitimate chain breaks.** When you call `ledger.erase()`, matching entries are replaced with `system.entry-erased` tombstones whose payloads differ from the original — the next entry's `prevHash` no longer matches. `verify()` recognises this pattern and reports the erased seqs on the valid arm:
+
+```ts
+const result = ledger.verify();
+if (result.valid) {
+  console.log(`${result.entryCount} entries; ${result.erasedAt?.length ?? 0} erased`);
+}
+```
+
+Real tamper still surfaces as `valid: false` even when tombstones are present.
+
+**Algorithm discriminator (N5).** Every entry carries `hashAlgo: "djb2-1"`. `verify()` dispatches on this tag — v1 has a single arm; v2 will add `"sha256-1"` without breaking pre-v2 exports. Entries with an unknown `hashAlgo` cause `verify()` to throw with a clear error.
 
 See [Threat model](#threat-model) above for what this catches and what it doesn't.
 
@@ -147,15 +184,39 @@ Opt out with `capturePII: true`. Custom sanitization: pass `redact?: (entry) => 
 ## Erasure (GDPR Art. 17 stub)
 
 ```ts
-const { erased, tombstone } = ledger.erase({ factPath: "user.email" });
-console.log(`erased ${erased} entries; tombstone seq=${tombstone.seq}`);
+const { erased, markerEntry } = ledger.erase({ factPath: "user.email" });
+console.log(`erased ${erased} entries; marker seq=${markerEntry.seq}`);
 ```
 
-`erase(filter)` replaces matching entries in the sink with
-`system.entry-erased` tombstones that preserve `seq`, `prevHash`, and
-`hashAlgo` so the chain still verifies, then appends a chained
-`system.subject-erased` marker recording the filter summary and the
-count.
+`erase(filter)` does two things:
+
+1. Replaces matching entries in the sink with `system.entry-erased`
+   tombstones that preserve `seq`, `prevHash`, and `hashAlgo` so
+   `verify()` can resync the chain across the gap. `verify()` reports
+   these in `erasedAt: number[]` rather than as tamper — see
+   [Hash chain](#hash-chain--tamper-detection).
+2. Appends a chained `system.subject-erased` summary entry — the
+   `markerEntry` returned — carrying `erased: number` plus a PII-safe
+   description of the filter that ran.
+
+The returned name is `markerEntry` (M7) — the singular chained
+summary — to distinguish it from the N per-entry tombstones that
+land in the sink (M1).
+
+### Filter PII safety (N2)
+
+The summary marker does **not** record the raw filter — `filterSummary`
+is gone. It carries:
+
+| Field | What |
+| --- | --- |
+| `filterHash` | `hashObject(filter)` — tamper-evident identity, no values. |
+| `filterShape` | Stripped shape, e.g. `{ factPath: true, constraintId: false, kind: undefined, changedBetween: "[range]" }`. |
+
+This is intentional: a filter like `{ factPath: "alice@x.com" }` would
+land plaintext PII in the audit trail under the old `filterSummary`
+field. Two erasures that ran with the *same* filter still share the
+same `filterHash` for cross-correlation.
 
 > ⚠ **v1 erases only from THIS sink.** External copies — `toJSON()`
 > exports, downstream sinks (SQLite/Loki/Parquet), persisted backups,
@@ -229,7 +290,7 @@ an audit gap and find out at the compliance review:
   time evidence*. **v2 promise:** optional `tsaProvider` config that
   attaches an RFC 3161 token to each entry (or to chain checkpoints) at
   acceptable cost/latency.
-- **Signing keys with rotation** — v1 uses an unkeyed djb2 chain. Anyone
+- **Signing keys with rotation** — v1 uses an unkeyed djb2 32-bit chain. Anyone
   with write access to the sink can replay the chain after tampering;
   the chain only catches *uncoordinated* mutation. **v2 promise:** HMAC
   (or Ed25519) signed entries with a rotation protocol that doesn't

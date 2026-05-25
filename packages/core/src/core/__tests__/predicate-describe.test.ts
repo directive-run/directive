@@ -3,7 +3,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { describePredicate } from "../predicate-describe.js";
+import {
+  describePredicate,
+  getNumberFormat,
+} from "../predicate-describe.js";
 
 // ============================================================================
 // Empty / trivial
@@ -364,6 +367,26 @@ describe("describePredicate — locale formatting", () => {
     );
     // Intl uses a non-breaking space in some locales; just check no comma.
     expect(out).not.toContain(",");
+    expect(out.startsWith("cartTotal is at least ")).toBe(true);
+  });
+
+  it("caches Intl.NumberFormat instances per locale (identity on hit)", () => {
+    const a = getNumberFormat("en-US");
+    const b = getNumberFormat("en-US");
+    expect(a).toBe(b); // same reference → cache hit
+    const c = getNumberFormat("de-DE");
+    expect(c).not.toBe(a); // different locale → different instance
+  });
+
+  it("falls back to en-US for invalid locale tags", () => {
+    // Invalid BCP-47 tag — should not throw, should return a valid formatter.
+    const fmt = getNumberFormat("not-a-real-locale-tag-zzz");
+    expect(fmt).toBeInstanceOf(Intl.NumberFormat);
+    // Smoke-test through describePredicate too.
+    const out = describePredicate(
+      { cartTotal: { $gte: 1234 } },
+      { locale: "not-a-real-locale-tag-zzz" },
+    );
     expect(out.startsWith("cartTotal is at least ")).toBe(true);
   });
 });

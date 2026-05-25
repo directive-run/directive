@@ -308,12 +308,59 @@ function renderLedgerEntry(e: AuditEntry): string {
         <span class="kind">resolver error</span>
         <span>${escapeHtml(e.resolverId)}: ${escapeHtml(e.error)}</span>
       </div>`;
-    default:
+    case "system.init":
+    case "system.start":
+    case "system.stop":
+    case "system.destroy":
+      return `<div class="entry muted">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">lifecycle</span>
+        <span>${escapeHtml(e.kind)}</span>
+      </div>`;
+    case "system.snapshot":
       return `<div class="entry">
         <span class="ts">${ts}</span>
         <span class="seq">#${e.seq}</span>
-        <span class="kind">${escapeHtml(e.kind)}</span>
+        <span class="kind">snapshot</span>
+        <span>snapshot #${e.snapshotId} (${escapeHtml(e.trigger)})</span>
       </div>`;
+    case "system.history.navigate":
+      return `<div class="entry">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">time-travel</span>
+        <span>${e.from} → ${e.to}</span>
+      </div>`;
+    case "system.truncated":
+      return `<div class="entry fail">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">truncated</span>
+        <span>dropped ${e.droppedCount} entries (oldest seq ${e.droppedSeq})</span>
+      </div>`;
+    case "system.entry-erased":
+      return `<div class="entry erased">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">erased</span>
+        <span>entry erased (was kind ${escapeHtml(e.originalKind)})</span>
+      </div>`;
+    case "system.subject-erased":
+      return `<div class="entry erased">
+        <span class="ts">${ts}</span>
+        <span class="seq">#${e.seq}</span>
+        <span class="kind">subject-erased</span>
+        <span>subject erased: ${e.erased} entries via filter ${escapeHtml(e.filterHash.slice(0, 8))}</span>
+      </div>`;
+    default: {
+      // Exhaustiveness check — any new AuditEntry kind shipped from
+      // core forces this default arm to widen, which the compiler
+      // catches before the demo silently falls through.
+      const _exhaustive: never = e;
+      void _exhaustive;
+      return `<div class="entry"><span class="ts">${ts}</span><span class="kind">${escapeHtml((e as { kind: string }).kind)}</span></div>`;
+    }
   }
 }
 

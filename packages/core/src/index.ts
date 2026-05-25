@@ -161,7 +161,16 @@ export {
   listAllPredicateOperators,
 } from "./core/schema-introspection.js";
 export type { SchemaKind, SchemaKindNode } from "./core/schema-introspection.js";
-export { validatePredicateAgainstSchema, dangerousRegex } from "./core/predicate.js";
+export { validatePredicateAgainstSchema } from "./core/predicate.js";
+/**
+ * Heuristic detector for catastrophic-backtracking regex patterns.
+ *
+ * @internal Exported for tools that need to validate user-supplied regex
+ * outside of the predicate pipeline. Returns true for nested quantifiers
+ * like `(a+)+$`, `(.*)*`, `(\w+)+`, and `(a|a)+` — patterns that can
+ * cause ReDoS at the database/regex engine.
+ */
+export { dangerousRegex } from "./core/predicate.js";
 export type {
   SchemaValidationError,
   SchemaValidationOptions,

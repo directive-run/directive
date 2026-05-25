@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createModule, createSystem, t } from "../../index.js";
 import { doctor } from "../doctor.js";
 import { flattenPredicate } from "../rules-diff.js";
 
@@ -155,7 +156,7 @@ describe("doctor.checkAgainst — reason quality", () => {
 // ============================================================================
 
 describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
-  it("flags a candidate path that matches a constraint's owns:", () => {
+  it("flags a candidate path that matches a constraint's owns: (M5: in warnings)", () => {
     const result = doctor.checkOwns(
       { cartTotal: { $gte: 100 }, region: { $eq: "US" } },
       [
@@ -166,22 +167,25 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
         },
       ],
     );
-    expect(result.findings).toHaveLength(1);
-    const f = result.findings[0]!;
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings).toHaveLength(1);
+    const f = result.warnings[0]!;
     expect(f.constraintId).toBe("applyDiscount");
     expect(f.candidatePath).toBe("cartTotal");
     expect(f.source).toBe("owns");
+    expect(f.severity).toBe("warning");
     expect(f.reason).toContain("applyDiscount");
     expect(f.reason).toContain("cartTotal");
   });
 
-  it("flags a candidate path that matches a constraint's bind:", () => {
+  it("flags a candidate path that matches a constraint's bind: (M5: in warnings)", () => {
     const result = doctor.checkOwns(
       { phase: { $eq: "red" } },
       [{ id: "lock", bind: ["phase"] }],
     );
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0]?.source).toBe("bind");
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.source).toBe("bind");
+    expect(result.warnings[0]?.severity).toBe("warning");
   });
 
   it("no findings when constraints expose no owns:/bind: metadata", () => {
@@ -189,7 +193,8 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
       { cartTotal: { $gte: 100 } },
       [{ id: "noMeta", whenSpec: { cartTotal: { $lt: 50 } } }],
     );
-    expect(result.findings).toEqual([]);
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("no findings when candidate paths are disjoint from owners", () => {
@@ -197,7 +202,8 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
       { region: { $eq: "US" } },
       [{ id: "x", owns: ["cartTotal"] }],
     );
-    expect(result.findings).toEqual([]);
+    expect(result.contradictions).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("accepts the inspect()-style { constraints: [...] } wrapper", () => {
@@ -205,7 +211,61 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
       { cartTotal: { $gte: 100 } },
       { constraints: [{ id: "owner", owns: ["cartTotal"] }] },
     );
-    expect(result.findings).toHaveLength(1);
+    expect(result.warnings).toHaveLength(1);
+  });
+
+  // ============================================================================
+  // F1 — owns: surfaces through real system.inspect()
+  // ============================================================================
+
+  it("F1: real system.inspect().constraints[].owns is populated and doctor flags it", () => {
+    const mod = createModule("ownsmod", {
+      schema: {
+        facts: {
+          foo: t.number(),
+          bar: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: { SET_FOO: {} },
+      },
+      init: (facts) => {
+        facts.foo = 0;
+        facts.bar = 0;
+      },
+      constraints: {
+        x: {
+          when: { bar: { $gte: 5 } },
+          require: { type: "SET_FOO" },
+          owns: ["foo"],
+        },
+      },
+      resolvers: {
+        setFoo: {
+          requirement: "SET_FOO",
+          resolve: async (_req, ctx) => {
+            ctx.facts.foo = 1;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: mod });
+    system.start();
+    try {
+      const inspection = system.inspect();
+      expect(inspection.constraints[0]?.owns).toEqual(["foo"]);
+
+      const result = doctor.checkOwns(
+        { foo: { $gte: 1 } },
+        inspection,
+      );
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]?.constraintId).toBe("x");
+      expect(result.warnings[0]?.candidatePath).toBe("foo");
+      expect(result.warnings[0]?.source).toBe("owns");
+    } finally {
+      system.destroy();
+    }
   });
 });
 

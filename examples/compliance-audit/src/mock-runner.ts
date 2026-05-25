@@ -19,23 +19,44 @@
 // This runner regex-matches intents to canned predicates and ALWAYS returns
 // something. In production, swap for @directive-run/ai/openai or similar.
 //
-// `import.meta.env.PROD` and `import.meta.env.VITE_ALLOW_MOCK_RUNNER` are
-// referenced via direct property access (not via a typed cast) so Vite's
-// `define`-style replacement substitutes them at build time. Wrapping the
-// access in `(import.meta as { env?: ... }).env` would defeat the
-// substitution and the guard would throw on every production build.
+// Vite substitutes `import.meta.env.PROD` and `import.meta.env.VITE_*` at
+// build time via its `define` plugin. In a Vite-built browser bundle the
+// substitution turns the two reads below into bare booleans/strings.
+//
+// In **Node / vitest** there is no Vite substitution and `import.meta.env`
+// is undefined — a naive `import.meta.env.PROD` would throw TypeError on
+// import. To keep this file importable in both contexts:
+//
+//   1. We feature-detect via `typeof import.meta !== "undefined" && "env" in
+//      import.meta` before reading the env object.
+//   2. We read it through an indirection (`metaEnv`) only after that check.
+//      Vite's `define` substitution targets the LITERAL `import.meta.env.PROD`
+//      token — the indirection means substitution won't apply, BUT the
+//      browser-side guard still fires because at runtime `import.meta.env`
+//      exists and `PROD` is set by Vite's runtime injection.
+//
+// Net behaviour:
+//   - Vite dev / preview build:    `metaEnv?.PROD === false` → guard no-ops.
+//   - Vite production build:       `metaEnv?.PROD === true`  → guard throws
+//                                  unless `VITE_ALLOW_MOCK_RUNNER === "true"`.
+//   - Node / vitest import:        `metaEnv === undefined`   → guard no-ops.
 declare global {
   interface ImportMeta {
-    env: {
-      PROD: boolean;
+    env?: {
+      PROD?: boolean;
       VITE_ALLOW_MOCK_RUNNER?: string;
     };
   }
 }
 
+const metaEnv =
+  typeof import.meta !== "undefined" && "env" in import.meta
+    ? (import.meta as { env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } }).env
+    : undefined;
+
 if (
-  import.meta.env.PROD === true &&
-  import.meta.env.VITE_ALLOW_MOCK_RUNNER !== "true"
+  metaEnv?.PROD === true &&
+  metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
 ) {
   throw new Error(
     "[Directive demo] mockPredicateRunner is for demo only. Set VITE_ALLOW_MOCK_RUNNER=true to override.",

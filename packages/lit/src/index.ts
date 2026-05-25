@@ -1276,6 +1276,13 @@ export class AuditLedgerController implements ReactiveController {
   private pollMs: number;
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Latest matching audit entries. Updates on each poll tick when the
+   * seq-window (first/last entry seq) changes. Lit `requestUpdate()` is
+   * only called when the window moves — in-place tombstone replacement
+   * within the visible window does NOT trigger re-render (use the ledger's
+   * onWrite hook for revision-level updates when added).
+   */
   value: readonly AuditEntry[];
 
   constructor(

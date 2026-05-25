@@ -92,7 +92,15 @@ export interface ExistingConstraint {
   readonly bind?: readonly string[];
 }
 
-/** Returned by {@link doctor.checkOwns}. */
+/**
+ * Returned by {@link doctor.checkOwns}.
+ *
+ * `severity` matches the {@link Contradiction} discriminator on
+ * {@link CheckAgainstResult} so callers can route both shapes
+ * uniformly: by default, owns-collisions are `"warning"` (the engine
+ * still has a runtime gate), but a caller can promote them to
+ * `"error"` for stricter pre-deploy linting. (M5)
+ */
 export interface CheckOwnsFinding {
   readonly constraintId: string;
   /** The fact path on the candidate predicate that triggered the finding. */
@@ -100,10 +108,29 @@ export interface CheckOwnsFinding {
   /** The owner side it would collide with: "owns" or "bind". */
   readonly source: "owns" | "bind";
   readonly reason: string;
+  /**
+   * Severity discriminator — `"warning"` by default (the engine has
+   * its own runtime gate), `"error"` reserved for callers that want
+   * strict pre-deploy lints. (M5)
+   */
+  readonly severity?: "error" | "warning";
 }
 
+/**
+ * Result shape unified with {@link CheckAgainstResult}: owns-collisions
+ * are warnings, not contradictions — the engine itself enforces the
+ * runtime gate, so a pre-deploy doctor pass treats them as advisory.
+ * (M5)
+ */
 export interface CheckOwnsResult {
-  readonly findings: readonly CheckOwnsFinding[];
+  /**
+   * Reserved slot — owns-collisions are warnings by default, but the
+   * shape mirrors {@link CheckAgainstResult} so a caller that
+   * promotes findings to `severity: "error"` can route them here.
+   */
+  readonly contradictions: readonly CheckOwnsFinding[];
+  /** Owns-/bind- collisions (always populated by {@link doctor.checkOwns}). */
+  readonly warnings: readonly CheckOwnsFinding[];
 }
 
 // ============================================================================
@@ -442,37 +469,42 @@ export const doctor = {
 
     const candidateLeaves = flattenPredicate(candidate);
     if (candidateLeaves.length === 0) {
-      return { findings: [] };
+      return { contradictions: [], warnings: [] };
     }
     const candidatePaths = new Set(candidateLeaves.map((l) => l.path));
 
-    const findings: CheckOwnsFinding[] = [];
+    const warnings: CheckOwnsFinding[] = [];
     for (const c of constraints) {
       if (!isExistingConstraint(c)) continue;
       const owns = Array.isArray(c.owns) ? c.owns : [];
       const bind = Array.isArray(c.bind) ? c.bind : [];
       for (const path of owns) {
         if (candidatePaths.has(path)) {
-          findings.push({
+          warnings.push({
             constraintId: c.id,
             candidatePath: path,
             source: "owns",
             reason: `Constraint "${c.id}" already owns "${path}" — candidate would race or shadow its writes.`,
+            severity: "warning",
           });
         }
       }
       for (const path of bind) {
         if (candidatePaths.has(path)) {
-          findings.push({
+          warnings.push({
             constraintId: c.id,
             candidatePath: path,
             source: "bind",
             reason: `Constraint "${c.id}" binds "${path}" — candidate would write to a bound field.`,
+            severity: "warning",
           });
         }
       }
     }
 
-    return { findings };
+    // (M5) Owns-collisions are warnings by default — the engine still
+    // enforces the runtime binding gate. Callers wanting hard-fail
+    // pre-deploy lints can promote findings into `contradictions`.
+    return { contradictions: [], warnings };
   },
 };

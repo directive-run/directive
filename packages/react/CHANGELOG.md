@@ -13,8 +13,8 @@
   > _"The LLM wrote a rule. The type-checker said no. The doctor said no.
   > The predictor said which facts must change. Two turns later, the rule
   > was in production — and every state change since then ships with a
-  > court-admissible, cryptographically-chained explanation. Tamper one
-  > byte, the chain proves it."_
+  > tamper-evident, hash-chained (djb2 32-bit; SHA-256 reserved for v2)
+  > explanation. Tamper one byte, the chain proves it."_
 
   Six new public APIs across three packages, all compounding on the
   rules-as-data substrate shipped earlier this quarter.
@@ -110,9 +110,9 @@
   - **Audit-ledger devtools panel** — `useAuditLedger` hook ships;
     full panel integration with the floating devtools panel is a
     follow-up.
-  - **Strong async SHA-256 verify** — v1 ships sync djb2 chain (fast,
-    isomorphic, catches accidental + light-adversarial tamper). SHA-256
-    for compliance-grade collision resistance lands as v2 dual-chain.
+  - **Strong async SHA-256 verify** — v1 ships sync djb2 32-bit chain
+    (fast, isomorphic, catches accidental + light-adversarial tamper).
+    SHA-256 dual-chain reserved for v2.
   - **Full SMT-lite `doctor`** — z3.wasm-based satisfiability. v1 ships
     structural contradiction detection (direct / subset / overlap).
   - **`predicateToZod()`** — schema introspection unlocks this. ~0.5d
@@ -123,6 +123,8 @@
   Compounds with: `@directive-run/query`, RFC-0004 data predicates, R4.G
   `replayUnder`, R4.F `diffRules`, R4.H `predicateToSQL`. The eight-tool
   story — see the `eight-tools-from-one-decision` blog post.
+
+  > Correction (v1.12.x AE review): the original v1.11.0 language overpromised. The shipped substrate is tamper-evident with hash-chained (djb2 32-bit) entries; "court-admissible" and "GDPR-grade" were marketing claims that exceeded what the code delivers. See docs/concepts/audit-ledger.md for the accurate threat model.
 
 ## 1.10.0
 

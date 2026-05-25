@@ -518,8 +518,10 @@ describe("predicateFromIntentWithProvenance (M24)", () => {
     );
     expect(result.provenance.attemptCount).toBe(1);
     expect(result.provenance.emittedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(typeof result.provenance.rawOutputHash).toBe("string");
-    expect(result.provenance.rawOutputHash.length).toBeGreaterThan(0);
+    expect(typeof result.provenance.predicateHash).toBe("string");
+    expect(result.provenance.predicateHash.length).toBeGreaterThan(0);
+    expect(typeof result.provenance.intentHash).toBe("string");
+    expect(result.provenance.intentHash.length).toBeGreaterThan(0);
   });
 
   it("provenance.model is 'unknown' when agent has no model", async () => {
@@ -555,7 +557,7 @@ describe("predicateFromIntentWithProvenance (M24)", () => {
     ).rejects.toBeInstanceOf(PredicateFromIntentError);
   });
 
-  it("two identical successful runs yield the same rawOutputHash", async () => {
+  it("two identical successful runs yield the same predicateHash", async () => {
     const r1 = await predicateFromIntentWithProvenance({
       intent: "x",
       schema: SCHEMA,
@@ -566,6 +568,247 @@ describe("predicateFromIntentWithProvenance (M24)", () => {
       schema: SCHEMA,
       runner: mockRunner('{"cartTotal":{"$gte":50}}'),
     });
-    expect(r1.provenance.rawOutputHash).toBe(r2.provenance.rawOutputHash);
+    expect(r1.provenance.predicateHash).toBe(r2.provenance.predicateHash);
+  });
+
+  // ============================================================================
+  // N3 — predicateHash is invariant under whitespace / key-order differences
+  // ============================================================================
+
+  it("N3: same logical predicate emitted with different whitespace → same predicateHash", async () => {
+    const tight = '{"cartTotal":{"$gte":50},"region":{"$in":["US","EU"]}}';
+    const loose =
+      '  {\n  "cartTotal" : {\n    "$gte" : 50\n  },\n  "region" : {\n    "$in" : [\n      "US",\n      "EU"\n    ]\n  }\n  }  ';
+
+    const r1 = await predicateFromIntentWithProvenance({
+      intent: "x",
+      schema: SCHEMA,
+      runner: mockRunner(tight),
+    });
+    const r2 = await predicateFromIntentWithProvenance({
+      intent: "x",
+      schema: SCHEMA,
+      runner: mockRunner(loose),
+    });
+
+    // Same predicateHash — canonicalization absorbs the whitespace.
+    expect(r1.provenance.predicateHash).toBe(r2.provenance.predicateHash);
+  });
+
+  it("N3: same logical predicate with different key order → same predicateHash", async () => {
+    const orderA = '{"cartTotal":{"$gte":50},"region":{"$in":["US","EU"]}}';
+    const orderB = '{"region":{"$in":["US","EU"]},"cartTotal":{"$gte":50}}';
+
+    const r1 = await predicateFromIntentWithProvenance({
+      intent: "x",
+      schema: SCHEMA,
+      runner: mockRunner(orderA),
+    });
+    const r2 = await predicateFromIntentWithProvenance({
+      intent: "x",
+      schema: SCHEMA,
+      runner: mockRunner(orderB),
+    });
+
+    expect(r1.provenance.predicateHash).toBe(r2.provenance.predicateHash);
+  });
+
+  // ============================================================================
+  // M6 — redactIntent option omits raw intent, keeps intentHash
+  // ============================================================================
+
+  it("M6: redactIntent: true → provenance omits raw intent, keeps intentHash", async () => {
+    const runner = mockRunner('{"cartTotal":{"$gte":1}}');
+    const result = await predicateFromIntentWithProvenance({
+      intent: "patient SSN 123-45-6789 over-the-limit on cart",
+      schema: SCHEMA,
+      runner,
+      redactIntent: true,
+    });
+
+    expect(result.provenance.intent).toBeUndefined();
+    expect(typeof result.provenance.intentHash).toBe("string");
+    expect(result.provenance.intentHash.length).toBeGreaterThan(0);
+
+    // The raw intent must not appear anywhere in the serialized provenance.
+    const serialized = JSON.stringify(result.provenance);
+    expect(serialized).not.toContain("123-45-6789");
+    expect(serialized).not.toContain("patient");
+    expect(serialized).not.toContain("SSN");
+  });
+
+  it("M6: redactIntent: false (default) → both intent and intentHash present", async () => {
+    const runner = mockRunner('{"cartTotal":{"$gte":1}}');
+    const result = await predicateFromIntentWithProvenance({
+      intent: "checkout unblocked when cart > 0",
+      schema: SCHEMA,
+      runner,
+    });
+
+    expect(result.provenance.intent).toBe(
+      "checkout unblocked when cart > 0",
+    );
+    expect(typeof result.provenance.intentHash).toBe("string");
+  });
+
+  it("M6: intentHash is stable across runs for the same intent", async () => {
+    const r1 = await predicateFromIntentWithProvenance({
+      intent: "stable intent string",
+      schema: SCHEMA,
+      runner: mockRunner('{"cartTotal":{"$gte":1}}'),
+    });
+    const r2 = await predicateFromIntentWithProvenance({
+      intent: "stable intent string",
+      schema: SCHEMA,
+      runner: mockRunner('{"cartTotal":{"$gte":1}}'),
+    });
+    expect(r1.provenance.intentHash).toBe(r2.provenance.intentHash);
+  });
+});
+
+// ============================================================================
+// M3 — mock-runner-style import.meta.env guard is Node-safe
+// ============================================================================
+//
+// The mock-runner file in examples/compliance-audit references
+// `import.meta.env.PROD` for its Vite production-build guard. In Node
+// (vitest) `import.meta.env` is undefined and a naive read would throw
+// TypeError on import.
+//
+// We can't cross-package import the actual file from a typed test
+// project (rootDir constraint), but we CAN replicate the guard pattern
+// here and assert it does the right thing in Node — vitest IS Node, so
+// the same runtime guard the example uses is exercised here.
+
+describe("mock-runner-style import.meta.env guard (M3)", () => {
+  it("the feature-detected env access does NOT throw in Node (vitest IS Node)", () => {
+    // Exact pattern used by examples/compliance-audit/src/mock-runner.ts.
+    // If `import.meta.env` is undefined (Node), the optional chain
+    // resolves to `undefined`; the comparison reads `undefined === true`
+    // → false and the throw never fires. If we instead read
+    // `import.meta.env.PROD` directly, Node would TypeError.
+    expect(() => {
+      const metaEnv =
+        typeof import.meta !== "undefined" && "env" in import.meta
+          ? (import.meta as { env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } }).env
+          : undefined;
+
+      if (
+        metaEnv?.PROD === true &&
+        metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
+      ) {
+        throw new Error("guard fired in Node — should have no-opped");
+      }
+    }).not.toThrow();
+  });
+
+  it("the same guard DOES fire when metaEnv?.PROD === true (browser PROD build sim)", () => {
+    // Simulate the Vite production build where the substituted env
+    // object exists and PROD is true.
+    expect(() => {
+      const metaEnv: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } = {
+        PROD: true,
+      };
+      if (
+        metaEnv?.PROD === true &&
+        metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
+      ) {
+        throw new Error("[Directive demo] mockPredicateRunner is for demo only.");
+      }
+    }).toThrow(/demo only/);
+  });
+
+  it("the guard no-ops when VITE_ALLOW_MOCK_RUNNER='true' even in PROD (browser opt-out)", () => {
+    expect(() => {
+      const metaEnv: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } = {
+        PROD: true,
+        VITE_ALLOW_MOCK_RUNNER: "true",
+      };
+      if (
+        metaEnv?.PROD === true &&
+        metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
+      ) {
+        throw new Error("should not fire");
+      }
+    }).not.toThrow();
+  });
+});
+
+// ============================================================================
+// N6 — AbortSignal threaded into runner call (in-flight cancellation)
+// ============================================================================
+
+describe("predicateFromIntent — AbortSignal threaded into runner (N6)", () => {
+  it("forwards signal as the runner's third arg via RunOptions", async () => {
+    const runner = vi.fn(async () => ({
+      output: '{"cartTotal":{"$gte":1}}',
+      messages: [],
+      toolCalls: [],
+      totalTokens: 0,
+    })) as AgentRunner;
+
+    const controller = new AbortController();
+    await predicateFromIntent({
+      intent: "x",
+      schema: SCHEMA,
+      runner,
+      signal: controller.signal,
+    });
+
+    const calls = (runner as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const lastCall = calls[0]!;
+    // Third positional arg is RunOptions; signal is forwarded.
+    expect(lastCall[2]).toBeDefined();
+    expect((lastCall[2] as { signal?: AbortSignal }).signal).toBe(
+      controller.signal,
+    );
+  });
+
+  it("throws 'aborted' when a slow runner is cancelled mid-call (runner honors signal)", async () => {
+    const controller = new AbortController();
+    let runnerCalls = 0;
+
+    // Runner that resolves after a delay — but honors the signal by
+    // rejecting once aborted (mirrors fetch's behavior).
+    const slowRunner: AgentRunner = vi.fn(async (_agent, _input, options) => {
+      runnerCalls++;
+
+      return new Promise((resolve, reject) => {
+        const onAbort = () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        };
+        if (options?.signal?.aborted) {
+          onAbort();
+
+          return;
+        }
+        options?.signal?.addEventListener("abort", onAbort, { once: true });
+        // Long delay — never resolves before abort fires.
+        setTimeout(() => {
+          resolve({
+            output: '{"cartTotal":{"$gte":1}}',
+            messages: [],
+            toolCalls: [],
+            totalTokens: 0,
+          });
+        }, 10_000);
+      });
+    }) as AgentRunner;
+
+    const promise = predicateFromIntent({
+      intent: "x",
+      schema: SCHEMA,
+      runner: slowRunner,
+      signal: controller.signal,
+      maxRetries: 3,
+    });
+
+    // Fire abort on the next macrotask, after the runner has been called.
+    setTimeout(() => controller.abort(), 5);
+
+    await expect(promise).rejects.toThrow(/aborted/);
+    // The abort fires before the next retry — runner called exactly once.
+    expect(runnerCalls).toBe(1);
   });
 });

@@ -162,4 +162,4 @@ export {
 } from "./core/types.js";
 
 // Shared utilities
-export { safeStringify } from "./utils/utils.js";
+export { safeStringify, hashObject, stableStringify } from "./utils/utils.js";

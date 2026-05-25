@@ -1762,6 +1762,11 @@ export function createEngine<S extends Schema>(
         })),
         constraints: constraintsManager.getAllStates().map((s) => {
           const whenSpec = constraintsManager.getWhenSpec(s.id);
+          // (F1) Surface `owns:` from the merged constraint def so
+          // `doctor.checkOwns()` can flag candidates that would race
+          // or shadow these writes. `bind` slot reserved for v2.
+          const def = mergedConstraints[s.id];
+          const owns = def?.owns && def.owns.length > 0 ? def.owns : undefined;
 
           return {
             id: s.id,
@@ -1770,8 +1775,9 @@ export function createEngine<S extends Schema>(
             priority: s.priority,
             hitCount: s.hitCount,
             lastActiveAt: s.lastActiveAt,
-            meta: mergedConstraints[s.id]?.meta,
+            meta: def?.meta,
             ...(whenSpec ? { whenSpec } : {}),
+            ...(owns ? { owns } : {}),
           };
         }),
         resolvers: Object.fromEntries(

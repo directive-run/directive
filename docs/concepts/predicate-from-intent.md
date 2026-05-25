@@ -86,7 +86,7 @@ Schema reminder:
 
 This keeps retry prompts short for large schemas (200+ facts) — critical for token budgets and context-window pressure. Non-structural errors (e.g. JSON parse failures) fall back to the full schema, since the offending paths aren't known.
 
-## Concurrency + cancellation (M7)
+## Concurrency + cancellation (M7, N6)
 
 `predicateFromIntent` does **NOT** limit in-flight calls. Wrap it with a concurrency limiter (e.g. `p-limit`, `Bottleneck`) before exposing it to user-driven traffic:
 
@@ -97,7 +97,7 @@ const limit = pLimit(5); // at most 5 concurrent LLM calls
 const predicate = await limit(() => predicateFromIntent({ ... }));
 ```
 
-Pass an `AbortSignal` via `opts.signal` for cooperative cancellation — checked between retry attempts. Aborted calls throw `Error("aborted")`:
+Pass an `AbortSignal` via `opts.signal` for cooperative cancellation. The signal is checked between retry attempts AND forwarded into the runner call (`runner(agent, input, { signal })`):
 
 ```ts
 const controller = new AbortController();
@@ -111,7 +111,11 @@ const predicate = await predicateFromIntent({
 });
 ```
 
-## Provenance — auditable rule emission (M24)
+**Runner must honor the signal for true mid-call cancellation (N6).** Fetch-based adapters (the bundled OpenAI / Anthropic / Ollama runners) thread the signal through to `fetch`, so the network call aborts mid-stream. A custom runner that ignores the third arg of the `AgentRunner` signature still delivers cancellation — but only at the next retry boundary, since the in-flight request will run to completion before the loop checks `signal.aborted` again.
+
+When the runner honors the signal and throws an abort-shaped error (`DOMException("Aborted", "AbortError")` from fetch, or any throw while `signal.aborted` is true), `predicateFromIntent` rethrows as `Error("aborted")` without burning a retry attempt.
+
+## Provenance — auditable rule emission (M24, N3, M6)
 
 Production deployments **MUST** persist a provenance record alongside any LLM-emitted predicate. Without it, auditing "where did this rule come from?" later is guesswork.
 
@@ -129,15 +133,43 @@ const { predicate, provenance } = await predicateFromIntentWithProvenance({
 
 await db.predicates.insert({
   predicate,
-  model: provenance.model,           // "gpt-4o-mini"
-  intent: provenance.intent,         // sanitized (post-redact) user intent
-  emittedAt: provenance.emittedAt,   // ISO timestamp
-  attempts: provenance.attemptCount, // retry count
-  rawOutputHash: provenance.rawOutputHash, // SHA-256 hex (or djb2 fallback)
+  model: provenance.model,            // "gpt-4o-mini" (or "unknown" — see below)
+  intent: provenance.intent,          // sanitized intent — omitted when redactIntent: true
+  intentHash: provenance.intentHash,  // SHA-256 hex of the sanitized intent (always present)
+  emittedAt: provenance.emittedAt,    // ISO timestamp
+  attempts: provenance.attemptCount,  // retry count
+  predicateHash: provenance.predicateHash, // canonicalized hash of the validated predicate
 });
 ```
 
-The `rawOutputHash` is SHA-256 when `crypto.subtle` is available (browsers, Node 19+, workers); otherwise a sync djb2 hex hash — sufficient as a tamper-evident pointer.
+### Hash semantics (N3)
+
+- **`predicateHash`** hashes the VALIDATED predicate object, canonicalized via stable stringification. Two LLM responses that differ only in whitespace or key order produce the **same** hash. This is the right primitive for "did the model emit the same logical rule?" queries.
+- **`intentHash`** hashes the sanitized intent STRING (SHA-256 when `crypto.subtle` is available, djb2 fallback). Use it to dedupe identical intents or to satisfy "we never stored the raw intent" claims.
+
+The legacy `rawOutputHash` field is gone — it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `hashObject(predicate)` from `@directive-run/core/internals`.
+
+### PII guidance — `redactIntent` (M6)
+
+The `intent` field stores the (sanitized) user input verbatim by default. For PII-sensitive contexts (medical, financial, customer messages), pass `redactIntent: true` to omit the raw intent from the provenance record:
+
+```ts
+const { provenance } = await predicateFromIntentWithProvenance({
+  intent: "patient with SSN 123-45-6789 over the limit",
+  schema,
+  runner,
+  redactIntent: true, // ← raw intent omitted; only intentHash remains
+});
+
+provenance.intent;     // undefined
+provenance.intentHash; // "a1b2c3…" — still present
+```
+
+You can still dedupe / correlate via `intentHash`, but the raw text never lands in the provenance payload.
+
+### Model field caveat
+
+`provenance.model` is populated from `opts.agent?.model`. If you call `predicateFromIntentWithProvenance` with no `agent`, the default `predicate-emitter` agent has no model field, and `provenance.model` resolves to `"unknown"`. v1 does **NOT** read provider-detected model strings from `RunResult` — that requires the `AgentRunner` contract to expose it, which is a v2 change. Pass `agent: { name: "...", model: "..." }` explicitly if you need provider attribution today.
 
 ## Security model
 

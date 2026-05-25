@@ -727,6 +727,8 @@ evaluated directly on the client. The end of dual-write hell."*
 
 ### R4.I — `factsBaseline` audit log: GDPR-grade query-the-history — **SHIPPED v1.11.0 (memory sink + djb2 chain; SQLite + SHA-256 strong verify deferred)**
 
+> SHIPPED v1.11.0 with REDUCED CLAIMS: see docs/concepts/audit-ledger.md for actual threat model. v1 ships tamper-evident hash-chained (djb2 32-bit) ledger; full court-admissible posture (signing keys + RFC 3161 TSA + SHA-256 + Art.17 erasure) is reserved for v2.
+
 **[2 days — viral HIGH (regulated industries), compound MAX]**
 
 Every constraint fire and every resolver clobber already carries the

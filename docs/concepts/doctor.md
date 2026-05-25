@@ -46,16 +46,22 @@ Three finding types, two buckets:
 ```ts
 doctor.checkOwns(candidate, system.inspect());
 // → {
-//     findings: [
+//     contradictions: [],
+//     warnings: [
 //       { constraintId: "applyDiscount",
 //         candidatePath: "cartTotal",
 //         source: "owns",
+//         severity: "warning",
 //         reason: "Constraint applyDiscount already owns cartTotal — candidate would race or shadow its writes." }
 //     ]
 //   }
 ```
 
-> **v1 LIMITATION (M4):** `checkOwns` only reports findings when `system.inspect()` exposes `owns:` / `bind:` metadata on each constraint snapshot. Older inspect payloads lack that field, in which case `checkOwns` returns `{ findings: [] }` — no false positives. Wiring resolver-ownership through `inspect()` automatically is on the v2 roadmap.
+> **M5 — `checkOwns` returns `{ contradictions, warnings }` now (was `{ findings }`).** Owns-collisions are *warnings* by default — the engine still enforces the runtime binding gate, so a doctor pass is advisory rather than fatal. Each finding carries `severity: "warning"`; callers running stricter pre-deploy lints can promote findings into `contradictions` themselves. The unified shape matches `checkAgainst` so a caller can route both with one branch.
+
+> **F1 — `system.inspect().constraints[].owns` is now populated automatically** from the constraint definition's `owns:` field. `checkOwns(candidate, system.inspect())` works against any system without manual annotation. `bind:` is reserved as a v2 promise — the type slot is in place but the runtime does not yet emit a `bind` field on inspect snapshots.
+
+> **v1 LIMITATION (M4):** `checkOwns` still returns `{ contradictions: [], warnings: [] }` when constraints expose neither `owns:` nor `bind:` metadata. No false positives.
 
 ## Use cases
 

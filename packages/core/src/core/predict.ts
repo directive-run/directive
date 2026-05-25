@@ -208,7 +208,14 @@ export function predict<F = Record<string, unknown>>(
   // M10: $changed clause needs a `prev` snapshot. If the caller omitted
   // `prev`, evaluation silently treats every `$changed` clause as failing —
   // surface a synthetic warning so the caller sees the real cause.
-  if (prev === undefined) {
+  //
+  // M2: but ONLY when the predicate actually failed. If `wouldFire === true`,
+  // every clause (including any $changed clauses) already passed, so the
+  // synthetic warning would be noise. The runtime treats `$changed` with no
+  // `prev` as a no-op; if the predicate as a whole fired despite a $changed
+  // clause being present-but-uncheckable, the result is unambiguous and the
+  // synthetic warning would mislead the caller into thinking something is wrong.
+  if (!wouldFire && prev === undefined) {
     const changedPaths: string[] = [];
     walkPredicate(predicate as unknown, {
       operator(factPath, op) {

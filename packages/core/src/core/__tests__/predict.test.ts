@@ -157,13 +157,25 @@ describe("predict — prev/$changed", () => {
     expect(result.missingChanges[0]?.suggestion).toContain("required to differ");
   });
 
-  it("M10: $changed without prev → synthetic warning entry per $changed clause", () => {
+  it("M10: $changed without prev → synthetic warning entry per $changed clause (when wouldFire is false)", () => {
+    // Mix a $changed clause with a non-matching $eq clause so wouldFire is
+    // false — that's when the synthetic warning is relevant. (M2: when the
+    // predicate fires despite $changed-without-prev, the synthetic warning
+    // is silenced because the predicate result is unambiguous.)
     const result = predict(
-      { phase: { $changed: true }, status: { $changed: true } },
-      { phase: "green", status: "ok" },
+      {
+        $all: [
+          { phase: { $changed: true } },
+          { status: { $changed: true } },
+          // Force wouldFire=false with a clause we know fails.
+          { region: { $eq: "EU" } },
+        ],
+      },
+      { phase: "green", status: "ok", region: "US" },
       // prev intentionally omitted
     );
 
+    expect(result.wouldFire).toBe(false);
     const synthetics = result.missingChanges.filter(
       (m) => m.op === "$changed" && m.suggestion.includes("`prev` snapshot"),
     );
@@ -175,11 +187,55 @@ describe("predict — prev/$changed", () => {
     }
   });
 
-  it("M10: $changed without prev and nested in $any → still synthetically reported", () => {
+  it("M10: $changed without prev and nested in $all → still synthetically reported when wouldFire is false", () => {
+    // Use $all so the predicate as a whole fails (status.$eq "ok" fails),
+    // making the synthetic warning relevant. Note: $changed without prev
+    // is "actual !== undefined" → "green" !== undefined → passes, but the
+    // $all combinator still fails because of the status clause, so the
+    // synthetic warning surfaces.
+    //
+    // (M2 update: synthetic warnings only fire when wouldFire === false.
+    // A $any predicate where another arm passes will silence the warning —
+    // see the M2-specific tests below for that case.)
     const result = predict(
-      { $any: [{ phase: { $changed: true } }, { status: { $eq: "ok" } }] },
+      { $all: [{ phase: { $changed: true } }, { status: { $eq: "ok" } }] },
       { phase: "green", status: "no" },
     );
+    const synthetic = result.missingChanges.find(
+      (m) => m.op === "$changed" && m.path === "phase",
+    );
+    expect(synthetic).toBeDefined();
+    expect(synthetic?.suggestion).toContain("`prev` snapshot");
+  });
+
+  // ============================================================================
+  // M2 — synthetic $changed warning is silent when wouldFire === true
+  // ============================================================================
+
+  it("M2: $changed without prev → NO synthetic warning when other clauses make wouldFire true", () => {
+    // When `prev` is undefined, `$changed` evaluates as: actual !== prev → actual !== undefined.
+    // "green" !== undefined → true → the $changed clause passes, $any fires.
+    // No missingChanges should be reported — the predicate is satisfied.
+    const result = predict(
+      { $any: [{ phase: { $changed: true } }, { status: { $eq: "no-match" } }] },
+      { phase: "green", status: "ok" },
+      // prev intentionally omitted
+    );
+
+    expect(result.wouldFire).toBe(true);
+    // Synthetic $changed warnings should be silent — the predicate fired.
+    expect(result.missingChanges).toHaveLength(0);
+  });
+
+  it("M2: $changed without prev → synthetic warning still fires when wouldFire === false", () => {
+    // Both clauses fail → wouldFire is false → synthetic warning surfaces.
+    // (Regression guard: don't accidentally silence the warning everywhere.)
+    const result = predict(
+      { $all: [{ phase: { $changed: true } }, { status: { $eq: "ok" } }] },
+      { phase: "green", status: "no" },
+    );
+
+    expect(result.wouldFire).toBe(false);
     const synthetic = result.missingChanges.find(
       (m) => m.op === "$changed" && m.path === "phase",
     );

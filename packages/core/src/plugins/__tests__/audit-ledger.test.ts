@@ -697,9 +697,11 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     const before = ledger.forFact("cartTotal").length;
     expect(before).toBeGreaterThan(0);
 
-    const { erased, tombstone } = ledger.erase({ factPath: "cartTotal" });
+    // (M7) erase returns `markerEntry` (the chained summary), not
+    // `tombstone` — N per-entry tombstones live in the sink itself.
+    const { erased, markerEntry } = ledger.erase({ factPath: "cartTotal" });
     expect(erased).toBeGreaterThan(0);
-    expect(tombstone.kind).toBe("system.subject-erased");
+    expect(markerEntry.kind).toBe("system.subject-erased");
 
     // Subject-erased marker is recorded in the chain.
     const markers = ledger.query({ kind: "system.subject-erased" });
@@ -708,6 +710,182 @@ describe("createAuditLedger — per-subject erase() (C8)", () => {
     // Erased entries are now tombstones, not fact.change.
     const tombstones = ledger.query({ kind: "system.entry-erased" });
     expect(tombstones.length).toBe(erased);
+
+    system.destroy();
+  });
+
+  it("verify() recognizes tombstones as legitimate breaks (N1 + M1)", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 25;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 75;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 125;
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Pre-erase: chain should verify clean.
+    const before = ledger.verify();
+    expect(before.valid).toBe(true);
+
+    // Erase the middle cartTotal entry (the 75 one).
+    const { erased } = ledger.erase({
+      factPath: "cartTotal",
+      changedBetween: [0, Date.now()],
+    });
+    expect(erased).toBeGreaterThan(0);
+
+    // After erasure: verify() still reports valid:true and surfaces
+    // the erased seqs in erasedAt rather than as tamper.
+    const after = ledger.verify();
+    expect(after.valid).toBe(true);
+    if (after.valid) {
+      expect(after.erasedAt).toBeDefined();
+      expect(after.erasedAt!.length).toBe(erased);
+      expect(after.entryCount).toBeGreaterThan(0);
+    }
+
+    system.destroy();
+  });
+
+  it("verify() still detects REAL tamper even when tombstones are present (N1)", async () => {
+    // Use a sink wrapper to simulate persisted-bytes tampering on an
+    // entry that has nothing to do with erasure.
+    const realSink = memorySink();
+    let swap: ((entries: AuditEntry[]) => void) | null = null;
+    const sink: typeof realSink = {
+      ...realSink,
+      query: realSink.query.bind(realSink),
+      recent: realSink.recent.bind(realSink),
+      forFact: realSink.forFact.bind(realSink),
+      forConstraint: realSink.forConstraint.bind(realSink),
+      write: realSink.write.bind(realSink),
+      clear: realSink.clear.bind(realSink),
+      destroy: realSink.destroy.bind(realSink),
+      erase: realSink.erase?.bind(realSink),
+      onTruncate: realSink.onTruncate?.bind(realSink),
+      toJSON: () => {
+        const out = realSink.toJSON();
+        if (swap) {
+          const cloned = JSON.parse(JSON.stringify(out)) as typeof out;
+          swap(cloned.entries as AuditEntry[]);
+          return cloned;
+        }
+        return out;
+      },
+    };
+    const ledger = createAuditLedger({ sink });
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 25;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 75;
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 125;
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Erase one fact-change entry.
+    ledger.erase({ factPath: "cartTotal" });
+
+    // Tamper with an EARLY entry (system.init) — has nothing to do
+    // with the erasure window.
+    swap = (entries) => {
+      const initIdx = entries.findIndex((e) => e.kind === "system.init");
+      if (initIdx >= 0 && entries[initIdx]) {
+        (entries[initIdx] as { kind: string }).kind = "fact.change";
+      }
+    };
+
+    const after = ledger.verify();
+    expect(after.valid).toBe(false);
+    if (!after.valid) {
+      expect(after.brokenAt).toBeGreaterThanOrEqual(0);
+    }
+
+    system.destroy();
+  });
+
+  it("verify() throws on unknown hashAlgo discriminator (N5)", () => {
+    const sink = memorySink();
+    // Genesis entry with a bogus hashAlgo.
+    sink.write({
+      seq: 0,
+      ts: 0,
+      kind: "fact.change",
+      key: "x",
+      prior: null,
+      next: 1,
+      prevHash: null,
+      hashAlgo: "unknown-algo" as "djb2-1",
+    } as AuditEntry);
+
+    const ledger = createAuditLedger({ sink });
+    expect(() => ledger.verify()).toThrow(/unknown hashAlgo/i);
+  });
+
+  it("erase marker uses filterHash + filterShape — no raw PII (N2)", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 100;
+    await new Promise((r) => setTimeout(r, 0));
+
+    // PII-like factPath as a filter value — must not leak into entry.
+    const piiPath = "alice@x.com";
+    ledger.erase({ factPath: piiPath });
+
+    const markers = ledger.query({ kind: "system.subject-erased" });
+    expect(markers.length).toBe(1);
+    const m = markers[0] as Extract<
+      AuditEntry,
+      { kind: "system.subject-erased" }
+    >;
+    // No raw filter blob in any field.
+    const serialized = JSON.stringify(m);
+    expect(serialized).not.toContain(piiPath);
+    expect(typeof m.filterHash).toBe("string");
+    expect(m.filterHash.length).toBeGreaterThan(0);
+    expect(m.filterShape).toEqual({
+      factPath: true,
+      constraintId: false,
+      kind: undefined,
+      changedBetween: undefined,
+    });
+
+    system.destroy();
+  });
+
+  it("erase marker filterShape marks changedBetween as '[range]' without values (N2)", async () => {
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: makeModule(),
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+    system.facts.cartTotal = 100;
+    await new Promise((r) => setTimeout(r, 0));
+
+    ledger.erase({ changedBetween: [0, Date.now()] });
+    const markers = ledger.query({ kind: "system.subject-erased" });
+    const m = markers[0] as Extract<
+      AuditEntry,
+      { kind: "system.subject-erased" }
+    >;
+    expect(m.filterShape.changedBetween).toBe("[range]");
 
     system.destroy();
   });
@@ -776,8 +954,8 @@ describe("createAuditLedger — snapshot / history.navigate lifecycle (M9)", () 
 // R1 fixes — M22 function-form whenSource
 // ============================================================================
 
-describe("createAuditLedger — function-form whenSource (M22)", () => {
-  it("captures a whenSource preview for function-form constraints", async () => {
+describe("createAuditLedger — function-form whenSource (M22, N5)", () => {
+  it("captures a sourceHash (not raw source) for function-form constraints", async () => {
     const fnModule = createModule("fn-when", {
       schema: {
         facts: {
@@ -813,12 +991,76 @@ describe("createAuditLedger — function-form whenSource (M22)", () => {
     const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
     // No whenSpec for function-form constraints…
     expect(e.whenSpec).toBeUndefined();
-    // …but a whenSource preview is captured.
+    // …but a sourceHash is captured (NOT the source itself).
     expect(e.whenSource).toBeDefined();
     expect(e.whenSource?.kind).toBe("function");
-    expect(typeof e.whenSource?.preview).toBe("string");
+    expect(typeof e.whenSource?.sourceHash).toBe("string");
+    expect(e.whenSource?.sourceHash.length).toBeGreaterThan(0);
+    // Regression guard: the legacy `preview` field must not be present.
+    expect(
+      (e.whenSource as unknown as { preview?: unknown }).preview,
+    ).toBeUndefined();
 
     system.destroy();
+  });
+
+  it("N5: secret in closure body is NOT leaked into the audit entry", async () => {
+    // Construct a function-form constraint whose source contains a
+    // distinct, recognizable "secret" string. After capture, the
+    // serialized audit entry must NOT contain that string anywhere —
+    // the whole point of hashing the source instead of slicing it.
+    const API_KEY_SENTINEL = "sk-live-CANARY-12345";
+
+    const secretFnModule = createModule("secret-fn-when", {
+      schema: {
+        facts: {
+          x: t.number(),
+        },
+        derivations: {},
+        events: {},
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.x = 0;
+      },
+      constraints: {
+        secretGated: {
+          // Inline secret in the function body — exactly the kind of
+          // pattern that would leak via a preview field.
+          when: (facts) => {
+            const apiKey = API_KEY_SENTINEL;
+
+            return facts.x > 0 && apiKey.length > 0;
+          },
+          require: { type: "GO" },
+        },
+      },
+    });
+
+    const ledger = createAuditLedger();
+    const system = createSystem({
+      module: secretFnModule,
+      plugins: [ledger.plugin],
+    });
+    system.start();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const evals = ledger.query({
+      kind: "constraint.evaluate",
+      constraintId: "secretGated",
+    });
+    expect(evals.length).toBeGreaterThan(0);
+    const e = evals[0] as Extract<AuditEntry, { kind: "constraint.evaluate" }>;
+
+    // sourceHash is present…
+    expect(e.whenSource?.sourceHash).toBeDefined();
+    expect(typeof e.whenSource?.sourceHash).toBe("string");
+
+    // …but the secret literal is nowhere in the serialized entry.
+    const serialized = JSON.stringify(e);
+    expect(serialized).not.toContain(API_KEY_SENTINEL);
+    expect(serialized).not.toContain("CANARY");
+    expect(serialized).not.toContain("apiKey");
   });
 });
 
