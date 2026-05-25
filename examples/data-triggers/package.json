@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-data-triggers",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "type": "module",
   "description": "All five Directive definition surfaces as data — a one-file showcase.",
