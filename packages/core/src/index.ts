@@ -199,6 +199,7 @@ export type {
   AuditLedgerOptions,
   AuditLedgerSink,
   QueryFilter,
+  VerifyResult,
 } from "./plugins/audit-ledger.js";
 
 // describePredicate — render any FactPredicate as English / algebraic prose

@@ -28,6 +28,7 @@
  * @module
  */
 
+import { combineSignals } from "./agent-utils.js";
 import type { DebugTimeline } from "./debug-timeline.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
@@ -670,7 +671,7 @@ Respond with ONLY a JSON object: {"score": <number>, "reason": "<brief explanati
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const combinedSignal = options.signal
-        ? AbortSignal.any([options.signal, controller.signal])
+        ? combineSignals([options.signal, controller.signal])
         : controller.signal;
 
       try {
@@ -861,7 +862,7 @@ export function evalFaithfulness(options: EvalSemanticOptions): EvalCriterion {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const combinedSignal = options.signal
-        ? AbortSignal.any([options.signal, controller.signal])
+        ? combineSignals([options.signal, controller.signal])
         : controller.signal;
 
       try {
@@ -936,7 +937,7 @@ export function evalRelevance(options: EvalSemanticOptions): EvalCriterion {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const combinedSignal = options.signal
-        ? AbortSignal.any([options.signal, controller.signal])
+        ? combineSignals([options.signal, controller.signal])
         : controller.signal;
 
       try {
@@ -1011,7 +1012,7 @@ export function evalCoherence(options: EvalSemanticOptions): EvalCriterion {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       const combinedSignal = options.signal
-        ? AbortSignal.any([options.signal, controller.signal])
+        ? combineSignals([options.signal, controller.signal])
         : controller.signal;
 
       try {

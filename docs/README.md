@@ -17,6 +17,11 @@ field-report lives in [`posts/migrating-55-machines.md`](./posts/migrating-55-ma
 - [`concepts/chained-pipelines.md`](./concepts/chained-pipelines.md) — how facts → constraints → resolvers → facts forms causal chains.
 - [`derivations.md`](./derivations.md) — purity rule, composition (`derive` parameter, not `sys.derive`), top-of-funnel placement.
 - [`patterns/internal-events.md`](./patterns/internal-events.md) — `status`-as-event-bus; why no `module.fire('INTERNAL_EVENT')` API.
+- [`concepts/predicate-from-intent.md`](./concepts/predicate-from-intent.md) — LLM → validated `FactPredicate` pipeline; five-layer guard, provenance, hash semantics.
+- [`concepts/predicate-codegen.md`](./concepts/predicate-codegen.md) — one predicate, run on client AND server (SQL / Mongo / PostgREST).
+- [`concepts/describe-predicate.md`](./concepts/describe-predicate.md) — render any `FactPredicate` as English (`natural`) or algebra (`formal`); powers rules-diff prose + LLM round-trip prompts.
+- [`concepts/audit-ledger.md`](./concepts/audit-ledger.md) — tamper-evident, hash-chained, PII-redacting audit log; threat model + v2 promises.
+- [`concepts/doctor.md`](./concepts/doctor.md) — structural contradiction + owns/bind collision detection before assignment.
 
 ## API reference
 

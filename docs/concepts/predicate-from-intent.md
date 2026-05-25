@@ -147,7 +147,7 @@ await db.predicates.insert({
 - **`predicateHash`** hashes the VALIDATED predicate object, canonicalized via stable stringification. Two LLM responses that differ only in whitespace or key order produce the **same** hash. This is the right primitive for "did the model emit the same logical rule?" queries.
 - **`intentHash`** hashes the sanitized intent STRING (SHA-256 when `crypto.subtle` is available, djb2 fallback). Use it to dedupe identical intents or to satisfy "we never stored the raw intent" claims.
 
-The legacy `rawOutputHash` field is gone — it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `hashObject(predicate)` from `@directive-run/core/internals`.
+The legacy `rawOutputHash` field is gone — it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `predicateHash(predicate)` from `@directive-run/core` (public API — semver-stable, no `/internals` import needed).
 
 ### PII guidance — `redact` vs `redactIntent` (M6)
 
