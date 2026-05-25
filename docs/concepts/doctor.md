@@ -46,7 +46,6 @@ Three finding types, two buckets:
 ```ts
 doctor.checkOwns(candidate, system.inspect());
 // → {
-//     contradictions: [],
 //     warnings: [
 //       { constraintId: "applyDiscount",
 //         candidatePath: "cartTotal",
@@ -57,11 +56,13 @@ doctor.checkOwns(candidate, system.inspect());
 //   }
 ```
 
-> **M5 — `checkOwns` returns `{ contradictions, warnings }` now (was `{ findings }`).** Owns-collisions are *warnings* by default — the engine still enforces the runtime binding gate, so a doctor pass is advisory rather than fatal. Each finding carries `severity: "warning"`; callers running stricter pre-deploy lints can promote findings into `contradictions` themselves. The unified shape matches `checkAgainst` so a caller can route both with one branch.
+> **F-3 — `checkOwns` returns `{ warnings }` only.** Earlier R-cycles shipped `{ contradictions, warnings }` (where `contradictions` was always `[]` in v1). The empty slot encouraged callers to write dead branches, so it's gone — owns-collisions are *warnings* by default and each finding carries a `severity: "warning"` discriminator. Callers running stricter pre-deploy lints can promote findings to `severity: "error"` themselves and route on the discriminator. v2 may surface a structured `errors` field; the discriminator is the migration shim.
+
+> **M5 — engine still enforces the runtime binding gate.** A doctor pass is advisory rather than fatal — the system already refuses double-owners at runtime. Use `checkOwns` to fail fast in pre-deploy lints / CI.
 
 > **F1 — `system.inspect().constraints[].owns` is now populated automatically** from the constraint definition's `owns:` field. `checkOwns(candidate, system.inspect())` works against any system without manual annotation. `bind:` is reserved as a v2 promise — the type slot is in place but the runtime does not yet emit a `bind` field on inspect snapshots.
 
-> **v1 LIMITATION (M4):** `checkOwns` still returns `{ contradictions: [], warnings: [] }` when constraints expose neither `owns:` nor `bind:` metadata. No false positives.
+> **v1 LIMITATION (M4):** `checkOwns` returns `{ warnings: [] }` when constraints expose neither `owns:` nor `bind:` metadata. No false positives.
 
 ## Use cases
 

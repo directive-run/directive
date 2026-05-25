@@ -33,6 +33,8 @@ Five layers of validation per call:
 
 On failure: structured errors feed back to the model in the next attempt. Three retries. On exhaustion: throws — never returns a partial predicate.
 
+Function-calling tool-spec presets ship for both providers: `predicateToolSpecOpenAI(schema)` returns the Chat Completions `{ type, function: { name, description, parameters } }` shape; `predicateToolSpecAnthropic(schema)` returns the Messages API `{ name, description, input_schema }` shape. Drop into your `tools: [...]` array directly.
+
 Pair this with [`doctor.checkAgainst`](/docs/doctor) and [`predict`](/docs/predict) and you get the loop the positioning post promised:
 
 > *The LLM wrote a rule. The type-checker said no. The doctor said no. The predictor said which facts must change. Two turns later, the rule was in production — and the runtime never executed unsafe code.*

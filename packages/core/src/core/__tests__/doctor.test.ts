@@ -167,7 +167,6 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
         },
       ],
     );
-    expect(result.contradictions).toEqual([]);
     expect(result.warnings).toHaveLength(1);
     const f = result.warnings[0]!;
     expect(f.constraintId).toBe("applyDiscount");
@@ -193,7 +192,6 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
       { cartTotal: { $gte: 100 } },
       [{ id: "noMeta", whenSpec: { cartTotal: { $lt: 50 } } }],
     );
-    expect(result.contradictions).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
 
@@ -202,8 +200,16 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
       { region: { $eq: "US" } },
       [{ id: "x", owns: ["cartTotal"] }],
     );
-    expect(result.contradictions).toEqual([]);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("F-3: CheckOwnsResult shape is { warnings } only — no contradictions field", () => {
+    const result = doctor.checkOwns(
+      { cartTotal: { $gte: 100 } },
+      [{ id: "owner", owns: ["cartTotal"] }],
+    );
+    expect(Object.keys(result).sort()).toEqual(["warnings"]);
+    expect((result as { contradictions?: unknown }).contradictions).toBeUndefined();
   });
 
   it("accepts the inspect()-style { constraints: [...] } wrapper", () => {

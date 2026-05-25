@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+import { combineSignals, createRunner } from "../agent-utils.js";
+import type { AgentLike } from "../types.js";
+
+describe("combineSignals (Sec MAJOR — fetch signal collision)", () => {
+  it("returns undefined when no signals provided", () => {
+    expect(combineSignals([undefined, undefined])).toBeUndefined();
+    expect(combineSignals([])).toBeUndefined();
+  });
+
+  it("returns the single signal when only one is live", () => {
+    const c = new AbortController();
+    const out = combineSignals([undefined, c.signal]);
+    expect(out).toBe(c.signal);
+  });
+
+  it("aborts when EITHER input signal aborts", () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    const out = combineSignals([a.signal, b.signal])!;
+    expect(out.aborted).toBe(false);
+    a.abort();
+    expect(out.aborted).toBe(true);
+  });
+
+  it("aborts via second signal independently", () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    const out = combineSignals([a.signal, b.signal])!;
+    b.abort();
+    expect(out.aborted).toBe(true);
+  });
+
+  it("returns an already-aborted signal if any input is pre-aborted", () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    a.abort();
+    const out = combineSignals([a.signal, b.signal])!;
+    expect(out.aborted).toBe(true);
+  });
+});
+
+describe("createRunner — signal collision (Sec MAJOR)", () => {
+  it("both buildRequest signal AND runOptions signal can trigger fetch abort", async () => {
+    let observedSignal: AbortSignal | undefined;
+
+    const userController = new AbortController();
+    const buildController = new AbortController();
+
+    const fakeFetch: typeof globalThis.fetch = async (
+      _url,
+      init?: RequestInit,
+    ) => {
+      observedSignal = init?.signal ?? undefined;
+      // Return a minimal Response-like object that the runner's
+      // `response.ok` branch is happy with.
+      return new Response(JSON.stringify({ text: "ok" }), { status: 200 });
+    };
+
+    const runner = createRunner({
+      fetch: fakeFetch,
+      buildRequest: () => ({
+        url: "https://example.test/api",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+          signal: buildController.signal,
+        },
+      }),
+      parseResponse: async () => ({
+        text: "ok",
+        totalTokens: 1,
+        inputTokens: 1,
+        outputTokens: 0,
+      }),
+    });
+
+    const agent: AgentLike = { name: "test" };
+    await runner(agent, "hello", { signal: userController.signal });
+
+    expect(observedSignal).toBeDefined();
+    expect(observedSignal!.aborted).toBe(false);
+    // Aborting either underlying signal must propagate to the combined signal.
+    userController.abort();
+    expect(observedSignal!.aborted).toBe(true);
+  });
+
+  it("buildRequest signal still works when caller passes no signal", async () => {
+    let observedSignal: AbortSignal | undefined;
+    const buildController = new AbortController();
+
+    const fakeFetch: typeof globalThis.fetch = async (
+      _url,
+      init?: RequestInit,
+    ) => {
+      observedSignal = init?.signal ?? undefined;
+      return new Response(JSON.stringify({ text: "ok" }), { status: 200 });
+    };
+
+    const runner = createRunner({
+      fetch: fakeFetch,
+      buildRequest: () => ({
+        url: "https://example.test/api",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+          signal: buildController.signal,
+        },
+      }),
+      parseResponse: async () => ({
+        text: "ok",
+        totalTokens: 1,
+        inputTokens: 1,
+        outputTokens: 0,
+      }),
+    });
+
+    await runner({ name: "test" }, "hello");
+    // The buildRequest signal must still reach fetch when no
+    // runOptions.signal is provided.
+    expect(observedSignal).toBe(buildController.signal);
+  });
+});

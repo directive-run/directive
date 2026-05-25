@@ -41,6 +41,28 @@ import { hashObject } from "../utils/utils.js";
 const HASH_ALGO = "djb2-1" as const;
 
 /**
+ * Entry schema version. Bumped if `AuditEntry` field shape changes in
+ * a way that breaks back-compat parsers. Persisted on every entry so
+ * exports remain self-describing across library upgrades. (F-5)
+ */
+const SCHEMA_VERSION = 1 as const;
+
+/**
+ * Private sentinel stamped onto tombstone entries by {@link createAuditLedger.erase}.
+ * Never exported, never serialized — `verify()` checks for it before
+ * accepting a `system.entry-erased` entry as a legitimate chain break.
+ *
+ * (N7) Without this, a caller holding a raw `AuditLedgerSink` reference
+ * could write `{ kind: "system.entry-erased", … }` directly into the
+ * sink to mask real tampering as legitimate erasure. The sentinel
+ * raises the bar so only the in-process ledger plugin (which lives in
+ * this module's closure) can mint a valid tombstone.
+ */
+const LEDGER_INTERNAL_TOKEN: unique symbol = Symbol(
+  "directive.audit-ledger.internal",
+);
+
+/**
  * Navigate `root` to `dottedPath` (`foo.bar.$eq`, `foo[0].value`) and
  * replace the value at the leaf. Used by `redactWhenSpec` to scrub
  * PII operands in cached predicate specs. Best-effort: silently no-ops
@@ -142,6 +164,25 @@ interface AuditEntryBase {
    * changes, so exports remain verifiable across versions.
    */
   readonly hashAlgo: typeof HASH_ALGO;
+  /**
+   * Entry schema version — bumped if any `AuditEntry` field shape
+   * changes in a way that breaks back-compat. Pair with `hashAlgo`
+   * when migrating older exports. (F-5)
+   */
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  /**
+   * Private sentinel — present (and equal to the in-module token) only
+   * on legitimate tombstones minted by `ledger.erase()`. Filtered out
+   * of all public read paths (`query`, `recent`, `toJSON`, etc.) so
+   * consumers never see or copy it. (N7)
+   *
+   * NOT serialized. NOT exported. Forging this from outside the module
+   * is impossible without the symbol reference; `verify()` rejects any
+   * `system.entry-erased` entry that lacks it.
+   *
+   * @internal
+   */
+  readonly __internal?: typeof LEDGER_INTERNAL_TOKEN;
 }
 
 export type AuditEntry =
@@ -260,19 +301,26 @@ export interface QueryFilter {
  * Verify result — chain valid OR a break with full context for tamper visualization.
  *
  * Erased entries (via `ledger.erase()`) appear as legitimate chain breaks —
- * `verify()` reports them in `erasedAt` and continues the walk from the
+ * `verify()` reports them in `erasedSeqs` and continues the walk from the
  * tombstone's own hash. Real tamper still surfaces as `valid: false`.
+ *
+ * Forged tombstones (a caller writes `kind: "system.entry-erased"`
+ * directly via `sink.write()` to mask tamper as erasure) are detected:
+ * legitimate tombstones carry an in-module sentinel that forgeries
+ * cannot mint, so `verify()` reports them as tamper. (N7)
  */
 export type VerifyResult =
   | {
       valid: true;
       entryCount: number;
       /**
-       * Sequence numbers of entries that were legitimately broken by
-       * `erase()` tombstones. Empty unless the chain contains erasures.
-       * (N1 + M1)
+       * Seq numbers of entries legitimately broken by `erase()`
+       * tombstones. NOT timestamps — each entry pairs this seq with
+       * the per-entry `system.entry-erased.erasedAt` (ms epoch) for
+       * the timestamp. Empty unless the chain contains erasures.
+       * (N1 + M1; renamed from `erasedAt` in R3)
        */
-      erasedAt?: number[];
+      erasedSeqs?: number[];
     }
   | {
       valid: false;
@@ -280,6 +328,12 @@ export type VerifyResult =
       expectedHash: string;
       actualHash: string;
       entry: AuditEntry;
+      /**
+       * Human-readable reason for the break — populated for cases
+       * where the cause is more specific than "hash mismatch" (e.g.
+       * tombstone forgery detected via missing sentinel).
+       */
+      reason?: string;
     };
 
 export interface AuditLedgerSink {
@@ -546,9 +600,14 @@ export interface AuditLedger {
    * "TAMPERED" visualization.
    *
    * Erased entries (via `ledger.erase()`) appear as legitimate chain
-   * breaks — `verify()` reports them in `erasedAt` and continues the
-   * walk from the tombstone's actual hash. Real tamper still surfaces
-   * as `valid: false`. (N1 + M1)
+   * breaks — `verify()` reports them in `erasedSeqs` and continues
+   * the walk from the tombstone's actual hash. Real tamper still
+   * surfaces as `valid: false`. (N1 + M1)
+   *
+   * Forged tombstones — `kind: "system.entry-erased"` entries written
+   * directly via `sink.write()` to mask tamper — are detected as
+   * forgery. Legitimate tombstones carry an in-module sentinel that
+   * forgeries cannot mint. (N7)
    *
    * v1 ships sync djb2 only. `verify({ strong: true })` is reserved
    * for v2 (SHA-256) and THROWS today — there is no silent fallback.
@@ -565,11 +624,18 @@ export interface AuditLedger {
    * `system.subject-erased` summary (the N per-entry tombstones live
    * in the sink, not on the return value). (M7)
    *
+   * When `erased === 0` (filter matched nothing), `markerEntry` is
+   * `null` and no marker is emitted into the chain — avoids polluting
+   * the audit trail with empty "erased: 0" records. (MAJOR-3)
+   *
    * WARNING: v1 erases only from THIS sink. External copies (toJSON
    * exports, downstream pipelines, persisted backups) must be erased
    * separately. (C8)
    */
-  erase(filter: QueryFilter): { erased: number; markerEntry: AuditEntry };
+  erase(filter: QueryFilter): {
+    erased: number;
+    markerEntry: AuditEntry | null;
+  };
   /** Empty the sink. */
   clear(): void;
   /** Unsubscribe + drop the sink. */
@@ -807,6 +873,7 @@ export function createAuditLedger(
       ts: Date.now(),
       prevHash: lastHashCache,
       hashAlgo: HASH_ALGO,
+      schemaVersion: SCHEMA_VERSION,
     } as AuditEntry;
 
     const finalEntry = userRedact ? userRedact(entry) : entry;
@@ -1005,13 +1072,58 @@ export function createAuditLedger(
     },
   };
 
+  /**
+   * Strip the internal sentinel from an entry before it reaches a
+   * public read path. Returns a shallow clone with `__internal`
+   * removed — keeps the (frozen) live entry intact for verify() while
+   * making sure consumers never see the symbol. (N7)
+   */
+  function stripInternal(entry: AuditEntry): AuditEntry {
+    if (
+      (entry as AuditEntry & { __internal?: unknown }).__internal === undefined
+    ) {
+      return entry;
+    }
+    const clone = { ...entry } as AuditEntry & { __internal?: unknown };
+    delete clone.__internal;
+
+    return clone as AuditEntry;
+  }
+
+  function stripInternalAll(
+    entries: readonly AuditEntry[],
+  ): readonly AuditEntry[] {
+    // Avoid allocating a new array unless at least one entry carries
+    // the sentinel — the common case (no tombstones) is a no-op.
+    let needsClone = false;
+    for (const e of entries) {
+      if ((e as AuditEntry & { __internal?: unknown }).__internal !== undefined) {
+        needsClone = true;
+        break;
+      }
+    }
+    if (!needsClone) {
+      return entries;
+    }
+
+    return entries.map(stripInternal);
+  }
+
   return {
     plugin,
-    query: (filter = {}) => sink.query(filter),
-    recent: (n) => sink.recent(n),
-    forFact: (path, opts2) => sink.forFact(path, opts2),
-    forConstraint: (id, opts2) => sink.forConstraint(id, opts2),
-    toJSON: () => sink.toJSON(),
+    query: (filter = {}) => stripInternalAll(sink.query(filter)),
+    recent: (n) => stripInternalAll(sink.recent(n)),
+    forFact: (path, opts2) => stripInternalAll(sink.forFact(path, opts2)),
+    forConstraint: (id, opts2) =>
+      stripInternalAll(sink.forConstraint(id, opts2)),
+    toJSON: () => {
+      const snap = sink.toJSON();
+
+      return {
+        entries: stripInternalAll(snap.entries),
+        capturedAt: snap.capturedAt,
+      };
+    },
     verify(opts?: { strong?: boolean }): VerifyResult {
       // (C1) v1 ships sync djb2 only. Strong (SHA-256) verify is
       // reserved for v2 and must NOT silently no-op — the previous
@@ -1034,9 +1146,19 @@ export function createAuditLedger(
       // from the original entry it replaced, so the NEXT entry's
       // prevHash no longer matches. When we detect a break whose
       // PREVIOUS entry is a tombstone (or the broken entry itself is
-      // one), record the seq in `erasedAt` and resync the walk from
-      // the tombstone's own hash.
-      const erasedAt: number[] = [];
+      // one), record the seq and resync the walk from the tombstone's
+      // own hash.
+      //
+      // (N7) Only tombstones bearing the internal sentinel are
+      // recognised. A forged tombstone — `kind: "system.entry-erased"`
+      // written directly via `sink.write()` to mask real tamper —
+      // lacks the in-module symbol and is reported as tamper.
+      //
+      // Use a Set to dedupe — adjacent tombstones can otherwise be
+      // recorded twice (once when the tombstone itself is the broken
+      // entry, once when the next iteration sees its predecessor was
+      // also a tombstone).
+      const erasedSeqsSet = new Set<number>();
       let prevHash: string | null = null;
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i]!;
@@ -1046,16 +1168,38 @@ export function createAuditLedger(
           //   (b) the previous entry was the tombstone whose payload
           //       was rewritten by erase().
           const prevEntry = i > 0 ? entries[i - 1]! : null;
-          const brokenByErasure =
-            entry.kind === "system.entry-erased" ||
-            prevEntry?.kind === "system.entry-erased";
-          if (brokenByErasure) {
-            // Record the seq of the tombstone that broke the chain and
+          const entryIsTombstone = entry.kind === "system.entry-erased";
+          const prevIsTombstone = prevEntry?.kind === "system.entry-erased";
+
+          if (entryIsTombstone || prevIsTombstone) {
+            // (N7) Verify the SENTINEL on whichever entry(ies) claim
+            // tombstone status. Missing sentinel ⇒ forgery ⇒ tamper.
+            const candidates: AuditEntry[] = [];
+            if (entryIsTombstone) candidates.push(entry);
+            if (prevIsTombstone && prevEntry !== null) {
+              candidates.push(prevEntry);
+            }
+            const forged = candidates.find(
+              (e) =>
+                (e as AuditEntry & { __internal?: unknown }).__internal !==
+                LEDGER_INTERNAL_TOKEN,
+            );
+            if (forged) {
+              return {
+                valid: false,
+                brokenAt: i,
+                expectedHash: prevHash ?? "<genesis>",
+                actualHash: entry.prevHash ?? "<genesis>",
+                entry: forged,
+                reason:
+                  "tombstone forgery detected — missing internal sentinel. A 'system.entry-erased' entry was written via sink.write() rather than ledger.erase(); rejected as tamper.",
+              };
+            }
+            // Legitimate erasure — record the tombstone's seq and
             // resync the walk by hashing this entry as our new pointer
             // for the next iteration.
-            const tombstoneEntry =
-              entry.kind === "system.entry-erased" ? entry : prevEntry!;
-            erasedAt.push(tombstoneEntry.seq);
+            const tombstoneEntry = entryIsTombstone ? entry : prevEntry!;
+            erasedSeqsSet.add(tombstoneEntry.seq);
             prevHash = hashForEntry(entry);
 
             continue;
@@ -1072,12 +1216,16 @@ export function createAuditLedger(
         prevHash = hashForEntry(entry);
       }
 
-      const result: { valid: true; entryCount: number; erasedAt?: number[] } = {
+      const result: {
+        valid: true;
+        entryCount: number;
+        erasedSeqs?: number[];
+      } = {
         valid: true,
         entryCount: entries.length,
       };
-      if (erasedAt.length > 0) {
-        result.erasedAt = erasedAt;
+      if (erasedSeqsSet.size > 0) {
+        result.erasedSeqs = [...erasedSeqsSet].sort((a, b) => a - b);
       }
 
       return result;
@@ -1090,24 +1238,43 @@ export function createAuditLedger(
       if (typeof sink.erase === "function") {
         count = sink.erase(filter, (e) => {
           // Build a tombstone preserving the immutable chain fields.
+          // Carry SCHEMA_VERSION from the original so a fresh tombstone
+          // doesn't claim to be at a newer schema than the entry it
+          // replaced. (F-5)
+          //
+          // (N7) Stamp the in-module sentinel so `verify()` can tell
+          // this tombstone apart from a forgery written via
+          // `sink.write({ kind: "system.entry-erased", … })`. The
+          // sentinel is stripped from every public read path.
           const tombstone = {
             seq: e.seq,
             ts: e.ts,
             kind: "system.entry-erased" as const,
             prevHash: e.prevHash,
             hashAlgo: e.hashAlgo,
+            schemaVersion:
+              (e as AuditEntry & { schemaVersion?: typeof SCHEMA_VERSION })
+                .schemaVersion ?? SCHEMA_VERSION,
             originalKind: e.kind,
             erasedAt,
+            __internal: LEDGER_INTERNAL_TOKEN,
           } as AuditEntry;
           // CAUTION: replacing the payload changes the entry's hash —
           // which means the NEXT entry's prevHash will no longer match.
           // verify() recognises `system.entry-erased` as a legitimate
-          // chain break and reports it in `erasedAt` rather than as
+          // chain break and reports it in `erasedSeqs` rather than as
           // tamper. (N1 + M1)
           freezeEntry(tombstone);
 
           return tombstone;
         });
+      }
+      // (MAJOR-3) Skip the `system.subject-erased` marker when nothing
+      // matched the filter — emitting an "erased: 0" marker pollutes
+      // the chain with noise and confuses auditors looking for real
+      // erasures.
+      if (count === 0) {
+        return { erased: 0, markerEntry: null };
       }
       // (N2) Don't store the raw filter — PII can land in the values
       // (e.g. `factPath: "alice@x.com"`). Capture a hash + a shape

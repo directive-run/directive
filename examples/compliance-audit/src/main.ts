@@ -458,7 +458,7 @@ function onVerify(): void {
   // may still include Promise<…> until the package is rebuilt. Narrow
   // defensively.
   const result = ledger.verify() as
-    | { valid: true; entryCount: number }
+    | { valid: true; entryCount: number; erasedSeqs?: number[] }
     | {
         valid: false;
         brokenAt: number;
@@ -466,6 +466,49 @@ function onVerify(): void {
         actualHash: string;
       };
   setVerifyResult(result, "live");
+}
+
+// GDPR Art.17 erasure simulation — replaces every ledger entry that
+// touched `tier` with a tombstone, then appends a chained
+// `system.subject-erased` summary. The hash chain still verifies
+// (tombstones are sentinel-stamped); verify() reports the erased seqs
+// on the valid arm instead of as tamper. Pairs with the TAMPER button:
+// TAMPER shows "valid: false" (forgery); ERASE shows "valid: true,
+// erasedSeqs: [...]" (legitimate Art.17 break).
+function onErase(): void {
+  // Drop any tampered clone — running erase against the live ledger
+  // makes the clone state moot, and leaving it set would cause the
+  // next VERIFY to show stale tamper info.
+  tamperedClone = null;
+  const { erased, markerEntry } = ledger.erase({ factPath: "tier" });
+  renderLedger();
+  const result = ledger.verify() as
+    | { valid: true; entryCount: number; erasedSeqs?: number[] }
+    | {
+        valid: false;
+        brokenAt: number;
+        expectedHash: string;
+        actualHash: string;
+      };
+  if (result.valid) {
+    const erasedCount = result.erasedSeqs?.length ?? 0;
+    // (MAJOR-3) markerEntry is null when 0 entries matched — guard the
+    // string interpolation so a "marker #null" never lands in the UI.
+    const markerNote = markerEntry
+      ? `(marker #${markerEntry.seq})`
+      : "(no marker — filter matched nothing)";
+    setVerifyStatus(
+      "ok",
+      `⌫ erased ${erased} entries via factPath=tier ${markerNote}. ` +
+        `chain still valid — ${result.entryCount} entries, ${erasedCount} tombstones recognised as legitimate breaks (not tamper).`,
+    );
+    return;
+  }
+  setVerifyStatus(
+    "fail",
+    `⌫ erased ${erased} entries via factPath=tier, but VERIFY broke at entry index ${result.brokenAt}. ` +
+      `expected prevHash: ${result.expectedHash.slice(0, 16)}…  actual prevHash: ${result.actualHash.slice(0, 16)}…`,
+  );
 }
 
 function setVerifyResult(
@@ -526,6 +569,7 @@ $("intent-input").addEventListener("keydown", (e) => {
 });
 $("tamper-btn").addEventListener("click", onTamper);
 $("verify-btn").addEventListener("click", onVerify);
+$("erase-btn").addEventListener("click", onErase);
 
 // Re-render the ledger every 500ms — the rest of the UI re-renders on
 // user input, but the ledger grows asynchronously.

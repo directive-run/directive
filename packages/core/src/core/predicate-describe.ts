@@ -38,9 +38,26 @@ import isDevelopment from "#is-development";
  *
  * Invalid locales (e.g. user-supplied garbage) fall back to `"en-US"`.
  *
+ * **(F-4)** Capped at {@link NUMBER_FORMAT_CACHE_LIMIT} entries with FIFO
+ * eviction so an attacker cannot grow the cache unboundedly by emitting a
+ * predicate with a fresh `locale` per call.
+ *
  * @internal Exported for tests; do not import from application code.
  */
 const numberFormatCache = new Map<string, Intl.NumberFormat>();
+
+/** @internal */
+export const NUMBER_FORMAT_CACHE_LIMIT = 50;
+
+/** @internal — exported for tests. */
+export function _getNumberFormatCacheSize(): number {
+  return numberFormatCache.size;
+}
+
+/** @internal — exported for tests. */
+export function _clearNumberFormatCache(): void {
+  numberFormatCache.clear();
+}
 
 /** @internal */
 export function getNumberFormat(locale: string): Intl.NumberFormat {
@@ -50,6 +67,15 @@ export function getNumberFormat(locale: string): Intl.NumberFormat {
       fmt = new Intl.NumberFormat(locale);
     } catch {
       fmt = new Intl.NumberFormat("en-US"); // fallback for invalid locales
+    }
+    // (F-4) Evict the oldest entry when the cache hits its cap. Map
+    // iteration order is insertion order, so `.keys().next().value` is
+    // the FIFO head. Cheap O(1) maintenance, bounded memory.
+    if (numberFormatCache.size >= NUMBER_FORMAT_CACHE_LIMIT) {
+      const oldest = numberFormatCache.keys().next().value;
+      if (oldest !== undefined) {
+        numberFormatCache.delete(oldest);
+      }
     }
     numberFormatCache.set(locale, fmt);
   }

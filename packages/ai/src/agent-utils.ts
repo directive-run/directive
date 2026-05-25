@@ -94,6 +94,60 @@ export function validateBaseURL(baseURL: string): void {
 }
 
 // ============================================================================
+// AbortSignal combination helper
+// ============================================================================
+
+/**
+ * Combine multiple `AbortSignal`s into one — the resulting signal aborts
+ * as soon as ANY input signal aborts. Falls back to a manual controller
+ * wiring on runtimes without `AbortSignal.any` (Node < 20).
+ *
+ * @internal
+ */
+export function combineSignals(
+  signals: ReadonlyArray<AbortSignal | undefined>,
+): AbortSignal | undefined {
+  const live = signals.filter((s): s is AbortSignal => s !== undefined);
+  if (live.length === 0) return undefined;
+  if (live.length === 1) return live[0];
+
+  // Prefer the standard helper when available (Node 20.3+, modern browsers).
+  const anyFn = (
+    AbortSignal as unknown as {
+      any?: (signals: readonly AbortSignal[]) => AbortSignal;
+    }
+  ).any;
+  if (typeof anyFn === "function") {
+    return anyFn(live);
+  }
+
+  // Fallback: manual controller. If any input is already aborted, the
+  // result is too — wire listeners for the rest.
+  const controller = new AbortController();
+  const already = live.find((s) => s.aborted);
+  if (already) {
+    controller.abort(
+      (already as AbortSignal & { reason?: unknown }).reason ?? undefined,
+    );
+
+    return controller.signal;
+  }
+  for (const s of live) {
+    s.addEventListener(
+      "abort",
+      () => {
+        controller.abort(
+          (s as AbortSignal & { reason?: unknown }).reason ?? undefined,
+        );
+      },
+      { once: true },
+    );
+  }
+
+  return controller.signal;
+}
+
+// ============================================================================
 // createRunner Helper
 // ============================================================================
 
@@ -208,8 +262,17 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     try {
       const { url, init } = buildRequest(agent, input, messages);
 
-      const fetchInit: RequestInit = runOptions?.signal
-        ? { ...init, signal: runOptions.signal }
+      // (Sec MAJOR) Combine signals — `buildRequest` may set
+      // `init.signal` (e.g. `AbortSignal.timeout(timeoutMs)`) and the
+      // caller may pass their own via `runOptions.signal`. Naively
+      // overwriting one with the other silently disables whichever was
+      // dropped. `combineSignals` aborts as soon as either fires.
+      const combined = combineSignals([
+        init.signal ?? undefined,
+        runOptions?.signal,
+      ]);
+      const fetchInit: RequestInit = combined
+        ? { ...init, signal: combined }
         : init;
 
       const response = await fetchFn(url, fetchInit);

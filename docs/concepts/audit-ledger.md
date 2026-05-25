@@ -31,14 +31,30 @@ record. Read this before deploying it as evidence:
 - **No signing keys in v1.** No HMAC, no Ed25519, no key rotation.
   Anyone with write access to the sink can rewrite history. Keyed
   signing is a v2 promise.
+- **Sink-level tombstone forgery (N7).** An attacker holding a
+  `sink.write()` reference can ATTEMPT to forge `system.entry-erased`
+  tombstones to hide tampering — without the sentinel defense, a
+  swapped payload could be hand-replaced with a `kind:
+  "system.entry-erased"` entry and `verify()` would treat the chain
+  break as legitimate erasure. `verify()` defends via an internal
+  sentinel that ONLY `ledger.erase()` can stamp. Forged tombstones
+  (written directly via `sink.write({ kind: "system.entry-erased",
+  … })`) are detected as tamper with `reason: "tombstone forgery
+  detected — missing internal sentinel."`. The sentinel is stripped
+  from every public read path (`query`, `recent`, `toJSON`, `forFact`,
+  `forConstraint`) so consumers cannot see or copy it. Use
+  `ledger.erase()` for legitimate erasure; sink-level WORM storage or
+  write ACLs remain the primary defense; the sentinel is
+  defense-in-depth.
 - **Hash chain canonicalization.** `syncHash(entry)` calls
   `hashObject(entry)` which calls `stableStringify(entry)` — the entry
-  shape (`seq`, `ts`, `kind`, `prevHash`, `hashAlgo`, …payload) is
-  canonicalized via key-sorted JSON, then djb2-hashed to a 32-bit hex
-  string. Each entry carries `hashAlgo: "djb2-1"` — any future change
-  to the canonicalization or hash function bumps this tag, so existing
-  exports remain verifiable against the algorithm they were written
-  under.
+  shape (`seq`, `ts`, `kind`, `prevHash`, `hashAlgo`, `schemaVersion`,
+  …payload) is canonicalized via key-sorted JSON, then djb2-hashed to
+  a 32-bit hex string. Each entry carries `hashAlgo: "djb2-1"` and
+  `schemaVersion: 1` (F-5) — any future change to the canonicalization,
+  hash function, or entry shape bumps the matching tag, so existing
+  exports remain verifiable against the algorithm and schema they were
+  written under.
 
 ## Setup
 
@@ -149,9 +165,11 @@ v1 ships sync djb2 32-bit only. `verify({ strong: true })` is reserved for v2 (S
 ```ts
 const result = ledger.verify();
 if (result.valid) {
-  console.log(`${result.entryCount} entries; ${result.erasedAt?.length ?? 0} erased`);
+  console.log(`${result.entryCount} entries; ${result.erasedSeqs?.length ?? 0} erased`);
 }
 ```
+
+The per-entry `system.entry-erased` tombstone payload carries an `erasedAt` (ms epoch) timestamp; the `VerifyResult` summary surfaces the matching seq numbers in `erasedSeqs` so callers can correlate without re-walking the chain.
 
 Real tamper still surfaces as `valid: false` even when tombstones are present.
 
@@ -185,19 +203,29 @@ Opt out with `capturePII: true`. Custom sanitization: pass `redact?: (entry) => 
 
 ```ts
 const { erased, markerEntry } = ledger.erase({ factPath: "user.email" });
-console.log(`erased ${erased} entries; marker seq=${markerEntry.seq}`);
+if (markerEntry) {
+  console.log(`erased ${erased} entries; marker seq=${markerEntry.seq}`);
+} else {
+  console.log("filter matched nothing — no marker emitted");
+}
 ```
 
 `erase(filter)` does two things:
 
 1. Replaces matching entries in the sink with `system.entry-erased`
-   tombstones that preserve `seq`, `prevHash`, and `hashAlgo` so
-   `verify()` can resync the chain across the gap. `verify()` reports
-   these in `erasedAt: number[]` rather than as tamper — see
-   [Hash chain](#hash-chain--tamper-detection).
-2. Appends a chained `system.subject-erased` summary entry — the
-   `markerEntry` returned — carrying `erased: number` plus a PII-safe
-   description of the filter that ran.
+   tombstones that preserve `seq`, `prevHash`, `hashAlgo`, and
+   `schemaVersion` so `verify()` can resync the chain across the gap.
+   `verify()` reports these seqs in `erasedSeqs: number[]` rather
+   than as tamper — see [Hash chain](#hash-chain--tamper-detection).
+   Each tombstone also carries an in-module sentinel so `verify()`
+   distinguishes legitimate erasures from `sink.write()` forgeries
+   (N7 — see [Threat model](#threat-model)).
+2. When at least one entry matched, appends a chained
+   `system.subject-erased` summary entry — the `markerEntry`
+   returned — carrying `erased: number` plus a PII-safe description
+   of the filter that ran. **When zero entries match, `markerEntry`
+   is `null` and no marker is emitted (MAJOR-3)** — keeps the audit
+   trail free of empty `"erased: 0"` records.
 
 The returned name is `markerEntry` (M7) — the singular chained
 summary — to distinguish it from the N per-entry tombstones that
@@ -222,6 +250,8 @@ same `filterHash` for cross-correlation.
 > exports, downstream sinks (SQLite/Loki/Parquet), persisted backups,
 > log shippers — must be erased separately. Sink-level erasure
 > contracts are a v2 promise.
+
+*Note: actor / operator attribution is not recorded on erase markers — see [What v1 does NOT capture (v2 promises)](#what-v1-does-not-capture-v2-promises) for the complete v2 roadmap.*
 
 ## Sinks
 

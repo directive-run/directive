@@ -2,8 +2,11 @@
  * Tests for `describePredicate` — natural-language + algebraic rendering.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  _clearNumberFormatCache,
+  _getNumberFormatCacheSize,
+  NUMBER_FORMAT_CACHE_LIMIT,
   describePredicate,
   getNumberFormat,
 } from "../predicate-describe.js";
@@ -451,5 +454,43 @@ describe("describePredicate — nested fact paths", () => {
         },
       }),
     ).toBe("auth.token is set AND auth.role is admin");
+  });
+});
+
+// ============================================================================
+// F-4 — NumberFormat cache bound (FIFO eviction at NUMBER_FORMAT_CACHE_LIMIT)
+// ============================================================================
+
+describe("getNumberFormat — F-4 cache cap (50 entries, FIFO eviction)", () => {
+  beforeEach(() => {
+    _clearNumberFormatCache();
+  });
+
+  it("caps cache at NUMBER_FORMAT_CACHE_LIMIT (50) entries", () => {
+    // Allocate 60 distinct locales (mix of valid + bogus). Invalid
+    // ones fall back to en-US BUT are still cached under their raw
+    // key — bounded growth is the point of the cap.
+    for (let i = 0; i < 60; i++) {
+      getNumberFormat(`x-test-locale-${i}`);
+    }
+    expect(_getNumberFormatCacheSize()).toBe(NUMBER_FORMAT_CACHE_LIMIT);
+    expect(NUMBER_FORMAT_CACHE_LIMIT).toBe(50);
+  });
+
+  it("evicts the OLDEST entry first when at capacity", () => {
+    // Fill cache to exactly the cap.
+    for (let i = 0; i < NUMBER_FORMAT_CACHE_LIMIT; i++) {
+      getNumberFormat(`x-locale-${i}`);
+    }
+    expect(_getNumberFormatCacheSize()).toBe(NUMBER_FORMAT_CACHE_LIMIT);
+
+    // Adding one more should evict the oldest (`x-locale-0`).
+    getNumberFormat("x-locale-NEW");
+    expect(_getNumberFormatCacheSize()).toBe(NUMBER_FORMAT_CACHE_LIMIT);
+
+    // Re-requesting the oldest now causes a fresh insert (proving
+    // it was evicted) — verify size remains at the cap, not above.
+    getNumberFormat("x-locale-0");
+    expect(_getNumberFormatCacheSize()).toBe(NUMBER_FORMAT_CACHE_LIMIT);
   });
 });

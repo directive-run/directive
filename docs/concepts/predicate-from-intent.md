@@ -149,16 +149,33 @@ await db.predicates.insert({
 
 The legacy `rawOutputHash` field is gone — it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `hashObject(predicate)` from `@directive-run/core/internals`.
 
-### PII guidance — `redactIntent` (M6)
+### PII guidance — `redact` vs `redactIntent` (M6)
 
-The `intent` field stores the (sanitized) user input verbatim by default. For PII-sensitive contexts (medical, financial, customer messages), pass `redactIntent: true` to omit the raw intent from the provenance record:
+> ⚠ **`redactIntent` defaults to `false` for back-compat.** For
+> PII-sensitive deployments, ALWAYS pass `redactIntent: true` — the
+> raw intent often contains user-supplied content (names, emails,
+> medical / financial details, customer messages) that becomes a
+> permanent record in `provenance.intent` once persisted. The default
+> is opt-in only because flipping it now would silently strip
+> diagnostic data from existing callers; **v2 may flip this default**
+> (tracked in IDEAS.md).
+
+The two PII knobs run at different stages of the pipeline. Use both for full coverage:
+
+| Option | When it runs | What it does | Default |
+| --- | --- | --- | --- |
+| `redact` | **Before the LLM call** | Sanitize the `intent` STRING before it lands in the system prompt sent to the model. Common uses: strip SSN / email / phone patterns, scrub prompt-injection markers. | `undefined` (no-op) |
+| `redactIntent` | **After the LLM call** (in the provenance record) | Omit the raw `intent` field from `PredicateFromIntentProvenance`. `intentHash` is still computed and persisted — only the raw text drops out. | `false` |
+
+The two are independent — `redact` shapes what the MODEL sees, `redactIntent` shapes what the PROVENANCE RECORD persists. For a PII-sensitive deployment you probably want both: a `redact` sanitizer (so the third-party LLM provider never sees raw PII) plus `redactIntent: true` (so the audit record persists only the hash).
 
 ```ts
 const { provenance } = await predicateFromIntentWithProvenance({
   intent: "patient with SSN 123-45-6789 over the limit",
   schema,
   runner,
-  redactIntent: true, // ← raw intent omitted; only intentHash remains
+  redact: (s) => s.replace(/\d{3}-\d{2}-\d{4}/g, "[SSN]"), // ← LLM sees scrubbed
+  redactIntent: true,                                        // ← record drops raw text
 });
 
 provenance.intent;     // undefined
@@ -198,5 +215,5 @@ For sensitive use (admin tools, public APIs):
 ## Reference
 
 - API: `predicateFromIntent`, `predicateFromIntentRaw`, `predicateFromIntentWithProvenance`, `predicateToolSpecOpenAI`, `predicateToolSpecAnthropic`, `predicateToolSpec` (deprecated alias), `PredicateFromIntentError`, `PredicateFromIntentProvenance`
-- Validation helpers: [`validatePredicateAgainstSchema`](../api/types.md), [`getSchemaFieldKinds`](../api/types.md), [`getOperatorsForKind`](../api/types.md), `dangerousRegex`
+- Validation helpers: [`validatePredicateAgainstSchema`](../api/types.md), [`getSchemaFieldKinds`](../api/types.md), [`getOperatorsForKind`](../api/types.md), `dangerousRegex` (subpath `@directive-run/core/internals` — no semver guarantee)
 - Pairs with: [`doctor`](./doctor.md), [`predict`](./predict.md), [predicate codegen](./predicate-codegen.md)

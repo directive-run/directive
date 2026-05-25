@@ -7,6 +7,11 @@
  *
  * Most consumers should use `createModule` + `createSystem` from the main entry point.
  *
+ * @internal Sub-path export for tools that need lower-level primitives.
+ * **NO SEMVER GUARANTEE** — names, signatures, and exports here may change
+ * in any release (including patch). For public, semver-stable APIs use
+ * the main barrel (`import from "@directive-run/core"`).
+ *
  * @packageDocumentation
  */
 
@@ -163,3 +168,16 @@ export {
 
 // Shared utilities
 export { safeStringify, hashObject, stableStringify } from "./utils/utils.js";
+
+/**
+ * Heuristic detector for catastrophic-backtracking regex patterns.
+ *
+ * Returns true for nested quantifiers like `(a+)+$`, `(.*)*`, `(\w+)+`,
+ * and `(a|a)+` — patterns that can cause ReDoS at the database / regex
+ * engine. Used internally to reject `$matches` operands that ship a
+ * pathological pattern.
+ *
+ * @internal Defensive helper, not a primary public API. Subject to the
+ * `@directive-run/core/internals` no-semver guarantee.
+ */
+export { dangerousRegex } from "./core/predicate.js";

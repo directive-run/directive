@@ -725,9 +725,9 @@ evaluated directly on the client. The end of dual-write hell."*
 
 **Headline:** *"The state library that doubles as your ORM's query AST."*
 
-### R4.I — `factsBaseline` audit log: GDPR-grade query-the-history — **SHIPPED v1.11.0 (memory sink + djb2 chain; SQLite + SHA-256 strong verify deferred)**
+### R4.I — `factsBaseline` audit log: tamper-evident query-the-history — **SHIPPED v1.11.0 (memory sink + djb2 chain; SQLite + SHA-256 strong verify deferred)**
 
-> SHIPPED v1.11.0 with REDUCED CLAIMS: see docs/concepts/audit-ledger.md for actual threat model. v1 ships tamper-evident hash-chained (djb2 32-bit) ledger; full court-admissible posture (signing keys + RFC 3161 TSA + SHA-256 + Art.17 erasure) is reserved for v2.
+> SHIPPED v1.11.0 with REDUCED CLAIMS: see docs/concepts/audit-ledger.md for actual threat model. v1 ships tamper-evident hash-chained (djb2 32-bit) ledger with PII redaction + Art.17 erasure markers; full court-admissible posture (signing keys + RFC 3161 TSA + SHA-256 + per-subject erasure across external sinks) is reserved for v2.
 
 **[2 days — viral HIGH (regulated industries), compound MAX]**
 
@@ -780,11 +780,18 @@ just needs a queryable sink. SOC2/HIPAA/PCI/GDPR all collapse from
 the audit ledger UI — show the predicate that fired, the clause-level pass
 breakdown, the prior/new value, the resolver that wrote it, the chain back
 to the user-action event. Quote-tweet: *"Every state change in production
-now ships with a court-admissible explanation. Built-in. No custom
+now ships with a tamper-evident explanation. Built-in. No custom
 pipeline."*
 
-**Headline:** *"The first state library that's GDPR-compliant out of the
-box, because it already knows why every fact changed."*
+> Correction (v1.12.x): the original blurb said "court-admissible" /
+> "GDPR-compliant out of the box". v1 ships a tamper-evident djb2-chained
+> ledger with PII redaction and Art.17 erasure markers. Court-admissible
+> posture (signing keys + RFC 3161 TSA + SHA-256 + per-subject erasure
+> across external sinks) is reserved for v2. See
+> `docs/concepts/audit-ledger.md#what-v1-does-not-capture-v2-promises`.
+
+**Headline:** *"The first state library with a tamper-evident audit trail
+out of the box, because it already knows why every fact changed."*
 
 ### R4.J — `clobber-loop` detector: real-time ownership-thrash alarms
 
@@ -842,7 +849,7 @@ arguing — and tells you why."*
 | 1 | **R4.G** `replay-under` predicate-backtest rule replay — **✅ SHIPPED 2026-05-21** | 3 | Max | Max | **Asymmetric pick.** Answers the PM question every product team has every week. Rides timeline + whenSpec together. |
 | 2 | **R4.F** `directive rules-diff` PR-review tool – **✅ SHIPPED 2026-05-23** | 2 | Max | Max | Quickest path to a viral PR-comment screenshot. Every regulated team wants this yesterday. |
 | 3 | **R4.H** `predicateToSQL` isomorphic predicates | 3 | High | Max | The "one truth, three targets" article writes itself. Drizzle/Prisma envy. |
-| 4 | **R4.I** GDPR-grade audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |
+| 4 | **R4.I** tamper-evident audit ledger | 2 | High (regulated) | Max | Niche viral, but compliance teams will literally pay money. |
 | 5 | **R4.J** clobber-loop detector | 1 | Med-High | High | One-day quick win. Diagnoses a bug class that has no name yet. |
 
 **Suggested arc:** **R4.J (1d, quick win)** → **R4.F (2d, PR-comment

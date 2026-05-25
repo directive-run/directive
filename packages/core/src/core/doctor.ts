@@ -117,19 +117,19 @@ export interface CheckOwnsFinding {
 }
 
 /**
- * Result shape unified with {@link CheckAgainstResult}: owns-collisions
- * are warnings, not contradictions — the engine itself enforces the
- * runtime gate, so a pre-deploy doctor pass treats them as advisory.
- * (M5)
+ * Result of {@link doctor.checkOwns}.
+ *
+ * Owns-/bind- collisions are warnings, not contradictions — the engine
+ * itself enforces the runtime binding gate, so a pre-deploy doctor pass
+ * treats them as advisory. The {@link CheckOwnsFinding.severity}
+ * discriminator anticipates v2 promotion of findings to errors. (M5, F-3)
  */
 export interface CheckOwnsResult {
   /**
-   * Reserved slot — owns-collisions are warnings by default, but the
-   * shape mirrors {@link CheckAgainstResult} so a caller that
-   * promotes findings to `severity: "error"` can route them here.
+   * Owns-/bind- collisions surfaced by {@link doctor.checkOwns}. Empty
+   * when constraints expose no `owns:` / `bind:` metadata or the
+   * candidate's fact paths don't overlap.
    */
-  readonly contradictions: readonly CheckOwnsFinding[];
-  /** Owns-/bind- collisions (always populated by {@link doctor.checkOwns}). */
   readonly warnings: readonly CheckOwnsFinding[];
 }
 
@@ -469,7 +469,7 @@ export const doctor = {
 
     const candidateLeaves = flattenPredicate(candidate);
     if (candidateLeaves.length === 0) {
-      return { contradictions: [], warnings: [] };
+      return { warnings: [] };
     }
     const candidatePaths = new Set(candidateLeaves.map((l) => l.path));
 
@@ -502,9 +502,11 @@ export const doctor = {
       }
     }
 
-    // (M5) Owns-collisions are warnings by default — the engine still
-    // enforces the runtime binding gate. Callers wanting hard-fail
-    // pre-deploy lints can promote findings into `contradictions`.
-    return { contradictions: [], warnings };
+    // (M5, F-3) Owns-collisions are warnings by default — the engine
+    // still enforces the runtime binding gate. v1 result shape is
+    // `{ warnings }` only; the per-finding `severity` discriminator
+    // anticipates v2 promotion of findings to errors without breaking
+    // existing callers.
+    return { warnings };
   },
 };

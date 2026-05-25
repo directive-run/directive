@@ -83,6 +83,8 @@
     }
     .ledger-controls button.tamper { color: var(--fail); border-color: rgba(232, 131, 111, 0.3); }
     .ledger-controls button.verify { background: var(--primary); color: white; border-color: var(--primary); }
+    .ledger-controls button.erase { color: var(--pii); border-color: rgba(167, 139, 250, 0.3); }
+    .ledger-controls .erase-label { color: var(--text-faint); font-size: 0.7rem; align-self: center; }
 
     .verify-status { padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.5rem; min-height: 1.5rem; font-family: ui-monospace, monospace; }
     .verify-status.ok { background: rgba(109, 171, 114, 0.15); color: var(--ok); }
@@ -142,6 +144,8 @@
       <div class="ledger-controls">
         <button id="tamper-btn" class="tamper">⚠ TAMPER (simulate on a clone)</button>
         <button id="verify-btn" class="verify">✓ VERIFY chain</button>
+        <button id="erase-btn" class="erase">⌫ ERASE PII for tier</button>
+        <span class="erase-label">(GDPR erasure simulation)</span>
       </div>
       <div id="verify-status" class="verify-status"></div>
       <small class="muted" style="display:block; margin-bottom:0.5rem;">

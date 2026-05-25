@@ -22,13 +22,13 @@
 import {
   getOperatorsForKind,
   getSchemaFieldKinds,
+  predicateHash,
   validatePredicate,
   validatePredicateAgainstSchema,
   type FactPredicate,
   type SchemaKindNode,
   type SchemaValidationError,
 } from "@directive-run/core";
-import { hashObject, stableStringify } from "@directive-run/core/internals";
 
 import { extractJsonFromOutput } from "./structured-output.js";
 import type { AgentLike, AgentRunner } from "./types.js";
@@ -39,10 +39,10 @@ import type { AgentLike, AgentRunner } from "./types.js";
 //
 // Provenance hashing has two flavors:
 //
-//   - `hashCanonical(value)` — synchronous djb2 of a stable-stringified
-//     payload. Used for `predicateHash` so two semantically-identical
-//     predicates emitted with different whitespace / key-order produce
-//     the same hash. (N3)
+//   - `predicateHash(spec)` — synchronous djb2 of a stable-stringified
+//     predicate. Imported from `@directive-run/core` (the supported,
+//     semver-stable surface). Two semantically-identical predicates emitted
+//     with different whitespace / key-order produce the same hash. (N3)
 //
 //   - `hashStringSha256(str)` — async SHA-256 via crypto.subtle when
 //     available, djb2 fallback otherwise. Used for `intentHash` —
@@ -56,13 +56,6 @@ function djb2Hash(str: string): string {
   }
 
   return (hash >>> 0).toString(16);
-}
-
-/** Stable-stringify + djb2 hash. Same hash for semantically-identical inputs regardless of whitespace / key order. */
-function hashCanonical(value: unknown): string {
-  // hashObject() === djb2(stableStringify(value)) — single source of
-  // truth for canonicalized hashing across core + ai.
-  return hashObject(value);
 }
 
 async function hashStringSha256(raw: string): Promise<string> {
@@ -89,10 +82,6 @@ async function hashStringSha256(raw: string): Promise<string> {
 
   return djb2Hash(raw);
 }
-
-// Keep stableStringify import live (used transitively via hashObject — kept
-// imported so future canonicalization changes flow through one helper).
-void stableStringify;
 
 // ============================================================================
 // Types
@@ -171,8 +160,17 @@ export interface PredicateFromIntentOptions<_F = Record<string, unknown>> {
    * stores only the SHA-256 `intentHash`. Use this in PII-sensitive
    * contexts where the original intent must not be persisted. (M6)
    *
-   * Default `false` — both `intent` and `intentHash` are populated, since
-   * the raw intent is useful for debugging and provenance review.
+   * **Default `false` for back-compat.** For PII-sensitive deployments,
+   * ALWAYS set `redactIntent: true` — the raw intent may contain
+   * user-supplied content (names, emails, medical or financial details,
+   * customer messages) that becomes a permanent record in
+   * `provenance.intent`. The default is opt-in only because flipping it
+   * now would silently strip diagnostic data from existing callers; v2
+   * may flip this default (tracked in IDEAS.md).
+   *
+   * Pair with a `redact:` sanitizer when the intent itself must be
+   * scrubbed BEFORE it lands in the LLM prompt — `redactIntent` controls
+   * only what enters the provenance record, not what the LLM sees.
    */
   redactIntent?: boolean;
 }
@@ -869,8 +867,9 @@ export async function predicateFromIntentWithProvenance<
   const model = opts.agent?.model ?? "unknown";
   // (N3) Hash the VALIDATED predicate (stable canonical form), not the
   // raw LLM output — two semantically-identical responses with different
-  // whitespace / key order produce the same predicateHash.
-  const predicateHash = hashCanonical(raw.predicate);
+  // whitespace / key order produce the same hash. Uses the supported
+  // public `predicateHash` helper from `@directive-run/core`.
+  const predicateHashValue = predicateHash(raw.predicate);
   // (M6) Always hash the intent; raw intent string is included only when
   // `redactIntent` is not set.
   const intentHash = await hashStringSha256(sanitizedIntent);
@@ -881,7 +880,7 @@ export async function predicateFromIntentWithProvenance<
         intentHash,
         attemptCount: raw.attempts,
         emittedAt: new Date().toISOString(),
-        predicateHash,
+        predicateHash: predicateHashValue,
       }
     : {
         model,
@@ -889,7 +888,7 @@ export async function predicateFromIntentWithProvenance<
         intentHash,
         attemptCount: raw.attempts,
         emittedAt: new Date().toISOString(),
-        predicateHash,
+        predicateHash: predicateHashValue,
       };
 
   return {
