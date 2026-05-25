@@ -121,14 +121,32 @@ export interface WorkerClient {
   setFacts(facts: Record<string, unknown>): void;
   /** Dispatch an event */
   dispatch(event: { type: string; [key: string]: unknown }): void;
-  /** Get a distributable snapshot */
+  /**
+   * Get a distributable snapshot.
+   *
+   * @param options Snapshot options forwarded to the worker.
+   * @param timeoutMs Per-request timeout in ms. Defaults to 30_000.
+   *   Pass `0` or `Infinity` to disable the timeout.
+   */
   getSnapshot(
     options?: DistributableSnapshotOptions,
+    timeoutMs?: number,
   ): Promise<DistributableSnapshot>;
-  /** Inspect the system state */
-  inspect(): Promise<SystemInspection>;
-  /** Wait for the system to settle */
-  settle(timeout?: number): Promise<void>;
+  /**
+   * Inspect the system state.
+   *
+   * @param timeoutMs Per-request timeout in ms. Defaults to 30_000.
+   *   Pass `0` or `Infinity` to disable the timeout.
+   */
+  inspect(timeoutMs?: number): Promise<SystemInspection>;
+  /**
+   * Wait for the system to settle.
+   *
+   * @param timeout Settle timeout forwarded to the worker (separate from request timeout).
+   * @param timeoutMs Per-request timeout in ms. Defaults to 30_000.
+   *   Pass `0` or `Infinity` to disable the timeout.
+   */
+  settle(timeout?: number, timeoutMs?: number): Promise<void>;
   /** Terminate the worker */
   terminate(): void;
 }
@@ -160,12 +178,27 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
     onError,
   } = options;
 
-  // Pending request callbacks
+  // Pending request callbacks. Each entry MAY hold a timeout handle so we
+  // can clear it on resolve/reject without leaking the timer.
   const pendingRequests = new Map<
     string,
-    { resolve: (value: unknown) => void; reject: (error: Error) => void }
+    {
+      resolve: (value: unknown) => void;
+      reject: (error: Error) => void;
+      timeoutHandle?: ReturnType<typeof setTimeout>;
+    }
   >();
   let requestIdCounter = 0;
+
+  /** Default per-request timeout (ms). 0 / Infinity = disabled. */
+  const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+  function clearPendingTimeout(requestId: string): void {
+    const pending = pendingRequests.get(requestId);
+    if (pending?.timeoutHandle !== undefined) {
+      clearTimeout(pending.timeoutHandle);
+    }
+  }
 
   // Promise resolvers for lifecycle events
   let initResolve: (() => void) | null = null;
@@ -184,6 +217,7 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
   function resolvePendingRequest(requestId: string, value: unknown): void {
     const pending = pendingRequests.get(requestId);
     if (pending) {
+      clearPendingTimeout(requestId);
       pending.resolve(value);
       pendingRequests.delete(requestId);
     }
@@ -252,6 +286,7 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
   ): void {
     const pending = pendingRequests.get(message.requestId);
     if (pending) {
+      clearPendingTimeout(message.requestId);
       if (message.success) {
         pending.resolve(undefined);
       } else {
@@ -294,7 +329,22 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
   };
 
   worker.onerror = (event) => {
-    onError?.(event.message, "worker");
+    const msg =
+      event && typeof event === "object" && "message" in event
+        ? String((event as { message?: unknown }).message ?? "unknown error")
+        : "unknown error";
+    // Reject ALL pending requests so they don't leak when the worker dies.
+    if (pendingRequests.size > 0) {
+      const err = new Error(`[Directive] worker errored: ${msg}`);
+      for (const [, pending] of pendingRequests) {
+        if (pending.timeoutHandle !== undefined) {
+          clearTimeout(pending.timeoutHandle);
+        }
+        pending.reject(err);
+      }
+      pendingRequests.clear();
+    }
+    onError?.(msg, "worker");
   };
 
   function send(message: WorkerInboundMessage): void {
@@ -303,12 +353,36 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
 
   function request<T>(
     message: WorkerInboundMessage & { requestId: string },
+    timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      pendingRequests.set(message.requestId, {
+      const entry: {
+        resolve: (value: unknown) => void;
+        reject: (error: Error) => void;
+        timeoutHandle?: ReturnType<typeof setTimeout>;
+      } = {
         resolve: resolve as (value: unknown) => void,
         reject,
-      });
+      };
+
+      // Only arm the timer if a finite positive timeout was requested.
+      if (
+        Number.isFinite(timeoutMs) &&
+        (timeoutMs as number) > 0
+      ) {
+        entry.timeoutHandle = setTimeout(() => {
+          if (pendingRequests.has(message.requestId)) {
+            pendingRequests.delete(message.requestId);
+            reject(
+              new Error(
+                `[Directive] worker request timed out after ${timeoutMs}ms`,
+              ),
+            );
+          }
+        }, timeoutMs);
+      }
+
+      pendingRequests.set(message.requestId, entry);
       send(message);
     });
   }
@@ -356,19 +430,29 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
 
     getSnapshot(
       options?: DistributableSnapshotOptions,
+      timeoutMs?: number,
     ): Promise<DistributableSnapshot> {
       const requestId = `snapshot-${++requestIdCounter}`;
-      return request({ type: "GET_SNAPSHOT", options, requestId });
+      return request(
+        { type: "GET_SNAPSHOT", options, requestId },
+        timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      );
     },
 
-    inspect(): Promise<SystemInspection> {
+    inspect(timeoutMs?: number): Promise<SystemInspection> {
       const requestId = `inspect-${++requestIdCounter}`;
-      return request({ type: "INSPECT", requestId });
+      return request(
+        { type: "INSPECT", requestId },
+        timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      );
     },
 
-    settle(timeout?: number): Promise<void> {
+    settle(timeout?: number, timeoutMs?: number): Promise<void> {
       const requestId = `settle-${++requestIdCounter}`;
-      return request({ type: "SETTLE", timeout, requestId });
+      return request(
+        { type: "SETTLE", timeout, requestId },
+        timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+      );
     },
 
     terminate(): void {

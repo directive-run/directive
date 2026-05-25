@@ -73,6 +73,36 @@
       "types": "./dist/gemini.d.ts",
       "require": "./dist/gemini.cjs",
       "import": "./dist/gemini.js"
+    },
+    "./multi-agent": {
+      "types": "./dist/multi-agent.d.ts",
+      "require": "./dist/multi-agent.cjs",
+      "import": "./dist/multi-agent.js"
+    },
+    "./predicate": {
+      "types": "./dist/predicate.d.ts",
+      "require": "./dist/predicate.cjs",
+      "import": "./dist/predicate.js"
+    },
+    "./guardrails": {
+      "types": "./dist/guardrails.d.ts",
+      "require": "./dist/guardrails.cjs",
+      "import": "./dist/guardrails.js"
+    },
+    "./devtools": {
+      "types": "./dist/devtools.d.ts",
+      "require": "./dist/devtools.cjs",
+      "import": "./dist/devtools.js"
+    },
+    "./evals": {
+      "types": "./dist/evals.d.ts",
+      "require": "./dist/evals.cjs",
+      "import": "./dist/evals.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp.d.ts",
+      "require": "./dist/mcp.cjs",
+      "import": "./dist/mcp.js"
     }
   },
   "files": [

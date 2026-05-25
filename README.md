@@ -10,7 +10,7 @@
 - **Constraint-Driven Resolution** &ndash; declare requirements, resolvers fulfill them automatically with retry, batching, and error boundaries
 - **AI Guardrails** &ndash; prompt injection detection, PII redaction, cost tracking, multi-agent orchestration with 4 LLM adapters (zero SDK dependencies)
 - **Auto-Tracking Derivations** &ndash; computed values that track their own dependencies, no manual dep arrays
-- **5 Framework Adapters** &ndash; React, Vue, Svelte, Solid, Lit from a single state layer
+- **5 Framework Adapters + 1 Vanilla** &ndash; React, Vue, Svelte, Solid, Lit, plus `el()` for plain DOM &mdash; from a single state layer
 - **Zero Runtime Dependencies** &ndash; nothing to audit, nothing to break
 - **Time-Travel Debugging** &ndash; snapshot, rewind, replay, export/import system state
 
@@ -194,7 +194,14 @@ function UserProfile({ system }) {
 | [`@directive-run/solid`](./packages/solid) | Solid signals with fine-grained reactivity |
 | [`@directive-run/lit`](./packages/lit) | Lit reactive controllers |
 | [`@directive-run/ai`](./packages/ai) | AI orchestration, guardrails, multi-agent |
-| [`@directive-run/cli`](./packages/cli) | CLI &ndash; scaffolding, inspection, AI coding rules |
+| [`@directive-run/el`](./packages/el) | Vanilla DOM adapter (`el()`, JSX, htm) |
+| [`@directive-run/query`](./packages/query) | Declarative data fetching with causal cache invalidation |
+| [`@directive-run/cli`](./packages/cli) | `directive` CLI &ndash; `init`, `new`, `rules`, `tune`, and more |
+| [`@directive-run/mutator`](./packages/mutator) | Transactional fact mutations with rollback |
+| [`@directive-run/optimistic`](./packages/optimistic) | Optimistic UI updates layered over Directive systems |
+| [`@directive-run/timeline`](./packages/timeline) | Time-travel debugging panel |
+| [`@directive-run/vite-plugin-api-proxy`](./packages/vite-plugin-api-proxy) | Vite dev-server proxy for AI providers (CORS + key handling) |
+| [`@directive-run/knowledge`](./packages/knowledge) | Knowledge files consumed by AI assistants and editors |
 
 ## Documentation
 

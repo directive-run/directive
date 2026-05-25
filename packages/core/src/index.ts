@@ -191,7 +191,7 @@ export type {
 export {
   createAuditLedger,
   memorySink,
-} from "./plugins/audit-ledger.js";
+} from "./plugins/audit-ledger/index.js";
 export type {
   AuditEntry,
   AuditEntryKind,
@@ -200,7 +200,7 @@ export type {
   AuditLedgerSink,
   QueryFilter,
   VerifyResult,
-} from "./plugins/audit-ledger.js";
+} from "./plugins/audit-ledger/index.js";
 
 // describePredicate — render any FactPredicate as English / algebraic prose
 export { describePredicate } from "./core/predicate-describe.js";

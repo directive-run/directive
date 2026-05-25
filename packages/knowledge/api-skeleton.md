@@ -7,46 +7,14 @@
 
 ### Functions
 
-- `createConstraintFactory` — Create a typed constraint factory for a specific schema.
-- `createConstraintsManager` — Create a manager that evaluates constraint rules and produces unmet
+- `applyPatch` — Apply a {@link PatchSpec} — assign facts from literals, payload copies
+- `completeTimer` — Transition: mark the timer completed. For countdown mode when
   ```ts
-  function createConstraintsManager(options: CreateConstraintsOptions<S>): ConstraintsManager<S>
+  function completeTimer(state: TimerFactState): TimerFactState
   ```
-- `createDerivationsManager` — Create a manager for lazily-evaluated, auto-tracked derived values.
+- `createAuditLedger` — Create an audit ledger that subscribes to the given system's
   ```ts
-  function createDerivationsManager(options: CreateDerivationsOptions<S, D>): DerivationsManager<S, D>
-  ```
-- `createDisabledHistory` — Create a no-op history manager for use when history is disabled.
-  ```ts
-  function createDisabledHistory(): HistoryManager<S>
-  ```
-- `createEffectsManager` — Create a manager for fire-and-forget side effects that run after facts
-  ```ts
-  function createEffectsManager(options: CreateEffectsOptions<S>): EffectsManager<S>
-  ```
-- `createEngine` — Create the core Directive reconciliation engine that wires facts, derivations,
-  ```ts
-  function createEngine(config: SystemConfig<any>): System<any>
-  ```
-- `createErrorBoundaryManager` — Create a manager that handles errors from constraints, resolvers, effects,
-  ```ts
-  function createErrorBoundaryManager(options: CreateErrorBoundaryOptions = {}): ErrorBoundaryManager
-  ```
-- `createFacts` — Convenience factory that creates both a {@link FactsStore} and its
-  ```ts
-  function createFacts(options: CreateFactsStoreOptions<S>): { store: FactsStore<S>; facts: Facts<S>; }
-  ```
-- `createFactsProxy` — Create a Proxy wrapper around a {@link FactsStore} for clean property-style
-  ```ts
-  function createFactsProxy(store: FactsStore<S>, schema: S): Facts<S>
-  ```
-- `createFactsStore` — Create a reactive facts store backed by a Map with schema validation,
-  ```ts
-  function createFactsStore(options: CreateFactsStoreOptions<S>): FactsStore<S>
-  ```
-- `createHistoryManager` — Create a snapshot-based history manager backed by a ring buffer.
-  ```ts
-  function createHistoryManager(options: CreateHistoryOptions<S>): HistoryManager<S>
+  function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger
   ```
 - `createModule` — Create a module definition with full type inference.
   ```ts
@@ -56,17 +24,7 @@
   ```ts
   export function createModuleFactory<const M extends ModuleSchema>(
   ```
-- `createPluginManager` — Create a {@link PluginManager} that broadcasts lifecycle events to registered plugins.
-  ```ts
-  function createPluginManager(): PluginManager<S>
-  ```
 - `createRequirementStatusPlugin` — Create a plugin that tracks requirement status for reactive UI updates.
-- `createResolverFactory` — Create a typed resolver factory for a specific schema.
-- `createResolversManager` — Create a manager that fulfills requirements by matching them to resolver
-  ```ts
-  function createResolversManager(options: CreateResolversOptions<S>): ResolversManager<S>
-  ```
-- `createRetryLaterManager` — Create a manager for deferred retry scheduling with exponential backoff.
 - `createStatusHook` — Create a hook factory for requirement status.
 - `createSystem` — Create a Directive system.
   ```ts
@@ -76,18 +34,88 @@
   ```ts
   function createSystemWithStatus(options: CreateSystemWithStatusOptions<M>): SystemWithStatus<M>
   ```
+- `defaultClock` — Returns `realClock()` always.
+  ```ts
+  function defaultClock(): SignalClock
+  ```
+- `describePredicate` — Render a {@link FactPredicate} as a precise human-readable sentence.
+  ```ts
+  function describePredicate(predicate: FactPredicate<F>, opts: DescribeOptions = {}): string
+  ```
+- `diffClauses` — Diff two predicate trees and return the list of leaf-level changes.
+  ```ts
+  function diffClauses(before: unknown, after: unknown): Change[]
+  ```
+- `diffRules` — Diff two snapshots of a system's constraint whenSpec map.
+  ```ts
+  function diffRules(options: DiffRulesOptions): RulesDiffReport
+  ```
 - `diffSnapshots` — Compare two distributable snapshots and return the differences.
+- `elapsedMs` — Compute elapsed ms for a given timer state at a given clock-now.
+  ```ts
+  function elapsedMs(state: TimerFactState, nowMs: number): number
+  ```
+- `evaluateKeySelector` — Build a stable dedup key by selecting fields from a requirement payload.
+  ```ts
+  function evaluateKeySelector(selector: readonly string[], source: Record<string, unknown>): string
+  ```
+- `evaluatePredicate` — Evaluate a {@link FactPredicate} against a fact scope. `prev` (a previous
+  ```ts
+  function evaluatePredicate(spec: unknown, facts: Scope, prev?: Scope, depth = 0): boolean
+  ```
+- `evaluatePredicateExplained` — Evaluate a predicate and return a per-clause breakdown — the data feed for
+  ```ts
+  function evaluatePredicateExplained(spec: unknown, facts: Scope, prev?: Scope, pathPrefix = ""): ClauseResult[]
+  ```
+- `evaluateTemplate` — Interpolate a {@link FactTemplate} against a scope. Single-pass character
+  ```ts
+  function evaluateTemplate(spec: FactTemplate, scope: Scope): string
+  ```
+- `extractDeps` — Collect the fact keys a predicate references. Used for static analysis,
+  ```ts
+  function extractDeps(spec: unknown, prefix = ""): Set<string>
+  ```
+- `extractTemplateKeys` — Collect the placeholder keys referenced by a template. The static-analysis
+  ```ts
+  function extractTemplateKeys(spec: FactTemplate): Set<string>
+  ```
+- `flattenPredicate` — Walk a predicate tree and emit every leaf clause with its dotted path.
+  ```ts
+  function flattenPredicate(spec: unknown, pathPrefix = "", out: LeafClause[] = []): LeafClause[]
+  ```
 - `forType` — Create a type-guard function suitable for a resolver's `requirement`
   ```ts
   export function forType<R extends Requirement>(
   ```
-- `getCurrentTracker` — Get the current tracking context.
+- `framesFromHistory` — Convert a history-manager export (the JSON produced by
   ```ts
-  function getCurrentTracker(): TrackingContext
+  function framesFromHistory(historyExport: unknown): ReplayFrame<Record<string, unknown>>[]
+  ```
+- `framesFromSnapshots` — Convert an array of `{ id, timestamp?, facts }` snapshots — e.g. the
+  ```ts
+  function framesFromSnapshots(snapshots: unknown): ReplayFrame<Record<string, unknown>>[]
+  ```
+- `generateRequirementId` — Computes a stable identifier for a requirement, used for coalescing
+  ```ts
+  function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
+  ```
+- `getKind` — Return the {@link SchemaKindNode} for a schema field. Prefers the
+- `getOperatorsForKind` — Return the set of `PredicateOp` strings that are valid against a
+  ```ts
+  function getOperatorsForKind(node: SchemaKindNode): readonly PredicateOp[]
+  ```
+- `getSchemaFieldKinds` — Walk the `facts` block of a module schema and emit a flat map from
+- `initialTimerState` — Initial state for a newly-created timer. Pass this to your Directive
+  ```ts
+  function initialTimerState(): TimerFactState
   ```
 - `isNamespacedSystem` — Check if a system is a namespaced (multi-module) system.
   ```ts
   function isNamespacedSystem(system: AnySystem): boolean
+  ```
+- `isPredicate` — True when `v` is a data-form spec (predicate object/array) rather than a
+  ```ts
+  function isPredicate(v: unknown): boolean
   ```
 - `isRequirementType` — Type-narrowing guard that checks whether a requirement's `type` matches the
   ```ts
@@ -105,13 +133,74 @@
   ```ts
   function isSnapshotExpired(snapshot: DistributableSnapshotLike<T>, now: number = Date.now()): boolean
   ```
-- `isTracking` — Check if dependency tracking is currently active.
+- `isTemplate` — True when `v` is a {@link FactTemplate} (`{ $template: string }`).
   ```ts
-  function isTracking(): boolean
+  function isTemplate(v: unknown): boolean
+  ```
+- `listAllPredicateOperators` — Return all known predicate operators — convenience for prompt builders
+  ```ts
+  function listAllPredicateOperators(): readonly PredicateOp[]
+  ```
+- `memoizePredicate` — Memoize a predicate as a reusable evaluation closure.
+  ```ts
+  function memoizePredicate(predicate: object): (facts: Scope, prev?: Scope) => boolean
+  ```
+- `memorySink` — In-memory bounded ring-buffer sink. Drops oldest entries past
+  ```ts
+  function memorySink(opts: { capacity?: number } = {}): AuditLedgerSink
+  ```
+- `pauseTimer` — Transition: pause a running timer. Records the pause moment so a
+  ```ts
+  function pauseTimer(state: TimerFactState, nowMs: number): TimerFactState
+  ```
+- `predicateHash` — Compute a content-addressed hash for a {@link FactPredicate}. Canonicalised
+  ```ts
+  function predicateHash(spec: FactPredicate<F>): string
+  ```
+- `predicateToMongo` — Compile a {@link FactPredicate} to a MongoDB query document.
+  ```ts
+  function predicateToMongo(predicate: FactPredicate<F>, options: PredicateToMongoOptions = {}): Record<string, unknown>
+  ```
+- `predicateToPostgrest` — Compile a {@link FactPredicate} to a PostgREST querystring.
+  ```ts
+  function predicateToPostgrest(predicate: FactPredicate<F>, options: PredicateToPostgrestOptions = {}): string
+  ```
+- `predicateToSQL` — Compile a {@link FactPredicate} to a parameterized SQL statement.
+  ```ts
+  function predicateToSQL(predicate: FactPredicate<F>, options: PredicateToSqlOptions): PredicateToSqlResult
+  ```
+- `predicateToWhere` — Lower-level variant — returns just the `WHERE` clause body and the
+- `predict` — Run a predicate against the current fact state and report whether it
+  ```ts
+  function predict(predicate: FactPredicate<F>, facts: F, prev?: F): PredictResult<F>
+  ```
+- `realClock` — Production clock — wraps `Date.now()` and `globalThis.setTimeout`.
+  ```ts
+  function realClock(): SignalClock
+  ```
+- `registerRepeat` — Transition: register a repeat firing. Increments `repeats` and
+  ```ts
+  function registerRepeat(state: TimerFactState, ms: number): TimerFactState
+  ```
+- `remainingMs` — Compute remaining ms for a countdown timer at a given clock-now.
+  ```ts
+  function remainingMs(state: TimerFactState, nowMs: number, totalMs: number): number
+  ```
+- `replayUnder` — Replay a recorded fact-frame history through two predicates — the
+  ```ts
+  function replayUnder(options: ReplayUnderOptions<F>): PredicateBacktestReport
   ```
 - `req` — Create a typed requirement factory for a given requirement type string.
   ```ts
   function req(type: T): <P extends Record<string, unknown>>(props: P) => Requirement & { type: T; } & P
+  ```
+- `resetTimer` — Transition: reset a timer to idle. Loses all elapsed time + repeat
+  ```ts
+  function resetTimer(): TimerFactState
+  ```
+- `resumeTimer` — Transition: resume a paused timer. Adds the time spent paused into
+  ```ts
+  function resumeTimer(state: TimerFactState, nowMs: number): TimerFactState
   ```
 - `shallowEqual` — Shallow equality comparison for objects.
   ```ts
@@ -121,9 +210,23 @@
   ```ts
   function signSnapshot(snapshot: DistributableSnapshotLike<T>, secret: string | Uint8Array): Promise<SignedSnapshot<T>>
   ```
-- `trackAccess` — Track a specific key in the current context.
+- `startTimer` — Transition: start an idle (or reset) timer.
   ```ts
-  function trackAccess(key: string): void
+  function startTimer(state: TimerFactState, nowMs: number): TimerFactState
+  ```
+- `sweepUnder` — Sweep a predicate template's hole(s) across candidate values and replay
+  ```ts
+  function sweepUnder(options: SweepUnderOptions<F>): SweepReport
+  ```
+- `tickTimer` — Higher-level helper: given a timer state, total ms, and the current
+- `timerOps` — Bundle of helpers for one timer in one module — convenience for
+- `toReplayFrames` — Normalize a parsed-from-JSON history value into a `ReplayFrame[]`.
+  ```ts
+  function toReplayFrames(raw: unknown): ReplayFrame<Record<string, unknown>>[]
+  ```
+- `toRulesMap` — Coerce supported input shapes into a flat `Record<constraintId, whenSpec>`.
+  ```ts
+  function toRulesMap(raw: RulesMapInput): Record<string, unknown>
   ```
 - `typedConstraint` — Type-safe constraint creator.
   ```ts
@@ -133,6 +236,11 @@
   ```ts
   function typedResolver(resolver: TypedResolver<S, R>): TypedResolver<S, R>
   ```
+- `validatePredicate` — Throw when a predicate spec contains an operand that cannot survive a
+  ```ts
+  function validatePredicate(spec: unknown, path = ""): void
+  ```
+- `validatePredicateAgainstSchema` — Cross-check an LLM-emitted (or otherwise externally-sourced) predicate
 - `validateSnapshot` — Validate a distributable snapshot and return its data.
   ```ts
   function validateSnapshot(snapshot: DistributableSnapshotLike<T>, now: number = Date.now()): T
@@ -141,13 +249,9 @@
   ```ts
   function verifySnapshotSignature(signedSnapshot: SignedSnapshot<T>, secret: string | Uint8Array): Promise<boolean>
   ```
-- `withoutTracking` — Run a function without tracking.
+- `virtualClock` — Virtual clock — advances only when `advanceBy(ms)` is called. All
   ```ts
-  function withoutTracking(fn: () => T): T
-  ```
-- `withTracking` — Run a function with dependency tracking.
-  ```ts
-  function withTracking(fn: () => T): { value: T; deps: Set<string>; }
+  function virtualClock(initialMs = 0): SignalClock
   ```
 
 ### Classes
@@ -171,21 +275,25 @@
   ```ts
   export interface BatchConfig {
   ```
-- `BatchItemResult` — Result for a single item in a batch resolution.
-  ```ts
-  export interface BatchItemResult<T = unknown> {
-  ```
 - `ChainableSchemaType` — Chainable schema type with all common methods
   ```ts
   export interface ChainableSchemaType<T> extends ExtendedSchemaType<T> {
   ```
-- `ConstraintsControl` — Runtime control for constraints
+- `Change` — A single change between two predicates at a specific path.
   ```ts
-  export interface ConstraintsControl<M extends ModuleSchema = ModuleSchema> {
+  export interface Change {
   ```
-- `ConstraintState` — Internal constraint state
+- `CheckOwnsFinding` — Returned by {@link doctor.checkOwns}.
   ```ts
-  export interface ConstraintState {
+  export interface CheckOwnsFinding {
+  ```
+- `CheckOwnsResult` — Result of {@link doctor.checkOwns}.
+  ```ts
+  export interface CheckOwnsResult {
+  ```
+- `ClauseResult` — The per-clause result of an explained predicate evaluation. One entry per
+  ```ts
+  export interface ClauseResult {
   ```
 - `CreateSystemOptionsNamed` — Options for createSystem with object modules (namespaced mode).
   ```ts
@@ -195,21 +303,17 @@
   ```ts
   export interface CreateSystemOptionsSingle<S extends ModuleSchema> {
   ```
-- `CrossModuleConstraintDef` — Constraint definition with cross-module typed facts.
+- `DefinitionMeta` — Optional metadata for module, fact, event, constraint, resolver, effect, and derivation definitions.
   ```ts
-  export interface CrossModuleConstraintDef<
+  export interface DefinitionMeta {
   ```
-- `CrossModuleEffectDef` — Effect definition with cross-module typed facts.
+- `DerivationDefWithMeta` — Derivation definition with metadata (object form).
   ```ts
-  export interface CrossModuleEffectDef<
+  export interface DerivationDefWithMeta<
   ```
-- `DerivationsControl` — Runtime control for derivations (dynamic registration + value access)
+- `DescribeOptions` — Options controlling how {@link describePredicate} renders a predicate.
   ```ts
-  export interface DerivationsControl<M extends ModuleSchema = ModuleSchema> {
-  ```
-- `DerivationState` — Internal derivation state
-  ```ts
-  export interface DerivationState<T> {
+  export interface DescribeOptions {
   ```
 - `DistributableSnapshot` — A distributable snapshot containing computed state.
   ```ts
@@ -235,45 +339,45 @@
   ```ts
   export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   ```
-- `EffectsControl` — Runtime control for effects
-  ```ts
-  export interface EffectsControl<M extends ModuleSchema = ModuleSchema> {
-  ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
   export interface ErrorBoundaryConfig {
+  ```
+- `ExistingConstraint` — Shape of `system.inspect().constraints[N]` we care about — accepts any superset.
+  ```ts
+  export interface ExistingConstraint {
   ```
 - `ExtendedSchemaType` — Extended SchemaType with type name for better error messages
   ```ts
   export interface ExtendedSchemaType<T> extends SchemaType<T> {
   ```
-- `FactChange` — Fact change record
-  ```ts
-  export interface FactChange {
-  ```
 - `FactsSnapshot` — Read-only snapshot of facts
   ```ts
   export interface FactsSnapshot<S extends Schema = Schema> {
   ```
-- `FactsStore` — Mutable facts store
+- `FactTemplate` — A fact-interpolating string expression. `${key}` placeholders are replaced
   ```ts
-  export interface FactsStore<S extends Schema = Schema>
+  export interface FactTemplate {
   ```
 - `HistoryAPI` — History API for snapshot navigation, changesets, and export/import
   ```ts
   export interface HistoryAPI {
   ```
-- `HistoryConfig` — History configuration for snapshot-based state history (undo/redo, rollback, audit trails)
-  ```ts
-  export interface HistoryConfig {
-  ```
 - `HistoryState` — Reactive history state for framework hooks
   ```ts
   export interface HistoryState {
   ```
-- `InflightInfo` — Summary of a resolver that is currently in flight.
+- `LeafClause` — A leaf clause extracted from a predicate tree, keyed by its dotted path.
   ```ts
-  export interface InflightInfo {
+  export interface LeafClause {
+  ```
+- `MetaAccessor` — O(1) accessor for definition metadata.
+  ```ts
+  export interface MetaAccessor {
+  ```
+- `MetaMatch` — Result from bulk meta queries (byCategory, byTag).
+  ```ts
+  export interface MetaMatch {
   ```
 - `ModuleConfig` — Module configuration with consolidated schema.
   ```ts
@@ -289,7 +393,7 @@
   ```
 - `ModuleHooks` — Lifecycle hooks for modules
   ```ts
-  export interface ModuleHooks<_M extends ModuleSchema> {
+  export interface ModuleHooks<M extends ModuleSchema> {
   ```
 - `ModuleSchema` — Consolidated module schema - single source of truth for all types.
   ```ts
@@ -299,25 +403,33 @@
   ```ts
   export interface NamespacedSystem<Modules extends ModulesMap> {
   ```
-- `PendingRetry` — A queued retry entry tracking its source, attempt count, and scheduled time.
+- `PatchSpec` — An event handler written as data: assigns facts from literals, payload
   ```ts
-  export interface PendingRetry {
+  export interface PatchSpec<F, P> {
+  ```
+- `PayloadRef` — *Note: Directive's `$ref` is **not** a JSON Pointer or JSON Schema `$ref`.
+  ```ts
+  export interface PayloadRef<P> {
   ```
 - `Plugin` — Plugin interface for extending Directive functionality.
   ```ts
   export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   ```
-- `ReconcileResult` — Reconcile result
+- `PredicateBacktestReport` — The outcome of replaying a recorded history under two predicates — a
   ```ts
-  export interface ReconcileResult {
+  export interface PredicateBacktestReport {
+  ```
+- `ReplayDiffSample` — A frame where the original and proposed predicate disagree.
+  ```ts
+  export interface ReplayDiffSample {
+  ```
+- `ReplayFrame` — One recorded fact-state frame.
+  ```ts
+  export interface ReplayFrame<F = Record<string, unknown>> {
   ```
 - `Requirement` — Base requirement structure
   ```ts
   export interface Requirement {
-  ```
-- `RequirementExplanation` — Explanation of why a requirement exists
-  ```ts
-  export interface RequirementExplanation {
   ```
 - `RequirementTypeStatus` — Status of a requirement type
   ```ts
@@ -327,18 +439,6 @@
   ```ts
   export interface RequirementWithId {
   ```
-- `ResolverContext` — Resolver context passed to resolve function
-  ```ts
-  export interface ResolverContext<S extends Schema = Schema> {
-  ```
-- `ResolversControl` — Runtime control for resolvers
-  ```ts
-  export interface ResolversControl<M extends ModuleSchema = ModuleSchema> {
-  ```
-- `RetryLaterConfig` — Configuration for retry-later strategy.
-  ```ts
-  export interface RetryLaterConfig {
-  ```
 - `RetryPolicy` — Retry policy configuration
   ```ts
   export interface RetryPolicy {
@@ -346,6 +446,10 @@
 - `SchemaType` — Primitive type definitions for schema
   ```ts
   export interface SchemaType<T> {
+  ```
+- `SignalClock` — Stable interface for any time source.
+  ```ts
+  export interface SignalClock {
   ```
 - `SignedSnapshot` — A signed distributable snapshot.
   ```ts
@@ -367,17 +471,17 @@
   ```ts
   export interface SnapshotDiffEntry {
   ```
-- `SnapshotMeta` — Lightweight snapshot metadata (no facts data — keeps re-renders cheap)
+- `SweepHole` — A placeholder inside a predicate template — substituted from `sweep` values.
   ```ts
-  export interface SnapshotMeta {
+  export interface SweepHole {
+  ```
+- `SweepPoint` — One point on the sweep curve — one candidate value tuple.
+  ```ts
+  export interface SweepPoint {
   ```
 - `SystemConfig` — System configuration
   ```ts
   export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
-  ```
-- `SystemEvent` — System event
-  ```ts
-  export interface SystemEvent {
   ```
 - `SystemInspection` — System inspection result
   ```ts
@@ -387,148 +491,40 @@
   ```ts
   export interface SystemSnapshot {
   ```
-- `TraceConfig` — Trace configuration for per-run reconciliation changelogs
+- `TimerFactState` — Persistent timer state — JSON-roundtrippable, suitable for storing
   ```ts
-  export interface TraceConfig {
+  export interface TimerFactState {
   ```
 - `TraceEntry` — A structured record of one reconciliation run — fact changes, derivation recomputes, constraints hit, resolvers, effects.
   ```ts
   export interface TraceEntry {
   ```
-- `TypedConstraint` — External constraint definition with full typing.
-  ```ts
-  export interface TypedConstraint<
-  ```
-- `TypedConstraintDef` — Constraint definition with typed requirements.
-  ```ts
-  export interface TypedConstraintDef<M extends ModuleSchema> {
-  ```
-- `TypedResolver` — External resolver definition with full typing.
-  ```ts
-  export interface TypedResolver<
-  ```
-- `TypedResolverContext` — Resolver context with typed facts.
-  ```ts
-  export interface TypedResolverContext<M extends ModuleSchema> {
-  ```
-- `TypedResolverDef` — Typed resolver definition for a specific requirement type.
-  ```ts
-  export interface TypedResolverDef<
-  ```
 
 ### Types
 
-- `BatchResolveResults` — Results from batch resolution with per-item status.
-  ```ts
-  export type BatchResolveResults<T = unknown> = Array<BatchItemResult<T>>;
-  ```
 - `Branded` — Branded type - adds a unique brand to a base type
   ```ts
   export type Branded<T, B extends string> = T & { readonly [Brand]: B };
   ```
-- `ConstraintsDef` — Map of constraint definitions (generic)
+- `ChangeKind` — Kind of change observed for a single clause.
   ```ts
-  export type ConstraintsDef<S extends Schema> = Record<
+  export type ChangeKind =
   ```
-- `CrossModuleConstraintsDef` — Cross-module constraints definition.
+- `ConstraintStatus` — Status of a single constraint across the two snapshots.
   ```ts
-  export type CrossModuleConstraintsDef<
+  export type ConstraintStatus = "added" | "removed" | "changed" | "unchanged";
   ```
 - `CrossModuleDeps` — Map of namespace to schema for cross-module dependencies.
   ```ts
   export type CrossModuleDeps = Record<string, ModuleSchema>;
   ```
-- `CrossModuleDerivationFn` — Derivation function with cross-module typed facts.
+- `FactPredicate` — A declarative boolean spec over a fact namespace `F`. The data form of a
   ```ts
-  export type CrossModuleDerivationFn<
-  ```
-- `CrossModuleDerivationsDef` — Cross-module derivations definition.
-  ```ts
-  export type CrossModuleDerivationsDef<
-  ```
-- `CrossModuleEffectsDef` — Cross-module effects definition.
-  ```ts
-  export type CrossModuleEffectsDef<
-  ```
-- `CrossModuleFactsWithSelf` — Cross-module facts type using "self" for own module.
-  ```ts
-  export type CrossModuleFactsWithSelf<
-  ```
-- `DerivationKeys` — Derivation keys from module schema.
-  ```ts
-  export type DerivationKeys<M extends ModuleSchema> = keyof M["derivations"] &
-  ```
-- `DerivationReturnType` — Get derivation return type from module schema.
-  ```ts
-  export type DerivationReturnType<
-  ```
-- `DerivationsDef` — Map of derivation definitions.
-  ```ts
-  export type DerivationsDef<S extends Schema> = Record<
-  ```
-- `DerivationsSchema` — Derivations schema - maps derivation names to their return types.
-  ```ts
-  export type DerivationsSchema = Record<string, SchemaType<unknown> | unknown>;
-  ```
-- `DeriveAccessor` — Derive accessor from module schema.
-  ```ts
-  export type DeriveAccessor<M extends ModuleSchema> = InferDerivations<M>;
-  ```
-- `DerivedValues` — Computed derived values.
-  ```ts
-  export type DerivedValues<S extends Schema, D extends DerivationsDef<S>> = {
-  ```
-- `DispatchEventsFromSchema` — Dispatch events union type from a module schema.
-  ```ts
-  export type DispatchEventsFromSchema<M extends ModuleSchema> = InferEvents<M>;
-  ```
-- `EffectCleanup` — A cleanup function returned by an effect's `run()`.
-  ```ts
-  export type EffectCleanup = () => void;
-  ```
-- `EffectsDef` — Map of effect definitions
-  ```ts
-  export type EffectsDef<S extends Schema> = Record<string, EffectDef<S>>;
-  ```
-- `ErrorSource` — Error source types
-  ```ts
-  export type ErrorSource =
-  ```
-- `EventPayloadSchema` — Event payload schema - maps property names to their types.
-  ```ts
-  export type EventPayloadSchema = Record<string, SchemaType<unknown> | unknown>;
-  ```
-- `EventsAccessor` — Events accessor from module schema.
-  ```ts
-  export type EventsAccessor<M extends ModuleSchema> =
-  ```
-- `EventsAccessorFromSchema` — Events accessor type from a module schema.
-  ```ts
-  export type EventsAccessorFromSchema<M extends ModuleSchema> = {
-  ```
-- `EventsDef` — Events definition - accepts any event handler signature
-  ```ts
-  export type EventsDef<S extends Schema> = Record<
-  ```
-- `EventsSchema` — Events schema - maps event names to their payload schemas.
-  ```ts
-  export type EventsSchema = Record<string, EventPayloadSchema>;
-  ```
-- `FactKeys` — Fact keys from module schema.
-  ```ts
-  export type FactKeys<M extends ModuleSchema> = keyof M["facts"] & string;
-  ```
-- `FactReturnType` — Get fact return type from module schema.
-  ```ts
-  export type FactReturnType<
+  export type FactPredicate<F> =
   ```
 - `Facts` — Proxy-based facts accessor (cleaner API)
   ```ts
   export type Facts<S extends Schema = Schema> = InferSchema<S> & {
-  ```
-- `FlexibleEventHandler` — Flexible event handler that accepts either:
-  ```ts
-  export type FlexibleEventHandler<S extends Schema> = (
   ```
 - `HistoryOption` — History option: boolean shorthand or full config (presence implies enabled)
   ```ts
@@ -538,10 +534,6 @@
   ```ts
   export type InferDerivations<M extends ModuleSchema> = {
   ```
-- `InferEventPayloadFromSchema` — Infer event payload type from an event payload schema.
-  ```ts
-  export type InferEventPayloadFromSchema<P extends EventPayloadSchema> = {
-  ```
 - `InferEvents` — Infer all events from a module schema as a discriminated union.
   ```ts
   export type InferEvents<M extends ModuleSchema> = {
@@ -549,10 +541,6 @@
 - `InferFacts` — Infer the facts type from a module schema.
   ```ts
   export type InferFacts<M extends ModuleSchema> = InferSchema<M["facts"]>;
-  ```
-- `InferRequirementPayloadFromSchema` — Infer requirement payload type from a requirement payload schema.
-  ```ts
-  export type InferRequirementPayloadFromSchema<
   ```
 - `InferRequirements` — Infer all requirements from a module schema as a discriminated union.
   ```ts
@@ -562,10 +550,6 @@
   ```ts
   export type InferRequirementTypes<M extends ModuleSchema> =
   ```
-- `InferSchema` — Extract the TypeScript type from a schema (removes readonly from const type params)
-  ```ts
-  export type InferSchema<S extends Schema> = {
-  ```
 - `InferSchemaType` — Infer a single type from a SchemaType, Zod schema, or plain type.
   ```ts
   export type InferSchemaType<T> = T extends SchemaType<infer U>
@@ -574,61 +558,61 @@
   ```ts
   export type InferSelectorState<M extends ModuleSchema> = InferFacts<M> &
   ```
+- `KeySelector` — *Note: despite the "Selector" name, this does not select from facts — it
+  ```ts
+  export type KeySelector<R> = readonly (keyof R & string)[];
+  ```
 - `ModulesMap` — Map of module name to module definition (object form).
   ```ts
   export type ModulesMap = Record<string, ModuleDef<any>>;
   ```
-- `MutableNamespacedFacts` — Mutable version for constraint/resolver callbacks.
+- `ObservationEvent` — Typed events emitted by system.observe().
   ```ts
-  export type MutableNamespacedFacts<Modules extends ModulesMap> = {
+  export type ObservationEvent =
   ```
-- `NamespacedDerivations` — Namespace derivations under module keys.
+- `OperatorObject` — The operator object permitted for a fact of type `V`. Built as a
   ```ts
-  export type NamespacedDerivations<Modules extends ModulesMap> = {
+  export type OperatorObject<V> =
   ```
-- `NamespacedEventsAccessor` — Events accessor that groups event dispatchers by module namespace.
+- `PatchValue` — A patch value: a literal, a typed payload copy, or (for string facts) a
   ```ts
-  export type NamespacedEventsAccessor<Modules extends ModulesMap> = {
+  export type PatchValue<V, P> =
   ```
-- `NamespacedFacts` — Namespace facts under module keys.
+- `PredicateClause` — Array form — explicit clauses, AND-ed. The codegen/devtools-friendly form.
   ```ts
-  export type NamespacedFacts<Modules extends ModulesMap> = {
+  export type PredicateClause<F> = {
   ```
-- `ObservableKeys` — All observable keys (facts + derivations) from module schema.
+- `PredicateCombinator` — Combinator node — exactly one of `$all` / `$any` / `$not`.
   ```ts
-  export type ObservableKeys<M extends ModuleSchema> =
+  export type PredicateCombinator<F> =
   ```
-- `RecoveryStrategy` — Recovery strategy for errors
+- `PredicateCombinatorKey` — Combinator node keys.
   ```ts
-  export type RecoveryStrategy =
+  export type PredicateCombinatorKey = "$all" | "$any" | "$not";
   ```
-- `RequirementKeyFn` — Requirement key function for custom deduplication
+- `PredicateObject` — Object form — every key is a fact name, every value a
   ```ts
-  export type RequirementKeyFn<R extends Requirement = Requirement> = (
+  export type PredicateObject<F> = {
   ```
-- `RequirementOutput` — Requirement output from a constraint.
+- `PredicateOp` — Comparison operator names — the `$`-prefixed keys inside an operator object.
   ```ts
-  export type RequirementOutput<R> = R | R[] | null;
+  export type PredicateOp =
   ```
-- `RequirementPayloadSchema` — Requirement payload schema - maps property names to their types.
+- `RulesMapInput` — Accepted shapes for the `before` / `after` predicate maps:
   ```ts
-  export type RequirementPayloadSchema = Record<
-  ```
-- `RequirementsSchema` — Requirements schema definition - maps requirement type names to their payload schemas.
-  ```ts
-  export type RequirementsSchema = Record<string, RequirementPayloadSchema>;
-  ```
-- `ResolversDef` — Map of resolver definitions
-  ```ts
-  export type ResolversDef<S extends Schema> = Record<
-  ```
-- `ResolverStatus` — Resolver status
-  ```ts
-  export type ResolverStatus =
+  export type RulesMapInput = unknown;
   ```
 - `Schema` — Schema definition mapping keys to types.
   ```ts
   export type Schema = Record<string, SchemaType<unknown> | unknown>;
+  ```
+- `SchemaKind` — The closed set of kinds a Directive schema field can be.
+  ```ts
+  export type SchemaKind =
+  ```
+- `SchemaKindNode` — A tree-shaped discriminator for a schema field. Composite kinds
+  ```ts
+  export type SchemaKindNode =
   ```
 - `SystemMode` — System mode discriminator.
   ```ts
@@ -638,25 +622,9 @@
   ```ts
   export type TraceOption = boolean | TraceConfig;
   ```
-- `TypedConstraintsDef` — Typed constraints definition using the module schema.
+- `VerifyResult` — Verify result — chain valid OR a break with full context for tamper visualization.
   ```ts
-  export type TypedConstraintsDef<M extends ModuleSchema> = Record<
-  ```
-- `TypedDerivationsDef` — Typed derivations definition using the module schema.
-  ```ts
-  export type TypedDerivationsDef<M extends ModuleSchema> = {
-  ```
-- `TypedEventsDef` — Typed events definition using the module schema.
-  ```ts
-  export type TypedEventsDef<M extends ModuleSchema> = {
-  ```
-- `TypedResolversDef` — Typed resolvers definition using the module schema.
-  ```ts
-  export type TypedResolversDef<M extends ModuleSchema> = Record<
-  ```
-- `UnionEvents` — Union of all module events (not namespaced).
-  ```ts
-  export type UnionEvents<Modules extends ModulesMap> = {
+  export type VerifyResult =
   ```
 
 ### Constants
@@ -664,6 +632,14 @@
 - `Backoff` — Backoff strategy constants for retry policies.
   ```ts
   export const Backoff = {
+  ```
+- `MAX_REPLAY_FRAMES` — Upper bound on the number of frames a single {@link replayUnder} call will
+  ```ts
+  export const MAX_REPLAY_FRAMES = 1_000_000;
+  ```
+- `MAX_SWEEP_POINTS` — Hard cap on points evaluated in a single sweep — protects against runaway grids.
+  ```ts
+  export const MAX_SWEEP_POINTS = 10_000;
   ```
 - `t` — Schema type builders for defining fact types.
   ```ts
@@ -962,6 +938,10 @@
   ```ts
   function derivedConstraint(derivationId: string, condition: (value: unknown) => boolean, action: {
   ```
+- `detectAndRedactPII` — Detect PII in text and return a result whose `redactedText` is populated.
+  ```ts
+  function detectAndRedactPII(text: string, options: {
+  ```
 - `detectPII` — Detect PII in text without using as a guardrail.
   ```ts
   function detectPII(text: string, options: {
@@ -1033,6 +1013,10 @@
   function findAgentsByCapability(registry: AgentRegistry, requiredCapabilities: string[]): string[]
   ```
 - `forkFromCheckpoint` — Fork an orchestrator from a checkpoint — creates a new independent orchestrator
+- `formatSystemMeta` — Format a SystemInspection into a concise context string for LLM consumption.
+  ```ts
+  function formatSystemMeta(inspection: SystemInspection): string
+  ```
 - `getCheckpointProgress` — Compute progress metrics from a pattern checkpoint state.
   ```ts
   function getCheckpointProgress(state: PatternCheckpointState): CheckpointProgress
@@ -1129,6 +1113,23 @@
   ```
 - `pipeThrough` — Pipe one stream channel through a transform function into another.
 - `planGoal` — Dry-run goal execution to preview the plan without running agents.
+- `predicateFromIntent` — Ask an LLM to emit a FactPredicate matching the user's intent, then
+  ```ts
+  function predicateFromIntent(opts: PredicateFromIntentOptions<F>): Promise<FactPredicate<F>>
+  ```
+- `predicateFromIntentRaw` — Lower-level variant — returns the validated predicate (or null) plus
+  ```ts
+  function predicateFromIntentRaw(opts: PredicateFromIntentOptions<F>): Promise<PredicateFromIntentDiagnostics<F>>
+  ```
+- `predicateFromIntentWithProvenance` — Like {@link predicateFromIntent} but additionally returns a structured
+- `predicateToolSpecAnthropic` — Anthropic Messages API tool spec for predicate emission. Drop the
+  ```ts
+  function predicateToolSpecAnthropic(schema: unknown, opts: PredicateToolSpecOptions = {}): PredicateToolSpecAnthropic
+  ```
+- `predicateToolSpecOpenAI` — OpenAI Chat Completions / Responses API tool spec for predicate
+  ```ts
+  function predicateToolSpecOpenAI(schema: unknown, opts: PredicateToolSpecOptions = {}): PredicateToolSpecOpenAI
+  ```
 - `race` — Create a race pattern that runs handlers concurrently and returns the first successful result.
   ```ts
   function race(handlers: string[], options?: {
@@ -1165,6 +1166,10 @@
   function supervisor(supervisorAgent: string, workers: string[], options?: {
   ```
 - `tapStream` — Tap into a stream without consuming it.
+- `toAIContext` — Convenience: inspect a system and format its metadata for LLM context.
+  ```ts
+  function toAIContext(system: {
+  ```
 - `validateBaseURL` — Validate that a base URL uses the `http:` or `https:` protocol.
   ```ts
   function validateBaseURL(baseURL: string): void
@@ -1223,6 +1228,10 @@
 - `InMemoryCheckpointStore` — In-memory checkpoint store with FIFO eviction and time-based retention.
   ```ts
   class InMemoryCheckpointStore
+  ```
+- `PredicateFromIntentError` — Thrown by `predicateFromIntent` on retry exhaustion. `predicateFromIntentRaw` returns these as a diagnostics payload instead.
+  ```ts
+  class PredicateFromIntentError
   ```
 - `ReflectionExhaustedError` — Error thrown when reflection iterations are exhausted and onExhausted is "throw"
   ```ts
@@ -1371,7 +1380,7 @@
   ```ts
   export interface AuditPluginConfig {
   ```
-- `BatchedEmbedder` — Batched embedder instance with dispose capability
+- `BatchedEmbedder` — Batched embedder instance with destroy capability
   ```ts
   export interface BatchedEmbedder {
   ```
@@ -1554,6 +1563,10 @@
 - `DerivationUpdateEvent` — Derivation update event
   ```ts
   export interface DerivationUpdateEvent extends DebugEventBase {
+  ```
+- `DetectedPII` — Detected PII instance
+  ```ts
+  export interface DetectedPII {
   ```
 - `DevToolsClient` — A connected DevTools client
   ```ts
@@ -1770,6 +1783,10 @@
 - `InformMessage` — Inform message
   ```ts
   export interface InformMessage extends AgentMessage {
+  ```
+- `InjectionDetectionResult` — Detailed detection result
+  ```ts
+  export interface InjectionDetectionResult {
   ```
 - `InMemoryCheckpointStoreOptions` — Options for InMemoryCheckpointStore
   ```ts
@@ -2010,6 +2027,22 @@
 - `PatternStartEvent` — Pattern start event
   ```ts
   export interface PatternStartEvent extends DebugEventBase {
+  ```
+- `PIIDetectionResult` — PII detection result
+  ```ts
+  export interface PIIDetectionResult {
+  ```
+- `PIIDetector` — Custom PII detector interface
+  ```ts
+  export interface PIIDetector {
+  ```
+- `PredicateToolSpecAnthropic` — Anthropic Messages API tool shape. Drop into the `tools: [...]` array.
+  ```ts
+  export interface PredicateToolSpecAnthropic {
+  ```
+- `PredicateToolSpecOpenAI` — OpenAI Chat Completions / Responses API tool shape. Drop into the
+  ```ts
+  export interface PredicateToolSpecOpenAI {
   ```
 - `ProgressChunk` — Progress update for UI feedback
   ```ts
@@ -2461,6 +2494,14 @@
 - `PatternCheckpointState` — Discriminated union of all pattern checkpoint states
   ```ts
   export type PatternCheckpointState =
+  ```
+- `PIIType` — Supported PII types
+  ```ts
+  export type PIIType =
+  ```
+- `RedactionStyle` — Redaction style
+  ```ts
+  export type RedactionStyle =
   ```
 - `ReflectionEvaluator` — Evaluator function for reflection
   ```ts

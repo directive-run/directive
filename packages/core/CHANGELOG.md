@@ -104,6 +104,42 @@
 
 ## 1.12.0
 
+### Minor Changes
+
+- R4 sprint AE review loop — security hardening, honest claims, and +2 new public APIs. Four-round AE review on the v1.11.0 R4 sprint wrap converged 8 CRITICAL / 26 MAJOR → 0 / 0 (trajectory R1 8→R2 4→R3 1→R4 0). Tests 3551 → 3972 (+421).
+
+- **New public APIs**
+  - `describePredicate(spec)` — plain-English renderer for `FactPredicate`. `{ cartTotal: { $gte: 50 }, region: { $in: ["US","EU"] } }` → `"cart total is at least 50 AND region is one of [US, EU]"`. Powers RFC-0006 `RULES.md` codegen.
+  - `predicateHash(spec)` — content-addressed fingerprint (djb2 32-bit; SHA-256 reserved for v2). Canonicalized via `stableStringify` so semantically-identical predicates produce identical hashes across runs and runtimes.
+
+- **Audit-ledger hardening**
+  - Tombstone-forgery defense — `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable in-module sentinel symbol. Direct `sink.write({ kind: "system.entry-erased", ... })` is now detected as tamper.
+  - PII redaction walks predicate operands — `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into cached `whenSpec` operands flowing into `constraint.evaluate` entries.
+  - Function-form constraints capture `whenSource.sourceHash` only — raw function source NEVER lands in audit entries (closures routinely reference secrets in scope).
+  - `AuditEntry` payloads are frozen at write time. In-process mutation throws.
+  - `verify({ strong: true })` THROWS "reserved for v2" (previously silently returned `{ valid: true }` regardless of state).
+  - `ledger.erase()` skips the `system.subject-erased` marker when nothing matched the filter (`{ erased: 0, markerEntry: null }`) — no chain pollution from empty erasures.
+  - `AbortSignal.any()` properly composes runner timeouts with caller signals via portable `combineSignals()` (Node < 20 no longer throws on combined signals).
+  - `VerifyResult.erasedAt: number[]` renamed to `.erasedSeqs: number[]` (avoids units collision with per-tombstone `erasedAt` timestamp).
+
+- **`doctor` API refinements**
+  - `doctor.checkAgainst({ a: 100 }, [{ id: x, whenSpec: { a: 50 } }])`: `subset` finding now surfaces as `warnings` rather than `contradictions` (subset means "redundant", not "impossible").
+  - `doctor.checkOwns()` return shape: `{ findings }` → `{ warnings }` with a `severity` discriminator.
+
+- **`predict` honesty**
+  - `predict({ cartTotal: { $changed: true } }, facts)` now synthesizes a warning in `missingChanges` when `prev` is omitted (previously silent).
+  - `PredictResult.predicate` removed (input reference — caller already has it).
+
+- **`predicateFromIntent` polish**
+  - New options: `signal?: AbortSignal`, `redactIntent?: boolean`. Provenance entry gains `intentHash`. `dangerousRegex` ReDoS detection on incoming predicates (now exported from `@directive-run/core/internals`).
+  - `predicateFromIntentWithProvenance().rawOutputHash` → `.predicateHash` (canonicalized).
+
+- **Tool-spec presets split per provider** — `predicateToolSpec(schema)` → `predicateToolSpecAnthropic(schema)` (Claude function-calling shape) and `predicateToolSpecOpenAI(schema)` (Chat Completions shape). Old name retained as a deprecated alias.
+
+- **Audit-ledger ships 14 `AuditEntry` kinds** — every entry carries `schemaVersion: 1` and `hashAlgo: "djb2-1"` so future v2 verifiers can dual-format.
+
+- **v1 boundaries (honest)** — `docs/concepts/audit-ledger.md` corrected to drop overpromised "court-admissible / GDPR-grade" language. Substrate is **tamper-evident** (djb2 32-bit hash chain), NOT cryptographic-grade. In-memory ring buffer (default capacity 10k); SQLite / Parquet sinks reserved for v2. No actor/session attribution, no read-tracking, no trusted timestamps, no signing keys — all queued for v2.
+
 ## 1.11.0
 
 ### Minor Changes

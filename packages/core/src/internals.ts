@@ -167,7 +167,12 @@ export {
 } from "./core/types.js";
 
 // Shared utilities
-export { safeStringify, hashObject, stableStringify } from "./utils/utils.js";
+export {
+  safeStringify,
+  hashObject,
+  stableStringify,
+  isPrototypeSafe,
+} from "./utils/utils.js";
 
 /**
  * Heuristic detector for catastrophic-backtracking regex patterns.

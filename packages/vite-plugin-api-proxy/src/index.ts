@@ -27,14 +27,78 @@ function deriveEnvPrefix(envKey: string): string {
   return idx > 0 ? envKey.slice(0, idx) : envKey;
 }
 
+/** Hard cap on request body size to mitigate DoS. */
+export const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
+/** Slowloris defense — abort idle requests after this many ms. */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Headers safe to forward from upstream to the dev-server client.
+ * Anything not in this allowlist (case-insensitive) is dropped,
+ * including `set-cookie`, `authorization`, `x-api-key`, and any
+ * `x-internal-*` header.
+ */
+export const RESPONSE_HEADER_ALLOWLIST = new Set<string>([
+  "content-type",
+  "content-length",
+  "cache-control",
+  "etag",
+  "last-modified",
+  "vary",
+  "content-encoding",
+  "content-language",
+  "expires",
+  "pragma",
+]);
+
+/** Sentinel returned by collectBody when the request body exceeds MAX_BODY_BYTES. */
+class BodyTooLargeError extends Error {
+  constructor() {
+    super("Request body exceeds maximum size");
+    this.name = "BodyTooLargeError";
+  }
+}
+
 function collectBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
-    let body = "";
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let aborted = false;
+
     req.on("data", (chunk: Buffer) => {
-      body += chunk.toString();
+      if (aborted) {
+        return;
+      }
+      total += chunk.length;
+      if (total > MAX_BODY_BYTES) {
+        aborted = true;
+        // Reject NOW so the caller can write the 413; resume + discard
+        // remaining data so we don't keep buffering attacker bytes.
+        reject(new BodyTooLargeError());
+        // Drop further chunks on the floor instead of tearing down
+        // the socket — tearing down kills the response before it's read.
+        req.removeAllListeners("data");
+        req.on("data", () => {
+          // discard
+        });
+
+        return;
+      }
+      chunks.push(chunk);
     });
-    req.on("end", () => resolve(body));
-    req.on("error", reject);
+    req.on("end", () => {
+      if (aborted) {
+        return;
+      }
+      resolve(Buffer.concat(chunks).toString());
+    });
+    req.on("error", (err) => {
+      if (aborted) {
+        return;
+      }
+      reject(err);
+    });
   });
 }
 
@@ -65,6 +129,15 @@ export function apiProxy(options: ApiProxyOptions): Plugin {
               return;
             }
 
+            // Slowloris defense — abort idle connections
+            req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+              if (!res.headersSent) {
+                res.statusCode = 408;
+                res.end(JSON.stringify({ error: "Request timeout" }));
+              }
+              req.destroy();
+            });
+
             // API key: client header → env var → 401
             let apiKey: string | undefined;
             if (route.headerKey) {
@@ -78,43 +151,82 @@ export function apiProxy(options: ApiProxyOptions): Plugin {
               return;
             }
 
-            collectBody(req).then((body) => {
-              const reqHeaders: Record<string, string> = {
-                "content-type":
-                  req.headers["content-type"] ?? "application/json",
-                ...route.headers,
-              };
+            collectBody(req).then(
+              (body) => {
+                const reqHeaders: Record<string, string> = {
+                  "content-type":
+                    req.headers["content-type"] ?? "application/json",
+                  ...route.headers,
+                };
 
-              // Inject API key as the headerKey on the upstream request
-              if (apiKey && route.headerKey) {
-                reqHeaders[route.headerKey] = apiKey;
-              }
+                // Inject API key as the headerKey on the upstream request
+                if (apiKey && route.headerKey) {
+                  reqHeaders[route.headerKey] = apiKey;
+                }
 
-              const proxyReq = transport.request(
-                {
-                  hostname: url.hostname,
-                  port: url.port || (isHttps ? 443 : 80),
-                  path: url.pathname + url.search,
-                  method,
-                  headers: reqHeaders,
-                },
-                (proxyRes) => {
-                  res.statusCode = proxyRes.statusCode ?? 500;
-                  for (const [key, value] of Object.entries(proxyRes.headers)) {
-                    if (value) res.setHeader(key, value);
+                const proxyReq = transport.request(
+                  {
+                    hostname: url.hostname,
+                    port: url.port || (isHttps ? 443 : 80),
+                    path: url.pathname + url.search,
+                    method,
+                    headers: reqHeaders,
+                  },
+                  (proxyRes) => {
+                    res.statusCode = proxyRes.statusCode ?? 500;
+                    for (const [key, value] of Object.entries(
+                      proxyRes.headers,
+                    )) {
+                      if (!value) {
+                        continue;
+                      }
+                      const lower = key.toLowerCase();
+                      // Explicit deny — never forward credentials or internal headers
+                      if (
+                        lower === "set-cookie" ||
+                        lower === "authorization" ||
+                        lower === "x-api-key" ||
+                        lower.startsWith("x-internal-")
+                      ) {
+                        continue;
+                      }
+                      if (!RESPONSE_HEADER_ALLOWLIST.has(lower)) {
+                        continue;
+                      }
+                      res.setHeader(key, value);
+                    }
+                    proxyRes.pipe(res);
+                  },
+                );
+
+                proxyReq.on("error", (err) => {
+                  if (!res.headersSent) {
+                    res.statusCode = 502;
+                    res.end(JSON.stringify({ error: err.message }));
                   }
-                  proxyRes.pipe(res);
-                },
-              );
+                });
 
-              proxyReq.on("error", (err) => {
-                res.statusCode = 502;
-                res.end(JSON.stringify({ error: err.message }));
-              });
+                proxyReq.write(body);
+                proxyReq.end();
+              },
+              (err) => {
+                if (res.headersSent) {
+                  return;
+                }
+                if (err instanceof BodyTooLargeError) {
+                  res.statusCode = 413;
+                  res.end(JSON.stringify({ error: "Payload too large" }));
 
-              proxyReq.write(body);
-              proxyReq.end();
-            });
+                  return;
+                }
+                res.statusCode = 400;
+                res.end(
+                  JSON.stringify({
+                    error: err instanceof Error ? err.message : String(err),
+                  }),
+                );
+              },
+            );
           },
         );
       }

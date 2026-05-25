@@ -5,7 +5,13 @@
  * - Your framework handles LLM tool execution
  * - Directive adds safety guardrails, approval workflows, state persistence
  *
- * Also available:
+ * Also available (tree-shakable subpath exports):
+ * - `@directive-run/ai/multi-agent` – Multi-agent orchestration, patterns, communication, checkpoints
+ * - `@directive-run/ai/predicate` – LLM-emit-predicate (FactPredicate from natural-language intent)
+ * - `@directive-run/ai/guardrails` – Built-in + prompt-injection + PII + semantic-cache guardrails
+ * - `@directive-run/ai/devtools` – Debug timeline + DevTools WebSocket server + health monitor
+ * - `@directive-run/ai/evals` – Evaluation framework (cost, latency, judge, safety, etc.)
+ * - `@directive-run/ai/mcp` – Model Context Protocol client + types
  * - `@directive-run/ai/testing` – Mock runners, test orchestrators, assertion helpers
  * - `@directive-run/ai/anthropic` – Anthropic Claude adapter
  * - `@directive-run/ai/openai` – OpenAI / Azure / Together adapter
@@ -166,6 +172,10 @@ export {
 // Built-in Guardrails
 // ============================================================================
 
+/**
+ * @deprecated Import from `@directive-run/ai/guardrails` instead. Will be removed in v2.
+ * Re-exported from the main barrel for backwards compatibility this cycle.
+ */
 export {
   createPIIGuardrail,
   createModerationGuardrail,
@@ -254,6 +264,10 @@ export {
   mergeTaggedStreams,
 } from "./streaming.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ * Re-exported from the main barrel for backwards compatibility this cycle.
+ */
 // Multi-agent orchestration
 export {
   createMultiAgentOrchestrator,
@@ -328,6 +342,9 @@ export {
   type MultiAgentRunCallOptions,
 } from "./multi-agent-orchestrator.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Pattern visualization
 export {
   patternToMermaid,
@@ -336,6 +353,9 @@ export {
   type MermaidNodeShapes,
 } from "./pattern-mermaid.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Agent communication
 export {
   createMessageBus,
@@ -403,6 +423,9 @@ export {
   type AuditEventType,
 } from "./plugins/audit.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/guardrails` instead. Will be removed in v2.
+ */
 // Prompt Injection Guardrails
 export {
   createPromptInjectionGuardrail,
@@ -425,6 +448,9 @@ export {
   type ComplianceStorage,
 } from "./plugins/compliance.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/guardrails` instead. Will be removed in v2.
+ */
 // Enhanced PII Guardrails
 export {
   createEnhancedPIIGuardrail,
@@ -440,6 +466,9 @@ export {
   type RedactionStyle,
 } from "./guardrails/pii-enhanced.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/guardrails` instead. Will be removed in v2.
+ */
 // ANN Index
 export {
   createBruteForceIndex,
@@ -449,6 +478,9 @@ export {
   type VPTreeIndexConfig,
 } from "./guardrails/ann-index.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/guardrails` instead. Will be removed in v2.
+ */
 export {
   createSemanticCache,
   createSemanticCacheGuardrail,
@@ -545,6 +577,9 @@ export {
   type SafeParseResult,
 } from "./structured-output.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/predicate` instead. Will be removed in v2.
+ */
 // LLM-emit-predicate — typed FactPredicate from natural-language intent
 export {
   predicateFromIntent,
@@ -582,6 +617,9 @@ export {
   type RoutingConstraint,
 } from "./provider-routing.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/devtools` instead. Will be removed in v2.
+ */
 // Debug Timeline
 export {
   createDebugTimeline,
@@ -591,6 +629,9 @@ export {
   type DebugTimelineListener,
 } from "./debug-timeline.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/devtools` instead. Will be removed in v2.
+ */
 // Health Monitor
 export {
   createHealthMonitor,
@@ -600,6 +641,9 @@ export {
   type HealthCircuitState,
 } from "./health-monitor.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/devtools` instead. Will be removed in v2.
+ */
 // DevTools Server
 export {
   createDevToolsServer,
@@ -617,6 +661,9 @@ export {
   type DevToolsCompatibleOrchestrator,
 } from "./devtools-server.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Checkpointing
 export {
   createCheckpointId,
@@ -630,6 +677,9 @@ export {
   type InMemoryCheckpointStoreOptions,
 } from "./checkpoint.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Breakpoints
 export {
   matchBreakpoint,
@@ -645,6 +695,9 @@ export {
   type BreakpointState,
 } from "./breakpoints.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Reflection
 export {
   withReflection,
@@ -655,6 +708,9 @@ export {
   type ReflectionEvaluator,
 } from "./reflection.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/multi-agent` instead. Will be removed in v2.
+ */
 // Goal Utilities (standalone plan, validate, dependency graph, explain)
 export {
   planGoal,
@@ -674,6 +730,9 @@ export {
 // Meta Context (system introspection for LLM consumption)
 export { formatSystemMeta, toAIContext } from "./meta-context.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/mcp` instead. Will be removed in v2.
+ */
 // MCP (Model Context Protocol)
 export {
   createMCPAdapter,
@@ -699,6 +758,9 @@ export type {
   MCPRequirement,
 } from "./mcp-types.js";
 
+/**
+ * @deprecated Import from `@directive-run/ai/evals` instead. Will be removed in v2.
+ */
 // Evaluation Framework
 export {
   createEvalSuite,

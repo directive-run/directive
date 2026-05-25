@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
-import { createAuditLedger, memorySink, type AuditEntry } from "../audit-ledger.js";
+import { createAuditLedger, memorySink, type AuditEntry } from "../audit-ledger/index.js";
 
 // happy-dom or node fine; we use node.
 const flushTick = () => new Promise<void>((r) => setTimeout(r, 0));

@@ -53,8 +53,10 @@ Website: https://directive.run
 - [GraphQL](https://directive.run/docs/data-fetching/graphql)
 - [Explain & Debug](https://directive.run/docs/data-fetching/explain)
 
-### Advanced
+### Advanced Patterns
 - [Overview](https://directive.run/docs/advanced/overview)
+- [Data-form Definitions](https://directive.run/docs/data-triggers)
+- [Resolver Binding (owns)](https://directive.run/docs/resolver-binding)
 - [Multi-Module](https://directive.run/docs/advanced/multi-module)
 - [Runtime Dynamics](https://directive.run/docs/advanced/runtime)
 - [History & Snapshots](https://directive.run/docs/advanced/history)
@@ -62,10 +64,24 @@ Website: https://directive.run
 - [Error Boundaries](https://directive.run/docs/advanced/errors)
 - [Definition Meta](https://directive.run/docs/advanced/meta)
 
+### Analysis & Tooling
+- [Predicate Backtest (replay-under)](https://directive.run/docs/replay-under)
+- [Parameter Sweep (tune)](https://directive.run/docs/tune)
+- [Rules Diff](https://directive.run/docs/rules-diff)
+- [Predicate Codegen (SQL/Mongo/PostgREST)](https://directive.run/docs/predicate-codegen)
+- [predict()](https://directive.run/docs/predict)
+- [doctor.checkAgainst()](https://directive.run/docs/doctor)
+- [describePredicate (prose)](https://directive.run/docs/describe-predicate)
+
+### LLM Integration
+- [predicateFromIntent](https://directive.run/docs/predicate-from-intent)
+- [Audit Ledger](https://directive.run/docs/audit-ledger)
+
 ### Plugins
 - [Overview](https://directive.run/docs/plugins/overview)
 - [Logging](https://directive.run/docs/plugins/logging)
 - [DevTools](https://directive.run/docs/plugins/devtools)
+- [DevTools – whenExplain panel](https://directive.run/docs/when-explain-panel)
 - [Persistence](https://directive.run/docs/plugins/persistence)
 - [Performance](https://directive.run/docs/plugins/performance)
 - [Circuit Breaker](https://directive.run/docs/plugins/circuit-breaker)
@@ -91,6 +107,7 @@ Website: https://directive.run
 - [Error Boundaries](https://directive.run/docs/examples/error-boundaries)
 - [Fraud Analysis](https://directive.run/docs/examples/fraud-analysis)
 - [Dashboard Loader](https://directive.run/docs/examples/dashboard-loader)
+- [Compliance Audit](https://directive.run/docs/examples/compliance-audit)
 
 ### Guides
 - [Overview](https://directive.run/docs/guides/overview)

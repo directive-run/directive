@@ -11,7 +11,7 @@ export {
   type AuditLedgerOptions,
   type AuditLedgerSink,
   type QueryFilter,
-} from "./audit-ledger.js";
+} from "./audit-ledger/index.js";
 export { loggingPlugin, type LoggingPluginOptions } from "./logging.js";
 export {
   devtoolsPlugin,

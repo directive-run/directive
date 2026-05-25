@@ -28,7 +28,21 @@
  * ```
  */
 
+import { isPrototypeSafe } from "@directive-run/core/internals";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
+
+/**
+ * Guard against prototype pollution in LLM-extracted JSON. LLM output is
+ * attacker-controllable via prompt injection — payloads like
+ * `{"__proto__":{"polluted":true}}` would otherwise seed pollution downstream.
+ */
+function assertPrototypeSafe(value: unknown): void {
+  if (!isPrototypeSafe(value)) {
+    throw new Error(
+      "[Directive] structured-output: extracted JSON contains unsafe prototype keys",
+    );
+  }
+}
 
 // ============================================================================
 // Types
@@ -100,9 +114,19 @@ export function extractJsonFromOutput(output: string): unknown {
 
   // Try direct parse first
   try {
-    return JSON.parse(trimmed);
-  } catch {
-    // Continue to extraction
+    const parsed = JSON.parse(trimmed);
+    assertPrototypeSafe(parsed);
+
+    return parsed;
+  } catch (err) {
+    // Re-throw prototype-safety errors immediately — they are NOT parse errors
+    if (
+      err instanceof Error &&
+      err.message.startsWith("[Directive] structured-output:")
+    ) {
+      throw err;
+    }
+    // Continue to extraction on plain parse failures
   }
 
   // Try to find JSON object or array
@@ -165,8 +189,9 @@ export function extractJsonFromOutput(output: string): unknown {
       if (depth === 0) {
         const jsonStr = trimmed.slice(start, i + 1);
 
+        let parsed: unknown;
         try {
-          return JSON.parse(jsonStr);
+          parsed = JSON.parse(jsonStr);
         } catch {
           // LLMs emit literal newlines inside JSON string values — escape them
           const sanitized = jsonStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) =>
@@ -176,8 +201,12 @@ export function extractJsonFromOutput(output: string): unknown {
               .replace(/\t/g, "\\t"),
           );
 
-          return JSON.parse(sanitized);
+          parsed = JSON.parse(sanitized);
         }
+
+        assertPrototypeSafe(parsed);
+
+        return parsed;
       }
     }
   }

@@ -130,6 +130,47 @@ describe("extractJsonFromOutput", () => {
       reason: "need to check\nmultiple things",
     });
   });
+
+  // --------------------------------------------------------------------------
+  // R6 SECURITY — prototype pollution defense
+  // --------------------------------------------------------------------------
+
+  it("throws on extracted JSON with __proto__ key (direct parse path)", () => {
+    expect(() =>
+      extractJsonFromOutput('{"__proto__":{"polluted":true}}'),
+    ).toThrow(/\[Directive\] structured-output:/);
+  });
+
+  it("throws on extracted JSON with __proto__ key (extraction path)", () => {
+    // Trailing text forces the fallback extraction path
+    expect(() =>
+      extractJsonFromOutput(
+        'Here is your response: {"__proto__":{"polluted":true}} thanks',
+      ),
+    ).toThrow(/\[Directive\] structured-output:/);
+  });
+
+  it("throws on nested __proto__ key", () => {
+    expect(() =>
+      extractJsonFromOutput('{"safe":1,"nested":{"__proto__":{"x":1}}}'),
+    ).toThrow(/\[Directive\] structured-output:/);
+  });
+
+  it("throws on extracted JSON with constructor key", () => {
+    expect(() =>
+      extractJsonFromOutput('{"constructor":{"prototype":{"x":1}}}'),
+    ).toThrow(/\[Directive\] structured-output:/);
+  });
+
+  it("returns legitimate JSON object unchanged", () => {
+    expect(extractJsonFromOutput('{"foo":1}')).toEqual({ foo: 1 });
+  });
+
+  it("returns legitimate nested JSON unchanged", () => {
+    expect(
+      extractJsonFromOutput('{"user":{"name":"Alice","age":30},"active":true}'),
+    ).toEqual({ user: { name: "Alice", age: 30 }, active: true });
+  });
 });
 
 // ============================================================================
