@@ -18,7 +18,7 @@ In Zustand, a derived value is a closure. Same story.
 
 In MobX, a `@computed` is a memoized function. Same story.
 
-None of these are wrong. Functions are the right primitive for most state — they're flexible, they're fast, they're how programmers think. But the moment you want to do *anything* to a rule that isn't "run it," you fall off a cliff.
+None of these are wrong. Functions are the right primitive for most state – they're flexible, they're fast, they're how programmers think. But the moment you want to do *anything* to a rule that isn't "run it," you fall off a cliff.
 
 We hit that cliff three times in eighteen months at Sizls:
 
@@ -38,7 +38,7 @@ Instead, we asked a different question.
 
 What if the rule was data?
 
-Not "the rule has data attached to it." Not "the rule can be serialized." The rule *is* a JSON object. Operators are strings, operands are JSON literals, combinators are arrays. No closures. No source-code parsing. No reflection. A tree of nouns and verbs that any program — including programs that don't know about Directive — can walk.
+Not "the rule has data attached to it." Not "the rule can be serialized." The rule *is* a JSON object. Operators are strings, operands are JSON literals, combinators are arrays. No closures. No source-code parsing. No reflection. A tree of nouns and verbs that any program – including programs that don't know about Directive – can walk.
 
 A normal constraint looks like this in Directive:
 
@@ -54,15 +54,15 @@ const adultUsers = createModule("adults", {
 });
 ```
 
-`when:` is a `FactPredicate` — a JSON tree. The operators (`$gte`, `$in`, `$all`, `$any`, `$not`, `$matches`, `$between`, etc.) are a small closed set. The runtime walks the tree once per evaluation, returns a boolean, and that's the constraint check.
+`when:` is a `FactPredicate` – a JSON tree. The operators (`$gte`, `$in`, `$all`, `$any`, `$not`, `$matches`, `$between`, etc.) are a small closed set. The runtime walks the tree once per evaluation, returns a boolean, and that's the constraint check.
 
-If you've never used Mongo or built a query DSL, this looks like over-engineering. You could have just written `(facts) => facts.age >= 18 && ["active", "pending"].includes(facts.status)` and gotten the same boolean. Faster, too — one fewer object allocation per call.
+If you've never used Mongo or built a query DSL, this looks like over-engineering. You could have just written `(facts) => facts.age >= 18 && ["active", "pending"].includes(facts.status)` and gotten the same boolean. Faster, too – one fewer object allocation per call.
 
 The point isn't the boolean. The point is that *the same JSON* can be passed to any number of other programs.
 
 ## What that unlocks
 
-We didn't see all six tools at the start. We saw the first one — the devtools panel that explains why a constraint didn't fire — and that was enough to commit. The others showed up as we kept asking "what else can read a predicate?"
+We didn't see all six tools at the start. We saw the first one – the devtools panel that explains why a constraint didn't fire – and that was enough to commit. The others showed up as we kept asking "what else can read a predicate?"
 
 ### 1. The explanation
 
@@ -75,7 +75,7 @@ When a constraint fails, the runtime walks every clause. It already knows which 
     ✗ status ∈ ["active", "pending"]  (actual: "banned")
 ```
 
-This is the devtools panel ([whenExplain](../concepts/when-explain-panel.md)) we shipped two weeks ago. It's not magic — it's just `evaluatePredicateExplained(spec, facts)` returning a `ClauseResult[]` instead of a `boolean`. The data form makes the walk inspectable for free.
+This is the devtools panel ([whenExplain](../concepts/when-explain-panel.md)) we shipped two weeks ago. It's not magic – it's just `evaluatePredicateExplained(spec, facts)` returning a `ClauseResult[]` instead of a `boolean`. The data form makes the walk inspectable for free.
 
 What does this replace? Print debugging. Specifically, the thirty seconds of "wait, was `status` `'banned'` or `'inactive'`? Let me console.log it…" that happens every time a guard doesn't fire. We watched a junior engineer spend an hour on this same loop in XState last year. The panel collapses it to zero.
 
@@ -100,7 +100,7 @@ const report = replayUnder({
 
 Translation: lowering the threshold from $100 to $50 would have triggered 12,801 additional events on last month's traffic. The PM doesn't need a feature flag. They have the answer in milliseconds.
 
-We didn't write a "backtest engine." We wrote a `for` loop over frames and called the predicate's existing evaluator on each one. The data form is what made it cheap — predicates have no closures over module state, so they're portable across time.
+We didn't write a "backtest engine." We wrote a `for` loop over frames and called the predicate's existing evaluator on each one. The data form is what made it cheap – predicates have no closures over module state, so they're portable across time.
 
 ### 3. The diff
 
@@ -116,7 +116,7 @@ constraint blockCheckout
     region $in ["US", "EU"]
 ```
 
-"Relaxed" and "tightened" are first-class concepts here. If you drop `$gte 100` to `$gte 50`, that's not just "the literal changed" — it's *more rows match now*, and the diff says so. Auditors get clauses, not lines.
+"Relaxed" and "tightened" are first-class concepts here. If you drop `$gte 100` to `$gte 50`, that's not just "the literal changed" – it's *more rows match now*, and the diff says so. Auditors get clauses, not lines.
 
 We didn't write a "rule version control system." We wrote a tree walker that knew the algebra of numeric comparisons. Same predicate type, different consumer.
 
@@ -144,7 +144,7 @@ minTotal=50  regions=["US"]      → 18,402 ██████░░░░
 minTotal=100 regions=["US","EU"] → 12,300 ████░░░░░░  ← current
 ```
 
-The PM gets a sparkline. We got a tool. We didn't build a separate "experiments platform" — we recombined the predicate evaluator with the `for` loop from `replayUnder` and added a generator.
+The PM gets a sparkline. We got a tool. We didn't build a separate "experiments platform" – we recombined the predicate evaluator with the `for` loop from `replayUnder` and added a generator.
 
 ### 5. The codegen
 
@@ -162,7 +162,7 @@ predicateToMongo(adults);                   // server (Mongo)
 predicateToPostgrest(adults);               // edge (querystring)
 ```
 
-One JSON, three execution sites ([predicate codegen](../concepts/predicate-codegen.md)). The SQL compile is parameterized — operand values flow through the `params` array, never the SQL string, so it's SQL-injection-safe by construction. The Mongo translator rejects `$where` injection by blocking `$`-prefixed field keys. PostgREST is just a URL.
+One JSON, three execution sites ([predicate codegen](../concepts/predicate-codegen.md)). The SQL compile is parameterized – operand values flow through the `params` array, never the SQL string, so it's SQL-injection-safe by construction. The Mongo translator rejects `$where` injection by blocking `$`-prefixed field keys. PostgREST is just a URL.
 
 We didn't write an ORM. We wrote a few hundred lines of switch statements that walked the predicate tree and emitted strings.
 
@@ -170,7 +170,7 @@ We didn't write an ORM. We wrote a few hundred lines of switch statements that w
 
 The predicate type is the load-bearing layer under all five tools above. It's also a useful primitive in its own right. You write it once, and the type system catches typos (`$gtee`), wrong operand shapes (`$gt: "red"` on a number fact), and unknown fact keys at compile time. Auto-tracking is built in: the runtime knows which facts a predicate reads and re-evaluates only when those facts change.
 
-That last bit matters more than it sounds. In Redux, you wire `useSelector` and hope you remembered every dep. In XState, you write `guard:` and trust the machine knows when to re-check. In Directive, the predicate's dependencies are *extracted from its structure* — the same walk that evaluates the boolean also records every fact and derivation it touched. No deps array. No memo helper. No closure tracking. The data form is what makes it cheap.
+That last bit matters more than it sounds. In Redux, you wire `useSelector` and hope you remembered every dep. In XState, you write `guard:` and trust the machine knows when to re-check. In Directive, the predicate's dependencies are *extracted from its structure* – the same walk that evaluates the boolean also records every fact and derivation it touched. No deps array. No memo helper. No closure tracking. The data form is what makes it cheap.
 
 ## The recombination
 
@@ -178,7 +178,7 @@ Notice what these six tools share. **They all read the same data structure.** No
 
 This is the case for choosing data over functions when you can afford the verbosity tax. The verbosity tax is real: `{ age: { $gte: 18 } }` is more characters than `u => u.age >= 18`. The compounding benefit is also real: every new tool you'd ever want costs an afternoon, not a project.
 
-A second observation: none of the six tools were planned in the original design. We shipped the runtime, then the panel, then someone asked "could we backtest this against history?" — and the answer was yes, here it is, three days. Then "could we diff two of these?" — yes, here it is, two days. The architecture had room for the question we didn't know to ask.
+A second observation: none of the six tools were planned in the original design. We shipped the runtime, then the panel, then someone asked "could we backtest this against history?" – and the answer was yes, here it is, three days. Then "could we diff two of these?" – yes, here it is, two days. The architecture had room for the question we didn't know to ask.
 
 That's the thing we'd defend as the *real* product decision. Not "predicates," not "constraints," not any specific tool. The fact that the architecture made future tools cheap.
 
@@ -188,11 +188,11 @@ This isn't free. There are four costs we'd flag honestly.
 
 **Verbosity.** `{ age: { $gte: 18 } }` is wordier than `u => u.age >= 18`. For one-off filters in component code, this hurts. We mitigated it with type inference (TypeScript catches every typo), but the keystrokes are real.
 
-**Closed operator set.** We picked 15 operators (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$between`, `$matches`, `$startsWith`, `$endsWith`, `$contains`, `$changed`). If you need an operator that isn't on that list, you either ask us to add it, write a function predicate (which is still allowed everywhere data predicates are), or convince yourself the function form is fine. Most teams reach for function form 5-10% of the time, which is fine — the panel just shows "function-form when (no clause tree)" for those.
+**Closed operator set.** We picked 15 operators (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$exists`, `$between`, `$matches`, `$startsWith`, `$endsWith`, `$contains`, `$changed`). If you need an operator that isn't on that list, you either ask us to add it, write a function predicate (which is still allowed everywhere data predicates are), or convince yourself the function form is fine. Most teams reach for function form 5-10% of the time, which is fine – the panel just shows "function-form when (no clause tree)" for those.
 
 **Learning curve.** If you've never seen Mongo's query language, the operator set looks alien. We invested in good error messages (the typed `OperatorObject<V>` union catches `$gtee` and "wrong operand type for this fact" at compile time) and in a comparison page (`docs/comparison`), but you should know going in: this is a new vocabulary.
 
-**Not every state library decision is a constraint.** Predicates fit the "should this rule fire?" question well. They don't fit "what should the next phase be?" or "what should this string display?" as cleanly. Those still need functions. The runtime supports both — data form *or* function form, your call per surface — but we'd recommend you not try to predicate everything.
+**Not every state library decision is a constraint.** Predicates fit the "should this rule fire?" question well. They don't fit "what should the next phase be?" or "what should this string display?" as cleanly. Those still need functions. The runtime supports both – data form *or* function form, your call per surface – but we'd recommend you not try to predicate everything.
 
 The trade-off looks like this in practice:
 
@@ -203,21 +203,21 @@ In our 26,000-line migration from XState last quarter, about 70% of `when:` pred
 
 ## What this means for "state libraries"
 
-We didn't set out to argue that state libraries should ship six tools. We set out to ship a state library. The tools fell out of one architectural decision — predicates are data — that we made for completely different reasons (we wanted to inspect them).
+We didn't set out to argue that state libraries should ship six tools. We set out to ship a state library. The tools fell out of one architectural decision – predicates are data – that we made for completely different reasons (we wanted to inspect them).
 
-But here's the broader claim we'd defend: **the existing state-library category is too narrow.** Redux, Zustand, MobX, Jotai, Recoil, XState — they all answer the question "where does the state live and how does it update?" None of them answer the question "what does the state mean, and can other tools read that meaning?"
+But here's the broader claim we'd defend: **the existing state-library category is too narrow.** Redux, Zustand, MobX, Jotai, Recoil, XState – they all answer the question "where does the state live and how does it update?" None of them answer the question "what does the state mean, and can other tools read that meaning?"
 
-Compliance teams want to know what your rules say without reading your source code. Product teams want to know what would happen if you changed a threshold. Backend teams want the same rule to run on the server that runs on the client. None of these are "state management" problems in the narrow sense. They're *rule management* problems — and a state library that treats rules as opaque code can't help.
+Compliance teams want to know what your rules say without reading your source code. Product teams want to know what would happen if you changed a threshold. Backend teams want the same rule to run on the server that runs on the client. None of these are "state management" problems in the narrow sense. They're *rule management* problems – and a state library that treats rules as opaque code can't help.
 
-Directive treats rules as data. Once you've made that decision, every consumer of the rule — the runtime, the devtools, the auditor, the PM, the SQL compiler — gets to participate. The runtime evaluates. The devtools explain. The auditor diffs. The PM backtests. The compiler emits SQL. Same JSON.
+Directive treats rules as data. Once you've made that decision, every consumer of the rule – the runtime, the devtools, the auditor, the PM, the SQL compiler – gets to participate. The runtime evaluates. The devtools explain. The auditor diffs. The PM backtests. The compiler emits SQL. Same JSON.
 
-This isn't a knock on functions. Functions are still the right primitive for *most* state. But for the slice of state that is "rules" — the conditions, the predicates, the guards — data is a strictly better primitive when you can afford the verbosity.
+This isn't a knock on functions. Functions are still the right primitive for *most* state. But for the slice of state that is "rules" – the conditions, the predicates, the guards – data is a strictly better primitive when you can afford the verbosity.
 
 ## Where this goes
 
 The six tools we shipped are early. We have a longer list of things that fall out of the same architecture:
 
-- **LLM-emit-predicate**: GPT generates a `FactPredicate`. The type system validates it. The runtime runs it. The SQL compiler compiles it. The data form means there's no string concatenation anywhere in the loop — closing a whole class of "prompt-injected `DROP TABLE`" attacks for AI-generated queries.
+- **LLM-emit-predicate**: GPT generates a `FactPredicate`. The type system validates it. The runtime runs it. The SQL compiler compiles it. The data form means there's no string concatenation anywhere in the loop – closing a whole class of "prompt-injected `DROP TABLE`" attacks for AI-generated queries.
 - **Audit log query DSL**: The same predicate the constraint uses on the client lets the compliance team query "show me every fact-state change where this rule fired" in the audit log. Same predicate, different consumer.
 - **Per-clause attribution**: When a constraint fails, tag the actor who *changed* the fact that broke the predicate. The data form has the path; the audit log has the actor; the join is one `Map` lookup.
 - **Time-travel optimization**: A predicate is pure data, so it's hashable. Memoize the evaluation per `(predicate-hash, facts-snapshot-hash)` and a 100-frame `replayUnder` runs in microseconds.

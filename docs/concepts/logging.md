@@ -1,9 +1,9 @@
 ---
 title: loggingPlugin
-description: Console logging for every Directive lifecycle event — debug, info, warn, error, with configurable level, filter, logger backend, and prefix.
+description: Console logging for every Directive lifecycle event – debug, info, warn, error, with configurable level, filter, logger backend, and prefix.
 ---
 
-# `loggingPlugin` — every lifecycle event, one log line
+# `loggingPlugin` – every lifecycle event, one log line
 
 > A drop-in plugin that maps every Directive engine hook to a
 > log call at an appropriate severity. Tail your terminal and
@@ -13,10 +13,10 @@ description: Console logging for every Directive lifecycle event — debug, info
 
 ## What it does
 
-Subscribes to every plugin hook the engine exposes — facts changed,
+Subscribes to every plugin hook the engine exposes – facts changed,
 derivations recomputed, constraints evaluated, requirements created/met,
 resolvers started/completed/errored, effects run, history navigated,
-definitions registered — and emits a single log line per event at a
+definitions registered – and emits a single log line per event at a
 severity that matches the event class.
 
 Production builds opt out by setting the `level` above the events you
@@ -25,7 +25,7 @@ don't care about, or by passing a `filter` predicate that returns
 
 ## When to use
 
-- Local development — you want to see the system breathe without opening
+- Local development – you want to see the system breathe without opening
   the devtools panel.
 - CI / integration tests where the test runner already captures stdout.
 - Shipping to a structured log aggregator (Datadog, Loki, CloudWatch) by
@@ -79,16 +79,16 @@ internal `log(eventLevel, event, payload)` helper that:
 
 Severity assignments map to event semantics, not event count:
 
-- **`debug`** — fact changes, derivation compute/invalidate, reconcile
+- **`debug`** – fact changes, derivation compute/invalidate, reconcile
   start/end, constraint evaluate, resolver start/cancel, effect run,
   snapshot capture, definition call, trace complete, init/destroy.
-- **`info`** — start/stop, requirement met, resolver complete,
+- **`info`** – start/stop, requirement met, resolver complete,
   time-travel jump, definition register/assign/unregister.
-- **`warn`** — resolver retry, error recovery, resolver write rejected.
-- **`error`** — constraint error, resolver error, effect error, system
+- **`warn`** – resolver retry, error recovery, resolver write rejected.
+- **`error`** – constraint error, resolver error, effect error, system
   error.
 
-The plugin holds no state beyond the resolved options — no buffers, no
+The plugin holds no state beyond the resolved options – no buffers, no
 timers, no subscriptions outside the hooks. Cheap enough to leave on in
 production at `level: "warn"`.
 
@@ -107,7 +107,7 @@ session. Function-form `when:` omits the summary.
   object missing `group` / `groupEnd`, TypeScript will catch it, but a
   runtime hot-swap won't. Stick to `Pick<Console, ...>`.
 - **`filter` runs before severity gating.** A `filter` that's expensive
-  costs you on every hook, regardless of `level`. Keep it cheap — a
+  costs you on every hook, regardless of `level`. Keep it cheap – a
   `startsWith` check or a `Set.has` lookup.
 - **No structured fields beyond the payload object.** If your aggregator
   needs `service`, `env`, `traceId` etc., wrap the logger:
@@ -120,15 +120,15 @@ session. Function-form `when:` omits the summary.
 - **`onTraceComplete` payloads can be large.** Each trace entry includes
   arrays for fact changes, derivations recomputed, constraints hit,
   resolvers started, effects run. At `debug` level this floods structured
-  log backends — filter `"trace.complete"` if you don't need it.
+  log backends – filter `"trace.complete"` if you don't need it.
 
 ## See also
 
-- [`devtoolsPlugin`](./devtools.md) — same events, rendered as a
+- [`devtoolsPlugin`](./devtools.md) – same events, rendered as a
   floating panel with live tables and a timeline.
-- [`performancePlugin`](./performance.md) — the same hooks, aggregated
+- [`performancePlugin`](./performance.md) – the same hooks, aggregated
   into metrics instead of logged line-by-line.
-- [`createAuditLedger`](./audit-ledger.md) — tamper-evident persistence
+- [`createAuditLedger`](./audit-ledger.md) – tamper-evident persistence
   of the same events for compliance use.
-- [`whenExplain` panel](./when-explain-panel.md) — the per-clause
+- [`whenExplain` panel](./when-explain-panel.md) – the per-clause
   breakdown the `constraint.evaluate` summary refers to.

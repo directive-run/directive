@@ -1,14 +1,14 @@
 ---
 title: performancePlugin
-description: Engine-side performance metrics for constraints, resolvers, effects, and the reconcile loop — counts, total/avg/max duration, with slow-event callbacks.
+description: Engine-side performance metrics for constraints, resolvers, effects, and the reconcile loop – counts, total/avg/max duration, with slow-event callbacks.
 ---
 
-# `performancePlugin` — counts, durations, slow-event callbacks
+# `performancePlugin` – counts, durations, slow-event callbacks
 
 > A plugin that turns every relevant engine hook into running totals.
 > Pulls a `PerformanceSnapshot` whenever you want it, fires
 > `onSlowConstraint` / `onSlowResolver` when an evaluation exceeds your
-> threshold, and lives entirely outside the hot path — no patching, no
+> threshold, and lives entirely outside the hot path – no patching, no
 > instrumentation API surface.
 
 ## What it does
@@ -18,20 +18,20 @@ Subscribes to `onStart`, `onConstraintEvaluate`, `onResolverStart`,
 `onResolverCancel`, `onEffectRun`, `onEffectError`, `onReconcileStart`,
 `onReconcileEnd`, and `onDestroy`. Accumulates four metric tables
 (constraints, resolvers, effects, reconcile) and exposes
-`getSnapshot()` + `reset()` directly on the plugin object — so you can
+`getSnapshot()` + `reset()` directly on the plugin object – so you can
 keep the reference and query it at will.
 
 ## When to use
 
-- Local dev — `perf.getSnapshot()` after a flow reveals which resolver
+- Local dev – `perf.getSnapshot()` after a flow reveals which resolver
   ate the budget.
-- CI perf regression tests — assert resolver p99 / avg / max stays
+- CI perf regression tests – assert resolver p99 / avg / max stays
   under a threshold.
-- Production — wire `onSlowResolver` to your alerting and forget about
+- Production – wire `onSlowResolver` to your alerting and forget about
   it.
-- Dashboard pages — periodically poll `getSnapshot()` to render a live
+- Dashboard pages – periodically poll `getSnapshot()` to render a live
   metrics view.
-- Capacity planning — record `uptime`, count and duration totals,
+- Capacity planning – record `uptime`, count and duration totals,
   divide.
 
 ## Quick start
@@ -54,7 +54,7 @@ const system = createSystem({
 
 system.start();
 
-// Later — pull a snapshot
+// Later – pull a snapshot
 const snapshot = perf.getSnapshot();
 console.table(snapshot.resolvers);
 console.log("reconcile avg:", snapshot.reconcile.avgDurationMs);
@@ -64,8 +64,8 @@ console.log("reconcile avg:", snapshot.reconcile.avgDurationMs);
 
 | Field                       | Default | Description |
 | --------------------------- | ------- | ----------- |
-| `onSlowConstraint`          | —       | Callback fired when a constraint's measured evaluation time exceeds `slowConstraintThresholdMs`. Receives `(id, durationMs)`. |
-| `onSlowResolver`            | —       | Callback fired when a resolver's completion duration exceeds `slowResolverThresholdMs`. Receives `(id, durationMs)`. |
+| `onSlowConstraint`          | –       | Callback fired when a constraint's measured evaluation time exceeds `slowConstraintThresholdMs`. Receives `(id, durationMs)`. |
+| `onSlowResolver`            | –       | Callback fired when a resolver's completion duration exceeds `slowResolverThresholdMs`. Receives `(id, durationMs)`. |
 | `slowConstraintThresholdMs` | `16`    | Threshold in milliseconds for the slow-constraint callback. Aligned to one display frame at 60 Hz. |
 | `slowResolverThresholdMs`   | `1000`  | Threshold in milliseconds for the slow-resolver callback. |
 
@@ -116,12 +116,12 @@ interface ReconcileMetrics {
 }
 ```
 
-Each `getSnapshot()` returns a *copy* — mutating it won't corrupt the
+Each `getSnapshot()` returns a *copy* – mutating it won't corrupt the
 plugin's internal state.
 
 ## How it works
 
-Resolvers are easy — `onResolverComplete` carries `duration` directly
+Resolvers are easy – `onResolverComplete` carries `duration` directly
 from the engine. Effects only record run / error counts.
 
 Reconcile is timed from `onReconcileStart` (`performance.now()`) to
@@ -130,7 +130,7 @@ Reconcile is timed from `onReconcileStart` (`performance.now()`) to
 **Constraint timing is sampled, not exact.** Constraints evaluate
 sequentially within a reconcile cycle, but the engine doesn't surface
 per-constraint duration. The plugin measures the time between
-*consecutive* `onConstraintEvaluate` calls — so each constraint's
+*consecutive* `onConstraintEvaluate` calls – so each constraint's
 duration is the time elapsed since the previous one finished. The
 first constraint in each cycle has no baseline and is *not* timed.
 On `onReconcileStart`, `lastConstraintEvalEndTime` resets to `0` to
@@ -150,12 +150,12 @@ mark the next event as the new baseline.
 - **`uptime` is `Date.now() - startedAt`.** It's wall-clock, not
   monotonic. A NTP step or a sleep/wake on a laptop shifts it.
 - **`getSnapshot()` returns shallow copies of nested objects.** Each
-  per-id metric is `{ ...m }` — fine for current use, but don't store
+  per-id metric is `{ ...m }` – fine for current use, but don't store
   the snapshot across an `await` and expect it to track live values.
 - **Slow-event callbacks are synchronous in the hot path.** A heavy
   `onSlowResolver` (e.g. blocking I/O) will block the next reconcile.
   Forward to a queue if your handler is non-trivial.
-- **No histograms.** Mean / max only — for p50 / p90 / p99, feed the
+- **No histograms.** Mean / max only – for p50 / p90 / p99, feed the
   events into [`createObservability`](./observability.md) instead.
 - **`reset()` does not stop the plugin.** It just clears the maps. Call
   `system.destroy()` to fully tear down.
@@ -164,11 +164,11 @@ mark the next event as the new baseline.
 
 ## See also
 
-- [`createObservability`](./observability.md) — agent-side metrics with
+- [`createObservability`](./observability.md) – agent-side metrics with
   percentiles, alerts, and OTLP export.
-- [`devtoolsPlugin`](./devtools.md) — same perf data, rendered in the
+- [`devtoolsPlugin`](./devtools.md) – same perf data, rendered in the
   floating panel's perf section.
-- [`loggingPlugin`](./logging.md) — per-event logs rather than rolled-up
+- [`loggingPlugin`](./logging.md) – per-event logs rather than rolled-up
   metrics.
-- [`createAuditLedger`](./audit-ledger.md) — events for compliance, not
+- [`createAuditLedger`](./audit-ledger.md) – events for compliance, not
   performance.

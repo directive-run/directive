@@ -33,7 +33,7 @@ sys.start();
 
 `crossModuleDeps` returns an object keyed by **target module**. Each
 target gets functions returning facts or derivations from other modules.
-The functions are called fresh each time the cache invalidates — they're
+The functions are called fresh each time the cache invalidates – they're
 *not* memoized at wire time.
 
 Inside `gameModule`, those wired functions are available as `deps`:
@@ -71,7 +71,7 @@ You need access to the system reference. Two ways to get it:
 ## Why not a `sendParent`/`sendChild` API?
 
 XState's hierarchical actor model models child-of-parent and sibling-of-sibling
-explicitly. Directive deliberately doesn't — the system tree is flat (modules
+explicitly. Directive deliberately doesn't – the system tree is flat (modules
 are peers under one `createSystem`), and "parent" / "child" are relationships
 you encode through `crossModuleDeps` plus event direction.
 
@@ -91,7 +91,7 @@ declares what `deps` it needs.
 ## Lifecycle
 
 When `sys.destroy()` runs, all modules destroy in reverse-declaration order.
-There's no per-module `unregisterModule()` today — if you need dynamic
+There's no per-module `unregisterModule()` today – if you need dynamic
 add/remove of modules at runtime, you're hitting the spawn-model gap (see
 [migrating from XState § spawnChild](../migrating-from-xstate.md#porting-from-xstates-spawnchild)
 for the workaround).
@@ -120,12 +120,12 @@ either knowing the other's internal shape.
 
 Don't fan a single event out to all modules unless you actually need that.
 The temptation: a "global" event bus that every module subscribes to.
-Resist it — explicit per-module dispatch is more legible and easier to
+Resist it – explicit per-module dispatch is more legible and easier to
 test. If you find yourself wanting a broadcast, that's usually a sign the
 event represents shared state that should live in its own module instead.
 
 ## See also
 
-- [Events API](../api/events.md) — `events.X(payload)` canonical form
+- [Events API](../api/events.md) – `events.X(payload)` canonical form
 - [Migrating from XState § spawnChild](../migrating-from-xstate.md#porting-from-xstates-spawnchild)
-- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) — items 22, 25, 26 on the spawn model
+- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) – items 22, 25, 26 on the spawn model

@@ -1,16 +1,16 @@
-# RFC 0002 — `unregisterModule()` + multi-instance modules
+# RFC 0002 – `unregisterModule()` + multi-instance modules
 
 - **Status:** Draft (2026-04-29)
 - **Author:** Jason Comes
 - **MIGRATION_FEEDBACK ref:** Item 26
-- **Related:** RFC 0001 (timer/clock — uses `defaultClock` per system)
+- **Related:** RFC 0001 (timer/clock – uses `defaultClock` per system)
 
 ## Summary
 
 Two related additions to Directive's composition API:
 
-1. **`system.unregisterModule(name)`** — runtime removal of a module from a live system, with defined cancellation semantics for in-flight resolvers.
-2. **Multi-instance module spawning** — register N copies of the same module under distinct names (`atomFamily`-style), produced from a single module factory.
+1. **`system.unregisterModule(name)`** – runtime removal of a module from a live system, with defined cancellation semantics for in-flight resolvers.
+2. **Multi-instance module spawning** – register N copies of the same module under distinct names (`atomFamily`-style), produced from a single module factory.
 
 Both surface the same underlying primitive: dynamic mutation of a system's module set after `start()`. Today the set is frozen at `createSystem` time.
 
@@ -78,7 +78,7 @@ The pair `(registerModule, unregisterModule)` lets the consumer add/remove modul
 
 ### `system.modules.<name>` access
 
-After `registerModule`, the new module is accessible via `sys.modules[name].events.X(payload)`, `sys.modules[name].facts.Y`, etc. — same shape as a static module.
+After `registerModule`, the new module is accessible via `sys.modules[name].events.X(payload)`, `sys.modules[name].facts.Y`, etc. – same shape as a static module.
 
 For TypeScript, dynamic names lose static typing. Two options:
 
@@ -87,11 +87,11 @@ For TypeScript, dynamic names lose static typing. Two options:
 
 Recommendation: loose typing as the default (matches the runtime reality), with a `typedRegister<S extends ModuleSchema>(name, def)` overload that returns the typed handle for that specific instance.
 
-## Cancellation semantics — the core design question
+## Cancellation semantics – the core design question
 
 Three viable models for in-flight resolver cancellation:
 
-### Option A — `AbortSignal` injected into `ctx.signal`
+### Option A – `AbortSignal` injected into `ctx.signal`
 
 ```ts
 resolvers: {
@@ -111,7 +111,7 @@ Resolvers that observe `signal` cancel cleanly. Resolvers that ignore it run to 
 
 **Cons:** silent drop of writes is debugging-hostile in dev. Mitigation: dev-mode warning when an unregistered module's resolver attempts a fact write.
 
-### Option B — Synchronous detach with hard cancel
+### Option B – Synchronous detach with hard cancel
 
 `unregisterModule` synchronously detaches the module's resolvers from the engine. In-flight Promise chains keep running but their writes never reach Directive's reactive layer.
 
@@ -119,7 +119,7 @@ Resolvers that observe `signal` cancel cleanly. Resolvers that ignore it run to 
 
 **Cons:** orphaned async work continues to run (network, CPU) with no way to stop it. For long-running resolvers (file uploads, multi-second LLM streams) this is bad.
 
-### Option C — Hybrid
+### Option C – Hybrid
 
 `unregisterModule` synchronously detaches AND fires the `AbortSignal`. Resolvers that observe `signal` cancel; those that don't continue but drop their writes.
 
@@ -145,7 +145,7 @@ If "auto-instantiate-on-read" becomes a real pattern, it becomes RFC 0003 layere
 
 ### Cross-module deps to dynamic instances
 
-`crossModuleDeps` in `createSystem` config is static — but RFC 0002's dynamic register/unregister means new modules need to be wired post-hoc. Two options:
+`crossModuleDeps` in `createSystem` config is static – but RFC 0002's dynamic register/unregister means new modules need to be wired post-hoc. Two options:
 
 **A.** Cross-module deps must be declared at register time:
 
@@ -185,7 +185,7 @@ There's NO automatic dependent-cleanup on parent unregister. If you want cascade
 
 **Proposal:** add `system.module.registered` + `system.module.unregistered` to `ObservationEvent`. Replay reconstructs a fresh system, then plays back the register/unregister calls in order, recreating the exact dynamic topology.
 
-Module factories must be **identifiable by stable name** for replay — when replay sees `system.module.registered`, it needs to look up the factory. Either:
+Module factories must be **identifiable by stable name** for replay – when replay sees `system.module.registered`, it needs to look up the factory. Either:
 
 - **A.** Replay requires the consumer to pre-register factories by name in `createSystem({ moduleFactories: { turn: createTurnModule, player: createPlayerModule } })`. The recorded event includes `factoryName` + `instanceName` + serialized input.
 - **B.** Module factories must be importable by ID; replay imports them dynamically. Bundler-hostile.
@@ -194,11 +194,11 @@ Recommend A.
 
 ## Open questions
 
-1. **`unsafeDynamicModules()` type-flip ergonomics** — verbose but honest. Better name?
+1. **`unsafeDynamicModules()` type-flip ergonomics** – verbose but honest. Better name?
 2. **Module-factory input must be JSON-serializable** for replay? Or only the visible schema state?
-3. **What happens if `registerModule` is called with a name that already exists?** Throw? Replace? Recommend: throw — caller should explicitly unregister first.
+3. **What happens if `registerModule` is called with a name that already exists?** Throw? Replace? Recommend: throw – caller should explicitly unregister first.
 4. **Memory:** if a consumer registers 10,000 dynamic modules without unregistering, the system grows unboundedly. Cap? Warn?
-5. **`system.observe()` subscriptions when modules unregister** — do existing subscribers continue to receive events from the remaining modules? (Yes — observation is system-scoped, not module-scoped.)
+5. **`system.observe()` subscriptions when modules unregister** – do existing subscribers continue to receive events from the remaining modules? (Yes – observation is system-scoped, not module-scoped.)
 
 ## Migration path
 
@@ -213,7 +213,7 @@ For existing code that hand-rolls `Map<id, System>` patterns, migration is one-b
 ```
 packages/core/src/core/
   system.ts            # add registerModule, unregisterModule
-  module-registry.ts   # new — factory-by-name lookup for replay
+  module-registry.ts   # new – factory-by-name lookup for replay
   types/system.ts      # add system.module.registered/unregistered
                        #     ObservationEvents
   resolvers.ts         # plumb ctx.signal through resolver invocations
@@ -236,6 +236,6 @@ This RFC is **draft**. Open for review. Defer implementation until:
 
 ## See also
 
-- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) — Item 22 (rejected — `createSystem({ modules })` IS the idiom for static composition); Item 26 (this RFC's predecessor).
-- [RFC 0001 — `t.timer({ms})`](./0001-t-timer.md) — `defaultClock` injection precedent for system-level config.
-- [`@directive-run/timeline`](../../packages/timeline/README.md) — replay determinism contract that depends on stable module identification.
+- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) – Item 22 (rejected – `createSystem({ modules })` IS the idiom for static composition); Item 26 (this RFC's predecessor).
+- [RFC 0001 – `t.timer({ms})`](./0001-t-timer.md) – `defaultClock` injection precedent for system-level config.
+- [`@directive-run/timeline`](../../packages/timeline/README.md) – replay determinism contract that depends on stable module identification.

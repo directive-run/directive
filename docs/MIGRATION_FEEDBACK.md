@@ -1,4 +1,4 @@
-# Directive — improvements + gaps surfaced from 22 XState→Directive cycles
+# Directive – improvements + gaps surfaced from 22 XState→Directive cycles
 
 Captured live during Workstream-B migrations of Minglingo's
 state-machine layer. Each item is a real friction point, with the
@@ -7,7 +7,7 @@ crystallized.
 
 ---
 
-## P0 — Blocked or surprised a session for >1 hour
+## P0 – Blocked or surprised a session for >1 hour
 
 ### 1. Resolver-flush test harness is undocumented (B-Cycle-2)
 
@@ -56,13 +56,13 @@ debugging detours. Caused by Vitest reflecting on Directive's fact
 proxy.
 
 **Proposal:** ensure proxies expose an iterable shape that the
-Vitest serializer can introspect — likely needs a `toJSON` or
+Vitest serializer can introspect – likely needs a `toJSON` or
 `Symbol.toPrimitive` on the proxy. Even a default that serializes
 to the underlying plain value would fix this.
 
 ---
 
-## P1 — Pattern friction recurring every cycle
+## P1 – Pattern friction recurring every cycle
 
 ### 4. No first-class `after` / declarative timer
 
@@ -110,14 +110,14 @@ must assert TERMINAL state, never intermediate. Easy footgun:
 ```ts
 sys.events.SKIP();
 await flushAsync(); // skipping → starting → started ALL fire
-expect(sys.facts.status).toBe('starting'); // ❌ FAILS — already 'started'
+expect(sys.facts.status).toBe('starting'); // ❌ FAILS – already 'started'
 ```
 **Proposal:** docs guide on "asserting against chained pipelines."
 Optional `system.settle({ until: 'idle' | 'next-yield' })` API.
 
 ---
 
-## P2 — Quality-of-life / docs gaps
+## P2 – Quality-of-life / docs gaps
 
 ### 8. No `t.string<UnionType>()` discoverability
 
@@ -149,7 +149,7 @@ nullable check.
 **Proposal:** investigate; possibly a proxy / strict-equality issue
 specific to the nullable wrapper. May overlap with #3.
 
-### 11. `hooks.onStop` only — no `onError` / `onUnhandled`
+### 11. `hooks.onStop` only – no `onError` / `onUnhandled`
 
 Cycles with multiple resolvers each individually try/catch. A
 module-level `hooks.onResolverError` would let us route failures to
@@ -166,7 +166,7 @@ Directive testing guide.
 
 ---
 
-## P3 — Minor / nice-to-have
+## P3 – Minor / nice-to-have
 
 ### 13. Fact-proxy reassignment via helper
 
@@ -205,12 +205,12 @@ hatch.
 | Document "deps inside derivations are not reactive" | doc only | C34 winValidation (canContest reading nowMs) |
 
 The two highest-leverage items by far are #1 (flushAsync export +
-testing docs) and #3 (proxy/serializer fix) — together they would
+testing docs) and #3 (proxy/serializer fix) – together they would
 have saved 4+ hours of debug time across the migration so far.
 
 ---
 
-## Item 16 — Derivations reading external state (e.g. clock) aren't reactive (B-Cycle-34)
+## Item 16 – Derivations reading external state (e.g. clock) aren't reactive (B-Cycle-34)
 
 In `winValidationModule`, `canContest` derivation reads `deps.nowMs()`
 inside its body:
@@ -222,7 +222,7 @@ canContest: (f) =>
 ```
 
 When the test ticks the clock forward (a fake `nowMs` impl), the
-derivation does NOT recompute — Directive's reactive system tracks
+derivation does NOT recompute – Directive's reactive system tracks
 fact dependencies, not closure-captured values. So `canContest`
 returns stale `true` even though the contest period should now be
 expired.
@@ -242,12 +242,12 @@ non-`facts` non-`derivations` arguments. Probably impossible to
 detect statically; could be a doc-only "derivation purity" rule.
 
 **Affected:** any time/clock/random derivation. Likely to bite
-realtime cluster cycles (45-54) heavily — those have polling/poll-
+realtime cluster cycles (45-54) heavily – those have polling/poll-
 through behavior.
 
 ---
 
-## Item 17 — Discriminated `pendingAction` is the de-facto pattern but unclaimed (B-Cycles 23, 24, 26, 30, 33, 36, 37, 38, 40, 41)
+## Item 17 – Discriminated `pendingAction` is the de-facto pattern but unclaimed (B-Cycles 23, 24, 26, 30, 33, 36, 37, 38, 40, 41)
 
 **The pattern that emerged organically in 10 cycles:**
 
@@ -266,11 +266,11 @@ events: (f, payload) => { f.pendingAction = {kind, ...payload}; f.status = 'muta
 Replaces N separate states + N separate resolvers. 10 cycles
 converged on it independently. It works, but:
 
-1. There's no first-class API for it — every cycle re-derives it.
+1. There's no first-class API for it – every cycle re-derives it.
 2. Tests have to re-derive `isVerifying`-style booleans as
    derivations (`status === 'mutating' && pendingAction?.kind === 'verify'`).
 3. The constraint `when` always reads `f.pendingAction !== null`
-   in addition to the status — duplicate gate.
+   in addition to the status – duplicate gate.
 4. Cycles where mutations have non-symmetric outcomes (C34, C39)
    abandon the pattern and pay a verbosity tax instead.
 
@@ -288,7 +288,7 @@ codebase = a real abstraction worth promoting.
 
 ---
 
-## Item 18 — `setInterval` / recurring-tick wiring has no canonical pattern (B-Cycles 5, 26, 27, 34, 35, 39)
+## Item 18 – `setInterval` / recurring-tick wiring has no canonical pattern (B-Cycles 5, 26, 27, 34, 35, 39)
 
 **Recurring shape:** consumer wires `setInterval(() => sys.events.TICK(), 1000)`
 while in some status, clears it on status change. Each cycle
@@ -312,7 +312,7 @@ surface. Module is cleanly testable but the consumer pays.
 
 ---
 
-## Item 19 — Optimistic update + rollback has a manual snapshot ceremony (B-Cycle-41)
+## Item 19 – Optimistic update + rollback has a manual snapshot ceremony (B-Cycle-41)
 
 `friendsManagementMachine` had 5 mutations that each:
 1. Snapshot 3 facts (`friends`, `pendingRequests`, `sentRequests`)
@@ -347,11 +347,11 @@ optimistic update" a single declaration.
 
 ---
 
-## Item 20 — `Set` and `Map` proxies break silently (B-Cycle-32)
+## Item 20 – `Set` and `Map` proxies break silently (B-Cycle-32)
 
 `gameCreationMachine` had `expandedSections: Set<string>` in its
 context. Directive proxy doesn't trap Set methods (`add`, `delete`,
-`has`) — they appear to work but the reactive system doesn't
+`has`) – they appear to work but the reactive system doesn't
 register the change. Switching to `string[]` with
 `includes`/filter restored reactivity.
 
@@ -369,7 +369,7 @@ C34 (Date again). This is the most-frequent-cycle limitation.
 
 ---
 
-## Item 21 — `t.string<UnionType>()` lost on payload union types (B-Cycle-25, C28)
+## Item 21 – `t.string<UnionType>()` lost on payload union types (B-Cycle-25, C28)
 
 ```ts
 events: {
@@ -390,11 +390,11 @@ document the pattern for "polymorphic event payload."
 
 ---
 
-## Item 22 — No first-class "spawn child module" idiom (B-Cycle-31)
+## Item 22 – No first-class "spawn child module" idiom (B-Cycle-31)
 
 `scheduleGameMachine` spawned a child `formMachine` via
 `spawnChild`. The Directive port ducked it via a `formAdapter`
-dep — consumer wires the form externally. Works, but:
+dep – consumer wires the form externally. Works, but:
 
 1. There's no Directive idiom for "this module owns a sub-module's
    lifecycle."
@@ -406,7 +406,7 @@ schema entry; the parent module's events can dispatch to the peer
 via `ctx.peers.form.send(...)`. This is in the master plan as a
 Wave-0 toolchain item but hasn't shipped.
 
-Will become critical for realtime cluster (Wave 9) — `hostGameMachine`
+Will become critical for realtime cluster (Wave 9) – `hostGameMachine`
 spawns 4 children, `partyLobbyMachine` spawns 1+. Without this
 the verbosity tax compounds.
 
@@ -417,7 +417,7 @@ the verbosity tax compounds.
 | Win | Effort | Cycles affected so far |
 |---|---|---|
 | Export `flushAsync` from testing helpers | 5 LOC + doc | every test harness |
-| Runtime warn on non-JSON fact values (Date/Set/Map/class) | 30 LOC | C4, C16, C32, C34 (4× — most frequent) |
+| Runtime warn on non-JSON fact values (Date/Set/Map/class) | 30 LOC | C4, C16, C32, C34 (4× – most frequent) |
 | Fix proxy serialization for vitest format | unknown | every test |
 | `t.mutator<DiscriminatedUnion>()` higher-level helper | medium | C23, C24, C26, C30, C33, C36-C38, C40, C41 (10×) |
 | Lead with `t.string<'a' \| 'b'>()` in docs | doc only | every status fact |
@@ -435,7 +435,7 @@ of mutator scaffolding from this codebase.
 
 ---
 
-## Item 23 — Same-constraint re-fire is suppressed within a flushAsync window (B-Cycle-43)
+## Item 23 – Same-constraint re-fire is suppressed within a flushAsync window (B-Cycle-43)
 
 **Important correction to Cycle-5 catalog claim** ("Chained
 constraint→resolver pipelines fire in same flushAsync window").
@@ -463,27 +463,27 @@ into two constraints with two requirement types (`EXECUTE_ACTION`
 - Workaround: split MFA-style chains into separate constraints.
   Pays an extra ~15-20 LOC per cycle that uses chained mutations.
 - C36 (tournament) has a `matchComplete` → `advancingPlayers`
-  chain that *appeared* to work — likely because the user
+  chain that *appeared* to work – likely because the user
   dispatches `MATCH_COMPLETE_DONE` between, breaking the
   same-constraint chain.
 
 **Proposal (ranked):**
 1. Document the constraint-dedup behavior in "chained pipelines"
-   guide — add a section "Same-constraint re-fire is NOT supported."
+   guide – add a section "Same-constraint re-fire is NOT supported."
 2. Optionally: provide a `ctx.requeue()` API inside the resolver
    so a resolver can explicitly request itself to be re-evaluated
    if facts have changed.
 3. Long-term: model "transitions" as their own primitive separate
    from constraints.
 
-This is a P0/P1 limitation — undocumented, easy to hit, hard to
+This is a P0/P1 limitation – undocumented, easy to hit, hard to
 debug (the test failure looked like the constraint's `when` was
 returning false, but it was actually returning true and being
 ignored).
 
 **Affected cycles going back:** any with chained mutations through
 one constraint. Likely C30 (templateCreation save→reload), C40
-(spacesAdmin mutation→loading), and others — they "work" by
+(spacesAdmin mutation→loading), and others – they "work" by
 dispatching the next event from the user side, not via resolver-
 chained transition.
 
@@ -504,7 +504,7 @@ The most-bitten limitations after 43 cycles:
 
 ---
 
-## Item 24 — Map-in-fact silently breaks reactivity (B-Cycle-52)
+## Item 24 – Map-in-fact silently breaks reactivity (B-Cycle-52)
 
 Sibling to Item 20 (Date-in-fact), Item 32 (Set-in-fact). Discovered
 during turnMachine port:
@@ -519,7 +519,7 @@ submissions: Record<string, TurnSubmissionFact>  // ✓ JSON-friendly
 
 The Map appeared to work but `submissions.set(userId, sub)` mutations
 weren't observed by Directive's reactive system. Same root cause
-as Item 20 — non-JSON-roundtrippable values break the proxy. The
+as Item 20 – non-JSON-roundtrippable values break the proxy. The
 **JSON-fact rule** is now confirmed across 4 distinct shapes:
 - Date instances (4 cycles: C4, C16, C46, C48)
 - Set<T> (1 cycle: C32)
@@ -532,7 +532,7 @@ specifically. Most-bitten limitation by far.
 
 ---
 
-## Item 25 — Parent-event mechanism (`sendParent`) requires callback-shaped workaround (B-Cycle-31, C44, C51, C52)
+## Item 25 – Parent-event mechanism (`sendParent`) requires callback-shaped workaround (B-Cycle-31, C44, C51, C52)
 
 `turnMachine` had 10+ different `sendParent({...})` calls. XState
 spawns child machines that emit events to parents. Directive has
@@ -585,7 +585,7 @@ silent-failure modes (Items 20, 23, 25).
 
 ---
 
-## Item 26 — Spawning model: corrected analysis (post-Cycle-52 review)
+## Item 26 – Spawning model: corrected analysis (post-Cycle-52 review)
 
 This entry **corrects and supersedes** Items 22 and 25 in part.
 After investigating Directive's actual multi-module APIs, the
@@ -593,9 +593,9 @@ After investigating Directive's actual multi-module APIs, the
 
 ### What Directive HAS for module composition
 
-1. **Namespaced multi-module systems** — `createSystem({ modules: { auth: authModule, data: dataModule } })`. Each module gets its own namespace; facts/derivations/events accessible via `system.facts.auth.*`, `system.events.data.*`. Composes declaratively.
+1. **Namespaced multi-module systems** – `createSystem({ modules: { auth: authModule, data: dataModule } })`. Each module gets its own namespace; facts/derivations/events accessible via `system.facts.auth.*`, `system.events.data.*`. Composes declaratively.
 
-2. **`crossModuleDeps`** — A module can declare typed dependencies on other modules' schemas:
+2. **`crossModuleDeps`** – A module can declare typed dependencies on other modules' schemas:
    ```ts
    createModule('data', {
      crossModuleDeps: { auth: authSchema },
@@ -609,30 +609,30 @@ After investigating Directive's actual multi-module APIs, the
    ```
    At runtime: `facts.self.*` for own module, `facts.{depName}.*` for deps.
 
-3. **`registerModule()` at runtime** — Both single-module and namespaced systems support adding new modules into a RUNNING system. Perfect for lazy-loaded features:
+3. **`registerModule()` at runtime** – Both single-module and namespaced systems support adding new modules into a RUNNING system. Perfect for lazy-loaded features:
    ```ts
    system.registerModule('chat', chatModule);
    ```
 
-4. **Union events** — Cross-module dispatch works via `system.dispatch({ type: 'auth::LOGIN', ... })`. Each module's events are routed to that module.
+4. **Union events** – Cross-module dispatch works via `system.dispatch({ type: 'auth::LOGIN', ... })`. Each module's events are routed to that module.
 
-5. **Init order strategies** — `initOrder: 'auto'` topologically sorts by `crossModuleDeps`; `'declaration'` uses object key order; or pass an explicit string array.
+5. **Init order strategies** – `initOrder: 'auto'` topologically sorts by `crossModuleDeps`; `'declaration'` uses object key order; or pass an explicit string array.
 
 ### What Directive does NOT have for spawning
 
 The XState patterns that DON'T have a 1:1 Directive equivalent:
 
-1. **N instances of the same module** — Each namespace is unique. You can't have `turn-1`, `turn-2`, `turn-3` of the same `turnModule` schema running simultaneously without explicit registration of each as a separate namespace. XState's `spawn(turnFactory, {input})` per child has no direct map.
+1. **N instances of the same module** – Each namespace is unique. You can't have `turn-1`, `turn-2`, `turn-3` of the same `turnModule` schema running simultaneously without explicit registration of each as a separate namespace. XState's `spawn(turnFactory, {input})` per child has no direct map.
 
-2. **`unregisterModule()` / lifecycle teardown** — `registerModule` exists; the inverse does NOT. Once registered, a module cannot be removed. Memory grows monotonically.
+2. **`unregisterModule()` / lifecycle teardown** – `registerModule` exists; the inverse does NOT. Once registered, a module cannot be removed. Memory grows monotonically.
 
-3. **`sendParent` with payload** — Cross-module dispatch via `system.dispatch` works, but a *child module's resolver* dispatching upward to a *specific named parent* is not idiomatic. The recommended pattern is for the consumer to read child facts and dispatch parent events from the React component.
+3. **`sendParent` with payload** – Cross-module dispatch via `system.dispatch` works, but a *child module's resolver* dispatching upward to a *specific named parent* is not idiomatic. The recommended pattern is for the consumer to read child facts and dispatch parent events from the React component.
 
 ### Practical port strategies
 
 For the W9 realtime cluster (3 remaining machines):
 
-**Strategy A — Multi-module composition (preferred for 1:N child sets):**
+**Strategy A – Multi-module composition (preferred for 1:N child sets):**
 ```ts
 const system = createSystem({
   modules: {
@@ -647,22 +647,22 @@ const system = createSystem({
 ```
 This is the right shape for `hostGameMachine` (parent) + 4 children. No callback-dep ceremony. ALL of my Cycles 35/36/37/49/51/52 should have been ports of CHILDREN that compose into a parent system, not standalone modules with callback deps.
 
-**Strategy B — Single-instance reset for ephemeral children:**
+**Strategy B – Single-instance reset for ephemeral children:**
 For `turnBasedGame` spawning a fresh `turnMachine` per turn: keep ONE `turn` namespace; reset facts on turn change instead of spawning a new namespace. The lifecycle is "1 module, N reset cycles" rather than "N module instances."
 
-**Strategy C — Dynamic registration for lazy/optional features:**
+**Strategy C – Dynamic registration for lazy/optional features:**
 For features that may or may not exist (e.g., a tournament bracket that only some games have), use `system.registerModule('tournament', mod)` when needed. Memory leak caveat: never use this for short-lived features.
 
 ### Revised Item 22 + 25 status
 
-- **Item 22 (spawn-child idiom)**: NOT a missing feature. The idiom is `createSystem({ modules: ... })` + `crossModuleDeps`. The gap is in DOCS — there's no "porting from XState's spawnChild" guide. **Downgrade severity: P2 docs gap, not P0 missing primitive.**
+- **Item 22 (spawn-child idiom)**: NOT a missing feature. The idiom is `createSystem({ modules: ... })` + `crossModuleDeps`. The gap is in DOCS – there's no "porting from XState's spawnChild" guide. **Downgrade severity: P2 docs gap, not P0 missing primitive.**
 - **Item 25 (sendParent → callback workaround)**: PARTIAL gap. Cross-module dispatch works but isn't ergonomic for "child fires named event at named parent." The callback-dep pattern is a valid workaround, just less elegant than XState's `sendParent`. **Downgrade severity: P2 ergonomics, not P0 missing primitive.**
 
 ### Real remaining gaps (the actual spawn limitations)
 
-1. **No `unregisterModule()`** — registered modules persist for system lifetime. Real limitation for any code path that wants to "kill a child."
-2. **No multi-instance same-namespace** — can't run 5 instances of `turnModule` concurrently, each with its own facts. Workaround: re-design as a list-of-turns in a single module.
-3. **Cross-module event ergonomics** — sending a typed event from module A's resolver to module B's event handler is verbose compared to sendParent. Could be solved with a `ctx.system.dispatch` helper that's typed.
+1. **No `unregisterModule()`** – registered modules persist for system lifetime. Real limitation for any code path that wants to "kill a child."
+2. **No multi-instance same-namespace** – can't run 5 instances of `turnModule` concurrently, each with its own facts. Workaround: re-design as a list-of-turns in a single module.
+3. **Cross-module event ergonomics** – sending a typed event from module A's resolver to module B's event handler is verbose compared to sendParent. Could be solved with a `ctx.system.dispatch` helper that's typed.
 
 ### Migration policy (for cycles 53-55)
 
@@ -681,7 +681,7 @@ read this entire feedback doc and converged on the per-item verdicts below.
 Each item carries a final ship/defer/reject decision and a target landing
 location.
 
-## P0 SHIP — strictly additive, no BC risk, ship first
+## P0 SHIP – strictly additive, no BC risk, ship first
 
 | # | Item | Where | LOC | Why P0 |
 |---|---|---|---|---|
@@ -691,9 +691,9 @@ location.
 | 18 | `useTickWhile` React hook | @directive-run/react | ~15 | 8× cycles consumer-side, no core impact |
 | 20 | JSON-fact runtime warning | core | ~30 | Highest-leverage (8× silent breakage). WARN not coerce. |
 | 21 | `t.union<a\|b\|c>()` | core (schema-builders) | ~10 | Trivial; fills real type-safety gap |
-| 23 | Same-constraint re-fire docs + `ctx.requeue()` | core + docs | ~25 | P0 silent stall. DO NOT lift suppression — ship explicit opt-in only |
+| 23 | Same-constraint re-fire docs + `ctx.requeue()` | core + docs | ~25 | P0 silent stall. DO NOT lift suppression – ship explicit opt-in only |
 
-## SHIP DOCS — pure documentation, no code change
+## SHIP DOCS – pure documentation, no code change
 
 | # | Item | Doc target |
 |---|---|---|
@@ -709,21 +709,21 @@ location.
 | 25 | Cross-module dispatch ergonomics | docs/composition/cross-module-events.md |
 | 26 | "Porting from XState's spawnChild" | docs/migrating-from-xstate.md |
 
-## HELPER PACKAGES — SHIPPED 2026-04-29
+## HELPER PACKAGES – SHIPPED 2026-04-29
 
 | # | Item | Package | Status |
 |---|---|---|---|
 | 17 | `t.mutator<DiscriminatedUnion>()` | `@directive-run/mutator@0.1.0` | **SHIPPED.** Six-fragment spread API (`facts`/`events`/`requirements`/`eventHandlers`/`constraints`/`resolvers`); `mutate(kind, payload)` typed dispatch helper; `'pending' \| 'running' \| 'failed'` status union; proto-pollution-guarded handler lookup; truncated error capture. Pre-req `ctx.requeue` shipped (Item #23). Hardened through R1+R2 AE review. |
-| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic@0.1.0` | **SHIPPED.** `createSnapshot(facts, keys)` + `withOptimistic<F>(keys)(handler)` curried HOC. Atomic capture (R2 fix); throws typed `OptimisticCloneError` on non-cloneable shape rather than silently mis-restoring. Resolver-scope only — NOT a system-wide tx. |
+| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic@0.1.0` | **SHIPPED.** `createSnapshot(facts, keys)` + `withOptimistic<F>(keys)(handler)` curried HOC. Atomic capture (R2 fix); throws typed `OptimisticCloneError` on non-cloneable shape rather than silently mis-restoring. Resolver-scope only – NOT a system-wide tx. |
 
-## RFC — design / partial-ship
+## RFC – design / partial-ship
 
 | # | Item | Status |
 |---|---|---|
 | 4 | `t.timer({ms})` declarative timer | **v0.1 SHIPPED 2026-04-29.** RFC 0001 drafted; v0.1 ships the value layer (`SignalClock` interface, `realClock`/`virtualClock`/`defaultClock` factories, `TimerFactState` + pure transition helpers + `timerOps()` bundle). Engine-integrated `t.timer({ms})` schema constructor remains the v0.2 deliverable. v0.1 already obviates `vi.useFakeTimers` for module-side timer logic (use `virtualClock` + `advanceBy`); `useTickWhile` (#18) is now consumer-side polish only; clock-in-derivation (#16) is correct via `clock.now()` capture at module-factory time. |
 | 26 | `unregisterModule()` + multi-instance | Open. Cancellation semantics for in-flight resolvers; identity for N-of-same-schema (atomFamily-style). |
 
-## REJECT — would compromise framework design
+## REJECT – would compromise framework design
 
 | # | Item | Why reject |
 |---|---|---|
@@ -737,7 +737,7 @@ location.
 |---|---|---|
 | 2 | Date corruption | Subsumed → #20 |
 | 6 | Discriminated payload binding | Subsumed → #17 (helper) |
-| 10 | `nullable()` equality oddity | **CLOSED 2026-04-29** — investigation reproduction (`packages/core/src/core/__tests__/nullable-equality.test.ts`, 7 tests covering direct equality, derivation reads, nullable objects/arrays, rapid set/clear cycles, multi-fact composition, init paths) all pass. Item 10 was either a B-Cycle-9 developer-side bug or got incidentally fixed by another P0 ship. No framework change required. |
+| 10 | `nullable()` equality oddity | **CLOSED 2026-04-29** – investigation reproduction (`packages/core/src/core/__tests__/nullable-equality.test.ts`, 7 tests covering direct equality, derivation reads, nullable objects/arrays, rapid set/clear cycles, multi-fact composition, init paths) all pass. Item 10 was either a B-Cycle-9 developer-side bug or got incidentally fixed by another P0 ship. No framework change required. |
 | 24 | Map-in-fact | Subsumed → #20 |
 
 ---
@@ -747,16 +747,16 @@ location.
 The Innovation reviewer found 3 items that, if reframed, become viral-demo
 material rather than incremental fixes:
 
-1. **Time-travel Test REPL** (reframe #1+#3+#7) — Vitest reporter that
+1. **Time-travel Test REPL** (reframe #1+#3+#7) – Vitest reporter that
    auto-opens a scrubbable causal-graph timeline on every test failure.
    Built on Directive's existing causal cache. **The lead.** No other state
    library has this. ETA: 1 week prototype.
 
-2. **`t.mutator<>` with built-in optimistic + rollback** (reframe #17) —
+2. **`t.mutator<>` with built-in optimistic + rollback** (reframe #17) –
    RTK Query's `createApi` energy. 80 lines of optimistic boilerplate
    collapse to 8. ETA: 2 weeks polished.
 
-3. **Static analysis for silent stalls** (reframe #23) — IDE catches
+3. **Static analysis for silent stalls** (reframe #23) – IDE catches
    re-fire deadlocks at build time. ETA: 1 month (real flow analysis).
 
 ---
@@ -770,7 +770,7 @@ of `sendParent`). Future ships would simplify them, not break them.
 | Directive ships | Minglingo cleanup | LOC saved |
 |---|---|---|
 | #1 (flushAsync) | Replace 55 local impls with one import | ~275 |
-| #20 (JSON warn) | No rework — workarounds stay correct | 0 |
+| #20 (JSON warn) | No rework – workarounds stay correct | 0 |
 | #17 (mutator helper) | 12 modules collapse `pendingAction` ceremony | ~600 |
 | #18 (useTickWhile) | ~6 React hooks consolidate | consumer-side |
 | #23 (ctx.requeue) | C43 authModule MFA can re-merge constraints | ~30 |
@@ -780,20 +780,20 @@ of `sendParent`). Future ships would simplify them, not break them.
 
 ## Track Sequence
 
-**Track A** — Directive ships (~1 week per phase, sequential):
+**Track A** – Directive ships (~1 week per phase, sequential):
 - Phase 1: 7 P0 items
 - Phase 2: 11 docs items
 - Phase 3: Helper packages (mutator + optimistic)
 - Phase 4: `t.timer()` RFC → implementation
 - Phase 5: Time-travel REPL (the Sherlock)
 
-**Track B** — Minglingo rollout (parallel, 2-4 weeks):
+**Track B** – Minglingo rollout (parallel, 2-4 weeks):
 - Wire `MINGLINGO_DIRECTIVE_<X>` feature flags
 - Migrate React surfaces (`useMachine` → `@directive-run/react`)
 - Per-module 7-day soaks
 - Monitor production divergence
 
-**Track C** — Migration retrospective (parallel, ~1 week):
+**Track C** – Migration retrospective (parallel, ~1 week):
 - Per-cycle pattern catalog → docs/migrating-from-xstate.md
 - Promote derivation-composition (#9) to top-of-docs
 - Publish the 26-item learnings as a blog post

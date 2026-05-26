@@ -1,4 +1,4 @@
-# Session Handoff — 2026-04-29
+# Session Handoff – 2026-04-29
 
 This doc closes a long working session. The next session can read this
 file alone to pick up cold context.
@@ -29,7 +29,7 @@ all bump together regardless of which one had a real change.
 | `@directive-run/knowledge` | No real changes; locked |
 | `@directive-run/claude-plugin` | No real changes; locked |
 
-### First publishes (no version bump — declared at v0.1.0 / v0.2.0 in package.json)
+### First publishes (no version bump – declared at v0.1.0 / v0.2.0 in package.json)
 These have no changesets but `pnpm changeset publish` detects they
 aren't on npm yet and ships them.
 
@@ -64,7 +64,7 @@ When you merge that PR, the same workflow re-runs and this time
 
 1. Bumps versions per the now-consumed changesets.
 2. Generates CHANGELOG.md entries from the changeset bodies.
-3. `npm publish` for everything that's now ahead of npm — including
+3. `npm publish` for everything that's now ahead of npm – including
    the three new packages whose version simply doesn't exist on npm
    yet.
 4. Creates GitHub Releases.
@@ -77,11 +77,11 @@ already references it.
 - ✅ Working tree clean (just worktree `m` markers, untracked).
 - ✅ 30 commits ahead of `origin/main`.
 - ✅ All 14 publishable packages build clean (`pnpm -r --filter './packages/*' build`).
-- ✅ Test suite: 3,996 / 3,997 (1 skipped, 0 failures) — `npx vitest run`.
+- ✅ Test suite: 3,996 / 3,997 (1 skipped, 0 failures) – `npx vitest run`.
 - ✅ Three pending changesets:
-  - `dts-emit-fix.md` — core patch
-  - `timer-v0-1.md` — core minor (wins; group bumps to 1.3.0)
-  - `timeline-replay-scaffold.md` — timeline minor
+  - `dts-emit-fix.md` – core patch
+  - `timer-v0-1.md` – core minor (wins; group bumps to 1.3.0)
+  - `timeline-replay-scaffold.md` – timeline minor
 
 ## What just shipped this session (16 commits)
 
@@ -89,7 +89,7 @@ already references it.
 |---|---|---|
 | 1 | `2e28ca66` | DTS-emit fix |
 | 2 | `29d2a0db` | 11 SHIP DOCS files (testing, patterns, API, composition, migration) |
-| 3 | `0f486d37` | RFC 0001 — `t.timer({ms})` |
+| 3 | `0f486d37` | RFC 0001 – `t.timer({ms})` |
 | 4 | `c358498b` | `@directive-run/mutator@0.1.0` |
 | 5 | `e8c42ab8` | `@directive-run/optimistic@0.1.0` |
 | 6 | `7ab11e43` | `@directive-run/timeline@0.1.0` |
@@ -107,7 +107,7 @@ already references it.
 
 In rough priority order. Each is its own dedicated session.
 
-### A — `t.timer({ms})` v0.2 engine integration
+### A – `t.timer({ms})` v0.2 engine integration
 RFC 0001's deferred half. Engine subscribes to the SignalClock,
 ticks timer facts directly, eliminates the consumer-side
 `setInterval(() => sys.events.TICK())` from the v0.1 pattern.
@@ -117,56 +117,56 @@ ticks timer facts directly, eliminates the consumer-side
 - Replay determinism for engine-emitted timer ticks
 - AE-review-loop on the new surface
 
-### B — RFC 0002 implementation (`unregisterModule()` + multi-instance)
+### B – RFC 0002 implementation (`unregisterModule()` + multi-instance)
 Drafted in `docs/rfcs/0002-unregister-and-multi-instance.md`. Needs
 AE-review-loop on the doc + at least one concrete Minglingo
 prototype before implementation. Estimated 2-3 weeks per the RFC.
 Best-fit prototype: `turnMachine`-per-turn pattern from the
 realtime cluster.
 
-### C — R1.A v0.2 (auto-derived vitest source codegen)
+### C – R1.A v0.2 (auto-derived vitest source codegen)
 The scaffold that shipped this session reconstructs and replays
 dispatches. v0.2 generates a vitest source file from a serialized
 timeline:
 - `directive replay <id>.json` CLI
 - `vi.mock(...)` stub generation from recorded `resolver.start` /
   `resolver.complete` pairs
-- Determinism gate — assert replay's frame stream matches input
+- Determinism gate – assert replay's frame stream matches input
   byte-for-byte
 - Updates `@directive-run/cli`
 
-### D — R1.B causal-graph vitest matchers
+### D – R1.B causal-graph vitest matchers
 `expect(timeline).toReachIn(N).ms('status', 'ready')` etc. New
 package: `@directive-run/timeline-matchers`. ~2 days per the
 innovation review.
 
-### E — R1.C `defineMutator.cancellable()`
+### E – R1.C `defineMutator.cancellable()`
 AbortSignal plumbing through mutator handlers + supersession-aware
 cancellation. Closes type-ahead/debounce/throttle/dedup as 3-line
 declarations. ~2 days. Needs RFC 0001 v0.2 (engine timer
 integration) for the timeout side.
 
-### F — R1.D live timeline scrubber UI
+### F – R1.D live timeline scrubber UI
 WebSocket-streamed `system.observe()` + browser scrubber. ~1 week.
 The HN front-page screenshot.
 
-### G — R1.E `defineMutator.invariant(...)`
+### G – R1.E `defineMutator.invariant(...)`
 Inline state-machine spec compiled into a constraint. ~1 week.
 Risky scope creep; needs aggressive cap on surface (one invariant
 per mutation, no nesting).
 
-### H — Minglingo XState legacy sweep (54 machines)
+### H – Minglingo XState legacy sweep (54 machines)
 Each machine has consumer-side `useMachine(...)` calls that need
 provider-refactor (the same shape as the `NotificationProvider` work
 already done). ~30-60 minutes per cycle × 54. Multi-session. Pre-launch
-priority is low — the duplicate-path code isn't shipping to users.
+priority is low – the duplicate-path code isn't shipping to users.
 
-### I — Kite ↔ Minglingo integration (Workstream A from the original 12-week plan)
+### I – Kite ↔ Minglingo integration (Workstream A from the original 12-week plan)
 12 weeks. Phase 1 (local adapter) → Phase 2 (Postgres-coord dev only)
 → Phase 3 (CF DO authoritative party + game runtimes). Paused since
 Minglingo isn't launched. Unblocks when product launches.
 
-### J — IntentKit
+### J – IntentKit
 Your primary CWD project. `STATUS.md` at
 `/Users/jasonwcomes/Desktop/Sizls/projects/intentkit/STATUS.md` is
 authoritative. Whatever is next on its roadmap is its own session
@@ -174,10 +174,10 @@ focus.
 
 ## Minglingo state at session close
 
-- 3 commits ahead — flushAsync migration (`c496727`), outliers
+- 3 commits ahead – flushAsync migration (`c496727`), outliers
   cleanup (`a1719ae`), pre-launch single-Directive notification
   provider with `useFact`/`useDerived` (`3736c80`).
-- 53 XState machines still coexist with their Directive ports — see
+- 53 XState machines still coexist with their Directive ports – see
   Track H above.
 - Working tree has unrelated dirty state in `.claude/` that I left
   untouched.
@@ -202,5 +202,5 @@ based on priority + available time.
 
 ## Last green test count
 
-`3996 / 3997 (1 skipped, 0 failures)` — `npx vitest run` from
+`3996 / 3997 (1 skipped, 0 failures)` – `npx vitest run` from
 `/Users/jasonwcomes/Desktop/Sizls/projects/directive`.

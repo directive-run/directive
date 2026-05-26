@@ -3,16 +3,16 @@
 Derivations are computed reads over facts. They're memoized via the causal
 cache: a derivation that reads `facts.a + facts.b` only recomputes when `a`
 or `b` change. This is one of Directive's biggest wins over hand-rolled
-reactivity — and it has rules.
+reactivity – and it has rules.
 
 ## The two rules
 
 1. **Derivations must be pure.** No side effects, no clock reads, no
    `Math.random()`, no environment reads.
-2. **Derivations can compose with other derivations** — the cache propagates
+2. **Derivations can compose with other derivations** – the cache propagates
    correctly.
 
-Break rule 1 and the cache returns stale values. Break rule 2 — well, you
+Break rule 1 and the cache returns stale values. Break rule 2 – well, you
 can't, the engine handles it. But naming it explicitly is worth a section.
 
 ## Pure derivations
@@ -52,7 +52,7 @@ hooks subscribe to leaves and re-render only when ancestor facts change.
 ## Anti-pattern: clock reads in derivations
 
 ```ts
-// ❌ broken — derivation reads Date.now()
+// ❌ broken – derivation reads Date.now()
 derivation.create('isStale', ({ facts }) =>
   Date.now() - facts.lastUpdatedMs > 5000,
 );
@@ -84,13 +84,13 @@ useTickWhile(sys, () => true, 'TICK', 1000);
 Now the cache knows `nowMs` changed. The derivation invalidates correctly.
 
 A future `t.timer({ms})` schema primitive (RFC) would let you skip the
-manual ticking — declare a "this fact represents elapsed time since X" and
+manual ticking – declare a "this fact represents elapsed time since X" and
 the engine handles re-evaluation. Until then, the manual tick is the answer.
 
 ## Anti-pattern: side effects in derivations
 
 ```ts
-// ❌ broken — derivation logs
+// ❌ broken – derivation logs
 derivation.create('count', ({ facts }) => {
   console.log('recomputing count'); // side effect
   return facts.items.length;
@@ -98,7 +98,7 @@ derivation.create('count', ({ facts }) => {
 ```
 
 Derivations may compute many times during dev (devtools subscriptions,
-StrictMode double-render). Logs, fetches, dispatches — none of these belong.
+StrictMode double-render). Logs, fetches, dispatches – none of these belong.
 
 If you want to react to a derivation changing, use a constraint:
 
@@ -114,8 +114,8 @@ constraint.create({
 
 ## Reading external state (the hard case)
 
-If a derivation truly needs external state — say, "is the user authenticated"
-where auth lives in a context outside Directive — make it a fact, not a
+If a derivation truly needs external state – say, "is the user authenticated"
+where auth lives in a context outside Directive – make it a fact, not a
 derivation. Wire the external state in via a subscription:
 
 ```tsx
@@ -151,12 +151,12 @@ Adding a new item to `facts.items` re-renders `<ItemCount />`. Changing
 
 Derivation composition (#9 in MIGRATION_FEEDBACK) is the single most
 under-documented Directive feature. Most newcomers' first reaction is "this
-is just a getter" — until they see derivations reading derivations and
+is just a getter" – until they see derivations reading derivations and
 realize the whole point. If you take one thing from this page: lead with
 `derive: ({ derive }) => derive.X && derive.Y` in your own examples.
 
 ## See also
 
-- [Migrating from XState — concept mapping](./migrating-from-xstate.md#tldr-concept-mapping)
-- [Internal events](./patterns/internal-events.md) — `status` as discriminator
-- [Fake timers](./testing/fake-timers.md) — when intervals matter
+- [Migrating from XState – concept mapping](./migrating-from-xstate.md#tldr-concept-mapping)
+- [Internal events](./patterns/internal-events.md) – `status` as discriminator
+- [Fake timers](./testing/fake-timers.md) – when intervals matter

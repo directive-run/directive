@@ -32,7 +32,7 @@ majority of real modules.
 ## When 3 deep isn't enough
 
 Long chains (4+ sequential resolvers) need an additional `flushAsync()` call
-per extra step. There's no penalty — `flushAsync` is idempotent on a settled
+per extra step. There's no penalty – `flushAsync` is idempotent on a settled
 system.
 
 ```ts
@@ -42,14 +42,14 @@ await flushAsync(); // 4th resolver waits one more tick
 expect(sys.facts.status).toBe('done');
 ```
 
-If you need this often, your module is likely doing too much in one cycle —
+If you need this often, your module is likely doing too much in one cycle –
 consider whether the steps belong in different modules or whether some can
 collapse into derivations.
 
 ## The same-constraint re-fire stall
 
 This is the #1 reason a Directive test silently hangs. A constraint cannot
-re-fire itself within the same `flushAsync` window — the engine deduplicates
+re-fire itself within the same `flushAsync` window – the engine deduplicates
 to prevent infinite loops.
 
 **Symptom:** assertion after `flushAsync()` times out at vitest's default
@@ -69,7 +69,7 @@ constraint.create({
     facts.queue = facts.queue.slice(1);
     process(next);
     if (facts.queue.length > 0) {
-      ctx.requeue(); // explicit opt-in — same constraint will re-fire
+      ctx.requeue(); // explicit opt-in – same constraint will re-fire
     }
   },
 });
@@ -87,14 +87,14 @@ trigger facts. The pattern that almost always works:
 
 Derivations recompute lazily. Reading `sys.derive.X` triggers the read.
 Reading `sys.facts.X` returns the stored value. After `flushAsync()` both are
-stable — but if you read derivations during the chain (mid-flush) they may
+stable – but if you read derivations during the chain (mid-flush) they may
 return stale values. Always assert *after* the await.
 
 ## Don't `vi.useFakeTimers()` mid-flush
 
 Directive's resolver scheduler uses real microtasks. Fake timers freeze the
 microtask queue and starve resolvers. Use fake timers only when you have an
-**imperative** `setTimeout` in the consumer (like a `useTickWhile` interval) —
+**imperative** `setTimeout` in the consumer (like a `useTickWhile` interval) –
 not inside the module's resolver chain.
 
 See [fake timers](./fake-timers.md) for the supported pattern.
@@ -136,6 +136,6 @@ scheduler changes; a local copy will drift.
 
 ## See also
 
-- [`@directive-run/core/testing`](https://www.npmjs.com/package/@directive-run/core) — full testing exports
-- [Fake timers](./fake-timers.md) — `vi.useFakeTimers()` integration
+- [`@directive-run/core/testing`](https://www.npmjs.com/package/@directive-run/core) – full testing exports
+- [Fake timers](./fake-timers.md) – `vi.useFakeTimers()` integration
 - [Migrating from XState § same-constraint re-fire](../migrating-from-xstate.md#same-constraint-re-fire-the-silent-stall)

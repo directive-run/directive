@@ -1,21 +1,21 @@
-# DevTools — whenExplain clause panel
+# DevTools – whenExplain clause panel
 
 > The devtools panel renders the per-clause ✓/✗ breakdown for every
 > data-form `when` constraint, live, color-coded, updating in place.
 > Look at one panel section and immediately know which clause is the
-> blocker — and what value would unblock it.
+> blocker – and what value would unblock it.
 
 ## The problem
 
 A constraint's `when:` clause is a black box in most state libraries.
-Your XState guard is a function — when the transition doesn't fire, you
+Your XState guard is a function – when the transition doesn't fire, you
 get to print-debug your way to "ah, `elapsed` was 20, not ≥30." Redux
 selectors are worse: a chain of memoized boolean ANDs, none of which
 explain *which* AND failed.
 
 Directive's data-form `when` is a *structural predicate*: not opaque
 code, but a JSON tree of operators and values. The runtime already walks
-that tree to compute the boolean — the only thing missing was a way to
+that tree to compute the boolean – the only thing missing was a way to
 see the walk.
 
 ## The panel
@@ -54,7 +54,7 @@ The Constraints section shows:
 - **Header mark** (`✓`/`✗`): is the constraint currently active?
 - **Per-clause mark**: is each clause passing?
 - **Failed clause adds `(actual: X)`**: see the real value beside the
-  expected one — no need to cross-reference Facts.
+  expected one – no need to cross-reference Facts.
 
 The tree updates in place on every re-evaluation. Mutate the watched
 fact and the colors flip live.
@@ -93,7 +93,7 @@ their children:
 
 ## Function-form `when`
 
-A `when:` that's a function — not a predicate — still appears in the
+A `when:` that's a function – not a predicate – still appears in the
 panel, but without a clause tree:
 
 ```
@@ -109,7 +109,7 @@ The clause tree is a *property of the data form*. Migrate to a data
 
 The panel's clause walk only runs when at least one plugin is attached
 (`hasPlugins()` gate in the engine). Production builds with no plugins
-pay zero cost — the `whenExplain` payload is never computed.
+pay zero cost – the `whenExplain` payload is never computed.
 
 When the devtools plugin *is* attached, the cost is one
 `evaluatePredicateExplained` call per constraint evaluation, which is

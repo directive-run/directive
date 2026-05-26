@@ -40,7 +40,7 @@ export {};
 ```
 
 This makes the import succeed. The module under test still gets the real
-behavior in the dev server / production — only vitest sees the no-op.
+behavior in the dev server / production – only vitest sees the no-op.
 
 ## Per-test environment override
 
@@ -63,7 +63,7 @@ clock) via constructor injection. The Next.js layer wires up the real server
 fetchers; tests wire in-memory fakes:
 
 ```ts
-// xModule.ts — pure, no server-only imports
+// xModule.ts – pure, no server-only imports
 export interface XModuleDeps {
   loadX: () => Promise<X[]>;
 }
@@ -72,7 +72,7 @@ export const createXModule = (deps: XModuleDeps) => createModule(...);
 ```
 
 ```ts
-// app/page.tsx (Server Component) — wires the real fetcher
+// app/page.tsx (Server Component) – wires the real fetcher
 import 'server-only';
 import { db } from '@/lib/db';
 
@@ -84,7 +84,7 @@ const sys = createSystem({
 ```
 
 ```ts
-// xModule.test.ts — wires a fake
+// xModule.test.ts – wires a fake
 const sys = createSystem({
   module: createXModule({
     loadX: async () => [{ id: '1' }],
@@ -98,7 +98,7 @@ the escape hatch for codebases that aren't ready to refactor.
 ## App Router caveat: `'use server'` files
 
 A file with `'use server'` at the top exports server actions. These can't be
-called from a vitest test that runs the same JS bundle — the bundler strips
+called from a vitest test that runs the same JS bundle – the bundler strips
 the export. Either:
 
 1. Test the server action separately via integration test (real Next.js dev
@@ -110,5 +110,5 @@ Directive modules should call the plain function, not the action.
 
 ## See also
 
-- [Migrating from XState — JSON-roundtrippable facts](../migrating-from-xstate.md#json-roundtrippable-facts-load-bearing-rule)
-- [Chained pipelines](./chained-pipelines.md) — testing async resolver chains
+- [Migrating from XState – JSON-roundtrippable facts](../migrating-from-xstate.md#json-roundtrippable-facts-load-bearing-rule)
+- [Chained pipelines](./chained-pipelines.md) – testing async resolver chains

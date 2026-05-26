@@ -1,9 +1,9 @@
-# RFC 0001 — `t.timer({ms})` declarative timer
+# RFC 0001 – `t.timer({ms})` declarative timer
 
 - **Status:** Draft (2026-04-29)
 - **Author:** Jason Comes
 - **MIGRATION_FEEDBACK refs:** #4 (declarative timer), #15 (fake-timer integration), #16 (clock-in-derivation), #18 (`useTickWhile`)
-- **Domain Expert verdict:** *killer differentiator — would make `vi.useFakeTimers`, `useTickWhile`, and clock-in-derivation evaporate*
+- **Domain Expert verdict:** *killer differentiator – would make `vi.useFakeTimers`, `useTickWhile`, and clock-in-derivation evaporate*
 
 ## Summary
 
@@ -18,22 +18,22 @@ Across the 55-cycle Minglingo migration, four distinct items all converged
 on the same root problem: **time is not currently a first-class fact in
 Directive.**
 
-1. **Item #4 — No declarative `after`.** XState's `after: { 5000: 'TIMEOUT' }`
+1. **Item #4 – No declarative `after`.** XState's `after: { 5000: 'TIMEOUT' }`
    becomes an imperative `setTimeout` in an effect. The effect can't be
    replayed; the dehydrated state can't restore the timer. Every cycle that
    needed a delay paid this tax.
 
-2. **Item #15 — Fake-timer integration.** `vi.useFakeTimers()` freezes the
+2. **Item #15 – Fake-timer integration.** `vi.useFakeTimers()` freezes the
    microtask queue, starving Directive's resolver chain. Workarounds exist
    (`shouldAdvanceTime: true`) but the docs page (`docs/testing/fake-timers.md`)
    reads as a list of caveats.
 
-3. **Item #16 — Clock reads in derivations are silently broken.** A
+3. **Item #16 – Clock reads in derivations are silently broken.** A
    derivation reading `Date.now()` won't invalidate when the clock moves.
    The fix is to thread elapsed time through a fact, manually ticked by the
    consumer. Every "is this stale?" check pays the cost.
 
-4. **Item #18 — `useTickWhile` React hook.** The shipped escape hatch for
+4. **Item #18 – `useTickWhile` React hook.** The shipped escape hatch for
    predicate-gated intervals. Useful but consumer-side and React-only;
    doesn't help non-React consumers (Node services, edge handlers).
 
@@ -72,7 +72,7 @@ interface TimerFact {
 }
 ```
 
-The fact reads as a reactive object — `facts.countdown.remainingMs` is a
+The fact reads as a reactive object – `facts.countdown.remainingMs` is a
 cache-tracked read. Derivations and React hooks subscribe granularly to
 each subfield.
 
@@ -135,7 +135,7 @@ createSystem({
 ```
 
 The clock is injectable. Real clock in production. Virtual clock in tests
-— `clock.advanceBy(5000)` synchronously advances all running timers and
+– `clock.advanceBy(5000)` synchronously advances all running timers and
 fires their effects.
 
 **Pros:** clean separation, replays deterministically, fake-timer
@@ -158,14 +158,14 @@ to today's manual pattern but blessed.
 
 **Pros:** zero new infrastructure, makes the existing pattern first-class.
 
-**Cons:** still requires the consumer to tick — doesn't solve Item #18.
+**Cons:** still requires the consumer to tick – doesn't solve Item #18.
 
 ### Option C: Engine schedules ticks; consumer can observe
 
 ```ts
 createSystem({
   module: createX(),
-  // no clock param — engine uses a default scheduler
+  // no clock param – engine uses a default scheduler
   // optionally:
   scheduler: { mode: 'real' | 'virtual', granularityMs: 16 },
 });
@@ -210,7 +210,7 @@ Concrete invariants:
   facts. The proxy contract from `docs/api/facts.md` applies.
 - `elapsedMs` and `remainingMs` are derivations off `(now - startedAtMs -
   pausedDurationMs)`. They invalidate when the clock advances.
-- The clock never fires effects faster than the engine can process them —
+- The clock never fires effects faster than the engine can process them –
   if a constraint is mid-flight when a timer would fire, the timer waits
   for the next tick.
 
@@ -219,12 +219,12 @@ Concrete invariants:
 | Existing pattern | After `t.timer` |
 |---|---|
 | Imperative `setTimeout` in effect | `facts.timer.start()` + constraint on `status === 'completed'` |
-| `useTickWhile(sys, predicate, EVENT, ms)` | `facts.poll.start()` (mode: `'repeat'`) — works in any consumer, not just React |
-| Manual `nowMs` tick + derivation | `facts.timer.elapsedMs` — direct read |
+| `useTickWhile(sys, predicate, EVENT, ms)` | `facts.poll.start()` (mode: `'repeat'`) – works in any consumer, not just React |
+| Manual `nowMs` tick + derivation | `facts.timer.elapsedMs` – direct read |
 | `vi.useFakeTimers({ shouldAdvanceTime: true })` + manual advance | `clock.advanceBy(ms)` on the injected virtual clock |
 | Stale-check derivation | `facts.staleTimer.status === 'completed'` |
 
-`useTickWhile` doesn't go away — it's still useful for non-timer interval
+`useTickWhile` doesn't go away – it's still useful for non-timer interval
 dispatch. But `t.timer` covers the cases where the interval is part of the
 *module's logic* (countdown, polling, debounce) rather than a consumer
 concern.
@@ -237,7 +237,7 @@ concern.
 
 2. **Pause/resume semantics under hydrate.** If a system dehydrates while
    a timer is paused, then rehydrates 1 hour later, does `pausedDurationMs`
-   include the offline hour? Proposal: yes — pauses freeze; the wall-clock
+   include the offline hour? Proposal: yes – pauses freeze; the wall-clock
    gap during dehydration is irrelevant.
 
 3. **Multiple timers in one module.** Naming convention? Proposal:
@@ -245,7 +245,7 @@ concern.
 
 4. **N-of-same-shape (`atomFamily` style).** A poker module with one timer
    per player. Today this is blocked by the spawn-model gap (Item #26).
-   Proposal: defer — `t.timer` ships as singletons; multi-instance follows
+   Proposal: defer – `t.timer` ships as singletons; multi-instance follows
    when the spawn API lands.
 
 5. **Throttle / debounce.** Are these special timer modes (`mode:
@@ -265,17 +265,17 @@ concern.
 consumers keep working. Existing manual `nowMs` patterns keep working.
 
 Once shipped, the docs migrate (in order):
-1. `docs/testing/fake-timers.md` — note that `t.timer` is the preferred
+1. `docs/testing/fake-timers.md` – note that `t.timer` is the preferred
    pattern, link to the new API doc; keep the manual-fake-timers escape
    hatch for non-Directive setIntervals
-2. `docs/derivations.md` — clock-in-derivation section pivots to "if you
+2. `docs/derivations.md` – clock-in-derivation section pivots to "if you
    need elapsed time, use `t.timer` instead of `Date.now()`"
-3. `docs/migrating-from-xstate.md` — `after:` row in the cheat-sheet
+3. `docs/migrating-from-xstate.md` – `after:` row in the cheat-sheet
    updates to point at `t.timer`
 
 The two helper packages currently in Phase 3:
-- `@directive-run/mutator` — unaffected; `pendingAction` doesn't involve time
-- `@directive-run/optimistic` — unaffected; rollback doesn't involve time
+- `@directive-run/mutator` – unaffected; `pendingAction` doesn't involve time
+- `@directive-run/optimistic` – unaffected; rollback doesn't involve time
 
 So `t.timer` doesn't obsolete the helpers. It does likely deprecate
 `useTickWhile` for in-module use; the React hook stays for consumer-side
@@ -287,8 +287,8 @@ logic.
 ```
 packages/core/src/core/
   schema-builders.ts       # add t.timer({ms, mode?, source?})
-  timer-fact.ts            # new — TimerFact runtime, clock binding
-  clock.ts                 # new — SignalClock interface, realClock(),
+  timer-fact.ts            # new – TimerFact runtime, clock binding
+  clock.ts                 # new – SignalClock interface, realClock(),
                            #       virtualClock(), auto-detect
   engine.ts                # tick integration in flush phase
 ```
@@ -303,7 +303,7 @@ This RFC is **draft**. Open for review. Defer implementation until:
 1. AE-review-loop on this doc (security/correctness, architecture, DX,
    domain expert). Settle the clock-source choice on paper.
 2. One concrete use-case prototype (in Minglingo: pick the simplest
-   timer-using machine — likely `gameLobbyMachine`'s start-countdown — and
+   timer-using machine – likely `gameLobbyMachine`'s start-countdown – and
    sketch how it would read with `t.timer` before / after).
 3. Budget confirmation. 1.5 weeks is a real fraction of the program; if
    Phase 5 (Time-travel REPL) is the bigger viral lever, this RFC may be
@@ -311,7 +311,7 @@ This RFC is **draft**. Open for review. Defer implementation until:
 
 ## See also
 
-- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) — items 4, 15, 16, 18
-- [Fake timers](../testing/fake-timers.md) — current escape hatch
+- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) – items 4, 15, 16, 18
+- [Fake timers](../testing/fake-timers.md) – current escape hatch
 - [Derivations § clock reads](../derivations.md#anti-pattern-clock-reads-in-derivations)
 - [`@directive-run/react` `useTickWhile`](https://www.npmjs.com/package/@directive-run/react)

@@ -165,7 +165,7 @@ In dev mode (`NODE_ENV !== "production"`), Directive wraps returned objects in a
 Use: facts.user = { ...facts.user, ... }
 ```
 
-The warning proxy is tree-shaken in production builds. The mutation still applies — it just won't be reactive.
+The warning proxy is tree-shaken in production builds. The mutation still applies – it just won't be reactive.
 
 This is the same pattern used by:
 - **React useState**: `setUser({ ...user, name: "John" })`
@@ -561,14 +561,14 @@ Directive uses file suffixes to manage feature readiness across source code, doc
 
 ### How It Works
 
-- **Source code:** Barrel files (`index.ts`) only export from `.ts` files. `.lab.ts` files are never referenced in exports, so bundlers exclude them. Type-only imports (`import type`) from `.lab.ts` are fine — they're erased at compile time.
+- **Source code:** Barrel files (`index.ts`) only export from `.ts` files. `.lab.ts` files are never referenced in exports, so bundlers exclude them. Type-only imports (`import type`) from `.lab.ts` are fine – they're erased at compile time.
 - **Docs pages:** Next.js routes from `page.md`. Renaming to `page.lab.md` removes the route. The embedding generator globs `**/page.md`, so `.lab.md` files are automatically skipped.
-- **Navigation:** Comment out the nav entry in `directive-docs: src/lib/navigation.ts` with a note: `// Feature — lab (reason)`.
+- **Navigation:** Comment out the nav entry in `directive-docs: src/lib/navigation.ts` with a note: `// Feature – lab (reason)`.
 - **Examples:** Private examples can import directly from `.lab.ts` via relative path. Published packages never reference lab files.
 
 ### Conventions
 
-- Always leave a comment at the old export site explaining why it's in lab: `// createObservability moved to observability.lab.ts — re-evaluating vs OTel`
+- Always leave a comment at the old export site explaining why it's in lab: `// createObservability moved to observability.lab.ts – re-evaluating vs OTel`
 - Keep types exported from the barrel even when runtime code is in lab (other modules may need the types)
 - Track all lab/deprecated items in `LAB.md` at the repo root
 
@@ -613,7 +613,7 @@ All merged objects, lookup tables, caches, and dynamically-keyed maps use `Objec
 const cache = {};
 cache[userInput] = value;        // attacker could set "__proto__"
 
-// ✅ Null-prototype object — no inherited properties
+// ✅ Null-prototype object – no inherited properties
 const cache = Object.create(null);
 cache[userInput] = value;        // "__proto__" is just a regular key
 cache.constructor;               // undefined (no prototype chain)
@@ -679,7 +679,7 @@ const readOnlyProxy = new Proxy(target, {
 When writing new code that creates objects used as lookup tables or merge targets:
 
 1. **Always** use `Object.create(null)` instead of `{}`
-2. **Never** use `Object.assign({}, ...)` — use `Object.assign(Object.create(null), ...)`
+2. **Never** use `Object.assign({}, ...)` – use `Object.assign(Object.create(null), ...)`
 3. **Always** add `BLOCKED_PROPS` checks to new Proxy `get` handlers
 4. **Always** validate user-provided keys against `BLOCKED_PROPS` before using them as object keys
 

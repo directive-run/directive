@@ -91,11 +91,11 @@ timers are only needed when the *consumer* wires the timer, and the consumer's
 test concerns aren't Directive-specific.
 
 A future `t.timer({ms})` schema primitive (RFC, MIGRATION_FEEDBACK item 4)
-would make declarative timers replayable / dehydrate-safe — at which point
+would make declarative timers replayable / dehydrate-safe – at which point
 fake-timer integration would become standardized. Until then, this is the
 pattern.
 
 ## See also
 
-- [Chained pipelines](./chained-pipelines.md) — the no-fake-timers default
-- [`useTickWhile`](https://www.npmjs.com/package/@directive-run/react) — the React hook for predicate-gated intervals
+- [Chained pipelines](./chained-pipelines.md) – the no-fake-timers default
+- [`useTickWhile`](https://www.npmjs.com/package/@directive-run/react) – the React hook for predicate-gated intervals

@@ -1,4 +1,4 @@
-# `doctor` — "does this rule contradict an existing rule?"
+# `doctor` – "does this rule contradict an existing rule?"
 
 > Structural contradiction detection between a candidate `FactPredicate`
 > and a system's existing constraint set. The "doctor says no" gate
@@ -24,7 +24,7 @@ doctor.checkAgainst(candidate, system.inspect().constraints);
 //     warnings: [
 //       { constraintId: "applyDiscount",
 //         type: "subset",
-//         reason: "Candidate's lower bound on cartTotal (100) is stricter than the existing rule's (50) — candidate is a subset." }
+//         reason: "Candidate's lower bound on cartTotal (100) is stricter than the existing rule's (50) – candidate is a subset." }
 //     ]
 //   }
 ```
@@ -34,12 +34,12 @@ Three finding types, two buckets:
 | Type | Bucket | When |
 | --- | --- | --- |
 | `direct` | `contradictions` | The two rules cannot both fire. `$gte 100` vs `$lt 50`, `$eq "a"` vs `$ne "a"`, two disjoint `$in` sets. |
-| `subset` | `warnings` | The candidate's range is strictly within the existing rule's range. The candidate is **redundant**, not in conflict — surfaced as a warning. |
-| `overlap` | `warnings` | The two rules touch the same fact with non-trivial intersection. Surfaced as a warning — they *can* coexist. |
+| `subset` | `warnings` | The candidate's range is strictly within the existing rule's range. The candidate is **redundant**, not in conflict – surfaced as a warning. |
+| `overlap` | `warnings` | The two rules touch the same fact with non-trivial intersection. Surfaced as a warning – they *can* coexist. |
 
-> **M17 — subset is a warning, not a contradiction.** A subset rule co-fires with its parent; it's noise (the existing rule already covers it), not a conflict. Prior versions bucketed `subset` under `contradictions` — if you're upgrading, move your assertions accordingly.
+> **M17 – subset is a warning, not a contradiction.** A subset rule co-fires with its parent; it's noise (the existing rule already covers it), not a conflict. Prior versions bucketed `subset` under `contradictions` – if you're upgrading, move your assertions accordingly.
 
-## `doctor.checkOwns` — owns:/bind: collision check
+## `doctor.checkOwns` – owns:/bind: collision check
 
 `checkAgainst` only inspects predicate **logic**. To flag a candidate that would *write* to a field already owned by another constraint's resolver, use `doctor.checkOwns`:
 
@@ -51,16 +51,16 @@ doctor.checkOwns(candidate, system.inspect());
 //         candidatePath: "cartTotal",
 //         source: "owns",
 //         severity: "warning",
-//         reason: "Constraint applyDiscount already owns cartTotal — candidate would race or shadow its writes." }
+//         reason: "Constraint applyDiscount already owns cartTotal – candidate would race or shadow its writes." }
 //     ]
 //   }
 ```
 
-> **F-3 — `checkOwns` returns `{ warnings }` only.** Earlier R-cycles shipped `{ contradictions, warnings }` (where `contradictions` was always `[]` in v1). The empty slot encouraged callers to write dead branches, so it's gone — owns-collisions are *warnings* by default and each finding carries a `severity: "warning"` discriminator. Callers running stricter pre-deploy lints can promote findings to `severity: "error"` themselves and route on the discriminator. v2 may surface a structured `errors` field; the discriminator is the migration shim.
+> **F-3 – `checkOwns` returns `{ warnings }` only.** Earlier R-cycles shipped `{ contradictions, warnings }` (where `contradictions` was always `[]` in v1). The empty slot encouraged callers to write dead branches, so it's gone – owns-collisions are *warnings* by default and each finding carries a `severity: "warning"` discriminator. Callers running stricter pre-deploy lints can promote findings to `severity: "error"` themselves and route on the discriminator. v2 may surface a structured `errors` field; the discriminator is the migration shim.
 
-> **M5 — engine still enforces the runtime binding gate.** A doctor pass is advisory rather than fatal — the system already refuses double-owners at runtime. Use `checkOwns` to fail fast in pre-deploy lints / CI.
+> **M5 – engine still enforces the runtime binding gate.** A doctor pass is advisory rather than fatal – the system already refuses double-owners at runtime. Use `checkOwns` to fail fast in pre-deploy lints / CI.
 
-> **F1 — `system.inspect().constraints[].owns` is now populated automatically** from the constraint definition's `owns:` field. `checkOwns(candidate, system.inspect())` works against any system without manual annotation. `bind:` is reserved as a v2 promise — the type slot is in place but the runtime does not yet emit a `bind` field on inspect snapshots.
+> **F1 – `system.inspect().constraints[].owns` is now populated automatically** from the constraint definition's `owns:` field. `checkOwns(candidate, system.inspect())` works against any system without manual annotation. `bind:` is reserved as a v2 promise – the type slot is in place but the runtime does not yet emit a `bind` field on inspect snapshots.
 
 > **v1 LIMITATION (M4):** `checkOwns` returns `{ warnings: [] }` when constraints expose neither `owns:` nor `bind:` metadata. No false positives.
 
@@ -74,11 +74,11 @@ doctor.checkOwns(candidate, system.inspect());
 
 This is a structural v1. It does **NOT** check:
 
-- **Semantic contradictions that need an SMT solver** — e.g. *"`a + b > 10` vs `a < 3 AND b < 3`"*. (Out of scope; ships separately as full `doctor` with Z3.wasm.)
-- **Indirect contradictions through derivations** — a rule on a derived value vs a rule on its inputs.
-- **Operator-set asymmetry** — *"`$matches /^x/` vs `$startsWith 'y'`"*. The structural checker doesn't know that `/^x/` and `'y'` are disjoint patterns; it falls back to `overlap` warning.
+- **Semantic contradictions that need an SMT solver** – e.g. *"`a + b > 10` vs `a < 3 AND b < 3`"*. (Out of scope; ships separately as full `doctor` with Z3.wasm.)
+- **Indirect contradictions through derivations** – a rule on a derived value vs a rule on its inputs.
+- **Operator-set asymmetry** – *"`$matches /^x/` vs `$startsWith 'y'`"*. The structural checker doesn't know that `/^x/` and `'y'` are disjoint patterns; it falls back to `overlap` warning.
 
-**False negatives are acceptable.** A missed contradiction means "doctor says it's fine when it's actually not" — caller still has runtime safety from the engine itself. **False positives are NOT acceptable** — every reported contradiction is defensible from the structure alone.
+**False negatives are acceptable.** A missed contradiction means "doctor says it's fine when it's actually not" – caller still has runtime safety from the engine itself. **False positives are NOT acceptable** – every reported contradiction is defensible from the structure alone.
 
 ## Reference
 

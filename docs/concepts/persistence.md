@@ -1,9 +1,9 @@
 ---
 title: persistencePlugin
-description: Save and restore selected facts to a Storage backend — localStorage, sessionStorage, or custom — with include/exclude filtering, debounced writes, and prototype-pollution defense on restore.
+description: Save and restore selected facts to a Storage backend – localStorage, sessionStorage, or custom – with include/exclude filtering, debounced writes, and prototype-pollution defense on restore.
 ---
 
-# `persistencePlugin` — facts in, facts out, across reloads
+# `persistencePlugin` – facts in, facts out, across reloads
 
 > Persists a chosen slice of your facts to any `Storage`-shaped backend
 > on every change, restores them on `onInit`, debounces writes so a
@@ -20,7 +20,7 @@ save that serializes the currently tracked facts. On `onDestroy`,
 flushes any pending debounced save synchronously so a tab close doesn't
 lose state.
 
-Tracking is opportunistic — the plugin only learns about a fact's
+Tracking is opportunistic – the plugin only learns about a fact's
 existence after it's been set once (either restored or written
 post-init). Use `include` to enumerate the keys you want to persist if
 you need deterministic behaviour.
@@ -68,9 +68,9 @@ system.start();
 | `include`    | *all keys*    | Whitelist of fact keys to persist. When set, only these keys flow into storage; everything else is ignored. |
 | `exclude`    | `[]`          | Blacklist of fact keys to skip. Combines with `include` (`exclude` wins). |
 | `debounce`   | `100`         | Milliseconds to debounce saves. A burst of fact mutations within the window collapses into one `setItem`. |
-| `onRestore`  | —             | Callback fired after state is restored from storage on `onInit`, with the parsed `Record<string, unknown>`. |
-| `onSave`     | —             | Callback fired after each successful `setItem`, with the serialised `Record<string, unknown>`. |
-| `onError`    | —             | Callback fired when load or save throws. Receives an `Error` — JSON parse failures, quota errors, and prototype-pollution detections all funnel here. |
+| `onRestore`  | –             | Callback fired after state is restored from storage on `onInit`, with the parsed `Record<string, unknown>`. |
+| `onSave`     | –             | Callback fired after each successful `setItem`, with the serialised `Record<string, unknown>`. |
+| `onError`    | –             | Callback fired when load or save throws. Receives an `Error` – JSON parse failures, quota errors, and prototype-pollution detections all funnel here. |
 
 ## How it works
 
@@ -86,7 +86,7 @@ onDestroy ─→ clearTimeout ─→ save() (synchronous final flush)
 ```
 
 Restoration uses `facts.$store.batch()` so the constraints/derivations
-don't fan out a notification per restored key — one reconcile after the
+don't fan out a notification per restored key – one reconcile after the
 whole restore.
 
 `shouldPersist(key)` returns `false` if `key` is in `exclude`,
@@ -100,7 +100,7 @@ otherwise `true` if `include` is undefined or `include.includes(key)`.
   migration in `onRestore`.
 - **Storage quota errors funnel to `onError`.** `setItem` throws when
   the user's quota is full; without an `onError` handler, the throw is
-  caught and dropped. Wire `onError` to surface this — quota issues are
+  caught and dropped. Wire `onError` to surface this – quota issues are
   user-visible bugs.
 - **The plugin only persists keys it's seen.** A fact that was set in
   `init` *before* `onInit` runs (i.e., outside a plugin lifecycle)
@@ -110,7 +110,7 @@ otherwise `true` if `include` is undefined or `include.includes(key)`.
   Anything you persist is recoverable by any script running on the
   origin. Exclude PII from the `include` list or encrypt before write.
 - **`onDestroy` runs a synchronous save.** A pending debounce timer is
-  cleared and `save()` runs once more — so a `system.destroy()` from
+  cleared and `save()` runs once more – so a `system.destroy()` from
   `onbeforeunload` captures the latest state. The trade-off is a
   blocking `setItem` on shutdown.
 - **Prototype-pollution defense is restore-side only.** Anything *your
@@ -123,8 +123,8 @@ otherwise `true` if `include` is undefined or `include.includes(key)`.
 ## See also
 
 - [Time-travel & snapshots](https://github.com/directive-run/directive/blob/main/docs/PLAN.md)
-  — in-memory state history vs durable persistence.
-- [`createAuditLedger`](./audit-ledger.md) — durable, queryable,
+  – in-memory state history vs durable persistence.
+- [`createAuditLedger`](./audit-ledger.md) – durable, queryable,
   tamper-evident *event* persistence (not a state-restore layer).
-- [`loggingPlugin`](./logging.md) — pair with `onError` to capture
+- [`loggingPlugin`](./logging.md) – pair with `onError` to capture
   persistence failures in your structured logs.

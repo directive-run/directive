@@ -24,7 +24,7 @@ should always use the typed accessor.
   affordance as XState's `send({ type: 'X', ... })` minus the redundant
   type-property pattern.
 
-The generic dispatch stays available for adapters and tools — for example, a
+The generic dispatch stays available for adapters and tools – for example, a
 WebSocket bridge that receives `{type, ...rest}` from a peer can forward it
 verbatim with `sys.dispatch(frame)`.
 
@@ -40,7 +40,7 @@ event.handle('SUBMIT', ({ payload, facts }) => {
 ```
 
 The handler's `payload` parameter is narrowed to the schema you declared.
-This works for both canonical and generic dispatch — but only the canonical
+This works for both canonical and generic dispatch – but only the canonical
 form gives you autocomplete.
 
 ## Cross-module events
@@ -59,8 +59,8 @@ sys.start();
 sys.modules.party.events.GAME_ENDED({ gameId });
 ```
 
-For deeper detail on cross-module flows — including how the receiving module
-reacts via constraints — see [cross-module events](../composition/cross-module-events.md).
+For deeper detail on cross-module flows – including how the receiving module
+reacts via constraints – see [cross-module events](../composition/cross-module-events.md).
 
 ## Don't `dispatch` from inside a constraint or resolver
 
@@ -100,7 +100,7 @@ constraint pair) rather than the event handler. Resolvers are first-class
 to the cache; async work in handlers bypasses some optimizations.
 
 This is one of the few places Directive deliberately gives you both
-ergonomics — async handlers are convenient for one-shot work, resolvers are
+ergonomics – async handlers are convenient for one-shot work, resolvers are
 right for chained pipelines.
 
 ## See also

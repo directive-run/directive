@@ -1,4 +1,4 @@
-# Ship Recovery — first-publish failures for new `@directive-run/*` packages
+# Ship Recovery – first-publish failures for new `@directive-run/*` packages
 
 The 2026-05-01 release (PR #24 merge) successfully published `@directive-run/{core,react,vue,svelte,solid,lit,ai,cli,knowledge,claude-plugin}@1.3.0` but **silently failed to upload** the three new scoped packages:
 
@@ -12,7 +12,7 @@ The 2026-05-01 release (PR #24 merge) successfully published `@directive-run/{co
 
 You need an authenticated npm session that can create packages under `@directive-run`. Two viable paths:
 
-### Path A — manual first publish from your local machine (recommended, ~3 min)
+### Path A – manual first publish from your local machine (recommended, ~3 min)
 
 ```sh
 cd /Users/jasonwcomes/Desktop/Sizls/projects/directive
@@ -43,7 +43,7 @@ npm view @directive-run/timeline version   # → 0.2.0
 
 After the first publish lands, GitHub Actions's `NPM_TOKEN` can update them in subsequent releases (the token already has update permission on packages it can see).
 
-### Path B — replace the GitHub Actions `NPM_TOKEN` with a granular access token (durable fix, ~5 min)
+### Path B – replace the GitHub Actions `NPM_TOKEN` with a granular access token (durable fix, ~5 min)
 
 Granular access tokens scope explicitly to package patterns and operations.
 
@@ -69,10 +69,10 @@ The 2026-05-01 release pushed git tags for the three failed packages even though
 - `@directive-run/optimistic@0.1.0`
 - `@directive-run/timeline@0.2.0`
 
-These tags are technically wrong (they point at a commit whose state didn't actually publish) but harmless — the recovery publish from Path A or Path B uses the same versions, so the tags re-align to the actual published state once recovery finishes. Skip the cleanup unless you have a reason to.
+These tags are technically wrong (they point at a commit whose state didn't actually publish) but harmless – the recovery publish from Path A or Path B uses the same versions, so the tags re-align to the actual published state once recovery finishes. Skip the cleanup unless you have a reason to.
 
 ## See also
 
-- [Changesets action README](https://github.com/changesets/action) — release flow context.
-- [npm scoped packages docs](https://docs.npmjs.com/about-scopes) — public/private + access semantics.
-- [npm granular access tokens](https://docs.npmjs.com/about-access-tokens) — token permission model.
+- [Changesets action README](https://github.com/changesets/action) – release flow context.
+- [npm scoped packages docs](https://docs.npmjs.com/about-scopes) – public/private + access semantics.
+- [npm granular access tokens](https://docs.npmjs.com/about-access-tokens) – token permission model.

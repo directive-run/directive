@@ -19,7 +19,7 @@ createModule('myModule', { schema, ... });
 
 Each field is a `t.X()` builder that controls runtime validation (in dev) and
 TypeScript types. See `t.string<Union>()`, `t.array<T>()`, `t.object<T>()`,
-`t.union<T>()` for the typed-narrowing forms — these eliminate boilerplate
+`t.union<T>()` for the typed-narrowing forms – these eliminate boilerplate
 predicates throughout your module.
 
 ## Reading facts
@@ -77,7 +77,7 @@ scopes won't see the proxy.
 ### Helper-scope gotcha
 
 ```ts
-// ❌ Helper called outside a handler — no proxy, no reactivity
+// ❌ Helper called outside a handler – no proxy, no reactivity
 function pickFirst(facts) {
   return facts.items[0];
 }
@@ -129,7 +129,7 @@ async () => {
 ```
 
 The reason is replay determinism + dehydrate/hydrate. A `Date` may serialize
-fine but its identity won't survive a roundtrip — `===` comparisons in
+fine but its identity won't survive a roundtrip – `===` comparisons in
 constraints will silently break.
 
 ## Nullability
@@ -154,7 +154,7 @@ trips equality comparisons in derivations.
 ## Optional vs nullable
 
 Use `nullable()` (allows `null`) for "not yet selected." Use `.optional()`
-(allows `undefined`) for "field absent from payload" — primarily on event
+(allows `undefined`) for "field absent from payload" – primarily on event
 payloads, rarely on facts.
 
 ## Default values
@@ -171,6 +171,6 @@ handler if every fact has a default.
 
 ## See also
 
-- [Derivations](../derivations.md) — purity rule for read-only computed values
+- [Derivations](../derivations.md) – purity rule for read-only computed values
 - [Migrating from XState § JSON-roundtrippable facts](../migrating-from-xstate.md#json-roundtrippable-facts-load-bearing-rule)
-- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) — items 2, 20, 24 on the JSON contract
+- [`MIGRATION_FEEDBACK.md`](../MIGRATION_FEEDBACK.md) – items 2, 20, 24 on the JSON contract

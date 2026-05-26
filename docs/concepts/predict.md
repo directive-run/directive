@@ -1,8 +1,8 @@
-# `predict` — "what would this rule do, and what facts must change?"
+# `predict` – "what would this rule do, and what facts must change?"
 
 > Run a `FactPredicate` against the current facts without firing it.
 > Returns whether it would fire, the full clause-by-clause breakdown,
-> and — if it wouldn't — a list of the smallest changes that would make
+> and – if it wouldn't – a list of the smallest changes that would make
 > it fire.
 
 ## The Sherlock moment
@@ -59,14 +59,14 @@ For combinators (`$all`, `$any`, `$not`), `predict()` recurses into children and
 
 ## Use cases
 
-- **LLM iteration loop** — emit → predict → reprompt. The model converges to a firing rule in 1-2 turns.
-- **"Preview this rule" UI** — show a user what their proposed rule would do against today's data, including the exact facts that would need to change.
-- **Test-suite assertion** — `expect(predict(rule, facts).wouldFire).toBe(true)`.
+- **LLM iteration loop** – emit → predict → reprompt. The model converges to a firing rule in 1-2 turns.
+- **"Preview this rule" UI** – show a user what their proposed rule would do against today's data, including the exact facts that would need to change.
+- **Test-suite assertion** – `expect(predict(rule, facts).wouldFire).toBe(true)`.
 
 ## What this does NOT do
 
-- **Not a SAT solver** — `predict()` reports failing leaves, not the *minimal* set of fact changes that satisfy the rule. For `$any: [A, B]` with both failed, it lists both — you pick which to change.
-- **Doesn't mutate facts** — pure read.
+- **Not a SAT solver** – `predict()` reports failing leaves, not the *minimal* set of fact changes that satisfy the rule. For `$any: [A, B]` with both failed, it lists both – you pick which to change.
+- **Doesn't mutate facts** – pure read.
 
 ## `$changed` and the `prev` snapshot (M10)
 
@@ -80,7 +80,7 @@ predict({ phase: { $changed: true } }, { phase: "green" });
 //     wouldFire: false,
 //     missingChanges: [
 //       { path: "phase", op: "$changed", expected: true, actual: undefined,
-//         suggestion: "$changed clause at \"phase\" cannot be evaluated without a `prev` snapshot — pass predict(predicate, facts, prev)." }
+//         suggestion: "$changed clause at \"phase\" cannot be evaluated without a `prev` snapshot – pass predict(predicate, facts, prev)." }
 //     ],
 //   }
 ```
@@ -94,7 +94,7 @@ predict({ phase: { $changed: true } }, { phase: "green" }, { phase: "red" });
 
 ## Result shape
 
-`PredictResult` carries `wouldFire`, `whenExplain`, and `missingChanges`. It does **not** include the input `predicate` (the caller already has it — keep the reference at the call site if you need to display "what we predicted" alongside the result).
+`PredictResult` carries `wouldFire`, `whenExplain`, and `missingChanges`. It does **not** include the input `predicate` (the caller already has it – keep the reference at the call site if you need to display "what we predicted" alongside the result).
 
 Pure read; does not mutate facts.
 

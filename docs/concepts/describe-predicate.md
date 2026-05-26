@@ -1,4 +1,4 @@
-# `describePredicate` — render a `FactPredicate` as English or algebra
+# `describePredicate` – render a `FactPredicate` as English or algebra
 
 > A pure tree walker that turns any `FactPredicate` AST into a precise
 > human-readable sentence. Closes the LLM-emit round-trip
@@ -22,7 +22,7 @@ describePredicate({ cartTotal: { $gte: 50 } }, { style: "formal" });
 // → "cartTotal ≥ 50"
 ```
 
-Pure. No side effects. No throws on a valid predicate — on cyclic /
+Pure. No side effects. No throws on a valid predicate – on cyclic /
 non-object input it returns a sentinel string so it's safe to call on
 LLM output, third-party data, or whatever else flows into the audit
 trail.
@@ -34,7 +34,7 @@ trail.
 | `style` | `"natural" \| "formal"` | `"natural"` | English prose vs algebra (`≥`, `∈`, `∧`, `¬`). |
 | `locale` | `string` | `"en-US"` | Forwarded to `Intl.NumberFormat`. Invalid locales fall back to `en-US`. |
 | `parenthesize` | `boolean` | `true` | Wrap each clause of a combinator in parens when there's > 1 child. |
-| `factName` | `(path: string) => string` | identity | Map fact paths to friendly labels (`cartTotal` → `"cart total"`). Only consulted in `"natural"` style — the formal style preserves raw dotted paths so the output stays algebraic. |
+| `factName` | `(path: string) => string` | identity | Map fact paths to friendly labels (`cartTotal` → `"cart total"`). Only consulted in `"natural"` style – the formal style preserves raw dotted paths so the output stays algebraic. |
 
 ## Operators rendered
 
@@ -114,9 +114,9 @@ so it's safe to call from a UI render path:
   `"<invalid predicate: cycle>"` rather than recursing forever.
 - **Depth limit.** Inherits `MAX_PREDICATE_DEPTH` from the predicate
   validator. Exceeding it logs a dev warning and bails to `"always true"`
-  (`⊤`) — the predicate validator would have rejected this shape upstream.
+  (`⊤`) – the predicate validator would have rejected this shape upstream.
 - **Non-object input.** Strings, numbers, `null`, and `undefined` at the
-  root return `"<invalid predicate>"` — no throw.
+  root return `"<invalid predicate>"` – no throw.
 - **Unknown operators.** A `{ x: { $weird: 1 } }` predicate logs a dev
   warning and falls through to a generic `"x $weird 1"` rendering. The
   validator would reject this at registration; the renderer simply
@@ -125,7 +125,7 @@ so it's safe to call from a UI render path:
 ## Why `describePredicate` (not `describe`)
 
 The export is `describePredicate` to avoid colliding with vitest's global
-`describe()` — `describe` is the canonical block name for every test
+`describe()` – `describe` is the canonical block name for every test
 file in the monorepo, and `import { describe } from "@directive-run/core"`
 would shadow it. `describePredicate` is the one-token-longer trade we
 make so test files don't need a rename alias.
@@ -175,18 +175,18 @@ const predicate = await predicateFromIntent({ intent, schema, runner });
 const description = describePredicate(predicate, {
   factName: humanizeFactPath,
 });
-// "Is this the rule you meant? — cart total is at least 50 AND region
+// "Is this the rule you meant? – cart total is at least 50 AND region
 // is one of US, EU"
 ```
 
 If the user says no, feed the description back in the next prompt
-turn — the model gets the same plain-English target it was asked to
+turn – the model gets the same plain-English target it was asked to
 emit.
 
 ### `whenExplain` tooltips
 
 In a devtools panel, render the predicate AS PROSE next to the per-clause
-pass/fail breakdown — keeps the tooltip readable when the JSON is deep:
+pass/fail breakdown – keeps the tooltip readable when the JSON is deep:
 
 ```tsx
 <Tooltip content={describePredicate(constraint.whenSpec, { factName })}>

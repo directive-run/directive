@@ -1,12 +1,12 @@
 ---
 title: devtoolsPlugin
-description: Browser devtools integration — window.__DIRECTIVE__ inspect API plus an optional floating debug panel with facts, derivations, constraints, requirements, perf, timeline, time-travel, and session record/replay.
+description: Browser devtools integration – window.__DIRECTIVE__ inspect API plus an optional floating debug panel with facts, derivations, constraints, requirements, perf, timeline, time-travel, and session record/replay.
 ---
 
-# `devtoolsPlugin` — browser devtools, plus a floating panel
+# `devtoolsPlugin` – browser devtools, plus a floating panel
 
 > Exposes every running Directive system to `window.__DIRECTIVE__` so
-> you can `inspect()` from the console, and — when `panel: true` — drops
+> you can `inspect()` from the console, and – when `panel: true` – drops
 > a live, dark-themed debug panel into the page with the same view the
 > AE reviewers ship to production-readiness reviews.
 
@@ -22,28 +22,28 @@ any subscribers, and (when the panel is on) schedules a coalesced
 The panel renders:
 
 - **Facts & derivations** tables with live flash-on-change.
-- **Constraints** section with the per-clause `whenExplain` tree —
+- **Constraints** section with the per-clause `whenExplain` tree –
   same data the [`whenExplain` panel](./when-explain-panel.md) doc covers.
 - **Inflight / unmet** requirements lists.
-- **Perf metrics** — reconcile time, resolver latency p99, resolver
+- **Perf metrics** – reconcile time, resolver latency p99, resolver
   stats (count/totalMs/errors).
-- **Dependency graph** SVG — facts → derivations → constraints →
+- **Dependency graph** SVG – facts → derivations → constraints →
   requirements → resolvers.
 - **Timeline / flamechart** of resolver execution.
-- **Time-travel controls** — undo, redo, snapshot index.
+- **Time-travel controls** – undo, redo, snapshot index.
 - **Event log** (when `trace: true`) and **record & replay** buttons.
 
 ## When to use
 
-- Local dev — the panel beats `console.log` for understanding *why* a
+- Local dev – the panel beats `console.log` for understanding *why* a
   requirement fired.
-- Debugging a clause-level `when:` regression — the Constraints section
+- Debugging a clause-level `when:` regression – the Constraints section
   pinpoints which clause is failing and shows the actual value.
-- Profiling a slow reconcile — the perf section and timeline together
+- Profiling a slow reconcile – the perf section and timeline together
   identify which resolver is the long pole.
-- Reproducing customer bugs — record a session, export the JSON, attach
+- Reproducing customer bugs – record a session, export the JSON, attach
   it to the ticket; reimport on your machine via `importSession()`.
-- Multi-system pages — give each system a distinct `name` and switch
+- Multi-system pages – give each system a distinct `name` and switch
   between them via `__DIRECTIVE__.getSystem(name)`.
 
 ## Quick start
@@ -88,19 +88,19 @@ system.start();
 
 On `onInit`, the plugin lazily creates `window.__DIRECTIVE__` (a single
 non-writable global, configurable only in dev mode for test cleanup),
-registers a `DevtoolsState` entry under `name`, and — if
-`shouldCreatePanel` — calls `createPanel()` to build the DOM.
+registers a `DevtoolsState` entry under `name`, and – if
+`shouldCreatePanel` – calls `createPanel()` to build the DOM.
 
 Every hook does three things:
 
-1. `addEvent(type, data)` — push into the circular buffer (if `trace`),
+1. `addEvent(type, data)` – push into the circular buffer (if `trace`),
    fan out to subscribers (always).
-2. `recordEvent(type, data)` — append to the recording buffer if a
+2. `recordEvent(type, data)` – append to the recording buffer if a
    record session is active (capped at 10k events / 100 snapshots).
 3. Mark a dirty bit and call `schedulePanelUpdate(bits)` so the next
    `rAF` flushes the affected sections in one paint.
 
-Pending fact, constraint, and derivation updates coalesce per frame —
+Pending fact, constraint, and derivation updates coalesce per frame –
 a batch that flips 50 constraints repaints once.
 
 Imported sessions are sanitized: payloads over 10MB are rejected,
@@ -133,7 +133,7 @@ every 100 ms for up to 10 s).
 
 - **The panel is dev-only by design.** `isDevMode()` checks
   `process.env.NODE_ENV` and Vite's `import.meta.env.MODE`. In
-  production builds the panel never renders even with `panel: true` —
+  production builds the panel never renders even with `panel: true` –
   but the `__DIRECTIVE__` global *does* still mount. If you don't want
   that, gate the whole plugin behind your build flag.
 - **`trace: false` still feeds subscribers.** The circular buffer is
@@ -154,17 +154,17 @@ every 100 ms for up to 10 s).
   your app shell if you don't want it to fight your CSS.
 - **`window.__DIRECTIVE__` is non-writable in production builds.** Tests
   that need to swap it should call `Object.defineProperty` in a
-  `beforeEach` — the descriptor is `configurable: true` only in dev
+  `beforeEach` – the descriptor is `configurable: true` only in dev
   mode.
 
 ## See also
 
-- [`whenExplain` panel](./when-explain-panel.md) — the Constraints
+- [`whenExplain` panel](./when-explain-panel.md) – the Constraints
   section in detail.
-- [`loggingPlugin`](./logging.md) — same events, in stdout.
-- [`performancePlugin`](./performance.md) — perf metrics as a
+- [`loggingPlugin`](./logging.md) – same events, in stdout.
+- [`performancePlugin`](./performance.md) – perf metrics as a
   programmatic snapshot rather than a panel section.
-- [`createAuditLedger`](./audit-ledger.md) — tamper-evident persistence
+- [`createAuditLedger`](./audit-ledger.md) – tamper-evident persistence
   with PII redaction.
 - [`emitDevToolsEvent`](https://github.com/directive-run/directive/blob/main/packages/core/src/plugins/devtools-ai-bridge.ts)
-  — emit AI agent events into the devtools event stream.
+  – emit AI agent events into the devtools event stream.

@@ -1,4 +1,4 @@
-# `predicateFromIntent` — LLMs write rules, runtime validates
+# `predicateFromIntent` – LLMs write rules, runtime validates
 
 > Let an LLM emit a `FactPredicate` as JSON, structurally + semantically
 > validated against your schema *before* it ever reaches the runtime.
@@ -22,11 +22,11 @@ const predicate = await predicateFromIntent({
 
 Five layers of validation per call:
 
-1. **Output-size cap** (default 64 KiB) — rejects the 10 MB-payload DoS before `JSON.parse`.
-2. **`JSON.parse`** — wrapped in `extractJsonFromOutput` so surrounding prose is tolerated.
-3. **`validatePredicate`** — closed operator set (`$eq`, `$gte`, `$any`, …), depth limit, prototype-safe, JSON-safe operands.
-4. **Operator-count cap** (default 256) — kills `{ $any: [{x:1}, …100k] }`.
-5. **`validatePredicateAgainstSchema`** — cross-checks operator-on-kind: `$gte` on a boolean fact, unknown fact path, etc.
+1. **Output-size cap** (default 64 KiB) – rejects the 10 MB-payload DoS before `JSON.parse`.
+2. **`JSON.parse`** – wrapped in `extractJsonFromOutput` so surrounding prose is tolerated.
+3. **`validatePredicate`** – closed operator set (`$eq`, `$gte`, `$any`, …), depth limit, prototype-safe, JSON-safe operands.
+4. **Operator-count cap** (default 256) – kills `{ $any: [{x:1}, …100k] }`.
+5. **`validatePredicateAgainstSchema`** – cross-checks operator-on-kind: `$gte` on a boolean fact, unknown fact path, etc.
 
 On any failure: the structured error feeds back to the LLM in the next attempt's prompt, including the original intent, the schema kinds, and the operator allowlist for the offending fact. Default 3 retries.
 
@@ -34,7 +34,7 @@ On retry exhaustion: throws `PredicateFromIntentError` with `.attempts`, `.error
 
 ## Tool-spec preset for function-calling APIs
 
-OpenAI and Anthropic use different tool-spec shapes — pick the matching helper.
+OpenAI and Anthropic use different tool-spec shapes – pick the matching helper.
 
 **OpenAI (Chat Completions / Responses):**
 
@@ -80,11 +80,11 @@ Validation errors (fix every one):
     → allowed operators for this fact: $eq, $ne, $in, $nin, $exists
 
 Schema reminder:
-  active: boolean — allowed: $eq, $ne, $in, $nin, $exists
-  …and 199 more fact(s) available — ask if you need the full list.
+  active: boolean – allowed: $eq, $ne, $in, $nin, $exists
+  …and 199 more fact(s) available – ask if you need the full list.
 ```
 
-This keeps retry prompts short for large schemas (200+ facts) — critical for token budgets and context-window pressure. Non-structural errors (e.g. JSON parse failures) fall back to the full schema, since the offending paths aren't known.
+This keeps retry prompts short for large schemas (200+ facts) – critical for token budgets and context-window pressure. Non-structural errors (e.g. JSON parse failures) fall back to the full schema, since the offending paths aren't known.
 
 ## Concurrency + cancellation (M7, N6)
 
@@ -111,11 +111,11 @@ const predicate = await predicateFromIntent({
 });
 ```
 
-**Runner must honor the signal for true mid-call cancellation (N6).** Fetch-based adapters (the bundled OpenAI / Anthropic / Ollama runners) thread the signal through to `fetch`, so the network call aborts mid-stream. A custom runner that ignores the third arg of the `AgentRunner` signature still delivers cancellation — but only at the next retry boundary, since the in-flight request will run to completion before the loop checks `signal.aborted` again.
+**Runner must honor the signal for true mid-call cancellation (N6).** Fetch-based adapters (the bundled OpenAI / Anthropic / Ollama runners) thread the signal through to `fetch`, so the network call aborts mid-stream. A custom runner that ignores the third arg of the `AgentRunner` signature still delivers cancellation – but only at the next retry boundary, since the in-flight request will run to completion before the loop checks `signal.aborted` again.
 
 When the runner honors the signal and throws an abort-shaped error (`DOMException("Aborted", "AbortError")` from fetch, or any throw while `signal.aborted` is true), `predicateFromIntent` rethrows as `Error("aborted")` without burning a retry attempt.
 
-## Provenance — auditable rule emission (M24, N3, M6)
+## Provenance – auditable rule emission (M24, N3, M6)
 
 Production deployments **MUST** persist a provenance record alongside any LLM-emitted predicate. Without it, auditing "where did this rule come from?" later is guesswork.
 
@@ -133,8 +133,8 @@ const { predicate, provenance } = await predicateFromIntentWithProvenance({
 
 await db.predicates.insert({
   predicate,
-  model: provenance.model,            // "gpt-4o-mini" (or "unknown" — see below)
-  intent: provenance.intent,          // sanitized intent — omitted when redactIntent: true
+  model: provenance.model,            // "gpt-4o-mini" (or "unknown" – see below)
+  intent: provenance.intent,          // sanitized intent – omitted when redactIntent: true
   intentHash: provenance.intentHash,  // SHA-256 hex of the sanitized intent (always present)
   emittedAt: provenance.emittedAt,    // ISO timestamp
   attempts: provenance.attemptCount,  // retry count
@@ -147,12 +147,12 @@ await db.predicates.insert({
 - **`predicateHash`** hashes the VALIDATED predicate object, canonicalized via stable stringification. Two LLM responses that differ only in whitespace or key order produce the **same** hash. This is the right primitive for "did the model emit the same logical rule?" queries.
 - **`intentHash`** hashes the sanitized intent STRING (SHA-256 when `crypto.subtle` is available, djb2 fallback). Use it to dedupe identical intents or to satisfy "we never stored the raw intent" claims.
 
-The legacy `rawOutputHash` field is gone — it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `predicateHash(predicate)` from `@directive-run/core` (public API — semver-stable, no `/internals` import needed).
+The legacy `rawOutputHash` field is gone – it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `predicateHash(predicate)` from `@directive-run/core` (public API – semver-stable, no `/internals` import needed).
 
-### PII guidance — `redact` vs `redactIntent` (M6)
+### PII guidance – `redact` vs `redactIntent` (M6)
 
 > ⚠ **`redactIntent` defaults to `false` for back-compat.** For
-> PII-sensitive deployments, ALWAYS pass `redactIntent: true` — the
+> PII-sensitive deployments, ALWAYS pass `redactIntent: true` – the
 > raw intent often contains user-supplied content (names, emails,
 > medical / financial details, customer messages) that becomes a
 > permanent record in `provenance.intent` once persisted. The default
@@ -165,9 +165,9 @@ The two PII knobs run at different stages of the pipeline. Use both for full cov
 | Option | When it runs | What it does | Default |
 | --- | --- | --- | --- |
 | `redact` | **Before the LLM call** | Sanitize the `intent` STRING before it lands in the system prompt sent to the model. Common uses: strip SSN / email / phone patterns, scrub prompt-injection markers. | `undefined` (no-op) |
-| `redactIntent` | **After the LLM call** (in the provenance record) | Omit the raw `intent` field from `PredicateFromIntentProvenance`. `intentHash` is still computed and persisted — only the raw text drops out. | `false` |
+| `redactIntent` | **After the LLM call** (in the provenance record) | Omit the raw `intent` field from `PredicateFromIntentProvenance`. `intentHash` is still computed and persisted – only the raw text drops out. | `false` |
 
-The two are independent — `redact` shapes what the MODEL sees, `redactIntent` shapes what the PROVENANCE RECORD persists. For a PII-sensitive deployment you probably want both: a `redact` sanitizer (so the third-party LLM provider never sees raw PII) plus `redactIntent: true` (so the audit record persists only the hash).
+The two are independent – `redact` shapes what the MODEL sees, `redactIntent` shapes what the PROVENANCE RECORD persists. For a PII-sensitive deployment you probably want both: a `redact` sanitizer (so the third-party LLM provider never sees raw PII) plus `redactIntent: true` (so the audit record persists only the hash).
 
 ```ts
 const { provenance } = await predicateFromIntentWithProvenance({
@@ -179,18 +179,18 @@ const { provenance } = await predicateFromIntentWithProvenance({
 });
 
 provenance.intent;     // undefined
-provenance.intentHash; // "a1b2c3…" — still present
+provenance.intentHash; // "a1b2c3…" – still present
 ```
 
 You can still dedupe / correlate via `intentHash`, but the raw text never lands in the provenance payload.
 
 ### Model field caveat
 
-`provenance.model` is populated from `opts.agent?.model`. If you call `predicateFromIntentWithProvenance` with no `agent`, the default `predicate-emitter` agent has no model field, and `provenance.model` resolves to `"unknown"`. v1 does **NOT** read provider-detected model strings from `RunResult` — that requires the `AgentRunner` contract to expose it, which is a v2 change. Pass `agent: { name: "...", model: "..." }` explicitly if you need provider attribution today.
+`provenance.model` is populated from `opts.agent?.model`. If you call `predicateFromIntentWithProvenance` with no `agent`, the default `predicate-emitter` agent has no model field, and `provenance.model` resolves to `"unknown"`. v1 does **NOT** read provider-detected model strings from `RunResult` – that requires the `AgentRunner` contract to expose it, which is a v2 change. Pass `agent: { name: "...", model: "..." }` explicitly if you need provider attribution today.
 
 ## Security model
 
-The `intent` string is **untrusted user input**. The security boundary is the structural validation pipeline — operators are restricted to a closed set, so a prompt-injected `$where: "..."` is rejected at layer 3 before it ever reaches a query compiler.
+The `intent` string is **untrusted user input**. The security boundary is the structural validation pipeline – operators are restricted to a closed set, so a prompt-injected `$where: "..."` is rejected at layer 3 before it ever reaches a query compiler.
 
 For sensitive use (admin tools, public APIs):
 - Pass `redact?: (intent) => string` to sanitize the intent before it lands in the system prompt.
@@ -199,10 +199,10 @@ For sensitive use (admin tools, public APIs):
 
 ## What this does NOT do
 
-- **Doesn't invoke the model** — you bring your own `runner` (an `AgentRunner` from `@directive-run/ai`'s adapters).
-- **Doesn't memoize** — every call hits the LLM. Cache at the call site.
-- **Doesn't sanitize the LLM's training-data biases** — if the model emits a discriminatory rule, the validator says "structurally fine"; you still need policy review.
-- **Doesn't perform multi-turn reasoning** — one retry loop, errors fed back inline. For complex reasoning, wrap with your own state machine.
+- **Doesn't invoke the model** – you bring your own `runner` (an `AgentRunner` from `@directive-run/ai`'s adapters).
+- **Doesn't memoize** – every call hits the LLM. Cache at the call site.
+- **Doesn't sanitize the LLM's training-data biases** – if the model emits a discriminatory rule, the validator says "structurally fine"; you still need policy review.
+- **Doesn't perform multi-turn reasoning** – one retry loop, errors fed back inline. For complex reasoning, wrap with your own state machine.
 
 > **Demo runners are not LLMs.** The `mockPredicateRunner` shipped in
 > `examples/compliance-audit/` is a regex-based dispatcher: it always
@@ -215,5 +215,5 @@ For sensitive use (admin tools, public APIs):
 ## Reference
 
 - API: `predicateFromIntent`, `predicateFromIntentRaw`, `predicateFromIntentWithProvenance`, `predicateToolSpecOpenAI`, `predicateToolSpecAnthropic`, `predicateToolSpec` (deprecated alias), `PredicateFromIntentError`, `PredicateFromIntentProvenance`
-- Validation helpers: [`validatePredicateAgainstSchema`](../api/types.md), [`getSchemaFieldKinds`](../api/types.md), [`getOperatorsForKind`](../api/types.md), `dangerousRegex` (subpath `@directive-run/core/internals` — no semver guarantee)
+- Validation helpers: [`validatePredicateAgainstSchema`](../api/types.md), [`getSchemaFieldKinds`](../api/types.md), [`getOperatorsForKind`](../api/types.md), `dangerousRegex` (subpath `@directive-run/core/internals` – no semver guarantee)
 - Pairs with: [`doctor`](./doctor.md), [`predict`](./predict.md), [predicate codegen](./predicate-codegen.md)

@@ -14,11 +14,11 @@ gotchas the first port through each shape will hit.
 | `assign({field: ...})` | `event.handle(...)` writing a fact, or a `derivation` recomputing from upstream facts |
 | `fromPromise(async fn)` | `resolver` (async fact source). Bonus: causal cache invalidation via `@directive-run/query` |
 | `sendTo(child, event)` | Direct `event.dispatch` on same module, or cross-module event bus (see [Cross-Module Events](./composition/cross-module-events.md)) |
-| `spawnChild(machine, {input})` | `createSystem({ modules })` + `crossModuleDeps` — see [Porting from XState's spawnChild](#porting-from-xstates-spawnchild) below |
+| `spawnChild(machine, {input})` | `createSystem({ modules })` + `crossModuleDeps` – see [Porting from XState's spawnChild](#porting-from-xstates-spawnchild) below |
 | Parallel states | Multiple independent facts on the same module |
 | `useMachine(...)` (React) | `useFact` / `useDerivation` from `@directive-run/react`. Granular subscriptions = fewer re-renders |
 | `useSelector(state, selector)` | First-class `useDerivation` |
-| `@statelyai/inspect` | `devtoolsPlugin` from `@directive-run/core/plugins`. Loses the visual statechart — gap accepted |
+| `@statelyai/inspect` | `devtoolsPlugin` from `@directive-run/core/plugins`. Loses the visual statechart – gap accepted |
 | `after: { 5000: 'TIMEOUT' }` | No declarative `after`. Becomes imperative `setTimeout` in an effect, OR the `useTickWhile` React hook for predicate-gated dispatch (see [fake timers](./testing/fake-timers.md)) |
 | Realtime subscription inside actor | `createSubscription` from `@directive-run/query` feeding facts. Causal cache handles dedup |
 
@@ -33,7 +33,7 @@ change; resolvers run when a constraint declares a fact missing or stale.
 
 The result is fewer explicit transitions and more *truth-preserving* logic.
 Most ports come in 25-40% smaller. The exceptions are pure FSMs (auth, signup
-wizards) where Directive's verbosity tax shows up — see the [LOC delta
+wizards) where Directive's verbosity tax shows up – see the [LOC delta
 analysis](#loc-delta-by-machine-shape).
 
 ## Discriminated `status` is the de-facto pattern
@@ -54,7 +54,7 @@ to re-validate the union shape.
 
 ## The `pendingAction` pattern (12+ cycles confirmed)
 
-When a single state has multiple paths forward — submit, cancel, retry, undo —
+When a single state has multiple paths forward – submit, cancel, retry, undo –
 don't model each as its own constraint. Use a discriminated `pendingAction`
 fact:
 
@@ -74,17 +74,17 @@ A single constraint fires on `pendingAction != null`, dispatches the matching
 resolver, then nulls it. This collapses what would be 4-8 XState transitions
 into one constraint with a switch. See the upcoming
 [`@directive-run/mutator`](https://github.com/directive-run/directive/discussions)
-helper which formalizes this — it ships in Phase 3.
+helper which formalizes this – it ships in Phase 3.
 
 ## JSON-roundtrippable facts (load-bearing rule)
 
 Facts MUST be JSON-roundtrippable. `Date`, `Set`, `Map`, `File`, `Promise`,
-class instances — none of these survive Directive's proxy reactivity layer. A
+class instances – none of these survive Directive's proxy reactivity layer. A
 Date assigned to a fact silently becomes a frozen object that compares unequal
 to itself.
 
 As of `@directive-run/core@1.2.0`, assigning one of these in dev mode emits a
-runtime warning. In production builds the warning is tree-shaken — your app
+runtime warning. In production builds the warning is tree-shaken – your app
 will silently misbehave. **Convert at the boundary**:
 
 ```ts
@@ -156,7 +156,7 @@ explicitly before destroying the parent system.
 A constraint cannot re-fire itself within the same `flushAsync` window. If
 your XState machine had `[transition: 'self']` or a state self-loop, naively
 mapping that to a Directive constraint that re-evaluates its trigger fact will
-appear to stall — the test won't fail, the assertion just never resolves.
+appear to stall – the test won't fail, the assertion just never resolves.
 
 `ctx.requeue()` is the explicit opt-in (shipped in 1.2.0). Use it inside the
 constraint body when you intentionally want a same-constraint re-fire. See
@@ -196,17 +196,17 @@ From the 55-cycle migration:
 | Realtime cluster (game, lobby) | **-15 to -25%** | Wins concentrate in derivations, not transitions |
 
 Default rule: if the machine is mostly query-driven, expect a big shrink. If
-it's mostly transition-driven, expect parity. This is by design — Directive
+it's mostly transition-driven, expect parity. This is by design – Directive
 optimizes for **derived state**, not finite states.
 
 ## Migration order (lessons from doing it in the wrong order)
 
-1. Smallest non-realtime machines first — proves the cycle template
-2. Pure-logic / validation machines next — lowest risk
-3. Query-driven (browse, leaderboard) — biggest wins, build confidence
-4. Auth / forms — verbosity tax, but contained
-5. Page state / dashboards — bulk volume, easy
-6. Realtime cluster LAST — needs all the above patterns plus subscription wiring
+1. Smallest non-realtime machines first – proves the cycle template
+2. Pure-logic / validation machines next – lowest risk
+3. Query-driven (browse, leaderboard) – biggest wins, build confidence
+4. Auth / forms – verbosity tax, but contained
+5. Page state / dashboards – bulk volume, easy
+6. Realtime cluster LAST – needs all the above patterns plus subscription wiring
 
 Don't migrate a machine that's actively being developed. Use the WRAP model
 (Directive owns facts, XState becomes a thin view layer reading them) for
@@ -218,16 +218,16 @@ Ship each port behind a feature flag (`MINGLINGO_DIRECTIVE_<MachineName>` in
 the Minglingo case). Run both implementations in parallel for 7 days, log
 divergence, then flip. Delete the XState file two weeks after the soak.
 
-This pattern is independent of Directive — it's the rollback-discipline part
+This pattern is independent of Directive – it's the rollback-discipline part
 that makes solo-dev migration tractable.
 
 ---
 
 ## See also
 
-- [Chained pipelines testing](./testing/chained-pipelines.md) — the canonical flushing pattern
-- [Fake timers](./testing/fake-timers.md) — when `vi.useFakeTimers()` plays well with Directive
-- [Internal events](./patterns/internal-events.md) — `status`-as-event-bus
-- [Derivations](./derivations.md) — composition + purity rules
-- [Cross-module events](./composition/cross-module-events.md) — peer dispatch ergonomics
-- [`MIGRATION_FEEDBACK.md`](./MIGRATION_FEEDBACK.md) — full 26-item gap log from the migration
+- [Chained pipelines testing](./testing/chained-pipelines.md) – the canonical flushing pattern
+- [Fake timers](./testing/fake-timers.md) – when `vi.useFakeTimers()` plays well with Directive
+- [Internal events](./patterns/internal-events.md) – `status`-as-event-bus
+- [Derivations](./derivations.md) – composition + purity rules
+- [Cross-module events](./composition/cross-module-events.md) – peer dispatch ergonomics
+- [`MIGRATION_FEEDBACK.md`](./MIGRATION_FEEDBACK.md) – full 26-item gap log from the migration

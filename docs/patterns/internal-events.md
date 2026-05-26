@@ -2,7 +2,7 @@
 
 Directive deliberately has only one event channel: `dispatch`. There is no
 parallel "internal event bus" because the discriminated `status` fact already
-fills that role — and a hidden second channel would split tooling, devtools
+fills that role – and a hidden second channel would split tooling, devtools
 visibility, and replay determinism.
 
 ## The pattern
@@ -53,7 +53,7 @@ Considered and rejected (MIGRATION_FEEDBACK item 5):
    third channel means three things to track and three places to look when
    replay diverges.
 2. **Replay determinism requires a single ordering.** Two channels means a
-   tiebreaker rule for "fact-change vs internal-event in the same tick" —
+   tiebreaker rule for "fact-change vs internal-event in the same tick" –
    one more rule to remember and one more silent footgun.
 3. **The status discriminator already encodes the intent.** A name like
    `'pendingHostApproval'` is a state and an event simultaneously; you can't
@@ -89,7 +89,7 @@ constraint.create({
 ```
 
 Always null the payload when the constraint completes. A stale
-`pendingSubmit` left dangling is the most common bug in this pattern — the
+`pendingSubmit` left dangling is the most common bug in this pattern – the
 next status transition into `'submitting'` will reuse the old payload.
 
 The upcoming [`@directive-run/mutator`](../MIGRATION_FEEDBACK.md) helper
@@ -100,7 +100,7 @@ type. Until it ships, the manual pattern works fine.
 
 External events (user clicks, network responses, websocket frames) come in
 through the normal `events.X(payload)` API. They're untyped from the module's
-perspective — every `event.handle(...)` decides what to do.
+perspective – every `event.handle(...)` decides what to do.
 
 The internal/external distinction collapses inside the module. From the
 module's view, it's all "things that happen, possibly with a payload." The

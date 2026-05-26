@@ -5,7 +5,7 @@ MIGRATION_FEEDBACK items in one shape: declarative `after` (#4),
 fake-timer integration (#15), clock-in-derivation (#16), and
 predicate-gated tick wiring (#18).
 
-> **v0.1 status:** ships the *value layer* — `SignalClock` interface +
+> **v0.1 status:** ships the *value layer* – `SignalClock` interface +
 > `realClock` / `virtualClock` factories, and a set of pure timer-state
 > helpers (`startTimer`, `pauseTimer`, `tickTimer`, etc) plus a
 > `timerOps()` bundle for ergonomic single-import use. Engine-integrated
@@ -22,7 +22,7 @@ import { realClock, virtualClock, defaultClock } from '@directive-run/core';
 
 const clock = realClock();        // production
 const test = virtualClock(0);     // tests; advanceBy() to step time
-const auto = defaultClock();      // alias for realClock — auto-detect
+const auto = defaultClock();      // alias for realClock – auto-detect
                                   // was removed (footgun under vitest)
 ```
 
@@ -36,7 +36,7 @@ interface SignalClock {
 }
 ```
 
-`virtualClock` is the test ergonomics win — `advanceBy(5000)`
+`virtualClock` is the test ergonomics win – `advanceBy(5000)`
 synchronously fires every callback whose deadline falls in the window,
 in deadline order, with ties broken by registration order.
 
@@ -52,7 +52,7 @@ interface TimerFactState {
 }
 ```
 
-JSON-roundtrippable — store directly in a Directive fact via
+JSON-roundtrippable – store directly in a Directive fact via
 `t.object<TimerFactState>()`. No `Date` instances, no class wrappers.
 
 ## Recommended pattern
@@ -105,8 +105,8 @@ const interval = setInterval(() => sys.events.TICK(), 100);
 | Mode | Meaning | Completion |
 |---|---|---|
 | `'down'` (default) | Counts down from `ms` to 0 | `status` → `'completed'` at 0 |
-| `'up'` | Counts elapsed time, no upper bound | Never completes — consumer reads `elapsedMs` |
-| `'repeat'` | Fires every `ms`, drift-free | Never completes — `registerRepeat` advances `startedAtMs` cleanly |
+| `'up'` | Counts elapsed time, no upper bound | Never completes – consumer reads `elapsedMs` |
+| `'repeat'` | Fires every `ms`, drift-free | Never completes – `registerRepeat` advances `startedAtMs` cleanly |
 
 ## Replay determinism
 
@@ -124,7 +124,7 @@ the seed.
 ## What's deferred to v0.2
 
 The shipped helpers are pure functions on JSON state. The engine has no
-auto-tick integration today — your consumer wires the interval. v0.2
+auto-tick integration today – your consumer wires the interval. v0.2
 adds `t.timer({ms})` as a real schema constructor that the engine
 handles natively, eliminating the consumer-side tick. The pure helpers
 ship now because they're sufficient to write correct, deterministic
@@ -133,6 +133,6 @@ foundation v0.2 will be built on.
 
 ## See also
 
-- [RFC 0001 — `t.timer({ms})`](../rfcs/0001-t-timer.md) — full design rationale
-- [Fake timers](../testing/fake-timers.md) — `vi.useFakeTimers()` integration (still useful for non-Directive setIntervals)
+- [RFC 0001 – `t.timer({ms})`](../rfcs/0001-t-timer.md) – full design rationale
+- [Fake timers](../testing/fake-timers.md) – `vi.useFakeTimers()` integration (still useful for non-Directive setIntervals)
 - [Migrating from XState § `after:`](../migrating-from-xstate.md#tldr-concept-mapping)

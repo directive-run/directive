@@ -1,4 +1,4 @@
-# Predicate codegen — one predicate, three targets
+# Predicate codegen – one predicate, three targets
 
 > Compile a `FactPredicate` to SQL, MongoDB, or PostgREST. Same JSON, same
 > semantics, three execution sites. The end of dual-write hell.
@@ -22,7 +22,7 @@ Three places. Three drift surfaces. Three bugs waiting to happen.
 
 ## The solution
 
-Directive's `FactPredicate` is a *data form* — a JSON object describing
+Directive's `FactPredicate` is a *data form* – a JSON object describing
 "what must be true." Because the operator set (`$eq`, `$gte`, `$in`,
 `$matches`, `$between`, `$contains`, `$all` / `$any` / `$not`) is a
 proper subset of every modern query language, the *same* predicate can
@@ -81,9 +81,9 @@ predicateToSQL(predicate, options): { sql, where, params }
 
 ### Returns
 
-- `sql` — the full `SELECT … FROM table WHERE …` statement.
-- `where` — just the `WHERE` clause body (no leading `WHERE`).
-- `params` — values in `$1`, `$2`, … order, for the driver's parameter array.
+- `sql` – the full `SELECT … FROM table WHERE …` statement.
+- `where` – just the `WHERE` clause body (no leading `WHERE`).
+- `params` – values in `$1`, `$2`, … order, for the driver's parameter array.
 
 ### Use `predicateToWhere` for non-SELECT queries
 
@@ -140,7 +140,7 @@ predicateToMongo(predicate, options?): Record<string, unknown>
 | `allowedKeys?`      | `readonly string[]` | none    |
 | `allowDottedPaths?` | `boolean`           | `false` |
 
-Field names beginning with `$` are **rejected** — that's the injection
+Field names beginning with `$` are **rejected** – that's the injection
 vector for `$where` JavaScript-evaluation. Dotted field names (sub-document
 paths like `"user.role"`) are rejected by default; opt in with
 `allowDottedPaths: true` when you genuinely need them.
@@ -156,7 +156,7 @@ paths like `"user.role"`) are rejected by default; opt in with
 | `{ $any: [...] }`               | `{ $or: [...] }`                             |
 | `{ $not: {...} }`               | `{ $nor: [{...}] }`                          |
 
-The result is plain JSON — no BSON, no driver-specific types — so it
+The result is plain JSON – no BSON, no driver-specific types – so it
 survives `JSON.stringify` round-trips and can be sent over the wire.
 
 ## `predicateToPostgrest`
@@ -186,13 +186,13 @@ predicateToPostgrest({ $any: [{ tier: "gold" }, { score: { $gte: 100 } }] }, { m
 
 ### SQL injection by construction
 
-Every operand flows through the `params` array — *never* the SQL string.
+Every operand flows through the `params` array – *never* the SQL string.
 The only thing interpolated literally into the SQL is the table name and
 the column names, both regex-validated against
 `[A-Za-z_][A-Za-z0-9_]*` (optionally dotted for qualified names).
 
 ```ts
-// SAFE — even with a malicious-looking value:
+// SAFE – even with a malicious-looking value:
 predicateToSQL(
   { name: "Robert'); DROP TABLE Students;--" },
   { table: "users" },
@@ -203,25 +203,25 @@ predicateToSQL(
 
 The pgolfer's classic ["Bobby Tables"](https://xkcd.com/327/) attack
 becomes a literal string parameter. The database sees one bound
-parameter — never SQL.
+parameter – never SQL.
 
 ### Mongo `$where` injection blocked
 
 `predicateToMongo` rejects any field name beginning with `$`. This is
 the only way an attacker-controlled predicate could land a top-level
-`$where` (which evaluates server-side JavaScript) — closed by
+`$where` (which evaluates server-side JavaScript) – closed by
 construction:
 
 ```ts
 predicateToMongo({ $where: "function(){return true}" });
-// → throws: field name "$where" starts with "$" — reserved for Mongo operators
+// → throws: field name "$where" starts with "$" – reserved for Mongo operators
 ```
 
 ### Combinator-and-sibling-key rejection
 
 A predicate like `{ $all: [aiPredicate], tenant_id: "abc" }` would
 silently drop the `tenant_id` clause if combinators and sibling keys were
-both honored — a real cross-tenant data leak waiting to happen. All
+both honored – a real cross-tenant data leak waiting to happen. All
 three codegens **throw** when a combinator coexists with sibling keys:
 
 ```ts
@@ -229,7 +229,7 @@ predicateToSQL(
   { $all: [aiPredicate], tenant_id: req.user.tenant_id },
   { table: "rows" },
 );
-// → throws: $all cannot coexist with sibling keys (tenant_id) — wrap them in $all together
+// → throws: $all cannot coexist with sibling keys (tenant_id) – wrap them in $all together
 ```
 
 The fix is to nest: `{ $all: [aiPredicate, { tenant_id: req.user.tenant_id }] }`.
@@ -268,7 +268,7 @@ across `standard_conforming_strings` settings and MySQL's
 ### `select` projection validation
 
 `select` accepts `"*"`, a single column identifier, or an array of
-column identifiers. Free-form SQL is rejected — build the wrapper SQL
+column identifiers. Free-form SQL is rejected – build the wrapper SQL
 yourself with `predicateToWhere` for COUNT, JOIN, or other constructs:
 
 ```ts
@@ -278,7 +278,7 @@ predicateToSQL({ x: 1 }, { table: "u", select: "*, password FROM admin --" });
 
 ### Effects-only operators are rejected
 
-`$changed` requires a `prev` snapshot — meaningful in the Directive
+`$changed` requires a `prev` snapshot – meaningful in the Directive
 runtime, meaningless on a SQL row. All three codegens throw
 `[Directive] predicateTo*: $changed is an effects-only operator` rather
 than silently producing wrong queries.
@@ -310,8 +310,8 @@ const rows = await pg.query(sql, params);
 
 ### AI-generated query, safely
 
-Pair this with `R4.D` — an LLM emits a `FactPredicate` (JSON, validated
-by the type system before it ever reaches a database) — and pass it
+Pair this with `R4.D` – an LLM emits a `FactPredicate` (JSON, validated
+by the type system before it ever reaches a database) – and pass it
 through `predicateToSQL` with an `allowedKeys` list. Three layers of
 defense:
 
@@ -334,7 +334,7 @@ const res = await fetch(`${SUPABASE_URL}/rest/v1/users?${qs}`, {
 });
 ```
 
-Zero cold-start, no Node runtime, no driver — the predicate compiles to
+Zero cold-start, no Node runtime, no driver – the predicate compiles to
 a querystring in microseconds at the edge.
 
 ## Limitations
@@ -345,7 +345,7 @@ a querystring in microseconds at the edge.
   (`age=gte.18&age=lte.65`) for portability.
 - **Mongo `$contains` is string-only.** For array element-membership use
   `$elemMatch` or `$in` directly.
-- **`$matches` flag semantics differ** between JS, Postgres, and Mongo —
+- **`$matches` flag semantics differ** between JS, Postgres, and Mongo –
   the `i` flag is portable; multiline / dotall flags are not.
 - **RegExp operands reach the server.** Catastrophic-backtracking
   patterns (`/(a+)+/`, `/(.+)*/`) will burn database CPU. Treat

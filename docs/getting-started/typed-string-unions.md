@@ -1,4 +1,4 @@
-# `t.string<Union>()` — Lead With This
+# `t.string<Union>()` – Lead With This
 
 The single highest-leverage feature for legibility in a Directive module is
 the typed-union schema constructor:
@@ -73,7 +73,7 @@ constraint.create({
 
 Same trick everywhere: the generic narrows the TypeScript type without
 changing the runtime validator. Runtime stays `typeof === 'string'` (or
-`Array.isArray`, etc.) — the TS compiler does the rest.
+`Array.isArray`, etc.) – the TS compiler does the rest.
 
 ## When to use a runtime-validated form instead
 
@@ -107,5 +107,5 @@ afterthought.
 
 ## See also
 
-- [Facts API](../api/facts.md) — full schema-builder reference
+- [Facts API](../api/facts.md) – full schema-builder reference
 - [Migrating from XState § discriminated `status`](../migrating-from-xstate.md#discriminated-status-is-the-de-facto-pattern)
