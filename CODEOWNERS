@@ -1,0 +1,8 @@
+# Every file in this repository requires review from the project maintainer.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# CODEOWNERS pairs with the `require_code_owner_reviews` branch-protection
+# rule on main: PRs cannot merge without an explicit approval from the
+# owners listed below.
+
+* @jasoncomes
