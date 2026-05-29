@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useDerived } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _doubled = useDerived(system, "doubled");
-const _isPositive = useDerived(system, "isPositive");
-const _multi = useDerived(system, ["doubled", "isPositive"]);
+const doubled = useDerived(system, "doubled");
+const isPositive = useDerived(system, "isPositive");
+const multi = useDerived(system, ["doubled", "isPositive"]);
 </script>
 
 <template>

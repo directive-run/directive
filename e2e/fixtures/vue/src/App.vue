@@ -12,12 +12,14 @@ import UseInspect from "./hooks/UseInspect.vue";
 import UseOptimisticUpdate from "./hooks/UseOptimisticUpdate.vue";
 import UseRequirementStatus from "./hooks/UseRequirementStatus.vue";
 import UseSelector from "./hooks/UseSelector.vue";
+import UseSelectorDefault from "./hooks/UseSelectorDefault.vue";
 import UseWatch from "./hooks/UseWatch.vue";
 
-const _routes: Record<string, any> = {
+const routes: Record<string, any> = {
   useFact: UseFact,
   useDerived: UseDerived,
   useSelector: UseSelector,
+  useSelectorDefault: UseSelectorDefault,
   useDispatch: UseDispatch,
   useWatch: UseWatch,
   useInspect: UseInspect,

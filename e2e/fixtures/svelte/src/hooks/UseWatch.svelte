@@ -1,6 +1,7 @@
 <script lang="ts">
 import { useWatch } from "@directive-run/svelte";
 import { writable } from "svelte/store";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
 const prev = writable("none");

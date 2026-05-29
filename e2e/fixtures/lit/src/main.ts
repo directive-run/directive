@@ -2,6 +2,7 @@ import "./app-root.js";
 import "./elements/use-fact-page.js";
 import "./elements/use-derived-page.js";
 import "./elements/use-selector-page.js";
+import "./elements/use-selector-default-page.js";
 import "./elements/use-dispatch-page.js";
 import "./elements/use-watch-page.js";
 import "./elements/use-inspect-page.js";

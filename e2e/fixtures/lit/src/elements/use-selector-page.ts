@@ -12,9 +12,16 @@ export class UseSelectorPage extends LitElement {
     (facts) => (facts.count as number) * 3,
   );
 
+  private _name = new DirectiveSelectorController<string>(
+    this,
+    system,
+    (facts) => (facts.name as string) ?? "fallback",
+  );
+
   render() {
     return html`
       <span data-testid="${TestIds.selectorResult}">${this._tripled.value}</span>
+      <span data-testid="${TestIds.selectorDefault}">${this._name.value}</span>
       <button data-testid="${TestIds.btnIncrement}" @click=${() => system.events.increment()}>
         inc
       </button>

@@ -1,9 +1,10 @@
 <script lang="ts">
 import { useConstraintStatus, useFact } from "@directive-run/svelte";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _constraints = useConstraintStatus(system);
-const _status = useFact(system, "status");
+const constraints = useConstraintStatus(system);
+const status = useFact(system, "status");
 
 // biome-ignore lint/suspicious/noExplicitAny: Svelte framework store type-erasure
 $: constraintsList = /** @type {any[]} */ ($constraints) as any[];

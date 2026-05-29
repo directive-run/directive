@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useWatch } from "@directive-run/vue";
 import { ref } from "vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
 const prev = ref<string>("none");

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useFact, useInspect } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _inspect = useInspect(system);
-const _status = useFact(system, "status");
+const inspect = useInspect(system);
+const status = useFact(system, "status");
 </script>
 
 <template>

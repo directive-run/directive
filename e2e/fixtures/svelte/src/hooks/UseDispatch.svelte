@@ -1,9 +1,10 @@
 <script lang="ts">
 import { useDispatch, useFact } from "@directive-run/svelte";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _count = useFact(system, "count");
-const _dispatch = useDispatch(system);
+const count = useFact(system, "count");
+const dispatch = useDispatch(system);
 </script>
 
 <div>

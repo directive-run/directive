@@ -6,6 +6,7 @@ const routes: Record<string, string> = {
   useFact: "use-fact-page",
   useDerived: "use-derived-page",
   useSelector: "use-selector-page",
+  useSelectorDefault: "use-selector-default-page",
   useDispatch: "use-dispatch-page",
   useWatch: "use-watch-page",
   useInspect: "use-inspect-page",

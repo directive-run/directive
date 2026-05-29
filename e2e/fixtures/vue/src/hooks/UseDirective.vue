@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDirective } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { testModule } from "../../../../shared/test-module";
 
 const { system, facts, derived, events, dispatch } = useDirective(testModule, {

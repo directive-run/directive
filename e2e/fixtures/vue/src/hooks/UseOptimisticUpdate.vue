@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useFact, useOptimisticUpdate } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { statusPlugin, system } from "../system";
 
-const _count = useFact(system, "count");
+const count = useFact(system, "count");
 const { mutate, isPending, error, rollback } = useOptimisticUpdate(
   system,
   statusPlugin,

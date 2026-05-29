@@ -12,12 +12,14 @@ import { UseInspectPage } from "./hooks/UseInspect";
 import { UseOptimisticUpdatePage } from "./hooks/UseOptimisticUpdate";
 import { UseRequirementStatusPage } from "./hooks/UseRequirementStatus";
 import { UseSelectorPage } from "./hooks/UseSelector";
+import { UseSelectorDefaultPage } from "./hooks/UseSelectorDefault";
 import { UseWatchPage } from "./hooks/UseWatch";
 
 const routes: Record<string, Component> = {
   useFact: UseFactPage,
   useDerived: UseDerivedPage,
   useSelector: UseSelectorPage,
+  useSelectorDefault: UseSelectorDefaultPage,
   useDispatch: UseDispatchPage,
   useWatch: UseWatchPage,
   useInspect: UseInspectPage,

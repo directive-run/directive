@@ -1,9 +1,10 @@
 <script lang="ts">
 import { useFact, useHistory } from "@directive-run/svelte";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _count = useFact(system, "count");
-const _history = useHistory(system);
+const count = useFact(system, "count");
+const history = useHistory(system);
 </script>
 
 <div>

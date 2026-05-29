@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useExplain, useFact } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _status = useFact(system, "status");
-const _explanation = useExplain(system, "LOAD_DATA:{}");
+const status = useFact(system, "status");
+const explanation = useExplain(system, "LOAD_DATA:{}");
 </script>
 
 <template>

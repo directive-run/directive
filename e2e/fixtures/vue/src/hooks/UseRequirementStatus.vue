@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useFact } from "@directive-run/vue";
 import { useRequirementStatus } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { statusPlugin, system } from "../system";
 
-const _reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
-const _status = useFact(system, "status");
+const reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
+const status = useFact(system, "status");
 </script>
 
 <template>

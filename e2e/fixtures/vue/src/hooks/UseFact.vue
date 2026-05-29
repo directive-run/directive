@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useFact } from "@directive-run/vue";
+import { TestIds } from "../../../../shared/test-ids";
 import { system } from "../system";
 
-const _count = useFact(system, "count");
-const _multi = useFact(system, ["count", "name"]);
+const count = useFact(system, "count");
+const multi = useFact(system, ["count", "name"]);
 </script>
 
 <template>

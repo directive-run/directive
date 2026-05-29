@@ -1,10 +1,24 @@
 <script lang="ts">
 import { onMount } from "svelte";
+import UseConstraintStatusPage from "./hooks/UseConstraintStatus.svelte";
+import UseDerivedPage from "./hooks/UseDerived.svelte";
+import UseDirectivePage from "./hooks/UseDirective.svelte";
+import UseDispatchPage from "./hooks/UseDispatch.svelte";
+import UseEventsPage from "./hooks/UseEvents.svelte";
+import UseExplainPage from "./hooks/UseExplain.svelte";
+import UseFactPage from "./hooks/UseFact.svelte";
+import UseHistoryPage from "./hooks/UseHistory.svelte";
+import UseInspectPage from "./hooks/UseInspect.svelte";
+import UseOptimisticUpdatePage from "./hooks/UseOptimisticUpdate.svelte";
+import UseRequirementStatusPage from "./hooks/UseRequirementStatus.svelte";
+import UseSelectorPage from "./hooks/UseSelector.svelte";
+import UseSelectorDefaultPage from "./hooks/UseSelectorDefault.svelte";
+import UseWatchPage from "./hooks/UseWatch.svelte";
 
-let _route = window.location.hash.slice(2) || "";
+let route = window.location.hash.slice(2) || "";
 
 function onHash() {
-  _route = window.location.hash.slice(2);
+  route = window.location.hash.slice(2);
 }
 
 onMount(() => {
@@ -19,6 +33,8 @@ onMount(() => {
   <UseDerivedPage />
 {:else if route === "useSelector"}
   <UseSelectorPage />
+{:else if route === "useSelectorDefault"}
+  <UseSelectorDefaultPage />
 {:else if route === "useDispatch"}
   <UseDispatchPage />
 {:else if route === "useWatch"}
