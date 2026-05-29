@@ -3,14 +3,15 @@
 **The constraint-driven runtime for TypeScript.** Declare what must be true. The runtime makes it happen.
 
 [![npm](https://img.shields.io/npm/v/@directive-run/core)](https://www.npmjs.com/package/@directive-run/core)
-[![tests](https://img.shields.io/badge/tests-4%2C100%2B-brightgreen)](#)
+[![CI](https://github.com/directive-run/directive/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/directive-run/directive/actions/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-4%2C800%2B-brightgreen)](#)
 [![zero deps](https://img.shields.io/badge/dependencies-0-blue)](#)
 [![license](https://img.shields.io/npm/l/@directive-run/core)](./LICENSE)
 
 - **Constraint-Driven Resolution** &ndash; declare requirements, resolvers fulfill them automatically with retry, batching, and error boundaries
 - **AI Guardrails** &ndash; prompt injection detection, PII redaction, cost tracking, multi-agent orchestration with 4 LLM adapters (zero SDK dependencies)
 - **Auto-Tracking Derivations** &ndash; computed values that track their own dependencies, no manual dep arrays
-- **5 Framework Adapters + 1 Vanilla** &ndash; React, Vue, Svelte, Solid, Lit, plus `el()` for plain DOM &mdash; from a single state layer
+- **5 Framework Adapters + 1 Vanilla** &ndash; React, Vue, Svelte, Solid, Lit, plus `el()` for plain DOM &ndash; from a single state layer
 - **Zero Runtime Dependencies** &ndash; nothing to audit, nothing to break
 - **Time-Travel Debugging** &ndash; snapshot, rewind, replay, export/import system state
 
@@ -41,7 +42,7 @@ constraints: {
 // The runtime handles when, how, retry, and error recovery.
 ```
 
-Set `userId = 123` and the constraint fires, the resolver fetches the user, and the system settles &mdash; automatically.
+Set `userId = 123` and the constraint fires, the resolver fetches the user, and the system settles &ndash; automatically.
 
 ---
 
@@ -218,4 +219,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and architecture 
 
 ## License
 
-[MIT OR Apache-2.0](./LICENSE) &mdash; your choice.
+[MIT OR Apache-2.0](./LICENSE) &ndash; your choice.
