@@ -4,114 +4,75 @@
 
 ### Minor Changes
 
-- [`8c59331`](https://github.com/directive-run/directive/commit/8c5933191502009871449c7610d78836a4863602) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R6 full-library AE review — 4 security fixes, bundle splits, +64 tests
+- [`8c59331`](https://github.com/directive-run/directive/commit/8c5933191502009871449c7610d78836a4863602) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Security hardening, a smaller AI bundle, and broader test coverage.
 
-  Library-wide AE review across all 16 packages (~100K LOC, 4,765 tests).
-  Found 0 CRITICAL / 23 MAJOR. Closed the real-gap subset surgically; deferred
-  architectural-only items. Tests 4,765 → 4,829 (+64).
+  ### Security fixes
 
-  ### Security fixes (4 MAJOR closed)
-
-  - **`@directive-run/vite-plugin-api-proxy`** — 10 MB body cap + 30 s slowloris
-    timeout + response-header allowlist. `set-cookie`, `authorization`,
-    `x-api-key`, `x-internal-*` are now explicitly dropped from upstream
-    responses; only `content-type`, `cache-control`, `etag`, `last-modified`,
-    `vary`, `content-encoding`, `content-language`, `expires`, `pragma`
-    forwarded. Closes upstream-header info-leak + body-flood DoS.
-  - **`@directive-run/core` worker adapter** — `request<T>()` accepts
+  - **`@directive-run/vite-plugin-api-proxy`** – 10 MB body cap, a 30 s
+    slowloris timeout, and a response-header allowlist. `set-cookie`,
+    `authorization`, `x-api-key`, and `x-internal-*` are now explicitly
+    dropped from upstream responses; only `content-type`, `cache-control`,
+    `etag`, `last-modified`, `vary`, `content-encoding`, `content-language`,
+    `expires`, and `pragma` are forwarded. Closes an upstream-header info
+    leak and a body-flood denial-of-service.
+  - **`@directive-run/core` worker adapter** – `request<T>()` accepts
     `timeoutMs?: number` (default 30 s; `0`/`Infinity` opts out). On timeout
-    or `worker.onerror`, all pending entries reject + clear. Closes
+    or `worker.onerror`, all pending entries reject and clear, closing an
     unbounded `pendingRequests` Map leak.
-  - **`@directive-run/ai` structured-output** — `extractJsonFromOutput` now
+  - **`@directive-run/ai` structured output** – `extractJsonFromOutput` now
     runs `isPrototypeSafe` on every `JSON.parse` return point. LLM output
     with `__proto__`/`constructor`/`prototype` keys throws
     `[Directive] structured-output: extracted JSON contains unsafe
 prototype keys` instead of silently passing through.
 
-  ### Architecture splits (2 MAJOR closed)
+  ### Smaller AI bundle
 
-  - **`@directive-run/ai` bundle split** — main bundle 120 KB → **44 KB**
-    (-63%). New subpath exports (additive — main barrel keeps re-exports
-    with `@deprecated` JSDoc for one cycle):
-    - `@directive-run/ai/multi-agent` — orchestrator + patterns + agent
-      communication + checkpoints + breakpoints
-    - `@directive-run/ai/predicate` — `predicateFromIntent*`,
+  - **`@directive-run/ai` bundle split** – the main bundle drops from 120 KB
+    to **44 KB** (-63%). New subpath exports (additive – the main barrel
+    keeps re-exports with `@deprecated` JSDoc for one cycle):
+    - `@directive-run/ai/multi-agent` – orchestrator, patterns, agent
+      communication, checkpoints, breakpoints
+    - `@directive-run/ai/predicate` – `predicateFromIntent*`,
       `predicateToolSpec*`, `PredicateFromIntentError`
-    - `@directive-run/ai/guardrails` — PII / moderation / prompt-injection /
+    - `@directive-run/ai/guardrails` – PII, moderation, prompt-injection,
       semantic cache
-    - `@directive-run/ai/devtools` — debug timeline + devtools WebSocket
-      server + health monitor
-    - `@directive-run/ai/evals` — eval harness
+    - `@directive-run/ai/devtools` – debug timeline, devtools WebSocket
+      server, health monitor
+    - `@directive-run/ai/evals` – eval harness
     - (`@directive-run/ai/mcp`, `/openai`, `/anthropic`, `/ollama`, `/gemini`
       unchanged)
-  - **`@directive-run/core` audit-ledger split** — 1,313 LOC monolith
-    refactored into `packages/core/src/plugins/audit-ledger/` (6 files:
-    `types`, `hash`, `sink`, `predicate-redact`, `verify`, `index`). Public
-    API unchanged. `LEDGER_INTERNAL_TOKEN` sentinel still confined to one
-    file; tombstone-forgery defense intact.
+  - **`@directive-run/core` audit-ledger refactor** – the audit ledger moved
+    to `packages/core/src/plugins/audit-ledger/`. Public API unchanged; the
+    tombstone-forgery defense is intact.
 
-  ### Test parity (1 MAJOR closed)
+  ### Test coverage
 
-  `useAuditLedger` hooks shipped in v1.13 for React / Vue / Svelte / Solid
-  had ZERO tests (Lit had 1 controller test). Added **25 tests** across 4
-  new test files covering: initial-value sync, reactive update,
-  filter exclusion, `pollMs<50` clamp + dev warning, large-ledger warning,
-  cleanup on unmount.
+  Added coverage for the `useAuditLedger` hooks across React, Vue, Svelte,
+  and Solid (initial-value sync, reactive update, filter exclusion,
+  `pollMs<50` clamp with dev warning, large-ledger warning, and cleanup on
+  unmount), plus new tests for the vite-plugin-api-proxy body cap / header
+  allowlist / timeout, the worker-adapter timeout and `onerror` paths, and
+  the structured-output prototype-safety guard.
 
-  Plus: vite-plugin-api-proxy gained its first 4 tests (body cap, header
-  allowlist, timeout) + worker adapter gained 5 timeout/onerror tests + 6
-  new structured-output prototype-safety tests. Total +40 tests.
+  ### Other fixes
 
-  ### DX fixes (5 closed)
-
-  - Root README — added 8 missing packages to the table (`el`, `query`,
+  - Root README – added the 8 missing packages to the table (`el`, `query`,
     `cli`, `mutator`, `optimistic`, `timeline`, `vite-plugin-api-proxy`,
-    `knowledge`); fixed adapter-count mismatch.
-  - `@directive-run/vite-plugin-api-proxy` — new README documenting CORS
-    rationale, header allowlist, body cap, prod warning.
-  - `@directive-run/core` CHANGELOG — 1.12.0 entry was empty; filled in
-    with the R4 AE-review-loop scope.
+    `knowledge`) and fixed an adapter-count mismatch.
+  - `@directive-run/vite-plugin-api-proxy` – new README documenting the CORS
+    rationale, header allowlist, body cap, and production warning.
   - `AuditLedgerSink.erase` parameter renamed `tombstoneFactory` →
-    `markerEntryFactory` (param-name rename, no behavior change — TS
+    `markerEntryFactory` (parameter-name rename only, no behavior change –
     positional args mean no consumer breakage).
-  - `[Directive]` prefix sweep on `predicate-to-mongo.ts`, `sweep-under.ts`,
-    `module.ts`, `adapter-utils.ts` — confirmed all 36 throws already
-    prefixed (no diff).
-
-  ### Docs (1 closed)
-
-  6 plugin concept docs added (`logging`, `devtools`, `persistence`,
-  `observability`, `circuit-breaker`, `performance`) under
-  `docs/concepts/`. Mirror pages at `directive-docs/src/app/docs/<name>/`
-  for v2 routing (the existing nav under `/docs/plugins/<name>` keeps its
-  deeper content; the observability nav entry remains commented out per
-  the existing "re-evaluating vs OTel" product call).
-
-  ### Deferred (R5 MAJOR not closed this round)
-
-  - Observability + OTLP exporter + predicate-to-{sql,mongo,pgrest} direct
-    test files (~300-1100 LOC each, no regression risk currently)
-  - Cross-package integration tests
-  - LLM-emit provenance → audit-ledger seam (predicateHash on
-    `constraint.evaluate` entries) — wider design call
-  - Subject-keyed audit queries (multi-tenant ergonomics)
-  - Devtools extraction to its own package
-  - Shared `Sink<T>` interface refactor
-
-  R5 review surfaced 0 CRITICAL across the whole library. R6 closes the
-  high-signal subset. Engine + AI substrate + R4 hardening all intact.
+  - Added 6 plugin concept docs (`logging`, `devtools`, `persistence`,
+    `observability`, `circuit-breaker`, `performance`) under
+    `docs/concepts/`.
 
 ## 1.13.0
 
 ### Minor Changes
 
-- [`195480a`](https://github.com/directive-run/directive/commit/195480a1fe92234e023fa70db3a021b60f5efb91) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R4 sprint AE review loop — security hardening, honest claims, +2 new public APIs
-
-  Four-round AE review loop on the v1.12.0 R4 sprint wrap. Started with
-  8 CRITICAL / 26 MAJOR; converged in 4 rounds to 0 / 0. Trajectory:
-  R1 8→R2 4→R3 1→R4 0 CRITICAL. Tests 3551 → 3972 (+421). Two
-  game-changers shipped as byproducts: `describePredicate` (R6.B) and
-  `predicateHash` (R6.D).
+- [`195480a`](https://github.com/directive-run/directive/commit/195480a1fe92234e023fa70db3a021b60f5efb91) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Security hardening, more honest audit-ledger claims, and two new public APIs.
 
   ### New public APIs
 
@@ -132,9 +93,9 @@ prototype keys` instead of silently passing through.
 
   ### Security guarantees hardened
 
-  - **Tombstone forgery defense** — `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable internal sentinel symbol. Direct `sink.write({kind:"system.entry-erased",...})` is detected as tamper.
-  - **PII redaction now walks predicate operands** — `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into `whenSpec`.
-  - **Function-form `whenSource` → `sourceHash` only** — function source NEVER lands in audit entries; secrets in closures stay private.
+  - **Tombstone forgery defense** – `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable internal sentinel symbol. Direct `sink.write({kind:"system.entry-erased",...})` is detected as tamper.
+  - **PII redaction now walks predicate operands** – `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into `whenSpec`.
+  - **Function-form `whenSource` → `sourceHash` only** – function source NEVER lands in audit entries; secrets in closures stay private.
   - **AuditEntry payloads are frozen** at write time. In-process mutation throws.
   - **`AbortSignal.any()` properly composes** runner timeouts with caller signals (previously caller signal silently disabled timeout).
   - **PII default-redaction** for `meta({ tags: ["pii"] })` fact values in the audit ledger. `capturePII: true` opts out.
@@ -144,13 +105,13 @@ prototype keys` instead of silently passing through.
 
   The audit-ledger is **tamper-evident**, NOT cryptographic-grade:
 
-  - djb2 32-bit hash chain — detects accidental + light-adversarial tamper. SHA-256 reserved for v2.
+  - djb2 32-bit hash chain – detects accidental + light-adversarial tamper. SHA-256 reserved for v2.
   - `verify({ strong: true })` throws "reserved for v2" (was a no-op silently returning valid in v1.12.0).
   - In-memory ring buffer drops oldest past `capacity` (default 10k). SQLite / Parquet sinks reserved for v2.
   - `ledger.erase()` provides per-subject GDPR Art.17 erasure in-sink only; persisted exports must be erased separately. Erased entries break the chain at the erasure point; `verify()` reports them in `erasedSeqs: number[]`.
   - No actor / operator / session attribution on entries (v2).
   - No read-tracking (constraint evaluations + writes only).
-  - No trusted timestamps (RFC 3161 TSA) — `Date.now()` is operator-controlled.
+  - No trusted timestamps (RFC 3161 TSA) – `Date.now()` is operator-controlled.
   - No signing keys with rotation (v2).
 
   ### Migration (from v1.12.0)
@@ -158,8 +119,8 @@ prototype keys` instead of silently passing through.
   | Was                                                                                             | Now                                                                                                                                   |
   | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
   | `predicateToolSpec(schema)`                                                                     | `predicateToolSpecAnthropic(schema)` (deprecated alias retained)                                                                      |
-  | —                                                                                               | `predicateToolSpecOpenAI(schema)` (new — OpenAI Chat Completions shape)                                                               |
-  | `predicateFromIntentWithProvenance().rawOutputHash`                                             | `.predicateHash` (now canonicalized via `stableStringify` before hashing — semantically-identical responses produce identical hashes) |
+  | (none)                                                                                          | `predicateToolSpecOpenAI(schema)` (new – OpenAI Chat Completions shape)                                                               |
+  | `predicateFromIntentWithProvenance().rawOutputHash`                                             | `.predicateHash` (now canonicalized via `stableStringify` before hashing – semantically-identical responses produce identical hashes) |
   | `VerifyResult.erasedAt: number[]`                                                               | `VerifyResult.erasedSeqs: number[]` (avoids units collision with per-tombstone `erasedAt` timestamp)                                  |
   | `ledger.erase().tombstone`                                                                      | `.markerEntry` (renamed; plural mismatch resolved)                                                                                    |
   | `ledger.erase()` always emitted marker                                                          | Now `{ erased: 0, markerEntry: null }` for zero-match calls (no chain pollution)                                                      |
@@ -187,41 +148,41 @@ prototype keys` instead of silently passing through.
 
   ### What didn't change (back-compat)
 
-  - The 14-variant `AuditEntry` discriminated union — every consumer's switch keeps working; new kinds were strictly additive (the compliance-audit demo gained an exhaustiveness `never` check to catch future drift at compile time).
-  - All R4 sprint v1.12.0 APIs (`createAuditLedger`, `predicateFromIntent`, `predict`, `doctor`, `predicateToSQL/Mongo/Postgrest`, `whenExplain` panel) — same call signatures, hardened internals.
-  - All R6.B / R6.D APIs added are net-new exports; no removed surface.
+  - The 14-variant `AuditEntry` discriminated union – every consumer's switch keeps working; new kinds were strictly additive (the compliance-audit demo gained an exhaustiveness `never` check to catch future drift at compile time).
+  - All v1.12.0 APIs (`createAuditLedger`, `predicateFromIntent`, `predict`, `doctor`, `predicateToSQL/Mongo/Postgrest`, `whenExplain` panel) – same call signatures, hardened internals.
+  - The newly added APIs (`describePredicate`, `predicateHash`) are net-new exports; no removed surface.
 
   ### Compliance demo updates
 
   `examples/compliance-audit` gained an ERASE button alongside TAMPER + VERIFY, demoing the full GDPR Art.17 → tombstone → verify-with-`erasedSeqs` flow. Bundle 146 kB / 46 kB gz.
 
-  ### Out of scope (queued for next sprint, see IDEAS.md)
+  ### Not in this release
 
-  R6.A `ledger.replayUnder()`, R6.C `predicateToZod/JSONSchema/TypeScript`,
-  R7.A ensemble-jury `tuneFromIntent`, R7.B `directive ledger render`
-  (English forensic timeline), R7.C predict×checkOwns preemptive
-  collision, R7.E `RULES.md` codegen via `describePredicate`. All
-  buildable in <3 days each on the hardened v1.13.0 substrate.
+  Planned follow-ups include `ledger.replayUnder()`,
+  `predicateToZod/JSONSchema/TypeScript`, an ensemble-jury `tuneFromIntent`,
+  a `directive ledger render` English forensic timeline, a predict ×
+  checkOwns preemptive collision check, and `RULES.md` codegen via
+  `describePredicate`.
 
 ## 1.12.0
 
 ### Minor Changes
 
-- R4 sprint AE review loop — security hardening, honest claims, and +2 new public APIs. Four-round AE review on the v1.11.0 R4 sprint wrap converged 8 CRITICAL / 26 MAJOR → 0 / 0 (trajectory R1 8→R2 4→R3 1→R4 0). Tests 3551 → 3972 (+421).
+- Security hardening, more honest audit-ledger claims, and two new public APIs.
 
 - **New public APIs**
 
-  - `describePredicate(spec)` — plain-English renderer for `FactPredicate`. `{ cartTotal: { $gte: 50 }, region: { $in: ["US","EU"] } }` → `"cart total is at least 50 AND region is one of [US, EU]"`. Powers RFC-0006 `RULES.md` codegen.
-  - `predicateHash(spec)` — content-addressed fingerprint (djb2 32-bit; SHA-256 reserved for v2). Canonicalized via `stableStringify` so semantically-identical predicates produce identical hashes across runs and runtimes.
+  - `describePredicate(spec)` – plain-English renderer for `FactPredicate`. `{ cartTotal: { $gte: 50 }, region: { $in: ["US","EU"] } }` → `"cart total is at least 50 AND region is one of [US, EU]"`. Powers `RULES.md` codegen.
+  - `predicateHash(spec)` – content-addressed fingerprint (djb2 32-bit; SHA-256 reserved for v2). Canonicalized via `stableStringify` so semantically-identical predicates produce identical hashes across runs and runtimes.
 
 - **Audit-ledger hardening**
 
-  - Tombstone-forgery defense — `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable in-module sentinel symbol. Direct `sink.write({ kind: "system.entry-erased", ... })` is now detected as tamper.
-  - PII redaction walks predicate operands — `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into cached `whenSpec` operands flowing into `constraint.evaluate` entries.
-  - Function-form constraints capture `whenSource.sourceHash` only — raw function source NEVER lands in audit entries (closures routinely reference secrets in scope).
+  - Tombstone-forgery defense – `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable in-module sentinel symbol. Direct `sink.write({ kind: "system.entry-erased", ... })` is now detected as tamper.
+  - PII redaction walks predicate operands – `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into cached `whenSpec` operands flowing into `constraint.evaluate` entries.
+  - Function-form constraints capture `whenSource.sourceHash` only – raw function source NEVER lands in audit entries (closures routinely reference secrets in scope).
   - `AuditEntry` payloads are frozen at write time. In-process mutation throws.
   - `verify({ strong: true })` THROWS "reserved for v2" (previously silently returned `{ valid: true }` regardless of state).
-  - `ledger.erase()` skips the `system.subject-erased` marker when nothing matched the filter (`{ erased: 0, markerEntry: null }`) — no chain pollution from empty erasures.
+  - `ledger.erase()` skips the `system.subject-erased` marker when nothing matched the filter (`{ erased: 0, markerEntry: null }`) – no chain pollution from empty erasures.
   - `AbortSignal.any()` properly composes runner timeouts with caller signals via portable `combineSignals()` (Node < 20 no longer throws on combined signals).
   - `VerifyResult.erasedAt: number[]` renamed to `.erasedSeqs: number[]` (avoids units collision with per-tombstone `erasedAt` timestamp).
 
@@ -233,30 +194,30 @@ prototype keys` instead of silently passing through.
 - **`predict` honesty**
 
   - `predict({ cartTotal: { $changed: true } }, facts)` now synthesizes a warning in `missingChanges` when `prev` is omitted (previously silent).
-  - `PredictResult.predicate` removed (input reference — caller already has it).
+  - `PredictResult.predicate` removed (input reference – caller already has it).
 
 - **`predicateFromIntent` polish**
 
   - New options: `signal?: AbortSignal`, `redactIntent?: boolean`. Provenance entry gains `intentHash`. `dangerousRegex` ReDoS detection on incoming predicates (now exported from `@directive-run/core/internals`).
   - `predicateFromIntentWithProvenance().rawOutputHash` → `.predicateHash` (canonicalized).
 
-- **Tool-spec presets split per provider** — `predicateToolSpec(schema)` → `predicateToolSpecAnthropic(schema)` (Claude function-calling shape) and `predicateToolSpecOpenAI(schema)` (Chat Completions shape). Old name retained as a deprecated alias.
+- **Tool-spec presets split per provider** – `predicateToolSpec(schema)` → `predicateToolSpecAnthropic(schema)` (Claude function-calling shape) and `predicateToolSpecOpenAI(schema)` (Chat Completions shape). Old name retained as a deprecated alias.
 
-- **Audit-ledger ships 14 `AuditEntry` kinds** — every entry carries `schemaVersion: 1` and `hashAlgo: "djb2-1"` so future v2 verifiers can dual-format.
+- **Audit-ledger ships 14 `AuditEntry` kinds** – every entry carries `schemaVersion: 1` and `hashAlgo: "djb2-1"` so future v2 verifiers can dual-format.
 
-- **v1 boundaries (honest)** — `docs/concepts/audit-ledger.md` corrected to drop overpromised "court-admissible / GDPR-grade" language. Substrate is **tamper-evident** (djb2 32-bit hash chain), NOT cryptographic-grade. In-memory ring buffer (default capacity 10k); SQLite / Parquet sinks reserved for v2. No actor/session attribution, no read-tracking, no trusted timestamps, no signing keys — all queued for v2.
+- **v1 boundaries (honest)** – `docs/concepts/audit-ledger.md` corrected to drop overpromised "court-admissible / GDPR-grade" language. Substrate is **tamper-evident** (djb2 32-bit hash chain), NOT cryptographic-grade. In-memory ring buffer (default capacity 10k); SQLite / Parquet sinks reserved for v2. No actor/session attribution, no read-tracking, no trusted timestamps, no signing keys – all queued for v2.
 
 ## 1.11.0
 
 ### Minor Changes
 
-- [`280928d`](https://github.com/directive-run/directive/commit/280928dec0776fda998055fc9b47955abdf58c04) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: predicate-from-intent + audit-ledger + predict + doctor (R4 sprint wrap)
+- [`280928d`](https://github.com/directive-run/directive/commit/280928dec0776fda998055fc9b47955abdf58c04) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: predicate-from-intent + audit-ledger + predict + doctor
 
   The headline this release earns:
 
   > _"The LLM wrote a rule. The type-checker said no. The doctor said no.
   > The predictor said which facts must change. Two turns later, the rule
-  > was in production — and every state change since then ships with a
+  > was in production – and every state change since then ships with a
   > tamper-evident, hash-chained (djb2 32-bit; SHA-256 reserved for v2)
   > explanation. Tamper one byte, the chain proves it."_
 
@@ -328,7 +289,7 @@ prototype keys` instead of silently passing through.
   ### `@directive-run/core`: schema introspection
 
   `getKind(schema)`, `getSchemaFieldKinds(schema)`,
-  `getOperatorsForKind(kindNode)` — runtime discriminant for the
+  `getOperatorsForKind(kindNode)` – runtime discriminant for the
   operator-on-kind matrix that previously only lived in the
   `OperatorObject<V>` type. Used by `predicateFromIntent` and
   `validatePredicateAgainstSchema`; also useful for prompt builders,
@@ -349,32 +310,32 @@ prototype keys` instead of silently passing through.
 
   ### What's deferred (tracked in IDEAS.md)
 
-  - **SQLite / Parquet / Loki sinks** — sink interface is open; v1 ships
+  - **SQLite / Parquet / Loki sinks** – sink interface is open; v1 ships
     in-memory `memorySink` only.
-  - **Audit-ledger devtools panel** — `useAuditLedger` hook ships;
+  - **Audit-ledger devtools panel** – `useAuditLedger` hook ships;
     full panel integration with the floating devtools panel is a
     follow-up.
-  - **Strong async SHA-256 verify** — v1 ships sync djb2 32-bit chain
+  - **Strong async SHA-256 verify** – v1 ships sync djb2 32-bit chain
     (fast, isomorphic, catches accidental + light-adversarial tamper).
     SHA-256 dual-chain reserved for v2.
-  - **Full SMT-lite `doctor`** — z3.wasm-based satisfiability. v1 ships
+  - **Full SMT-lite `doctor`** – z3.wasm-based satisfiability. v1 ships
     structural contradiction detection (direct / subset / overlap).
-  - **`predicateToZod()`** — schema introspection unlocks this. ~0.5d
+  - **`predicateToZod()`** – schema introspection unlocks this. ~0.5d
     follow-up once demanded.
-  - **`useAuditLedger` for Vue / Svelte / Solid / Lit** — React only in
+  - **`useAuditLedger` for Vue / Svelte / Solid / Lit** – React only in
     v1; framework parity is mechanical.
 
-  Compounds with: `@directive-run/query`, RFC-0004 data predicates, R4.G
-  `replayUnder`, R4.F `diffRules`, R4.H `predicateToSQL`. The eight-tool
-  story — see the `eight-tools-from-one-decision` blog post.
+  Pairs with `@directive-run/query`, data predicates, `replayUnder`,
+  `diffRules`, and `predicateToSQL`. See the `eight-tools-from-one-decision`
+  blog post.
 
-  > Correction (v1.12.x AE review): the original v1.11.0 language overpromised. The shipped substrate is tamper-evident with hash-chained (djb2 32-bit) entries; "court-admissible" and "GDPR-grade" were marketing claims that exceeded what the code delivers. See docs/concepts/audit-ledger.md for the accurate threat model.
+  > Correction (later release): the original v1.11.0 language overpromised. The shipped substrate is tamper-evident with hash-chained (djb2 32-bit) entries; "court-admissible" and "GDPR-grade" were marketing claims that exceeded what the code delivers. See docs/concepts/audit-ledger.md for the accurate threat model.
 
 ## 1.10.0
 
 ### Minor Changes
 
-- [`8b4af1d`](https://github.com/directive-run/directive/commit/8b4af1d521c547b3c137e2848512620a552d6db8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: devtools panel renders per-clause `whenExplain` tree (R4.E)
+- [`8b4af1d`](https://github.com/directive-run/directive/commit/8b4af1d521c547b3c137e2848512620a552d6db8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: devtools panel renders per-clause `whenExplain` tree
 
   The devtools floating panel now has a `Constraints` section that renders
   the per-clause ✓/✗ breakdown for every data-form `when` constraint, live,
@@ -394,7 +355,7 @@ prototype keys` instead of silently passing through.
     schema: { phase: t.string<"red" | "green">(), elapsed: t.number() },
     constraints: {
       transition: {
-        // Data-form `when` — predicate, not function. Gives the panel
+        // Data-form `when` – predicate, not function. Gives the panel
         // a structural tree to render.
         when: { phase: { $eq: "red" }, elapsed: { $gte: 30 } },
         require: { type: "TRANSITION" },
@@ -417,7 +378,7 @@ prototype keys` instead of silently passing through.
 
   Function-form `when` constraints (no predicate tree available) render
   with the constraint id + active mark + a small "function-form when (no
-  clause tree)" note — no clause tree, no surprise.
+  clause tree)" note – no clause tree, no surprise.
 
   Operators render with mathematical symbols (`=`, `≠`, `≥`, `∈`, …) and
   the failed clause includes the actual value (`(actual: 20)`) so the
@@ -437,11 +398,11 @@ prototype keys` instead of silently passing through.
 
 ### Minor Changes
 
-- [`cc42608`](https://github.com/directive-run/directive/commit/cc42608e91b1da61f129035df50d0edef4173264) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: predicate codegen — one predicate, three targets
+- [`cc42608`](https://github.com/directive-run/directive/commit/cc42608e91b1da61f129035df50d0edef4173264) Thanks [@jasoncomes](https://github.com/jasoncomes)! - feat: predicate codegen – one predicate, three targets
 
   Compile a `FactPredicate` to parameterized SQL, a MongoDB query, or a
   PostgREST querystring. Same JSON spec, same semantics, three execution
-  sites — the end of dual-write hell for filter logic.
+  sites – the end of dual-write hell for filter logic.
 
   ```ts
   import {
@@ -479,13 +440,13 @@ prototype keys` instead of silently passing through.
   determinism. Effects-only operators (`$changed`) are rejected.
 
   **`$where` injection blocked on Mongo.** Field names starting with `$`
-  are refused — closes the predicate-as-RCE class for AI-generated
+  are refused – closes the predicate-as-RCE class for AI-generated
   queries. Sub-document paths (`"user.role"`) require explicit
   `allowDottedPaths: true`.
 
   **Combinator-and-sibling-key rejection.** `{ $all: [aiPredicate],
 tenant_id: req.user.id }` throws instead of silently dropping the
-  tenant check — closes the cross-tenant data-leak attack class. Nest
+  tenant check – closes the cross-tenant data-leak attack class. Nest
   your conditions inside the combinator instead.
 
   **Depth limit.** All three codegens enforce the same 64-level recursion
@@ -512,8 +473,8 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   detection for `$matches` operands. See
   `docs/concepts/predicate-codegen.md`.
 
-  Compounds with `@directive-run/query`, RFC-0004 data forms, R4.D
-  LLM-emit-predicate, and edge-runtime predicates (Cloudflare Workers).
+  Pairs with `@directive-run/query`, data-form predicates, LLM-emitted
+  predicates, and edge-runtime predicates (Cloudflare Workers).
 
 ## 1.8.0
 
@@ -586,7 +547,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   report.best.values; // { threshold: 25 }
   report.best.report.proposed.matched; // 9210
-  report.baseline.score; // 4217 — original's matched count
+  report.baseline.score; // 4217 – original's matched count
   ```
 
   Multi-hole sweeps grid-search:
@@ -620,7 +581,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   sparkline; the argmax row highlights green.
 
   Same caveats as `replayUnder` apply (no cascade modeling, survivorship
-  bias, frames-vs-entities) — see `docs/concepts/tune.md`.
+  bias, frames-vs-entities) – see `docs/concepts/tune.md`.
 
 ## 1.6.1
 
@@ -629,7 +590,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 - [`b506536`](https://github.com/directive-run/directive/commit/b506536aa7babfa2931b55c11ce6f36b13052e0d) Thanks [@jasoncomes](https://github.com/jasoncomes)! - fix: dev-mode validation runs in consumer production builds (v1.5.0 / v1.6.0)
 
   The published bundles in v1.5.0 and v1.6.0 baked `isDevelopment = true`
-  as a literal — tsup resolved the `#is-development` package.json import
+  as a literal – tsup resolved the `#is-development` package.json import
   to `dev-true.ts` (which was `export default true;`) and shipped the
   constant into the chunk. Every consumer's production build then ran
   dev-mode fact-validation as if `NODE_ENV` were `development`, and a
@@ -639,7 +600,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   [Directive] Validation failed for "<key>": expected <type>, got null
   ```
 
-  `directive.run` itself hit this — `next build` failed end-to-end on a
+  `directive.run` itself hit this – `next build` failed end-to-end on a
   clean v1.5.0 doc-site against the `@directive-run/ai` orchestrator's
   fact init.
 
@@ -653,7 +614,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   - In a bundler (Webpack / Vite / Turbopack / Rollup / esbuild) for a
     consumer production build, the expression folds to literal `false` via
-    the bundler's standard `process.env.NODE_ENV = "production"` define —
+    the bundler's standard `process.env.NODE_ENV = "production"` define –
     dev-mode validation is dropped.
   - In a Node.js process, the check evaluates at runtime against the live
     `NODE_ENV`. Setting `NODE_ENV=production` correctly disables dev-mode
@@ -667,30 +628,30 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   `dev-true.ts` form.
 
   **Required action for consumers on v1.5.0 / v1.6.0:** upgrade. There
-  is no runtime workaround for the broken published bundle — the literal
+  is no runtime workaround for the broken published bundle – the literal
   `true` was baked into the chunk and is read every time `createSystem`
   runs in any environment.
 
   Tested via the doc-site's `next build` against a local link of the
-  patched packages — clean end-to-end after the change.
+  patched packages – clean end-to-end after the change.
 
 ## 1.6.0
 
 ### Minor Changes
 
-- [`94db2f4`](https://github.com/directive-run/directive/commit/94db2f4af0cee8f28ad27102ab246a87aa4a580c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - fix + feat: AE hardening of `owns` (RFC-0003) and data-form predicates (RFC-0004)
+- [`94db2f4`](https://github.com/directive-run/directive/commit/94db2f4af0cee8f28ad27102ab246a87aa4a580c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - fix + feat: hardening of `owns` (RFC-0003) and data-form predicates (RFC-0004)
 
-  A nine-round AE review loop on the v1.5.0 `owns` + data-form predicate
-  surface closed 2 critical and 59 major issues. The release pairs a
-  headline bug fix — `owns` was silently broken in every multi-module
-  system — with a handful of new public exports for observability and
-  safety. Pure-function fixes; no breaking API changes against v1.5.0.
+  Hardening pass on the v1.5.0 `owns` and data-form predicate surface. The
+  release pairs a headline bug fix – `owns` was silently broken in every
+  multi-module system – with a handful of new public exports for
+  observability and safety. Pure-function fixes; no breaking API changes
+  against v1.5.0.
 
   **Critical bug fixes (visible in v1.5.0)**
 
   - `owns:` keys are now namespace-prefixed inside `prefixConstraints`. In
     v1.5.0 the entire RFC-0003 clobber-detection feature silently no-op'd
-    in every multi-module system — a constraint owning `["status"]` in
+    in every multi-module system – a constraint owning `["status"]` in
     module `counter` kept `owns=["status"]` while resolver writes flowed
     as `"counter::status"`, so the proxy's ownership check missed every
     namespaced write.
@@ -705,11 +666,11 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   - Three predicate AST walkers (evaluatePredicate, validatePredicate,
     containsChangedOperator) are now depth- and cycle-guarded with
     `MAX_PREDICATE_DEPTH = 64`.
-  - `evaluateKeySelector` typed-value collisions fixed — `stableStringify`
+  - `evaluateKeySelector` typed-value collisions fixed – `stableStringify`
     now handles `bigint`, `Date`, `RegExp`, `Map`, `Set` with distinct
     prefixes (was producing `"{}"` for all).
   - `evaluateTemplate` now uses `Object.hasOwn` (was walking the
-    prototype chain — `${toString}` returned the function source).
+    prototype chain – `${toString}` returned the function source).
   - Facts proxy `getOwnPropertyDescriptor` now honours `BLOCKED_PROPS`
     consistently with the `get` trap.
   - Bound-facts intended-value staging fixed (the proxy now stores the
@@ -724,11 +685,11 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   **New public exports (additive)**
 
-  - `validatePredicate(spec: unknown): void` — opt-in JSON-safety
+  - `validatePredicate(spec: unknown): void` – opt-in JSON-safety
     validator. Throws on non-RegExp `$matches`, `bigint`, `Set`, `Map`,
     or nested non-rehydratable operands. Call after `JSON.parse` of a
     persisted predicate.
-  - `MAX_PREDICATE_DEPTH = 64` — exported so a caller designing a deep
+  - `MAX_PREDICATE_DEPTH = 64` – exported so a caller designing a deep
     predicate can see the cap.
   - `resolver.write.rejected` observation event + `onResolverWriteRejected`
     plugin hook. Surfaces dropped owned-fact writes through the standard
@@ -781,7 +742,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   report.lostMatches; // sampled frames, with per-clause explain
   ```
 
-  The mechanism is a static backtest — each recorded frame is re-scored
+  The mechanism is a static backtest – each recorded frame is re-scored
   against both predicates with `evaluatePredicate`, and the boolean is
   diffed. The engine is **not** re-run: downstream cascades are not
   modeled, so treat the numbers as a divergence scan, not a forecast. The
@@ -790,7 +751,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   `evaluatePredicateExplained` breakdown so you can see which clause
   flipped.
 
-  Both predicates are validated up front — a malformed spec throws a clear
+  Both predicates are validated up front – a malformed spec throws a clear
   `[Directive] replayUnder:` error naming which spec failed. Histories are
   capped at `MAX_REPLAY_FRAMES`. Pass `entityKey` to also count distinct
   entities (not just frames). `framesFromHistory` / `framesFromSnapshots`
@@ -808,7 +769,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   file. `--entity-key` reports distinct-entity counts; `--json` emits the
   full `PredicateBacktestReport`.
 
-  This builds directly on the RFC-0004 data-form predicate runtime — a
+  This builds directly on the RFC-0004 data-form predicate runtime – a
   predicate is data, so it can be re-evaluated against history a function
   `when` never could. See `docs/concepts/replay-under.md`.
 
@@ -825,26 +786,26 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   ```ts
   constraints: {
     transition: {
-      when: { phase: "red", elapsed: { $gte: 30 } },   // NEW — was: (f) => …
+      when: { phase: "red", elapsed: { $gte: 30 } },   // NEW – was: (f) => …
       require: { type: "TRANSITION", to: "green" },
     },
   },
   effects: {
     ledOn: {
-      on: { phase: "red" },                            // NEW — was: deps: [...]
+      on: { phase: "red" },                            // NEW – was: deps: [...]
       run: () => turnLedOn(),
     },
   },
   resolvers: {
     fetcher: {
       requirement: "FETCH",
-      key: ["id"],                                     // NEW — was: (req) => req.id
+      key: ["id"],                                     // NEW – was: (req) => req.id
       resolve: doFetch,
     },
   },
   events: {
     setStatus: {
-      patch: {                                         // NEW — alongside handler
+      patch: {                                         // NEW – alongside handler
         $set: {
           status: { $ref: "value" },
           label:  { $template: "user ${name}" },
@@ -865,9 +826,9 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   The data form unlocks introspection that a function form cannot:
 
-  - `system.inspect().constraints[]` exposes `whenSpec` — the original
-    predicate object — for any consumer (devtools, custom inspectors).
-  - The `constraint.evaluate` observation event carries `whenExplain` —
+  - `system.inspect().constraints[]` exposes `whenSpec` – the original
+    predicate object – for any consumer (devtools, custom inspectors).
+  - The `constraint.evaluate` observation event carries `whenExplain` –
     a per-clause breakdown showing which clauses passed and which failed.
   - `system.explain(requirementId)` renders the clause tree:
     ```
@@ -887,7 +848,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   Adds opt-in resolver constraint-binding (RFC-0003). A constraint can declare
   the facts its resolver _owns_; a write from that resolver to an owned fact is
-  dropped — and the resolver aborted — if the fact was changed by anything else
+  dropped – and the resolver aborted – if the fact was changed by anything else
   since the resolver last wrote it. Eliminates the executor-tail-clobber footgun
   (an in-flight resolver's tail overwriting a terminal status an event just set)
   without touching the resolver's other ("data") writes.
@@ -897,7 +858,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
     mutate: {
       when: (f) => f.status === "mutating",
       require: { type: "EXECUTE_ACTION" },
-      owns: ["status"], // NEW — omit for no binding (default)
+      owns: ["status"], // NEW – omit for no binding (default)
     },
   }
   ```
@@ -910,15 +871,15 @@ tenant_id: req.user.id }` throws instead of silently dropping the
     fact's ownership is lost (one-shot).
   - Writes to facts not listed in `owns` always land.
   - The constraint's `when()` predicate is never consulted by the binding.
-    Sync constraints only — `owns` on an async constraint is ignored (the
+    Sync constraints only – `owns` on an async constraint is ignored (the
     owned-fact snapshot would race the predicate await; dev-mode warning).
   - A bound resolver is **detached, not cancelled**, when its requirement is
-    removed — it runs to completion so its data writes land (the binding drops
+    removed – it runs to completion so its data writes land (the binding drops
     only the owned-fact clobber), and the requirement can re-dispatch cleanly.
   - No-op for `callOne()` and mixed-source batch resolvers.
 
   This supersedes the `bind: 'auto'` constraint-binding from the reverted
-  v1.4.0 release, which re-evaluated `when()` on every write — that was
+  v1.4.0 release, which re-evaluated `when()` on every write – that was
   all-or-nothing (dropped legitimate data writes) and coupled to predicate
   shape (could freeze a resolver). Migrate `bind: 'auto'` →
   `owns: [<phase fact>]`. See `docs/upgrade-guides/constraint-binding.md`.
@@ -939,14 +900,14 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   nullable-fact fallbacks. Replaces the `useFact(sys, k) ?? factory()`
   pattern that breaks downstream memoization.
 
-  **RFC-1 — Resolver constraint-binding (`@directive-run/core`):**
+  **RFC-1 – Resolver constraint-binding (`@directive-run/core`):**
 
   ```ts
   constraints: {
     mutate: {
       when: (f) => f.status === "mutating",
       require: { type: "EXECUTE_ACTION" },
-      bind: "auto", // NEW — default 'none'
+      bind: "auto", // NEW – default 'none'
     },
   }
   ```
@@ -968,7 +929,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   - Mixed-source batches fall back to no binding (predicate would be
     ambiguous).
 
-  **RFC-2 — `useFactWithDefault` (`@directive-run/react`):**
+  **RFC-2 – `useFactWithDefault` (`@directive-run/react`):**
 
   ```ts
   const markedCells = useFactWithDefault(sys, "markedCells", () =>
@@ -983,11 +944,9 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   NOT run again). Swapping the `system` argument re-runs the factory on the
   new system.
 
-  **Tests added (+21):** 14 in core (12 unit-level binding tests in
-  `resolvers.test.ts` + 2 engine-level integration tests in `engine.test.ts`)
-
-  - 7 in react (`useFactWithDefault.test.tsx`). 0 regressions in the existing
-    4091-test suite.
+  Added test coverage for the new binding behavior (core: unit-level binding
+  tests plus engine-level integration tests) and for `useFactWithDefault`
+  (react), with no regressions in the existing suite.
 
   Migration guide: `docs/upgrade-guides/constraint-binding.md` (added).
 
@@ -997,20 +956,20 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
 - [`08ac983`](https://github.com/directive-run/directive/commit/08ac9830ae062dbc61de66ca51c77e7049b0bd47) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add `SignalClock` + timer helpers (RFC 0001 v0.1)
 
-  Resolves four MIGRATION_FEEDBACK items in one shape: declarative `after` (#4), fake-timer integration (#15), clock-in-derivation (#16), and predicate-gated tick wiring (#18).
+  Covers declarative `after`, fake-timer integration, clock-in-derivation, and predicate-gated tick wiring in one shape.
 
   **New exports** (all from `@directive-run/core`):
 
-  - `SignalClock` interface — injectable time source.
-  - `realClock()` — production clock backed by `Date.now()` + `globalThis.setTimeout`.
-  - `virtualClock(initialMs?)` — test clock; advance synchronously via `clock.advanceBy(ms)` to fire scheduled callbacks in deadline order.
-  - `defaultClock()` — auto-detects vitest (`process.env.VITEST === 'true'`) and returns `virtualClock()` there, `realClock()` everywhere else.
-  - `TimerFactState` interface — JSON-roundtrippable timer state (idle / running / paused / completed) suitable for storing inside any Directive fact.
-  - `initialTimerState()`, `startTimer()`, `pauseTimer()`, `resumeTimer()`, `resetTimer()`, `completeTimer()`, `registerRepeat()` — pure transition helpers.
-  - `elapsedMs()`, `remainingMs()`, `tickTimer()` — pure read helpers; `tickTimer` returns a structured signal (`'no-op' | 'complete' | 'repeat'`).
-  - `timerOps({ms, mode})` — convenience bundle of all of the above closed over a single timer's options.
+  - `SignalClock` interface – injectable time source.
+  - `realClock()` – production clock backed by `Date.now()` + `globalThis.setTimeout`.
+  - `virtualClock(initialMs?)` – test clock; advance synchronously via `clock.advanceBy(ms)` to fire scheduled callbacks in deadline order.
+  - `defaultClock()` – auto-detects vitest (`process.env.VITEST === 'true'`) and returns `virtualClock()` there, `realClock()` everywhere else.
+  - `TimerFactState` interface – JSON-roundtrippable timer state (idle / running / paused / completed) suitable for storing inside any Directive fact.
+  - `initialTimerState()`, `startTimer()`, `pauseTimer()`, `resumeTimer()`, `resetTimer()`, `completeTimer()`, `registerRepeat()` – pure transition helpers.
+  - `elapsedMs()`, `remainingMs()`, `tickTimer()` – pure read helpers; `tickTimer` returns a structured signal (`'no-op' | 'complete' | 'repeat'`).
+  - `timerOps({ms, mode})` – convenience bundle of all of the above closed over a single timer's options.
 
-  **Scope:** v0.1 ships the value layer. The engine doesn't auto-tick timer facts yet — consumers wire a small `setInterval(() => sys.events.TICK(), 100)`. Engine-integrated `t.timer({ms})` schema is the v0.2 deliverable.
+  **Scope:** v0.1 ships the value layer. The engine doesn't auto-tick timer facts yet – consumers wire a small `setInterval(() => sys.events.TICK(), 100)`. Engine-integrated `t.timer({ms})` schema is the v0.2 deliverable.
 
   **Replay determinism:** the clock is the only source of time in timer ops. Replaying through a `virtualClock` seeded from a recorded stream reproduces fact streams byte-for-byte. Pause durations survive dehydrate/hydrate intact.
 
@@ -1022,7 +981,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
 - [`dcad00d`](https://github.com/directive-run/directive/commit/dcad00db373f7d77cffb9e3f7f971e40118b1d48) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix: `t.union<>()` declaration emit cycle
 
-  The 1.2.0 release shipped `t.union<T>()` as a generic-only schema constructor (the Phase 1 P0 from MIGRATION_FEEDBACK item #21). The runtime works correctly, but the declaration emitter hit a self-reference cycle when typing the `t` object — the overload-cast pattern (`(impl) as { ovl1; ovl2 }`) inside an object literal triggered:
+  The 1.2.0 release shipped `t.union<T>()` as a generic-only schema constructor. The runtime works correctly, but the declaration emitter hit a self-reference cycle when typing the `t` object – the overload-cast pattern (`(impl) as { ovl1; ovl2 }`) inside an object literal triggered:
 
   ```
   error TS7022: 't' implicitly has type 'any' because it does not have a
@@ -1030,15 +989,15 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   initializer.
   ```
 
-  Downstream consumers running `tsc --noEmit` against `@directive-run/core@1.2.0` saw type errors. Hoist `unionImpl` to a typed top-level const (`unionImpl: UnionFn`) and reference it as `union: unionImpl` in the `t` object — runtime semantics unchanged, declaration emit walks cleanly.
+  Downstream consumers running `tsc --noEmit` against `@directive-run/core@1.2.0` saw type errors. Hoist `unionImpl` to a typed top-level const (`unionImpl: UnionFn`) and reference it as `union: unionImpl` in the `t` object – runtime semantics unchanged, declaration emit walks cleanly.
 
-  Caught when Minglingo's `apps/web` tried to consume `@directive-run/core/testing.flushAsync` — the JS dist built fine but the DTS build failed for the union exports, masking the entire testing surface from typed downstream usage.
+  Caught when Minglingo's `apps/web` tried to consume `@directive-run/core/testing.flushAsync` – the JS dist built fine but the DTS build failed for the union exports, masking the entire testing surface from typed downstream usage.
 
 ## 1.1.2
 
 ### Patch Changes
 
-- [`81da1e2`](https://github.com/directive-run/directive/commit/81da1e285e96f29f40451bcd2a05e61345f94487) Thanks [@jasoncomes](https://github.com/jasoncomes)! - AE review fixes + test coverage for new features
+- [`81da1e2`](https://github.com/directive-run/directive/commit/81da1e285e96f29f40451bcd2a05e61345f94487) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Bug fixes and added test coverage for the new features.
 
   **Core:**
 
@@ -1046,24 +1005,24 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   - Fix: Observer cap (100 max) prevents memory leaks from fast-remounting components
   - Fix: `hasPlugins` cached as boolean for O(1) hot-path access
   - Fix: Knowledge docs `inspect()` section rewritten with correct field names
-  - Tests: 8 tests for `system.observe()`, 9 tests for coverage/observer utilities
+  - Tests: added coverage for `system.observe()` and the coverage/observer utilities
 
   **Adapters (React, Vue, Svelte, Solid, Lit):**
 
   - All 5 framework adapters migrated to `#is-development` compile-time imports
-  - Tests: 6 tests for `createDirectiveContext` (useFact, useDerived, useEvents, Provider override, error boundary, useSystem)
+  - Tests: added coverage for `createDirectiveContext` (useFact, useDerived, useEvents, Provider override, error boundary, useSystem)
 
 ## 1.1.1
 
 ### Patch Changes
 
-- [`0561920`](https://github.com/directive-run/directive/commit/0561920b8096a69253f7a02ba5184842943bd2f8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Performance: #is-development imports (+11-35% across all benchmarks) + AE review fixes
+- [`0561920`](https://github.com/directive-run/directive/commit/0561920b8096a69253f7a02ba5184842943bd2f8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Performance: #is-development imports (+11-35% across all benchmarks) plus bug fixes
 
   - Replace 40 `process.env.NODE_ENV` checks with `#is-development` compile-time imports (XState pattern)
-  - Fix P0: `system.observe()` now fires all events when no initial plugins configured (stale `hasPlugins` flag → live function)
-  - Fix P1: `reconcile.end` event now correctly reports `added`/`removed` from ReconcileResult
-  - Fix P1: `adapter-utils.ts` migrated to `isDevelopment` import
-  - Fix P2: `CoverageReport` now includes `effectCoverage` and `derivationCoverage` percentages
+  - Fix: `system.observe()` now fires all events when no initial plugins configured (stale `hasPlugins` flag → live function)
+  - Fix: `reconcile.end` event now correctly reports `added`/`removed` from ReconcileResult
+  - Fix: `adapter-utils.ts` migrated to `isDevelopment` import
+  - Fix: `CoverageReport` now includes `effectCoverage` and `derivationCoverage` percentages
   - Fix: SVG architecture diagram uses inline styles (GitHub CSP strips `<style>`)
 
   Benchmarks (vs previous release):
@@ -1081,14 +1040,14 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   **React (`@directive-run/react`):**
 
-  - `createDirectiveContext(system)` — returns `{ Provider, useFact, useDerived, useEvents, useDispatch, useSelector, useWatch, useInspect, useExplain, useHistory, useSystem }`. Eliminates prop-drilling. Provider accepts `system` override for testing.
+  - `createDirectiveContext(system)` – returns `{ Provider, useFact, useDerived, useEvents, useDispatch, useSelector, useWatch, useInspect, useExplain, useHistory, useSystem }`. Eliminates prop-drilling. Provider accepts `system` override for testing.
 
   **Core (`@directive-run/core`):**
 
-  - `system.observe(observer)` — typed inspection protocol with 18 event types (`ObservationEvent`). Enables browser extensions, third-party tools, and inspection-based test assertions. Implemented as internal plugin — zero overhead when no observers.
-  - `createCoverageTracker(system)` — run test scenarios, get coverage report showing which constraints/resolvers/effects/derivations were exercised and which were missed. Something XState can't do.
-  - `createTestObserver(system)` — collect all observation events during tests, filter by type for assertions.
-  - `CLAUDE.md` — AI contributor guide with architecture, key files, conventions.
+  - `system.observe(observer)` – typed inspection protocol with 18 event types (`ObservationEvent`). Enables browser extensions, third-party tools, and inspection-based test assertions. Implemented as internal plugin – zero overhead when no observers.
+  - `createCoverageTracker(system)` – run test scenarios, get coverage report showing which constraints/resolvers/effects/derivations were exercised and which were missed. Something XState can't do.
+  - `createTestObserver(system)` – collect all observation events during tests, filter by type for assertions.
+  - `CLAUDE.md` – AI contributor guide with architecture, key files, conventions.
 
 ## 1.0.1
 
@@ -1096,18 +1055,18 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
 - [`2c922f9`](https://github.com/directive-run/directive/commit/2c922f955e61a438bc9afa89f8e2d8c841ca77d0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Performance optimizations: +36-95% faster derivations, +8-17% faster reconcile
 
-  - Gate `validateValue` behind `__DEV__` — skip schema validation in production builds (+7-11% writes)
-  - Eliminate TrackingContext object allocation — bare Set<string> dep stack (+50-112% derivation compute)
+  - Gate `validateValue` behind `__DEV__` – skip schema validation in production builds (+7-11% writes)
+  - Eliminate TrackingContext object allocation – bare Set<string> dep stack (+50-112% derivation compute)
   - Skip plugin emit callbacks when no plugins registered (+14-16% reconcile)
   - Remove unused `unchanged` array from RequirementSet.diff() (+8-17% reconcile)
   - Short-circuit disabled constraint filter when disabled.size === 0
-  - Remove TrackingContext interface (pre-launch cleanup — replaced with getCurrentDeps)
+  - Remove TrackingContext interface (pre-launch cleanup – replaced with getCurrentDeps)
 
 ## 1.0.0
 
 ### Minor Changes
 
-- [`a6a23b2`](https://github.com/directive-run/directive/commit/a6a23b2e52377a07bbbde52a89dcffcc3db2f826) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add DefinitionMeta — optional metadata for all 7 definition types
+- [`a6a23b2`](https://github.com/directive-run/directive/commit/a6a23b2e52377a07bbbde52a89dcffcc3db2f826) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add DefinitionMeta – optional metadata for all 7 definition types
 
   **Core (`@directive-run/core`):**
 
@@ -1123,8 +1082,8 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   **AI (`@directive-run/ai`):**
 
-  - `formatSystemMeta(inspection)` — formats SystemInspection into LLM-readable markdown context
-  - `toAIContext(system)` — convenience wrapper
+  - `formatSystemMeta(inspection)` – formats SystemInspection into LLM-readable markdown context
+  - `toAIContext(system)` – convenience wrapper
   - `metaContext: true` option on both single-agent and multi-agent orchestrators
   - Token-efficient: only includes annotated definitions, omits empty sections
 
@@ -1164,7 +1123,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   - svelte: Add `setHydrationSnapshot` + `useHydratedSystem`
   - solid: Add `DirectiveHydrator` + `useHydratedSystem`
   - lit: Add `HydrationController` with lifecycle management
-  - ai: Split orchestrator (8.7K -> 7.4K LOC), rename `dispose()` to `destroy()`, enable bundle splitting (246KB -> 109KB), remove legacy shims
+  - ai: Split the orchestrator into smaller modules, rename `dispose()` to `destroy()`, enable bundle splitting (246KB -> 109KB), remove legacy shims
   - query: Add `persistQueryCache` plugin for offline cache persistence
 
 ## 0.8.6
@@ -1226,7 +1185,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
 - [`72ed25c`](https://github.com/directive-run/directive/commit/72ed25c1a6b00019a3f6e9e119de85d5107a5676) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add type-safe runtime dynamics for dynamic definition APIs.
   - Add `DynamicConstraintDef`, `DynamicEffectDef`, `DynamicResolverDef` types for typed `register()` and `assign()` callbacks
-  - Parameterize `ConstraintsControl`, `EffectsControl`, `DerivationsControl`, `ResolversControl` on module schema — dynamic definition callbacks now receive typed `facts` with autocomplete
+  - Parameterize `ConstraintsControl`, `EffectsControl`, `DerivationsControl`, `ResolversControl` on module schema – dynamic definition callbacks now receive typed `facts` with autocomplete
   - Add generic `call<T>()` on `DerivationsControl` for typed derivation return values
   - Thread type params through `System<M>` and `SingleModuleSystem<S>`
 
@@ -1273,7 +1232,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
   **Improvements**
 
   - Extract shared adapter utilities (SSE parsing, hooks, error handling) in AI package
-  - Split orchestrator into pattern-composition, pattern-factories, pattern-serialization (10,272 → 8,729 LOC)
+  - Split orchestrator into pattern-composition, pattern-factories, pattern-serialization
   - Split `facts.ts` into `schema-builders.ts` + facts store
   - Consolidate `BLOCKED_PROPS` to single export in `tracking.ts`
   - Remove 7 internal builder types from public exports
@@ -1293,7 +1252,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   **Fixes**
 
-  - Add `destroy()` to FactsStore — clears all listeners on system destroy (prevents memory leaks)
+  - Add `destroy()` to FactsStore – clears all listeners on system destroy (prevents memory leaks)
   - Add `setPrototypeOf` trap to all 13 proxies for consistent prototype pollution protection
   - Share visited Set across `invalidateMany` calls for correct deduplication
   - Reset effects dependency stability on errors and `runAll()`

@@ -172,7 +172,7 @@ The `--system <path>` file must export a started Directive system as either a de
 
 ### `directive bisect <timeline.json>`
 
-Binary-search a recorded timeline for the first frame whose inclusion flips a user-supplied assertion from passing to failing — git-bisect, but over `ObservationEvent` frames.
+Binary-search a recorded timeline for the first frame whose inclusion flips a user-supplied assertion from passing to failing – git-bisect, but over `ObservationEvent` frames.
 
 ```bash
 directive bisect bug-1234.json \
@@ -181,7 +181,7 @@ directive bisect bug-1234.json \
 # ✓ bisect complete: first failing frame is #47 (fact.change)
 ```
 
-The `--system <path>` file must export a **factory** (not a started instance — bisect calls the factory once per midpoint to keep each replay hermetic). Looks for `createSystem` / `systemFactory` / `default` exports, in that order. The factory must return a started system:
+The `--system <path>` file must export a **factory** (not a started instance – bisect calls the factory once per midpoint to keep each replay hermetic). Looks for `createSystem` / `systemFactory` / `default` exports, in that order. The factory must return a started system:
 
 ```ts
 // test/bisect-system.ts
@@ -202,7 +202,7 @@ Exit codes: `0` (no failure to bisect / fails-on-empty), `2` (bisect found a fra
 
 ### `directive timeline diff <a.json> <b.json>`
 
-Semantic causal-graph diff between two serialized timelines. Not a textual JSON diff — per-category deltas (frame counts, constraint fires, mutation kinds, resolver runs, new errors).
+Semantic causal-graph diff between two serialized timelines. Not a textual JSON diff – per-category deltas (frame counts, constraint fires, mutation kinds, resolver runs, new errors).
 
 ```bash
 directive timeline diff baseline.json regression.json

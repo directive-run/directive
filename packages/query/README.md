@@ -139,7 +139,7 @@ app.explain("user"); // causal chain
 
 ### List queries (the "N items each fetched independently" pattern)
 
-`createQuery` is intentionally singular: one ResourceState per query name, key change replaces the entry. That fits page-level "current entity" reads. For "render N cards each fetching its own data" — TanStack's `useQuery({queryKey: ["X", id]})`-per-component pattern — use `createListQuery` (or the `listQueries:` config field on `createQuerySystem`).
+`createQuery` is intentionally singular: one ResourceState per query name, key change replaces the entry. That fits page-level "current entity" reads. For "render N cards each fetching its own data" – TanStack's `useQuery({queryKey: ["X", id]})`-per-component pattern – use `createListQuery` (or the `listQueries:` config field on `createQuerySystem`).
 
 ```typescript
 const sys = createQuerySystem({
@@ -168,7 +168,7 @@ const drift = sys.listQueries.drift.peek({ gameId: "abc" });
 if (drift?.isSuccess) renderCard(drift.data);
 ```
 
-The constraint emits one requirement per active key, the resolver runs in parallel per item, each entry gets its own `ResourceState` keyed by `serializeKey(params)`. Cache is `Record<serializedKey, ResourceState>` — JSON-serializable so time-travel snapshots and structuredClone keep working.
+The constraint emits one requirement per active key, the resolver runs in parallel per item, each entry gets its own `ResourceState` keyed by `serializeKey(params)`. Cache is `Record<serializedKey, ResourceState>` – JSON-serializable so time-travel snapshots and structuredClone keep working.
 
 Bound handle methods:
 

@@ -17,7 +17,7 @@
 ---
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Directive Architecture — Constraint-Driven Reconciliation" width="720">
+  <img src="docs/architecture.svg" alt="Directive Architecture – Constraint-Driven Reconciliation" width="720">
 </p>
 
 ---

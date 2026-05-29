@@ -1,4 +1,4 @@
-# Data-form definitions — example
+# Data-form definitions – example
 
 A one-file showcase of every Directive definition surface expressed as
 **data** rather than functions, plus the introspection that only the
@@ -42,7 +42,7 @@ derive: {
 ```
 
 The script subscribes to `system.observe()` and prints each
-`constraint.evaluate` event's `whenExplain` — the per-clause `✓/✗`
+`constraint.evaluate` event's `whenExplain` – the per-clause `✓/✗`
 breakdown that only a data predicate makes available.
 
 It also dumps `system.inspect().constraints[].whenSpec` to show the
@@ -50,5 +50,5 @@ predicate object surfacing through the public inspection API.
 
 ## Read next
 
-- [`docs/concepts/data-triggers.md`](../../docs/concepts/data-triggers.md) — concept page
-- [`docs/rfcs/0004-data-configuration-triggers.md`](../../docs/rfcs/0004-data-configuration-triggers.md) — full RFC
+- [`docs/concepts/data-triggers.md`](../../docs/concepts/data-triggers.md) – concept page
+- [`docs/rfcs/0004-data-configuration-triggers.md`](../../docs/rfcs/0004-data-configuration-triggers.md) – full RFC

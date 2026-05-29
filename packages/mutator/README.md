@@ -1,6 +1,6 @@
 # `@directive-run/mutator`
 
-> Discriminated mutation helper for Directive — collapse the
+> Discriminated mutation helper for Directive – collapse the
 > `pendingAction` ceremony to a typed handler map.
 
 ```sh
@@ -9,7 +9,7 @@ npm install @directive-run/mutator
 
 > **Naming heads-up:** the mutation discriminator is named **`kind`**,
 > not `type`. Directive's event dispatcher reserves `payload.type` for
-> its own event-name routing — `type` here would collide with `MUTATE`
+> its own event-name routing – `type` here would collide with `MUTATE`
 > and route the dispatch to a non-existent event handler. Use `kind`
 > everywhere; the typed `mutate(kind, payload)` constructor builds the
 > right shape for you.
@@ -84,7 +84,7 @@ sys.events.MUTATE(mutate<FormMutations>('submit', { values }));
 ```
 
 The `mutate(kind, payload?)` helper is a typed payload constructor.
-The `kind` argument restricts the payload shape — passing a
+The `kind` argument restricts the payload shape – passing a
 wrong-shape payload is a compile error.
 
 ## Anatomy
@@ -116,13 +116,13 @@ sys.events.MUTATE({ kind, payload, status: 'pending', error: null })
     → calls handler({ payload, facts, deps, requeue })
     → on success: pendingMutation = null
     → on throw: pendingMutation.status = 'failed' + .error = message
-                (constraint stops firing — no infinite retry; UI can
+                (constraint stops firing – no infinite retry; UI can
                  disambiguate "still running" from "stopped on error")
 ```
 
 > `kind` (not `type`) discriminates the mutation variant. Directive's
 > own event dispatcher reserves the `type` field for its own
-> event-name routing — colliding here would route the dispatch to a
+> event-name routing – colliding here would route the dispatch to a
 > nonexistent event handler. `kind` keeps the two namespaces separate.
 
 A failed mutation leaves `pendingMutation` non-null with `status:
@@ -134,21 +134,21 @@ to retry (which overwrites the failed fact and re-fires).
 **XSS warning.** `pendingMutation.error` is a plaintext `string` that
 may echo handler-thrown messages, which in turn may have interpolated
 user-controlled input. Render it via `{error}` in JSX (default-escaped)
-or `textContent` — **never** via `dangerouslySetInnerHTML`, markdown
+or `textContent` – **never** via `dangerouslySetInnerHTML`, markdown
 rendering, or any other HTML-evaluating sink. The runtime truncates
 captured errors to 500 characters as a defense in depth, but that does
 not sanitize content; only escape on render.
 
 ## Concurrency
 
-The default model is single-flight — one mutation in flight at a time. If
+The default model is single-flight – one mutation in flight at a time. If
 a new `MUTATE` arrives while a handler is running, it overwrites the fact
 and the constraint re-fires once the in-flight handler completes (which
 nulls the fact, then the new value triggers another firing).
 
 If you need parallel mutations of different shapes (e.g. `submit` AND
 `uploadFile` running concurrently), use two mutators with distinct fact
-names — one per shape. v0.1 doesn't support parallel-of-same-shape; the
+names – one per shape. v0.1 doesn't support parallel-of-same-shape; the
 behaviour there is "last-write-wins."
 
 ## Same-constraint re-fire (`requeue`)
@@ -163,13 +163,13 @@ const mut = defineMutator<Mutations, MyFacts>({
     facts.step1Done = true;
     // queue step2:
     facts.pendingMutation = mutate<Mutations>('step2');
-    requeue(); // explicit — without this, step2 may stall
+    requeue(); // explicit – without this, step2 may stall
   },
   step2: ({ facts }) => { facts.step2Done = true; },
 });
 ```
 
-Most modules don't need `requeue` — the next user-event-driven `MUTATE`
+Most modules don't need `requeue` – the next user-event-driven `MUTATE`
 fires fine. It's specifically for handler-cascades-into-handler.
 
 See [Directive testing § same-constraint re-fire](https://docs.directive.run/testing/chained-pipelines#the-same-constraint-re-fire-stall).
@@ -183,7 +183,7 @@ becomes:
 - a required handler in the map (TypeScript errors if you forget one)
 - a typed `payload` argument inside that handler
 
-There is no runtime variant validation today — the type system catches
+There is no runtime variant validation today – the type system catches
 mismatches at the dispatch site, but a malformed `MUTATE` from outside
 TypeScript (e.g. WebSocket frame) will still hit the resolver. If you
 need runtime checks, validate at the boundary before dispatch.
@@ -191,9 +191,9 @@ need runtime checks, validate at the boundary before dispatch.
 ## When NOT to use a mutator
 
 - **One-off events with no error path.** A simple `event.handle('OPEN',
-  (f) => { f.isOpen = true; })` doesn't need this — there's no async
+  (f) => { f.isOpen = true; })` doesn't need this – there's no async
   work, no rollback, no error fact.
-- **Long-running streams.** Subscriptions, polls, websocket fan-in —
+- **Long-running streams.** Subscriptions, polls, websocket fan-in –
   these aren't single-shot mutations. Wire them through normal events.
 - **Pure derivations.** If the result is a function of existing facts,
   use a `derive` instead of a mutator.
@@ -204,7 +204,7 @@ with a discriminator**. That's the 12-instance shape from the migration.
 ## Auto-cancel on supersede (R1.C `cancellable()`)
 
 For mutations where a fresh dispatch should cancel the prior in-flight
-one — type-ahead search, debounce, throttle, request dedup — wrap
+one – type-ahead search, debounce, throttle, request dedup – wrap
 the handler with `cancellable()`. The wrapped handler receives a
 `signal: AbortSignal` that aborts when superseded or when an
 optional timeout fires:
@@ -221,7 +221,7 @@ const formMutator = defineMutator<MyMutations, MyFacts>({
     },
   ),
   submit: async ({ payload, facts }) => {
-    // No cancellation — plain handler.
+    // No cancellation – plain handler.
     facts.values = await deps.submit(payload.values);
   },
 });
@@ -229,10 +229,10 @@ const formMutator = defineMutator<MyMutations, MyFacts>({
 
 **Two cancellation triggers, both opt-in:**
 
-- `supersedeOn: 'self'` (default) — a new dispatch of the same
+- `supersedeOn: 'self'` (default) – a new dispatch of the same
   wrapped handler aborts the prior in-flight invocation. Set
   `'never'` if parallel runs are fine.
-- `timeoutMs: number` — abort after N ms from invocation start.
+- `timeoutMs: number` – abort after N ms from invocation start.
   Default unset (no timeout).
 
 **Test ergonomics:** pass `virtualClock.setTimeout` from
@@ -263,7 +263,7 @@ Use it inside handlers to distinguish how the cancellation arrived
 ## Recording cancellations for replay (R2.B `recordReplayable()`)
 
 `recordReplayable()` is `cancellable()` plus a synchronous `onCancel`
-callback that fires the moment the AbortController calls `abort()` —
+callback that fires the moment the AbortController calls `abort()` –
 *before* the handler's pending await rejects with AbortError. The
 callback receives a structured `CancelEvent` with the cancel kind,
 payload, dispatch sequence, and a live facts reference, so you can
@@ -271,7 +271,7 @@ pin cancellations into a place that survives in the timeline.
 
 Use this when you record a timeline (with `@directive-run/timeline`)
 and want a replay or `directive bisect` to reason about *which*
-dispatches were superseded vs which completed — not just see a
+dispatches were superseded vs which completed – not just see a
 free-form error string.
 
 ```ts
@@ -302,14 +302,14 @@ const search = recordReplayable<MyFacts, { q: string }>(
 );
 ```
 
-`recordReplayable()` is implemented as `cancellable(opts, innerHandler)` where `innerHandler` adds an `addEventListener('abort')` around the user's handler — timeout/supersession semantics are exactly those of `cancellable()`. The callback is generic ("call me when abort fires"); pinning into facts is one use case among many. Wire `onCancel` to Sentry breadcrumbs, a Redux action log, or a metrics sink with equal ease.
+`recordReplayable()` is implemented as `cancellable(opts, innerHandler)` where `innerHandler` adds an `addEventListener('abort')` around the user's handler – timeout/supersession semantics are exactly those of `cancellable()`. The callback is generic ("call me when abort fires"); pinning into facts is one use case among many. Wire `onCancel` to Sentry breadcrumbs, a Redux action log, or a metrics sink with equal ease.
 
-`onCancel` errors are caught and swallowed — the abort path stays clean.
+`onCancel` errors are caught and swallowed – the abort path stays clean.
 
 ## Optimistic updates + rollback
 
 A future `@directive-run/optimistic` package will integrate with this
-one — the planned `ctx.snapshot([keys])` API lets a handler snapshot
+one – the planned `ctx.snapshot([keys])` API lets a handler snapshot
 specific facts before mutating, with automatic rollback on throw. Until
 that ships, do snapshots manually inside handlers:
 
@@ -329,8 +329,8 @@ submit: async ({ payload, facts, deps }) => {
 ## See also
 
 - [Directive core](https://www.npmjs.com/package/@directive-run/core)
-- [Migrating from XState — `pendingAction` pattern](https://docs.directive.run/migrating-from-xstate#the-pendingaction-pattern-12-cycles-confirmed)
-- [Internal events](https://docs.directive.run/patterns/internal-events) — when `status` alone is enough
+- [Migrating from XState – `pendingAction` pattern](https://docs.directive.run/migrating-from-xstate#the-pendingaction-pattern-12-cycles-confirmed)
+- [Internal events](https://docs.directive.run/patterns/internal-events) – when `status` alone is enough
 - [`MIGRATION_FEEDBACK.md` items 17 + 19](https://github.com/directive-run/directive/blob/main/docs/MIGRATION_FEEDBACK.md)
 
 ## License

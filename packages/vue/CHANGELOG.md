@@ -4,114 +4,75 @@
 
 ### Patch Changes
 
-- [`8c59331`](https://github.com/directive-run/directive/commit/8c5933191502009871449c7610d78836a4863602) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R6 full-library AE review — 4 security fixes, bundle splits, +64 tests
+- [`8c59331`](https://github.com/directive-run/directive/commit/8c5933191502009871449c7610d78836a4863602) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Security hardening, a smaller AI bundle, and broader test coverage.
 
-  Library-wide AE review across all 16 packages (~100K LOC, 4,765 tests).
-  Found 0 CRITICAL / 23 MAJOR. Closed the real-gap subset surgically; deferred
-  architectural-only items. Tests 4,765 → 4,829 (+64).
+  ### Security fixes
 
-  ### Security fixes (4 MAJOR closed)
-
-  - **`@directive-run/vite-plugin-api-proxy`** — 10 MB body cap + 30 s slowloris
-    timeout + response-header allowlist. `set-cookie`, `authorization`,
-    `x-api-key`, `x-internal-*` are now explicitly dropped from upstream
-    responses; only `content-type`, `cache-control`, `etag`, `last-modified`,
-    `vary`, `content-encoding`, `content-language`, `expires`, `pragma`
-    forwarded. Closes upstream-header info-leak + body-flood DoS.
-  - **`@directive-run/core` worker adapter** — `request<T>()` accepts
+  - **`@directive-run/vite-plugin-api-proxy`** – 10 MB body cap, a 30 s
+    slowloris timeout, and a response-header allowlist. `set-cookie`,
+    `authorization`, `x-api-key`, and `x-internal-*` are now explicitly
+    dropped from upstream responses; only `content-type`, `cache-control`,
+    `etag`, `last-modified`, `vary`, `content-encoding`, `content-language`,
+    `expires`, and `pragma` are forwarded. Closes an upstream-header info
+    leak and a body-flood denial-of-service.
+  - **`@directive-run/core` worker adapter** – `request<T>()` accepts
     `timeoutMs?: number` (default 30 s; `0`/`Infinity` opts out). On timeout
-    or `worker.onerror`, all pending entries reject + clear. Closes
+    or `worker.onerror`, all pending entries reject and clear, closing an
     unbounded `pendingRequests` Map leak.
-  - **`@directive-run/ai` structured-output** — `extractJsonFromOutput` now
+  - **`@directive-run/ai` structured output** – `extractJsonFromOutput` now
     runs `isPrototypeSafe` on every `JSON.parse` return point. LLM output
     with `__proto__`/`constructor`/`prototype` keys throws
     `[Directive] structured-output: extracted JSON contains unsafe
 prototype keys` instead of silently passing through.
 
-  ### Architecture splits (2 MAJOR closed)
+  ### Smaller AI bundle
 
-  - **`@directive-run/ai` bundle split** — main bundle 120 KB → **44 KB**
-    (-63%). New subpath exports (additive — main barrel keeps re-exports
-    with `@deprecated` JSDoc for one cycle):
-    - `@directive-run/ai/multi-agent` — orchestrator + patterns + agent
-      communication + checkpoints + breakpoints
-    - `@directive-run/ai/predicate` — `predicateFromIntent*`,
+  - **`@directive-run/ai` bundle split** – the main bundle drops from 120 KB
+    to **44 KB** (-63%). New subpath exports (additive – the main barrel
+    keeps re-exports with `@deprecated` JSDoc for one cycle):
+    - `@directive-run/ai/multi-agent` – orchestrator, patterns, agent
+      communication, checkpoints, breakpoints
+    - `@directive-run/ai/predicate` – `predicateFromIntent*`,
       `predicateToolSpec*`, `PredicateFromIntentError`
-    - `@directive-run/ai/guardrails` — PII / moderation / prompt-injection /
+    - `@directive-run/ai/guardrails` – PII, moderation, prompt-injection,
       semantic cache
-    - `@directive-run/ai/devtools` — debug timeline + devtools WebSocket
-      server + health monitor
-    - `@directive-run/ai/evals` — eval harness
+    - `@directive-run/ai/devtools` – debug timeline, devtools WebSocket
+      server, health monitor
+    - `@directive-run/ai/evals` – eval harness
     - (`@directive-run/ai/mcp`, `/openai`, `/anthropic`, `/ollama`, `/gemini`
       unchanged)
-  - **`@directive-run/core` audit-ledger split** — 1,313 LOC monolith
-    refactored into `packages/core/src/plugins/audit-ledger/` (6 files:
-    `types`, `hash`, `sink`, `predicate-redact`, `verify`, `index`). Public
-    API unchanged. `LEDGER_INTERNAL_TOKEN` sentinel still confined to one
-    file; tombstone-forgery defense intact.
+  - **`@directive-run/core` audit-ledger refactor** – the audit ledger moved
+    to `packages/core/src/plugins/audit-ledger/`. Public API unchanged; the
+    tombstone-forgery defense is intact.
 
-  ### Test parity (1 MAJOR closed)
+  ### Test coverage
 
-  `useAuditLedger` hooks shipped in v1.13 for React / Vue / Svelte / Solid
-  had ZERO tests (Lit had 1 controller test). Added **25 tests** across 4
-  new test files covering: initial-value sync, reactive update,
-  filter exclusion, `pollMs<50` clamp + dev warning, large-ledger warning,
-  cleanup on unmount.
+  Added coverage for the `useAuditLedger` hooks across React, Vue, Svelte,
+  and Solid (initial-value sync, reactive update, filter exclusion,
+  `pollMs<50` clamp with dev warning, large-ledger warning, and cleanup on
+  unmount), plus new tests for the vite-plugin-api-proxy body cap / header
+  allowlist / timeout, the worker-adapter timeout and `onerror` paths, and
+  the structured-output prototype-safety guard.
 
-  Plus: vite-plugin-api-proxy gained its first 4 tests (body cap, header
-  allowlist, timeout) + worker adapter gained 5 timeout/onerror tests + 6
-  new structured-output prototype-safety tests. Total +40 tests.
+  ### Other fixes
 
-  ### DX fixes (5 closed)
-
-  - Root README — added 8 missing packages to the table (`el`, `query`,
+  - Root README – added the 8 missing packages to the table (`el`, `query`,
     `cli`, `mutator`, `optimistic`, `timeline`, `vite-plugin-api-proxy`,
-    `knowledge`); fixed adapter-count mismatch.
-  - `@directive-run/vite-plugin-api-proxy` — new README documenting CORS
-    rationale, header allowlist, body cap, prod warning.
-  - `@directive-run/core` CHANGELOG — 1.12.0 entry was empty; filled in
-    with the R4 AE-review-loop scope.
+    `knowledge`) and fixed an adapter-count mismatch.
+  - `@directive-run/vite-plugin-api-proxy` – new README documenting the CORS
+    rationale, header allowlist, body cap, and production warning.
   - `AuditLedgerSink.erase` parameter renamed `tombstoneFactory` →
-    `markerEntryFactory` (param-name rename, no behavior change — TS
+    `markerEntryFactory` (parameter-name rename only, no behavior change –
     positional args mean no consumer breakage).
-  - `[Directive]` prefix sweep on `predicate-to-mongo.ts`, `sweep-under.ts`,
-    `module.ts`, `adapter-utils.ts` — confirmed all 36 throws already
-    prefixed (no diff).
-
-  ### Docs (1 closed)
-
-  6 plugin concept docs added (`logging`, `devtools`, `persistence`,
-  `observability`, `circuit-breaker`, `performance`) under
-  `docs/concepts/`. Mirror pages at `directive-docs/src/app/docs/<name>/`
-  for v2 routing (the existing nav under `/docs/plugins/<name>` keeps its
-  deeper content; the observability nav entry remains commented out per
-  the existing "re-evaluating vs OTel" product call).
-
-  ### Deferred (R5 MAJOR not closed this round)
-
-  - Observability + OTLP exporter + predicate-to-{sql,mongo,pgrest} direct
-    test files (~300-1100 LOC each, no regression risk currently)
-  - Cross-package integration tests
-  - LLM-emit provenance → audit-ledger seam (predicateHash on
-    `constraint.evaluate` entries) — wider design call
-  - Subject-keyed audit queries (multi-tenant ergonomics)
-  - Devtools extraction to its own package
-  - Shared `Sink<T>` interface refactor
-
-  R5 review surfaced 0 CRITICAL across the whole library. R6 closes the
-  high-signal subset. Engine + AI substrate + R4 hardening all intact.
+  - Added 6 plugin concept docs (`logging`, `devtools`, `persistence`,
+    `observability`, `circuit-breaker`, `performance`) under
+    `docs/concepts/`.
 
 ## 1.13.0
 
 ### Minor Changes
 
-- [`195480a`](https://github.com/directive-run/directive/commit/195480a1fe92234e023fa70db3a021b60f5efb91) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R4 sprint AE review loop — security hardening, honest claims, +2 new public APIs
-
-  Four-round AE review loop on the v1.12.0 R4 sprint wrap. Started with
-  8 CRITICAL / 26 MAJOR; converged in 4 rounds to 0 / 0. Trajectory:
-  R1 8→R2 4→R3 1→R4 0 CRITICAL. Tests 3551 → 3972 (+421). Two
-  game-changers shipped as byproducts: `describePredicate` (R6.B) and
-  `predicateHash` (R6.D).
+- [`195480a`](https://github.com/directive-run/directive/commit/195480a1fe92234e023fa70db3a021b60f5efb91) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Security hardening, more honest audit-ledger claims, and two new public APIs.
 
   ### New public APIs
 
@@ -132,9 +93,9 @@ prototype keys` instead of silently passing through.
 
   ### Security guarantees hardened
 
-  - **Tombstone forgery defense** — `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable internal sentinel symbol. Direct `sink.write({kind:"system.entry-erased",...})` is detected as tamper.
-  - **PII redaction now walks predicate operands** — `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into `whenSpec`.
-  - **Function-form `whenSource` → `sourceHash` only** — function source NEVER lands in audit entries; secrets in closures stay private.
+  - **Tombstone forgery defense** – `verify()` recognizes only `ledger.erase()`-stamped tombstones via an unforgeable internal sentinel symbol. Direct `sink.write({kind:"system.entry-erased",...})` is detected as tamper.
+  - **PII redaction now walks predicate operands** – `{ email: { $eq: "alice@x.com" } }` no longer leaks the literal into `whenSpec`.
+  - **Function-form `whenSource` → `sourceHash` only** – function source NEVER lands in audit entries; secrets in closures stay private.
   - **AuditEntry payloads are frozen** at write time. In-process mutation throws.
   - **`AbortSignal.any()` properly composes** runner timeouts with caller signals (previously caller signal silently disabled timeout).
   - **PII default-redaction** for `meta({ tags: ["pii"] })` fact values in the audit ledger. `capturePII: true` opts out.
@@ -144,13 +105,13 @@ prototype keys` instead of silently passing through.
 
   The audit-ledger is **tamper-evident**, NOT cryptographic-grade:
 
-  - djb2 32-bit hash chain — detects accidental + light-adversarial tamper. SHA-256 reserved for v2.
+  - djb2 32-bit hash chain – detects accidental + light-adversarial tamper. SHA-256 reserved for v2.
   - `verify({ strong: true })` throws "reserved for v2" (was a no-op silently returning valid in v1.12.0).
   - In-memory ring buffer drops oldest past `capacity` (default 10k). SQLite / Parquet sinks reserved for v2.
   - `ledger.erase()` provides per-subject GDPR Art.17 erasure in-sink only; persisted exports must be erased separately. Erased entries break the chain at the erasure point; `verify()` reports them in `erasedSeqs: number[]`.
   - No actor / operator / session attribution on entries (v2).
   - No read-tracking (constraint evaluations + writes only).
-  - No trusted timestamps (RFC 3161 TSA) — `Date.now()` is operator-controlled.
+  - No trusted timestamps (RFC 3161 TSA) – `Date.now()` is operator-controlled.
   - No signing keys with rotation (v2).
 
   ### Migration (from v1.12.0)
@@ -158,8 +119,8 @@ prototype keys` instead of silently passing through.
   | Was                                                                                             | Now                                                                                                                                   |
   | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
   | `predicateToolSpec(schema)`                                                                     | `predicateToolSpecAnthropic(schema)` (deprecated alias retained)                                                                      |
-  | —                                                                                               | `predicateToolSpecOpenAI(schema)` (new — OpenAI Chat Completions shape)                                                               |
-  | `predicateFromIntentWithProvenance().rawOutputHash`                                             | `.predicateHash` (now canonicalized via `stableStringify` before hashing — semantically-identical responses produce identical hashes) |
+  | (none)                                                                                          | `predicateToolSpecOpenAI(schema)` (new – OpenAI Chat Completions shape)                                                               |
+  | `predicateFromIntentWithProvenance().rawOutputHash`                                             | `.predicateHash` (now canonicalized via `stableStringify` before hashing – semantically-identical responses produce identical hashes) |
   | `VerifyResult.erasedAt: number[]`                                                               | `VerifyResult.erasedSeqs: number[]` (avoids units collision with per-tombstone `erasedAt` timestamp)                                  |
   | `ledger.erase().tombstone`                                                                      | `.markerEntry` (renamed; plural mismatch resolved)                                                                                    |
   | `ledger.erase()` always emitted marker                                                          | Now `{ erased: 0, markerEntry: null }` for zero-match calls (no chain pollution)                                                      |
@@ -187,21 +148,21 @@ prototype keys` instead of silently passing through.
 
   ### What didn't change (back-compat)
 
-  - The 14-variant `AuditEntry` discriminated union — every consumer's switch keeps working; new kinds were strictly additive (the compliance-audit demo gained an exhaustiveness `never` check to catch future drift at compile time).
-  - All R4 sprint v1.12.0 APIs (`createAuditLedger`, `predicateFromIntent`, `predict`, `doctor`, `predicateToSQL/Mongo/Postgrest`, `whenExplain` panel) — same call signatures, hardened internals.
-  - All R6.B / R6.D APIs added are net-new exports; no removed surface.
+  - The 14-variant `AuditEntry` discriminated union – every consumer's switch keeps working; new kinds were strictly additive (the compliance-audit demo gained an exhaustiveness `never` check to catch future drift at compile time).
+  - All v1.12.0 APIs (`createAuditLedger`, `predicateFromIntent`, `predict`, `doctor`, `predicateToSQL/Mongo/Postgrest`, `whenExplain` panel) – same call signatures, hardened internals.
+  - The newly added APIs (`describePredicate`, `predicateHash`) are net-new exports; no removed surface.
 
   ### Compliance demo updates
 
   `examples/compliance-audit` gained an ERASE button alongside TAMPER + VERIFY, demoing the full GDPR Art.17 → tombstone → verify-with-`erasedSeqs` flow. Bundle 146 kB / 46 kB gz.
 
-  ### Out of scope (queued for next sprint, see IDEAS.md)
+  ### Not in this release
 
-  R6.A `ledger.replayUnder()`, R6.C `predicateToZod/JSONSchema/TypeScript`,
-  R7.A ensemble-jury `tuneFromIntent`, R7.B `directive ledger render`
-  (English forensic timeline), R7.C predict×checkOwns preemptive
-  collision, R7.E `RULES.md` codegen via `describePredicate`. All
-  buildable in <3 days each on the hardened v1.13.0 substrate.
+  Planned follow-ups include `ledger.replayUnder()`,
+  `predicateToZod/JSONSchema/TypeScript`, an ensemble-jury `tuneFromIntent`,
+  a `directive ledger render` English forensic timeline, a predict ×
+  checkOwns preemptive collision check, and `RULES.md` codegen via
+  `describePredicate`.
 
 ## 1.12.0
 
@@ -214,7 +175,7 @@ prototype keys` instead of silently passing through.
   - **Vue:** `useAuditLedger(ledger, filter)` returns a `ShallowRef<readonly AuditEntry[]>`
   - **Svelte:** `createAuditLedgerStore(ledger, filter)` returns a `Readable<readonly AuditEntry[]>`
   - **Solid:** `useAuditLedger(ledger, filter)` returns an `Accessor<readonly AuditEntry[]>`
-  - **Lit:** `AuditLedgerController` — a `ReactiveController` exposing `.value`
+  - **Lit:** `AuditLedgerController` – a `ReactiveController` exposing `.value`
 
   All four poll the ledger (default 250 ms, override with `pollMs`) and surface the latest entries matching the filter. The compliance-audit example now has a one-line install path on every supported framework.
 
@@ -263,7 +224,7 @@ prototype keys` instead of silently passing through.
 - [`b506536`](https://github.com/directive-run/directive/commit/b506536aa7babfa2931b55c11ce6f36b13052e0d) Thanks [@jasoncomes](https://github.com/jasoncomes)! - fix: dev-mode validation runs in consumer production builds (v1.5.0 / v1.6.0)
 
   The published bundles in v1.5.0 and v1.6.0 baked `isDevelopment = true`
-  as a literal — tsup resolved the `#is-development` package.json import
+  as a literal – tsup resolved the `#is-development` package.json import
   to `dev-true.ts` (which was `export default true;`) and shipped the
   constant into the chunk. Every consumer's production build then ran
   dev-mode fact-validation as if `NODE_ENV` were `development`, and a
@@ -273,7 +234,7 @@ prototype keys` instead of silently passing through.
   [Directive] Validation failed for "<key>": expected <type>, got null
   ```
 
-  `directive.run` itself hit this — `next build` failed end-to-end on a
+  `directive.run` itself hit this – `next build` failed end-to-end on a
   clean v1.5.0 doc-site against the `@directive-run/ai` orchestrator's
   fact init.
 
@@ -287,7 +248,7 @@ prototype keys` instead of silently passing through.
 
   - In a bundler (Webpack / Vite / Turbopack / Rollup / esbuild) for a
     consumer production build, the expression folds to literal `false` via
-    the bundler's standard `process.env.NODE_ENV = "production"` define —
+    the bundler's standard `process.env.NODE_ENV = "production"` define –
     dev-mode validation is dropped.
   - In a Node.js process, the check evaluates at runtime against the live
     `NODE_ENV`. Setting `NODE_ENV=production` correctly disables dev-mode
@@ -301,12 +262,12 @@ prototype keys` instead of silently passing through.
   `dev-true.ts` form.
 
   **Required action for consumers on v1.5.0 / v1.6.0:** upgrade. There
-  is no runtime workaround for the broken published bundle — the literal
+  is no runtime workaround for the broken published bundle – the literal
   `true` was baked into the chunk and is read every time `createSystem`
   runs in any environment.
 
   Tested via the doc-site's `next build` against a local link of the
-  patched packages — clean end-to-end after the change.
+  patched packages – clean end-to-end after the change.
 
 ## 1.6.0
 
@@ -320,7 +281,7 @@ prototype keys` instead of silently passing through.
 
 ### Patch Changes
 
-- [`81da1e2`](https://github.com/directive-run/directive/commit/81da1e285e96f29f40451bcd2a05e61345f94487) Thanks [@jasoncomes](https://github.com/jasoncomes)! - AE review fixes + test coverage for new features
+- [`81da1e2`](https://github.com/directive-run/directive/commit/81da1e285e96f29f40451bcd2a05e61345f94487) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Bug fixes and added test coverage for the new features.
 
   **Core:**
 
@@ -365,7 +326,7 @@ prototype keys` instead of silently passing through.
   - svelte: Add `setHydrationSnapshot` + `useHydratedSystem`
   - solid: Add `DirectiveHydrator` + `useHydratedSystem`
   - lit: Add `HydrationController` with lifecycle management
-  - ai: Split orchestrator (8.7K -> 7.4K LOC), rename `dispose()` to `destroy()`, enable bundle splitting (246KB -> 109KB), remove legacy shims
+  - ai: Split the orchestrator into smaller modules, rename `dispose()` to `destroy()`, enable bundle splitting (246KB -> 109KB), remove legacy shims
   - query: Add `persistQueryCache` plugin for offline cache persistence
 
 ## 0.8.6

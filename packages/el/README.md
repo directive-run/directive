@@ -4,20 +4,20 @@
 [![downloads](https://img.shields.io/npm/dm/@directive-run/el)](https://www.npmjs.com/package/@directive-run/el)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/@directive-run/el)](https://bundlephobia.com/package/@directive-run/el)
 
-Typed element creation, JSX runtime, and htm support — no framework required. Versions independently from the rest of the [Directive](https://www.npmjs.com/package/@directive-run/core) ecosystem.
+Typed element creation, JSX runtime, and htm support – no framework required. Versions independently from the rest of the [Directive](https://www.npmjs.com/package/@directive-run/core) ecosystem.
 
 Use `el()` standalone for any vanilla DOM project. Add `@directive-run/core` for reactive bindings (`bind`, `bindText`, `mount`).
 
 ## Three Ways to Write
 
 ```typescript
-// 1. el() — function calls
+// 1. el() – function calls
 el("div", { className: "card" }, el("h2", "Title"), el("p", "Body"))
 
-// 2. JSX — familiar component syntax, no React
+// 2. JSX – familiar component syntax, no React
 <div className="card"><h2>Title</h2><p>Body</p></div>
 
-// 3. htm — tagged templates, no build step
+// 3. htm – tagged templates, no build step
 html`<div className="card"><h2>Title</h2><p>Body</p></div>`
 ```
 
@@ -26,7 +26,7 @@ All three produce real DOM nodes. Pick what fits your project.
 ## Install
 
 ```bash
-# Standalone — no Directive dependency
+# Standalone – no Directive dependency
 npm install @directive-run/el
 
 # With reactive bindings (requires Directive)
@@ -38,7 +38,7 @@ npm install htm
 
 ## Standalone Usage
 
-`el()` works without Directive — just typed DOM creation:
+`el()` works without Directive – just typed DOM creation:
 
 ```typescript
 import { el } from "@directive-run/el";
@@ -84,7 +84,7 @@ system.start();
 ```
 
 ```typescript
-// main.ts — using el()
+// main.ts – using el()
 import { el, bindText } from "@directive-run/el";
 import { system } from "./system";
 
@@ -109,17 +109,17 @@ document.body.appendChild(app);
 
 Create a typed DOM element with optional props and children in a single call.
 
-**Props are auto-detected** — if the second argument is a child (string, number, Node, array), the empty `{}` is not needed:
+**Props are auto-detected** – if the second argument is a child (string, number, Node, array), the empty `{}` is not needed:
 
 ```typescript
 import { el } from "@directive-run/el";
 
-// Props auto-detection — no empty {} needed
+// Props auto-detection – no empty {} needed
 el("p", "Hello world")
 el("ul", items.map(item => el("li", item)))
 el("div", el("h1", "Title"), el("p", "Body"))
 
-// With props — plain objects are detected as props
+// With props – plain objects are detected as props
 el("a", { href: "/home", className: "nav" }, "Home")
 el("input", { type: "email", value: "a@b.com" })
 
@@ -129,7 +129,7 @@ el("ul", items.map(item => el("li", item)))
 // Event handlers attached at creation
 el("button", { onclick: () => save() }, "Save")
 
-// Conditional children — false/null/undefined silently skipped
+// Conditional children – false/null/undefined silently skipped
 el("div", hasError && el("p", { className: "error" }, message))
 
 // Numbers coerce to text nodes
@@ -142,10 +142,10 @@ Return type is inferred from the tag name:
 
 ```typescript
 const input = el("input", { type: "email" });
-//    ^? HTMLInputElement — type, value, checked all auto-complete
+//    ^? HTMLInputElement – type, value, checked all auto-complete
 
 const canvas = el("canvas", { width: 800, height: 600 });
-//    ^? HTMLCanvasElement — getContext() available
+//    ^? HTMLCanvasElement – getContext() available
 ```
 
 ### Children Types
@@ -162,7 +162,7 @@ const canvas = el("canvas", { width: 800, height: 600 });
 
 ## JSX Runtime
 
-Write JSX that compiles to `el()` calls — no React required.
+Write JSX that compiles to `el()` calls – no React required.
 
 ### Setup
 
@@ -195,7 +195,7 @@ const app = (
 document.body.appendChild(app);
 ```
 
-JSX produces real DOM nodes — same as calling `el()` directly. No virtual DOM, no diffing, no reconciliation.
+JSX produces real DOM nodes – same as calling `el()` directly. No virtual DOM, no diffing, no reconciliation.
 
 ---
 
@@ -228,7 +228,7 @@ const app = html`
 document.body.appendChild(app);
 ```
 
-Works in plain `.js` files — no TypeScript or bundler needed. Great for prototyping, CDN-based projects, or `<script type="module">` in HTML files.
+Works in plain `.js` files – no TypeScript or bundler needed. Great for prototyping, CDN-based projects, or `<script type="module">` in HTML files.
 
 ---
 
@@ -342,8 +342,8 @@ system.subscribe(["ship.*"], () => {
 
 ## Peer Dependencies
 
-- `@directive-run/core` (optional — only needed for `bind`, `bindText`, `mount`)
-- `htm` >= 3 (optional — only needed for `@directive-run/el/htm`)
+- `@directive-run/core` (optional – only needed for `bind`, `bindText`, `mount`)
+- `htm` >= 3 (optional – only needed for `@directive-run/el/htm`)
 
 ## Documentation
 

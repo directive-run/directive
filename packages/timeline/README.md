@@ -10,7 +10,7 @@ npm install --save-dev @directive-run/timeline
 ## What it solves
 
 When `expect(sys.facts.status).toBe('ready')` fails, vitest tells you
-"expected 'loading' to be 'ready'." That's not a debugging tool — it's
+"expected 'loading' to be 'ready'." That's not a debugging tool – it's
 a riddle.
 
 This package leans on Directive's already-shipped
@@ -20,7 +20,7 @@ trace inline with the failure. Now you see:
 ```
 ──────── Directive timeline for FAIL ────────
 load completes → ready
-Timeline 'load completes → ready' — 8 frames over 23ms
+Timeline 'load completes → ready' – 8 frames over 23ms
   [+0.1ms]    system.start
   [+0.1ms]    reconcile.start
   [+0.2ms]    fact.change status: "idle" → "loading"
@@ -35,7 +35,7 @@ Now the failure isn't a riddle. The resolver threw, the status fact
 never advanced, the test correctly observed status="loading."
 
 > **Frame-capture note.** `system.init` fires synchronously inside
-> `createSystem(...)` — *before* you call `recordTimeline(sys, ...)`,
+> `createSystem(...)` – *before* you call `recordTimeline(sys, ...)`,
 > so it is missed by any subscriber registered later. To include it,
 > call `recordTimeline()` first against a stub-observable, or accept
 > that captured frames begin at the next observable event (typically
@@ -86,10 +86,10 @@ renders it on failure.
 Every Directive `System` exposes `system.observe(observer)`, a typed
 event stream of:
 
-- `fact.change` — every fact write, with prev / next values
-- `constraint.evaluate` — every constraint predicate run
+- `fact.change` – every fact write, with prev / next values
+- `constraint.evaluate` – every constraint predicate run
 - `requirement.created` / `requirement.met` / `requirement.canceled`
-- `resolver.start` / `resolver.complete` / `resolver.error` — with
+- `resolver.start` / `resolver.complete` / `resolver.error` – with
   duration on completion
 - `effect.run` / `effect.error`
 - `derivation.compute`
@@ -106,7 +106,7 @@ no equivalent. This is Directive's compounding advantage made visible.
 
 ## Manual / programmatic use
 
-The recorder works without the reporter — useful if you want to inspect
+The recorder works without the reporter – useful if you want to inspect
 a timeline mid-test or attach it to a custom error message:
 
 ```ts
@@ -153,7 +153,7 @@ Drop a single timeline from the registry.
 Drop all recorded timelines. Useful in test global setup.
 
 ### `withTimeline(id, system, fn)`
-Convenience wrapper — records around an async block; auto-stops on
+Convenience wrapper – records around an async block; auto-stops on
 resolve / throw.
 
 ### `formatTimeline(timeline, opts?) → string`
@@ -190,7 +190,7 @@ you suspect it's not exercising what you expect).
 ## Causal-graph vitest matchers (R1.B)
 
 Five matchers for asserting against the *causal chain* a Directive
-system produced — not just final state. Subpath import:
+system produced – not just final state. Subpath import:
 
 ```ts
 // vitest.setup.ts
@@ -225,7 +225,7 @@ it('completes in under 50ms with no cascade', async () => {
 });
 ```
 
-Each matcher operates on the recorded `ObservationEvent` stream — the
+Each matcher operates on the recorded `ObservationEvent` stream – the
 same data the formatter renders and `replayTimeline` re-dispatches. No
 other state library has assertion-against-causal-graph for free.
 
@@ -234,7 +234,7 @@ other state library has assertion-against-causal-graph for free.
 Recorded timelines are **JSON-serializable**. The package ships four
 operational entry points that all consume that same JSON:
 
-### `serializeTimeline()` + `replayTimeline()` — re-dispatch a recorded run
+### `serializeTimeline()` + `replayTimeline()` – re-dispatch a recorded run
 
 ```ts
 import {
@@ -253,7 +253,7 @@ const incoming = deserializeTimeline(JSON.parse(prodErrorJson));
 const sys = createSystem({ module: createSameModuleAsProd() });
 sys.start();
 const result = await replayTimeline(incoming, sys);
-// result is { dispatched, skipped, truncated } — verify the replay
+// result is { dispatched, skipped, truncated } – verify the replay
 // actually re-fired what you expected.
 ```
 
@@ -263,10 +263,10 @@ Replay walks frames in order and re-dispatches anything that maps to a
 known dispatchable surface (today: `@directive-run/mutator`-shaped
 `pendingMutation` fact.change frames). Non-dispatchable frames
 (`system.start`, `reconcile.start`, `derivation.compute`, ...) are
-skipped by default — opt out with `{ dispatchableOnly: false }` for
+skipped by default – opt out with `{ dispatchableOnly: false }` for
 diagnostic walks.
 
-### `bisectTimeline()` — git-bisect for timelines (R2.A)
+### `bisectTimeline()` – git-bisect for timelines (R2.A)
 
 Binary-search a recorded timeline for the first frame whose inclusion
 flips a user-supplied assertion from passing to failing.
@@ -290,11 +290,11 @@ const result = await bisectTimeline(
 if (result.firstFailingFrameIndex !== undefined) {
   console.log(`first failing frame: #${result.firstFailingFrameIndex}`);
 } else if (result.noFailureFound) {
-  console.log('assertion never fails — wrong oracle?');
+  console.log('assertion never fails – wrong oracle?');
 } else if (result.failsOnEmptyReplay) {
-  console.log('bug is in initialization — bisect cannot narrow further');
+  console.log('bug is in initialization – bisect cannot narrow further');
 } else if (result.nonDeterministic) {
-  console.log('two full replays disagreed — fix determinism first');
+  console.log('two full replays disagreed – fix determinism first');
 }
 ```
 
@@ -302,15 +302,15 @@ CLI equivalent: `directive bisect bug.json --system factory.ts --assert 'facts.s
 
 **Cost:** O(log N) replays of up to N frames each, plus two
 full-timeline replays for the determinism gate. The dominant cost in
-practice is the **factory** — your `createSystem + start + initial reconcile`
+practice is the **factory** – your `createSystem + start + initial reconcile`
 runs ~log₂(N) times. Keep the factory cheap (lazy DB/network init,
 no real I/O in module factories) or expect bisect of large timelines
 to take seconds.
 
-### `diffTimelines()` — semantic causal-graph diff (R2.C)
+### `diffTimelines()` – semantic causal-graph diff (R2.C)
 
 Compare two serialized timelines as a structured causal-graph report.
-Not a textual JSON diff — a per-category delta.
+Not a textual JSON diff – a per-category delta.
 
 ```ts
 import { diffTimelines, deserializeTimeline } from '@directive-run/timeline';
@@ -349,14 +349,14 @@ spec, four operational entry points.
 
 Future versions explore:
 
-- **v0.3** — interactive scrubbing: pipe failures into a CLI prompt
+- **v0.3** – interactive scrubbing: pipe failures into a CLI prompt
   with `n`/`p` to step forward/back through frames, showing the facts
   snapshot at each step.
-- **v0.4** — web UI: a small static page that renders the timeline as
+- **v0.4** – web UI: a small static page that renders the timeline as
   a swim-lane diagram. Same data; richer rendering.
-- **v0.5** — Mermaid sequence-diagram emitter for `diffTimelines`
+- **v0.5** – Mermaid sequence-diagram emitter for `diffTimelines`
   (PR-comment-friendly causal diff visualization).
-- **v0.5** — first-class `event.dispatch` ObservationEvent support
+- **v0.5** – first-class `event.dispatch` ObservationEvent support
   (today replay/diff coupling is mutator-shape-based; core will land
   the canonical wire format).
 
@@ -365,8 +365,8 @@ the frontends compose.
 
 ## See also
 
-- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) — the substrate
-- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) — runtime inspector (orthogonal: that's for live apps; this is for test failures)
+- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) – the substrate
+- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) – runtime inspector (orthogonal: that's for live apps; this is for test failures)
 - [Testing chained pipelines](https://docs.directive.run/testing/chained-pipelines)
 
 ## License

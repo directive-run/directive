@@ -38,7 +38,7 @@ submit: withOptimistic<FormFacts>(['values'])(async ({ payload, facts }) => {
 ```
 
 The single-arg outer call (`withOptimistic<F>(keys)`) is what makes
-the keys array type-check against `keyof F` — a typo like
+the keys array type-check against `keyof F` – a typo like
 `['valuess']` becomes a compile error. The inner call accepts your
 mutator handler unchanged.
 
@@ -55,7 +55,7 @@ This package operates within a **single resolver invocation**. It is:
 - ❌ NOT a replay-undo
 
 If you need cross-module rollback, you're describing a distributed
-transaction — not what this is. The MIGRATION_FEEDBACK item this
+transaction – not what this is. The MIGRATION_FEEDBACK item this
 addresses (#19) is explicitly resolver-scope.
 
 ## API
@@ -77,7 +77,7 @@ try {
 }
 ```
 
-`restore()` can be called multiple times — each call writes the
+`restore()` can be called multiple times – each call writes the
 captured snapshot back. Useful if your handler has multiple
 mid-execution decision points.
 
@@ -85,7 +85,7 @@ mid-execution decision points.
 
 Higher-order helper that wraps a handler with snapshot + automatic
 rollback. The two-call signature lets TypeScript infer the keys array
-against `keyof F` — typos are compile errors. Composes with
+against `keyof F` – typos are compile errors. Composes with
 `@directive-run/mutator`:
 
 ```ts
@@ -112,7 +112,7 @@ The wrapper:
 ## Cloning semantics
 
 Snapshots are **deep-cloned** via `structuredClone` (Node 17+, modern
-browsers — Directive's documented engine baseline). There is **no**
+browsers – Directive's documented engine baseline). There is **no**
 JSON-roundtrip fallback: that path silently dropped functions,
 symbols, undefined values, and was the exact silent-corruption hole
 optimistic rollback exists to prevent. structuredClone covers what
@@ -121,7 +121,7 @@ adds zero recoverable cases and one corruption surface.
 
 If a fact contains a function, DOM node, non-cloneable instance, or
 some other shape `structuredClone` rejects, the snapshot **throws**
-an `OptimisticCloneError` with the offending key — making the
+an `OptimisticCloneError` with the offending key – making the
 violation loud rather than silently corrupting the rolled-back
 state. Convert at the boundary (e.g. `Date → number`,
 `BigInt → string`) before assigning to facts.
@@ -144,7 +144,7 @@ try {
 When using `@directive-run/mutator` and a handler throws, the mutator
 captures the error on `pendingMutation.error` and stops the constraint
 from re-firing. With `withOptimistic`, the rollback runs **before** the
-mutator captures the error — so by the time the UI renders the error,
+mutator captures the error – so by the time the UI renders the error,
 the facts are already back to their pre-mutation state.
 
 This is the right ordering for optimistic UI:
@@ -164,8 +164,8 @@ This is the right ordering for optimistic UI:
 
 ## See also
 
-- [`@directive-run/mutator`](https://www.npmjs.com/package/@directive-run/mutator) — composes with this for full optimistic-UI flows
-- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) — the runtime
+- [`@directive-run/mutator`](https://www.npmjs.com/package/@directive-run/mutator) – composes with this for full optimistic-UI flows
+- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) – the runtime
 - [JSON-fact contract](https://docs.directive.run/api/facts#json-roundtrippability-is-required)
 - [`MIGRATION_FEEDBACK.md` item 19](https://github.com/directive-run/directive/blob/main/docs/MIGRATION_FEEDBACK.md)
 
