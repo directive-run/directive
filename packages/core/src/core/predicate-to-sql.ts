@@ -9,10 +9,7 @@
  */
 
 import { MAX_PREDICATE_DEPTH } from "./predicate.js";
-import {
-  PREDICATE_OPERATORS,
-  type FactPredicate,
-} from "./types/predicate.js";
+import { type FactPredicate, PREDICATE_OPERATORS } from "./types/predicate.js";
 
 // ============================================================================
 // Types
@@ -91,7 +88,7 @@ function assertAllowed(
 function validateSelect(select: string | readonly string[]): string {
   if (Array.isArray(select)) {
     if (select.length === 0) {
-      throw new Error(`[Directive] predicateToSQL: select must not be empty`);
+      throw new Error("[Directive] predicateToSQL: select must not be empty");
     }
     for (const col of select) {
       assertIdentifier(col, "column");
@@ -148,12 +145,16 @@ function renderOp(
       return `${column} <= ${nextParam(ctx, operand)}`;
     case "$in":
       if (!Array.isArray(operand)) {
-        throw new Error(`[Directive] predicateToSQL: $in operand must be an array`);
+        throw new Error(
+          "[Directive] predicateToSQL: $in operand must be an array",
+        );
       }
       return `${column} = ANY(${nextParam(ctx, operand)})`;
     case "$nin":
       if (!Array.isArray(operand)) {
-        throw new Error(`[Directive] predicateToSQL: $nin operand must be an array`);
+        throw new Error(
+          "[Directive] predicateToSQL: $nin operand must be an array",
+        );
       }
       return `NOT (${column} = ANY(${nextParam(ctx, operand)}))`;
     case "$exists":
@@ -161,7 +162,7 @@ function renderOp(
     case "$between": {
       if (!Array.isArray(operand) || operand.length !== 2) {
         throw new Error(
-          `[Directive] predicateToSQL: $between operand must be a [low, high] tuple`,
+          "[Directive] predicateToSQL: $between operand must be a [low, high] tuple",
         );
       }
       return `${column} BETWEEN ${nextParam(ctx, operand[0])} AND ${nextParam(ctx, operand[1])}`;
@@ -169,7 +170,7 @@ function renderOp(
     case "$startsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToSQL: $startsWith operand must be a string`,
+          "[Directive] predicateToSQL: $startsWith operand must be a string",
         );
       }
       // ESCAPE '\' makes the escape character deterministic regardless of
@@ -179,21 +180,21 @@ function renderOp(
     case "$endsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToSQL: $endsWith operand must be a string`,
+          "[Directive] predicateToSQL: $endsWith operand must be a string",
         );
       }
       return `${column} LIKE '%' || ${nextParam(ctx, escapeLike(operand))} ESCAPE '\\'`;
     case "$contains":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToSQL: $contains only supports string operands — array containment requires a JOIN, not a predicate`,
+          "[Directive] predicateToSQL: $contains only supports string operands — array containment requires a JOIN, not a predicate",
         );
       }
       return `${column} LIKE '%' || ${nextParam(ctx, escapeLike(operand))} || '%' ESCAPE '\\'`;
     case "$matches": {
       if (!(operand instanceof RegExp)) {
         throw new Error(
-          `[Directive] predicateToSQL: $matches operand must be a RegExp`,
+          "[Directive] predicateToSQL: $matches operand must be a RegExp",
         );
       }
       // Postgres uses ~ (case-sensitive) and ~* (case-insensitive). The
@@ -241,7 +242,10 @@ function isOperatorObject(v: unknown): v is Record<string, unknown> {
   return true;
 }
 
-function assertNoSiblingKeys(spec: Record<string, unknown>, combinator: string): void {
+function assertNoSiblingKeys(
+  spec: Record<string, unknown>,
+  combinator: string,
+): void {
   const sibs = Object.keys(spec).filter((k) => k !== combinator);
   if (sibs.length > 0) {
     throw new Error(
@@ -273,7 +277,7 @@ function buildWhere(spec: unknown, ctx: BuildContext, depth: number): string {
         !("op" in clause)
       ) {
         throw new Error(
-          `[Directive] predicateToSQL: array-form clause must be { fact, op, value }`,
+          "[Directive] predicateToSQL: array-form clause must be { fact, op, value }",
         );
       }
       const c = clause as { fact: string; op: string; value: unknown };
@@ -291,7 +295,7 @@ function buildWhere(spec: unknown, ctx: BuildContext, depth: number): string {
     assertNoSiblingKeys(spec as Record<string, unknown>, "$all");
     const arr = (spec as { $all: unknown[] }).$all;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToSQL: $all must be an array`);
+      throw new Error("[Directive] predicateToSQL: $all must be an array");
     }
     if (arr.length === 0) return "TRUE";
     const parts = arr.map((p) => buildWhere(p, ctx, depth + 1));
@@ -302,7 +306,7 @@ function buildWhere(spec: unknown, ctx: BuildContext, depth: number): string {
     assertNoSiblingKeys(spec as Record<string, unknown>, "$any");
     const arr = (spec as { $any: unknown[] }).$any;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToSQL: $any must be an array`);
+      throw new Error("[Directive] predicateToSQL: $any must be an array");
     }
     if (arr.length === 0) return "FALSE";
     const parts = arr.map((p) => buildWhere(p, ctx, depth + 1));

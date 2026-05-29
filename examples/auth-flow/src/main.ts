@@ -177,7 +177,7 @@ function render(): void {
 system.subscribe(allKeys, render);
 
 // Timer — tick every 1s for reactive countdown
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 1000);
 

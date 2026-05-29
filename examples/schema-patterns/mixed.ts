@@ -165,7 +165,7 @@ const userProfileModule = createModule("user-profile", {
     },
     geocodeAddress: {
       requirement: "GEOCODE_ADDRESS",
-      resolve: async (req, context) => {
+      resolve: async (req, _context) => {
         console.log(
           `[Resolver] Geocoding address: ${req.address.city}, ${req.address.state}`,
         );
@@ -193,7 +193,7 @@ async function main() {
   console.log("  isAdmin:", system.derive.isAdmin);
   console.log(
     "  profileCompleteness:",
-    system.derive.profileCompleteness + "%",
+    `${system.derive.profileCompleteness}%`,
   );
 
   // Use t.*() typed event
@@ -225,7 +225,7 @@ async function main() {
   console.log("  address:", system.facts.address);
   console.log(
     "  profileCompleteness:",
-    system.derive.profileCompleteness + "%",
+    `${system.derive.profileCompleteness}%`,
   );
 
   // Add tags
@@ -235,7 +235,7 @@ async function main() {
   console.log("  tags:", system.facts.tags);
   console.log(
     "  profileCompleteness:",
-    system.derive.profileCompleteness + "%",
+    `${system.derive.profileCompleteness}%`,
   );
 
   // Activate

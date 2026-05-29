@@ -236,7 +236,9 @@ function printReport(
   const total = report.newMatchCount + report.lostMatchCount;
   if (sampled < total) {
     console.log(
-      pc.dim(`\n  ${sampled} of ${total} diff frames sampled — --json for the full report`),
+      pc.dim(
+        `\n  ${sampled} of ${total} diff frames sampled — --json for the full report`,
+      ),
     );
   }
   console.log("");
@@ -263,7 +265,9 @@ export async function replayUnderCommand(args: string[]): Promise<void> {
   if (!opts.originalPath) {
     console.error(
       pc.red("error: --original <spec.json> is required") +
-        pc.dim("\n       (v1 cannot recover the constraint's current `when` from a live system)"),
+        pc.dim(
+          "\n       (v1 cannot recover the constraint's current `when` from a live system)",
+        ),
     );
     printUsage();
     process.exit(1);
@@ -277,12 +281,16 @@ export async function replayUnderCommand(args: string[]): Promise<void> {
   // "matched every frame" report is not mistaken for a meaningful result.
   if (isEmptyPredicate(original)) {
     console.error(
-      pc.yellow("warning: --original is an empty predicate {} — it matches every frame"),
+      pc.yellow(
+        "warning: --original is an empty predicate {} — it matches every frame",
+      ),
     );
   }
   if (isEmptyPredicate(proposed)) {
     console.error(
-      pc.yellow("warning: --proposed is an empty predicate {} — it matches every frame"),
+      pc.yellow(
+        "warning: --proposed is an empty predicate {} — it matches every frame",
+      ),
     );
   }
 

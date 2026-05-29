@@ -3,8 +3,8 @@ import { useFact } from "@directive-run/vue";
 import { useHistory } from "@directive-run/vue";
 import { system } from "../system";
 
-const count = useFact(system, "count");
-const history = useHistory(system);
+const _count = useFact(system, "count");
+const _history = useHistory(system);
 </script>
 
 <template>

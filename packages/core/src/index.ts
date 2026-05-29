@@ -141,7 +141,12 @@ export type {
 } from "./core/sweep-under.js";
 
 // Rules diff — structural diff of constraint whenSpec across two snapshots
-export { diffClauses, diffRules, flattenPredicate, toRulesMap } from "./core/rules-diff.js";
+export {
+  diffClauses,
+  diffRules,
+  flattenPredicate,
+  toRulesMap,
+} from "./core/rules-diff.js";
 export type {
   Change,
   ChangeKind,
@@ -160,7 +165,10 @@ export {
   getSchemaFieldKinds,
   listAllPredicateOperators,
 } from "./core/schema-introspection.js";
-export type { SchemaKind, SchemaKindNode } from "./core/schema-introspection.js";
+export type {
+  SchemaKind,
+  SchemaKindNode,
+} from "./core/schema-introspection.js";
 export { validatePredicateAgainstSchema } from "./core/predicate.js";
 export type {
   SchemaValidationError,

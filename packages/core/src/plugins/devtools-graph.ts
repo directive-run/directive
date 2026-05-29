@@ -72,7 +72,7 @@ function updateAnimationAttrs(
       continue;
     }
     const pulsing = depGraph.recentlyChangedFacts.has(key);
-    node.rect.setAttribute("fill", pulsing ? S.text + "33" : "none");
+    node.rect.setAttribute("fill", pulsing ? `${S.text}33` : "none");
     node.rect.setAttribute("stroke-width", pulsing ? "2" : "1");
   }
   for (const key of derivKeys) {
@@ -81,7 +81,7 @@ function updateAnimationAttrs(
       continue;
     }
     const pulsing = depGraph.recentlyComputedDerivations.has(key);
-    node.rect.setAttribute("fill", pulsing ? S.accent + "33" : "none");
+    node.rect.setAttribute("fill", pulsing ? `${S.accent}33` : "none");
     node.rect.setAttribute("stroke-width", pulsing ? "2" : "1");
   }
   for (const id of constraintIds) {
@@ -93,7 +93,7 @@ function updateAnimationAttrs(
     // Active constraints use S.yellow, inactive use S.muted — these are part of the fingerprint,
     // so the color is already correct. Only update pulsing fill and stroke-width.
     const color = node.rect.getAttribute("stroke") ?? S.muted;
-    node.rect.setAttribute("fill", pulsing ? color + "33" : "none");
+    node.rect.setAttribute("fill", pulsing ? `${color}33` : "none");
     node.rect.setAttribute("stroke-width", pulsing ? "2" : "1");
   }
 }
@@ -322,7 +322,7 @@ export function updateDependencyGraph(
     rect.setAttribute("width", String(FLOW.nodeW));
     rect.setAttribute("height", String(FLOW.nodeH));
     rect.setAttribute("rx", "3");
-    rect.setAttribute("fill", pulsing ? color + "33" : "none");
+    rect.setAttribute("fill", pulsing ? `${color}33` : "none");
     rect.setAttribute("stroke", color);
     rect.setAttribute("stroke-width", pulsing ? "2" : "1");
     rect.setAttribute("opacity", dimmed ? "0.35" : "1");

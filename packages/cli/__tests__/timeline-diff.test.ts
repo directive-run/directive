@@ -22,7 +22,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function writeTimeline(name: string, items: Array<unknown>): string {
+function writeTimeline(name: string, items: unknown[]): string {
   const path = join(tmpDir, name);
   writeFileSync(
     path,

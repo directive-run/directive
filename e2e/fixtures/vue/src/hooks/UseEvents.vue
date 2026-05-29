@@ -2,8 +2,8 @@
 import { useEvents, useFact } from "@directive-run/vue";
 import { system } from "../system";
 
-const count = useFact(system, "count");
-const events = useEvents(system);
+const _count = useFact(system, "count");
+const _events = useEvents(system);
 </script>
 
 <template>

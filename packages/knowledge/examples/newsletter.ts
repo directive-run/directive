@@ -151,7 +151,7 @@ const newsletter = createModule("newsletter", {
     // Simulated submission — no API account needed
     subscribe: {
       requirement: "SUBSCRIBE",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         addLog(`Subscribing: ${context.facts.email}`);
 
         // Simulate network delay
@@ -175,7 +175,7 @@ const newsletter = createModule("newsletter", {
 
     resetAfterDelay: {
       requirement: "RESET_AFTER_DELAY",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         addLog("Auto-resetting in 5 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 5000));
         context.facts.email = "";

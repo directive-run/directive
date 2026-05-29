@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { attributeError, freezeSpec } from "../../utils/utils.js";
 import {
+  MAX_PREDICATE_DEPTH,
   applyPatch,
   dangerousRegex,
   evaluateKeySelector,
@@ -13,7 +14,6 @@ import {
   isEmptyOrConfigPredicate,
   isPredicate,
   isTemplate,
-  MAX_PREDICATE_DEPTH,
   memoizePredicate,
   validatePredicate,
   validatePredicateAgainstSchema,
@@ -405,7 +405,7 @@ describe("walkPredicate", () => {
   });
 
   it("visits operator clauses with dotted fact paths", () => {
-    const ops: Array<[string, string]> = [];
+    const ops: [string, string][] = [];
     walkPredicate(
       { phase: "red", auth: { token: { $exists: true } } },
       {
@@ -721,9 +721,9 @@ describe("$matches operand must be RegExp (ReDoS hardening)", () => {
     expect(
       evaluatePredicate({ s: { $matches: /^foo/ } }, { s: "foobar" }),
     ).toBe(true);
-    expect(evaluatePredicate({ s: { $matches: /^foo/i } }, { s: "FOOBAR" })).toBe(
-      true,
-    );
+    expect(
+      evaluatePredicate({ s: { $matches: /^foo/i } }, { s: "FOOBAR" }),
+    ).toBe(true);
   });
 });
 
@@ -1190,7 +1190,9 @@ describe("attributeError", () => {
   });
 
   it("re-attributes a [Directive]-prefixed throw and preserves the original as cause", () => {
-    const original = new Error("[Directive] $matches: operand must be a RegExp");
+    const original = new Error(
+      "[Directive] $matches: operand must be a RegExp",
+    );
     const wrapped = attributeError("derivation", "d1", () => {
       throw original;
     });
@@ -1247,9 +1249,9 @@ describe("R2 — isEmptyOrConfigPredicate", () => {
 
   it("returns false for arrays", () => {
     expect(isEmptyOrConfigPredicate([])).toBe(false);
-    expect(
-      isEmptyOrConfigPredicate([{ fact: "a", op: "$eq", value: 1 }]),
-    ).toBe(false);
+    expect(isEmptyOrConfigPredicate([{ fact: "a", op: "$eq", value: 1 }])).toBe(
+      false,
+    );
   });
 
   it("returns true for a deeply-nested config object that never bottoms out in a primitive", () => {
@@ -1702,4 +1704,3 @@ describe("validatePredicateAgainstSchema — $matches ReDoS rejection (M2)", () 
     expect(result.ok).toBe(true);
   });
 });
-

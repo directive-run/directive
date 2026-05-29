@@ -152,7 +152,9 @@ function parseSweepArg(arg: string): [string, unknown[]] {
   const rangeStr = arg.slice(colon + 1);
 
   // Range form: a..b[:step]
-  const rangeMatch = rangeStr.match(/^(-?\d+(?:\.\d+)?)\.\.(-?\d+(?:\.\d+)?)(?::(-?\d+(?:\.\d+)?))?$/);
+  const rangeMatch = rangeStr.match(
+    /^(-?\d+(?:\.\d+)?)\.\.(-?\d+(?:\.\d+)?)(?::(-?\d+(?:\.\d+)?))?$/,
+  );
   if (rangeMatch) {
     const [, startStr, endStr, stepStr] = rangeMatch;
     const start = Number(startStr);
@@ -164,7 +166,9 @@ function parseSweepArg(arg: string): [string, unknown[]] {
     }
     if (end < start) {
       console.error(
-        pc.red(`error: --sweep ${arg}: end (${end}) must be >= start (${start})`),
+        pc.red(
+          `error: --sweep ${arg}: end (${end}) must be >= start (${start})`,
+        ),
       );
       process.exit(1);
     }
@@ -177,7 +181,10 @@ function parseSweepArg(arg: string): [string, unknown[]] {
   }
 
   // Discrete form: a,b,c (parse each as number if possible, else string)
-  const tokens = rangeStr.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  const tokens = rangeStr
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
   if (tokens.length === 0) {
     console.error(pc.red(`error: --sweep ${arg}: no values after ':'`));
     process.exit(1);
@@ -208,7 +215,7 @@ function bar(value: number, max: number, width = 32): string {
  */
 function printCurve(report: SweepReport, entityKey: string | undefined): void {
   const points = report.points;
-  const maxMatched = Math.max(...points.map((p) => p.report.proposed.matched));
+  const _maxMatched = Math.max(...points.map((p) => p.report.proposed.matched));
   const baselineMatched = report.baseline.report.original.matched;
 
   // Bars + sparkline track the OBJECTIVE score, not matched, so the green
@@ -222,7 +229,9 @@ function printCurve(report: SweepReport, entityKey: string | undefined): void {
   const sparkline = points
     .map((p) => {
       const r = scoreRange > 0 ? (p.score - minScore) / scoreRange : 0;
-      return BLOCKS[Math.min(BLOCKS.length - 1, Math.round(r * (BLOCKS.length - 1)))];
+      return BLOCKS[
+        Math.min(BLOCKS.length - 1, Math.round(r * (BLOCKS.length - 1)))
+      ];
     })
     .join("");
 
@@ -230,24 +239,15 @@ function printCurve(report: SweepReport, entityKey: string | undefined): void {
   console.log(
     `\n  frames evaluated   ${points[0]?.report.framesEvaluated ?? 0}`,
   );
-  console.log(
-    `  baseline (current) matched ${baselineMatched} frames`,
-  );
+  console.log(`  baseline (current) matched ${baselineMatched} frames`);
   console.log(`  points evaluated   ${points.length}\n`);
 
   console.log(`  sparkline   ${pc.cyan(sparkline)}\n`);
 
   // Detail table.
   const valueKeys = Object.keys(points[0]?.values ?? {});
-  const header =
-    valueKeys.map((k) => k.padEnd(12)).join(" ") +
-    "  " +
-    "matched".padStart(8) +
-    "  " +
-    "delta".padStart(7) +
-    (entityKey ? "  " + `${entityKey}s`.padStart(8) : "") +
-    "  bar";
-  console.log(pc.dim("  " + header));
+  const header = `${valueKeys.map((k) => k.padEnd(12)).join(" ")}  ${"matched".padStart(8)}  ${"delta".padStart(7)}${entityKey ? `  ${`${entityKey}s`.padStart(8)}` : ""}  bar`;
+  console.log(pc.dim(`  ${header}`));
 
   for (const p of points) {
     const valsStr = valueKeys
@@ -266,18 +266,10 @@ function printCurve(report: SweepReport, entityKey: string | undefined): void {
           : pc.dim("±0".padStart(7));
     const barLen =
       scoreRange > 0 ? Math.round(((p.score - minScore) / scoreRange) * 24) : 0;
-    const row =
-      valsStr +
-      "  " +
-      String(matched).padStart(8) +
-      "  " +
-      deltaStr +
-      (entityKey ? "  " + entityStr : "") +
-      "  " +
-      "█".repeat(barLen).padEnd(24);
+    const row = `${valsStr}  ${String(matched).padStart(8)}  ${deltaStr}${entityKey ? `  ${entityStr}` : ""}  ${"█".repeat(barLen).padEnd(24)}`;
 
     const isBest = p === report.best;
-    console.log(isBest ? pc.green("  " + row) : "  " + row);
+    console.log(isBest ? pc.green(`  ${row}`) : `  ${row}`);
   }
 
   console.log(
@@ -317,7 +309,9 @@ export async function tuneCommand(args: string[]): Promise<void> {
     process.exit(1);
   }
   if (opts.sweepArgs.length === 0) {
-    console.error(pc.red("error: at least one --sweep <key:range> is required"));
+    console.error(
+      pc.red("error: at least one --sweep <key:range> is required"),
+    );
     printUsage();
     process.exit(1);
   }

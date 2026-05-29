@@ -3,8 +3,8 @@ import { useFact } from "@directive-run/svelte";
 import { useRequirementStatus } from "@directive-run/svelte";
 import { statusPlugin, system } from "../system";
 
-const reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
-const status = useFact(system, "status");
+const _reqStatus = useRequirementStatus(statusPlugin, "LOAD_DATA");
+const _status = useFact(system, "status");
 </script>
 
 <div>

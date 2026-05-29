@@ -369,7 +369,7 @@ function extractExample(source: ExampleSource): string {
     cleaned.pop();
   }
 
-  return addHeader(source, cleaned.join("\n") + "\n");
+  return addHeader(source, `${cleaned.join("\n")}\n`);
 }
 
 function addHeader(source: ExampleSource, content: string): string {
@@ -377,12 +377,7 @@ function addHeader(source: ExampleSource, content: string): string {
     ? "// Pure module file — no DOM wiring"
     : "// Extracted for AI rules — DOM wiring stripped";
 
-  return (
-    `// Example: ${source.name}\n` +
-    `// Source: examples/${source.sourcePath}\n` +
-    `${note}\n\n` +
-    content
-  );
+  return `// Example: ${source.name}\n// Source: examples/${source.sourcePath}\n${note}\n\n${content}`;
 }
 
 function main() {
@@ -418,7 +413,7 @@ function main() {
     }
   }
 
-  log.writes(`packages/knowledge/examples/`, `${extracted} files`);
+  log.writes("packages/knowledge/examples/", `${extracted} files`);
 
   if (warnings > 0) {
     log.warn(`${warnings} examples had warnings`);

@@ -275,9 +275,9 @@ export function createGeminiStreamingRunner(
           } = {};
 
           const text = (
-            (event.candidates as Array<Record<string, unknown>>)?.[0]
+            (event.candidates as Record<string, unknown>[])?.[0]
               ?.content as Record<string, unknown>
-          )?.parts as Array<Record<string, unknown>> | undefined;
+          )?.parts as Record<string, unknown>[] | undefined;
           const textVal = text?.[0]?.text;
           if (textVal) {
             result.text = textVal as string;

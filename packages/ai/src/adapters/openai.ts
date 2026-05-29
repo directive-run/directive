@@ -370,7 +370,7 @@ export function createOpenAIStreamingRunner(
             outputTokens?: number;
           } = {};
 
-          const delta = (event.choices as Array<Record<string, unknown>>)?.[0]
+          const delta = (event.choices as Record<string, unknown>[])?.[0]
             ?.delta as Record<string, unknown> | undefined;
           if (delta?.content) {
             result.text = delta.content as string;

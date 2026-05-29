@@ -8,10 +8,7 @@
  */
 
 import { MAX_PREDICATE_DEPTH } from "./predicate.js";
-import {
-  PREDICATE_OPERATORS,
-  type FactPredicate,
-} from "./types/predicate.js";
+import { type FactPredicate, PREDICATE_OPERATORS } from "./types/predicate.js";
 
 export interface PredicateToPostgrestOptions {
   /** Allowlist of column keys the predicate may reference. */
@@ -41,7 +38,10 @@ function assertColumn(name: string, allowed?: readonly string[]): void {
   }
 }
 
-function assertNoSiblingKeys(spec: Record<string, unknown>, combinator: string): void {
+function assertNoSiblingKeys(
+  spec: Record<string, unknown>,
+  combinator: string,
+): void {
   const sibs = Object.keys(spec).filter((k) => k !== combinator);
   if (sibs.length > 0) {
     throw new Error(
@@ -99,12 +99,16 @@ function renderOp(op: string, operand: unknown): string {
       return `lte.${encodeValue(operand)}`;
     case "$in":
       if (!Array.isArray(operand)) {
-        throw new Error(`[Directive] predicateToPostgrest: $in operand must be an array`);
+        throw new Error(
+          "[Directive] predicateToPostgrest: $in operand must be an array",
+        );
       }
       return `in.${encodeList(operand)}`;
     case "$nin":
       if (!Array.isArray(operand)) {
-        throw new Error(`[Directive] predicateToPostgrest: $nin operand must be an array`);
+        throw new Error(
+          "[Directive] predicateToPostgrest: $nin operand must be an array",
+        );
       }
       return `not.in.${encodeList(operand)}`;
     case "$exists":
@@ -112,24 +116,24 @@ function renderOp(op: string, operand: unknown): string {
     case "$startsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToPostgrest: $startsWith operand must be a string`,
+          "[Directive] predicateToPostgrest: $startsWith operand must be a string",
         );
       }
-      return `like.${encodeValue(escapeLikeOperand(operand) + "*")}`;
+      return `like.${encodeValue(`${escapeLikeOperand(operand)}*`)}`;
     case "$endsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToPostgrest: $endsWith operand must be a string`,
+          "[Directive] predicateToPostgrest: $endsWith operand must be a string",
         );
       }
-      return `like.${encodeValue("*" + escapeLikeOperand(operand))}`;
+      return `like.${encodeValue(`*${escapeLikeOperand(operand)}`)}`;
     case "$contains":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToPostgrest: $contains expects a string operand (array containment is the cs operator with a different shape — out of scope for v1)`,
+          "[Directive] predicateToPostgrest: $contains expects a string operand (array containment is the cs operator with a different shape — out of scope for v1)",
         );
       }
-      return `like.${encodeValue("*" + escapeLikeOperand(operand) + "*")}`;
+      return `like.${encodeValue(`*${escapeLikeOperand(operand)}*`)}`;
     case "$matches":
       if (operand instanceof RegExp) {
         const o = operand.flags.includes("i") ? "imatch" : "match";
@@ -140,12 +144,12 @@ function renderOp(op: string, operand: unknown): string {
         return `match.${encodeValue(operand)}`;
       }
       throw new Error(
-        `[Directive] predicateToPostgrest: $matches operand must be a RegExp or string`,
+        "[Directive] predicateToPostgrest: $matches operand must be a RegExp or string",
       );
     // $between is handled at the build() level by decomposing into $gte + $lte.
     case "$changed":
       throw new Error(
-        `[Directive] predicateToPostgrest: $changed is an effects-only operator — no server query equivalent`,
+        "[Directive] predicateToPostgrest: $changed is an effects-only operator — no server query equivalent",
       );
     default:
       throw new Error(
@@ -193,7 +197,7 @@ function renderColumnOps(
   if (op === "$between") {
     if (!Array.isArray(operand) || operand.length !== 2) {
       throw new Error(
-        `[Directive] predicateToPostgrest: $between operand must be a [low, high] tuple`,
+        "[Directive] predicateToPostgrest: $between operand must be a [low, high] tuple",
       );
     }
     const lo = atTop
@@ -235,7 +239,7 @@ function build(
   }
   if (spec === null || typeof spec !== "object") {
     throw new Error(
-      `[Directive] predicateToPostgrest: predicate must be an object or array`,
+      "[Directive] predicateToPostgrest: predicate must be an object or array",
     );
   }
 
@@ -249,7 +253,7 @@ function build(
         !("op" in clause)
       ) {
         throw new Error(
-          `[Directive] predicateToPostgrest: array-form clause must be { fact, op, value }`,
+          "[Directive] predicateToPostgrest: array-form clause must be { fact, op, value }",
         );
       }
       const c = clause as { fact: string; op: string; value: unknown };
@@ -264,7 +268,9 @@ function build(
     assertNoSiblingKeys(spec as Record<string, unknown>, "$all");
     const arr = (spec as { $all: unknown[] }).$all;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToPostgrest: $all must be an array`);
+      throw new Error(
+        "[Directive] predicateToPostgrest: $all must be an array",
+      );
     }
     if (atTop) {
       const out: string[] = [];
@@ -285,7 +291,9 @@ function build(
     assertNoSiblingKeys(spec as Record<string, unknown>, "$any");
     const arr = (spec as { $any: unknown[] }).$any;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToPostgrest: $any must be an array`);
+      throw new Error(
+        "[Directive] predicateToPostgrest: $any must be an array",
+      );
     }
     // Empty $any is tautological-false. PostgREST has no clean way to
     // express "match nothing"; pick a stable contradiction.
@@ -374,5 +382,7 @@ export function predicateToPostgrest<F = Record<string, unknown>>(
   const clauses = build(predicate, options.allowedKeys, true, 0);
   if (clauses.length === 0) return "";
 
-  return mode === "raw" ? clauses.join("&") : clauses.map(encodeClause).join("&");
+  return mode === "raw"
+    ? clauses.join("&")
+    : clauses.map(encodeClause).join("&");
 }

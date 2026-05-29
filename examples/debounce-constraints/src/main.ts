@@ -224,7 +224,7 @@ function render(): void {
 system.subscribe(allKeys, render);
 
 // Timer — tick every 100ms for smooth debounce progress bar
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 100);
 

@@ -334,8 +334,8 @@ function toCascade(this: unknown, received: Timeline): MatcherResult {
     pass: cascadeDetected,
     message: () =>
       cascadeDetected
-        ? `expected timeline NOT to cascade — detected ≥2 constraints firing within the same reconcile cycle`
-        : `expected timeline to cascade — no reconcile cycle had ≥2 active constraints`,
+        ? "expected timeline NOT to cascade — detected ≥2 constraints firing within the same reconcile cycle"
+        : "expected timeline to cascade — no reconcile cycle had ≥2 active constraints",
   };
 }
 

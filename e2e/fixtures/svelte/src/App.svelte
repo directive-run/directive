@@ -1,10 +1,10 @@
 <script lang="ts">
 import { onMount } from "svelte";
 
-let route = window.location.hash.slice(2) || "";
+let _route = window.location.hash.slice(2) || "";
 
 function onHash() {
-  route = window.location.hash.slice(2);
+  _route = window.location.hash.slice(2);
 }
 
 onMount(() => {

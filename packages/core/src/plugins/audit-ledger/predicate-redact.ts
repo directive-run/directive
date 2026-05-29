@@ -21,7 +21,11 @@ import { walkPredicate } from "../../core/predicate.js";
  * PII operands in cached predicate specs. Best-effort: silently no-ops
  * if the path doesn't resolve (caller already cloned the spec).
  */
-function replaceAtPath(root: unknown, dottedPath: string, value: unknown): void {
+function replaceAtPath(
+  root: unknown,
+  dottedPath: string,
+  value: unknown,
+): void {
   if (root === null || typeof root !== "object") return;
   // Split on "." but treat "[N]" segments as array indices.
   // E.g. "[0].value" → ["[0]", "value"], "foo.bar[1]" → ["foo", "bar[1]"].

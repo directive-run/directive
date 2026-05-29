@@ -204,7 +204,7 @@ export async function replayCommand(args: string[]): Promise<void> {
   if (typeof sys.dispatch !== "function") {
     console.error(
       pc.red(
-        `error: loaded system has no dispatch() method. The --system file must export a started Directive system or a factory.`,
+        "error: loaded system has no dispatch() method. The --system file must export a started Directive system or a factory.",
       ),
     );
     process.exit(1);

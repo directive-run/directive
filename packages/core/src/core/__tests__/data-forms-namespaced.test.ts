@@ -914,7 +914,9 @@ describe("namespaced constraint owns — clobber detection", () => {
     await flush();
 
     const clobbers = events.filter(
-      (e): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
+      (
+        e,
+      ): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
         e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBeGreaterThanOrEqual(1);
@@ -1007,7 +1009,9 @@ describe("namespaced constraint owns — clobber detection", () => {
     await flush();
 
     const clobbers = events.filter(
-      (e): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
+      (
+        e,
+      ): e is Extract<ObservationEvent, { type: "resolver.write.rejected" }> =>
         e.type === "resolver.write.rejected",
     );
     expect(clobbers.length).toBe(1);

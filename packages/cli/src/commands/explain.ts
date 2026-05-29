@@ -65,8 +65,7 @@ export async function explainCommand(args: string[]) {
 
     if (!explanation) {
       console.error(
-        `Requirement "${requirementId}" not found.\n\n` +
-          "Current requirements:",
+        `Requirement "${requirementId}" not found.\n\nCurrent requirements:`,
       );
 
       if (inspection.unmet.length === 0) {
@@ -164,7 +163,7 @@ export async function explainCommand(args: string[]) {
 
       console.log(
         pc.dim(
-          `Run ${pc.cyan(`directive explain <file> <requirement-id>`)} for detailed explanation.`,
+          `Run ${pc.cyan("directive explain <file> <requirement-id>")} for detailed explanation.`,
         ),
       );
     }

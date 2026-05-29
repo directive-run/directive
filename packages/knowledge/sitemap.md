@@ -64,18 +64,15 @@ Website: https://directive.run
 - [Error Boundaries](https://directive.run/docs/advanced/errors)
 - [Definition Meta](https://directive.run/docs/advanced/meta)
 
-### Analysis & Tooling
-- [Predicate Backtest (replay-under)](https://directive.run/docs/replay-under)
-- [Parameter Sweep (tune)](https://directive.run/docs/tune)
-- [Rules Diff](https://directive.run/docs/rules-diff)
+### Predicate Tools
+- [predicateFromIntent (LLM emit)](https://directive.run/docs/predicate-from-intent)
+- [describePredicate (prose)](https://directive.run/docs/describe-predicate)
 - [Predicate Codegen (SQL/Mongo/PostgREST)](https://directive.run/docs/predicate-codegen)
 - [predict()](https://directive.run/docs/predict)
 - [doctor.checkAgainst()](https://directive.run/docs/doctor)
-- [describePredicate (prose)](https://directive.run/docs/describe-predicate)
-
-### LLM Integration
-- [predicateFromIntent](https://directive.run/docs/predicate-from-intent)
-- [Audit Ledger](https://directive.run/docs/audit-ledger)
+- [Predicate Backtest (replay-under)](https://directive.run/docs/replay-under)
+- [Parameter Sweep (tune)](https://directive.run/docs/tune)
+- [Rules Diff](https://directive.run/docs/rules-diff)
 
 ### Plugins
 - [Overview](https://directive.run/docs/plugins/overview)
@@ -85,6 +82,7 @@ Website: https://directive.run
 - [Persistence](https://directive.run/docs/plugins/persistence)
 - [Performance](https://directive.run/docs/plugins/performance)
 - [Circuit Breaker](https://directive.run/docs/plugins/circuit-breaker)
+- [Audit Ledger](https://directive.run/docs/audit-ledger)
 - [Observability](https://directive.run/docs/plugins/observability)
 - [Custom Plugins](https://directive.run/docs/plugins/custom)
 

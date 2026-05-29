@@ -428,10 +428,10 @@ describe("useSelector (NamespacedSystem)", () => {
 
   it("does NOT update when unrelated namespace changes (equality)", () => {
     system = createNamespacedSystem();
-    let renderCount = 0;
+    let _renderCount = 0;
 
     const { result } = renderHook(() => {
-      renderCount++;
+      _renderCount++;
 
       return useSelector(
         system,

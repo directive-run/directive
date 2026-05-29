@@ -20,7 +20,7 @@ function parseRangeBound(v: string | number | Date): number {
   if (typeof v === "number") {
     if (!Number.isFinite(v)) {
       throw new Error(
-        `[Directive] audit-ledger: changedBetween bound must be a finite number, ISO string, or Date.`,
+        "[Directive] audit-ledger: changedBetween bound must be a finite number, ISO string, or Date.",
       );
     }
 
@@ -37,7 +37,7 @@ function parseRangeBound(v: string | number | Date): number {
     return t;
   }
   throw new Error(
-    `[Directive] audit-ledger: changedBetween bound must be a number, ISO string, or Date.`,
+    "[Directive] audit-ledger: changedBetween bound must be a number, ISO string, or Date.",
   );
 }
 
@@ -75,9 +75,7 @@ export function matchesFilter(entry: AuditEntry, filter: QueryFilter): boolean {
  * `capacity` (default 10,000). Use this as the default sink for dev,
  * tests, and StackBlitz demos.
  */
-export function memorySink(
-  opts: { capacity?: number } = {},
-): AuditLedgerSink {
+export function memorySink(opts: { capacity?: number } = {}): AuditLedgerSink {
   const capacity = opts.capacity ?? DEFAULT_MEMORY_CAPACITY;
   let entries: AuditEntry[] = [];
   let truncateHandler:

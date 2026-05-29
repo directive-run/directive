@@ -14,7 +14,7 @@ import UseRequirementStatus from "./hooks/UseRequirementStatus.vue";
 import UseSelector from "./hooks/UseSelector.vue";
 import UseWatch from "./hooks/UseWatch.vue";
 
-const routes: Record<string, any> = {
+const _routes: Record<string, any> = {
   useFact: UseFact,
   useDerived: UseDerived,
   useSelector: UseSelector,

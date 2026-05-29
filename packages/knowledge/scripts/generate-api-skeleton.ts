@@ -122,7 +122,7 @@ function main() {
   lines.push("", "## @directive-run/ai", "");
   lines.push(...formatEntries(aiEntries));
 
-  const output = lines.join("\n") + "\n";
+  const output = `${lines.join("\n")}\n`;
   writeFileSync(OUTPUT, output, "utf-8");
 
   const size = `${(Buffer.byteLength(output) / 1024).toFixed(0)} KB`;

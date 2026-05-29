@@ -99,7 +99,7 @@ export interface BatchItemResult<T = unknown> {
  * Results from batch resolution with per-item status.
  * The array order must match the order of requirements passed in.
  */
-export type BatchResolveResults<T = unknown> = Array<BatchItemResult<T>>;
+export type BatchResolveResults<T = unknown> = BatchItemResult<T>[];
 
 /** Resolver context passed to resolve function */
 export interface ResolverContext<S extends Schema = Schema> {
@@ -253,12 +253,12 @@ type TypedResolverForType<
   resolve?: (req: InferredReq<R, T>, ctx: ResolverContext<S>) => Promise<void>;
   /** Resolve function for batched requirements (all-or-nothing) */
   resolveBatch?: (
-    reqs: Array<InferredReq<R, T>>,
+    reqs: InferredReq<R, T>[],
     ctx: ResolverContext<S>,
   ) => Promise<void>;
   /** Resolve function for batched requirements with per-item results */
   resolveBatchWithResults?: (
-    reqs: Array<InferredReq<R, T>>,
+    reqs: InferredReq<R, T>[],
     ctx: ResolverContext<S>,
   ) => Promise<BatchResolveResults>;
 };

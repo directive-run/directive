@@ -271,7 +271,7 @@ describe("circuit state", () => {
     // Read metrics multiple times
     expect(monitor.getMetrics("agent").circuitState).toBe("OPEN");
     expect(monitor.getMetrics("agent").circuitState).toBe("OPEN");
-    expect(monitor.getAllMetrics()["agent"]!.circuitState).toBe("OPEN");
+    expect(monitor.getAllMetrics().agent!.circuitState).toBe("OPEN");
   });
 });
 

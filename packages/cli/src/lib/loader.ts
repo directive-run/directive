@@ -46,10 +46,7 @@ export async function loadSystem(filePath: string): Promise<any> {
     }
 
     throw new Error(
-      `No Directive system found in ${pc.dim(filePath)}\n` +
-        `Export a system as default or named "system":\n\n` +
-        `  ${pc.cyan("export default")} createSystem({ module: myModule });\n` +
-        `  ${pc.cyan("export const system")} = createSystem({ module: myModule });`,
+      `No Directive system found in ${pc.dim(filePath)}\nExport a system as default or named "system":\n\n  ${pc.cyan("export default")} createSystem({ module: myModule });\n  ${pc.cyan("export const system")} = createSystem({ module: myModule });`,
     );
   } catch (err) {
     if (err instanceof Error && err.message.includes("No Directive system")) {
@@ -57,9 +54,7 @@ export async function loadSystem(filePath: string): Promise<any> {
     }
 
     throw new Error(
-      `Failed to load ${pc.dim(filePath)}: ${err instanceof Error ? err.message : String(err)}\n\n` +
-        `Make sure the file is valid TypeScript and tsx is installed:\n` +
-        `  ${pc.cyan("npm install -D tsx")}`,
+      `Failed to load ${pc.dim(filePath)}: ${err instanceof Error ? err.message : String(err)}\n\nMake sure the file is valid TypeScript and tsx is installed:\n  ${pc.cyan("npm install -D tsx")}`,
     );
   }
 }
@@ -129,13 +124,11 @@ export async function loadSystemFactory(
     mod = (await import(resolved)) as Record<string, unknown>;
   } catch (err) {
     throw new Error(
-      `Failed to load ${pc.dim(filePath)}: ${err instanceof Error ? err.message : String(err)}\n\n` +
-        `Make sure the file is valid TypeScript and tsx is installed:\n` +
-        `  ${pc.cyan("npm install -D tsx")}`,
+      `Failed to load ${pc.dim(filePath)}: ${err instanceof Error ? err.message : String(err)}\n\nMake sure the file is valid TypeScript and tsx is installed:\n  ${pc.cyan("npm install -D tsx")}`,
     );
   }
 
-  const candidates: Array<[string, unknown]> = [
+  const candidates: [string, unknown][] = [
     ["createSystem", mod.createSystem],
     ["systemFactory", mod.systemFactory],
     ["default", mod.default],
@@ -150,8 +143,7 @@ export async function loadSystemFactory(
         const result = await Promise.resolve((candidate as () => unknown)());
         if (!isSystem(result)) {
           throw new Error(
-            `Factory '${name}' from ${pc.dim(filePath)} returned a value that is not a started Directive system.\n` +
-              `Expected an object with inspect/start/stop/facts. The factory must call sys.start() before returning.`,
+            `Factory '${name}' from ${pc.dim(filePath)} returned a value that is not a started Directive system.\nExpected an object with inspect/start/stop/facts. The factory must call sys.start() before returning.`,
           );
         }
         return result;
@@ -170,25 +162,11 @@ export async function loadSystemFactory(
 
   if (hasStartedInstance) {
     throw new Error(
-      `Found a started Directive system in ${pc.dim(filePath)}, but bisect needs a factory.\n` +
-        `Bisect instantiates a fresh system for every midpoint replay (so each attempt is hermetic),\n` +
-        `which means it can't reuse a singleton instance the way ${pc.cyan("directive replay")} does.\n\n` +
-        `Wrap the existing export in a function:\n\n` +
-        `  ${pc.cyan("export function createSystem()")} {\n` +
-        `    const sys = createSystem({ module: yourModule });\n` +
-        `    sys.start();\n` +
-        `    return sys;\n` +
-        `  }`,
+      `Found a started Directive system in ${pc.dim(filePath)}, but bisect needs a factory.\nBisect instantiates a fresh system for every midpoint replay (so each attempt is hermetic),\nwhich means it can't reuse a singleton instance the way ${pc.cyan("directive replay")} does.\n\nWrap the existing export in a function:\n\n  ${pc.cyan("export function createSystem()")} {\n    const sys = createSystem({ module: yourModule });\n    sys.start();\n    return sys;\n  }`,
     );
   }
 
   throw new Error(
-    `No system factory found in ${pc.dim(filePath)}\n` +
-      `Bisect needs to instantiate a fresh system per midpoint replay. Export one of:\n\n` +
-      `  ${pc.cyan("export function createSystem()")} { ... return sys; }\n` +
-      `  ${pc.cyan("export const systemFactory")} = () => { ... return sys; };\n` +
-      `  ${pc.cyan("export default")} () => { ... return sys; };\n\n` +
-      `The factory MUST call sys.start() and return the started system.\n` +
-      `(Did you forget ${pc.cyan("sys.start()")} before returning?)`,
+    `No system factory found in ${pc.dim(filePath)}\nBisect needs to instantiate a fresh system per midpoint replay. Export one of:\n\n  ${pc.cyan("export function createSystem()")} { ... return sys; }\n  ${pc.cyan("export const systemFactory")} = () => { ... return sys; };\n  ${pc.cyan("export default")} () => { ... return sys; };\n\nThe factory MUST call sys.start() and return the started system.\n(Did you forget ${pc.cyan("sys.start()")} before returning?)`,
   );
 }

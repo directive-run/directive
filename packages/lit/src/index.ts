@@ -1235,11 +1235,7 @@ export class HydrationController implements ReactiveController {
 // AuditLedgerController — live ledger entries with filter (R4.I parity)
 // ============================================================================
 
-import type {
-  AuditEntry,
-  AuditLedger,
-  QueryFilter,
-} from "@directive-run/core";
+import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";
 
 /**
  * Reactive controller exposing the latest audit-ledger entries matching
@@ -1328,8 +1324,7 @@ export class AuditLedgerController implements ReactiveController {
       // last seq instead. (R4.C7)
       const moved =
         next[0]?.seq !== this.value[0]?.seq ||
-        next[next.length - 1]?.seq !==
-          this.value[this.value.length - 1]?.seq;
+        next[next.length - 1]?.seq !== this.value[this.value.length - 1]?.seq;
       this.value = next;
       if (moved) {
         this.host.requestUpdate();

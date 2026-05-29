@@ -34,7 +34,7 @@ export async function loadTimelinePackage(
   } catch (err) {
     console.error(
       pc.red(
-        `error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline`,
+        "error: @directive-run/timeline not installed in this project.\n       Install it: npm install --save-dev @directive-run/timeline",
       ),
     );
     if (verbose) console.error(pc.dim((err as Error).message));

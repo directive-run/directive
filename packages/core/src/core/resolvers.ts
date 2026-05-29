@@ -1551,7 +1551,12 @@ export function createResolversManager<S extends Schema>(
       onStart?.(resolverId, req);
 
       // Execute asynchronously
-      executeResolve(resolverId, req, controller, options?.factsBaseline).finally(() => {
+      executeResolve(
+        resolverId,
+        req,
+        controller,
+        options?.factsBaseline,
+      ).finally(() => {
         // Only fire onResolutionComplete if we're the first to clean up.
         // If cancel() already removed us from inflight, skip to avoid
         // spurious double-notifications.

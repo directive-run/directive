@@ -415,7 +415,10 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
         removeConstraintRow(refs, constraintRowMap, id);
       }
       pendingConstraintDeletes.clear();
-      for (const [id, { active, whenExplain, label }] of pendingConstraintUpdates) {
+      for (const [
+        id,
+        { active, whenExplain, label },
+      ] of pendingConstraintUpdates) {
         renderConstraintRow(
           refs,
           constraintRowMap,
@@ -558,8 +561,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
 
         // R4.E: refine the Constraints empty-state. A system with zero
         // constraints would otherwise sit on "Waiting…" forever.
-        const hasConstraints =
-          (inspection?.constraints?.length ?? 0) > 0;
+        const hasConstraints = (inspection?.constraints?.length ?? 0) > 0;
         setConstraintsEmptyState(refs, hasConstraints);
 
         // Wire record & export buttons

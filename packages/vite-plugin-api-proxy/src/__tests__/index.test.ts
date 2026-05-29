@@ -8,7 +8,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { apiProxy, MAX_BODY_BYTES, REQUEST_TIMEOUT_MS } from "../index.js";
+import { MAX_BODY_BYTES, REQUEST_TIMEOUT_MS, apiProxy } from "../index.js";
 
 // ----------------------------------------------------------------------------
 // Helpers — minimal Vite-like server harness
@@ -43,7 +43,9 @@ function createFakeServer(): FakeServer {
 }
 
 /** Start an HTTP server that wraps the registered middleware. */
-function startMiddlewareServer(handlers: Array<{ path: string; fn: Middleware }>) {
+function startMiddlewareServer(
+  handlers: Array<{ path: string; fn: Middleware }>,
+) {
   const server = http.createServer((req, res) => {
     const match = handlers.find((h) => req.url?.startsWith(h.path));
     if (!match) {
@@ -91,7 +93,11 @@ function postRaw(
   path: string,
   body: Buffer | string,
   headers: Record<string, string> = {},
-): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
+): Promise<{
+  status: number;
+  headers: http.IncomingHttpHeaders;
+  body: string;
+}> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (result: {
@@ -175,10 +181,10 @@ let upstreamPort = 0;
 let upstreamServer: http.Server;
 
 /** Configurable upstream response per test. */
-let upstreamHandler: (req: http.IncomingMessage, res: http.ServerResponse) => void = (
-  _req,
-  res,
-) => {
+let upstreamHandler: (
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+) => void = (_req, res) => {
   res.statusCode = 200;
   res.end("{}");
 };
@@ -223,7 +229,9 @@ async function makeProxy(extraRoute?: {
   // biome-ignore lint/suspicious/noExplicitAny: minimal duck-typed server
   (plugin as any).configureServer(fake);
 
-  const { server, port } = await startMiddlewareServer(fake.middlewares.handlers);
+  const { server, port } = await startMiddlewareServer(
+    fake.middlewares.handlers,
+  );
   proxyServers.push(server);
   return port;
 }
@@ -282,7 +290,9 @@ describe("apiProxy — security", () => {
     const result = await postRaw(port, "/api/proxy", "{}");
 
     expect(result.status).toBe(200);
-    expect(result.headers["content-type"]).toBe("application/json; charset=utf-8");
+    expect(result.headers["content-type"]).toBe(
+      "application/json; charset=utf-8",
+    );
     expect(result.headers["cache-control"]).toBe("no-store");
     expect(result.headers.etag).toBe('"v1"');
   });

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = join(__dirname, "..", "examples");
-const EXAMPLES_ROOT = join(__dirname, "..", "..", "..", "examples");
+const _EXAMPLES_ROOT = join(__dirname, "..", "..", "..", "examples");
 
 function getExtractedExamples(): string[] {
   try {

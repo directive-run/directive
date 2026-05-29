@@ -188,7 +188,7 @@ function render(): void {
   const loaded = derive.loadedCount;
   const combined = derive.combinedStatus;
   const canStart = derive.canStart;
-  const anyLoading = derive.anyLoading;
+  const _anyLoading = derive.anyLoading;
   const anyError = derive.anyError;
   const allLoaded = derive.allLoaded;
   const eventLog = facts.eventLog;

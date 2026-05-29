@@ -81,10 +81,7 @@ describe("predicateToSQL — string LIKE operators", () => {
   });
 
   it("translates $contains for strings", () => {
-    const r = predicateToSQL(
-      { bio: { $contains: "50%" } },
-      { table: "users" },
-    );
+    const r = predicateToSQL({ bio: { $contains: "50%" } }, { table: "users" });
     expect(r.where).toBe("bio LIKE '%' || $1 || '%' ESCAPE '\\'");
     expect(r.params).toEqual(["50\\%"]);
   });
@@ -139,22 +136,17 @@ describe("predicateToSQL — combinators", () => {
 
   it("rejects combinator with sibling keys", () => {
     expect(() =>
-      predicateToSQL(
-        { $all: [{ a: 1 }], evil: 2 } as never,
-        { table: "t" },
-      ),
+      predicateToSQL({ $all: [{ a: 1 }], evil: 2 } as never, { table: "t" }),
     ).toThrow(/\$all cannot coexist with sibling keys \(evil\)/);
     expect(() =>
-      predicateToSQL(
-        { $any: [{ a: 1 }], tenant_id: "evil" } as never,
-        { table: "t" },
-      ),
+      predicateToSQL({ $any: [{ a: 1 }], tenant_id: "evil" } as never, {
+        table: "t",
+      }),
     ).toThrow(/\$any cannot coexist with sibling keys/);
     expect(() =>
-      predicateToSQL(
-        { $not: { tier: "free" }, role: "admin" } as never,
-        { table: "t" },
-      ),
+      predicateToSQL({ $not: { tier: "free" }, role: "admin" } as never, {
+        table: "t",
+      }),
     ).toThrow(/\$not cannot coexist with sibling keys/);
   });
 });
@@ -173,10 +165,9 @@ describe("predicateToSQL — array form", () => {
   });
 
   it("single-clause array stays flat", () => {
-    const r = predicateToSQL(
-      [{ fact: "x", op: "$eq", value: 1 }],
-      { table: "t" },
-    );
+    const r = predicateToSQL([{ fact: "x", op: "$eq", value: 1 }], {
+      table: "t",
+    });
     expect(r.where).toBe("x = $1");
   });
 });
@@ -196,10 +187,10 @@ describe("predicateToSQL — security", () => {
 
   it("rejects column not in allowlist", () => {
     expect(() =>
-      predicateToSQL(
-        { age: 1, evil: 2 } as never,
-        { table: "users", allowedKeys: ["age"] },
-      ),
+      predicateToSQL({ age: 1, evil: 2 } as never, {
+        table: "users",
+        allowedKeys: ["age"],
+      }),
     ).toThrow(/"evil" is not in the allowedKeys list/);
   });
 
@@ -221,10 +212,7 @@ describe("predicateToSQL — security", () => {
 
   it("rejects nested predicate", () => {
     expect(() =>
-      predicateToSQL(
-        { user: { name: "ada" } } as never,
-        { table: "t" },
-      ),
+      predicateToSQL({ user: { name: "ada" } } as never, { table: "t" }),
     ).toThrow(/nested predicate/);
   });
 
@@ -257,17 +245,17 @@ describe("predicateToSQL — security", () => {
     for (let i = 0; i < 70; i++) {
       spec = { $not: spec };
     }
-    expect(() =>
-      predicateToSQL(spec as never, { table: "t" }),
-    ).toThrow(/depth limit/);
+    expect(() => predicateToSQL(spec as never, { table: "t" })).toThrow(
+      /depth limit/,
+    );
   });
 
   it("rejects cyclic spec (DoS guard via depth limit)", () => {
     const spec: Record<string, unknown> = {};
     spec.$all = [spec];
-    expect(() =>
-      predicateToSQL(spec as never, { table: "t" }),
-    ).toThrow(/depth limit|cyclic/);
+    expect(() => predicateToSQL(spec as never, { table: "t" })).toThrow(
+      /depth limit|cyclic/,
+    );
   });
 });
 
@@ -403,33 +391,29 @@ describe("predicateToMongo — security", () => {
   });
 
   it("rejects dotted field by default", () => {
-    expect(() =>
-      predicateToMongo({ "user.role": "admin" } as never),
-    ).toThrow(/invalid field name "user\.role"/);
+    expect(() => predicateToMongo({ "user.role": "admin" } as never)).toThrow(
+      /invalid field name "user\.role"/,
+    );
   });
 
   it("allows dotted paths when opt-in", () => {
     expect(
-      predicateToMongo(
-        { "user.role": "admin" } as never,
-        { allowDottedPaths: true },
-      ),
+      predicateToMongo({ "user.role": "admin" } as never, {
+        allowDottedPaths: true,
+      }),
     ).toEqual({ "user.role": "admin" });
   });
 
   it("respects allowedKeys", () => {
     expect(() =>
-      predicateToMongo(
-        { age: 1, evil: 2 } as never,
-        { allowedKeys: ["age"] },
-      ),
+      predicateToMongo({ age: 1, evil: 2 } as never, { allowedKeys: ["age"] }),
     ).toThrow(/"evil" is not in the allowedKeys list/);
   });
 
   it("rejects $changed", () => {
-    expect(() =>
-      predicateToMongo({ x: { $changed: true } } as never),
-    ).toThrow(/effects-only/);
+    expect(() => predicateToMongo({ x: { $changed: true } } as never)).toThrow(
+      /effects-only/,
+    );
   });
 
   it("rejects deep recursion", () => {
@@ -518,7 +502,7 @@ describe("predicateToPostgrest — basic", () => {
 
   it("encodes the querystring by default", () => {
     const s = predicateToPostgrest({ city: "San Francisco" });
-    expect(s).toBe("city=" + encodeURIComponent('eq."San Francisco"'));
+    expect(s).toBe(`city=${encodeURIComponent('eq."San Francisco"')}`);
   });
 });
 
@@ -570,17 +554,16 @@ describe("predicateToPostgrest — combinators", () => {
 
 describe("predicateToPostgrest — security", () => {
   it("rejects invalid column", () => {
-    expect(() =>
-      predicateToPostgrest({ "x;DROP": 1 } as never),
-    ).toThrow(/invalid column identifier/);
+    expect(() => predicateToPostgrest({ "x;DROP": 1 } as never)).toThrow(
+      /invalid column identifier/,
+    );
   });
 
   it("respects allowedKeys", () => {
     expect(() =>
-      predicateToPostgrest(
-        { age: 1, evil: 2 } as never,
-        { allowedKeys: ["age"] },
-      ),
+      predicateToPostgrest({ age: 1, evil: 2 } as never, {
+        allowedKeys: ["age"],
+      }),
     ).toThrow(/"evil" is not in the allowedKeys list/);
   });
 

@@ -76,7 +76,7 @@ export const counterModule = createModule("counter", {
   resolvers: {
     clamp: {
       requirement: "CLAMP_TO_ZERO",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.count = 0;
       },
     },
@@ -351,7 +351,7 @@ const contactForm = createModule("contact-form", {
   resolvers: {
     sendMessage: {
       requirement: "SEND_MESSAGE",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         log(
           `Sending: ${context.facts.name} <${context.facts.email}> [${context.facts.subject}]`,
         );
@@ -376,7 +376,7 @@ const contactForm = createModule("contact-form", {
 
     resetAfterDelay: {
       requirement: "RESET_AFTER_DELAY",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         log("Auto-resetting in 3 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
         context.facts.name = "";
@@ -574,7 +574,7 @@ const newsletter = createModule("newsletter", {
     // Simulated submission — no API account needed
     subscribe: {
       requirement: "SUBSCRIBE",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         addLog(`Subscribing: ${context.facts.email}`);
 
         // Simulate network delay
@@ -598,7 +598,7 @@ const newsletter = createModule("newsletter", {
 
     resetAfterDelay: {
       requirement: "RESET_AFTER_DELAY",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         addLog("Auto-resetting in 5 seconds...");
         await new Promise((resolve) => setTimeout(resolve, 5000));
         context.facts.email = "";
@@ -804,14 +804,14 @@ export const featureFlagsModule = createModule("feature-flags", {
   resolvers: {
     enableBrandSwitcher: {
       requirement: "ENABLE_BRAND_SWITCHER",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.brandSwitcherEnabled = true;
       },
     },
 
     logMaintenanceWarning: {
       requirement: "LOG_MAINTENANCE_WARNING",
-      resolve: async (req, context) => {
+      resolve: async (_req, _context) => {
         console.warn(
           "[feature-flags] Maintenance mode is active. Chat, search, playground, and vote API are disabled.",
         );
@@ -1060,7 +1060,7 @@ export const cartModule = createModule("cart", {
       return sub * (facts.self.couponDiscount / 100);
     },
 
-    tax: (facts, derived) => {
+    tax: (_facts, derived) => {
       const sub = derived.subtotal;
       const disc = derived.discount;
 
@@ -1518,7 +1518,7 @@ export const wizardModule = createModule("wizard", {
   resolvers: {
     advanceStep: {
       requirement: "ADVANCE_STEP",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.currentStep = context.facts.currentStep + 1;
         context.facts.advanceRequested = false;
       },
@@ -1527,7 +1527,7 @@ export const wizardModule = createModule("wizard", {
     submitForm: {
       requirement: "SUBMIT_FORM",
       timeout: 10000,
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         // Simulate API submission
         await new Promise((resolve) => setTimeout(resolve, 800));
         context.facts.submitted = true;

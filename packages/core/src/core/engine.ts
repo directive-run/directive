@@ -208,14 +208,12 @@ export function createEngine<S extends Schema>(
       for (const key of Object.keys(obj)) {
         if (BLOCKED_PROPS.has(key)) {
           throw new Error(
-            `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. ` +
-              "This could indicate a prototype pollution attempt.",
+            `[Directive] Security: Module "${module.id}" has dangerous key "${key}" in ${section}. This could indicate a prototype pollution attempt.`,
           );
         }
         if (section === "schema" && key.startsWith("$")) {
           throw new Error(
-            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". ` +
-              "Keys starting with $ are reserved for internal accessors ($store, $snapshot).",
+            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
           );
         }
       }
@@ -248,8 +246,7 @@ export function createEngine<S extends Schema>(
         const owner = definitionOwners.get(key);
         if (owner && owner !== module.id) {
           throw new Error(
-            `[Directive] Definition collision: ${section} "${key}" is defined in both module "${owner}" and "${module.id}". ` +
-              "Use namespacing or rename to avoid conflicts.",
+            `[Directive] Definition collision: ${section} "${key}" is defined in both module "${owner}" and "${module.id}". Use namespacing or rename to avoid conflicts.`,
           );
         }
         definitionOwners.set(key, module.id);
@@ -339,8 +336,7 @@ export function createEngine<S extends Schema>(
     for (const key of Object.keys(mergedSchema)) {
       if (derivationNames.has(key)) {
         console.warn(
-          `[Directive] "${key}" exists as both a fact and a derivation. ` +
-            "This may cause unexpected dependency tracking behavior.",
+          `[Directive] "${key}" exists as both a fact and a derivation. This may cause unexpected dependency tracking behavior.`,
         );
       }
     }
@@ -616,8 +612,7 @@ export function createEngine<S extends Schema>(
           );
         } else {
           console.warn(
-            `[Directive] Constraint "${constraintId}" has \`owns\` but is async. ` +
-              "Binding is disabled — async constraints cannot be bound.",
+            `[Directive] Constraint "${constraintId}" has \`owns\` but is async. Binding is disabled — async constraints cannot be bound.`,
           );
         }
       }
@@ -882,9 +877,7 @@ export function createEngine<S extends Schema>(
     if (reconcileDepth > MAX_RECONCILE_DEPTH) {
       if (isDevelopment) {
         console.warn(
-          `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. ` +
-            "This usually means resolvers are creating circular requirement chains. " +
-            `Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
+          `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. This usually means resolvers are creating circular requirement chains. Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
         );
       }
       // Drain pending fact changes so they don't leak into the next trace entry (M4)
@@ -1166,9 +1159,7 @@ export function createEngine<S extends Schema>(
       }
     } else if (isDevelopment) {
       console.warn(
-        `[Directive] Unknown event type "${eventName}". ` +
-          "No handler is registered for this event. " +
-          `Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
+        `[Directive] Unknown event type "${eventName}". No handler is registered for this event. Available events: ${Object.keys(mergedEvents).join(", ") || "(none)"}`,
       );
     }
   }
@@ -1713,6 +1704,7 @@ export function createEngine<S extends Schema>(
           return;
         }
 
+        // biome-ignore lint/style/useConst: assigned once, but must stay `let` — `cleanup` (defined below) closes over it before the subscribeAll assignment, and subscribeAll may emit synchronously
         let unsub: (() => void) | undefined;
         let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -2364,8 +2356,7 @@ export function createEngine<S extends Schema>(
     // Guard: cannot register during reconciliation (would corrupt iteration state)
     if (state.isReconciling) {
       throw new Error(
-        `[Directive] Cannot register module "${module.id}" during reconciliation. ` +
-          "Wait for the current reconciliation cycle to complete.",
+        `[Directive] Cannot register module "${module.id}" during reconciliation. Wait for the current reconciliation cycle to complete.`,
       );
     }
 
@@ -2387,8 +2378,7 @@ export function createEngine<S extends Schema>(
         }
         if (section === "schema" && key.startsWith("$")) {
           throw new Error(
-            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". ` +
-              "Keys starting with $ are reserved for internal accessors ($store, $snapshot).",
+            `[Directive] Module "${module.id}" has schema key "${key}" starting with "$". Keys starting with $ are reserved for internal accessors ($store, $snapshot).`,
           );
         }
       }

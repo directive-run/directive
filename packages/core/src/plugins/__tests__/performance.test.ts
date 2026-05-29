@@ -40,7 +40,7 @@ describe("performancePlugin", () => {
       plugin.onConstraintEvaluate!("c1", true);
 
       const snap = plugin.getSnapshot();
-      expect(snap.constraints["c1"]!.evaluations).toBe(2);
+      expect(snap.constraints.c1!.evaluations).toBe(2);
     });
 
     it("tracks lastEvaluatedAt as a timestamp", () => {
@@ -51,12 +51,10 @@ describe("performancePlugin", () => {
       const after = Date.now();
 
       const snap = plugin.getSnapshot();
-      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeGreaterThanOrEqual(
+      expect(snap.constraints.c1!.lastEvaluatedAt).toBeGreaterThanOrEqual(
         before,
       );
-      expect(snap.constraints["c1"]!.lastEvaluatedAt).toBeLessThanOrEqual(
-        after,
-      );
+      expect(snap.constraints.c1!.lastEvaluatedAt).toBeLessThanOrEqual(after);
     });
 
     it("does not record duration for the first constraint in a reconcile cycle", () => {
@@ -66,8 +64,8 @@ describe("performancePlugin", () => {
 
       const snap = plugin.getSnapshot();
       // First constraint has no baseline, so totalDurationMs stays 0
-      expect(snap.constraints["c1"]!.totalDurationMs).toBe(0);
-      expect(snap.constraints["c1"]!.maxDurationMs).toBe(0);
+      expect(snap.constraints.c1!.totalDurationMs).toBe(0);
+      expect(snap.constraints.c1!.maxDurationMs).toBe(0);
     });
 
     it("records duration for subsequent constraints in a cycle", () => {
@@ -86,9 +84,9 @@ describe("performancePlugin", () => {
       plugin.onConstraintEvaluate!("c2", true);
 
       const snap = plugin.getSnapshot();
-      expect(snap.constraints["c2"]!.totalDurationMs).toBe(150);
-      expect(snap.constraints["c2"]!.maxDurationMs).toBe(150);
-      expect(snap.constraints["c2"]!.avgDurationMs).toBe(150);
+      expect(snap.constraints.c2!.totalDurationMs).toBe(150);
+      expect(snap.constraints.c2!.maxDurationMs).toBe(150);
+      expect(snap.constraints.c2!.avgDurationMs).toBe(150);
 
       perfNowSpy.mockRestore();
     });
@@ -111,7 +109,7 @@ describe("performancePlugin", () => {
 
       const snap = plugin.getSnapshot();
       // c1 was always the first constraint per cycle, so no duration tracked
-      expect(snap.constraints["c1"]!.totalDurationMs).toBe(0);
+      expect(snap.constraints.c1!.totalDurationMs).toBe(0);
 
       perfNowSpy.mockRestore();
     });
@@ -128,7 +126,7 @@ describe("performancePlugin", () => {
       plugin.onResolverStart!("r1", mockReq("TEST"));
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.starts).toBe(2);
+      expect(snap.resolvers.r1!.starts).toBe(2);
     });
 
     it("tracks completions and duration on onResolverComplete", () => {
@@ -137,9 +135,9 @@ describe("performancePlugin", () => {
       plugin.onResolverComplete!("r1", mockReq("TEST"), 58);
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.completions).toBe(2);
-      expect(snap.resolvers["r1"]!.totalDurationMs).toBe(100);
-      expect(snap.resolvers["r1"]!.avgDurationMs).toBe(50);
+      expect(snap.resolvers.r1!.completions).toBe(2);
+      expect(snap.resolvers.r1!.totalDurationMs).toBe(100);
+      expect(snap.resolvers.r1!.avgDurationMs).toBe(50);
     });
 
     it("tracks maxDurationMs across completions", () => {
@@ -149,7 +147,7 @@ describe("performancePlugin", () => {
       plugin.onResolverComplete!("r1", mockReq("A"), 50);
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.maxDurationMs).toBe(90);
+      expect(snap.resolvers.r1!.maxDurationMs).toBe(90);
     });
 
     it("tracks lastCompletedAt as a timestamp", () => {
@@ -159,10 +157,8 @@ describe("performancePlugin", () => {
       const after = Date.now();
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.lastCompletedAt).toBeGreaterThanOrEqual(
-        before,
-      );
-      expect(snap.resolvers["r1"]!.lastCompletedAt).toBeLessThanOrEqual(after);
+      expect(snap.resolvers.r1!.lastCompletedAt).toBeGreaterThanOrEqual(before);
+      expect(snap.resolvers.r1!.lastCompletedAt).toBeLessThanOrEqual(after);
     });
 
     it("increments errors on onResolverError", () => {
@@ -171,7 +167,7 @@ describe("performancePlugin", () => {
       plugin.onResolverError!("r1", mockReq("A"), new Error("bang"));
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.errors).toBe(2);
+      expect(snap.resolvers.r1!.errors).toBe(2);
     });
 
     it("increments retries on onResolverRetry", () => {
@@ -181,7 +177,7 @@ describe("performancePlugin", () => {
       plugin.onResolverRetry!("r1", mockReq("A"), 3);
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.retries).toBe(3);
+      expect(snap.resolvers.r1!.retries).toBe(3);
     });
 
     it("increments cancellations on onResolverCancel", () => {
@@ -189,7 +185,7 @@ describe("performancePlugin", () => {
       plugin.onResolverCancel!("r1", mockReq("A"));
 
       const snap = plugin.getSnapshot();
-      expect(snap.resolvers["r1"]!.cancellations).toBe(1);
+      expect(snap.resolvers.r1!.cancellations).toBe(1);
     });
   });
 
@@ -258,7 +254,7 @@ describe("performancePlugin", () => {
       plugin.onEffectRun!("e1");
 
       const snap = plugin.getSnapshot();
-      expect(snap.effects["e1"]!.runs).toBe(3);
+      expect(snap.effects.e1!.runs).toBe(3);
     });
 
     it("tracks lastRunAt as a timestamp", () => {
@@ -268,8 +264,8 @@ describe("performancePlugin", () => {
       const after = Date.now();
 
       const snap = plugin.getSnapshot();
-      expect(snap.effects["e1"]!.lastRunAt).toBeGreaterThanOrEqual(before);
-      expect(snap.effects["e1"]!.lastRunAt).toBeLessThanOrEqual(after);
+      expect(snap.effects.e1!.lastRunAt).toBeGreaterThanOrEqual(before);
+      expect(snap.effects.e1!.lastRunAt).toBeLessThanOrEqual(after);
     });
 
     it("increments errors on onEffectError", () => {
@@ -278,7 +274,7 @@ describe("performancePlugin", () => {
       plugin.onEffectError!("e1", new Error("fail again"));
 
       const snap = plugin.getSnapshot();
-      expect(snap.effects["e1"]!.errors).toBe(2);
+      expect(snap.effects.e1!.errors).toBe(2);
     });
   });
 
@@ -303,10 +299,10 @@ describe("performancePlugin", () => {
       plugin.onResolverStart!("r1", mockReq("A"));
 
       const snap1 = plugin.getSnapshot();
-      snap1.resolvers["r1"]!.starts = 999;
+      snap1.resolvers.r1!.starts = 999;
 
       const snap2 = plugin.getSnapshot();
-      expect(snap2.resolvers["r1"]!.starts).toBe(1);
+      expect(snap2.resolvers.r1!.starts).toBe(1);
     });
 
     it("returns empty records when no hooks have fired", () => {
@@ -523,15 +519,15 @@ describe("performancePlugin", () => {
 
       const snap = plugin.getSnapshot();
 
-      expect(snap.resolvers["auth"]!.starts).toBe(2);
-      expect(snap.resolvers["auth"]!.completions).toBe(1);
-      expect(snap.resolvers["auth"]!.errors).toBe(0);
-      expect(snap.resolvers["auth"]!.totalDurationMs).toBe(100);
+      expect(snap.resolvers.auth!.starts).toBe(2);
+      expect(snap.resolvers.auth!.completions).toBe(1);
+      expect(snap.resolvers.auth!.errors).toBe(0);
+      expect(snap.resolvers.auth!.totalDurationMs).toBe(100);
 
-      expect(snap.resolvers["data"]!.starts).toBe(1);
-      expect(snap.resolvers["data"]!.completions).toBe(1);
-      expect(snap.resolvers["data"]!.errors).toBe(1);
-      expect(snap.resolvers["data"]!.totalDurationMs).toBe(200);
+      expect(snap.resolvers.data!.starts).toBe(1);
+      expect(snap.resolvers.data!.completions).toBe(1);
+      expect(snap.resolvers.data!.errors).toBe(1);
+      expect(snap.resolvers.data!.totalDurationMs).toBe(200);
     });
 
     it("tracks multiple constraints independently", () => {
@@ -551,16 +547,16 @@ describe("performancePlugin", () => {
 
       const snap = plugin.getSnapshot();
 
-      expect(snap.constraints["priority"]!.evaluations).toBe(1);
-      expect(snap.constraints["transition"]!.evaluations).toBe(1);
-      expect(snap.constraints["safety"]!.evaluations).toBe(1);
+      expect(snap.constraints.priority!.evaluations).toBe(1);
+      expect(snap.constraints.transition!.evaluations).toBe(1);
+      expect(snap.constraints.safety!.evaluations).toBe(1);
 
       // priority: first in cycle, no duration
-      expect(snap.constraints["priority"]!.totalDurationMs).toBe(0);
+      expect(snap.constraints.priority!.totalDurationMs).toBe(0);
       // transition: duration = 110 - 100 = 10
-      expect(snap.constraints["transition"]!.totalDurationMs).toBe(10);
+      expect(snap.constraints.transition!.totalDurationMs).toBe(10);
       // safety: duration = 130 - 110 = 20
-      expect(snap.constraints["safety"]!.totalDurationMs).toBe(20);
+      expect(snap.constraints.safety!.totalDurationMs).toBe(20);
 
       perfNowSpy.mockRestore();
     });
@@ -575,10 +571,10 @@ describe("performancePlugin", () => {
 
       const snap = plugin.getSnapshot();
 
-      expect(snap.effects["log"]!.runs).toBe(2);
-      expect(snap.effects["log"]!.errors).toBe(0);
-      expect(snap.effects["notify"]!.runs).toBe(1);
-      expect(snap.effects["notify"]!.errors).toBe(1);
+      expect(snap.effects.log!.runs).toBe(2);
+      expect(snap.effects.log!.errors).toBe(0);
+      expect(snap.effects.notify!.runs).toBe(1);
+      expect(snap.effects.notify!.errors).toBe(1);
     });
   });
 });

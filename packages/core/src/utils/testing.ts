@@ -489,7 +489,7 @@ export function mockResolver<R extends Requirement = Requirement>(
     return new Promise<void>((resolve, reject) => {
       pending.push({
         requirement: req as R,
-        resolve: (val?: unknown) => resolve(val as void),
+        resolve: (val?: unknown) => resolve(val as undefined),
         reject,
       });
     });

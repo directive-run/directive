@@ -1045,11 +1045,7 @@ export function useHydratedSystem<S extends ModuleSchema>(
 // createAuditLedgerStore — live ledger entries with filter (R4.I parity)
 // ============================================================================
 
-import type {
-  AuditEntry,
-  AuditLedger,
-  QueryFilter,
-} from "@directive-run/core";
+import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";
 
 /**
  * Create a Svelte readable store that holds the latest audit-ledger

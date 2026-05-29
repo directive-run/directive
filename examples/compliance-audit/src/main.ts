@@ -12,20 +12,20 @@
  * Mock LLM runner so the demo works in StackBlitz without an API key.
  */
 
+import { predicateFromIntent } from "@directive-run/ai";
 import {
+  type AuditEntry,
+  type FactPredicate,
   createAuditLedger,
   createSystem,
   doctor,
   evaluatePredicateExplained,
-  predict,
   predicateToSQL,
-  type AuditEntry,
-  type FactPredicate,
+  predict,
 } from "@directive-run/core";
-import { predicateFromIntent } from "@directive-run/ai";
 
-import { checkoutModule } from "./module.js";
 import { mockPredicateRunner } from "./mock-runner.js";
+import { checkoutModule } from "./module.js";
 
 // ============================================================================
 // System setup with ledger
@@ -59,8 +59,7 @@ function escapeHtml(s: string): string {
 
 function fmtTs(ms: number): string {
   const d = new Date(ms);
-  return d.toLocaleTimeString("en-US", { hour12: false }) + "." +
-    String(d.getMilliseconds()).padStart(3, "0");
+  return `${d.toLocaleTimeString("en-US", { hour12: false })}.${String(d.getMilliseconds()).padStart(3, "0")}`;
 }
 
 // ============================================================================
@@ -106,13 +105,18 @@ function renderFacts(): void {
     refreshAll();
   });
   $<HTMLSelectElement>("fact-region").addEventListener("change", (e) => {
-    system.facts.region = (e.target as HTMLSelectElement)
-      .value as "US" | "EU" | "ASIA" | "OTHER";
+    system.facts.region = (e.target as HTMLSelectElement).value as
+      | "US"
+      | "EU"
+      | "ASIA"
+      | "OTHER";
     refreshAll();
   });
   $<HTMLSelectElement>("fact-tier").addEventListener("change", (e) => {
-    system.facts.tier = (e.target as HTMLSelectElement)
-      .value as "free" | "pro" | "enterprise";
+    system.facts.tier = (e.target as HTMLSelectElement).value as
+      | "free"
+      | "pro"
+      | "enterprise";
     refreshAll();
   });
 }
@@ -121,7 +125,7 @@ function renderFacts(): void {
 // Top panel — Intent → predicate
 // ============================================================================
 
-let lastEmittedPredicate: FactPredicate<Record<string, unknown>> | null = null;
+let _lastEmittedPredicate: FactPredicate<Record<string, unknown>> | null = null;
 
 async function onEmit(): Promise<void> {
   const intent = $<HTMLInputElement>("intent-input").value;
@@ -134,7 +138,7 @@ async function onEmit(): Promise<void> {
       runner: mockPredicateRunner,
       maxRetries: 2,
     });
-    lastEmittedPredicate = predicate as FactPredicate<Record<string, unknown>>;
+    _lastEmittedPredicate = predicate as FactPredicate<Record<string, unknown>>;
     out.innerHTML = `
       <div class="label">Emitted predicate (validated):</div>
       <pre class="json">${escapeHtml(JSON.stringify(predicate, null, 2))}</pre>
@@ -149,7 +153,7 @@ async function onEmit(): Promise<void> {
     out.innerHTML = `<div class="error">Rejected after retries: ${escapeHtml(
       (err as Error).message,
     )}</div>`;
-    lastEmittedPredicate = null;
+    _lastEmittedPredicate = null;
   }
 }
 
@@ -181,7 +185,9 @@ function renderDoctor(candidate: FactPredicate<Record<string, unknown>>): void {
   `;
 }
 
-function renderPredict(candidate: FactPredicate<Record<string, unknown>>): void {
+function renderPredict(
+  candidate: FactPredicate<Record<string, unknown>>,
+): void {
   const verdict = $("predict-verdict");
   const facts = system.facts.$store.toObject();
   const result = predict(candidate, facts as Record<string, unknown>);
@@ -369,9 +375,10 @@ function renderLedgerEntry(e: AuditEntry): string {
 // tamper: clone the snapshot, mutate the clone, and rerun verify()
 // against the cloned chain. The clone shows what a verifier WOULD see
 // if persisted bytes were swapped on disk.
-let tamperedClone:
-  | { entries: import("@directive-run/core").AuditEntry[]; capturedAt: number }
-  | null = null;
+let tamperedClone: {
+  entries: import("@directive-run/core").AuditEntry[];
+  capturedAt: number;
+} | null = null;
 
 function onTamper(): void {
   const snap = ledger.toJSON();
@@ -396,12 +403,10 @@ function onTamper(): void {
   renderLedger();
 }
 
-function verifyClone(
-  clone: {
-    entries: import("@directive-run/core").AuditEntry[];
-    capturedAt: number;
-  },
-):
+function verifyClone(clone: {
+  entries: import("@directive-run/core").AuditEntry[];
+  capturedAt: number;
+}):
   | { valid: true; entryCount: number }
   | {
       valid: false;
@@ -538,10 +543,7 @@ function setVerifyResult(
   );
 }
 
-function setVerifyStatus(
-  klass: "ok" | "warn" | "fail",
-  msg: string,
-): void {
+function setVerifyStatus(klass: "ok" | "warn" | "fail", msg: string): void {
   const el = $("verify-status");
   el.className = `verify-status ${klass}`;
   el.textContent = msg;

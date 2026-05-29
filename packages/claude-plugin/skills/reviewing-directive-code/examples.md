@@ -76,7 +76,7 @@ export const counterModule = createModule("counter", {
   resolvers: {
     clamp: {
       requirement: "CLAMP_TO_ZERO",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.count = 0;
       },
     },

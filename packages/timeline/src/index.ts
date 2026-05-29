@@ -245,7 +245,7 @@ export interface FormatOptions {
   /** Maximum number of frames to render. Default: 200. */
   maxFrames?: number;
   /** Frame kinds to include. Default: all. */
-  include?: ReadonlyArray<ObservationEvent["type"]>;
+  include?: readonly ObservationEvent["type"][];
   /** Truncate fact-change values to this length. Default: 80. */
   valuePreviewLen?: number;
 }
@@ -1500,7 +1500,7 @@ export function diffTimelines(
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v, (_k, val) =>
-      typeof val === "bigint" ? val.toString() + "n" : val,
+      typeof val === "bigint" ? `${val.toString()}n` : val,
     );
   } catch {
     return `[unstringifiable ${typeof v}]`;

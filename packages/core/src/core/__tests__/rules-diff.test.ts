@@ -10,13 +10,13 @@ describe("diffRules – constraint level", () => {
     const report = diffRules({
       before: {
         unchanged: { phase: "red" },
-        removed:   { phase: "yellow" },
-        changed:   { cartTotal: { $gte: 100 } },
+        removed: { phase: "yellow" },
+        changed: { cartTotal: { $gte: 100 } },
       },
       after: {
         unchanged: { phase: "red" },
-        changed:   { cartTotal: { $gte: 50 } },
-        added:     { riskScore: { $gte: 0.7 } },
+        changed: { cartTotal: { $gte: 50 } },
+        added: { riskScore: { $gte: 0.7 } },
       },
     });
 
@@ -38,7 +38,7 @@ describe("diffRules – constraint level", () => {
   it("sorts constraints alphabetically for deterministic output", () => {
     const report = diffRules({
       before: { z: { x: 1 }, a: { x: 1 }, m: { x: 1 } },
-      after:  { z: { x: 1 }, a: { x: 1 }, m: { x: 1 } },
+      after: { z: { x: 1 }, a: { x: 1 }, m: { x: 1 } },
     });
     expect(report.constraints.map((c) => c.id)).toEqual(["a", "m", "z"]);
   });
@@ -52,7 +52,7 @@ describe("diffRules – direction analysis", () => {
   it("relaxes $gte when threshold drops", () => {
     const report = diffRules({
       before: { c: { cartTotal: { $gte: 100 } } },
-      after:  { c: { cartTotal: { $gte: 50 } } },
+      after: { c: { cartTotal: { $gte: 50 } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("relaxed");
   });
@@ -60,7 +60,7 @@ describe("diffRules – direction analysis", () => {
   it("tightens $gte when threshold rises", () => {
     const report = diffRules({
       before: { c: { cartTotal: { $gte: 50 } } },
-      after:  { c: { cartTotal: { $gte: 100 } } },
+      after: { c: { cartTotal: { $gte: 100 } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("tightened");
   });
@@ -68,7 +68,7 @@ describe("diffRules – direction analysis", () => {
   it("relaxes $lte when threshold rises", () => {
     const report = diffRules({
       before: { c: { age: { $lte: 18 } } },
-      after:  { c: { age: { $lte: 21 } } },
+      after: { c: { age: { $lte: 21 } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("relaxed");
   });
@@ -76,7 +76,7 @@ describe("diffRules – direction analysis", () => {
   it("tightens $between when range narrows", () => {
     const report = diffRules({
       before: { c: { x: { $between: [10, 90] } } },
-      after:  { c: { x: { $between: [25, 75] } } },
+      after: { c: { x: { $between: [25, 75] } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("tightened");
   });
@@ -84,13 +84,13 @@ describe("diffRules – direction analysis", () => {
   it("relaxes $in when the set grows, tightens $nin when set grows", () => {
     const relax = diffRules({
       before: { c: { plan: { $in: ["free"] } } },
-      after:  { c: { plan: { $in: ["free", "plus", "pro"] } } },
+      after: { c: { plan: { $in: ["free", "plus", "pro"] } } },
     });
     expect(relax.constraints[0]?.changes[0]?.kind).toBe("relaxed");
 
     const tighten = diffRules({
       before: { c: { plan: { $nin: ["banned"] } } },
-      after:  { c: { plan: { $nin: ["banned", "fraud"] } } },
+      after: { c: { plan: { $nin: ["banned", "fraud"] } } },
     });
     expect(tighten.constraints[0]?.changes[0]?.kind).toBe("tightened");
   });
@@ -98,7 +98,7 @@ describe("diffRules – direction analysis", () => {
   it("falls back to 'changed' for non-numeric value changes", () => {
     const report = diffRules({
       before: { c: { phase: "red" } },
-      after:  { c: { phase: "blue" } },
+      after: { c: { phase: "blue" } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("changed");
   });
@@ -126,7 +126,7 @@ describe("diffRules – combinators", () => {
   it("walks into $any and reports added branches", () => {
     const report = diffRules({
       before: { c: { $any: [{ phase: "red" }] } },
-      after:  { c: { $any: [{ phase: "red" }, { phase: "blue" }] } },
+      after: { c: { $any: [{ phase: "red" }, { phase: "blue" }] } },
     });
     const change = report.constraints[0]?.changes[0];
     expect(change?.path).toBe("$any[1].phase");
@@ -136,7 +136,7 @@ describe("diffRules – combinators", () => {
   it("walks into $not", () => {
     const report = diffRules({
       before: { c: { $not: { paused: true } } },
-      after:  { c: { $not: { paused: false } } },
+      after: { c: { $not: { paused: false } } },
     });
     const change = report.constraints[0]?.changes[0];
     expect(change?.path).toBe("$not.paused");
@@ -225,7 +225,7 @@ describe("diffClauses – function-form predicates", () => {
     // without per-clause detail.
     const report = diffRules({
       before: { c: undefined },
-      after:  { c: { phase: "red" } },
+      after: { c: { phase: "red" } },
     });
     expect(report.constraints[0]?.status).toBe("changed");
   });
@@ -233,7 +233,7 @@ describe("diffClauses – function-form predicates", () => {
   it("treats two undefined whenSpecs as unchanged", () => {
     const report = diffRules({
       before: { c: undefined },
-      after:  { c: undefined },
+      after: { c: undefined },
     });
     expect(report.constraints[0]?.status).toBe("unchanged");
   });
@@ -247,7 +247,7 @@ describe("diffRules – AE-round regressions", () => {
   it("$contains on arrays gets direction analysis (relaxed when set grows)", () => {
     const report = diffRules({
       before: { c: { tags: { $contains: ["admin"] } } },
-      after:  { c: { tags: { $contains: ["admin", "auditor"] } } },
+      after: { c: { tags: { $contains: ["admin", "auditor"] } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("relaxed");
   });
@@ -255,7 +255,7 @@ describe("diffRules – AE-round regressions", () => {
   it("$contains on strings stays 'changed' (substring direction is ambiguous)", () => {
     const report = diffRules({
       before: { c: { name: { $contains: "foo" } } },
-      after:  { c: { name: { $contains: "foobar" } } },
+      after: { c: { name: { $contains: "foobar" } } },
     });
     expect(report.constraints[0]?.changes[0]?.kind).toBe("changed");
   });
@@ -263,7 +263,7 @@ describe("diffRules – AE-round regressions", () => {
   it("emits a (function-form) placeholder for opaque removed/added constraints", () => {
     const removed = diffRules({
       before: { fn: undefined },
-      after:  {},
+      after: {},
     });
     expect(removed.constraints[0]?.status).toBe("removed");
     expect(removed.constraints[0]?.changes).toEqual([
@@ -272,7 +272,7 @@ describe("diffRules – AE-round regressions", () => {
 
     const added = diffRules({
       before: {},
-      after:  { fn: undefined },
+      after: { fn: undefined },
     });
     expect(added.constraints[0]?.status).toBe("added");
     expect(added.constraints[0]?.changes).toEqual([
@@ -322,7 +322,7 @@ describe("diffRules – output stability", () => {
   it("two value-equal predicates with different key order diff as unchanged", () => {
     const report = diffRules({
       before: { c: { a: 1, b: 2 } },
-      after:  { c: { b: 2, a: 1 } },
+      after: { c: { b: 2, a: 1 } },
     });
     expect(report.constraints[0]?.status).toBe("unchanged");
   });

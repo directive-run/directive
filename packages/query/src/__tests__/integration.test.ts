@@ -212,7 +212,7 @@ describe("Integration: createQuerySystem", () => {
     });
     await app.settle();
 
-    const state = app.read("flaky") as ResourceState<{ ok: boolean }>;
+    const _state = app.read("flaky") as ResourceState<{ ok: boolean }>;
     // Retry policy is passed to the engine — the engine handles retries
     // We just verify the option is accepted without error
     app.destroy();

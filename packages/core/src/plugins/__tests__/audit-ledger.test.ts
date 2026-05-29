@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
-import { createAuditLedger, memorySink, type AuditEntry } from "../audit-ledger/index.js";
+import {
+  type AuditEntry,
+  createAuditLedger,
+  memorySink,
+} from "../audit-ledger/index.js";
 
 // happy-dom or node fine; we use node.
 const flushTick = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -128,9 +132,9 @@ describe("createAuditLedger — query API", () => {
     }
     const last5 = sink.recent(5);
     expect(last5).toHaveLength(5);
-    expect((last5[0] as Extract<AuditEntry, { kind: "fact.change" }>).next).toBe(
-      15,
-    );
+    expect(
+      (last5[0] as Extract<AuditEntry, { kind: "fact.change" }>).next,
+    ).toBe(15);
   });
 
   it("forFact / forConstraint shortcuts work", async () => {
@@ -171,9 +175,9 @@ describe("createAuditLedger — query API", () => {
     });
     expect(inRange.length).toBeGreaterThan(0);
 
-    expect(() =>
-      sink.query({ changedBetween: ["not a date", 0] }),
-    ).toThrow(/parseable ISO/);
+    expect(() => sink.query({ changedBetween: ["not a date", 0] })).toThrow(
+      /parseable ISO/,
+    );
   });
 
   it("query factPath is exact-match only — no LIKE wildcards", () => {
@@ -1322,7 +1326,10 @@ describe("createAuditLedger — MAJOR-3 erase 0-match guard", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     const before = ledger.query({ kind: "system.subject-erased" }).length;
-    const result = ledger.erase({ kind: "constraint.evaluate", factPath: "nonexistent-key" });
+    const result = ledger.erase({
+      kind: "constraint.evaluate",
+      factPath: "nonexistent-key",
+    });
 
     expect(result.erased).toBe(0);
     expect(result.markerEntry).toBeNull();

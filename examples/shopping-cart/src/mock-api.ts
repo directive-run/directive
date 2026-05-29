@@ -58,8 +58,8 @@ export async function validateCoupon(code: string): Promise<CouponResult> {
  * Process a checkout. 10% random failure rate.
  */
 export async function processCheckout(
-  items: Array<{ id: string; name: string; quantity: number; price: number }>,
-  couponCode: string,
+  _items: Array<{ id: string; name: string; quantity: number; price: number }>,
+  _couponCode: string,
 ): Promise<CheckoutResult> {
   await wait(1000);
 

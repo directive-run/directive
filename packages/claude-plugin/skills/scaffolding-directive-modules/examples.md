@@ -76,7 +76,7 @@ export const counterModule = createModule("counter", {
   resolvers: {
     clamp: {
       requirement: "CLAMP_TO_ZERO",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.count = 0;
       },
     },
@@ -660,7 +660,7 @@ export const cartModule = createModule("cart", {
       return sub * (facts.self.couponDiscount / 100);
     },
 
-    tax: (facts, derived) => {
+    tax: (_facts, derived) => {
       const sub = derived.subtotal;
       const disc = derived.discount;
 

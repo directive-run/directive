@@ -20,14 +20,14 @@
  */
 
 import {
+  type FactPredicate,
+  type SchemaKindNode,
+  type SchemaValidationError,
   getOperatorsForKind,
   getSchemaFieldKinds,
   predicateHash,
   validatePredicate,
   validatePredicateAgainstSchema,
-  type FactPredicate,
-  type SchemaKindNode,
-  type SchemaValidationError,
 } from "@directive-run/core";
 
 import { extractJsonFromOutput } from "./structured-output.js";
@@ -63,8 +63,8 @@ async function hashStringSha256(raw: string): Promise<string> {
   // Fall back to a sync djb2 — collision-prone, but adequate for telemetry
   // alongside the persisted predicate.
   try {
-    const subtle = (globalThis as { crypto?: { subtle?: SubtleCrypto } })
-      .crypto?.subtle;
+    const subtle = (globalThis as { crypto?: { subtle?: SubtleCrypto } }).crypto
+      ?.subtle;
     if (subtle && typeof subtle.digest === "function") {
       const enc = new TextEncoder();
       const buf = await subtle.digest("SHA-256", enc.encode(raw));
@@ -181,7 +181,11 @@ export interface PredicateFromIntentDiagnostics<F = Record<string, unknown>> {
   /** Number of LLM calls actually made. */
   attempts: number;
   /** Errors encountered across all attempts (most recent last). */
-  errors: ReadonlyArray<{ attempt: number; reason: string; details?: readonly SchemaValidationError[] }>;
+  errors: ReadonlyArray<{
+    attempt: number;
+    reason: string;
+    details?: readonly SchemaValidationError[];
+  }>;
   /** The raw LLM output from the final attempt — useful for debugging. */
   lastRawOutput?: string;
 }
@@ -269,7 +273,7 @@ function buildSystemPrompt(
   }
 
   lines.push(
-    "\nRespond with ONLY the JSON predicate object. No prose. No markdown fences. No \"Here is...\".",
+    '\nRespond with ONLY the JSON predicate object. No prose. No markdown fences. No "Here is...".',
   );
 
   return lines.join("\n");
@@ -281,7 +285,9 @@ function buildErrorFeedback(
   errors: readonly SchemaValidationError[] | string,
 ): string {
   const lines: string[] = [];
-  lines.push("Your previous response was rejected. Original intent (still applies):");
+  lines.push(
+    "Your previous response was rejected. Original intent (still applies):",
+  );
   lines.push(`  ${intent}`);
 
   // M16: When we have structured errors, scope the schema reminder to only
@@ -297,7 +303,9 @@ function buildErrorFeedback(
     for (const e of errors) {
       lines.push(`  - path "${e.path}", op "${e.op}": ${e.reason}`);
       if (e.allowedOps && e.allowedOps.length > 0) {
-        lines.push(`    → allowed operators for this fact: ${e.allowedOps.join(", ")}`);
+        lines.push(
+          `    → allowed operators for this fact: ${e.allowedOps.join(", ")}`,
+        );
       }
       // Collect every path mentioned by an error. If a path isn't in the
       // kindMap (unknown fact), the offending key may be a dotted prefix of
@@ -313,7 +321,9 @@ function buildErrorFeedback(
       const node = kindMap.get(path);
       if (node) {
         const ops = getOperatorsForKind(node);
-        lines.push(`  ${path}: ${renderKindForPrompt(node)} — allowed: ${ops.join(", ")}`);
+        lines.push(
+          `  ${path}: ${renderKindForPrompt(node)} — allowed: ${ops.join(", ")}`,
+        );
         shown++;
       } else {
         lines.push(
@@ -323,12 +333,16 @@ function buildErrorFeedback(
     }
     const remaining = kindMap.size - shown;
     if (remaining > 0) {
-      lines.push(`  …and ${remaining} more fact(s) available — ask if you need the full list.`);
+      lines.push(
+        `  …and ${remaining} more fact(s) available — ask if you need the full list.`,
+      );
     }
   } else {
     for (const [path, node] of kindMap.entries()) {
       const ops = getOperatorsForKind(node);
-      lines.push(`  ${path}: ${renderKindForPrompt(node)} — allowed: ${ops.join(", ")}`);
+      lines.push(
+        `  ${path}: ${renderKindForPrompt(node)} — allowed: ${ops.join(", ")}`,
+      );
     }
   }
 
@@ -525,9 +539,14 @@ export async function predicateFromIntentRaw<F = Record<string, unknown>>(
     const input =
       attempt === 1
         ? `Intent: ${intent}\n\nEmit the predicate now.`
-        : buildErrorFeedback(intent, kindMap, errors[errors.length - 1]!.details ?? errors[errors.length - 1]!.reason);
+        : buildErrorFeedback(
+            intent,
+            kindMap,
+            errors[errors.length - 1]!.details ??
+              errors[errors.length - 1]!.reason,
+          );
 
-    let runResult;
+    let runResult: Awaited<ReturnType<typeof runner>>;
     try {
       // (N6) Forward the abort signal to the runner so in-flight LLM
       // calls can be cancelled mid-fetch. fetch-based adapters honor
@@ -646,7 +665,9 @@ function buildSchemaSummary(
   for (const [path, node] of kindMap.entries()) {
     if (factPath && !path.startsWith(factPath)) continue;
     const ops = getOperatorsForKind(node);
-    lines.push(`${path}: ${renderKindForPrompt(node)} — ops: ${ops.join(", ")}`);
+    lines.push(
+      `${path}: ${renderKindForPrompt(node)} — ops: ${ops.join(", ")}`,
+    );
   }
 
   return lines.join("\n");
@@ -795,7 +816,9 @@ export interface PredicateFromIntentProvenance {
   readonly predicateHash: string;
 }
 
-export interface PredicateFromIntentWithProvenanceResult<F = Record<string, unknown>> {
+export interface PredicateFromIntentWithProvenanceResult<
+  F = Record<string, unknown>,
+> {
   readonly predicate: FactPredicate<F>;
   readonly provenance: PredicateFromIntentProvenance;
 }

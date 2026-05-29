@@ -135,8 +135,7 @@ export class OptimisticCloneError extends Error {
     cause?: unknown,
   ) {
     super(
-      `[optimistic] Failed to snapshot fact key "${String(key)}": value is not JSON-roundtrippable. ` +
-        `Convert at the boundary (e.g. Date → number, Set/Map → array/object, BigInt → string) before assigning to facts.`,
+      `[optimistic] Failed to snapshot fact key "${String(key)}": value is not JSON-roundtrippable. Convert at the boundary (e.g. Date → number, Set/Map → array/object, BigInt → string) before assigning to facts.`,
     );
     if (cause !== undefined) {
       (this as Error & { cause?: unknown }).cause = cause;

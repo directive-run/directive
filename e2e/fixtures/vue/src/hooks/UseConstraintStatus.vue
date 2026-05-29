@@ -4,9 +4,9 @@ import { computed } from "vue";
 import { system } from "../system";
 
 const constraints = useConstraintStatus(system);
-const status = useFact(system, "status");
+const _status = useFact(system, "status");
 
-const activeCount = computed(
+const _activeCount = computed(
   () => constraints.value.filter((c) => c.active).length,
 );
 </script>

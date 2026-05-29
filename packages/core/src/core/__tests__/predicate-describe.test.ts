@@ -4,9 +4,9 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  NUMBER_FORMAT_CACHE_LIMIT,
   _clearNumberFormatCache,
   _getNumberFormatCacheSize,
-  NUMBER_FORMAT_CACHE_LIMIT,
   describePredicate,
   getNumberFormat,
 } from "../predicate-describe.js";
@@ -202,10 +202,7 @@ describe("describePredicate — formal style operators", () => {
 
   it("renders $matches with ~", () => {
     expect(
-      describePredicate(
-        { email: { $matches: /^[a-z]/ } },
-        { style: "formal" },
-      ),
+      describePredicate({ email: { $matches: /^[a-z]/ } }, { style: "formal" }),
     ).toBe("email ~ /^[a-z]/");
   });
 
@@ -222,9 +219,9 @@ describe("describePredicate — formal style operators", () => {
 
 describe("describePredicate — combinators", () => {
   it("implicit AND on object-form siblings (no parens at top level)", () => {
-    expect(
-      describePredicate({ cartTotal: { $gte: 50 }, region: "US" }),
-    ).toBe("cartTotal is at least 50 AND region is US");
+    expect(describePredicate({ cartTotal: { $gte: 50 }, region: "US" })).toBe(
+      "cartTotal is at least 50 AND region is US",
+    );
   });
 
   it("$all with > 1 child parenthesizes each", () => {
@@ -332,22 +329,18 @@ describe("describePredicate — value formatting", () => {
   });
 
   it("renders array values via JSON", () => {
-    expect(describePredicate({ tags: ["a", "b"] })).toBe(
-      "tags is [a, b]",
-    );
+    expect(describePredicate({ tags: ["a", "b"] })).toBe("tags is [a, b]");
   });
 
   it("quotes strings with spaces / commas in natural style", () => {
-    expect(describePredicate({ name: "Mr Smith" })).toBe(
-      `name is "Mr Smith"`,
-    );
+    expect(describePredicate({ name: "Mr Smith" })).toBe(`name is "Mr Smith"`);
     expect(describePredicate({ name: "a, b" })).toBe(`name is "a, b"`);
   });
 
   it("always quotes strings in formal style", () => {
-    expect(
-      describePredicate({ region: "US" }, { style: "formal" }),
-    ).toBe(`region = "US"`);
+    expect(describePredicate({ region: "US" }, { style: "formal" })).toBe(
+      `region = "US"`,
+    );
   });
 });
 
@@ -400,9 +393,7 @@ describe("describePredicate — locale formatting", () => {
 
 describe("describePredicate — array form", () => {
   it("renders an array-form predicate equivalently to the object form", () => {
-    const arrayForm = describePredicate([
-      { fact: "x", op: "$gte", value: 5 },
-    ]);
+    const arrayForm = describePredicate([{ fact: "x", op: "$gte", value: 5 }]);
     const objForm = describePredicate({ x: { $gte: 5 } });
     expect(arrayForm).toBe(objForm);
     expect(arrayForm).toBe("x is at least 5");

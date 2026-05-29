@@ -161,7 +161,7 @@ function main() {
   // Extract all backtick-quoted identifiers from the skeleton
   const apiSymbols = new Set<string>();
   const symbolPattern = /`(\w+)`/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = symbolPattern.exec(skeletonContent)) !== null) {
     if (match[1]) {
       apiSymbols.add(match[1]);
@@ -176,7 +176,7 @@ function main() {
   log.step(`Checking ${files.length} knowledge files...`);
 
   let totalRefs = 0;
-  let missingRefs = 0;
+  let _missingRefs = 0;
   const missing: Array<{ file: string; symbol: string }> = [];
   const fileRefCounts: Record<string, number> = {};
 
@@ -187,7 +187,7 @@ function main() {
     // (PascalCase or camelCase starting identifiers, not lowercase keywords)
     const refPattern =
       /`((?:create|use|with|assert|mock|estimate|validate|pipe|select|t\.|Module|System|Plugin|Constraint|Resolver|Requirement|Derivation|Effect|Schema|Facts|Engine|Orchestrator|Agent|Runner|Budget|Guardrail|Memory|Circuit)\w*)`/g;
-    let ref;
+    let ref: RegExpExecArray | null;
     while ((ref = refPattern.exec(file.content)) !== null) {
       const symbol = ref[1];
       if (!symbol || KNOWN_EXCEPTIONS.has(symbol)) {
@@ -198,7 +198,7 @@ function main() {
       fileRefs++;
 
       if (!apiSymbols.has(symbol)) {
-        missingRefs++;
+        _missingRefs++;
         missing.push({ file: file.name, symbol });
       }
     }

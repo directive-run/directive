@@ -236,7 +236,7 @@ function render(): void {
 system.subscribe(allKeys, render);
 
 // Timer — tick every 500ms for reconnect countdown
-const tickInterval = setInterval(() => {
+const _tickInterval = setInterval(() => {
   system.events.tick();
 }, 500);
 

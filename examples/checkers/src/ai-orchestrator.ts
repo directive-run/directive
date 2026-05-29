@@ -319,7 +319,7 @@ export function createCheckersAI(): CheckersAI {
 
   function buildMoveInput(
     board: Board,
-    player: Player,
+    _player: Player,
     legalMoves: Move[],
     humanMoveDesc?: string,
   ): string {

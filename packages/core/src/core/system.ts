@@ -70,9 +70,7 @@ function topologicalSort<Modules extends ModulesMap>(
       const cycleStart = path.indexOf(namespace);
       const cycle = [...path.slice(cycleStart), namespace].join(" → ");
       throw new Error(
-        `[Directive] Circular dependency detected: ${cycle}. ` +
-          "Modules cannot have circular crossModuleDeps. " +
-          "Break the cycle by removing one of the cross-module references.",
+        `[Directive] Circular dependency detected: ${cycle}. Modules cannot have circular crossModuleDeps. Break the cycle by removing one of the cross-module references.`,
       );
     }
 
@@ -177,8 +175,7 @@ export function createSystem<
   if ("module" in options) {
     if (!options.module) {
       throw new Error(
-        "[Directive] createSystem requires a module. Got: " +
-          typeof options.module,
+        `[Directive] createSystem requires a module. Got: ${typeof options.module}`,
       );
     }
     return createSingleModuleSystem(
@@ -246,8 +243,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
         for (const depNamespace of Object.keys(mod.crossModuleDeps)) {
           if (depNamespace === namespace) {
             console.warn(
-              `[Directive] Module "${namespace}" references itself in crossModuleDeps. ` +
-                `Use "facts.self" to access own module's facts instead.`,
+              `[Directive] Module "${namespace}" references itself in crossModuleDeps. Use "facts.self" to access own module's facts instead.`,
             );
           } else if (!moduleNamespaces.has(depNamespace)) {
             console.warn(
@@ -285,8 +281,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
     );
     if (missingModules.length > 0) {
       throw new Error(
-        `[Directive] initOrder is missing modules: ${missingModules.join(", ")}. ` +
-          "All modules must be included in the explicit order.",
+        `[Directive] initOrder is missing modules: ${missingModules.join(", ")}. All modules must be included in the explicit order.`,
       );
     }
     orderedNamespaces = explicitOrder;
@@ -404,9 +399,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       // Validate facts object for prototype pollution
       if (facts && typeof facts === "object" && !isPrototypeSafe(facts)) {
         throw new Error(
-          `[Directive] initialFacts/hydrate for namespace "${namespace}" contains potentially ` +
-            "dangerous keys (__proto__, constructor, or prototype). This may indicate a " +
-            "prototype pollution attack.",
+          `[Directive] initialFacts/hydrate for namespace "${namespace}" contains potentially dangerous keys (__proto__, constructor, or prototype). This may indicate a prototype pollution attack.`,
         );
       }
 
@@ -741,8 +734,7 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       // Validate namespace
       if (moduleNamespaces.has(namespace)) {
         throw new Error(
-          `[Directive] Module namespace "${namespace}" already exists. ` +
-            "Cannot register a duplicate namespace.",
+          `[Directive] Module namespace "${namespace}" already exists. Cannot register a duplicate namespace.`,
         );
       }
       if (namespace.includes(SEPARATOR)) {
@@ -962,7 +954,7 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   // Validate module is provided
   if (!mod) {
     throw new Error(
-      "[Directive] createSystem requires a module. Got: " + typeof mod,
+      `[Directive] createSystem requires a module. Got: ${typeof mod}`,
     );
   }
 

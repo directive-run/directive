@@ -10,10 +10,7 @@
  * Pure, sync, no engine dependency. Reuses `evaluatePredicateExplained`.
  */
 
-import {
-  evaluatePredicateExplained,
-  walkPredicate,
-} from "./predicate.js";
+import { evaluatePredicateExplained, walkPredicate } from "./predicate.js";
 import type { ClauseResult, FactPredicate } from "./types/predicate.js";
 
 // ============================================================================

@@ -61,6 +61,7 @@ describe("JSX runtime", () => {
     const ul = (
       <ul>
         {items.map((item) => (
+          // biome-ignore lint/correctness/useJsxKeyInIterable: el's DOM JSX runtime has no key prop — not React
           <li>{item}</li>
         ))}
       </ul>
@@ -167,6 +168,7 @@ describe("Fragment", () => {
 
   it("renders text children", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
+    // biome-ignore lint/complexity/noUselessFragments: the fragment is the test subject
     const frag = (<>Hello world</>) as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);
@@ -187,6 +189,7 @@ describe("Fragment", () => {
 
   it("renders empty fragment with no children", () => {
     // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
+    // biome-ignore lint/complexity/noUselessFragments: the empty fragment is the test subject
     const frag = (<></>) as any as DocumentFragment;
 
     expect(frag).toBeInstanceOf(DocumentFragment);

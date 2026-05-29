@@ -51,20 +51,21 @@ declare global {
 
 const metaEnv =
   typeof import.meta !== "undefined" && "env" in import.meta
-    ? (import.meta as { env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } }).env
+    ? (
+        import.meta as {
+          env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string };
+        }
+      ).env
     : undefined;
 
-if (
-  metaEnv?.PROD === true &&
-  metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
-) {
+if (metaEnv?.PROD === true && metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true") {
   throw new Error(
     "[Directive demo] mockPredicateRunner is for demo only. Set VITE_ALLOW_MOCK_RUNNER=true to override.",
   );
 }
 
-import { createMockAgentRunner } from "@directive-run/ai/testing";
 import type { AgentRunner } from "@directive-run/ai";
+import { createMockAgentRunner } from "@directive-run/ai/testing";
 
 const CANNED: Array<{ match: RegExp; output: string }> = [
   {

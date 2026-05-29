@@ -115,7 +115,7 @@ function generateSitemap(docs: NavSection[], ai: NavSection[]): string {
     "# Directive Documentation Sitemap",
     "",
     "> Auto-generated from the docs site navigation. Do not edit manually.",
-    `> Run \`pnpm --filter @directive-run/knowledge generate-sitemap\` to refresh.`,
+    "> Run `pnpm --filter @directive-run/knowledge generate-sitemap` to refresh.",
     "",
     `Website: ${BASE_URL}`,
     "",

@@ -32,7 +32,7 @@ function extractCodeBlocks(
 ): Array<{ lang: string; code: string }> {
   const blocks: Array<{ lang: string; code: string }> = [];
   const regex = /```(\w+)?\n([\s\S]*?)```/g;
-  let match;
+  let match: RegExpExecArray | null;
 
   while ((match = regex.exec(content)) !== null) {
     blocks.push({

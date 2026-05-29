@@ -227,7 +227,7 @@ export const wizardModule = createModule("wizard", {
   resolvers: {
     advanceStep: {
       requirement: "ADVANCE_STEP",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.currentStep = context.facts.currentStep + 1;
         context.facts.advanceRequested = false;
       },
@@ -236,7 +236,7 @@ export const wizardModule = createModule("wizard", {
     submitForm: {
       requirement: "SUBMIT_FORM",
       timeout: 10000,
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         // Simulate API submission
         await new Promise((resolve) => setTimeout(resolve, 800));
         context.facts.submitted = true;

@@ -5,8 +5,8 @@
  * Imported by devtools.ts; depends only on devtools-types.ts.
  */
 
-import type { ClauseResult } from "../core/types/predicate.js";
 import type { ModuleSchema, System } from "../core/types.js";
+import type { ClauseResult } from "../core/types/predicate.js";
 import {
   type DevtoolsPluginOptions,
   MAX_PANEL_EVENTS,
@@ -1035,7 +1035,10 @@ export function removeConstraintRow(
     refs.constraintsCount.textContent = String(rowMap.size);
   }
   // Restore empty state if we just emptied the list.
-  if (rowMap.size === 0 && !refs.constraintsBody.querySelector(".dt-constraints-empty")) {
+  if (
+    rowMap.size === 0 &&
+    !refs.constraintsBody.querySelector(".dt-constraints-empty")
+  ) {
     const empty = document.createElement("div");
     empty.style.color = S.muted;
     empty.style.padding = "4px";

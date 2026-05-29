@@ -26,7 +26,10 @@ import {
   walkPredicate,
 } from "./predicate.js";
 import type { ClauseResult, FactPredicate } from "./types/predicate.js";
-import { PREDICATE_COMBINATORS, PREDICATE_OPERATORS } from "./types/predicate.js";
+import {
+  PREDICATE_COMBINATORS,
+  PREDICATE_OPERATORS,
+} from "./types/predicate.js";
 
 /**
  * Upper bound on the number of frames a single {@link replayUnder} call will

@@ -11,10 +11,7 @@
  */
 
 import { MAX_PREDICATE_DEPTH } from "./predicate.js";
-import {
-  PREDICATE_OPERATORS,
-  type FactPredicate,
-} from "./types/predicate.js";
+import { type FactPredicate, PREDICATE_OPERATORS } from "./types/predicate.js";
 
 export interface PredicateToMongoOptions {
   /**
@@ -88,7 +85,10 @@ function assertAllowed(
   }
 }
 
-function assertNoSiblingKeys(spec: Record<string, unknown>, combinator: string): void {
+function assertNoSiblingKeys(
+  spec: Record<string, unknown>,
+  combinator: string,
+): void {
   const sibs = Object.keys(spec).filter((k) => k !== combinator);
   if (sibs.length > 0) {
     throw new Error(
@@ -116,7 +116,7 @@ function translateOp(op: string, operand: unknown): Record<string, unknown> {
     case "$between": {
       if (!Array.isArray(operand) || operand.length !== 2) {
         throw new Error(
-          `[Directive] predicateToMongo: $between operand must be a [low, high] tuple`,
+          "[Directive] predicateToMongo: $between operand must be a [low, high] tuple",
         );
       }
       return { $gte: operand[0], $lte: operand[1] };
@@ -124,14 +124,14 @@ function translateOp(op: string, operand: unknown): Record<string, unknown> {
     case "$startsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToMongo: $startsWith operand must be a string`,
+          "[Directive] predicateToMongo: $startsWith operand must be a string",
         );
       }
       return { $regex: `^${escapeRegex(operand)}` };
     case "$endsWith":
       if (typeof operand !== "string") {
         throw new Error(
-          `[Directive] predicateToMongo: $endsWith operand must be a string`,
+          "[Directive] predicateToMongo: $endsWith operand must be a string",
         );
       }
       return { $regex: `${escapeRegex(operand)}$` };
@@ -140,7 +140,7 @@ function translateOp(op: string, operand: unknown): Record<string, unknown> {
         return { $regex: escapeRegex(operand) };
       }
       throw new Error(
-        `[Directive] predicateToMongo: $contains in Mongo expects a string operand — for array element membership use $elemMatch or $in directly`,
+        "[Directive] predicateToMongo: $contains in Mongo expects a string operand — for array element membership use $elemMatch or $in directly",
       );
     case "$matches": {
       if (operand instanceof RegExp) {
@@ -152,12 +152,12 @@ function translateOp(op: string, operand: unknown): Record<string, unknown> {
         return { $regex: operand };
       }
       throw new Error(
-        `[Directive] predicateToMongo: $matches operand must be a RegExp or string`,
+        "[Directive] predicateToMongo: $matches operand must be a RegExp or string",
       );
     }
     case "$changed":
       throw new Error(
-        `[Directive] predicateToMongo: $changed is an effects-only operator — no MongoDB query equivalent`,
+        "[Directive] predicateToMongo: $changed is an effects-only operator — no MongoDB query equivalent",
       );
     default:
       throw new Error(
@@ -186,7 +186,7 @@ function buildQuery(
   if (Array.isArray(spec)) {
     if (spec.length === 0) return {};
     const obj: Record<string, unknown> = {};
-    const conflicts: Array<Record<string, unknown>> = [];
+    const conflicts: Record<string, unknown>[] = [];
     for (const clause of spec) {
       if (
         !clause ||
@@ -195,7 +195,7 @@ function buildQuery(
         !("op" in clause)
       ) {
         throw new Error(
-          `[Directive] predicateToMongo: array-form clause must be { fact, op, value }`,
+          "[Directive] predicateToMongo: array-form clause must be { fact, op, value }",
         );
       }
       const c = clause as { fact: string; op: string; value: unknown };
@@ -218,7 +218,7 @@ function buildQuery(
       }
     }
     if (conflicts.length > 0) {
-      const andClauses: Array<Record<string, unknown>> = [];
+      const andClauses: Record<string, unknown>[] = [];
       for (const [k, v] of Object.entries(obj)) {
         andClauses.push({ [k]: v });
       }
@@ -235,7 +235,7 @@ function buildQuery(
     assertNoSiblingKeys(spec as Record<string, unknown>, "$all");
     const arr = (spec as { $all: unknown[] }).$all;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToMongo: $all must be an array`);
+      throw new Error("[Directive] predicateToMongo: $all must be an array");
     }
     if (arr.length === 0) return {};
     if (arr.length === 1) return buildQuery(arr[0], opts, depth + 1);
@@ -246,7 +246,7 @@ function buildQuery(
     assertNoSiblingKeys(spec as Record<string, unknown>, "$any");
     const arr = (spec as { $any: unknown[] }).$any;
     if (!Array.isArray(arr)) {
-      throw new Error(`[Directive] predicateToMongo: $any must be an array`);
+      throw new Error("[Directive] predicateToMongo: $any must be an array");
     }
     // Tautological-false — stable across Mongo versions, no _id assumption.
     if (arr.length === 0) return { $expr: { $eq: [1, 0] } };

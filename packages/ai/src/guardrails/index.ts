@@ -217,7 +217,7 @@ export function createOutputSanitizer(
 
     // Apply max length
     if (maxLength && text.length > maxLength) {
-      text = text.slice(0, maxLength) + "... [TRUNCATED]";
+      text = `${text.slice(0, maxLength)}... [TRUNCATED]`;
       reasons.push(`length:${original.length}>${maxLength}`);
     }
 

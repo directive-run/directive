@@ -68,23 +68,30 @@ export type SchemaKind =
  * wrapping kind) so operator-lookup on `t.number().nullable()` returns
  * the number's operators unchanged — `$gte` works on the non-null arm.
  */
-export type SchemaKindNode =
-  | (
-      | { kind: "number" | "string" | "boolean" | "bigint" | "date" | "unknown" }
-      | { kind: "literal"; value: string | number | boolean | null; primitive: "string" | "number" | "boolean" | "null" }
-      | { kind: "enum"; values: readonly (string | number)[]; primitive: "string" | "number" }
-      | { kind: "array"; element: SchemaKindNode }
-      | { kind: "tuple"; elements: readonly SchemaKindNode[] }
-      | { kind: "object"; shape: Record<string, SchemaKindNode> }
-      | { kind: "record"; value: SchemaKindNode }
-      | { kind: "union"; members: readonly SchemaKindNode[] }
-      | { kind: "branded"; inner: SchemaKindNode }
-    ) & {
-      /** True if the schema accepts `null` (from `.nullable()` / `.optional()`). */
-      nullable?: boolean;
-      /** True if the schema has a `.default()`. */
-      hasDefault?: boolean;
-    };
+export type SchemaKindNode = (
+  | { kind: "number" | "string" | "boolean" | "bigint" | "date" | "unknown" }
+  | {
+      kind: "literal";
+      value: string | number | boolean | null;
+      primitive: "string" | "number" | "boolean" | "null";
+    }
+  | {
+      kind: "enum";
+      values: readonly (string | number)[];
+      primitive: "string" | "number";
+    }
+  | { kind: "array"; element: SchemaKindNode }
+  | { kind: "tuple"; elements: readonly SchemaKindNode[] }
+  | { kind: "object"; shape: Record<string, SchemaKindNode> }
+  | { kind: "record"; value: SchemaKindNode }
+  | { kind: "union"; members: readonly SchemaKindNode[] }
+  | { kind: "branded"; inner: SchemaKindNode }
+) & {
+  /** True if the schema accepts `null` (from `.nullable()` / `.optional()`). */
+  nullable?: boolean;
+  /** True if the schema has a `.default()`. */
+  hasDefault?: boolean;
+};
 
 // ============================================================================
 // Parse `_typeName` → SchemaKindNode (fallback for legacy / third-party)
@@ -115,9 +122,7 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
 
   // "X | null" / "X | undefined" — nullable wrapper.
   if (typeName.endsWith(" | null") || typeName.endsWith(" | undefined")) {
-    const inner = parseTypeName(
-      typeName.replace(/ \| (null|undefined)$/, ""),
-    );
+    const inner = parseTypeName(typeName.replace(/ \| (null|undefined)$/, ""));
 
     return { ...inner, nullable: true };
   }
@@ -141,9 +146,11 @@ function parseTypeName(typeName: string | undefined): SchemaKindNode {
   }
 
   // Bare names we recognize as composite without elements.
-  if (typeName === "array") return { kind: "array", element: { kind: "unknown" } };
+  if (typeName === "array")
+    return { kind: "array", element: { kind: "unknown" } };
   if (typeName === "object") return { kind: "object", shape: {} };
-  if (typeName === "record") return { kind: "record", value: { kind: "unknown" } };
+  if (typeName === "record")
+    return { kind: "record", value: { kind: "unknown" } };
   if (typeName === "tuple") return { kind: "tuple", elements: [] };
   if (typeName === "union") return { kind: "union", members: [] };
 
@@ -323,7 +330,9 @@ const STRING_OPS: readonly PredicateOp[] = [
  * `nullable` does not change operator availability — `$gte` on a
  * nullable number is fine on the non-null arm; `$exists` handles null.
  */
-export function getOperatorsForKind(node: SchemaKindNode): readonly PredicateOp[] {
+export function getOperatorsForKind(
+  node: SchemaKindNode,
+): readonly PredicateOp[] {
   switch (node.kind) {
     case "number":
     case "bigint":

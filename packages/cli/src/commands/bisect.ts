@@ -344,10 +344,10 @@ export async function bisectCommand(args: string[]): Promise<void> {
     console.error(pc.red("✗ bisect aborted: timeline is non-deterministic"));
     console.error(
       pc.dim(
-        `       Two full-timeline replays produced different oracle verdicts.\n` +
-          `       Bisection is unreliable on non-deterministic timelines.\n` +
-          `       Either fix the timeline source (deterministic clocks/seeds)\n` +
-          `       or re-run with --no-determinism-check if you accept the risk.`,
+        "       Two full-timeline replays produced different oracle verdicts.\n" +
+          "       Bisection is unreliable on non-deterministic timelines.\n" +
+          "       Either fix the timeline source (deterministic clocks/seeds)\n" +
+          "       or re-run with --no-determinism-check if you accept the risk.",
       ),
     );
     process.exit(2);
@@ -360,9 +360,9 @@ export async function bisectCommand(args: string[]): Promise<void> {
     );
     console.error(
       pc.dim(
-        `       The recorded timeline does not exhibit the bug your\n` +
-          `       --assert expression checks. Verify the assertion or\n` +
-          `       try a different bad.json.`,
+        "       The recorded timeline does not exhibit the bug your\n" +
+          "       --assert expression checks. Verify the assertion or\n" +
+          "       try a different bad.json.",
       ),
     );
     process.exit(0);
@@ -375,9 +375,9 @@ export async function bisectCommand(args: string[]): Promise<void> {
     );
     console.error(
       pc.dim(
-        `       The freshly-started system already violates the assertion.\n` +
-          `       Bisect cannot narrow further. Inspect the system factory\n` +
-          `       or initial fact values.`,
+        "       The freshly-started system already violates the assertion.\n" +
+          "       Bisect cannot narrow further. Inspect the system factory\n" +
+          "       or initial fact values.",
       ),
     );
     process.exit(0);

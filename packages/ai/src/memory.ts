@@ -555,8 +555,7 @@ export function createAgentMemory(config: AgentMemoryConfig): AgentMemory {
         const totalTokens = estimateTotalTokens(contextMessages);
         if (totalTokens > maxContextTokens) {
           console.warn(
-            `[Directive Memory] Context messages (${totalTokens} tokens) exceed maxContextTokens (${maxContextTokens}). ` +
-              "Consider calling manage() or reducing message count.",
+            `[Directive Memory] Context messages (${totalTokens} tokens) exceed maxContextTokens (${maxContextTokens}). Consider calling manage() or reducing message count.`,
           );
         }
       }
@@ -627,7 +626,7 @@ export function createTruncationSummarizer(maxLength = 500): MessageSummarizer {
       return content;
     }
 
-    return content.slice(0, maxLength) + "\n[truncated]";
+    return `${content.slice(0, maxLength)}\n[truncated]`;
   };
 }
 

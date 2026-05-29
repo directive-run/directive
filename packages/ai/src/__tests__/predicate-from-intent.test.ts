@@ -1,13 +1,13 @@
 import { t } from "@directive-run/core";
 import { describe, expect, it, vi } from "vitest";
 import {
+  PredicateFromIntentError,
   predicateFromIntent,
   predicateFromIntentRaw,
   predicateFromIntentWithProvenance,
   predicateToolSpec,
   predicateToolSpecAnthropic,
   predicateToolSpecOpenAI,
-  PredicateFromIntentError,
 } from "../predicate-from-intent.js";
 import type { AgentRunner } from "../types.js";
 
@@ -376,10 +376,10 @@ describe("predicateFromIntent — maxArrayOperandLength cap (M1)", () => {
     });
 
     expect(raw.predicate).toBeNull();
-    const reasons = raw.errors.flatMap((e) => e.details ?? []).map((d) => d.reason);
-    expect(
-      reasons.some((r) => r.includes("maxArrayOperandLength")),
-    ).toBe(true);
+    const reasons = raw.errors
+      .flatMap((e) => e.details ?? [])
+      .map((d) => d.reason);
+    expect(reasons.some((r) => r.includes("maxArrayOperandLength"))).toBe(true);
   });
 
   it("accepts a $in operand at the cap", async () => {
@@ -645,9 +645,7 @@ describe("predicateFromIntentWithProvenance (M24)", () => {
       runner,
     });
 
-    expect(result.provenance.intent).toBe(
-      "checkout unblocked when cart > 0",
-    );
+    expect(result.provenance.intent).toBe("checkout unblocked when cart > 0");
     expect(typeof result.provenance.intentHash).toBe("string");
   });
 
@@ -690,7 +688,11 @@ describe("mock-runner-style import.meta.env guard (M3)", () => {
     expect(() => {
       const metaEnv =
         typeof import.meta !== "undefined" && "env" in import.meta
-          ? (import.meta as { env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string } }).env
+          ? (
+              import.meta as {
+                env?: { PROD?: boolean; VITE_ALLOW_MOCK_RUNNER?: string };
+              }
+            ).env
           : undefined;
 
       if (
@@ -713,7 +715,9 @@ describe("mock-runner-style import.meta.env guard (M3)", () => {
         metaEnv?.PROD === true &&
         metaEnv?.VITE_ALLOW_MOCK_RUNNER !== "true"
       ) {
-        throw new Error("[Directive demo] mockPredicateRunner is for demo only.");
+        throw new Error(
+          "[Directive demo] mockPredicateRunner is for demo only.",
+        );
       }
     }).toThrow(/demo only/);
   });

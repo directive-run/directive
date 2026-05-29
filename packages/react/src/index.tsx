@@ -87,11 +87,7 @@ export { shallowEqual };
 // useAuditLedger — live ledger entries with filter (R4.I + Ship 4)
 // ============================================================================
 
-import type {
-  AuditEntry,
-  AuditLedger,
-  QueryFilter,
-} from "@directive-run/core";
+import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";
 
 /**
  * Subscribe to an audit ledger and return the latest entries matching
@@ -946,8 +942,7 @@ export function useTickWhile<S extends ModuleSchema>(
     if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
       if (isDevelopment) {
         console.warn(
-          `[Directive] useTickWhile() received non-positive intervalMs: ${intervalMs}. ` +
-            `Interval will not fire.`,
+          `[Directive] useTickWhile() received non-positive intervalMs: ${intervalMs}. Interval will not fire.`,
         );
       }
       return;

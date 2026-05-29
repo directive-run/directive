@@ -549,8 +549,8 @@ export function validatePredicate(spec: unknown, path = ""): void {
 // ============================================================================
 
 import {
-  getOperatorsForKind,
   type SchemaKindNode,
+  getOperatorsForKind,
 } from "./schema-introspection.js";
 
 export interface SchemaValidationError {
@@ -636,7 +636,11 @@ export function dangerousRegex(source: string): boolean {
 
 export type SchemaValidationResult =
   | { ok: true; operatorCount: number }
-  | { ok: false; errors: readonly SchemaValidationError[]; operatorCount: number };
+  | {
+      ok: false;
+      errors: readonly SchemaValidationError[];
+      operatorCount: number;
+    };
 
 /**
  * Cross-check an LLM-emitted (or otherwise externally-sourced) predicate
@@ -676,14 +680,9 @@ export function validatePredicateAgainstSchema(
   walkPredicate(spec, {
     operator(factPath, op, operand, _operandPath) {
       operatorCount++;
-      if (
-        maxOperatorCount !== undefined &&
-        operatorCount > maxOperatorCount
-      ) {
+      if (maxOperatorCount !== undefined && operatorCount > maxOperatorCount) {
         // Don't pile up identical errors past the cap; one is enough.
-        if (
-          !errors.some((e) => e.reason.includes("maxOperatorCount"))
-        ) {
+        if (!errors.some((e) => e.reason.includes("maxOperatorCount"))) {
           errors.push({
             path: factPath,
             op,

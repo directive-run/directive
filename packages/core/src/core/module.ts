@@ -252,9 +252,7 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
   const reserved = new Set<string>(["self", "prev", "current"]);
   const deps =
     "crossModuleDeps" in config && config.crossModuleDeps
-      ? Object.keys(
-          config.crossModuleDeps as Record<string, unknown>,
-        )
+      ? Object.keys(config.crossModuleDeps as Record<string, unknown>)
       : [];
   for (const depName of deps) {
     reserved.add(depName);
@@ -262,10 +260,7 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
   for (const key of factKeys) {
     if (reserved.has(key)) {
       throw new Error(
-        `[Directive] module '${id}': fact key '${key}' conflicts with a reserved namespace pivot or evaluation alias (self / prev / current / a crossModuleDep namespace). Three fixes:\n` +
-          `  1. Rename the fact (e.g. ${key}_)\n` +
-          `  2. Remove '${key}' from this module's crossModuleDeps if it's not actually needed\n` +
-          `  3. Move the fact under a wrapping namespace (t.object({ inner: ... }))`,
+        `[Directive] module '${id}': fact key '${key}' conflicts with a reserved namespace pivot or evaluation alias (self / prev / current / a crossModuleDep namespace). Three fixes:\n  1. Rename the fact (e.g. ${key}_)\n  2. Remove '${key}' from this module's crossModuleDeps if it's not actually needed\n  3. Move the fact under a wrapping namespace (t.object({ inner: ... }))`,
       );
     }
   }

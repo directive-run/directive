@@ -215,7 +215,7 @@ describe("Multi-agent per-agent structured output", () => {
   });
 
   it("maxSchemaRetries controls retry count", async () => {
-    let callCount = 0;
+    let _callCount = 0;
     const schema = createMockSchema<{ name: string }>(
       (data) => typeof data === "object" && data !== null && "name" in data,
     );
@@ -232,7 +232,7 @@ describe("Multi-agent per-agent structured output", () => {
         output: "bad output",
         totalTokens: 10,
         generate: () => {
-          callCount++;
+          _callCount++;
           // Always return bad output — we want to exhaust all retries
           return { output: "still bad output" };
         },

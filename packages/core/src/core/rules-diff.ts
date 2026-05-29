@@ -94,7 +94,10 @@ export type RulesMapInput = unknown;
  */
 export function toRulesMap(raw: RulesMapInput): Record<string, unknown> {
   const inner =
-    raw && typeof raw === "object" && !Array.isArray(raw) && "constraints" in raw
+    raw &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    "constraints" in raw
       ? (raw as { constraints: unknown }).constraints
       : raw;
 
@@ -108,7 +111,9 @@ export function toRulesMap(raw: RulesMapInput): Record<string, unknown> {
       }
       const e = entry as { id: unknown; whenSpec?: unknown };
       if (typeof e.id !== "string") {
-        throw new Error("[Directive] diffRules: constraint `id` must be a string");
+        throw new Error(
+          "[Directive] diffRules: constraint `id` must be a string",
+        );
       }
       out[e.id] = e.whenSpec;
     }
@@ -217,9 +222,7 @@ export function flattenPredicate(
       ) {
         const c = clause as { fact: unknown; op: unknown; value: unknown };
         out.push({
-          path: pathPrefix
-            ? `${pathPrefix}.${String(c.fact)}`
-            : String(c.fact),
+          path: pathPrefix ? `${pathPrefix}.${String(c.fact)}` : String(c.fact),
           op: String(c.op),
           value: c.value,
         });

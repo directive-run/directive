@@ -131,9 +131,8 @@ describe("createAuditLedgerStore (svelte)", () => {
     await flushTick();
 
     const store = createAuditLedgerStore(ctx.ledger, { kind: "fact.change" });
-    const { getValue, unsubscribe } = subscribeToStore<readonly unknown[]>(
-      store,
-    );
+    const { getValue, unsubscribe } =
+      subscribeToStore<readonly unknown[]>(store);
 
     expect(getValue().length).toBeGreaterThan(0);
     expect(
@@ -148,9 +147,8 @@ describe("createAuditLedgerStore (svelte)", () => {
       { kind: "fact.change" },
       { pollMs: 50 },
     );
-    const { getValue, unsubscribe } = subscribeToStore<readonly unknown[]>(
-      store,
-    );
+    const { getValue, unsubscribe } =
+      subscribeToStore<readonly unknown[]>(store);
 
     const startLen = getValue().length;
 
@@ -168,9 +166,8 @@ describe("createAuditLedgerStore (svelte)", () => {
     const store = createAuditLedgerStore(ctx.ledger, {
       kind: "constraint.evaluate",
     });
-    const { getValue, unsubscribe } = subscribeToStore<readonly unknown[]>(
-      store,
-    );
+    const { getValue, unsubscribe } =
+      subscribeToStore<readonly unknown[]>(store);
 
     expect(
       getValue().every(

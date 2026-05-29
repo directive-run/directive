@@ -119,11 +119,16 @@ function readJsonFile(path: string, label: string): unknown {
 
 function symbol(kind: Change["kind"]): string {
   switch (kind) {
-    case "added": return pc.green("+");
-    case "removed": return pc.red("-");
-    case "relaxed": return pc.green("▲");
-    case "tightened": return pc.red("▽");
-    default: return pc.yellow("~");
+    case "added":
+      return pc.green("+");
+    case "removed":
+      return pc.red("-");
+    case "relaxed":
+      return pc.green("▲");
+    case "tightened":
+      return pc.red("▽");
+    default:
+      return pc.yellow("~");
   }
 }
 
@@ -154,7 +159,9 @@ function printHuman(report: RulesDiffReport): void {
   console.log(
     `  ${pc.green(`+${summary.added}`)} added   ${pc.red(`-${summary.removed}`)} removed   ${pc.yellow(`~${summary.changed}`)} changed   ${pc.dim(`·${summary.unchanged} unchanged`)}`,
   );
-  console.log(`  ${summary.totalClauseChanges} clause-level change${summary.totalClauseChanges === 1 ? "" : "s"}\n`);
+  console.log(
+    `  ${summary.totalClauseChanges} clause-level change${summary.totalClauseChanges === 1 ? "" : "s"}\n`,
+  );
 
   for (const c of constraints) {
     if (c.status === "unchanged") {

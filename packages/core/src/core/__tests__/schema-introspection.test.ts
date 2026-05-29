@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { t } from "../schema-builders.js";
 import {
+  type SchemaKindNode,
   getKind,
   getOperatorsForKind,
   getSchemaFieldKinds,
   listAllPredicateOperators,
-  type SchemaKindNode,
 } from "../schema-introspection.js";
 
 // ============================================================================

@@ -366,10 +366,7 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
       };
 
       // Only arm the timer if a finite positive timeout was requested.
-      if (
-        Number.isFinite(timeoutMs) &&
-        (timeoutMs as number) > 0
-      ) {
+      if (Number.isFinite(timeoutMs) && (timeoutMs as number) > 0) {
         entry.timeoutHandle = setTimeout(() => {
           if (pendingRequests.has(message.requestId)) {
             pendingRequests.delete(message.requestId);

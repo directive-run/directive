@@ -575,5 +575,5 @@ export function patternToMermaid(
       break;
   }
 
-  return preamble + "\n" + body.join("\n") + "\n";
+  return `${preamble}\n${body.join("\n")}\n`;
 }

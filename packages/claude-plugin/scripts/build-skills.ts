@@ -295,7 +295,7 @@ function main() {
     buildSkill(config);
   }
 
-  log.writes(`claude-plugin/skills/`, `${SKILL_MAP.length} directories`);
+  log.writes("claude-plugin/skills/", `${SKILL_MAP.length} directories`);
   log.done(PHASE);
 }
 

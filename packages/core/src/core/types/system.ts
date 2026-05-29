@@ -588,7 +588,7 @@ export interface DynamicEffectDef<M extends ModuleSchema = ModuleSchema> {
   run: (
     facts: Readonly<InferSchema<M["facts"]>>,
     prev: InferSchema<M["facts"]> | null,
-  ) => void | (() => void) | Promise<void | (() => void)>;
+  ) => void | (() => void) | Promise<undefined | (() => void)>;
   deps?: Array<string & keyof InferSchema<M["facts"]>>;
   /**
    * Optional declarative trigger — a {@link FactPredicate} that gates whether
@@ -833,7 +833,7 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * Keys are auto-detected -- pass any mix of fact keys and derivation keys.
    * @example system.subscribe(["count", "doubled"], () => { ... })
    */
-  subscribe(ids: Array<ObservableKeys<M>>, listener: () => void): () => void;
+  subscribe(ids: ObservableKeys<M>[], listener: () => void): () => void;
 
   /**
    * Watch a fact or derivation for value changes.
@@ -963,9 +963,9 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 
 /** System configuration */
 export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
-  modules: Array<ModuleDef<M>>;
+  modules: ModuleDef<M>[];
   // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
-  plugins?: Array<Plugin<any>>;
+  plugins?: Plugin<any>[];
   history?: HistoryOption;
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;

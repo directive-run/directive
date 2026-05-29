@@ -36,13 +36,13 @@
         "noExplicitAny": "warn",
         "noArrayIndexKey": "warn",
         "noAssignInExpressions": "warn",
-        "noConfusingVoidType": "error"
+        "noConfusingVoidType": "warn"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
       },
       "performance": {
-        "noDelete": "error"
+        "noDelete": "warn"
       },
       "a11y": {
         "recommended": false

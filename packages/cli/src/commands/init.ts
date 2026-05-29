@@ -602,7 +602,7 @@ export async function initCommand(args: string[]) {
   const s = p.spinner();
   s.start("Creating project files...");
 
-  let created = 0;
+  let _created = 0;
   let skipped = 0;
 
   for (const file of template.files) {
@@ -614,7 +614,7 @@ export async function initCommand(args: string[]) {
     }
 
     writeFile(filePath, file.content);
-    created++;
+    _created++;
   }
 
   s.stop("Project files created.");
@@ -636,9 +636,6 @@ export async function initCommand(args: string[]) {
   const depsCmd = installCmd(pm, template.deps.join(" "));
 
   p.outro(
-    `Next steps:\n` +
-      `  ${pc.cyan(depsCmd)}\n` +
-      `  ${pc.cyan(`${CLI_NAME} ai-rules init`)}\n` +
-      `  ${pc.dim("Start building!")}`,
+    `Next steps:\n  ${pc.cyan(depsCmd)}\n  ${pc.cyan(`${CLI_NAME} ai-rules init`)}\n  ${pc.dim("Start building!")}`,
   );
 }

@@ -39,7 +39,7 @@
  * Pure, sync, no engine dependency.
  */
 
-import { flattenPredicate, type LeafClause } from "./rules-diff.js";
+import { type LeafClause, flattenPredicate } from "./rules-diff.js";
 import type { FactPredicate } from "./types/predicate.js";
 
 // ============================================================================
@@ -191,7 +191,12 @@ function deepEqual(a: unknown, b: unknown): boolean {
   const kb = Object.keys(b as object);
   if (ka.length !== kb.length) return false;
   for (const k of ka) {
-    if (!deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) {
+    if (
+      !deepEqual(
+        (a as Record<string, unknown>)[k],
+        (b as Record<string, unknown>)[k],
+      )
+    ) {
       return false;
     }
   }
@@ -226,7 +231,10 @@ function compareClauses(
   // ---- $eq / $ne pairs ----
   if (cand.op === "$eq" && exi.op === "$eq") {
     if (deepEqual(cand.value, exi.value)) {
-      return { type: "subset", reason: `Both rules require ${cand.path} = ${JSON.stringify(cand.value)} — candidate is redundant.` };
+      return {
+        type: "subset",
+        reason: `Both rules require ${cand.path} = ${JSON.stringify(cand.value)} — candidate is redundant.`,
+      };
     }
 
     return {
@@ -278,8 +286,10 @@ function compareClauses(
 
   // ---- Order comparisons: $gt / $gte / $lt / $lte ----
   // Two range comparisons over the same fact; check for empty intersection.
-  const candLow = cand.op === "$gt" || cand.op === "$gte" ? cand.value : undefined;
-  const candHi = cand.op === "$lt" || cand.op === "$lte" ? cand.value : undefined;
+  const candLow =
+    cand.op === "$gt" || cand.op === "$gte" ? cand.value : undefined;
+  const candHi =
+    cand.op === "$lt" || cand.op === "$lte" ? cand.value : undefined;
   const exiLow = exi.op === "$gt" || exi.op === "$gte" ? exi.value : undefined;
   const exiHi = exi.op === "$lt" || exi.op === "$lte" ? exi.value : undefined;
 
@@ -374,7 +384,9 @@ export const doctor = {
    */
   checkAgainst<F = Record<string, unknown>>(
     candidate: FactPredicate<F>,
-    existing: readonly ExistingConstraint[] | { constraints: readonly ExistingConstraint[] },
+    existing:
+      | readonly ExistingConstraint[]
+      | { constraints: readonly ExistingConstraint[] },
   ): CheckAgainstResult {
     const constraints: readonly ExistingConstraint[] = Array.isArray(existing)
       ? existing

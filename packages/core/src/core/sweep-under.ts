@@ -15,7 +15,11 @@
  */
 
 import { MAX_PREDICATE_DEPTH } from "./predicate.js";
-import { type PredicateBacktestReport, type ReplayFrame, replayUnder } from "./replay-under.js";
+import {
+  type PredicateBacktestReport,
+  type ReplayFrame,
+  replayUnder,
+} from "./replay-under.js";
 import type { FactPredicate } from "./types/predicate.js";
 
 // ============================================================================
@@ -165,7 +169,9 @@ function substitute(
 
   try {
     if (Array.isArray(template)) {
-      return template.map((entry) => substitute(entry, values, path, depth + 1));
+      return template.map((entry) =>
+        substitute(entry, values, path, depth + 1),
+      );
     }
 
     const out: Record<string, unknown> = {};

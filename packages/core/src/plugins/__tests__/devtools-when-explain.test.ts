@@ -31,7 +31,7 @@ function findConstraintsBody(): HTMLElement | null {
   const allDetails = root.querySelectorAll("details");
   for (const d of Array.from(allDetails)) {
     const sum = d.querySelector("summary");
-    if (sum && sum.textContent && sum.textContent.startsWith("Constraints")) {
+    if (sum?.textContent?.startsWith("Constraints")) {
       const body = d.querySelector("div");
 
       return body as HTMLElement | null;
@@ -91,7 +91,11 @@ describe("devtools whenExplain panel (R4.E)", () => {
     const system = createSystem({
       module: mod,
       plugins: [
-        devtoolsPlugin({ name: "test-data-form", panel: true, defaultOpen: true }),
+        devtoolsPlugin({
+          name: "test-data-form",
+          panel: true,
+          defaultOpen: true,
+        }),
       ],
     });
     system.start();

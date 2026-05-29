@@ -217,18 +217,17 @@ function findWarnings(inspection: {
   const warnings: string[] = [];
 
   // Orphaned resolvers: resolver handles a type no constraint emits
-  const constraintTypes = new Set<string>();
+  const _constraintTypes = new Set<string>();
   // We can't know constraint requirement types from inspection alone,
   // but we can check unmet requirements
-  const unmetTypes = new Set(inspection.unmet.map((u) => u.requirement.type));
-  const resolverTypes = new Set(
+  const _unmetTypes = new Set(inspection.unmet.map((u) => u.requirement.type));
+  const _resolverTypes = new Set(
     inspection.resolverDefs.map((r) => r.requirement),
   );
 
   // Resolver types not in unmet — might be orphaned (can't be sure without full constraint analysis)
   for (const def of inspection.resolverDefs) {
     if (def.requirement === "(predicate)") {
-      continue;
     }
   }
 

@@ -157,7 +157,7 @@ export function formatValue(value: unknown): string {
       return "null";
     }
     if (typeof value === "bigint") {
-      return String(value) + "n";
+      return `${String(value)}n`;
     }
     if (typeof value === "symbol") {
       return String(value);
@@ -165,7 +165,7 @@ export function formatValue(value: unknown): string {
     if (typeof value === "object") {
       const str = JSON.stringify(value, (_k, v) => {
         if (typeof v === "bigint") {
-          return String(v) + "n";
+          return `${String(v)}n`;
         }
         if (typeof v === "symbol") {
           return String(v);
@@ -174,7 +174,7 @@ export function formatValue(value: unknown): string {
         return v;
       });
 
-      return str.length > 120 ? str.slice(0, 117) + "..." : str;
+      return str.length > 120 ? `${str.slice(0, 117)}...` : str;
     }
 
     return String(value);
@@ -189,7 +189,7 @@ export function truncate(str: string, max: number): string {
     return str;
   }
 
-  return str.slice(0, max - 3) + "...";
+  return `${str.slice(0, max - 3)}...`;
 }
 
 /** @internal Safely call system.inspect(), returning null on error. */

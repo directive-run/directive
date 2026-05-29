@@ -56,7 +56,7 @@ function formatPrice(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
 
-const ITEM_ICONS: Record<string, string> = {
+const _ITEM_ICONS: Record<string, string> = {
   headphones: "headphones-icon",
   keyboard: "keyboard-icon",
   hub: "hub-icon",

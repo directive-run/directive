@@ -19,13 +19,13 @@
  * @module
  */
 
+import isDevelopment from "#is-development";
+import { MAX_PREDICATE_DEPTH } from "./predicate.js";
 import type { FactPredicate } from "./types/predicate.js";
 import {
   PREDICATE_COMBINATORS,
   PREDICATE_OPERATORS,
 } from "./types/predicate.js";
-import { MAX_PREDICATE_DEPTH } from "./predicate.js";
-import isDevelopment from "#is-development";
 
 // ============================================================================
 // Internal helpers
@@ -384,8 +384,7 @@ function renderFieldClause(
     const obj = value as Record<string, unknown>;
     // Combinator-keyed nested object → recurse normally; the path prefix
     // doesn't apply to a combinator wrapper.
-    const hasCombinator =
-      "$all" in obj || "$any" in obj || "$not" in obj;
+    const hasCombinator = "$all" in obj || "$any" in obj || "$not" in obj;
     if (hasCombinator) {
       return render(value, ctx, depth + 1);
     }
@@ -422,8 +421,7 @@ function renderOperator(
 ): string {
   // In formal style preserve the raw path; in natural style allow user
   // remapping (e.g. cartTotal → "cart total").
-  const name =
-    ctx.style === "formal" ? factPath : ctx.factName(factPath);
+  const name = ctx.style === "formal" ? factPath : ctx.factName(factPath);
 
   if (ctx.style === "formal") {
     return renderOperatorFormal(name, op, operand, ctx);
@@ -464,9 +462,7 @@ function renderOperatorNatural(
     case "$nin":
       return `${name} is not one of ${formatList(operand, ctx)}`;
     case "$exists":
-      return operand === true
-        ? `${name} is set`
-        : `${name} is not set`;
+      return operand === true ? `${name} is set` : `${name} is not set`;
     case "$between": {
       if (Array.isArray(operand) && operand.length === 2) {
         return `${name} is between ${formatValue(operand[0], ctx)} and ${formatValue(operand[1], ctx)}`;
@@ -574,11 +570,7 @@ function stringNeedsQuotes(s: string): boolean {
   return /[\s,"']/.test(s);
 }
 
-function formatString(
-  v: unknown,
-  _ctx: Ctx,
-  alwaysQuote: boolean,
-): string {
+function formatString(v: unknown, _ctx: Ctx, alwaysQuote: boolean): string {
   if (typeof v !== "string") {
     return JSON.stringify(v);
   }

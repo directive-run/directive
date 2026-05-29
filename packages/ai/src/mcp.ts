@@ -469,8 +469,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
     if (serverConfig.command) {
       if (shellMetachars.test(serverConfig.command)) {
         throw new Error(
-          `[Directive MCP] Stdio command for server '${serverConfig.name}' contains shell metacharacters: '${serverConfig.command}'. ` +
-            `This may indicate a command injection vulnerability. Use 'args' for command arguments instead.`,
+          `[Directive MCP] Stdio command for server '${serverConfig.name}' contains shell metacharacters: '${serverConfig.command}'. This may indicate a command injection vulnerability. Use 'args' for command arguments instead.`,
         );
       }
     }
@@ -479,8 +478,7 @@ export function createMCPAdapter(config: MCPAdapterConfig): MCPAdapter {
       for (const arg of serverConfig.args) {
         if (shellMetachars.test(arg)) {
           throw new Error(
-            `[Directive MCP] Stdio argument for server '${serverConfig.name}' contains shell metacharacters: '${arg}'. ` +
-              `This may indicate a command injection vulnerability.`,
+            `[Directive MCP] Stdio argument for server '${serverConfig.name}' contains shell metacharacters: '${arg}'. This may indicate a command injection vulnerability.`,
           );
         }
       }

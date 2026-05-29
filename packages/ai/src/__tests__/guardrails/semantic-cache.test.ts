@@ -480,7 +480,7 @@ describe("createSemanticCache", () => {
   });
 
   it("perAgent=true filters by agentName on lookup", async () => {
-    const sharedVec = [0.7071, 0.7071, 0, 0]; // same vector for both
+    const sharedVec = [Math.SQRT1_2, Math.SQRT1_2, 0, 0]; // same vector for both
 
     const embedder = createFixedEmbedder({
       query: sharedVec,

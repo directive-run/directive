@@ -404,7 +404,9 @@ describe("createModule — pivot-name conflict", () => {
           requirements: {},
         },
       }),
-    ).toThrow(/Three fixes:[\s\S]+Rename the fact[\s\S]+Remove 'self'[\s\S]+wrapping namespace/);
+    ).toThrow(
+      /Three fixes:[\s\S]+Rename the fact[\s\S]+Remove 'self'[\s\S]+wrapping namespace/,
+    );
   });
 
   it("does NOT throw when fact keys do not collide", () => {

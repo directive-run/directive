@@ -23,7 +23,7 @@ export function mergeSection(
 
   const separator = existingContent.endsWith("\n") ? "\n" : "\n\n";
 
-  return existingContent + separator + wrapped + "\n";
+  return `${existingContent + separator + wrapped}\n`;
 }
 
 /**

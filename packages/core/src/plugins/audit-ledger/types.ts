@@ -8,11 +8,11 @@
  * types from here without a cycle.
  */
 
-import type { ClauseResult, FactPredicate } from "../../core/types/predicate.js";
+import type { ModuleSchema, Plugin } from "../../core/types.js";
 import type {
-  ModuleSchema,
-  Plugin,
-} from "../../core/types.js";
+  ClauseResult,
+  FactPredicate,
+} from "../../core/types/predicate.js";
 
 // ============================================================================
 // Version stamps
@@ -268,14 +268,19 @@ export interface AuditLedgerSink {
    * WARNING: erases only from this sink. Any external copies (toJSON
    * exports, downstream pipelines) must be erased separately.
    */
-  erase?(filter: QueryFilter, markerEntryFactory: (e: AuditEntry) => AuditEntry): number;
+  erase?(
+    filter: QueryFilter,
+    markerEntryFactory: (e: AuditEntry) => AuditEntry,
+  ): number;
   /**
    * Optional hook fired by the sink BEFORE shifting the oldest entry
    * out of a bounded ring buffer. The ledger plugin uses this to emit
    * a `system.truncated` marker so an auditor sees that the log was
    * truncated and where. (M23)
    */
-  onTruncate?(handler: (droppedSeq: number, droppedCount: number) => void): void;
+  onTruncate?(
+    handler: (droppedSeq: number, droppedCount: number) => void,
+  ): void;
 }
 
 // ============================================================================

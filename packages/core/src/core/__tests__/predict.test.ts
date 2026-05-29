@@ -3,10 +3,7 @@ import { predict } from "../predict.js";
 
 describe("predict — happy path", () => {
   it("wouldFire: true when all clauses pass, missingChanges empty", () => {
-    const result = predict(
-      { cartTotal: { $gte: 50 } },
-      { cartTotal: 75 },
-    );
+    const result = predict({ cartTotal: { $gte: 50 } }, { cartTotal: 75 });
     expect(result.wouldFire).toBe(true);
     expect(result.missingChanges).toEqual([]);
     expect(result.whenExplain.every((c) => c.pass)).toBe(true);
@@ -21,10 +18,7 @@ describe("predict — happy path", () => {
 
 describe("predict — missingChanges suggestions", () => {
   it("$gte → 'set X to at least N (currently A)'", () => {
-    const result = predict(
-      { cartTotal: { $gte: 50 } },
-      { cartTotal: 30 },
-    );
+    const result = predict({ cartTotal: { $gte: 50 } }, { cartTotal: 30 });
     expect(result.wouldFire).toBe(false);
     expect(result.missingChanges).toHaveLength(1);
     const m = result.missingChanges[0]!;
@@ -59,30 +53,23 @@ describe("predict — missingChanges suggestions", () => {
 
   it("$exists: true → 'set X to a non-null value' when the fact is undefined", () => {
     // Directive's $exists checks `!== undefined`. null counts as "exists".
-    const result = predict(
-      { email: { $exists: true } },
-      { email: undefined } as unknown as Record<string, unknown>,
-    );
+    const result = predict({ email: { $exists: true } }, {
+      email: undefined,
+    } as unknown as Record<string, unknown>);
     expect(result.missingChanges[0]?.suggestion).toBe(
       "set email to a non-null value (currently null/missing)",
     );
   });
 
   it("$exists: false → 'unset X'", () => {
-    const result = predict(
-      { ssn: { $exists: false } },
-      { ssn: "123" },
-    );
+    const result = predict({ ssn: { $exists: false } }, { ssn: "123" });
     expect(result.missingChanges[0]?.suggestion).toBe(
       'unset ssn (currently "123")',
     );
   });
 
   it("$between → ranges show both bounds", () => {
-    const result = predict(
-      { age: { $between: [18, 65] } },
-      { age: 12 },
-    );
+    const result = predict({ age: { $between: [18, 65] } }, { age: 12 });
     expect(result.missingChanges[0]?.suggestion).toBe(
       "set age between 18 and 65 (currently 12)",
     );
@@ -104,10 +91,7 @@ describe("predict — multi-clause + combinators", () => {
   it("collects every failing leaf when $all has multiple", () => {
     const result = predict(
       {
-        $all: [
-          { cartTotal: { $gte: 50 } },
-          { region: { $in: ["US", "EU"] } },
-        ],
+        $all: [{ cartTotal: { $gte: 50 } }, { region: { $in: ["US", "EU"] } }],
       },
       { cartTotal: 30, region: "ASIA" },
     );
@@ -154,7 +138,9 @@ describe("predict — prev/$changed", () => {
       { phase: "green" },
     );
     expect(result.wouldFire).toBe(false);
-    expect(result.missingChanges[0]?.suggestion).toContain("required to differ");
+    expect(result.missingChanges[0]?.suggestion).toContain(
+      "required to differ",
+    );
   });
 
   it("M10: $changed without prev → synthetic warning entry per $changed clause (when wouldFire is false)", () => {
@@ -217,7 +203,9 @@ describe("predict — prev/$changed", () => {
     // "green" !== undefined → true → the $changed clause passes, $any fires.
     // No missingChanges should be reported — the predicate is satisfied.
     const result = predict(
-      { $any: [{ phase: { $changed: true } }, { status: { $eq: "no-match" } }] },
+      {
+        $any: [{ phase: { $changed: true } }, { status: { $eq: "no-match" } }],
+      },
       { phase: "green", status: "ok" },
       // prev intentionally omitted
     );

@@ -10,11 +10,7 @@
  */
 
 import { attributeError, freezeSpec } from "../utils/utils.js";
-import {
-  evaluateTemplate,
-  isTemplate,
-  memoizePredicate,
-} from "./predicate.js";
+import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
 import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
 import type {
   DefinitionMeta,

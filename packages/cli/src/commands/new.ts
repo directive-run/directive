@@ -66,96 +66,97 @@ function generateModule(name: string, sections: Section[]): string {
   let code = `import { ${imports.join(", ")} } from "@directive-run/core";\n\n`;
 
   // Schema
-  code += `const schema = {\n`;
-  code += `  facts: {\n`;
-  code += `    // Add your facts here\n`;
-  code += `    status: t.string(),\n`;
-  code += `  },\n`;
+  code += "const schema = {\n";
+  code += "  facts: {\n";
+  code += "    // Add your facts here\n";
+  code += "    status: t.string(),\n";
+  code += "  },\n";
 
   if (sections.includes("derive")) {
-    code += `  derivations: {\n`;
-    code += `    // Add derivation types here\n`;
-    code += `    isReady: t.boolean(),\n`;
-    code += `  },\n`;
+    code += "  derivations: {\n";
+    code += "    // Add derivation types here\n";
+    code += "    isReady: t.boolean(),\n";
+    code += "  },\n";
   }
 
   if (sections.includes("events")) {
-    code += `  events: {\n`;
-    code += `    // Add event shapes here\n`;
-    code += `    setStatus: { value: t.string() },\n`;
-    code += `  },\n`;
+    code += "  events: {\n";
+    code += "    // Add event shapes here\n";
+    code += "    setStatus: { value: t.string() },\n";
+    code += "  },\n";
   }
 
   if (hasConstraints || hasResolvers) {
-    code += `  requirements: {\n`;
-    code += `    // Add requirement shapes here\n`;
-    code += `    PROCESS: { input: t.string() },\n`;
-    code += `  },\n`;
+    code += "  requirements: {\n";
+    code += "    // Add requirement shapes here\n";
+    code += "    PROCESS: { input: t.string() },\n";
+    code += "  },\n";
   }
 
-  code += `} satisfies ModuleSchema;\n\n`;
+  code += "} satisfies ModuleSchema;\n\n";
 
   // Module
   code += `export const ${camelName} = createModule("${name}", {\n`;
-  code += `  schema,\n\n`;
+  code += "  schema,\n\n";
 
-  code += `  init: (facts) => {\n`;
+  code += "  init: (facts) => {\n";
   code += `    facts.status = "idle";\n`;
-  code += `  },\n`;
+  code += "  },\n";
 
   if (sections.includes("derive")) {
-    code += `\n  derive: {\n`;
+    code += "\n  derive: {\n";
     code += `    isReady: (facts) => facts.status === "ready",\n`;
-    code += `  },\n`;
+    code += "  },\n";
   }
 
   if (sections.includes("events")) {
-    code += `\n  events: {\n`;
-    code += `    setStatus: (facts, { value }) => {\n`;
-    code += `      facts.status = value;\n`;
-    code += `    },\n`;
-    code += `  },\n`;
+    code += "\n  events: {\n";
+    code += "    setStatus: (facts, { value }) => {\n";
+    code += "      facts.status = value;\n";
+    code += "    },\n";
+    code += "  },\n";
   }
 
   if (hasConstraints) {
-    code += `\n  constraints: {\n`;
-    code += `    needsProcessing: {\n`;
-    code += `      priority: 100,\n`;
+    code += "\n  constraints: {\n";
+    code += "    needsProcessing: {\n";
+    code += "      priority: 100,\n";
     code += `      when: (facts) => facts.status === "pending",\n`;
-    code += `      require: (facts) => ({\n`;
+    code += "      require: (facts) => ({\n";
     code += `        type: "PROCESS",\n`;
-    code += `        input: facts.status,\n`;
-    code += `      }),\n`;
-    code += `    },\n`;
-    code += `  },\n`;
+    code += "        input: facts.status,\n";
+    code += "      }),\n";
+    code += "    },\n";
+    code += "  },\n";
   }
 
   if (hasResolvers) {
-    code += `\n  resolvers: {\n`;
-    code += `    process: {\n`;
+    code += "\n  resolvers: {\n";
+    code += "    process: {\n";
     code += `      requirement: "PROCESS",\n`;
-    code += `      resolve: async (req, context) => {\n`;
-    code += `        // Implement resolution logic here\n`;
+    code += "      resolve: async (req, context) => {\n";
+    code += "        // Implement resolution logic here\n";
     code += `        context.facts.status = "done";\n`;
-    code += `      },\n`;
-    code += `    },\n`;
-    code += `  },\n`;
+    code += "      },\n";
+    code += "    },\n";
+    code += "  },\n";
   }
 
   if (sections.includes("effects")) {
-    code += `\n  effects: {\n`;
-    code += `    logChange: {\n`;
+    code += "\n  effects: {\n";
+    code += "    logChange: {\n";
     code += `      deps: ["status"],\n`;
-    code += `      run: (facts, prev) => {\n`;
-    code += `        if (prev && prev.status !== facts.status) {\n`;
-    code += `          console.log(\`Status: \${prev.status} → \${facts.status}\`);\n`;
-    code += `        }\n`;
-    code += `      },\n`;
-    code += `    },\n`;
-    code += `  },\n`;
+    code += "      run: (facts, prev) => {\n";
+    code += "        if (prev && prev.status !== facts.status) {\n";
+    code +=
+      "          console.log(`Status: ${prev.status} → ${facts.status}`);\n";
+    code += "        }\n";
+    code += "      },\n";
+    code += "    },\n";
+    code += "  },\n";
   }
 
-  code += `});\n`;
+  code += "});\n";
 
   return code;
 }
@@ -330,8 +331,7 @@ export async function newModuleCommand(name: string, args: string[]) {
 
   if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
     console.error(
-      `Invalid module name: ${name || "(none)"}\n` +
-        "Must start with a letter, use lowercase letters, numbers, and hyphens.",
+      `Invalid module name: ${name || "(none)"}\nMust start with a letter, use lowercase letters, numbers, and hyphens.`,
     );
     process.exit(1);
   }
@@ -374,8 +374,7 @@ export async function newOrchestratorCommand(name: string, args: string[]) {
 
   if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
     console.error(
-      `Invalid orchestrator name: ${name || "(none)"}\n` +
-        "Must start with a letter, use lowercase letters, numbers, and hyphens.",
+      `Invalid orchestrator name: ${name || "(none)"}\nMust start with a letter, use lowercase letters, numbers, and hyphens.`,
     );
     process.exit(1);
   }

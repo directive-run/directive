@@ -29,13 +29,16 @@
  *   index.ts (this)     — createAuditLedger factory + plugin wiring
  */
 
-import type { ClauseResult, FactPredicate } from "../../core/types/predicate.js";
 import type {
   ModuleSchema,
   ObservationEvent,
   Plugin,
   System,
 } from "../../core/types.js";
+import type {
+  ClauseResult,
+  FactPredicate,
+} from "../../core/types/predicate.js";
 import { hashObject } from "../../utils/utils.js";
 import { LEDGER_INTERNAL_TOKEN, freezeEntry, hashForEntry } from "./hash.js";
 import { redactWhenSpec } from "./predicate-redact.js";
@@ -89,9 +92,7 @@ export type {
  * }
  * ```
  */
-export function createAuditLedger(
-  opts: AuditLedgerOptions = {},
-): AuditLedger {
+export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   const sink = opts.sink ?? memorySink();
   const capturePII = opts.capturePII ?? false;
   const userRedact = opts.redact;
@@ -174,7 +175,8 @@ export function createAuditLedger(
           // scope, and any preview would leak them into the audit
           // trail. (N5, M22)
           const def = mergedDefs?.[c.id];
-          const whenFn = def && typeof def.when === "function" ? def.when : undefined;
+          const whenFn =
+            def && typeof def.when === "function" ? def.when : undefined;
           if (whenFn) {
             whenSourceCache.set(c.id, hashObject(String(whenFn)));
           } else if (c.when !== undefined && typeof c.when === "function") {
@@ -197,7 +199,9 @@ export function createAuditLedger(
     piiTaggedFacts.clear();
     if (capturePII || !system) return;
     try {
-      const meta = (system as { meta?: { byTag?: (tag: string) => Array<{ id: string }> } }).meta;
+      const meta = (
+        system as { meta?: { byTag?: (tag: string) => Array<{ id: string }> } }
+      ).meta;
       if (!meta || typeof meta.byTag !== "function") return;
       const tagged = meta.byTag("pii") ?? [];
       for (const m of tagged) {
@@ -483,7 +487,9 @@ export function createAuditLedger(
     // the sentinel — the common case (no tombstones) is a no-op.
     let needsClone = false;
     for (const e of entries) {
-      if ((e as AuditEntry & { __internal?: unknown }).__internal !== undefined) {
+      if (
+        (e as AuditEntry & { __internal?: unknown }).__internal !== undefined
+      ) {
         needsClone = true;
         break;
       }

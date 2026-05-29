@@ -102,7 +102,7 @@ export const topicGuardModule = createModule("topic-guard", {
         .length;
     },
 
-    blockRate: (facts, derived) => {
+    blockRate: (_facts, derived) => {
       const total = derived.messageCount;
       if (total === 0) {
         return "0%";

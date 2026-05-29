@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  MAX_SWEEP_POINTS,
-  type ReplayFrame,
-  sweepUnder,
-} from "../../index.js";
+import { MAX_SWEEP_POINTS, type ReplayFrame, sweepUnder } from "../../index.js";
 
 // ============================================================================
 // Test fixtures
@@ -238,7 +234,9 @@ describe("sweepUnder — AE-round regression coverage", () => {
   });
 
   it("throws on a cyclic template", () => {
-    const tmpl: Record<string, unknown> = { cartTotal: { $eq: { $hole: "t" } } };
+    const tmpl: Record<string, unknown> = {
+      cartTotal: { $eq: { $hole: "t" } },
+    };
     tmpl.self = tmpl;
     expect(() =>
       sweepUnder({
@@ -263,7 +261,9 @@ describe("sweepUnder — AE-round regression coverage", () => {
     });
     expect(report.points).toHaveLength(2);
     // Every score is -Infinity (the safe fallback), bestIndex is 0.
-    expect(report.points.every((p) => p.score === Number.NEGATIVE_INFINITY)).toBe(true);
+    expect(
+      report.points.every((p) => p.score === Number.NEGATIVE_INFINITY),
+    ).toBe(true);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("objective threw"),
     );
@@ -288,10 +288,13 @@ describe("sweepUnder — AE-round regression coverage", () => {
     const { MAX_SWEEP_EVALUATIONS } = await import("../sweep-under.js");
     // 1000 points × 100k frames > 50M evaluations
     const big = Array.from({ length: 1000 }, (_, i) => i);
-    const manyFrames: ReplayFrame[] = Array.from({ length: 100_000 }, (_, i) => ({
-      id: i,
-      facts: { x: i },
-    }));
+    const manyFrames: ReplayFrame[] = Array.from(
+      { length: 100_000 },
+      (_, i) => ({
+        id: i,
+        facts: { x: i },
+      }),
+    );
     expect(() =>
       sweepUnder({
         frames: manyFrames,

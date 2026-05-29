@@ -251,7 +251,7 @@ export interface RaceSuccessEntry<T = unknown> {
 export interface RaceResult<T = unknown> {
   winnerId: string;
   result: T;
-  allResults?: Array<RaceSuccessEntry<T>>;
+  allResults?: RaceSuccessEntry<T>[];
 }
 
 /**
