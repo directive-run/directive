@@ -394,10 +394,18 @@ const matcherImpls = {
 
 // Register on load. Importing this file is the only thing a consumer
 // needs to do — no manual `expect.extend` call.
+//
+// The side-effect path used to fail silently if the runtime didn't expose
+// `globalThis.__vitest_expect`, which made "matchers don't seem to be
+// installed" indistinguishable from "I forgot to import the module."
+// We now emit a loud warning that points at `registerMatchers(expect)`,
+// so a misconfigured setup file fails noisily during the first test run
+// instead of producing cryptic `toReachInMs is not a function` errors.
+const REGISTRATION_HINT =
+  "[Directive timeline] matchers were not auto-registered – call `registerMatchers(expect)` from your vitest.setup.ts, or import this module from a context where vitest's expect is exposed on globalThis.";
+
+let autoRegistered = false;
 try {
-  // Prefer dynamic import-time discovery so this file works against
-  // either vitest 1.x or 2.x without a hard peer-dep.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const vitestModule = (globalThis as { __vitest_expect?: unknown })
     .__vitest_expect;
   if (vitestModule !== undefined) {
@@ -407,12 +415,24 @@ try {
         (...args: unknown[]) => MatcherResult
       >,
     );
-  } else {
-    // Fall through — `registerMatchers(expect)` is the explicit API.
+    autoRegistered = true;
+  } else if (typeof globalThis !== "undefined") {
+    console.warn(REGISTRATION_HINT);
   }
-} catch {
-  // Lazy-register fallback — consumers can call registerMatchers(expect)
-  // explicitly if the side-effect path doesn't fire.
+} catch (err) {
+  // Bubble the error up via console.warn so the test author sees both the
+  // hint and the underlying failure (e.g. vitest internals changed shape).
+  console.warn(REGISTRATION_HINT, err);
+}
+
+/**
+ * Whether the side-effect auto-registration found `vitest`'s expect on
+ * `globalThis` and succeeded. Exposed for tests that want to assert the
+ * registration ran, and for `registerMatchers` to suppress the duplicate
+ * warning when the explicit path is taken.
+ */
+export function isAutoRegistered(): boolean {
+  return autoRegistered;
 }
 
 /**
@@ -434,6 +454,9 @@ export function registerMatchers(expectFn: ExpectExtendShape): void {
       (...args: unknown[]) => MatcherResult
     >,
   );
+  // Flip the flag so a subsequent re-import of this module doesn't print
+  // a misleading auto-register warning.
+  autoRegistered = true;
 }
 
 // Re-export the impls so consumers can call them directly without

@@ -170,6 +170,17 @@ export function createSubscription<
         run: (facts: Record<string, unknown>) => {
           const currentKey = keyFn(facts);
           if (currentKey === null) {
+            // Key gone (e.g. trigger fact cleared). The previous run's
+            // cleanup will fire before the next run by Directive's effect
+            // contract, so the AbortController is torn down already; here
+            // we just clear the prev-key bookkeeping so a future re-key
+            // to the same value still establishes a fresh subscription.
+            if (prevKeyByFacts.delete(facts)) {
+              facts[keyKey] = null;
+              // Reset the resource state to idle so consumers re-render
+              // with no stale `isSuccess`/`isComplete` carry-over.
+              facts[stateKey] = createIdleResourceState<TData>();
+            }
             return;
           }
 

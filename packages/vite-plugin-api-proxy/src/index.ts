@@ -3,6 +3,28 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import https from "node:https";
 import { type Plugin, loadEnv } from "vite";
 
+export interface CorsOptions {
+  /**
+   * Origin(s) to echo back in `Access-Control-Allow-Origin`. Pass `true`
+   * to reflect the request's `Origin` header. Pass a string or string[]
+   * for an explicit allowlist (`"*"` matches everything).
+   *
+   * Default: `true` (reflect the request origin).
+   */
+  origin?: true | string | string[];
+  /**
+   * Extra header names to allow on top of the route's `headerKey` and
+   * `content-type` (which are always allowed when cors is enabled).
+   */
+  allowHeaders?: string[];
+  /**
+   * `Access-Control-Max-Age` in seconds. Default: `600` (ten minutes).
+   */
+  maxAge?: number;
+  /** Whether to allow credentials. Default: `false`. */
+  credentials?: boolean;
+}
+
 export interface ProxyRoute {
   /** Upstream URL to forward requests to */
   target: string;
@@ -16,6 +38,19 @@ export interface ProxyRoute {
   headerKey?: string;
   /** loadEnv prefix filter (default: derived from envKey) */
   envPrefix?: string;
+  /**
+   * Handle browser CORS preflight (OPTIONS) requests in front of the
+   * proxied route. Required for any cross-origin browser caller that
+   * uses a non-CORS-safelisted header (e.g. a custom `headerKey`).
+   *
+   * Default: `false` (OPTIONS returns 405, same as any other non-method
+   * request — preserves backward compatibility).
+   *
+   * Pass `true` for the defaults (reflect origin, allow the route's
+   * `headerKey` + `content-type`, 10-minute cache, no credentials).
+   * Pass a {@link CorsOptions} object for fine control.
+   */
+  cors?: boolean | CorsOptions;
 }
 
 export interface ApiProxyOptions {
@@ -120,9 +155,60 @@ export function apiProxy(options: ApiProxyOptions): Plugin {
           envApiKey = env[route.envKey];
         }
 
+        const corsConfig: CorsOptions | null =
+          route.cors === true ? {} : route.cors ? route.cors : null;
+
         server.middlewares.use(
           path,
           (req: IncomingMessage, res: ServerResponse) => {
+            // CORS preflight. Browsers send OPTIONS before any cross-
+            // origin POST that uses a non-CORS-safelisted header (e.g.
+            // `x-api-key`, `authorization`). Without this branch, the
+            // proxy returns 405 to OPTIONS and the real POST is never
+            // sent.
+            if (corsConfig && req.method === "OPTIONS") {
+              const reqOrigin = req.headers.origin;
+              const allowOriginConfig = corsConfig.origin ?? true;
+              let allowOrigin: string | null = null;
+              if (allowOriginConfig === true) {
+                allowOrigin = reqOrigin ?? "*";
+              } else if (typeof allowOriginConfig === "string") {
+                allowOrigin = allowOriginConfig;
+              } else if (Array.isArray(allowOriginConfig)) {
+                if (reqOrigin && allowOriginConfig.includes(reqOrigin)) {
+                  allowOrigin = reqOrigin;
+                } else if (allowOriginConfig.includes("*")) {
+                  allowOrigin = "*";
+                }
+              }
+              if (allowOrigin) {
+                res.setHeader("Access-Control-Allow-Origin", allowOrigin);
+                res.setHeader("Vary", "Origin");
+              }
+              res.setHeader("Access-Control-Allow-Methods", method);
+              const allowHeaders = new Set<string>([
+                "content-type",
+                ...(corsConfig.allowHeaders ?? []).map((h) => h.toLowerCase()),
+              ]);
+              if (route.headerKey) {
+                allowHeaders.add(route.headerKey.toLowerCase());
+              }
+              res.setHeader(
+                "Access-Control-Allow-Headers",
+                [...allowHeaders].join(", "),
+              );
+              res.setHeader(
+                "Access-Control-Max-Age",
+                String(corsConfig.maxAge ?? 600),
+              );
+              if (corsConfig.credentials) {
+                res.setHeader("Access-Control-Allow-Credentials", "true");
+              }
+              res.statusCode = 204;
+              res.end();
+              return;
+            }
+
             if (req.method !== method) {
               res.statusCode = 405;
               res.end(JSON.stringify({ error: "Method not allowed" }));
@@ -194,6 +280,40 @@ export function apiProxy(options: ApiProxyOptions): Plugin {
                         continue;
                       }
                       res.setHeader(key, value);
+                    }
+                    // Mirror CORS response headers on the real POST so the
+                    // browser accepts the response after passing preflight.
+                    if (corsConfig) {
+                      const reqOrigin = req.headers.origin;
+                      const allowOriginConfig = corsConfig.origin ?? true;
+                      let allowOrigin: string | null = null;
+                      if (allowOriginConfig === true) {
+                        allowOrigin = reqOrigin ?? "*";
+                      } else if (typeof allowOriginConfig === "string") {
+                        allowOrigin = allowOriginConfig;
+                      } else if (Array.isArray(allowOriginConfig)) {
+                        if (
+                          reqOrigin &&
+                          allowOriginConfig.includes(reqOrigin)
+                        ) {
+                          allowOrigin = reqOrigin;
+                        } else if (allowOriginConfig.includes("*")) {
+                          allowOrigin = "*";
+                        }
+                      }
+                      if (allowOrigin) {
+                        res.setHeader(
+                          "Access-Control-Allow-Origin",
+                          allowOrigin,
+                        );
+                        res.setHeader("Vary", "Origin");
+                      }
+                      if (corsConfig.credentials) {
+                        res.setHeader(
+                          "Access-Control-Allow-Credentials",
+                          "true",
+                        );
+                      }
                     }
                     proxyRes.pipe(res);
                   },

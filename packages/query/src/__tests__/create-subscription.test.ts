@@ -256,6 +256,64 @@ describe("createSubscription", () => {
       expect(state.isPending).toBe(false);
     });
 
+    it("re-keying to null clears prev tracking and resets state to idle", async () => {
+      const cleanup = vi.fn();
+      let capturedCallbacks: { onData: (data: unknown) => void } | null = null;
+
+      const sub = createSubscription({
+        name: "price",
+        key: (f) => {
+          const ticker = f.ticker as string;
+          return ticker ? { ticker } : null;
+        },
+        subscribe: (_params, callbacks) => {
+          capturedCallbacks = callbacks;
+          return cleanup;
+        },
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: { ticker: t.string() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      system.facts.ticker = "AAPL";
+      await flushMicrotasks(20);
+
+      expect(capturedCallbacks).not.toBeNull();
+      capturedCallbacks!.onData({ price: 1 });
+      await flushMicrotasks();
+
+      // Clear the trigger fact — key goes to null (empty string treated as "no key")
+      system.facts.ticker = "";
+      await flushMicrotasks(20);
+
+      const idleState = system.read("price") as ResourceState<{
+        price: number;
+      }>;
+      // Subscription cleanup fired and state reverted to idle
+      expect(cleanup).toHaveBeenCalled();
+      expect(idleState.isSuccess).toBe(false);
+      expect(idleState.isComplete).toBe(false);
+      expect(idleState.data).toBeNull();
+
+      // Re-key to the same value as before establishes a fresh subscription
+      // (prev-key bookkeeping was cleared so the early-return on equal-key
+      // does NOT fire).
+      capturedCallbacks = null;
+      cleanup.mockClear();
+      system.facts.ticker = "AAPL";
+      await flushMicrotasks(20);
+      expect(capturedCallbacks).not.toBeNull();
+    });
+
     it("isComplete defaults to false in the idle state", async () => {
       const sub = createSubscription({
         name: "price",

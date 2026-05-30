@@ -212,6 +212,9 @@ afterEach(async () => {
 
 async function makeProxy(extraRoute?: {
   headers?: Record<string, string>;
+  headerKey?: string;
+  // biome-ignore lint/suspicious/noExplicitAny: pass-through to the route config
+  cors?: any;
 }): Promise<number> {
   const plugin = apiProxy({
     routes: {
@@ -219,6 +222,8 @@ async function makeProxy(extraRoute?: {
         target: `http://127.0.0.1:${upstreamPort}/upstream`,
         method: "POST",
         headers: extraRoute?.headers,
+        headerKey: extraRoute?.headerKey,
+        cors: extraRoute?.cors,
       },
     },
   });
@@ -328,5 +333,126 @@ describe("apiProxy — security", () => {
     } finally {
       http.IncomingMessage.prototype.setTimeout = original;
     }
+  });
+});
+
+function optionsRaw(
+  port: number,
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; headers: http.IncomingHttpHeaders }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path,
+        method: "OPTIONS",
+        headers,
+      },
+      (res) => {
+        res.resume(); // drain body
+        res.on("end", () => {
+          resolve({ status: res.statusCode ?? 0, headers: res.headers });
+        });
+        res.on("error", reject);
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+describe("apiProxy — CORS preflight (opt-in)", () => {
+  it("returns 405 for OPTIONS when cors is not configured (backward compat)", async () => {
+    const port = await makeProxy();
+    const result = await optionsRaw(port, "/api/proxy", {
+      origin: "http://example.com",
+    });
+    expect(result.status).toBe(405);
+    expect(result.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("answers preflight with reflected origin and allow-headers when cors=true", async () => {
+    const port = await makeProxy({
+      headerKey: "x-api-key",
+      cors: true,
+    });
+    const result = await optionsRaw(port, "/api/proxy", {
+      origin: "http://app.example.com",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type, x-api-key",
+    });
+    expect(result.status).toBe(204);
+    expect(result.headers["access-control-allow-origin"]).toBe(
+      "http://app.example.com",
+    );
+    expect(result.headers.vary).toContain("Origin");
+    expect(result.headers["access-control-allow-methods"]).toBe("POST");
+    const allowHeaders = String(
+      result.headers["access-control-allow-headers"],
+    ).toLowerCase();
+    // route.headerKey + content-type are always allowed
+    expect(allowHeaders).toContain("x-api-key");
+    expect(allowHeaders).toContain("content-type");
+    // default max-age
+    expect(result.headers["access-control-max-age"]).toBe("600");
+  });
+
+  it("respects an explicit allowlisted origin array", async () => {
+    const port = await makeProxy({
+      cors: { origin: ["http://app.example.com", "http://other.example.com"] },
+    });
+    const allowed = await optionsRaw(port, "/api/proxy", {
+      origin: "http://app.example.com",
+    });
+    expect(allowed.headers["access-control-allow-origin"]).toBe(
+      "http://app.example.com",
+    );
+
+    const denied = await optionsRaw(port, "/api/proxy", {
+      origin: "http://attacker.example.com",
+    });
+    // Browser side will block; we still emit the preflight response with no
+    // allow-origin header so the browser fails the check.
+    expect(denied.status).toBe(204);
+    expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("adds Access-Control-Allow-Credentials when credentials: true", async () => {
+    const port = await makeProxy({ cors: { credentials: true } });
+    const result = await optionsRaw(port, "/api/proxy", {
+      origin: "http://app.example.com",
+    });
+    expect(result.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
+  it("mirrors Allow-Origin on the actual POST response when cors is enabled", async () => {
+    upstreamHandler = (_req, res) => {
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end('{"ok":true}');
+    };
+    const port = await makeProxy({ cors: true });
+    const result = await postRaw(port, "/api/proxy", "{}", {
+      origin: "http://app.example.com",
+    });
+    expect(result.status).toBe(200);
+    expect(result.headers["access-control-allow-origin"]).toBe(
+      "http://app.example.com",
+    );
+  });
+
+  it("includes user-supplied allowHeaders in preflight response", async () => {
+    const port = await makeProxy({
+      cors: { allowHeaders: ["x-trace-id"] },
+    });
+    const result = await optionsRaw(port, "/api/proxy", {
+      origin: "http://app.example.com",
+    });
+    const allow = String(
+      result.headers["access-control-allow-headers"],
+    ).toLowerCase();
+    expect(allow).toContain("x-trace-id");
   });
 });

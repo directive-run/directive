@@ -300,10 +300,13 @@ export function defineMutator<
   const eventHandlers = {
     MUTATE: (facts: F, payload: Pending) => {
       // Overwrite is intentional — caller is responsible for ordering.
-      // If a previous mutation is mid-flight, the new one queues by
-      // overwriting; the in-flight handler will null the fact when it
-      // completes, then the constraint re-fires for the new one.
-      // (Same as the manual pattern across all 12 audited modules.)
+      // If a previous mutation is mid-flight, the new one supersedes by
+      // writing `status: "pending"` over the in-flight `status: "running"`
+      // marker. The resolver's `if (status === "running")` checks at the
+      // success and failure paths then leave the fresh dispatch untouched
+      // so the next constraint fire picks it up — the in-flight result is
+      // dropped on the floor (caller wanted to move on). See sec M5 / DX M2
+      // in the AE review for the full reasoning.
       (facts as { pendingMutation: Pending | null }).pendingMutation = {
         ...payload,
         status: "pending",

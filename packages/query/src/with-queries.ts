@@ -175,29 +175,51 @@ export function withQueries(
         const { facts } = context;
         const invalidatedTags = req.tags as string[];
 
-        // Clear the invalidation list immediately
-        facts[TAGS_INVALIDATED_KEY] = [];
+        // Atomic batching prevents a torn read where a subscriber sees the
+        // cleared invalidation list before the matching trigger writes
+        // land. Without the batch the resolver writes one fact at a time
+        // and the reactive flush runs between every write, so any
+        // listener subscribed to both keys would observe a half-applied
+        // step (tags cleared but triggers not yet fired, or vice versa).
+        const store = (
+          facts as { $store?: { batch: (fn: () => void) => void } }
+        ).$store;
+        const apply = () => {
+          // Clear the invalidation list immediately
+          facts[TAGS_INVALIDATED_KEY] = [];
 
-        // Match against each tagged query
-        for (const { name: queryName, tags } of taggedQueries) {
-          const queryTags: string[] =
-            typeof tags === "function"
-              ? (
-                  tags(
-                    (facts[`${PREFIX}${queryName}_state`] as { data?: unknown })
-                      ?.data,
-                  ) as (string | { type: string; id?: string | number })[]
-                ).map(normalizeTag)
-              : tags;
+          // Match against each tagged query
+          for (const { name: queryName, tags } of taggedQueries) {
+            const queryTags: string[] =
+              typeof tags === "function"
+                ? (
+                    tags(
+                      (
+                        facts[`${PREFIX}${queryName}_state`] as {
+                          data?: unknown;
+                        }
+                      )?.data,
+                    ) as (string | { type: string; id?: string | number })[]
+                  ).map(normalizeTag)
+                : tags;
 
-          const matched = invalidatedTags.some((invTag) =>
-            queryTags.some((qTag) => tagMatches(invTag, qTag)),
-          );
+            const matched = invalidatedTags.some((invTag) =>
+              queryTags.some((qTag) => tagMatches(invTag, qTag)),
+            );
 
-          if (matched) {
-            // Trigger refetch by setting the query's trigger
-            facts[`${PREFIX}${queryName}_trigger`] = Date.now();
+            if (matched) {
+              // Trigger refetch by setting the query's trigger
+              facts[`${PREFIX}${queryName}_trigger`] = Date.now();
+            }
           }
+        };
+        if (store) {
+          store.batch(apply);
+        } else {
+          // Defensive: if $store isn't accessible (e.g. namespaced system
+          // path), fall back to direct writes. Behaviour matches the
+          // pre-batch implementation.
+          apply();
         }
       },
     };
