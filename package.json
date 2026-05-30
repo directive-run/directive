@@ -21,7 +21,9 @@
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm changeset publish",
     "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
-    "size": "npx tsx scripts/size-check.ts"
+    "size": "npx tsx scripts/size-check.ts",
+    "mirror-concepts": "npx tsx scripts/mirror-concepts.ts",
+    "mirror-concepts:check": "npx tsx scripts/mirror-concepts.ts --dry-run"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
