@@ -191,6 +191,96 @@ describe("createSubscription", () => {
     // may batch. The subscription pattern works correctly in real usage
     // where push events arrive over time (WebSocket messages, SSE events).
 
+    it("sets isComplete and stops fetching when onComplete is called", async () => {
+      let capturedCallbacks: {
+        onData: (data: unknown) => void;
+        onComplete?: () => void;
+      } | null = null;
+
+      const sub = createSubscription({
+        name: "price",
+        // Realistic key shape: derive from facts so the effect picks up the
+        // ticker as a tracked dep instead of falling through to the
+        // "no-deps means run on any change" auto-track fallback.
+        key: (facts) => {
+          const ticker = facts.ticker as string | null;
+          return ticker ? { ticker } : null;
+        },
+        subscribe: (_params, callbacks) => {
+          capturedCallbacks = callbacks;
+        },
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: { ticker: t.string<string | null>() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      system.facts.ticker = "AAPL";
+      await flushMicrotasks(20);
+
+      expect(capturedCallbacks).not.toBeNull();
+
+      // Stream a chunk
+      capturedCallbacks!.onData({ price: 150.25, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      let state = system.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
+      expect(state.isSuccess).toBe(true);
+      expect(state.isComplete).toBe(false);
+
+      // Stream ends
+      capturedCallbacks!.onComplete?.();
+      await flushMicrotasks();
+
+      state = system.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
+      // Final data preserved
+      expect(state.data).toEqual({ price: 150.25, ticker: "AAPL" });
+      // Status stays success; isComplete is the terminal signal
+      expect(state.status).toBe("success");
+      expect(state.isComplete).toBe(true);
+      expect(state.isFetching).toBe(false);
+      expect(state.isPending).toBe(false);
+    });
+
+    it("isComplete defaults to false in the idle state", async () => {
+      const sub = createSubscription({
+        name: "price",
+        key: () => null,
+        subscribe: () => undefined,
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await flushMicrotasks();
+
+      const state = system.read("price") as ResourceState<unknown>;
+      expect(state.isComplete).toBe(false);
+    });
+
     it("calls cleanup when system is destroyed", async () => {
       const cleanup = vi.fn();
       const sub = createSubscription({

@@ -47,6 +47,13 @@ export interface ResourceState<T, E = Error> {
   isSuccess: boolean;
   /** True when status is "error". */
   isError: boolean;
+  /**
+   * True when a push-based subscription has signalled it has finished
+   * delivering values (e.g. server sent the final SSE chunk and closed
+   * the stream). Stays true until the subscription is re-keyed. For
+   * one-shot queries/mutations this is always false.
+   */
+  isComplete: boolean;
   /** True when showing previous key's data during a key transition. */
   isPreviousData: boolean;
   /** Timestamp (ms) when data was last successfully fetched. */
@@ -68,6 +75,7 @@ export function createIdleResourceState<T, E = Error>(): ResourceState<T, E> {
     isStale: false,
     isSuccess: false,
     isError: false,
+    isComplete: false,
     isPreviousData: false,
     dataUpdatedAt: null,
     failureCount: 0,

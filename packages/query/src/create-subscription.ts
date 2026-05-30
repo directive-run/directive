@@ -8,7 +8,9 @@
  * @module
  */
 
+import { withoutTracking } from "@directive-run/core/internals";
 import { PREFIX, buildKey, serializeKey } from "./internal.js";
+
 import type { ResourceState } from "./types.js";
 import { createIdleResourceState } from "./types.js";
 
@@ -22,6 +24,17 @@ export interface SubscriptionCallbacks<T> {
   onData: (data: T | ((current: T | null) => T)) => void;
   /** Report an error. Sets ResourceState to error status. */
   onError: (error: Error) => void;
+  /**
+   * Signal that the subscription has finished delivering values (e.g.
+   * SSE stream closed cleanly, server sent its terminal frame). Leaves
+   * the most recent `data` in place, keeps `status: "success"`, and
+   * sets `isComplete: true` so consumers can distinguish a streaming
+   * chunk (`isSuccess && !isComplete`) from the final value
+   * (`isComplete`). After this call, further `onData` / `onError`
+   * invocations are accepted normally — call it at most once when the
+   * underlying transport reaches its terminal frame.
+   */
+  onComplete?: () => void;
   /** AbortSignal for cancellation (fires when key changes or system stops). */
   signal: AbortSignal;
 }
@@ -105,6 +118,15 @@ export function createSubscription<
   const stateKey = buildKey(name, "state");
   const keyKey = buildKey(name, "key");
 
+  // The previous serialized key is tracked in a WeakMap keyed by the live
+  // facts object instead of inside the facts store. Reading + writing the
+  // same fact inside an auto-tracked effect makes the effect depend on
+  // itself: writing `facts[keyKey]` would re-trigger the effect, fire its
+  // cleanup, and abort the live AbortController on the first emission. A
+  // closure WeakMap removes that read-write self-trigger while still
+  // letting each system keep its own prev-key bookkeeping.
+  const prevKeyByFacts = new WeakMap<object, string>();
+
   /** Build ResourceState derivation. */
   function buildState(facts: Record<string, unknown>): ResourceState<TData> {
     const state = facts[stateKey] as ResourceState<TData> | undefined;
@@ -156,23 +178,35 @@ export function createSubscription<
           }
 
           const serializedKey = serializeKey(currentKey);
-          const prevKey = facts[keyKey] as string | null;
+
+          // Track prev key off-fact so we don't depend on our own writes.
+          const prevKey = prevKeyByFacts.get(facts) ?? null;
 
           // Key hasn't changed and subscription already active — skip
           if (serializedKey === prevKey) {
             return;
           }
 
-          // Update key tracking
+          // Update key tracking (in closure + in facts for downstream
+          // observers; the facts write isn't read by the effect so it
+          // doesn't cause a self-trigger).
+          prevKeyByFacts.set(facts, serializedKey);
           facts[keyKey] = serializedKey;
 
-          // Set pending state
-          const prevState = facts[stateKey] as ResourceState<TData>;
+          // Set pending state. Re-keying resets `isComplete` because the
+          // previous stream's terminal signal no longer applies to the new
+          // subscription instance. Reading prev state is untracked so a
+          // re-emission of the stream (which writes `stateKey`) does not
+          // cause this effect to re-run.
+          const prevState = withoutTracking(
+            () => facts[stateKey] as ResourceState<TData>,
+          );
           facts[stateKey] = {
             ...prevState,
             status: "pending",
             isPending: prevState.data === null,
             isFetching: true,
+            isComplete: false,
           };
 
           // Create abort controller for this subscription instance
@@ -221,6 +255,19 @@ export function createSubscription<
                 error,
                 failureCount: currentState.failureCount + 1,
                 failureReason: error,
+              };
+            },
+            onComplete: () => {
+              if (controller.signal.aborted) {
+                return;
+              }
+
+              const currentState = facts[stateKey] as ResourceState<TData>;
+              facts[stateKey] = {
+                ...currentState,
+                isPending: false,
+                isFetching: false,
+                isComplete: true,
               };
             },
             signal: controller.signal,

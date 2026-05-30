@@ -400,7 +400,15 @@ describe("createQuerySystem", () => {
         },
         subscriptions: {
           notifications: {
-            key: () => ({ all: true }),
+            // Subscriptions key off facts so the effect's auto-tracked
+            // deps include the relevant fact; a constant `() => ({...})`
+            // would track nothing and fall through to the auto-track
+            // "run on any change" fallback, which tears the subscription
+            // down on every unrelated fact write.
+            key: (f) => {
+              const userId = f.userId as string;
+              return userId ? { userId } : null;
+            },
             subscribe: (_params, callbacks) => {
               subCallbacks = callbacks;
             },

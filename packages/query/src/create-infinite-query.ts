@@ -392,6 +392,7 @@ export function createInfiniteQuery<
               isStale: false,
               isSuccess: true,
               isError: false,
+              isComplete: false,
               isPreviousData: false,
               dataUpdatedAt: Date.now(),
               failureCount: 0,

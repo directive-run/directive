@@ -315,6 +315,7 @@ export function createQuery<
               isStale: false,
               isSuccess: true,
               isError: false,
+              isComplete: false,
               isPreviousData: false,
               dataUpdatedAt: now,
               failureCount: 0,
