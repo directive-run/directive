@@ -340,6 +340,24 @@ system.subscribe(["ship.*"], () => {
 |--------|-------------|
 | `html` | Tagged template bound to `el()` via [htm](https://github.com/developit/htm) |
 
+## SSR
+
+`@directive-run/el` is **browser-only**. `el()`, the JSX runtime, and the
+reactive bindings all call `document.createElement` directly, so they
+throw `document is not defined` if imported in a Node server context
+(Next.js server components, Astro server islands, Remix loaders, etc.).
+
+For SSR-capable apps:
+
+- Use one of the framework adapters that ship a server renderer:
+  `@directive-run/react`, `@directive-run/vue`, `@directive-run/svelte`,
+  `@directive-run/solid`.
+- Or guard the `el` import behind a client-only boundary
+  (`"use client"`, `<ClientOnly>`, `if (typeof document !== "undefined")`).
+
+A future `@directive-run/el/server` companion that emits HTML strings
+and hydrates on the client is on the roadmap; it does not exist today.
+
 ## Peer Dependencies
 
 - `@directive-run/core` (optional – only needed for `bind`, `bindText`, `mount`)

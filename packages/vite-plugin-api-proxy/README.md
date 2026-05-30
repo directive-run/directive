@@ -24,11 +24,11 @@ npm install -D @directive-run/vite-plugin-api-proxy
 ```ts
 // vite.config.ts
 import { defineConfig } from "vite";
-import { apiProxyPlugin } from "@directive-run/vite-plugin-api-proxy";
+import { apiProxy } from "@directive-run/vite-plugin-api-proxy";
 
 export default defineConfig({
   plugins: [
-    apiProxyPlugin({
+    apiProxy({
       routes: {
         "/api/openai": {
           target: "https://api.openai.com/v1/chat/completions",

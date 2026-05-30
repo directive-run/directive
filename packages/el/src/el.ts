@@ -15,8 +15,14 @@ export type ElChild =
   | Node
   | ElChild[];
 
-/** Props that must never be set via Object.assign (XSS vectors). */
-const BLOCKED_PROPS = new Set(["innerHTML", "outerHTML", "srcdoc"]);
+/**
+ * Props that must never be set via `Object.assign` (XSS vectors).
+ *
+ * Shared between `el()` and the JSX runtime so the two render paths
+ * can't drift on what's considered unsafe to write to an Element.
+ */
+export const XSS_BLOCKED_PROPS = new Set(["innerHTML", "outerHTML", "srcdoc"]);
+const BLOCKED_PROPS = XSS_BLOCKED_PROPS;
 
 function isProps(value: unknown): value is Record<string, unknown> {
   return (
