@@ -122,6 +122,78 @@ export function withOptimistic<F extends Record<string, unknown>>(
 }
 
 /**
+ * Wrap every handler in a `defineMutator`-style handler map with
+ * automatic rollback on throw, declaring the rollback keys per handler
+ * instead of repeating `withOptimistic` at every callsite.
+ *
+ * The keys map is partial: any handler not listed is passed through
+ * unwrapped. Each listed handler is wrapped with `withOptimistic(keys)`
+ * – the snapshot is captured at handler entry, restored on throw, and
+ * the throw still propagates so the mutator captures it on
+ * `pendingMutation.error` for the UI.
+ *
+ * @param keys - Per-handler rollback key arrays. Omit a handler to skip wrapping.
+ * @param handlers - The original handler map (matches the shape returned to `defineMutator`).
+ * @returns A new handler map with the same shape; listed entries are wrapped.
+ *
+ * @example
+ * ```ts
+ * import { defineMutator } from "@directive-run/mutator";
+ * import { withOptimisticHandlers } from "@directive-run/optimistic";
+ *
+ * type Muts = {
+ *   saveDraft: { text: string };
+ *   publish: void;
+ * };
+ *
+ * const handlers = withOptimisticHandlers<typeof handlersRaw, Facts>(
+ *   {
+ *     // saveDraft optimistically writes `draft` then awaits the server;
+ *     // on throw the prior `draft` value is restored.
+ *     saveDraft: ["draft"],
+ *     // publish flips `draft` → `published`, both need restoring on failure.
+ *     publish: ["draft", "published"],
+ *   },
+ *   handlersRaw,
+ * );
+ *
+ * const mut = defineMutator<Muts, Facts>(handlers);
+ * ```
+ *
+ * Layering note: wrap with `withOptimisticHandlers` BEFORE wrapping
+ * the result with `cancellable()` so a supersede-abort doesn't trip
+ * the rollback. See the README's "Layering with cancellable()" section.
+ */
+export function withOptimisticHandlers<
+  H extends Record<
+    string,
+    // biome-ignore lint/suspicious/noExplicitAny: handler ctx is provided by the consumer (e.g. mutator); structural shape is "must include facts: F"
+    (ctx: any) => Promise<void> | void
+  >,
+  F extends Record<string, unknown>,
+>(keys: { [K in keyof H]?: readonly (keyof F)[] }, handlers: H): H {
+  const wrapped: Record<string, H[keyof H]> = {};
+  for (const handlerName of Object.keys(handlers) as Array<keyof H>) {
+    const handler = handlers[handlerName];
+    const rollbackKeys = keys[handlerName];
+    if (!rollbackKeys || rollbackKeys.length === 0) {
+      wrapped[handlerName as string] = handler;
+      continue;
+    }
+
+    const wrap = withOptimistic<F>(rollbackKeys);
+    // Cast preserves the original handler's signature; the structural
+    // bound on H is "function taking a ctx with facts: F", which is the
+    // contract `withOptimistic` requires.
+    wrapped[handlerName as string] = wrap(
+      handler as unknown as (ctx: { facts: F }) => Promise<void> | void,
+    ) as H[keyof H];
+  }
+
+  return wrapped as unknown as H;
+}
+
+/**
  * Thrown when a fact value cannot be cloned for snapshotting. This
  * surfaces as a real error rather than a silent corruption — Directive's
  * fact contract is JSON-roundtrippable, and shapes outside that contract

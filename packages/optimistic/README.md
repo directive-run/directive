@@ -152,6 +152,42 @@ This is the right ordering for optimistic UI:
 - Rollback happens before the error surfaces (no torn state)
 - Error message is preserved on `pendingMutation.error` (UI can show)
 
+### Whole handler map with `withOptimisticHandlers`
+
+When several handlers in a `defineMutator` map need rollback, wrapping
+each one individually adds a layer of nesting at every callsite. The
+`withOptimisticHandlers` helper takes a partial per-handler key map and
+returns a same-shape handler map with the listed handlers wrapped and
+the rest passed through:
+
+```ts
+import { defineMutator } from "@directive-run/mutator";
+import { withOptimisticHandlers } from "@directive-run/optimistic";
+
+type Muts = {
+  saveDraft: { text: string };
+  publish: void;
+  trash: void;
+};
+
+const handlers = withOptimisticHandlers<typeof handlersRaw, Facts>(
+  {
+    saveDraft: ["draft"],
+    publish: ["draft", "published"],
+    // trash: omitted → passed through unwrapped
+  },
+  handlersRaw,
+);
+
+const mut = defineMutator<Muts, Facts>(handlers);
+```
+
+Each listed handler is equivalent to wrapping it manually with
+`withOptimistic(rollbackKeys)`. Omitted handlers (and entries with an
+empty key array) are returned by identity so a future `=== handlers.x`
+check stays sound. Apply this **before** any outer `cancellable()` so
+a supersede-abort doesn't trip the rollback.
+
 ### Layering with `cancellable()`
 
 `@directive-run/mutator` also ships a `cancellable()` HOC that aborts an

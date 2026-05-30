@@ -4,6 +4,7 @@ import {
   OptimisticCloneError,
   createSnapshot,
   withOptimistic,
+  withOptimisticHandlers,
 } from "../index.js";
 
 describe("@directive-run/optimistic — createSnapshot", () => {
@@ -199,5 +200,92 @@ describe("@directive-run/optimistic — withOptimistic", () => {
     node.child = node; // cycle — structuredClone preserves
     const facts = { node };
     expect(() => createSnapshot(facts, ["node"])).not.toThrow();
+  });
+});
+
+describe("@directive-run/optimistic — withOptimisticHandlers", () => {
+  type Facts = { draft: string; published: string };
+  type Ctx = { facts: Facts };
+
+  it("wraps listed handlers with withOptimistic and leaves the rest alone", async () => {
+    const facts: Facts = { draft: "saved", published: "old" };
+    const handlers = {
+      saveDraft: async (ctx: Ctx) => {
+        ctx.facts.draft = "in-flight";
+        throw new Error("server rejected");
+      },
+      noop: async (_ctx: Ctx) => {
+        // unrelated, no rollback declared
+      },
+    };
+
+    const wrapped = withOptimisticHandlers<typeof handlers, Facts>(
+      { saveDraft: ["draft"] },
+      handlers,
+    );
+
+    // Listed handler rolls back on throw
+    await expect(wrapped.saveDraft({ facts })).rejects.toThrow(
+      "server rejected",
+    );
+    expect(facts.draft).toBe("saved");
+    expect(facts.published).toBe("old");
+
+    // Identity preserved for un-listed handlers
+    expect(wrapped.noop).toBe(handlers.noop);
+  });
+
+  it("restores every listed key on throw, not just the first", async () => {
+    const facts: Facts = { draft: "d0", published: "p0" };
+    const handlers = {
+      publish: async (ctx: Ctx) => {
+        ctx.facts.draft = "d1";
+        ctx.facts.published = "p1";
+        throw new Error("publish failed");
+      },
+    };
+    const wrapped = withOptimisticHandlers<typeof handlers, Facts>(
+      { publish: ["draft", "published"] },
+      handlers,
+    );
+
+    await expect(wrapped.publish({ facts })).rejects.toThrow("publish failed");
+    expect(facts.draft).toBe("d0");
+    expect(facts.published).toBe("p0");
+  });
+
+  it("does not roll back when a listed handler succeeds", async () => {
+    const facts: Facts = { draft: "d0", published: "p0" };
+    const handlers = {
+      saveDraft: async (ctx: Ctx) => {
+        ctx.facts.draft = "d1";
+      },
+    };
+    const wrapped = withOptimisticHandlers<typeof handlers, Facts>(
+      { saveDraft: ["draft"] },
+      handlers,
+    );
+
+    await wrapped.saveDraft({ facts });
+    expect(facts.draft).toBe("d1");
+  });
+
+  it("treats an empty key array as opt-out (no wrap, no rollback)", async () => {
+    const facts: Facts = { draft: "d0", published: "p0" };
+    const handlers = {
+      saveDraft: async (ctx: Ctx) => {
+        ctx.facts.draft = "d1";
+        throw new Error("noop");
+      },
+    };
+    const wrapped = withOptimisticHandlers<typeof handlers, Facts>(
+      { saveDraft: [] },
+      handlers,
+    );
+
+    await expect(wrapped.saveDraft({ facts })).rejects.toThrow("noop");
+    // No rollback declared — the partial write stays.
+    expect(facts.draft).toBe("d1");
+    expect(wrapped.saveDraft).toBe(handlers.saveDraft);
   });
 });
