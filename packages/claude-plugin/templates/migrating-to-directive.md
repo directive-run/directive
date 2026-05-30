@@ -1,6 +1,8 @@
 ---
 name: migrating-to-directive
 description: "Migrate state management code from Redux, Zustand, XState, MobX, Recoil, or Jotai to Directive. Provides concept mapping, step-by-step migration patterns, and before/after code examples. Use when asked to migrate, convert, or port existing state management to Directive."
+knowledgeFiles: [api-skeleton, core-patterns, schema-types, anti-patterns]
+examples: [counter, shopping-cart]
 ---
 
 # Migrating to Directive

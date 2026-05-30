@@ -1,6 +1,8 @@
 ---
 name: writing-directive-modules
 description: "Create and structure Directive modules with schema definitions, init functions, derivations, effects, events, constraints, and resolvers using the correct t.* type builders and naming conventions. Use when asked to build a Directive module, add facts/derivations/resolvers to an existing module, or scaffold any stateful domain with Directive."
+knowledgeFiles: [api-skeleton, core-patterns, schema-types, naming, anti-patterns]
+examples: [counter, contact-form, newsletter, feature-flags, shopping-cart, form-wizard]
 ---
 
 # Writing Directive Modules

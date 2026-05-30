@@ -1,6 +1,8 @@
 ---
 name: reviewing-directive-code
 description: "Review Directive code for anti-patterns, naming violations, missing error boundaries, constraint/resolver misuse, and performance issues. Use when asked to review, audit, or improve existing Directive modules, systems, or orchestrators."
+knowledgeFiles: [api-skeleton, anti-patterns, core-patterns, naming]
+examples: [counter, auth-flow]
 ---
 
 # Reviewing Directive Code

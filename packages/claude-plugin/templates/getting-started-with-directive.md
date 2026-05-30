@@ -1,6 +1,8 @@
 ---
 name: getting-started-with-directive
 description: "Understand Directive fundamentals: what modules, facts, derivations, constraints, resolvers, and systems are, and how they fit together. Use when someone is new to Directive, asks 'what is Directive', wants to understand the mental model, or needs help choosing between Directive concepts."
+knowledgeFiles: [api-skeleton, core-patterns, sitemap]
+examples: [counter]
 ---
 
 # Getting Started with Directive

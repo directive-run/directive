@@ -1,6 +1,8 @@
 ---
 name: testing-ai-systems
 description: "Test AI orchestrators without real LLM API calls using createMockRunner, write quality evaluations for agent output, add debug observability with tracing and metrics, integrate MCP tool servers, and wire RAG pipelines. Use when writing unit tests for agents, setting up CI evaluation suites, debugging orchestrator behavior, or connecting external tool sources."
+knowledgeFiles: [api-skeleton, ai-testing-evals, ai-debug-observability, ai-mcp-rag]
+examples: [ai-orchestrator, fraud-analysis]
 ---
 
 # Testing AI Systems

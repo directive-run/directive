@@ -86,6 +86,13 @@ Website: https://directive.run
 - [Observability](https://directive.run/docs/plugins/observability)
 - [Custom Plugins](https://directive.run/docs/plugins/custom)
 
+### Packages
+- [Timeline (test REPL)](https://directive.run/docs/packages/timeline)
+- [Mutator (typed mutations)](https://directive.run/docs/packages/mutator)
+- [Optimistic (auto-rollback)](https://directive.run/docs/packages/optimistic)
+- [Query (data fetching)](https://directive.run/docs/packages/query)
+- [Vite Dev Proxy](https://directive.run/docs/packages/vite-dev-proxy)
+
 ### Testing
 - [Overview](https://directive.run/docs/testing/overview)
 - [Mock Resolvers](https://directive.run/docs/testing/mock-resolvers)

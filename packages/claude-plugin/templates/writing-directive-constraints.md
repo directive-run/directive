@@ -1,6 +1,8 @@
 ---
 name: writing-directive-constraints
 description: "Write Directive constraints, resolvers, and error boundaries: when/require patterns, static vs dynamic requirements, async constraints with explicit deps, priority and ordering, resolver retry policies, deduplication keys, batch resolution, and system error boundaries. Use when asked to add constraint-resolver pairs, handle errors/retries in resolvers, or configure recovery strategies."
+knowledgeFiles: [api-skeleton, constraints, resolvers, error-boundaries]
+examples: [auth-flow, async-chains, debounce-constraints, batch-resolver, error-boundaries]
 ---
 
 # Writing Directive Constraints

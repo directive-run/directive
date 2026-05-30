@@ -1,6 +1,8 @@
 ---
 name: building-directive-systems
 description: "Compose Directive modules into systems: single-module and multi-module createSystem() calls, namespaced fact/derive/event access, cross-module dependencies, initialFacts and hydration, plugins (logging, devtools, persistence, circuit breaker), React adapter hooks (useSelector, useEvent, useSystem, DirectiveProvider), and system lifecycle. Use when creating a system, connecting modules together, adding plugins, or integrating Directive with React."
+knowledgeFiles: [api-skeleton, multi-module, system-api, plugins, react-adapter]
+examples: [multi-module, dynamic-modules, theme-locale, permissions, notifications, dashboard-loader, pagination, url-sync, websocket, server, optimistic-updates, ab-testing, sudoku]
 ---
 
 # Building Directive Systems

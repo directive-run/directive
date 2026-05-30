@@ -1,6 +1,8 @@
 ---
 name: scaffolding-directive-modules
 description: "Generate Directive module scaffolds with schema, init, derivations, constraints, resolvers, and matching test files. Use when asked to scaffold, generate, or create a new module from scratch, or when the user describes a feature and wants the boilerplate created."
+knowledgeFiles: [api-skeleton, core-patterns, schema-types, naming]
+examples: [counter, auth-flow, shopping-cart, dashboard-loader]
 ---
 
 # Scaffolding Directive Modules

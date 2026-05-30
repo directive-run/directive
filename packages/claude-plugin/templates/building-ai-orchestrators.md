@@ -1,6 +1,8 @@
 ---
 name: building-ai-orchestrators
 description: "Create AI orchestration systems using createAgentOrchestrator (single agent) and createMultiAgentOrchestrator (multi-agent). Define factsSchema with t.*() builders, init state, constraints for trigger conditions, and resolvers for LLM execution. Use when building LLM-powered workflows, agent pipelines, task runners, or multi-agent coordination systems."
+knowledgeFiles: [api-skeleton, ai-orchestrator, ai-multi-agent, ai-tasks]
+examples: [checkers, goal-heist, fraud-analysis]
 ---
 
 # Building AI Orchestrators

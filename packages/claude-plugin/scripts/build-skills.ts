@@ -41,142 +41,67 @@ interface SkillConfig {
   examples?: string[];
 }
 
-const SKILL_MAP: SkillConfig[] = [
-  {
-    name: "getting-started-with-directive",
-    knowledgeFiles: ["api-skeleton", "core-patterns", "sitemap"],
-    examples: ["counter"],
-  },
-  {
-    name: "writing-directive-modules",
-    knowledgeFiles: [
-      "api-skeleton",
-      "core-patterns",
-      "schema-types",
-      "naming",
-      "anti-patterns",
-    ],
-    examples: [
-      "counter",
-      "contact-form",
-      "newsletter",
-      "feature-flags",
-      "shopping-cart",
-      "form-wizard",
-    ],
-  },
-  {
-    name: "writing-directive-constraints",
-    knowledgeFiles: [
-      "api-skeleton",
-      "constraints",
-      "resolvers",
-      "error-boundaries",
-    ],
-    examples: [
-      "auth-flow",
-      "async-chains",
-      "debounce-constraints",
-      "batch-resolver",
-      "error-boundaries",
-    ],
-  },
-  {
-    name: "building-directive-systems",
-    knowledgeFiles: [
-      "api-skeleton",
-      "multi-module",
-      "system-api",
-      "plugins",
-      "react-adapter",
-    ],
-    examples: [
-      "multi-module",
-      "dynamic-modules",
-      "theme-locale",
-      "permissions",
-      "notifications",
-      "dashboard-loader",
-      "pagination",
-      "url-sync",
-      "websocket",
-      "server",
-      "optimistic-updates",
-      "ab-testing",
-      "sudoku",
-    ],
-  },
-  {
-    name: "testing-directive-code",
-    knowledgeFiles: ["api-skeleton", "testing", "history"],
-    examples: ["time-machine"],
-  },
-  {
-    name: "building-ai-orchestrators",
-    knowledgeFiles: [
-      "api-skeleton",
-      "ai-orchestrator",
-      "ai-multi-agent",
-      "ai-tasks",
-    ],
-    examples: ["checkers", "goal-heist", "fraud-analysis"],
-  },
-  {
-    name: "building-ai-agents",
-    knowledgeFiles: [
-      "api-skeleton",
-      "ai-agents-streaming",
-      "ai-adapters",
-      "ai-communication",
-    ],
-    examples: ["ai-checkpoint", "provider-routing"],
-  },
-  {
-    name: "hardening-ai-systems",
-    knowledgeFiles: [
-      "api-skeleton",
-      "ai-guardrails-memory",
-      "ai-budget-resilience",
-      "ai-security",
-    ],
-    examples: ["ai-guardrails", "topic-guard"],
-  },
-  {
-    name: "testing-ai-systems",
-    knowledgeFiles: [
-      "api-skeleton",
-      "ai-testing-evals",
-      "ai-debug-observability",
-      "ai-mcp-rag",
-    ],
-    examples: ["ai-orchestrator", "fraud-analysis"],
-  },
-  {
-    name: "reviewing-directive-code",
-    knowledgeFiles: [
-      "api-skeleton",
-      "anti-patterns",
-      "core-patterns",
-      "naming",
-    ],
-    examples: ["counter", "auth-flow"],
-  },
-  {
-    name: "scaffolding-directive-modules",
-    knowledgeFiles: ["api-skeleton", "core-patterns", "schema-types", "naming"],
-    examples: ["counter", "auth-flow", "shopping-cart", "dashboard-loader"],
-  },
-  {
-    name: "migrating-to-directive",
-    knowledgeFiles: [
-      "api-skeleton",
-      "core-patterns",
-      "schema-types",
-      "anti-patterns",
-    ],
-    examples: ["counter", "shopping-cart"],
-  },
-];
+/**
+ * Parse `knowledgeFiles: [a, b, c]` and `examples: [x, y]` arrays from a
+ * template's YAML frontmatter without pulling in a yaml dependency. The
+ * arrays must be inline (single-line) for the regex to match.
+ *
+ * Returns `null` for `knowledgeFiles` when the field is absent — the
+ * caller falls back to the legacy `SKILL_MAP` entry in that case.
+ */
+function parseFrontmatterArrays(template: string): {
+  knowledgeFiles: string[] | null;
+  examples: string[] | null;
+} {
+  const fmMatch = template.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return { knowledgeFiles: null, examples: null };
+  const fm = fmMatch[1] ?? "";
+  const parseArray = (field: string): string[] | null => {
+    const m = fm.match(new RegExp(`^${field}:\\s*\\[([^\\]]*)\\]`, "m"));
+    if (!m) return null;
+    return (m[1] ?? "")
+      .split(",")
+      .map((s) => s.trim().replace(/^['"]|['"]$/g, ""))
+      .filter(Boolean);
+  };
+  return {
+    knowledgeFiles: parseArray("knowledgeFiles"),
+    examples: parseArray("examples"),
+  };
+}
+
+/**
+ * Strip the build-only `knowledgeFiles` and `examples` lines from a
+ * template before writing it to `SKILL.md`. Claude only needs the
+ * `name` / `description` fields; the others are scaffold metadata
+ * that lives next to the template purely so adding a knowledge file
+ * is a one-place edit.
+ */
+function stripBuildFrontmatter(template: string): string {
+  return template.replace(/^(knowledgeFiles|examples):.*$\n?/gm, "");
+}
+
+/**
+ * Discover skills by listing `templates/*.md`. Each template owns its
+ * `knowledgeFiles` and `examples` arrays in its YAML frontmatter, so
+ * adding a knowledge file is a one-place edit (the template) instead of
+ * touching the knowledge package, the template, AND a SKILL_MAP entry.
+ */
+function discoverSkills(): SkillConfig[] {
+  return readdirSync(TEMPLATES_DIR)
+    .filter((f) => f.endsWith(".md"))
+    .map((file) => {
+      const name = file.replace(/\.md$/, "");
+      const template = readFileSync(join(TEMPLATES_DIR, file), "utf-8");
+      const fm = parseFrontmatterArrays(template);
+      return {
+        name,
+        knowledgeFiles: fm.knowledgeFiles ?? [],
+        examples: fm.examples ?? undefined,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function findKnowledgeFile(name: string): string | null {
   // Check package root first (e.g., api-skeleton.md)
@@ -220,8 +145,8 @@ function buildExamplesMd(examples: string[]): string {
   return lines.join("\n");
 }
 
-function buildSkill(config: SkillConfig): void {
-  const skillDir = join(SKILLS_DIR, config.name);
+function buildSkill(baseConfig: SkillConfig): void {
+  const skillDir = join(SKILLS_DIR, baseConfig.name);
 
   // Clean and recreate
   if (existsSync(skillDir)) {
@@ -230,17 +155,35 @@ function buildSkill(config: SkillConfig): void {
   mkdirSync(skillDir, { recursive: true });
 
   // 1. Copy SKILL.md template
-  const templatePath = join(TEMPLATES_DIR, `${config.name}.md`);
+  const templatePath = join(TEMPLATES_DIR, `${baseConfig.name}.md`);
+  let config = baseConfig;
   if (!existsSync(templatePath)) {
-    log.warn(`Template not found: ${config.name}.md — creating placeholder`);
+    log.warn(
+      `Template not found: ${baseConfig.name}.md — creating placeholder`,
+    );
     writeFileSync(
       join(skillDir, "SKILL.md"),
-      `---\nname: ${config.name}\ndescription: TODO\n---\n\n# ${config.name}\n\nTODO: Add content\n`,
+      `---\nname: ${baseConfig.name}\ndescription: TODO\n---\n\n# ${baseConfig.name}\n\nTODO: Add content\n`,
       "utf-8",
     );
   } else {
     const template = readFileSync(templatePath, "utf-8");
-    writeFileSync(join(skillDir, "SKILL.md"), template, "utf-8");
+    // Frontmatter `knowledgeFiles` / `examples` arrays override the
+    // legacy `SKILL_MAP` entry. The build-only fields are stripped from
+    // the `SKILL.md` that ships to the skill directory so Claude only
+    // sees the Claude-facing frontmatter (`name`, `description`).
+    const fm = parseFrontmatterArrays(template);
+    if (fm.knowledgeFiles) {
+      config = { ...config, knowledgeFiles: fm.knowledgeFiles };
+    }
+    if (fm.examples) {
+      config = { ...config, examples: fm.examples };
+    }
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      stripBuildFrontmatter(template),
+      "utf-8",
+    );
   }
 
   // 2. Copy knowledge files
@@ -289,13 +232,14 @@ function main() {
   // Clean skills dir
   mkdirSync(SKILLS_DIR, { recursive: true });
 
-  log.step(`Building ${SKILL_MAP.length} skills...`);
+  const skills = discoverSkills();
+  log.step(`Building ${skills.length} skills...`);
 
-  for (const config of SKILL_MAP) {
+  for (const config of skills) {
     buildSkill(config);
   }
 
-  log.writes("claude-plugin/skills/", `${SKILL_MAP.length} directories`);
+  log.writes("claude-plugin/skills/", `${skills.length} directories`);
   log.done(PHASE);
 }
 

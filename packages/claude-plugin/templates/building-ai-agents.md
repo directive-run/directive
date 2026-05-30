@@ -1,6 +1,8 @@
 ---
 name: building-ai-agents
 description: "Configure AI provider runners (Anthropic, OpenAI, Ollama), stream tokens and structured output, and wire cross-agent communication. Use when setting up LLM provider connections, implementing token streaming, choosing between providers, or building agents that communicate results to each other."
+knowledgeFiles: [api-skeleton, ai-agents-streaming, ai-adapters, ai-communication]
+examples: [ai-checkpoint, provider-routing]
 ---
 
 # Building AI Agents

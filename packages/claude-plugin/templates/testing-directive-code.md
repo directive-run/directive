@@ -1,6 +1,8 @@
 ---
 name: testing-directive-code
 description: "Test Directive modules and systems using createTestSystem, mockResolver, assertFact, assertDerivation, assertRequirement, settleWithFakeTimers, and flushMicrotasks. Use when writing tests for Directive modules, constraints, resolvers, derivations, effects, or time-travel behavior."
+knowledgeFiles: [api-skeleton, testing, history]
+examples: [time-machine]
 ---
 
 # Testing Directive Code

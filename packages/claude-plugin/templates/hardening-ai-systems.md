@@ -1,6 +1,8 @@
 ---
 name: hardening-ai-systems
 description: "Add guardrails (input/output validation), memory strategies, token budgets, PII detection, prompt injection prevention, and circuit breakers to AI orchestrators. Use when enforcing content policies, managing costs, preventing security vulnerabilities, adding resilience, or implementing agent memory across turns."
+knowledgeFiles: [api-skeleton, ai-guardrails-memory, ai-budget-resilience, ai-security]
+examples: [ai-guardrails, topic-guard]
 ---
 
 # Hardening AI Systems
