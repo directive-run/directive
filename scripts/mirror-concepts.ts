@@ -48,6 +48,7 @@ const MIRROR_TARGETS: Record<string, string> = {
   optimistic: "packages/optimistic",
   query: "packages/query",
   "vite-dev-proxy": "packages/vite-dev-proxy",
+  "composing-packages": "packages/composing-packages",
   // Plugins / predicate tools — older top-level paths
   "audit-ledger": "audit-ledger",
   doctor: "doctor",
