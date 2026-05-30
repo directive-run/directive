@@ -14,13 +14,24 @@ export function buildKey(name: string, suffix: string): string {
 }
 
 /**
+ * Property names that must never appear in a serialized cache key. If an
+ * attacker can influence the shape of a key object, allowing one of these
+ * through would let the resulting JSON string round-trip into a polluted
+ * prototype on the next `JSON.parse` upstream.
+ */
+const BLOCKED_KEY_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
  * Serialize a key object to a stable string for cache identity.
  * Sorts keys to ensure `{a:1, b:2}` and `{b:2, a:1}` produce the same string.
- * Uses `Object.create(null)` to prevent prototype pollution.
+ * Uses `Object.create(null)` to prevent prototype pollution on the accumulator
+ * and filters `__proto__` / `constructor` / `prototype` out of the input so a
+ * serialized key cannot smuggle a polluting shape downstream.
  */
 export function serializeKey(key: Record<string, unknown>): string {
   return JSON.stringify(
     Object.keys(key)
+      .filter((k) => !BLOCKED_KEY_PROPS.has(k))
       .sort()
       .reduce(
         (acc, k) => {

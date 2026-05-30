@@ -152,6 +152,45 @@ This is the right ordering for optimistic UI:
 - Rollback happens before the error surfaces (no torn state)
 - Error message is preserved on `pendingMutation.error` (UI can show)
 
+### Layering with `cancellable()`
+
+`@directive-run/mutator` also ships a `cancellable()` HOC that aborts an
+in-flight handler when a fresh dispatch supersedes it (or the timeout
+fires). `cancellable()` throws an `AbortError` / `SupersededCancelError`
+out of the handler, and `withOptimistic` cannot tell that error apart
+from a "real" failure: it rolls back the snapshot.
+
+If the successor dispatch has already written to the same facts by then,
+the rollback clobbers those writes – the UI flickers back to the pre-
+mutation state for one tick before the new dispatch's optimistic write
+lands.
+
+**Wrap `withOptimistic` on the inside of `cancellable`, not the outside:**
+
+```ts
+// good: withOptimistic only sees the handler that actually does the work.
+// If cancellable aborts, the abort never reaches the optimistic snapshot.
+const handler = cancellable(
+  withOptimistic<Facts, "draft">(["draft"])(async (req, ctx, signal) => {
+    ctx.facts.draft = req.text;
+    await saveDraft(req.text, { signal });
+  }),
+);
+
+// bad: a supersede abort throws past withOptimistic, which then rolls back
+// `draft` even though the new dispatch was about to set it.
+const handler = withOptimistic<Facts, "draft">(["draft"])(
+  cancellable(async (req, ctx, signal) => {
+    ctx.facts.draft = req.text;
+    await saveDraft(req.text, { signal });
+  }),
+);
+```
+
+The same rule applies to `recordReplayable()`: it sits at the outermost
+layer so timeline frames capture the cancel event before any rollback
+runs.
+
 ## When to skip the helper
 
 - **Synchronous handlers.** No async work means no in-flight state to

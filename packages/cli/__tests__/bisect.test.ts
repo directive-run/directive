@@ -37,6 +37,18 @@ describe("directive bisect command — argument parsing", () => {
     expect(calls).toContain("Binary-search a recorded timeline");
   });
 
+  it("--help includes the SECURITY block explaining --assert eval", async () => {
+    // `bisect --assert` evaluates user-supplied JavaScript in the CLI's own
+    // process via `new Function(...)`. The SECURITY block in the help text is
+    // the only place that warns about it. If a future docs refactor drops the
+    // block, this test fails loudly so the warning can't be lost silently.
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(bisectCommand(["--help"])).rejects.toThrow("__exit__");
+    const calls = errSpy.mock.calls.flat().join(" ");
+    expect(calls).toContain("SECURITY");
+    expect(calls).toContain("evaluated as JavaScript");
+  });
+
   it("errors when --system is missing", async () => {
     const fakeJson = join(tmpDir, "t.json");
     writeFileSync(

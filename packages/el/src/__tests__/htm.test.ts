@@ -87,4 +87,33 @@ describe("html tagged template (htm)", () => {
     expect(div.id).toBe("main");
     expect(div.title).toBe("tooltip");
   });
+
+  // XSS-relevant props (`innerHTML`, `outerHTML`, `srcdoc`) are blocked at the
+  // `el()` layer that htm dispatches through. The htm path goes via the same
+  // sink, so these tests guarantee a future change to the htm parser cannot
+  // skip the blocklist without an explicit test failure.
+  describe("XSS-blocked props", () => {
+    it("ignores innerHTML interpolated through htm", () => {
+      const payload = "<script>alert(1)</script>";
+      const div = html`<div innerHTML=${payload} />` as HTMLDivElement;
+      expect(div.innerHTML).toBe("");
+      expect(div.querySelector("script")).toBeNull();
+    });
+
+    it("ignores outerHTML interpolated through htm", () => {
+      const div = html`<div outerHTML=${"<b>x</b>"} />` as HTMLDivElement;
+      // outerHTML write would replace the element; the blocklist prevents
+      // that, so the original empty `<div>` survives.
+      expect(div.tagName).toBe("DIV");
+      expect(div.children.length).toBe(0);
+    });
+
+    it("ignores srcdoc on iframes interpolated through htm", () => {
+      const iframe =
+        html`<iframe srcdoc=${"<script>alert(1)</script>"} />` as HTMLIFrameElement;
+      expect(iframe.getAttribute("srcdoc")).toBeNull();
+      // srcdoc as a DOM property is undefined-or-empty when never set
+      expect(iframe.srcdoc ?? "").toBe("");
+    });
+  });
 });
