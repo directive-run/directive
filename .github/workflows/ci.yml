@@ -38,6 +38,11 @@ jobs:
 
       - run: pnpm -r --filter './packages/*' typecheck
 
+      # Bundle-size budgets enforce the lean adapter promise. Fails when a
+      # gzipped published entry busts the budget in `size-budgets.json`; raise
+      # the budget intentionally when shipping a deliberate new feature.
+      - run: pnpm size
+
       # The knowledge package's `generate` step builds api-skeleton.md from
       # docs/generated/api-reference.json, which lives in the sibling
       # directive-docs repo. directive-docs uploads the same JSON to the

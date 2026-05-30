@@ -20,7 +20,8 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm changeset publish",
-    "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts"
+    "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
+    "size": "npx tsx scripts/size-check.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
