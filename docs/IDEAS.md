@@ -1281,3 +1281,86 @@ Pure tree walker. `predicate.describe({ cartTotal: { $gte: 50 }, region: { $in: 
 Predicate as Zod refinement, JSON Schema validator, conditional TypeScript narrower. The same predicate that drives the runtime also validates API payloads and narrows types at compile time. Eight tools become eleven without new substrate.
 
 **Headline:** *"One predicate, five compile targets. Your runtime rule is now also your Zod schema, your OpenAPI doc, and your TypeScript narrower."*
+
+---
+
+## R7 – AE review of the 9 lesser-known packages (2026-05-30)
+
+Five-lens review across `timeline`, `mutator`, `optimistic`, `query`, `knowledge`, `claude-plugin`, `cli`, `vite-plugin-api-proxy`, and `el`. Five concept docs + a `Packages` nav section + small `el` and `vite-plugin-api-proxy` fixes shipped inline. The items below are everything left over – Tier 2 work that needs a focused session, plus Tier 3 game-changers worth tracking.
+
+### R7.A – `createSubscription` gains an `onComplete` callback **(critical, blocks chatbot dog-fooding)**
+
+**[1 day – correctness MAX, compound HIGH]**
+
+`@directive-run/query`'s subscription contract sets `status: "success"` on every `onData` call. There is no terminal "stream ended" signal distinct from per-chunk updates, which is exactly why the doc-site chatbot ate streaming after the first SSE token and we had to revert it to manual `fetch`. Add an `onComplete?: () => void` to `SubscriptionCallbacks<T>` that sets a terminal status, leaves `data`/`status: "success"`, and stops `isFetching`. Consumers branch on `isSuccess && !isComplete` (token arrival) vs `isComplete` (final). Re-integrating the chatbot becomes a 30-line change instead of a regression.
+
+**Headline:** *"AI streaming consumers stop dropping their last frames. The first dog-food user that broke this is fixed in one callback."*
+
+### R7.B – "Composing Packages" guide: real-time kitchen-display walkthrough
+
+**[1 day – viral HIGH, compound MAX]**
+
+A 10-section walkthrough that builds a restaurant order display by composing `query` + `optimistic` + `mutator` + `timeline`. WebSocket orders stream in via `query`; staff actions ship through `defineMutator` with `cancellable`; UI updates via `withOptimistic`; failure scenarios are recorded with `recordTimeline` and replay in vitest. The point isn't to teach four packages – it's to show that the four compose into ~80 LOC of what a Redux + TanStack + Zustand stack does in ~350.
+
+**Headline:** *"The four-package combo replaces Redux + TanStack + Zustand + a custom rollback hook in 80 lines. With a test that explains the bug."*
+
+### R7.C – Audit-ledger v2 with paid-tier gating built in from day 1
+
+**[1 week – revenue MAX, compound HIGH]**
+
+Build the v2 surface – SHA-256 chain, Ed25519 signing keys + rotation, RFC 3161 trusted timestamps, WORM-storage sink contracts (S3 Object Lock, Loki, Parquet), multi-tenant `subjectId` queries, retention-policy primitive – and gate it behind a `pro: true` (later `pro: "license-key"`) flag on `createSystem`. Regulated industries (healthcare, finance, AI compliance) buy this category today; competing references are Vanta-style attestation, AWS QLDB, Datadog Audit Logs. The v1 substrate is "tamper-evident"; v2 is "evidentiary-grade" – a buyer-recognised line. Free OSS stays free; v2 is the first paid surface.
+
+**Headline:** *"Audit ledger v2 takes Directive from 'tamper-evident logs' to evidentiary-grade in regulated industries. First paid tier, gated from day 1."*
+
+### R7.D – `SystemFacts<S>` / `SystemDerived<S>` type helpers in core
+
+**[2 days – DX HIGH, compound MAX]**
+
+Every framework adapter (`react`, `vue`, `svelte`, `solid`, `lit`, `el`) weak-types updater params as `Record<string, unknown>`, dropping the schema typing that `system.facts` already carries. Add two type helpers in core (`SystemFacts<S>`, `SystemDerived<S>`) and have every adapter use them in `bind`/`selector`/`useFact`/etc. One change in core, six adapters get typed updaters for free.
+
+**Headline:** *"Typed updaters across every adapter. One helper in core, every package wakes up smarter."*
+
+### R7.E – `size-limit` CI budget for every published adapter
+
+**[half day – hygiene MAX, compound HIGH]**
+
+`@directive-run/el` is the smallest adapter today (~2.8 KB across three entries). Nothing in CI fails if someone adds a heavy dep to `react`/`vue`/`svelte`/`solid`/`lit`. Add `size-limit` config to each with a budget (≤2 KB gz on the main entry for el, ≤10 KB for the framework adapters), wire into CI, surface a comment on PRs that bust the budget. Cheap insurance against bundle creep.
+
+### R7.F – Generator-script test harness for `@directive-run/knowledge` and `@directive-run/claude-plugin`
+
+**[1 day – correctness HIGH, compound MEDIUM]**
+
+The knowledge → claude-plugin → cli pipeline is load-bearing for AI-assistant adoption, but the generators themselves (`generate-api-skeleton`, `generate-sitemap`, `extract-examples`, `build-skills`) have zero unit tests. Output tests catch "the committed `.md` files have shape X" but not "a regression in generation logic that still produces valid-looking output." Add snapshot/golden tests using a fixture `api-reference.json` so silent logic regressions fail CI.
+
+### R7.G – Mirror auto-generation CI: kill the `docs/concepts/` ⇄ `directive-docs/*/page.md` drift forever
+
+**[half day – hygiene HIGH, compound HIGH]**
+
+This session shipped 5 concept docs + 5 site mirrors. The mirror transform (frontmatter + lead conversion + Markdoc callouts + cross-link rewrites) is fully deterministic. A `mirror-concepts` CI script can regenerate every site mirror from its source-of-truth on every push and fail CI if the committed mirror has drifted. Two source-of-truth files become one.
+
+### R7.H – Smaller Tier-2 follow-ups (each worth doing, each its own session)
+
+- `Q-M1` – `serializeKey` should filter `BLOCKED_PROPS` from input keys (prototype-pollution surface today)
+- `Q-M3` – subscription `key()` returning null doesn't trigger cleanup; live WebSocket stays open after the trigger fact clears
+- `Q-M8` – `withQueries` tag-invalidation should batch via `$store.batch()`; torn state today between cleared tags and fired triggers
+- `M-M1` – mutator `eventHandler` shouldn't clobber an in-flight `running` marker; fresh dispatches during an awaiting handler are silently dropped
+- `T-M3` – timeline matchers register via global side effect on import; should throw loudly when called without `registerMatchers(expect)` so missing registration doesn't look like a working matcher
+- `CLI-C1` mitigation – add a regression test asserting `directive bisect --help` includes the `SECURITY:` block so future doc refactors can't drop the eval-safety warning silently
+- `CP-M2` – move `SKILL_MAP` into per-skill frontmatter so the dual-write hazard between knowledge files and the skill builder map disappears
+- `VP-M1` – `vite-plugin-api-proxy` should opt-in handle OPTIONS preflights; today every cross-origin browser caller using a custom header fails preflight
+- `O-M2` – document `withOptimistic` × `cancellable` interaction so users don't wrap the outer cancellable and roll back facts the successor dispatch already updated
+- `el M2` – add htm-path XSS test coverage (current XSS tests only exercise `el()` and the JSX runtime, not the `htm` tagged-template path)
+
+### R7.I – `withOptimistic` × `defineMutator` integration HOC
+
+**[1 day – DX HIGH, compound HIGH]**
+
+`defineMutator` could surface a per-handler `optimistic: ["fact1", "fact2"]` config that auto-wraps the handler with `withOptimistic(["fact1", "fact2"])`. The obvious composition is missing today – users hand-wrap each handler. Closes the visible seam between two adjacent packages.
+
+### R7.J – Shared `serializeKey` in core
+
+**[1 day – architecture HIGH, compound HIGH]**
+
+Three packages serialize "this thing for stable comparison" differently: `mutator` uses `kind`-keyed lookup, `query` uses `serializeKey({...})` with prototype-pollution-safe `Object.create(null)`, `timeline` uses ad-hoc `safeStringify` in `diffTimelines`. Three serializers for one concept. Hoist to `@directive-run/core/utils` so the chain is consistent and the safety guarantees are written once.
+
+
