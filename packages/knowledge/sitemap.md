@@ -92,6 +92,7 @@ Website: https://directive.run
 - [Optimistic (auto-rollback)](https://directive.run/docs/packages/optimistic)
 - [Query (data fetching)](https://directive.run/docs/packages/query)
 - [Vite Dev Proxy](https://directive.run/docs/packages/vite-dev-proxy)
+- [Composing all four](https://directive.run/docs/packages/composing-packages)
 
 ### Testing
 - [Overview](https://directive.run/docs/testing/overview)
@@ -126,8 +127,6 @@ Website: https://directive.run
 - [Role-Based Permissions](https://directive.run/docs/guides/permissions)
 - [Batch Mutations](https://directive.run/docs/guides/batch-mutations)
 
-## AI
-
 ### Integration Guides
 - [Overview](https://directive.run/docs/works-with/overview)
 - [Redux](https://directive.run/docs/works-with/redux)
@@ -135,6 +134,8 @@ Website: https://directive.run
 - [XState](https://directive.run/docs/works-with/xstate)
 - [React Query](https://directive.run/docs/works-with/react-query)
 - [Web Worker](https://directive.run/docs/works-with/worker)
+
+## AI
 
 ### Foundations
 - [Overview](https://directive.run/ai/overview)

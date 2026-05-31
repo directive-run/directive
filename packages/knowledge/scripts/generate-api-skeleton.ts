@@ -55,7 +55,7 @@ const JSON_PATH = process.argv[2]
       );
 const OUTPUT = join(__dirname, "..", "api-skeleton.md");
 
-interface ApiDocEntry {
+export interface ApiDocEntry {
   name: string;
   kind: string;
   module?: string;
@@ -131,7 +131,7 @@ function main() {
   log.done(PHASE);
 }
 
-function formatEntries(entries: ApiDocEntry[]): string[] {
+export function formatEntries(entries: ApiDocEntry[]): string[] {
   const lines: string[] = [];
 
   const grouped: Record<string, ApiDocEntry[]> = {};
@@ -195,4 +195,7 @@ function formatEntries(entries: ApiDocEntry[]): string[] {
   return lines;
 }
 
-main();
+// Only invoke when run as a script — tests import the helpers directly.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

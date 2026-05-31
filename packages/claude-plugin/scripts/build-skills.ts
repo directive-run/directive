@@ -49,7 +49,7 @@ interface SkillConfig {
  * Returns `null` for `knowledgeFiles` when the field is absent — the
  * caller falls back to the legacy `SKILL_MAP` entry in that case.
  */
-function parseFrontmatterArrays(template: string): {
+export function parseFrontmatterArrays(template: string): {
   knowledgeFiles: string[] | null;
   examples: string[] | null;
 } {
@@ -77,7 +77,7 @@ function parseFrontmatterArrays(template: string): {
  * that lives next to the template purely so adding a knowledge file
  * is a one-place edit.
  */
-function stripBuildFrontmatter(template: string): string {
+export function stripBuildFrontmatter(template: string): string {
   return template.replace(/^(knowledgeFiles|examples):.*$\n?/gm, "");
 }
 
@@ -243,4 +243,7 @@ function main() {
   log.done(PHASE);
 }
 
-main();
+// Only invoke when run as a script — tests import the helpers directly.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

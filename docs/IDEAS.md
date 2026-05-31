@@ -1336,6 +1336,10 @@ Every framework adapter (`react`, `vue`, `svelte`, `solid`, `lit`, `el`) weak-ty
 
 **[1 day – correctness HIGH, compound MEDIUM]**
 
+**[SHIPPED 2026-05-31 — 43 unit tests across 4 generator scripts]**
+
+**Status:** The four generator scripts (`build-skills`, `generate-sitemap`, `generate-api-skeleton`, `extract-examples`) now export their pure helpers and gate their `main()` invocation on `import.meta.url === \`file://${process.argv[1]}\``. Golden/behavior tests cover frontmatter parsing, navigation walking, kind ordering, DOM-stripping rules, and the `addHeader` formatter. A latent bug in `parseNavigation` was caught and fixed: the last section of `docsNavigation` was being pushed into `aiNavigation` because the parser didn't flush at the array switch, silently misplacing entries in `sitemap.md`. The regenerated sitemap now puts "Integration Guides" back under Docs where it belongs and surfaces the "Composing all four" entry under Packages.
+
 The knowledge → claude-plugin → cli pipeline is load-bearing for AI-assistant adoption, but the generators themselves (`generate-api-skeleton`, `generate-sitemap`, `extract-examples`, `build-skills`) have zero unit tests. Output tests catch "the committed `.md` files have shape X" but not "a regression in generation logic that still produces valid-looking output." Add snapshot/golden tests using a fixture `api-reference.json` so silent logic regressions fail CI.
 
 ### R7.G – Mirror auto-generation CI: kill the `docs/concepts/` ⇄ `directive-docs/*/page.md` drift forever

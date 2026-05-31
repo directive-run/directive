@@ -32,7 +32,7 @@ const EXCLUDED_EXAMPLES: string[] = [
   "eleven-up", // React game, non-standard structure
 ];
 
-interface ExampleSource {
+export interface ExampleSource {
   name: string;
   sourcePath: string;
   /** If true, the source file has no DOM wiring — copy as-is with header. */
@@ -98,7 +98,7 @@ const DOM_DECL_PATTERNS = [
   /^\s*const\s+\w+Timeline\s*=/,
 ];
 
-function isDomLine(line: string): boolean {
+export function isDomLine(line: string): boolean {
   return (
     DOM_PATTERNS.some((p) => p.test(line)) ||
     DOM_DECL_PATTERNS.some((p) => p.test(line))
@@ -213,22 +213,16 @@ function discoverExamples(): ExampleSource[] {
   return sources;
 }
 
-function extractExample(source: ExampleSource): string {
-  const fullPath = join(EXAMPLES_ROOT, source.sourcePath);
-
-  if (!existsSync(fullPath)) {
-    log.warn(`${fullPath} not found, skipping`);
-
-    return `// Source not found: ${source.sourcePath}\n`;
-  }
-
-  const raw = readFileSync(fullPath, "utf-8");
-
-  if (source.pure) {
-    return addHeader(source, raw);
-  }
-
-  // Strip DOM wiring: walk through the file and remove DOM sections
+/**
+ * Strip DOM-wiring lines from a TypeScript source string and return the
+ * trimmed result. Walks line-by-line, dropping render functions, DOM
+ * statements, element variable declarations, and update side-effects so
+ * what's left is the module / system definition AI tools learn from.
+ *
+ * Pure — no file IO. Exported so the algorithm is testable against
+ * fixture strings without staging a temp directory.
+ */
+export function stripDomWiring(raw: string): string {
   const lines = raw.split("\n");
   const kept: string[] = [];
   let inDomBlock = false;
@@ -369,10 +363,28 @@ function extractExample(source: ExampleSource): string {
     cleaned.pop();
   }
 
-  return addHeader(source, `${cleaned.join("\n")}\n`);
+  return `${cleaned.join("\n")}\n`;
 }
 
-function addHeader(source: ExampleSource, content: string): string {
+function extractExample(source: ExampleSource): string {
+  const fullPath = join(EXAMPLES_ROOT, source.sourcePath);
+
+  if (!existsSync(fullPath)) {
+    log.warn(`${fullPath} not found, skipping`);
+
+    return `// Source not found: ${source.sourcePath}\n`;
+  }
+
+  const raw = readFileSync(fullPath, "utf-8");
+
+  if (source.pure) {
+    return addHeader(source, raw);
+  }
+
+  return addHeader(source, stripDomWiring(raw));
+}
+
+export function addHeader(source: ExampleSource, content: string): string {
   const note = source.pure
     ? "// Pure module file — no DOM wiring"
     : "// Extracted for AI rules — DOM wiring stripped";
@@ -423,4 +435,7 @@ function main() {
   log.done(PHASE);
 }
 
-main();
+// Only invoke when run as a script — tests import the helpers directly.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

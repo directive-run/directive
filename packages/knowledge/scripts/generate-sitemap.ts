@@ -44,7 +44,7 @@ interface NavSection {
  * Parse navigation arrays from the TypeScript source.
  * Line-by-line parsing — more robust than regex on multi-line TS.
  */
-function parseNavigation(source: string): {
+export function parseNavigation(source: string): {
   docs: NavSection[];
   ai: NavSection[];
 } {
@@ -57,13 +57,24 @@ function parseNavigation(source: string): {
   for (const line of source.split("\n")) {
     const trimmed = line.trim();
 
-    // Detect which array we're in
+    // Detect which array we're in. Flush the in-progress section into
+    // the OLD array before switching — otherwise the last section of
+    // docsNavigation gets pushed into aiNavigation by the next title-only
+    // line, silently misplacing it in the sitemap.
     if (trimmed.startsWith("export const docsNavigation")) {
+      if (currentArray && currentSection && currentSection.links.length > 0) {
+        currentArray.push(currentSection);
+      }
       currentArray = docs;
+      currentSection = null;
       continue;
     }
     if (trimmed.startsWith("export const aiNavigation")) {
+      if (currentArray && currentSection && currentSection.links.length > 0) {
+        currentArray.push(currentSection);
+      }
       currentArray = ai;
+      currentSection = null;
       continue;
     }
     // End of array (next export or combined navigation)
@@ -110,7 +121,7 @@ function parseNavigation(source: string): {
   return { docs, ai };
 }
 
-function generateSitemap(docs: NavSection[], ai: NavSection[]): string {
+export function generateSitemap(docs: NavSection[], ai: NavSection[]): string {
   const lines: string[] = [
     "# Directive Documentation Sitemap",
     "",
@@ -148,23 +159,29 @@ function generateSitemap(docs: NavSection[], ai: NavSection[]): string {
   return lines.join("\n");
 }
 
-// Main
-if (!existsSync(NAV_PATH)) {
-  log.warn(`Navigation file not found at ${NAV_PATH}`);
-  log.warn("Skipping sitemap generation (directive-docs repo not found)");
-  process.exit(0);
+function main(): void {
+  if (!existsSync(NAV_PATH)) {
+    log.warn(`Navigation file not found at ${NAV_PATH}`);
+    log.warn("Skipping sitemap generation (directive-docs repo not found)");
+    process.exit(0);
+  }
+
+  const source = readFileSync(NAV_PATH, "utf-8");
+  const { docs, ai } = parseNavigation(source);
+
+  const totalLinks =
+    docs.reduce((n, s) => n + s.links.length, 0) +
+    ai.reduce((n, s) => n + s.links.length, 0);
+
+  const sitemap = generateSitemap(docs, ai);
+  writeFileSync(OUTPUT, sitemap, "utf-8");
+
+  log.success(
+    `Generated sitemap.md — ${docs.length + ai.length} sections, ${totalLinks} pages`,
+  );
 }
 
-const source = readFileSync(NAV_PATH, "utf-8");
-const { docs, ai } = parseNavigation(source);
-
-const totalLinks =
-  docs.reduce((n, s) => n + s.links.length, 0) +
-  ai.reduce((n, s) => n + s.links.length, 0);
-
-const sitemap = generateSitemap(docs, ai);
-writeFileSync(OUTPUT, sitemap, "utf-8");
-
-log.success(
-  `Generated sitemap.md — ${docs.length + ai.length} sections, ${totalLinks} pages`,
-);
+// Only invoke when run as a script — tests import the helpers directly.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
