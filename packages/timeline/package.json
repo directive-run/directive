@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/timeline",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Time-travel test REPL for Directive. Auto-renders the causal-graph timeline of any failing test.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -50,7 +50,11 @@
       "import": "./dist/matchers.js"
     }
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

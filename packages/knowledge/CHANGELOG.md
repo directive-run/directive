@@ -1,5 +1,339 @@
 # @directive-run/knowledge
 
+## 1.15.0
+
+### Patch Changes
+
+- [`93cd8b8`](https://github.com/directive-run/directive/commit/93cd8b804c79ae3f08a52d9848312faf135f2cf5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Docs UX reconciliation: AI tooling becomes a first-class install path
+  and Directive's coding knowledge ships from one source-of-truth to
+  every assistant.
+
+  A new `/docs/ide-integration` page at directive.run is the canonical
+  decision tree across Claude Code, Cursor, GitHub Copilot, Windsurf,
+  Cline, OpenAI Codex, and the programmatic `@directive-run/knowledge`
+  API. The docs sidebar gets an "AI Tooling" section as item #2 between
+  Getting Started and Core API, surfacing the integration path
+  alongside the core learning journey. The `/llms.txt` route gains an
+  "Install paths for your AI assistant" block so LLM agents crawling
+  the docs at runtime learn how a downstream developer would install
+  the same knowledge they're consuming.
+
+  The Claude Code install path becomes real: a `.claude-plugin/
+marketplace.json` is now committed to the directive monorepo root —
+  previously gitignored, which is why `/plugin marketplace add
+directive-run/directive` returned 404 from GitHub. Users can now run
+  the two-step install the claude-plugin README has been documenting:
+
+  ```
+  /plugin marketplace add directive-run/directive
+  /plugin install directive@directive-plugins
+  ```
+
+  Every published adapter README (query, mutator, optimistic, timeline,
+  el, cli, vite-plugin-api-proxy) gains two new sections: a "Composes
+  with" footer linking the sibling packages it commonly composes with
+  (fixes the nav-orphan gap from R7 — query had no links to mutator /
+  optimistic / timeline despite being designed to compose), and a "Use
+  this package with your AI assistant" hook tied to that package's
+  value prop. Each knowledge `.md` file in `@directive-run/knowledge`
+  gains a one-line top-of-file breadcrumb naming the package(s) it
+  documents, so a developer or LLM reading any file in isolation knows
+  immediately which import to use.
+
+  The top-level monorepo README gains an "AI tooling" section between
+  the existing AI Guardrails and React sections. The
+  `@directive-run/knowledge` README is restructured so consumer
+  pathways (plugin / CLI / programmatic / llms.txt) lead, instead of
+  the programmatic API which previously dominated above the fold.
+
+  Strategic FYIs for the v1.15 release notes — these are NOT shipping
+  in v1.15 but are explicitly tracked:
+
+  - `@directive-run/claude-plugin` npm publication is under evaluation;
+    the plugin stays Claude Code marketplace-only for v1.15.
+  - See-also cross-link footers across the 25 knowledge files are on
+    the v1.16 roadmap.
+  - MCP SSE server (`mcp.directive.run`) for live agent retrieval is on
+    the v1.16 roadmap.
+
+  No code changes; no API changes; this is the docs UX reconciliation
+  that makes v1.15's AI tooling story discoverable.
+
+- [`dc739d7`](https://github.com/directive-run/directive/commit/dc739d7157650759f2899701edd95124ed9c16f1) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Rewrite `ai/ai-multi-agent.md`, `ai/ai-guardrails-memory.md`,
+  `ai/ai-budget-resilience.md`, and `ai/ai-testing-evals.md` against
+  the actual v1.14 exports. Every one of these four files had
+  comprehensive hallucinations that caused LLM-generated code to fail
+  at import time or first call.
+
+  **ai-multi-agent.md** had been teaching `dag([{}])` as an array form
+  (real shape: `Record<string, DagNode>` with `deps` not
+  `dependencies`), `parallel(handlers)` without a required `merge` arg,
+  `reflect("name", opts)` without a required `evaluator` agent,
+  `debate(arr, {judge})` instead of `debate(DebateConfig)` with
+  `evaluator`, and `goal("agent", opts)` instead of
+  `goal(Record<string, GoalNode>, when, options)`. All five pattern
+  factory signatures were wrong.
+
+  **ai-guardrails-memory.md** had `createOutputSchemaGuardrail({
+schema, retries })` (real shape: `{ validate, errorPrefix }`),
+  `createToolGuardrail({ allowedTools })` (real: `{ allowlist,
+denylist, caseSensitive }`), `createLengthGuardrail({ minChars,
+maxChars, minTokens, maxTokens })` (real: only `maxCharacters` and
+  `maxTokens` — no min, no `maxChars` spelling),
+  `createContentFilterGuardrail({ patterns, action: "redact" })`
+  (real: `{ blockedPatterns, caseSensitive }`, block-only, no redact
+  mode), and `GuardrailError.errorCode` / `error.reason` (real:
+  `error.code` / `error.userMessage`).
+
+  **ai-budget-resilience.md** had `withFallback(primary, backup)`
+  (real: array of runners), `withRetry({ backoff, shouldRetry })`
+  (neither option exists; real: `{ maxRetries, baseDelayMs,
+maxDelayMs, isRetryable, onRetry }`), `createCircuitBreaker({
+resetTimeout, halfOpenMaxAttempts })` (real: `recoveryTimeMs` and
+  `halfOpenMaxRequests`), `breaker.wrap(runner)` / `breaker.state`
+  (real: `breaker.execute(fn)` / `breaker.getState()`),
+  `createHealthMonitor({ agents, checkInterval, onStatusChange })`
+  with `monitor.start()`/`getReport()`/`stop()` (real: a metrics
+  tracker with `recordSuccess`/`recordFailure`/`getHealthScore`),
+  `createOpenAIEmbedder` and `createAnthropicEmbedder` (neither exists
+  — users supply their own `EmbedderFn`), and `cache.wrap(runner)`
+  (real: pair `createSemanticCache` with
+  `createSemanticCacheGuardrail`).
+
+  **ai-testing-evals.md** had `createMockRunner` (real:
+  `createMockAgentRunner`), five hallucinated `assert*` helpers
+  (`assertAgentCalled`/`assertTokensUsed`/etc. — none exist), the
+  entire `createEvaluator` + `criteria.*()` namespace + `createLLMJudge`
+
+  - `createEvaluationSuite` (all hallucinated — real surface is
+    `createEvalSuite` with top-level `evalCost`/`evalLatency`/`evalJudge`
+    /`evalRelevance`/`evalCoherence`/`evalFaithfulness`/etc. factories),
+    and `createErrorSimulator` / `createLatencySimulator` (real:
+    `createFailingRunner` + `delay` on `MockAgentConfig`).
+
+  All four files now use full runnable examples with the actual import
+  paths (`@directive-run/ai/multi-agent`, `@directive-run/ai/guardrails`,
+  `@directive-run/ai/evals`, etc.) instead of the main barrel, and
+  inline every hallucination as a WRONG/CORRECT pair so future LLMs
+  catch the same drift on first read.
+
+  No code changes; no API changes; this is a content fix to the
+  published knowledge package.
+
+- [`19b056c`](https://github.com/directive-run/directive/commit/19b056cb1ff0efdd9f3fd2c99a03bd4835a10f08) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Final batch of the Tier-1 knowledge sweep. Three coordinated changes:
+
+  **Subpath barrel migration (T1.9).** Knowledge AI files and the
+  checkers example now import `createMultiAgentOrchestrator`, `parallel`,
+  `createOutputSchemaGuardrail`, and related multi-agent / guardrail
+  symbols from their `@directive-run/ai/multi-agent` and
+  `@directive-run/ai/guardrails` subpath barrels instead of the main
+  `@directive-run/ai` barrel. The main-barrel re-exports are marked
+  `@deprecated` and will be removed in v2; every example now compiles
+  clean against the post-v2 surface.
+
+  **Broken example extracts removed (T1.10).** Adds
+  `debounce-constraints` and `multi-module` to the
+  `EXCLUDED_EXAMPLES` list in
+  `packages/knowledge/scripts/extract-examples.ts`. Both had structural
+  mismatches between the source layout and the extractor's preferred-
+  file-name heuristic, producing bundled `.ts` files with bare string
+  literals (debounce-constraints) and zero schema definitions plus
+  unresolved relative imports (multi-module). Their underlying concepts
+  remain covered by `permissions.ts`, `shopping-cart.ts`, and
+  `async-chains.ts` — which all extract cleanly.
+
+  `examples/checkers/src/ai-orchestrator.ts` also fixed in the same
+  pass: the `dispose` / `destroy` rename hole is closed (the canonical
+  verb is `destroy()` for the orchestrators and `destroy()` for the
+  observability instance), the broken `.lab.js` import is replaced with
+  the public `@directive-run/core/plugins` exports (`createObservability`
+  and `createAgentMetrics` are both shipped on the public barrel), and
+  `createLengthStreamingGuardrail` is imported from the right home (it
+  lives on the main `@directive-run/ai` barrel, NOT under
+  `/guardrails`). The bundled `ai-orchestrator.ts` and `checkers.ts`
+  examples both regenerate from this fixed source.
+
+  `examples/data-triggers/src/index.ts` also gets `(req, ctx)` →
+  `(req, context)` to match the team's naming convention.
+
+  **Comparison framing injected into discovery surfaces (T1.11).** The
+  CLI-generated `.cursorrules` (cursor.ts template) and `CLAUDE.md`
+  (claude.ts template) now lead with a "When to reach for Directive"
+  section that explicitly positions the package against Redux Toolkit,
+  Zustand, Jotai, XState, React Query, and TanStack Query. The unique
+  claim — "state and AI agents share the same runtime" — is stated
+  verbatim, because `@directive-run/ai` is structurally the only
+  state-library ecosystem that ships LLM orchestration as a sibling
+  concept. The same paragraph is added to the website's `/llms.txt`
+  route so an LLM doing free-form retrieval also sees the positioning
+  inline instead of clicking through the buried `/comparison` page. The
+  cursor template also drops the stale anti-pattern that flagged
+  `useDirective` (which DOES exist in v1.14) and the now-corrected
+  GuardrailError field names propagate into the claude template's
+  anti-pattern table.
+
+  No code changes; no API changes; this is a content + tooling fix.
+
+- [`5f5dd4d`](https://github.com/directive-run/directive/commit/5f5dd4d36b80bce0a13152cfa4db3895fc53616e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix the five core-CRIT knowledge issues flagged by the v1.14 AE audit.
+
+  **core/testing.md** rewritten against the actual `createTestSystem`
+  overload — options-object only (`{ module: ... }` or `{ modules: ... }`),
+  no separate `createTestSystemFromModules` factory, mocks keyed by
+  type under `mocks.resolvers: { TYPE: { resolve: (req, context) => ... } }`,
+  and assertion helpers exposed as methods on the test-system instance
+  (`system.assertRequirement`, `system.assertFactSet`,
+  `system.assertResolverCalled`, `system.assertFactChanges`) rather
+  than as top-level imports. Inspect results now reference the real
+  `inspection.unmet` / `inspection.inflight` accessors instead of the
+  fictitious `inspection.requirements` field.
+
+  **core/constraints.md** changes the very first "basic anatomy"
+  example to use the function form of `require:` so that `facts.userId`
+  is actually in scope. The previous static-object example with a bare
+  `facts.userId` reference would not compile.
+
+  **core/multi-module.md** and **core/anti-patterns.md** reconciled on
+  `dispatch()`: the string-keyed two-argument form
+  (`system.dispatch("login", payload)`) does not exist, but the
+  single-arg object form (`system.dispatch({ type: "login", token })`)
+  is supported and is the right escape hatch for forwarding
+  programmatically-built events. The events accessor remains the
+  preferred path; both files now say the same thing.
+
+  **core/naming.md** rewrites the "Always Use Braces" section to stop
+  flip-flopping between WRONG and "wait actually". The rule is now
+  stated plainly: arrow-expression bodies (single-line derivations,
+  predicates, computed requirements) stay concise; control-flow blocks
+  (`if` / `for` / `while`) always use braces.
+
+  No code changes; no API changes; content fix to the published
+  knowledge package.
+
+- [`8008465`](https://github.com/directive-run/directive/commit/80084654073360a1a84d2cab80d36db5e2b10561) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Rewrite `core/react-adapter.md` and `ai/ai-orchestrator.md` against the
+  actual v1.14 exports. Both files were teaching hallucinated APIs that
+  caused every LLM scaffolding code from these knowledge files to fail
+  at import time or runtime.
+
+  The React adapter file had been teaching `useEvent` (singular),
+  `useSystem` as a top-level import, `DirectiveProvider` as a top-level
+  import, and `useDirectiveContext` — none of which exist as top-level
+  exports. The rewrite leads with the canonical `createDirectiveContext`
+  pattern (the actual sanctioned way to share a system across a
+  component tree) and shows the typed standalone hooks (`useFact`,
+  `useDerived`, `useEvents`, `useDispatch`, `useSelector`, `useDirective`)
+  in full runnable example files. The hallucinations are now called out
+  inline with a "use instead" table.
+
+  The AI orchestrator file had been teaching five hook names
+  (`onStart`, `onBeforeRun`, `onAfterRun`, `onError`, `onBudgetWarning`
+  inside `hooks`) that don't exist on `OrchestratorLifecycleHooks`,
+  along with a sync `checkpoint()` that's actually async, a
+  `createAgentOrchestrator({ checkpoint })` restore option that doesn't
+  exist (real flow: `orch.restore(cp)` on an existing instance), and
+  state fields (`runCount`, `lastError`, `tokenUsage.total`) that don't
+  match `AgentState`. The rewrite shows the real hook names
+  (`onAgentStart` / `onAgentComplete` / `onAgentError` / `onAgentRetry`
+  / `onGuardrailCheck`), the correct top-level placement of
+  `onBudgetWarning`, async checkpoint flow, the `{ stream, result,
+abort }` shape returned by `runStream`, and the actual nested-under-
+  `agent` state read path.
+
+  Both files now use full runnable file examples (imports + exports +
+  runnable) instead of fragments, so LLMs aren't forced to fill in
+  missing imports with guessed paths.
+
+  No code changes; no API changes; this is a content fix to the
+  published knowledge package.
+
+- [`b4f748b`](https://github.com/directive-run/directive/commit/b4f748bbf194dadc019413f47dea3505147102c9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Rewrite `ai/ai-debug-observability.md`, `ai/ai-security.md`,
+  `ai/ai-mcp-rag.md`, `ai/ai-agents-streaming.md`, and
+  `ai/ai-communication.md` against the actual v1.14 exports. Closes the
+  final batch of T1.7 in the knowledge content sweep.
+
+  **ai-debug-observability.md** had been teaching
+  `timeline.subscribe(listener, { filter })` (no options arg exists),
+  `timeline.query({type, since})` (no `.query()` exists — real surface
+  is typed `getEventsByType<T>` / `getEventsInRange` /
+  `getEventsForAgent` / `getEventsAtSnapshot`), `debug: { timeline,
+verbose, breakpoints }` (real `OrchestratorDebugConfig` has only
+  `verboseTimeline?: boolean`; breakpoints + onBreakpoint are top-level
+  options; the timeline is read off `orchestrator.timeline` after
+  construction), and breakpoint configs with imaginary `when()` /
+  `onHit(event, resume)` shapes (real shape is declarative
+  `before:`/`after:` event type + optional `filter:` predicate, resumed
+  via `orchestrator.resumeBreakpoint(id)`).
+
+  **ai-security.md** had `createAuditTrailPlugin` and
+  `createCompliancePlugin` from `@directive-run/core/plugins` (real:
+  `createAuditTrail` and `createCompliance` from `@directive-run/ai`),
+  both treated as Directive plugins to drop into `plugins:[…]` (real:
+  they return instances you record into / call directly).
+  `createPromptInjectionGuardrail` had `sensitivity` and `allowlist`
+  options (real: `strictMode`, `blockThreshold`, `additionalPatterns`,
+  `replacePatterns`, `sanitize`, `onBlocked`, `ignoreCategories`).
+  `createPIIGuardrail` was being used on both input and output (real:
+  it's input-only; `createOutputPIIGuardrail` covers output).
+
+  **ai-mcp-rag.md** fixed every lifecycle verb
+  (`disconnect("name")` / `disconnectAll()` → `disconnectServer(name)`
+  / `disconnect()`), the status surface
+  (`getStatus()` → `getServerStatus(name)` + `getAllServerStatuses()`),
+  the tools return type (`getTools()` returns
+  `Map<server, MCPTool[]>` not a flat array), the MCPAdapterConfig
+  options (`autoConnect` / `autoReconnect` / `approvalTimeoutMs` /
+  `allowDirectCalls` / `clientFactory` — not `connectionTimeout` /
+  `reconnect`), and the embedder shape (`EmbedderFn = (string) =>
+Promise<number[]>` — no `createOpenAIEmbedder` /
+  `createAnthropicEmbedder` factories exist; users supply their own
+  embedder, optionally batched via `createBatchedEmbedder`).
+
+  **ai-agents-streaming.md** fixed `createStreamingCallbackRunner` →
+  `createStreamingRunner(callbackBased, opts)` (the callback form is
+  the INPUT to this wrapper, not a separate factory),
+  `createSSEResponse(stream)` → `createSSETransport(config)` with
+  `{ toResponse, toStream }`, the runStream return value
+  (`{ stream, result, abort }`, not an AsyncIterable directly), and the
+  `TokenUsage` shape (only `inputTokens` and `outputTokens` — no
+  `total`).
+
+  **ai-communication.md** fixed `bus.request(...)` (lives on
+  `AgentNetwork.request(from, to, action, payload, timeout)` — not on
+  the MessageBus), the subscription return type (`Subscription` with
+  `.unsubscribe()`, not a bare unsubscribe function), the
+  `findByCapability` return type (`AgentInfo[]`, not `string[]`),
+  removed the fictitious `network.route(capability, payload)` method,
+  removed the `createMultiAgentOrchestrator({ bus })` option (wire the
+  bus alongside the orchestrator via hooks), and corrected the
+  scratchpad mutability story (the scratchpad is `Readonly` — return
+  new state through task outputs).
+
+  All five files now use full runnable examples with the correct
+  subpath import paths and inline every hallucination as a WRONG/CORRECT
+  pair. T1.7 closed — combined with T1.1-T1.6 this completes the
+  Tier-1 knowledge content rewrites against v1.14.
+
+  No code changes; no API changes; this is a content fix to the
+  published knowledge package.
+
+- [`f1c0c7c`](https://github.com/directive-run/directive/commit/f1c0c7cf0e0320f15bc154fc9b09dbb17608c24e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix `parseNavigation` so the last section of `docsNavigation` no longer
+  gets misplaced under `aiNavigation` when the parser walks `navigation.ts`.
+
+  The parser switches `currentArray` when it sees `export const aiNavigation`
+  but did not flush the in-progress section into the old array first. The
+  next title-only line would then push the orphaned section into the wrong
+  bucket. In the published `sitemap.md`, that meant "Integration Guides"
+  appeared under `## AI` instead of `## Docs`. The regenerated sitemap now
+  places it correctly and surfaces the new "Composing all four" entry under
+  Packages.
+
+  Also adds 43 unit tests across the four generator scripts
+  (`build-skills`, `generate-sitemap`, `generate-api-skeleton`,
+  `extract-examples`), covering frontmatter parsing, nav walking,
+  kind-order rendering, DOM-stripping rules, and the `addHeader` formatter.
+  The pure helpers are now exported and each `main()` is gated on
+  `import.meta.url === \`file://${process.argv[1]}\`` so tests can import
+  the helpers without triggering script execution.
+
 ## 1.14.0
 
 ## 1.13.0

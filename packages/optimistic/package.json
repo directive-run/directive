@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/optimistic",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Resolver-scope optimistic update + automatic rollback for Directive.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -39,7 +39,11 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",

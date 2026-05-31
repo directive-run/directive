@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/mutator",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Discriminated mutation helper for Directive — collapse the pendingAction ceremony to a typed handler map.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -39,7 +39,11 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
