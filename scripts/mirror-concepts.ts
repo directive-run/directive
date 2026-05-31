@@ -147,10 +147,17 @@ function transform(source: string): TransformResult {
 }
 
 function buildMirrorFile(result: TransformResult): string {
-  // Escape any literal double-quote in the description for valid YAML.
-  const safeDescription = result.frontmatterDescription.replace(/"/g, '\\"');
+  // Wrap title and description in single-quoted YAML strings. Single-quoted
+  // YAML treats every character literally except `'` (which is escaped as
+  // `''`). That means `@` (otherwise a reserved YAML indicator), backticks,
+  // and double quotes all pass through unchanged — no JSON-style \" escapes
+  // (which break the docs site's frontmatter parser), no special handling
+  // of `@directive-run/*` titles (which YAML would otherwise read as a
+  // mapping key starting with the reserved `@`).
+  const safeTitle = `'${result.frontmatterTitle.replace(/'/g, "''")}'`;
+  const safeDescription = `'${result.frontmatterDescription.replace(/'/g, "''")}'`;
   return `---
-title: ${result.frontmatterTitle}
+title: ${safeTitle}
 description: ${safeDescription}
 ---
 
