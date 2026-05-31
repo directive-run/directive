@@ -1,5 +1,7 @@
 # React Adapter
 
+> Covers `@directive-run/react` — `useFact`, `useDerived`, `useEvents`, `useSelector`, `useDirective`, `createDirectiveContext`.
+
 The React adapter connects Directive systems to React components. Import from `@directive-run/react`.
 
 ## Canonical pattern: `createDirectiveContext`

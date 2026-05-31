@@ -1,5 +1,7 @@
 # AI multi-agent orchestrator
 
+> Covers `@directive-run/ai/multi-agent` — `createMultiAgentOrchestrator` + 8 composition patterns (parallel / sequential / supervisor / dag / reflect / race / debate / goal).
+
 `createMultiAgentOrchestrator` coordinates multiple agents using 8 composition patterns. Each agent becomes a namespaced Directive module with a shared coordinator. Patterns are pure config objects you assemble with factory functions and pass via the `patterns:` option.
 
 For a single agent, see `ai-orchestrator.md`.

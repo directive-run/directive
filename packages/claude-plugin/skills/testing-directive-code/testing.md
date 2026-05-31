@@ -1,5 +1,7 @@
 # Testing
 
+> Covers `@directive-run/core/testing` — `createTestSystem`, mock resolvers, assertion helpers, coverage tracker, test observer.
+
 Testing utilities for Directive modules and systems. Import from `@directive-run/core/testing`.
 
 ## Decision tree

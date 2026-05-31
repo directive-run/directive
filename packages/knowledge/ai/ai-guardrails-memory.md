@@ -1,5 +1,7 @@
 # AI guardrails and memory
 
+> Covers `@directive-run/ai/guardrails` and `@directive-run/ai` — input/output/toolCall guardrails (PII, prompt-injection, length, schema, content filter), memory strategies, summarizers.
+
 Guardrails validate and transform input, output, and tool calls. Memory strategies manage conversation history with configurable summarization. Both plug into `createAgentOrchestrator` and `createMultiAgentOrchestrator`.
 
 Import guardrail factories from the subpath barrel — the main `@directive-run/ai` re-exports them with `@deprecated` notices for v2.

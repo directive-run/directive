@@ -1,5 +1,7 @@
 # AI Adapters
 
+> Covers `@directive-run/ai/{openai,anthropic,ollama,gemini}` — provider runners that normalize to the `AgentRunner` interface (zero SDK deps).
+
 Adapters connect the orchestrator to LLM providers. Each adapter normalizes provider-specific APIs into Directive's `AgentRunner` interface.
 
 ## Decision Tree: "Which adapter do I need?"

@@ -1,5 +1,7 @@
 # AI agents + streaming
 
+> Covers `@directive-run/ai` — `AgentLike`, `RunResult`, `StreamChunk`, backpressure, `createStreamingRunner`, `createSSETransport`.
+
 Defines the `AgentLike` shape, the `RunResult` returned by every runner, the `StreamChunk` discriminated union, backpressure strategies, the streaming runner wrapper, and the SSE transport for piping tokens to a browser.
 
 ## Decision tree

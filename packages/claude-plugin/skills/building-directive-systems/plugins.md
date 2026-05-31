@@ -1,5 +1,7 @@
 # Plugins
 
+> Covers `@directive-run/core/plugins` — plugin authoring + built-ins (logging, devtools, persistence, audit-ledger, observability, OTLP).
+
 Plugins extend Directive systems with cross-cutting functionality like logging, persistence, devtools, and resilience patterns.
 
 ## Decision Tree: "Which plugin do I need?"

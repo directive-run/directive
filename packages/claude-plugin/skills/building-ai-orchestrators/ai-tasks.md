@@ -1,5 +1,7 @@
 # AI Tasks
 
+> Covers `@directive-run/ai` — deterministic non-LLM task registration with cancellation, retry, and scratchpad access; composes with multi-agent patterns.
+
 Tasks are deterministic, non-LLM work units that run alongside agents in orchestration patterns. Use tasks for data transformation, API calls, file I/O, or any work that does not need an LLM.
 
 ## Decision Tree: "Should this be an agent or a task?"

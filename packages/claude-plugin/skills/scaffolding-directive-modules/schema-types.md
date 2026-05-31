@@ -1,5 +1,7 @@
 # Schema Types
 
+> Covers `@directive-run/core` — schema builders (`t.string` / `t.number` / `t.array` / etc.) and inference helpers.
+
 The `t.*()` builders define fact types in module schemas. They provide runtime validation in dev mode and full TypeScript inference.
 
 ## Decision Tree: "Which type builder do I use?"

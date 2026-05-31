@@ -1,5 +1,7 @@
 # Constraints
 
+> Covers `@directive-run/core` — constraint definition: `when` / `require`, async constraints with `deps`, priority, data-form predicates.
+
 Constraints declare WHEN something is needed. They are the demand side of the constraint-resolver pattern. Constraints evaluate conditions against facts and emit requirements that resolvers fulfill.
 
 ## Decision Tree: "Should this be a constraint?"

@@ -1,5 +1,7 @@
 # AI testing and evaluations
 
+> Covers `@directive-run/ai/testing` and `@directive-run/ai/evals` — `createMockAgentRunner`, `createTestOrchestrator`, simulators, `createEvalSuite` + `eval*` criteria.
+
 Mock runners, test orchestrators, snapshot helpers, simulators, and a dataset-driven evaluation framework. Import all testing utilities from `@directive-run/ai/testing`; eval criteria factories come from `@directive-run/ai/evals`.
 
 ## Decision tree

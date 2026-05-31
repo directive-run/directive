@@ -1,5 +1,7 @@
 # AI debug + observability
 
+> Covers `@directive-run/ai/devtools` and `@directive-run/core/plugins` — `createDebugTimeline`, breakpoints, `createOtelPlugin`, `createOTLPExporter`.
+
 Debug timeline with typed event recording, breakpoints, checkpoints, an OTel plugin for span emission, and an OTLP exporter for sending metrics/traces to any OTel-compatible backend.
 
 ## Decision tree

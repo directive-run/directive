@@ -1,5 +1,7 @@
 # AI Orchestrator (single-agent)
 
+> Covers `@directive-run/ai` — `createAgentOrchestrator` for single-agent runs with constraints, resolvers, guardrails, memory, budgets, approval, breakpoints, retry, structured output, circuit breakers, checkpoints.
+
 `createAgentOrchestrator` builds a Directive-backed runtime for ONE AI agent with constraints, resolvers, guardrails, memory, budgets, approval, breakpoints, retry, structured output, circuit breakers, checkpoints, and observability hooks.
 
 For multiple agents (pipelines, debates, DAGs), see `ai-multi-agent.md`.

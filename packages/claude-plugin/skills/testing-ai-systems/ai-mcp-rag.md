@@ -1,5 +1,7 @@
 # AI MCP + RAG
 
+> Covers `@directive-run/ai/mcp` and `@directive-run/ai` — MCP adapter (`createMCPAdapter`), RAG enricher, embedder utilities.
+
 Model Context Protocol (MCP) server integration and Retrieval-Augmented Generation (RAG) enrichment for Directive AI agents. Import from `@directive-run/ai/mcp` for the MCP adapter (the main barrel re-exports it with `@deprecated` notices for v2 removal), and from `@directive-run/ai` for the RAG enricher + embedder utilities.
 
 ## Decision tree

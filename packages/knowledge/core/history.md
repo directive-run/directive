@@ -1,5 +1,7 @@
 # History & Snapshots
 
+> Covers `@directive-run/core` — time-travel: snapshot, undo/redo, replay, export/import, changeset grouping.
+
 Directive records fact changes as snapshots, enabling undo/redo, replay, export/import, and changeset grouping.
 
 ## Decision Tree: "Should I enable history?"

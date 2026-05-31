@@ -1,5 +1,7 @@
 # Multi-Module Systems
 
+> Covers `@directive-run/core` — namespaced multi-module systems, cross-module deps, `facts.self.*`.
+
 How to compose multiple modules into a namespaced system with cross-module type safety.
 
 ## Decision Tree: "Single or Multi-Module?"

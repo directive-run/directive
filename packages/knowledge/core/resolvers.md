@@ -1,5 +1,7 @@
 # Resolvers
 
+> Covers `@directive-run/core` — resolver definition: retry policies, batching, cancellation, custom dedup keys, `owns` binding.
+
 Resolvers fulfill requirements emitted by constraints. They are the supply side of the constraint-resolver pattern. Resolvers handle async work and mutate state through `context.facts`.
 
 ## Decision Tree: "How should this resolver work?"

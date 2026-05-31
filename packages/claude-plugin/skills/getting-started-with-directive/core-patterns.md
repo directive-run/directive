@@ -1,5 +1,7 @@
 # Core Patterns
 
+> Covers `@directive-run/core` — modules, facts, derivations, effects, events, and the constraint-resolver loop.
+
 How to think about building with Directive: modules, systems, and the constraint-resolver pattern.
 
 ## Decision Tree: "Where does this logic go?"

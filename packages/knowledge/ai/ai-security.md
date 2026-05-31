@@ -1,5 +1,7 @@
 # AI security
 
+> Covers `@directive-run/ai` and `@directive-run/ai/guardrails` — `createPIIGuardrail`, `createPromptInjectionGuardrail`, `createAuditTrail`, `createCompliance` (GDPR/CCPA).
+
 PII detection and redaction, prompt-injection defense, audit trails with non-repudiation, and GDPR/CCPA compliance — all wired in via Directive's guardrail and instance APIs. Import the audit + compliance instances from `@directive-run/ai` (NOT `@directive-run/core/plugins`); import the security guardrails from `@directive-run/ai/guardrails`.
 
 ## Decision tree

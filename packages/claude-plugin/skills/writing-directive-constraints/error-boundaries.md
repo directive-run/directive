@@ -1,5 +1,7 @@
 # Error Boundaries
 
+> Covers `@directive-run/core` — error boundaries, recovery strategies, lifecycle hooks, and circuit breakers.
+
 How to handle errors in Directive: recovery strategies, error boundaries, lifecycle hooks, and the circuit breaker pattern.
 
 ## Decision Tree: "How should errors be handled?"

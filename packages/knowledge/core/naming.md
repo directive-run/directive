@@ -1,5 +1,7 @@
 # Naming Conventions
 
+> Covers all `@directive-run/*` packages — terminology, parameter names, return-style rules.
+
 Directive naming rules that AI coding assistants must follow. These are non-negotiable project conventions.
 
 ## Decision Tree: "What do I call this?"

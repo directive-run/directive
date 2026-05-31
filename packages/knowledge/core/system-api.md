@@ -1,5 +1,7 @@
 # System API
 
+> Covers `@directive-run/core` — `createSystem`, the system instance surface, hydration, inspection, distributable snapshots.
+
 The system is created with `createSystem()` and is the runtime that orchestrates modules, constraints, resolvers, and plugins.
 
 ## Decision Tree: "How do I interact with the system?"

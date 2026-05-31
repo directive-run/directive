@@ -1,5 +1,7 @@
 # AI inter-agent communication
 
+> Covers `@directive-run/ai` — `createMessageBus`, `createAgentNetwork`, request/response patterns, scratchpad, cross-agent fact reads.
+
 `createMessageBus` for typed pub/sub, `createAgentNetwork` for capability-based discovery and request/response patterns, plus the scratchpad and cross-agent state access available via a multi-agent orchestrator. Import from `@directive-run/ai`.
 
 ## Decision tree

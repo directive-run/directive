@@ -1,5 +1,7 @@
 # AI budget + resilience
 
+> Covers `@directive-run/ai` — `withBudget`, `withRetry`, `withFallback`, `createCircuitBreaker`, `createHealthMonitor`, `createSemanticCache`, `createConstraintRouter`.
+
 Runner wrappers and supporting utilities for cost control, retry, fallback, circuit breaking, fleet health tracking, semantic caching, and constraint-driven provider routing. Compose these around any `AgentRunner` before passing it to an orchestrator.
 
 ## Decision tree
