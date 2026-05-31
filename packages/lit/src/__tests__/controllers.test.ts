@@ -415,6 +415,25 @@ describe("DirectiveSelectorController", () => {
 
     expect(host.updateCount).toBe(countBefore);
   });
+
+  it("infers the schema's value types into the selector callback", () => {
+    // Type-level: with the schema flowing through, `state.count` resolves
+    // to the schema's typed value — arithmetic on it should compile
+    // without an `as number` cast, and the same proxy carries derivations
+    // (`state.doubled` is the inferred derivation return type).
+    const controller = new DirectiveSelectorController(
+      host,
+      system,
+      (state) => state.count + state.doubled,
+    );
+    controller.hostConnected();
+
+    expect(controller.value).toBe(0);
+
+    system.facts.count = 5;
+
+    expect(controller.value).toBe(15);
+  });
 });
 
 // ============================================================================

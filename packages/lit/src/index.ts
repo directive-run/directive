@@ -20,6 +20,7 @@ import type {
   InferDerivations,
   InferEvents,
   InferFacts,
+  InferSelectorState,
   ModuleDef,
   ModuleSchema,
   ModulesMap,
@@ -292,8 +293,11 @@ export class RequirementStatusController implements ReactiveController {
  * Reactive controller for selecting across all facts.
  * Uses `withTracking()` for auto-tracking when constructed with `autoTrack: true`.
  */
-export class DirectiveSelectorController<R> extends DirectiveController {
-  private selector: (state: Record<string, unknown>) => R;
+export class DirectiveSelectorController<
+  S extends ModuleSchema = ModuleSchema,
+  R = unknown,
+> extends DirectiveController {
+  private selector: (state: InferSelectorState<S>) => R;
   private equalityFn: (a: R, b: R) => boolean;
   private autoTrack: boolean;
   private deriveKeySet: Set<string>;
@@ -304,9 +308,8 @@ export class DirectiveSelectorController<R> extends DirectiveController {
 
   constructor(
     host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
-    system: SingleModuleSystem<any>,
-    selector: (state: Record<string, unknown>) => R,
+    system: SingleModuleSystem<S>,
+    selector: (state: InferSelectorState<S>) => R,
     equalityFn: (a: R, b: R) => boolean = defaultEquality,
     options?: { autoTrack?: boolean },
   ) {
@@ -323,7 +326,11 @@ export class DirectiveSelectorController<R> extends DirectiveController {
   }
 
   private runWithTracking(): TrackedSelectorResult<R> {
-    return runTrackedSelector(this.system, this.deriveKeySet, this.selector);
+    return runTrackedSelector(
+      this.system,
+      this.deriveKeySet,
+      this.selector as (state: Record<string, unknown>) => R,
+    );
   }
 
   private resubscribe(): void {
@@ -799,15 +806,14 @@ export function createWatch<T>(
   return new WatchController<T>(host, system, derivationId, callback);
 }
 
-export function createDirectiveSelector<R>(
+export function createDirectiveSelector<S extends ModuleSchema, R>(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
-  system: SingleModuleSystem<any>,
-  selector: (state: Record<string, unknown>) => R,
+  system: SingleModuleSystem<S>,
+  selector: (state: InferSelectorState<S>) => R,
   equalityFn: (a: R, b: R) => boolean = defaultEquality,
   options?: { autoTrack?: boolean },
-): DirectiveSelectorController<R> {
-  return new DirectiveSelectorController<R>(
+): DirectiveSelectorController<S, R> {
+  return new DirectiveSelectorController<S, R>(
     host,
     system,
     selector,
