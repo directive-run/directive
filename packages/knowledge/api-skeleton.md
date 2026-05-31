@@ -100,11 +100,17 @@
   function generateRequirementId(req: Requirement, keyFn?: RequirementKeyFn): string
   ```
 - `getKind` — Return the {@link SchemaKindNode} for a schema field. Prefers the
+  ```ts
+  function getKind(schema: unknown): SchemaKindNode
+  ```
 - `getOperatorsForKind` — Return the set of `PredicateOp` strings that are valid against a
   ```ts
   function getOperatorsForKind(node: SchemaKindNode): readonly PredicateOp[]
   ```
 - `getSchemaFieldKinds` — Walk the `facts` block of a module schema and emit a flat map from
+  ```ts
+  function getSchemaFieldKinds(schema: unknown): Map<string, SchemaKindNode>
+  ```
 - `initialTimerState` — Initial state for a newly-created timer. Pass this to your Directive
   ```ts
   function initialTimerState(): TimerFactState
@@ -612,7 +618,15 @@
   ```
 - `SchemaKindNode` — A tree-shaped discriminator for a schema field. Composite kinds
   ```ts
-  export type SchemaKindNode =
+  export type SchemaKindNode = (
+  ```
+- `SystemDerived` — Extract the typed derivations shape from a Directive system or module schema.
+  ```ts
+  export type SystemDerived<T> = T extends SingleModuleSystem<infer S>
+  ```
+- `SystemFacts` — Extract the typed facts shape from a Directive system or module schema.
+  ```ts
+  export type SystemFacts<T> = T extends SingleModuleSystem<infer S>
   ```
 - `SystemMode` — System mode discriminator.
   ```ts
