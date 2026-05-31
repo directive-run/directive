@@ -2,244 +2,283 @@
 
 Testing utilities for Directive modules and systems. Import from `@directive-run/core/testing`.
 
-## Decision Tree: "How should I test this?"
+## Decision tree
 
 ```
 What are you testing?
-├── A single module in isolation → createTestSystem(module)
-├── Multiple modules together → createTestSystemFromModules({ a, b })
-├── A constraint fires correctly → Set facts, check requirements
-├── A resolver mutates facts → Mock the resolver, dispatch, assert facts
-├── A derivation computes correctly → Set facts, read derived value
-├── Async settling behavior → settleWithFakeTimers(system, vi)
-└── An effect runs → Set facts, assert side effects
+├── A single module in isolation       → createTestSystem({ module })
+├── Multiple modules together           → createTestSystem({ modules: {...} })
+├── A constraint fires correctly        → set facts, system.assertRequirement(type)
+├── A resolver mutates facts            → mocks.resolvers[TYPE], dispatch, await waitForIdle, assertFactSet
+├── A derivation computes correctly     → set facts, read system.derive.x
+├── Async settling with retry/timeouts  → await system.waitForIdle() (uses real timers)
+├── Coverage tracking                    → createCoverageTracker(system)
+└── Observation event capture            → createTestObserver(system)
 ```
 
-## Creating Test Systems
+## Creating a test system
+
+`createTestSystem` takes an options OBJECT — the same shape as `createSystem` — and adds an optional `mocks.resolvers` map keyed by requirement type. There is no separate `createTestSystemFromModules` factory; the same overload handles both single-module (`module:`) and namespaced (`modules:`) systems.
 
 ```typescript
-import {
-  createTestSystem,
-  createTestSystemFromModules,
-  mockResolver,
-  flushMicrotasks,
-  settleWithFakeTimers,
-  assertFact,
-  assertDerivation,
-  assertRequirement,
-} from "@directive-run/core/testing";
+import { createTestSystem } from "@directive-run/core/testing";
 
-// Single module – same API as createSystem, with testing defaults
-// (time-travel off, no plugins, synchronous settling)
-const system = createTestSystem(myModule);
-
-// With options
-const system = createTestSystem(myModule, {
-  initialFacts: { count: 5, phase: "loading" },
-  mockResolvers: [mockResolver("FETCH_USER", async (req, context) => {
-    context.facts.user = { id: req.userId, name: "Test User" };
-  })],
+// Single module
+const system = createTestSystem({
+  module: counterModule,
 });
 
-// Multi-module
-const system = createTestSystemFromModules(
-  { auth: authModule, cart: cartModule },
-  { mockResolvers: [mockResolver("AUTHENTICATE", async (req, context) => {
-    context.facts.auth.token = "test-token";
-  })] },
-);
+// Namespaced (multi-module)
+const system = createTestSystem({
+  modules: { auth: authModule, cart: cartModule },
+});
+
+// With mocks — keyed by requirement type, value is a MockResolverOptions
+const system = createTestSystem({
+  module: userModule,
+  mocks: {
+    resolvers: {
+      FETCH_USER: {
+        resolve: (req, context) => {
+          context.facts.user = { id: req.userId, name: "Test User" };
+        },
+      },
+    },
+  },
+});
 ```
 
-## Testing Constraints
+A `TestSystem` extends the production `SingleModuleSystem<S>` / `NamespacedSystem<Modules>` with extra fields for observability:
 
-Set facts to trigger the constraint's `when()`, then assert the requirement was emitted.
+```typescript
+system.waitForIdle(maxWait?);    // wait for all in-flight resolvers (default 5000ms; throws on timeout)
+system.eventHistory;              // every dispatched event
+system.resolverCalls;             // Map<requirementType, Requirement[]>
+system.allRequirements;           // every requirement generated (both resolved and pending)
+system.getFactsHistory();         // FactChangeRecord[] since start / last reset
+system.resetFactsHistory();
+```
+
+## Assertions are METHODS on the test system
+
+Assertion helpers live on the test-system instance, not as top-level imports. `assertFact` / `assertDerivation` / `assertRequirement` as top-level imports do not exist.
+
+```typescript
+system.assertRequirement("FETCH_USER");        // a requirement of this type was generated
+system.assertResolverCalled("FETCH_USER", 1);  // the resolver was called N times
+system.assertFactSet("phase", "loaded");       // the fact was set to a specific value
+system.assertFactChanges("count", 3);          // the fact was changed N times
+```
+
+For derivation assertions, just read the derivation value and use your test framework's expect / equality helpers:
+
+```typescript
+import { expect } from "vitest";
+expect(system.derive.isOverBudget).toBe(true);
+```
+
+## Testing constraints
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import { createTestSystem, assertRequirement } from "@directive-run/core/testing";
+import { createTestSystem } from "@directive-run/core/testing";
 
 describe("fetchWhenAuth constraint", () => {
   it("emits FETCH_USER when authenticated without profile", () => {
-    const system = createTestSystem(userModule);
+    const system = createTestSystem({ module: userModule });
 
-    // Set facts to satisfy the constraint's when()
     system.facts.isAuthenticated = true;
     system.facts.profile = null;
 
-    // Assert the requirement was emitted
-    assertRequirement(system, "FETCH_USER");
+    system.assertRequirement("FETCH_USER");
   });
 
-  it("does NOT emit when already has profile", () => {
-    const system = createTestSystem(userModule, {
+  it("does NOT emit when already has a profile", () => {
+    const system = createTestSystem({
+      module: userModule,
       initialFacts: {
         isAuthenticated: true,
         profile: { id: "1", name: "Alice" },
       },
     });
 
-    // No requirement should exist
     const inspection = system.inspect();
-    const fetchReqs = inspection.requirements.filter(
-      (r) => r.type === "FETCH_USER",
-    );
+    const fetchReqs = inspection.unmet.filter((r) => r.type === "FETCH_USER");
     expect(fetchReqs).toHaveLength(0);
   });
 });
 ```
 
-## Testing Resolvers
+`SystemInspection` exposes `unmet`, `inflight`, and other typed accessors — there is no flat `inspection.requirements` field. Filter the right list (`unmet` for pending requirements, `inflight` for in-progress).
 
-Mock the resolver, trigger a requirement, and assert fact mutations.
+## Testing resolvers
 
 ```typescript
 describe("fetchUser resolver", () => {
   it("stores fetched user in facts", async () => {
-    const system = createTestSystem(userModule, {
-      mockResolvers: [
-        mockResolver("FETCH_USER", async (req, context) => {
-          // Simulate API response
-          context.facts.user = { id: req.userId, name: "Mocked User" };
-          context.facts.phase = "loaded";
-        }),
-      ],
+    const system = createTestSystem({
+      module: userModule,
+      mocks: {
+        resolvers: {
+          FETCH_USER: {
+            resolve: (req, context) => {
+              context.facts.user = { id: req.userId, name: "Mocked User" };
+              context.facts.phase = "loaded";
+            },
+          },
+        },
+      },
     });
 
     // Trigger the constraint that emits FETCH_USER
     system.facts.isAuthenticated = true;
     system.facts.user = null;
 
-    // Wait for resolver to complete
-    await system.settle();
+    // Wait for the resolver to finish (default 5s timeout)
+    await system.waitForIdle();
 
-    assertFact(system, "user", { id: expect.any(String), name: "Mocked User" });
-    assertFact(system, "phase", "loaded");
+    system.assertFactSet("user", { id: expect.anything(), name: "Mocked User" });
+    system.assertFactSet("phase", "loaded");
   });
 });
 ```
 
-## Testing Derivations
+`mocks.resolvers[TYPE]` accepts a `MockResolverOptions` — the most common shape is `{ resolve: (req, context) => {…} }`. You can also pass full mock-resolver behaviors (`onCall`, `respondWith`, etc.) — see `MockResolverOptions` for the full surface.
 
-Set facts, then read the derived value.
+For programmatic control of when a mock resolves (e.g. holding a request to test loading states), use the `mockResolver(type)` factory:
+
+```typescript
+import { mockResolver } from "@directive-run/core/testing";
+
+const mock = mockResolver("FETCH_USER");
+
+const system = createTestSystem({
+  module: userModule,
+  mocks: {
+    resolvers: { FETCH_USER: { resolve: mock.handler } },
+  },
+});
+
+system.facts.isAuthenticated = true;
+
+// Now mock.pending contains the in-flight request — resolve it manually
+expect(mock.calls).toHaveLength(1);
+mock.pending[0].resolve({ id: "u1", name: "Alice" });
+
+await system.waitForIdle();
+```
+
+## Testing derivations
+
+Set facts, read the derived value via `system.derive`.
 
 ```typescript
 describe("isOverBudget derivation", () => {
-  it("returns true when total exceeds budget", () => {
-    const system = createTestSystem(budgetModule, {
-      initialFacts: { total: 150, budget: 100 },
-    });
-
-    assertDerivation(system, "isOverBudget", true);
-  });
-
-  it("returns false when under budget", () => {
-    const system = createTestSystem(budgetModule, {
-      initialFacts: { total: 50, budget: 100 },
-    });
-
-    assertDerivation(system, "isOverBudget", false);
-  });
-
   it("recomputes when facts change", () => {
-    const system = createTestSystem(budgetModule, {
+    const system = createTestSystem({
+      module: budgetModule,
       initialFacts: { total: 50, budget: 100 },
     });
 
-    assertDerivation(system, "isOverBudget", false);
+    expect(system.derive.isOverBudget).toBe(false);
 
     system.facts.total = 200;
 
-    assertDerivation(system, "isOverBudget", true);
+    expect(system.derive.isOverBudget).toBe(true);
   });
 });
 ```
 
-## Async Testing with Fake Timers
+## Async testing with fake timers
 
-Use `settleWithFakeTimers` when resolvers have retry delays or timeouts.
+`waitForIdle` uses real timers by default. For tests that depend on retry backoff / TTLs / timers without burning wall-clock seconds, use `createFakeTimers()` (a vitest/jest-compatible controller) or your test framework's fake-timer integration.
 
 ```typescript
-import { describe, it, vi } from "vitest";
-import { createTestSystem, settleWithFakeTimers } from "@directive-run/core/testing";
+import { describe, it, expect, vi } from "vitest";
+import { createTestSystem } from "@directive-run/core/testing";
 
 describe("retry behavior", () => {
   it("retries on failure with exponential backoff", async () => {
     vi.useFakeTimers();
     let attempts = 0;
 
-    const system = createTestSystem(myModule, {
-      mockResolvers: [
-        mockResolver("FETCH_DATA", async (req, context) => {
-          attempts += 1;
-          if (attempts < 3) {
-            throw new Error("Temporary failure");
-          }
-          context.facts.data = "success";
-        }),
-      ],
+    const system = createTestSystem({
+      module: myModule,
+      mocks: {
+        resolvers: {
+          FETCH_DATA: {
+            resolve: async (req, context) => {
+              attempts += 1;
+              if (attempts < 3) {
+                throw new Error("Temporary failure");
+              }
+              context.facts.data = "success";
+            },
+          },
+        },
+      },
     });
 
     system.facts.needsData = true;
 
-    // Advances fake timers through retry delays and settles
-    await settleWithFakeTimers(system, vi);
+    // Advance through retry delays, then drain
+    await vi.runAllTimersAsync();
+    await system.waitForIdle();
 
     expect(attempts).toBe(3);
-    assertFact(system, "data", "success");
+    system.assertFactSet("data", "success");
 
     vi.useRealTimers();
   });
 });
 ```
 
-## Flushing Microtasks
+## Microtask flush
 
-Use `flushMicrotasks()` when you need to process pending promises without fully settling.
+For checking intermediate state without fully settling, use `flushMicrotasks()`.
 
 ```typescript
+import { flushMicrotasks } from "@directive-run/core/testing";
+
 it("processes intermediate state", async () => {
-  const system = createTestSystem(myModule);
+  const system = createTestSystem({ module: myModule });
 
   system.facts.trigger = true;
 
-  // Flush pending microtasks without waiting for full settlement
+  // Process one round of microtasks without waiting for resolvers
   await flushMicrotasks();
 
-  // Check intermediate state
-  assertFact(system, "phase", "loading");
+  system.assertFactSet("phase", "loading");
 
-  // Now settle fully
-  await system.settle();
+  await system.waitForIdle();
 
-  assertFact(system, "phase", "done");
+  system.assertFactSet("phase", "done");
 });
 ```
 
-## Coverage Tracking
-
-Track which constraints, resolvers, effects, and derivations are exercised:
+## Coverage tracking
 
 ```typescript
 import { createCoverageTracker } from "@directive-run/core/testing";
 
-const { run, report } = createCoverageTracker(system);
+const tracker = createCoverageTracker(system);
 
-await run(async () => {
+await tracker.run(async () => {
   system.facts.userId = 123;
-  await system.settle();
+  await system.waitForIdle();
 });
 
-const coverage = report();
-// coverage.constraintCoverage — 0-1 (percentage hit)
-// coverage.resolverCoverage — 0-1
-// coverage.effectCoverage — 0-1
-// coverage.derivationCoverage — 0-1
-// coverage.constraintsMissed — Set<string> of IDs never triggered
+const coverage = tracker.report();
+// coverage.constraintCoverage   — 0-1
+// coverage.resolverCoverage     — 0-1
+// coverage.effectCoverage       — 0-1
+// coverage.derivationCoverage   — 0-1
+// coverage.constraintsMissed    — Set<string> of ids never triggered
 ```
 
-## Test Observer
+## Test observer
 
-Collect observation events for assertion-based testing:
+Capture observation events for assertion-based testing:
 
 ```typescript
 import { createTestObserver } from "@directive-run/core/testing";
@@ -247,52 +286,119 @@ import { createTestObserver } from "@directive-run/core/testing";
 const observer = createTestObserver(system);
 
 system.facts.count = 5;
-await system.settle();
+await system.waitForIdle();
 
 const evals = observer.ofType("constraint.evaluate");
 expect(evals).toHaveLength(1);
 
-observer.clear();   // Reset
-observer.dispose();  // Stop observing
+observer.clear();   // reset captured events
+observer.dispose(); // stop capturing
 ```
 
-## Common Mistakes
+## Anti-patterns
 
-### Testing real resolvers instead of mocking
+### `createTestSystem(myModule)` (module as positional arg)
 
 ```typescript
-// WRONG – tests hit real APIs, slow and flaky
+// WRONG — createTestSystem takes an options object, not a positional module
 const system = createTestSystem(myModule);
-system.facts.needsFetch = true;
-await system.settle(); // Makes real HTTP call
 
-// CORRECT – mock the resolver
+// CORRECT — wrap in { module: ... }
+const system = createTestSystem({ module: myModule });
+```
+
+### `createTestSystemFromModules({ a, b })`
+
+```typescript
+// WRONG — there is no separate factory; the same createTestSystem handles both forms
+const system = createTestSystemFromModules({ auth, cart });
+
+// CORRECT — pass `modules:`
+const system = createTestSystem({ modules: { auth, cart } });
+```
+
+### Importing assertions as top-level helpers
+
+```typescript
+// WRONG — assertFact / assertDerivation / assertRequirement are not top-level exports
+import { assertFact, assertDerivation, assertRequirement } from "@directive-run/core/testing";
+assertRequirement(system, "FETCH_USER");
+assertFact(system, "phase", "loaded");
+
+// CORRECT — they live on the test system instance
+system.assertRequirement("FETCH_USER");
+system.assertFactSet("phase", "loaded");
+
+// For derivation reads, use expect() directly
+expect(system.derive.isOverBudget).toBe(true);
+```
+
+### `mockResolvers: [mockResolver(TYPE, fn)]` (positional array)
+
+```typescript
+// WRONG — mocks are keyed by type, not an array; and mockResolver only takes the type
 const system = createTestSystem(myModule, {
-  mockResolvers: [mockResolver("FETCH", async (req, context) => {
-    context.facts.data = { mocked: true };
-  })],
+  mockResolvers: [
+    mockResolver("FETCH_USER", async (req, context) => { /* ... */ }),
+  ],
+});
+
+// CORRECT — mocks.resolvers is a Record<type, MockResolverOptions>
+const system = createTestSystem({
+  module: myModule,
+  mocks: {
+    resolvers: {
+      FETCH_USER: {
+        resolve: async (req, context) => { /* ... */ },
+      },
+    },
+  },
 });
 ```
 
-### Forgetting to settle before asserting async results
+### `inspection.requirements`
 
 ```typescript
-// WRONG – resolver hasn't completed yet
-system.facts.trigger = true;
-assertFact(system, "result", "done"); // Fails!
+// WRONG — SystemInspection has `unmet` and `inflight`, not a flat `requirements`
+inspection.requirements.filter((r) => r.type === "FETCH_USER")
 
-// CORRECT – wait for resolution
-system.facts.trigger = true;
-await system.settle();
-assertFact(system, "result", "done");
+// CORRECT — filter the right list
+inspection.unmet.filter((r) => r.type === "FETCH_USER")     // pending
+inspection.inflight.filter((r) => r.type === "FETCH_USER")  // in-progress
 ```
 
-### Using ctx instead of context in mock resolvers
+### Calling `system.settle()` instead of `system.waitForIdle()`
+
+`system.settle(maxWait?)` exists on production systems. Test systems inherit it, but the recommended assertion-friendly drain on a `TestSystem` is `waitForIdle` — it shares the same semantics and integrates with the resolver-call tracking used by `assertResolverCalled`.
+
+```typescript
+// FINE — both work, but waitForIdle is the testing-flavored verb
+await system.settle();
+await system.waitForIdle();
+```
+
+### `ctx` instead of `context`
 
 ```typescript
 // WRONG
-mockResolver("FETCH", async (req, ctx) => { /* ... */ }),
+resolve: (req, ctx) => { ctx.facts.x = 1; }
 
 // CORRECT
-mockResolver("FETCH", async (req, context) => { /* ... */ }),
+resolve: (req, context) => { context.facts.x = 1; }
 ```
+
+## Quick reference
+
+| API | Path | Purpose |
+|---|---|---|
+| `createTestSystem(options)` | `@directive-run/core/testing` | Single overload; pass `module:` or `modules:` |
+| `mockResolver(type)` | `@directive-run/core/testing` | Programmatic mock with `calls` / `pending` / `handler` |
+| `createFakeTimers()` | `@directive-run/core/testing` | Vitest/Jest-compatible timer controller |
+| `flushMicrotasks()` | `@directive-run/core/testing` | Advance one microtask round |
+| `createCoverageTracker(system)` | `@directive-run/core/testing` | `run(fn)` + `report()` for constraint/resolver/effect/derivation hit rate |
+| `createTestObserver(system)` | `@directive-run/core/testing` | Capture observation events for assertions |
+| `system.assertRequirement(type)` | instance method | Assert a requirement was generated |
+| `system.assertResolverCalled(type, n?)` | instance method | Assert a resolver was called |
+| `system.assertFactSet(key, value?)` | instance method | Assert a fact value |
+| `system.assertFactChanges(key, n)` | instance method | Assert the change count for a fact |
+| `system.waitForIdle(maxWait?)` | instance method | Wait for in-flight resolvers (default 5000ms) |

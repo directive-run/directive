@@ -22,8 +22,10 @@ constraints: {
     // when() returns boolean – evaluated on every fact change
     when: (facts) => facts.isAuthenticated && !facts.user,
 
-    // require – the requirement to emit when condition is true
-    require: { type: "FETCH_USER", userId: facts.userId },
+    // require – the requirement to emit when condition is true.
+    // Use the function form whenever you need to read facts —
+    // facts is NOT in scope inside the static object form.
+    require: (facts) => ({ type: "FETCH_USER", userId: facts.userId }),
   },
 },
 ```
