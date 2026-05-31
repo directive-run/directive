@@ -1,81 +1,87 @@
-# AI Testing and Evaluations
+# AI testing and evaluations
 
-Mock runners, test orchestrators, assertion helpers, simulators, and an evaluation framework with LLM-as-judge and dataset-driven quality gates.
+Mock runners, test orchestrators, snapshot helpers, simulators, and a dataset-driven evaluation framework. Import all testing utilities from `@directive-run/ai/testing`; eval criteria factories come from `@directive-run/ai/evals`.
 
-## Decision Tree: "How do I test my AI code?"
+## Decision tree
 
 ```
 What are you testing?
-├── Single agent behavior → createTestOrchestrator + createMockRunner
-├── Multi-agent patterns → createTestMultiAgentOrchestrator
-├── Specific agent was called → assertAgentCalled(mockRunner, name)
-├── Token budget behavior → createMockRunner with token counts
-├── Guardrail logic → createTestOrchestrator with guardrails
-│
+├── Single-agent runs (unit/integration) → createTestOrchestrator
+├── Multi-agent patterns                  → createTestMultiAgentOrchestrator
+├── Just the runner contract              → createMockAgentRunner
+├── Approval workflow                     → createApprovalSimulator (built into createTestOrchestrator)
+├── Breakpoint pauses                     → createBreakpointSimulator
+├── DAG topology                          → createTestDag + assertDagExecution
+├── Failure modes (timeouts, errors)      → createFailingRunner
+├── Snapshot constraint behavior          → createConstraintRecorder
+└── Time-dependent logic                  → createTimeController
+
 What are you evaluating?
-├── Output quality → createEvaluator with criteria
-├── Automated grading → LLM-as-judge evaluator
-├── Regression testing → dataset-driven evaluation
-├── CI quality gates → evaluation thresholds
-│
-Where do I import from?
-├── Test utilities → '@directive-run/ai/testing'
-├── Evaluators → '@directive-run/ai/testing'
-└── Schema builders → '@directive-run/ai' (main, for t.*())
+├── Output quality                       → createEvalSuite + eval* criteria
+├── Token / latency budgets              → evalCost + evalLatency
+├── Output shape / size                  → evalOutputLength + evalStructure
+├── Safety / PII                         → evalSafety
+├── Reference match                      → evalMatch
+├── Faithfulness / relevance / coherence → evalFaithfulness / evalRelevance / evalCoherence
+├── LLM-as-judge                          → evalJudge
+└── Custom assertion                     → evalAssert
 ```
 
-## Mock Runners
+## Mock runner
 
-Create deterministic runners that return predefined responses:
-
-```typescript
-import { createMockRunner } from "@directive-run/ai/testing";
-
-// Pattern-matched responses
-const mockRunner = createMockRunner([
-  { input: /analyze/, output: "Analysis complete: positive trend", tokens: 100 },
-  { input: /summarize/, output: "Summary: key findings are...", tokens: 50 },
-  { input: /translate/, output: "Translation: Hola mundo", tokens: 30 },
-]);
-
-// Catch-all default response
-const mockRunner = createMockRunner([
-  { input: /specific/, output: "Matched specific" },
-  { input: /.*/, output: "Default response", tokens: 10 },
-]);
-```
-
-### Mock Runner with Side Effects
+`createMockAgentRunner` returns `{ run, getCalls, getCallsFor, clearCalls, setResponse, setDefaultResponse }`. The factory takes a SINGLE options object — responses are keyed by **agent name**, NOT input pattern. (For input-pattern matching, use `generate` inside a response.) **The function is named `createMockAgentRunner`, not `createMockRunner`**.
 
 ```typescript
-const mockRunner = createMockRunner([
-  {
-    input: /analyze/,
-    output: "Analysis complete",
-    tokens: 100,
-    // Simulate tool calls
-    toolCalls: [
-      { name: "search", arguments: '{"query":"data"}', result: "found 5 items" },
-    ],
-    // Simulate latency
-    delayMs: 200,
+import { createMockAgentRunner } from "@directive-run/ai/testing";
+
+const mock = createMockAgentRunner({
+  responses: {
+    analyst: { output: "Analysis: positive trend", totalTokens: 100 },
+    writer:  { output: "Draft article…",            totalTokens: 200, delay: 50 },
+    failing: { output: "n/a", error: new Error("simulated 503") },
   },
-]);
+  defaultResponse: { output: "mock response", totalTokens: 10 },
+  recordCalls: true,
+});
+
+const orchestrator = createAgentOrchestrator({ runner: mock.run });
+
+await orchestrator.run({ name: "analyst", instructions: "…", model: "x" }, "Analyze this");
+
+mock.getCalls();                // RecordedCall[] — every recorded run
+mock.getCallsFor("analyst");    // RecordedCall[] — only this agent
+mock.setResponse("analyst", { output: "different reply", totalTokens: 80 });
+mock.clearCalls();
 ```
 
-## Test Orchestrator
-
-Lightweight orchestrator for unit testing:
+For dynamic responses keyed on input, use the `generate` callback inside the config:
 
 ```typescript
-import { createTestOrchestrator, createMockRunner, t } from "@directive-run/ai/testing";
+const mock = createMockAgentRunner({
+  responses: {
+    classifier: {
+      output: "fallback",
+      totalTokens: 10,
+      generate: (input) => /summarize/i.test(input)
+        ? { output: "Summary: …", totalTokens: 50 }
+        : { output: "Default reply", totalTokens: 10 },
+    },
+  },
+});
+```
 
-const mockRunner = createMockRunner([
-  { input: /analyze/, output: "Analysis: positive", tokens: 100 },
-]);
+## Test orchestrator
 
-const orchestrator = createTestOrchestrator({
-  runner: mockRunner,
+`createTestOrchestrator` extends `AgentOrchestrator` with mock-runner wiring, an approval simulator, and call recording. Pass `mockResponses` and Directive constraints/resolvers exactly as you would to the production factory.
+
+```typescript
+import { createTestOrchestrator } from "@directive-run/ai/testing";
+import { t } from "@directive-run/core";
+
+const test = createTestOrchestrator({
+  mockResponses: {
+    analyst: { output: "Analysis: positive trend", totalTokens: 100 },
+  },
   factsSchema: {
     result: t.string(),
     confidence: t.number(),
@@ -92,28 +98,295 @@ const orchestrator = createTestOrchestrator({
   },
   resolvers: {
     reAnalyze: {
-      requirement: "RE_ANALYZE",
-      resolve: async (req, context) => {
-        context.facts.confidence = 0.8;
-      },
+      requirement: (r): r is { type: "RE_ANALYZE" } => r.type === "RE_ANALYZE",
+      resolve: async (req, context) => { context.facts.confidence = 0.8; },
     },
   },
 });
 
-const agent = {
-  name: "analyst",
-  instructions: "You are a data analyst.",
-  model: "claude-sonnet-4-5",
-};
+const result = await test.run({ name: "analyst", instructions: "…", model: "x" }, "Analyze");
 
-const result = await orchestrator.run(agent, "Analyze this dataset");
+test.getCalls();             // RecordedCall[]
+test.getApprovalRequests();  // ApprovalRequest[] from the built-in simulator
+test.mockRunner;             // the underlying MockAgentRunner
+test.approvalSimulator;      // the built-in ApprovalSimulator
+test.resetAll();             // reset orchestrator + clear calls + clear approvals
 ```
 
-## Assertion Helpers
-
-Verify agent behavior after a test run:
+## Test multi-agent orchestrator
 
 ```typescript
+import {
+  createTestMultiAgentOrchestrator,
+  createMockAgentRunner,
+  assertMultiAgentState,
+} from "@directive-run/ai/testing";
+import { sequential } from "@directive-run/ai/multi-agent";
+
+const mock = createMockAgentRunner({
+  responses: {
+    researcher: { output: "research notes", totalTokens: 150 },
+    writer:     { output: "draft article", totalTokens: 200 },
+  },
+});
+
+const orch = createTestMultiAgentOrchestrator({
+  agents: {
+    researcher: { name: "researcher", instructions: "research", model: "x" },
+    writer:     { name: "writer",     instructions: "write",    model: "x" },
+  },
+  patterns: {
+    pipeline: sequential(["researcher", "writer"]),
+  },
+  runner: mock.run,
+});
+
+orch.start();
+await orch.runPattern("pipeline", "Write about AI");
+
+assertMultiAgentState(orch, {
+  status: "completed",
+});
+```
+
+## Snapshot / introspection helpers
+
+| Helper | Purpose |
+|---|---|
+| `createConstraintRecorder()` | Records every constraint evaluation as a `ConstraintSnapshot`; pair with `assertOrchestratorState`. |
+| `assertOrchestratorState(orch, expected)` | Diffs facts, status, and constraint state against an expected shape. |
+| `assertMultiAgentState(orch, expected)` | Same shape, for multi-agent. |
+| `assertScratchpadState(orch, expected)` | Checks the multi-agent scratchpad contents. |
+| `assertDerivedValues(orch, expected)` | Diffs derivation values. |
+| `assertTimelineEvents(timeline, expected)` | Asserts a sequence of timeline event types/payloads. |
+| `assertDagExecution(events, expected)` | Asserts DAG node execution order. |
+| `assertBreakpointHit(events, expected)` | Asserts a breakpoint was hit with given metadata. |
+| `assertRerouted(events, expected)` | Asserts a self-healing reroute fired (when configured). |
+| `assertAgentHealth(monitor, agentId, expected)` | Asserts a health score range / passing failed counts. |
+| `assertCheckpoint(cp, expected)` | Asserts checkpoint shape (state version, conversation length, etc.). |
+| `assertMultiplexedStream(stream, expected)` | Asserts a multiplexed stream produced expected per-agent chunks. |
+
+There is no `assertAgentCalled` / `assertAgentNotCalled` / `assertTokensUsed` / `assertGuardrailPassed` / `assertGuardrailBlocked` — those don't exist. Use `mock.getCalls()` + `expect()` from your test framework, and inspect `result.tokenUsage` and `result.guardrailEvents` directly.
+
+```typescript
+import { expect } from "vitest";
+
+const calls = mock.getCallsFor("analyst");
+expect(calls).toHaveLength(1);
+expect(calls[0].input).toMatch(/analyze/i);
+
+expect(result.tokenUsage).toBeLessThan(500);
+```
+
+## Simulators
+
+```typescript
+import {
+  createFailingRunner,
+  createApprovalSimulator,
+  createBreakpointSimulator,
+  createTimeController,
+  createTestCheckpointStore,
+  createTestReflectionEvaluator,
+  createTestEmbedder,
+} from "@directive-run/ai/testing";
+```
+
+### `createFailingRunner(error?, options?)`
+
+Returns an `AgentRunner` that throws (or fails after N successes). Replaces the imagined `createErrorSimulator` / `createLatencySimulator`.
+
+```typescript
+const failing = createFailingRunner(new Error("rate_limit"), {
+  delay: 100,
+  failAfter: 2, // first 2 calls succeed, then it starts throwing
+});
+
+const orchestrator = createAgentOrchestrator({
+  runner: failing,
+  selfHealing: { fallbackRunners: [backupRunner] },
+});
+```
+
+For latency-only simulation, set `delay` on a `MockAgentConfig`:
+
+```typescript
+const slow = createMockAgentRunner({
+  responses: { writer: { output: "slow reply", totalTokens: 50, delay: 800 } },
+});
+```
+
+### `createApprovalSimulator(options?)`
+
+Drives the approval workflow deterministically — auto-approve, auto-reject, or queue.
+
+```typescript
+const sim = createApprovalSimulator({ defaultAction: "approve" });
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  autoApproveToolCalls: false,
+  onApprovalRequest: (req) => sim.handle(req),
+});
+
+const requests = sim.getRequests();
+sim.clearRequests();
+```
+
+### `createBreakpointSimulator(options?)`
+
+Resolves breakpoints automatically, with optional modifications. Pair with the orchestrator's `breakpoints:` config.
+
+### `createTimeController(startTime?)`
+
+Drives `Date.now()` and `setTimeout` deterministically — required when testing budget windows, retry backoffs, or memory expiry.
+
+### `createTestCheckpointStore()`
+
+In-memory checkpoint store for round-tripping `checkpoint()` + `restore()` without disk IO.
+
+### `createTestReflectionEvaluator(options?)`
+
+Deterministic evaluator for `reflect()` patterns — scores can be hard-coded per iteration.
+
+### `createTestEmbedder()`
+
+Deterministic embedder (no network calls) for `createSemanticCache` testing.
+
+## Evaluation framework
+
+`createEvalSuite` runs a dataset of test cases through one or more agents, scores each output with one or more `EvalCriterion`, and returns aggregate results. Criteria are NOT a `criteria.*()` namespace — they're top-level `eval*` factories.
+
+```typescript
+import {
+  createEvalSuite,
+  evalCost,
+  evalLatency,
+  evalOutputLength,
+  evalSafety,
+  evalStructure,
+  evalMatch,
+  evalJudge,
+  evalFaithfulness,
+  evalRelevance,
+  evalCoherence,
+  evalAssert,
+} from "@directive-run/ai/evals";
+
+const suite = createEvalSuite({
+  agents: [analystAgent, writerAgent],
+  runner,
+  dataset: [
+    { id: "ts-basics",   input: "What is TypeScript?",   expected: "TypeScript is…",       tags: ["basics"] },
+    { id: "monads",      input: "Explain monads",         expected: "A monad is…",         tags: ["advanced"] },
+    { id: "ssr-tradeoffs", input: "Server vs client rendering", expected: "Tradeoffs…",    tags: ["advanced"] },
+  ],
+  criteria: {
+    cost:      evalCost({ maxTokensPerRun: 500 }),
+    latency:   evalLatency({ maxMs: 5000 }),
+    safety:    evalSafety(),
+    relevance: evalRelevance({ embedder: embedderFn, minSimilarity: 0.7 }),
+    judge:     evalJudge({ runner, judge: judgeAgent }),
+  },
+  concurrency: 4,
+  onCaseComplete: (caseResult) => console.log(`✓ ${caseResult.caseId} — ${caseResult.score.toFixed(2)}`),
+});
+
+const results = await suite.run();
+
+console.log(results.summary.averageScore);  // 0.82
+console.log(results.summary.passRate);      // 0.90
+console.log(results.cases);                 // EvalCaseResult[]
+console.log(results.agentSummaries);        // EvalAgentSummary[] (per-agent breakdown)
+console.log(results.totalTokens, results.durationMs);
+```
+
+### Custom criterion
+
+A criterion is `{ name, fn, threshold?, weight? }` where `fn` returns `{ score, passed?, reason?, durationMs? }`. **Scorers must be pure** — no side effects.
+
+```typescript
+const codeQuality = {
+  name: "code-quality",
+  threshold: 0.6,
+  weight: 1.0,
+  fn: (ctx) => {
+    const start = Date.now();
+    const output = String(ctx.result.output);
+    const hasCode = /\b(function|const|class)\b/.test(output);
+    const hasExplanation = output.length > 100;
+
+    const score = hasCode && hasExplanation ? 1.0 : hasCode ? 0.7 : 0.2;
+    return {
+      score,
+      passed: score >= 0.6,
+      reason: hasCode && hasExplanation ? "code with explanation"
+            : hasCode ? "code only"
+            : "no code",
+      durationMs: Date.now() - start,
+    };
+  },
+};
+
+const suite = createEvalSuite({
+  agents: [coderAgent],
+  runner,
+  dataset,
+  criteria: { codeQuality },
+});
+```
+
+### LLM-as-judge
+
+```typescript
+import { evalJudge } from "@directive-run/ai/evals";
+
+const judge = evalJudge({
+  runner,                     // any AgentRunner — typically a smaller/cheaper model
+  judge: judgeAgent,          // the AgentLike to invoke
+  promptTemplate: `…`,        // optional — defaults to a JSON-output rubric
+  timeoutMs: 30_000,
+});
+```
+
+The judge returns `{ score: number, reason?: string }` parsed from JSON. The default prompt enforces "Respond with ONLY a JSON object: …" — override `promptTemplate` if you need a different rubric.
+
+### CI quality gates
+
+```typescript
+const results = await suite.run();
+
+if (results.summary.averageScore < 0.75) {
+  console.error(`Quality gate failed: ${results.summary.averageScore} < 0.75`);
+  process.exit(1);
+}
+
+for (const [criterionName, summary] of Object.entries(results.summary.byCriterion)) {
+  if (summary.averageScore < 0.6) {
+    console.error(`${criterionName} regressed: ${summary.averageScore}`);
+    process.exit(1);
+  }
+}
+```
+
+## Anti-patterns
+
+### Calling `createMockRunner` (singular, with input-pattern array)
+
+```typescript
+// WRONG — createMockRunner does not exist; the array-pattern form does not exist
+createMockRunner([{ input: /analyze/, output: "…" }])
+
+// CORRECT — keyed by agent name
+createMockAgentRunner({
+  responses: { analyst: { output: "…", totalTokens: 100 } },
+})
+```
+
+### Importing hallucinated assertions
+
+```typescript
+// WRONG — none of these exist
 import {
   assertAgentCalled,
   assertAgentNotCalled,
@@ -122,257 +395,83 @@ import {
   assertGuardrailBlocked,
 } from "@directive-run/ai/testing";
 
-// Assert an agent was called with a matching input
-assertAgentCalled(mockRunner, "analyst");
-assertAgentCalled(mockRunner, "analyst", /analyze/);
-
-// Assert an agent was NOT called
-assertAgentNotCalled(mockRunner, "editor");
-
-// Assert token usage within bounds
-assertTokensUsed(result, { min: 50, max: 200 });
-
-// Assert guardrail behavior
-assertGuardrailPassed(result, "pii-detection");
-assertGuardrailBlocked(result, "content-filter");
+// CORRECT — use the mock's recorder + your test framework's assertions
+const calls = mock.getCallsFor("analyst");
+expect(calls).toHaveLength(1);
+expect(result.tokenUsage).toBeLessThan(200);
 ```
 
-## Test Multi-Agent Orchestrator
+### Importing `createEvaluator`, `criteria.*()`, `createLLMJudge`, `createEvaluationSuite`
 
 ```typescript
-import {
-  createTestMultiAgentOrchestrator,
-  createMockRunner,
-  assertMultiAgentState,
-} from "@directive-run/ai/testing";
+// WRONG — these are all hallucinated names
+import { createEvaluator, criteria, createLLMJudge, createEvaluationSuite } from "@directive-run/ai/testing";
+const evaluator = createEvaluator({ criteria: [criteria.relevance(), criteria.coherence()] });
+const judge = createLLMJudge({ runner, model: "…", criteria: ["accuracy"], rubric: "…" });
 
-const mockRunner = createMockRunner([
-  { input: /research/, output: "Research findings: ...", tokens: 150 },
-  { input: /write/, output: "Draft article: ...", tokens: 200 },
-]);
-
-const orchestrator = createTestMultiAgentOrchestrator({
-  agents: {
-    researcher: { name: "researcher", instructions: "Research.", model: "claude-sonnet-4-5" },
-    writer: { name: "writer", instructions: "Write.", model: "claude-sonnet-4-5" },
+// CORRECT — top-level eval factories + createEvalSuite
+import { createEvalSuite, evalRelevance, evalCoherence, evalJudge } from "@directive-run/ai/evals";
+const suite = createEvalSuite({
+  agents: [agent],
+  runner,
+  dataset,
+  criteria: {
+    relevance: evalRelevance({ embedder, minSimilarity: 0.7 }),
+    coherence: evalCoherence({ embedder, minSimilarity: 0.5 }),
+    judge:     evalJudge({ runner, judge: judgeAgent }),
   },
-  patterns: {
-    pipeline: sequential(["researcher", "writer"]),
-  },
-  runner: mockRunner,
 });
-
-orchestrator.start();
-const result = await orchestrator.runPattern("pipeline", "Write about AI");
-
-// Assert multi-agent state
-assertMultiAgentState(orchestrator, {
-  completedAgents: ["researcher", "writer"],
-  activePattern: null,
-});
-
-assertAgentCalled(mockRunner, "researcher");
-assertAgentCalled(mockRunner, "writer");
 ```
 
-## Simulators
-
-Simulate specific conditions for testing edge cases:
+### Importing `createErrorSimulator` / `createLatencySimulator`
 
 ```typescript
+// WRONG — neither exists
 import { createErrorSimulator, createLatencySimulator } from "@directive-run/ai/testing";
 
-// Simulate errors on specific calls
-const errorRunner = createErrorSimulator(baseRunner, {
-  failOnCall: [2, 5],     // Fail on 2nd and 5th calls
-  error: new Error("Rate limit exceeded"),
-});
-
-// Simulate variable latency
-const slowRunner = createLatencySimulator(baseRunner, {
-  minDelay: 100,
-  maxDelay: 2000,
-  distribution: "normal", // "uniform" | "normal"
-});
+// CORRECT — createFailingRunner for errors; delay in MockAgentConfig for latency
+import { createFailingRunner, createMockAgentRunner } from "@directive-run/ai/testing";
+const failing = createFailingRunner(new Error("503"), { failAfter: 2, delay: 100 });
+const slow = createMockAgentRunner({ responses: { writer: { output: "…", delay: 800 } } });
 ```
 
----
-
-## Evaluation Framework
-
-Measure and gate AI output quality with structured evaluations.
-
-### Built-In Criteria
-
-10+ evaluation criteria available out of the box:
+### Side-effecting scorers
 
 ```typescript
-import { createEvaluator, criteria } from "@directive-run/ai/testing";
-
-const evaluator = createEvaluator({
-  criteria: [
-    criteria.relevance(),        // Is the output relevant to the input?
-    criteria.coherence(),        // Is the output logically coherent?
-    criteria.completeness(),     // Does it fully address the prompt?
-    criteria.accuracy(),         // Is the information correct?
-    criteria.conciseness(),      // Is it free of unnecessary content?
-    criteria.helpfulness(),      // Is it useful to the user?
-    criteria.harmlessness(),     // Is it free of harmful content?
-    criteria.factuality(),       // Are claims factually supported?
-    criteria.creativity(),       // Does it show original thinking?
-    criteria.instructionFollow(),// Does it follow the prompt instructions?
-  ],
-});
-```
-
-### Custom Criteria
-
-```typescript
-const evaluator = createEvaluator({
-  criteria: [
-    {
-      name: "code-quality",
-      description: "Does the output contain valid, well-structured code?",
-      scorer: (input, output) => {
-        const hasCode = output.includes("function") || output.includes("const ");
-        const hasExplanation = output.length > 100;
-
-        if (hasCode && hasExplanation) {
-          return { score: 1.0, reason: "Contains code with explanation" };
-        }
-        if (hasCode) {
-          return { score: 0.7, reason: "Code present but no explanation" };
-        }
-
-        return { score: 0.2, reason: "No code block found" };
-      },
-    },
-  ],
-});
-```
-
-### Anti-Pattern #32: Side effects in evaluator scorer
-
-```typescript
-// WRONG – scorers must be pure functions
+// WRONG — scorers run inside the eval suite and must be pure
 {
   name: "quality",
-  scorer: (input, output) => {
-    // Side effects: writing files, calling APIs, mutating state
-    fs.writeFileSync("eval.log", output);
+  fn: (ctx) => {
+    fs.writeFileSync("eval.log", String(ctx.result.output)); // ← side effect
+    metrics.increment("evals");                                // ← side effect
+    return { score: 0.8 };
+  },
+}
+
+// CORRECT — log/metrics in onCaseComplete or after suite.run()
+const suite = createEvalSuite({
+  …,
+  onCaseComplete: (caseResult) => {
     metrics.increment("evals");
-
-    return { score: 0.8, reason: "OK" };
+    fs.appendFileSync("eval.log", JSON.stringify(caseResult) + "\n");
   },
-}
-
-// CORRECT – scorers are pure, return score + reason only
-{
-  name: "quality",
-  scorer: (input, output) => {
-    const wordCount = output.split(/\s+/).length;
-    const isDetailed = wordCount > 50;
-
-    return {
-      score: isDetailed ? 1.0 : 0.5,
-      reason: isDetailed ? "Detailed response" : "Too brief",
-    };
-  },
-}
-```
-
-### LLM-as-Judge
-
-Use an LLM to evaluate output quality:
-
-```typescript
-import { createLLMJudge } from "@directive-run/ai/testing";
-
-const judge = createLLMJudge({
-  runner,
-  model: "claude-sonnet-4-5",
-  criteria: ["relevance", "accuracy", "completeness"],
-  rubric: `
-    Score 1.0: Fully addresses the prompt with accurate, complete information.
-    Score 0.7: Mostly accurate but missing some details.
-    Score 0.3: Partially relevant, significant gaps.
-    Score 0.0: Irrelevant or incorrect.
-  `,
 });
-
-const evalResult = await judge.evaluate({
-  input: "Explain quantum computing",
-  output: agentOutput,
-  reference: "Optional reference answer for comparison",
-});
-
-console.log(evalResult.score);   // 0.85
-console.log(evalResult.reason);  // "Accurate explanation with good examples..."
 ```
 
-### Dataset-Driven Evaluation
+## Quick reference
 
-Run evaluations against a dataset for regression testing:
-
-```typescript
-import { createEvaluationSuite } from "@directive-run/ai/testing";
-
-const suite = createEvaluationSuite({
-  evaluator,
-  dataset: [
-    {
-      input: "What is TypeScript?",
-      expectedOutput: "TypeScript is a typed superset of JavaScript...",
-      tags: ["basics"],
-    },
-    {
-      input: "Explain monads",
-      expectedOutput: "A monad is a design pattern...",
-      tags: ["advanced"],
-    },
-  ],
-});
-
-const report = await suite.run(agent, runner);
-
-console.log(report.averageScore);    // 0.82
-console.log(report.passRate);        // 0.90 (90% above threshold)
-console.log(report.failedCases);     // Cases that scored below threshold
-```
-
-### CI Quality Gates
-
-Fail CI pipelines when quality drops below a threshold:
-
-```typescript
-const report = await suite.run(agent, runner);
-
-// Threshold-based gate
-if (report.averageScore < 0.75) {
-  console.error(`Quality gate failed: ${report.averageScore} < 0.75`);
-  process.exit(1);
-}
-
-// Per-criteria gates
-for (const criterion of report.criteria) {
-  if (criterion.averageScore < 0.6) {
-    console.error(`${criterion.name} failed: ${criterion.averageScore}`);
-    process.exit(1);
-  }
-}
-```
-
-## Quick Reference
-
-| API | Import Path | Purpose |
+| API | Import path | Purpose |
 |---|---|---|
-| `createMockRunner` | `@directive-run/ai/testing` | Deterministic test runner |
-| `createTestOrchestrator` | `@directive-run/ai/testing` | Lightweight test orchestrator |
-| `createTestMultiAgentOrchestrator` | `@directive-run/ai/testing` | Multi-agent test orchestrator |
-| `assertAgentCalled` | `@directive-run/ai/testing` | Verify agent was invoked |
-| `assertMultiAgentState` | `@directive-run/ai/testing` | Verify multi-agent state |
-| `createEvaluator` | `@directive-run/ai/testing` | Rule-based evaluation |
-| `createLLMJudge` | `@directive-run/ai/testing` | LLM-as-judge evaluation |
-| `createEvaluationSuite` | `@directive-run/ai/testing` | Dataset-driven evaluation |
-| `createErrorSimulator` | `@directive-run/ai/testing` | Simulate failures |
-| `createLatencySimulator` | `@directive-run/ai/testing` | Simulate latency |
+| `createMockAgentRunner` | `@directive-run/ai/testing` | Deterministic mock runner with call recording |
+| `createTestOrchestrator` | `@directive-run/ai/testing` | Single-agent orchestrator with mock + approval simulator |
+| `createTestMultiAgentOrchestrator` | `@directive-run/ai/testing` | Multi-agent orchestrator wired to a mock runner |
+| `createFailingRunner` | `@directive-run/ai/testing` | Runner that throws (or fails after N successes) |
+| `createApprovalSimulator` | `@directive-run/ai/testing` | Deterministic approve/reject driver |
+| `createBreakpointSimulator` | `@directive-run/ai/testing` | Deterministic breakpoint resolver |
+| `createTimeController` | `@directive-run/ai/testing` | Virtual clock for budgets / backoffs / TTLs |
+| `createTestCheckpointStore` | `@directive-run/ai/testing` | In-memory checkpoint store |
+| `createTestReflectionEvaluator` | `@directive-run/ai/testing` | Deterministic evaluator for `reflect()` |
+| `createTestEmbedder` | `@directive-run/ai/testing` | Deterministic embedder for cache tests |
+| `assertOrchestratorState` / `assertMultiAgentState` / `assertScratchpadState` / `assertDerivedValues` / `assertTimelineEvents` / `assertDagExecution` / `assertBreakpointHit` / `assertRerouted` / `assertAgentHealth` / `assertCheckpoint` / `assertMultiplexedStream` | `@directive-run/ai/testing` | State/topology/event assertions |
+| `createEvalSuite` | `@directive-run/ai/evals` | Dataset-driven multi-criterion eval runner |
+| `evalCost` / `evalLatency` / `evalOutputLength` / `evalSafety` / `evalStructure` / `evalMatch` / `evalJudge` / `evalFaithfulness` / `evalRelevance` / `evalCoherence` / `evalAssert` | `@directive-run/ai/evals` | Built-in criterion factories |
