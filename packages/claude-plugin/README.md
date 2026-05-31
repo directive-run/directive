@@ -4,8 +4,31 @@ Claude Code plugin providing coding guidance for the [Directive](https://directi
 
 ## Installation
 
+Two steps in a Claude Code session — first register the marketplace, then install the plugin:
+
 ```
+/plugin marketplace add directive-run/directive
 /plugin install directive@directive-plugins
+```
+
+After install, verify the plugin is active with `/plugins` — you should see `directive` in the list.
+
+## What happens after install
+
+Skills are **model-invoked**: Claude reads each skill's description and automatically loads the relevant skill when your task matches. There is nothing to invoke manually. You write code, Claude pulls in the right skill.
+
+Each of the 12 skills bundles:
+
+- A concise `SKILL.md` with a decision tree and quick-reference patterns
+- Supporting knowledge `.md` files copied from [`@directive-run/knowledge`](../knowledge)
+- Working code examples extracted from the [`examples/`](../../examples) directory
+
+When Claude invokes a skill, the skill name appears in the response (`/<plugin>:<skill>` namespaced). You can also call a skill directly:
+
+```
+/directive:writing-directive-modules
+/directive:writing-directive-constraints
+/directive:hardening-ai-systems
 ```
 
 ## Skills
@@ -25,13 +48,6 @@ Claude Code plugin providing coding guidance for the [Directive](https://directi
 | `scaffolding-directive-modules` | Generate module scaffolds with matching test files |
 | `migrating-to-directive` | Migrate from Redux, Zustand, XState, MobX to Directive |
 
-## How It Works
-
-Skills are model-invoked: Claude reads the skill descriptions and automatically loads the relevant skill when your task matches. Each skill includes:
-- A concise `SKILL.md` with decision trees and quick-reference patterns
-- Supporting knowledge `.md` files with full details
-- Relevant code examples
-
 ## Development
 
 ```bash
@@ -47,12 +63,14 @@ claude --plugin-dir packages/claude-plugin
 
 Skills are built from `@directive-run/knowledge` + hand-authored templates in `templates/`. The build script (`scripts/build-skills.ts`) assembles the `skills/` directories.
 
-## Alternative: CLI
+## Not using Claude Code?
 
-If you don't use Claude Code, use the CLI instead:
+The same knowledge ships through [`@directive-run/cli`](../cli) as rules files for every other AI assistant. Run it from your project:
 
 ```bash
 npx directive ai-rules init
 ```
 
-This generates `.cursorrules`, `.clinerules`, `copilot-instructions.md`, `windsurf.md`, or `CLAUDE.md` files.
+Generates `.cursorrules`, `.clinerules`, `copilot-instructions.md`, `windsurf.md`, OpenAI Codex `AGENTS.md`, and `CLAUDE.md` files tuned to each assistant's ingestion conventions.
+
+See [/docs/ide-integration](https://directive.run/docs/ide-integration) for the full decision tree across Claude Code, Cursor, Copilot, Windsurf, Cline, and Codex.

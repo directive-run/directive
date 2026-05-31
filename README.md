@@ -139,6 +139,29 @@ const orchestrator = createAgentOrchestrator({
 
 ---
 
+## AI tooling: your assistant speaks Directive
+
+Directive ships its own knowledge to your AI assistant, so generated code is idiomatic on the first try.
+
+**In Claude Code** — two commands install the plugin (12 model-invoked skills):
+
+```
+/plugin marketplace add directive-run/directive
+/plugin install directive@directive-plugins
+```
+
+**In Cursor, Copilot, Windsurf, Cline, or OpenAI Codex** — one command generates the rules file each assistant expects:
+
+```bash
+npx directive ai-rules init
+```
+
+**For LLM agents that crawl docs at runtime** — point at [`directive.run/llms.txt`](https://directive.run/llms.txt) for the comparison framing + full sitemap.
+
+The knowledge ships from a single source ([`@directive-run/knowledge`](./packages/knowledge)). See the [IDE Integration guide](https://directive.run/docs/ide-integration) for the decision tree across all install paths.
+
+---
+
 ## React Integration
 
 ```bash
@@ -203,6 +226,7 @@ function UserProfile({ system }) {
 | [`@directive-run/timeline`](./packages/timeline) | Time-travel debugging panel |
 | [`@directive-run/vite-plugin-api-proxy`](./packages/vite-plugin-api-proxy) | Vite dev-server proxy for AI providers (CORS + key handling) |
 | [`@directive-run/knowledge`](./packages/knowledge) | Knowledge files consumed by AI assistants and editors |
+| [`@directive-run/claude-plugin`](./packages/claude-plugin) | Claude Code plugin &ndash; 12 skills built from the knowledge package |
 
 ## Documentation
 

@@ -1,15 +1,16 @@
 ---
-"@directive-run/vite-plugin-api-proxy": minor
 "@directive-run/query": patch
 "@directive-run/timeline": patch
 ---
 
-Subscription cleanup, atomic tag invalidation, CORS preflight, louder matcher registration.
+Subscription cleanup, atomic tag invalidation, louder matcher registration.
 
-- `@directive-run/vite-plugin-api-proxy`: new `cors?: boolean | CorsOptions`
-  per-route option that wires up an opt-in OPTIONS preflight responder. Without
-  this, any cross-origin browser caller using a non-CORS-safelisted header
-  (e.g. `x-api-key`) failed preflight before it could even reach the proxy.
+Also includes a `@directive-run/vite-plugin-api-proxy` enhancement —
+new `cors?: boolean | CorsOptions` per-route option that wires up an
+opt-in OPTIONS preflight responder. The package is `"private": true`
+(not published to npm) so the bump is tracked only in this repo's
+internal history.
+
 - `@directive-run/query`: subscriptions whose `key()` returns `null` now
   reset both the in-memory prev-key bookkeeping and the resource state back
   to idle, so a future re-key to the same value establishes a fresh

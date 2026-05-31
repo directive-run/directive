@@ -36,7 +36,11 @@ website/
 
 # Claude Code
 .claude/
-.claude-plugin/
+# Local Claude Code plugin state — keep marketplace.json public (it's what
+# users register via `/plugin marketplace add directive-run/directive` to
+# install the @directive-run/claude-plugin via Claude Code's plugin system).
+.claude-plugin/*
+!.claude-plugin/marketplace.json
 
 # Git worktrees (sz CLI parallel-dev slots)
 worktrees/

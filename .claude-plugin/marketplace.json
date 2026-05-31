@@ -1,0 +1,13 @@
+{
+  "name": "directive-plugins",
+  "owner": {
+    "name": "Directive"
+  },
+  "plugins": [
+    {
+      "name": "directive",
+      "source": "./packages/claude-plugin",
+      "description": "Coding guidance for Directive — the constraint-driven TypeScript runtime"
+    }
+  ]
+}
