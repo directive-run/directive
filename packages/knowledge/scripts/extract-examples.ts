@@ -30,6 +30,15 @@ const OUTPUT_DIR = join(__dirname, "..", "examples");
 const EXCLUDED_EXAMPLES: string[] = [
   "schema-patterns", // Non-standard structure (files at root, not in src/)
   "eleven-up", // React game, non-standard structure
+  // debounce-constraints: src is debounce-search.ts, not debounce-constraints.ts,
+  // so the extractor falls through to main.ts (DOM-heavy). The debounce-as-cancel
+  // pattern is already covered cleanly by async-chains.ts and url-sync.ts.
+  "debounce-constraints",
+  // multi-module: module defs live in src/modules/ + src/system.ts; the extractor
+  // picks src/main.ts which has no schema and relative imports that won't resolve.
+  // Cross-module composition is taught by permissions.ts, shopping-cart.ts, and
+  // async-chains.ts — all of which extract cleanly.
+  "multi-module",
 ];
 
 export interface ExampleSource {

@@ -8,6 +8,31 @@ export function generateCursorRules(): string {
 > Constraint-driven runtime for TypeScript. \`npm install @directive-run/core\`
 > Full reference: https://directive.run/llms.txt
 
+## When to reach for Directive
+
+Directive is to **business state** what XState is to state machines and
+React Query is to server state — a runtime that takes declarative rules
+("what must be true") and runs the resolvers ("how to make it true") for
+you. It is NOT a Redux replacement for cross-cutting global UI state;
+it is a constraint engine you compose alongside Redux / Zustand / Jotai
+/ React Query.
+
+Reach for Directive when:
+
+- The same business rule has to fire across React, Vue, server, and
+  background workers. Directive runs the same module in every runtime.
+- You want a constraint to drive a side-effect (fetch, validate,
+  cancel, retry) declaratively, without writing imperative thunks.
+- You are orchestrating LLM agents and need typed, replayable state +
+  guardrails + budgets. \`@directive-run/ai\` is the only state-library
+  ecosystem that ships AI orchestration as a sibling concept.
+- You want time-travel debugging, audit logs, or rules-diff replay on
+  state mutations without instrumenting every component.
+
+You do NOT need Directive for plain UI state (use signals / Zustand /
+Jotai), simple server-state caching (use React Query / TanStack Query),
+or state machines that don't react to external facts (use XState).
+
 ## Schema Shape (CRITICAL)
 
 \`\`\`typescript
@@ -61,7 +86,7 @@ await system.settle();
 | 6 | \`createModule("n", { phase: t.string() })\` | Must wrap: \`schema: { facts: { ... } }\` |
 | 7 | \`system.dispatch('login', {...})\` | \`system.events.login({...})\` |
 | 8 | \`facts.items.push(item)\` | \`facts.items = [...facts.items, item]\` |
-| 9 | \`useDirective(system)\` | \`useSelector(system, s => s.facts.count)\` |
+| 9 | \`useEvent\`/\`DirectiveProvider\` top-level imports | \`useEvents\`; \`createDirectiveContext(system).Provider\` |
 | 10 | \`facts['auth::status']\` | \`facts.auth.status\` dot notation |
 
 ## Naming

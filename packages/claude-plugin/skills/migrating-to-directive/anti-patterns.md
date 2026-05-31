@@ -113,11 +113,16 @@ createModule("timer", {
 ## 7. String-Based Event Dispatch
 
 ```typescript
-// WRONG – events are not dispatched by string
+// WRONG – there is no two-argument string-keyed dispatch signature
 system.dispatch("login", { token: "abc" });
 
-// CORRECT – use the events accessor
+// CORRECT – use the typed events accessor (preferred — autocomplete + payload typing)
 system.events.login({ token: "abc" });
+
+// ALSO VALID – the single-arg object form of dispatch() is supported when you
+// need to forward a programmatically-built event. Prefer the events accessor
+// for normal code.
+system.dispatch({ type: "login", token: "abc" });
 ```
 
 ## 8. Direct Array/Object Mutation

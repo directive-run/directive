@@ -170,7 +170,8 @@ For full task surface, see `ai-tasks.md`.
 The orchestrator does NOT accept a `bus:` option directly — wire the bus alongside the orchestrator and route messages explicitly.
 
 ```typescript
-import { createMultiAgentOrchestrator, createMessageBus, createAgentNetwork } from "@directive-run/ai";
+import { createMultiAgentOrchestrator } from "@directive-run/ai/multi-agent";
+import { createMessageBus, createAgentNetwork } from "@directive-run/ai";
 
 const bus = createMessageBus({ maxHistory: 1000 });
 const network = createAgentNetwork({

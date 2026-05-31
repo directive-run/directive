@@ -19,7 +19,6 @@
 
 import {
   type AgentLike,
-  CircuitBreakerOpenError,
   type InputGuardrailData,
   type NamedGuardrail,
   type RunResult,
@@ -27,26 +26,26 @@ import {
   createAgentOrchestrator,
   createLengthStreamingGuardrail,
   createMessageBus,
-  createMultiAgentOrchestrator,
-  createOutputSchemaGuardrail,
   createSemanticCache,
   createSlidingWindowStrategy,
   createStreamingRunner,
   createTestEmbedder,
   estimateCost,
-  parallel,
 } from "@directive-run/ai";
 import type { CacheStats } from "@directive-run/ai";
+import { createOutputSchemaGuardrail } from "@directive-run/ai/guardrails";
 import {
+  createMultiAgentOrchestrator,
+  parallel,
+} from "@directive-run/ai/multi-agent";
+import {
+  CircuitBreakerOpenError,
   type CircuitState,
+  createAgentMetrics,
   createCircuitBreaker,
   createOTLPExporter,
-} from "@directive-run/core/plugins";
-// createObservability is alpha (not in bundle) — direct source import
-import {
-  createAgentMetrics,
   createObservability,
-} from "../../../packages/core/src/plugins/observability.lab.js";
+} from "@directive-run/core/plugins";
 import {
   analysisAgent,
   chatAgent,
@@ -99,7 +98,7 @@ export interface CheckersAI {
     cacheStats: CacheStats;
     busMessageCount: number;
   };
-  dispose(): void;
+  destroy(): void;
   /** Escape hatch for dashboard rendering */
   readonly observability: ReturnType<typeof createObservability> | null;
 }
@@ -560,7 +559,7 @@ export function createCheckersAI(): CheckersAI {
     };
   }
 
-  function dispose(): void {
+  function destroy(): void {
     clearInterval(otlpInterval);
     // Flush OTLP one final time
     try {
@@ -570,9 +569,9 @@ export function createCheckersAI(): CheckersAI {
     } catch {
       // Best-effort flush on dispose
     }
-    orchestrator.dispose();
-    multi.dispose();
-    obs.dispose();
+    orchestrator.destroy();
+    multi.destroy();
+    void obs.destroy();
   }
 
   return {
@@ -580,7 +579,7 @@ export function createCheckersAI(): CheckersAI {
     sendChat,
     reset,
     getState,
-    dispose,
+    destroy,
     get observability() {
       return obs;
     },

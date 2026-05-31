@@ -303,13 +303,16 @@ system.registerModule("chat", chatModule.default);
 
 ## Cross-Module Events
 
-Events are namespaced at the system level but dispatched through the events accessor:
+Events are namespaced at the system level. **Prefer the typed events accessor** — it carries autocomplete and per-event payload typing.
 
 ```typescript
-// Multi-module events
+// Multi-module events — canonical form
 system.events.auth.login({ token: "abc" });
 system.events.cart.addItem({ id: "item-1", qty: 1 });
 
-// dispatch() also works with type discriminator
+// dispatch() is supported when you need to forward a programmatically-built
+// event (e.g., replaying a serialized event). The string form
+// (system.dispatch("login", payload)) does NOT exist — only the single-arg
+// object form is valid.
 system.dispatch({ type: "login", token: "abc" });
 ```

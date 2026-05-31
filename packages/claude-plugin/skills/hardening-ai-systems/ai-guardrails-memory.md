@@ -1,215 +1,213 @@
-# AI Guardrails and Memory
+# AI guardrails and memory
 
-Built-in guardrails validate/transform input and output. Memory strategies manage conversation history with configurable summarization.
+Guardrails validate and transform input, output, and tool calls. Memory strategies manage conversation history with configurable summarization. Both plug into `createAgentOrchestrator` and `createMultiAgentOrchestrator`.
 
-## Decision Tree: "Which guardrail do I need?"
+Import guardrail factories from the subpath barrel — the main `@directive-run/ai` re-exports them with `@deprecated` notices for v2.
+
+```typescript
+import {
+  createPIIGuardrail,
+  createModerationGuardrail,
+  createRateLimitGuardrail,
+  createToolGuardrail,
+  createOutputSchemaGuardrail,
+  createOutputTypeGuardrail,
+  createLengthGuardrail,
+  createContentFilterGuardrail,
+} from "@directive-run/ai/guardrails";
+```
+
+## Decision tree
 
 ```
 What are you guarding against?
-├── PII in input/output      → createPIIGuardrail()
+├── PII in input             → createPIIGuardrail()
 ├── Harmful content           → createModerationGuardrail()
 ├── Rate limits               → createRateLimitGuardrail()
-├── Unauthorized tool use     → createToolGuardrail()
-├── Output format validation  → createOutputSchemaGuardrail()
-├── Output type checking      → createOutputTypeGuardrail()
-├── Response length           → createLengthGuardrail()
-└── Banned words/patterns     → createContentFilterGuardrail()
+├── Unauthorized tool calls   → createToolGuardrail()
+├── Output schema mismatch   → createOutputSchemaGuardrail()
+├── Output type / shape      → createOutputTypeGuardrail()
+├── Response length          → createLengthGuardrail()
+└── Banned words/patterns   → createContentFilterGuardrail()
 ```
 
-## GuardrailResult Shape
+## `GuardrailResult` shape
 
 Every guardrail returns this shape:
 
 ```typescript
 interface GuardrailResult {
-  // Did the input/output pass?
   passed: boolean;
-
-  // Why it failed (when passed: false)
-  reason?: string;
-
-  // Modified data – guardrail can transform the input/output
-  transformed?: unknown;
+  reason?: string;       // populated when passed: false
+  transformed?: unknown; // when set, replaces the original value downstream
 }
 ```
 
-When `transformed` is set, the modified value replaces the original for downstream processing.
+When `transformed` is set, the modified value replaces the original for downstream processing — that's how redaction and sanitization work.
 
-## Built-In Guardrails
+## Built-in guardrails
 
-### PII Detection and Redaction
+### PII detection + redaction
 
 ```typescript
-import { createPIIGuardrail } from "@directive-run/ai";
-
 const piiGuardrail = createPIIGuardrail({
-  // Additional regex patterns beyond defaults
-  patterns: [/CUSTOM-\d{8}/g],
-
-  // Redact instead of blocking (default: false)
-  redact: true,
-
-  // Replacement string (default: "[REDACTED]")
-  redactReplacement: "***",
+  patterns: [/CUSTOM-\d{8}/g],  // extra regex patterns beyond defaults (SSN / credit card / email)
+  redact: true,                  // redact in place instead of blocking (default: false)
+  redactReplacement: "***",      // string to substitute (default: "[REDACTED]")
 });
 ```
 
-### Content Moderation
+### Content moderation (user check function)
 
 ```typescript
-import { createModerationGuardrail } from "@directive-run/ai";
-
-const moderationGuardrail = createModerationGuardrail({
-  // Custom check function – return true if content is safe
-  checkFn: async (content) => {
-    const result = await moderationAPI.check(content);
-
-    return result.safe;
+const moderation = createModerationGuardrail({
+  checkFn: async (text) => {
+    const result = await moderationAPI.check(text);
+    return result.flagged;       // return TRUE when content should be flagged/blocked
   },
-
-  // Custom rejection message
-  message: "Content flagged by moderation",
+  message: "Content flagged by moderation", // optional override
 });
 ```
 
-### Rate Limiting
+The check function may be sync or async. Returning `true` causes the guardrail to block.
+
+### Rate limiting (sliding window)
 
 ```typescript
-import { createRateLimitGuardrail } from "@directive-run/ai";
+const rateLimit = createRateLimitGuardrail({
+  maxTokensPerMinute: 50_000,    // default 100_000
+  maxRequestsPerMinute: 30,      // default 60
+});
 
-const rateLimitGuardrail = createRateLimitGuardrail({
-  maxTokensPerMinute: 50000,
-  maxRequestsPerMinute: 10,
+// Test helper — included on the returned guardrail
+rateLimit.reset();
+```
+
+### Tool allow/deny lists
+
+```typescript
+const tools = createToolGuardrail({
+  allowlist: ["search", "calculator", "readFile"], // only these tools are allowed
+  denylist:  ["dangerous-tool"],                    // any of these are blocked
+  caseSensitive: false,                              // default false
 });
 ```
 
-### Tool Allowlist
+Use `allowlist` OR `denylist` (or both). A tool not on the allowlist is blocked; a tool on the denylist is blocked.
+
+### Output schema validation
+
+The validator is a function — Directive does NOT take a raw JSON schema. Use any validation library that has a `safeParse`-style API; pass an adapter.
 
 ```typescript
-import { createToolGuardrail } from "@directive-run/ai";
-
-const toolGuardrail = createToolGuardrail({
-  allowedTools: ["search", "calculator", "readFile"],
-  // Any tool not in this list is blocked
-});
-```
-
-### Output Schema Validation
-
-```typescript
-import { createOutputSchemaGuardrail } from "@directive-run/ai";
+import { z } from "zod";
 
 const schemaGuardrail = createOutputSchemaGuardrail({
-  schema: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      score: { type: "number", minimum: 0, maximum: 100 },
-    },
-    required: ["title", "score"],
+  validate: (value) => {
+    const result = z.object({ title: z.string(), score: z.number() }).safeParse(value);
+
+    return {
+      valid: result.success,
+      errors: result.success ? undefined : result.error.issues.map((i) => i.message),
+    };
   },
-
-  // Retry with schema feedback if validation fails (default: 0)
-  retries: 2,
+  errorPrefix: "Output schema validation failed", // default — prepended to error.reason
 });
 ```
 
-### Output Type Guard
+For automatic schema-retry on the agent's behalf, configure `outputSchema` + `maxSchemaRetries` on the orchestrator instead (see `ai-orchestrator.md` → Structured output).
+
+### Output type guard (no schema library needed)
 
 ```typescript
-import { createOutputTypeGuardrail } from "@directive-run/ai";
-
-const typeGuardrail = createOutputTypeGuardrail({
-  type: "object", // "string" | "number" | "boolean" | "object" | "array"
+const typeGuard = createOutputTypeGuardrail({
+  type: "object",                     // "string" | "number" | "boolean" | "object" | "array"
+  requiredFields: ["id", "name"],     // object keys that must exist
+  minLength: 1,                       // for arrays
+  maxLength: 100,                     // for arrays
+  minStringLength: 1,                 // for strings
+  maxStringLength: 5000,              // for strings
 });
 ```
 
-### Length Constraints
+### Length constraints
 
 ```typescript
-import { createLengthGuardrail } from "@directive-run/ai";
-
 const lengthGuardrail = createLengthGuardrail({
-  minChars: 100,
-  maxChars: 5000,
-  minTokens: 50,
-  maxTokens: 1000,
+  maxCharacters: 5000,
+  maxTokens: 1200,
+  estimateTokens: (text) => Math.ceil(text.length / 4), // default: chars / 4
 });
 ```
 
-### Content Filter
+There is NO `minChars`, `maxChars`, or `minTokens` option — only `maxCharacters` (note the spelling) and `maxTokens`.
+
+### Content filter (banned patterns)
 
 ```typescript
-import { createContentFilterGuardrail } from "@directive-run/ai";
-
 const contentFilter = createContentFilterGuardrail({
-  patterns: [/badword/i, /sensitive-term/gi],
-
-  // "block" (default) or "redact"
-  action: "redact",
-
-  // Replacement for redact mode
-  replacement: "[FILTERED]",
+  blockedPatterns: [/\bpassword\b/i, /\bsecret\b/i, "internal-only"],
+  caseSensitive: false,
 });
 ```
 
-## Applying Guardrails
+Strings are escaped and compiled to RegExp; RegExp instances pass through. There is NO `action: "redact"` mode — this guardrail blocks only. For redaction, use `createPIIGuardrail({ redact: true, patterns: [...] })`.
+
+## Applying guardrails
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
   runner,
   guardrails: {
-    // Run before the agent receives the prompt
-    input: [piiGuardrail, rateLimitGuardrail],
-
-    // Run after the agent produces output
-    output: [lengthGuardrail, schemaGuardrail, contentFilter],
+    input:    [piiGuardrail, rateLimit],
+    output:   [lengthGuardrail, schemaGuardrail, contentFilter],
+    toolCall: [tools],
   },
 });
 ```
 
-## Anti-Pattern #25: Catching Error Instead of GuardrailError
+## Catching `GuardrailError`
 
 ```typescript
-// WRONG – loses guardrail-specific metadata
-try {
-  const result = await orchestrator.run(agent, prompt);
-} catch (error) {
-  if (error instanceof Error) {
-    console.log(error.message); // No guardrail context
-  }
-}
-
-// CORRECT – catch GuardrailError for full context
-import { GuardrailError } from "@directive-run/ai";
+import { GuardrailError, isGuardrailError } from "@directive-run/ai";
 
 try {
-  const result = await orchestrator.run(agent, prompt);
+  await orchestrator.run(agent, prompt);
 } catch (error) {
-  if (error instanceof GuardrailError) {
-    console.log(error.guardrailName);  // "pii-detection"
-    console.log(error.errorCode);      // "GUARDRAIL_INPUT_BLOCKED"
-    console.log(error.reason);         // "PII detected in input"
+  if (isGuardrailError(error)) {
+    console.log(error.code);          // "INPUT_GUARDRAIL_FAILED" | "OUTPUT_GUARDRAIL_FAILED" | "TOOL_CALL_GUARDRAIL_FAILED" | …
+    console.log(error.guardrailName); // "pii-detection"
+    console.log(error.guardrailType); // "input" | "output" | "toolCall"
+    console.log(error.userMessage);   // safe-to-show user-facing message
+    console.log(error.agentName);     // which agent triggered it
+    // error.input and error.data are non-enumerable to prevent accidental log leakage
   }
 }
 ```
 
+There is no `errorCode` field — it's `code`. There is no `reason` field on `GuardrailError` — the rejection reason from the guardrail's result becomes the error's `message` (or `userMessage` for safe display).
+
+`GuardrailErrorCode` union:
+- `INPUT_GUARDRAIL_FAILED` / `OUTPUT_GUARDRAIL_FAILED` / `TOOL_CALL_GUARDRAIL_FAILED`
+- `APPROVAL_REJECTED`
+- `BUDGET_EXCEEDED`
+- `RATE_LIMIT_EXCEEDED`
+- `AGENT_ERROR`
+
 ---
 
-## Memory Strategies
+## Memory strategies
 
-Memory strategies control how conversation history is managed when it grows too large.
-
-## Decision Tree: "Which memory strategy?"
+Memory strategies control how conversation history is trimmed as it grows.
 
 ```
 How should history be trimmed?
 ├── Keep N most recent messages → createSlidingWindowStrategy()
 ├── Keep within token budget   → createTokenBasedStrategy()
-└── Both constraints           → createHybridStrategy()
+└── Both at once               → createHybridStrategy()
 ```
 
-### Sliding Window
+### Sliding window (message count)
 
 ```typescript
 import { createAgentMemory, createSlidingWindowStrategy } from "@directive-run/ai";
@@ -217,17 +215,15 @@ import { createAgentMemory, createSlidingWindowStrategy } from "@directive-run/a
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({
     maxMessages: 50,
-
-    // Always keep the N most recent (default: 5)
-    preserveRecentCount: 10,
+    preserveRecentCount: 10, // always keep the N most recent (default 5)
   }),
 });
 ```
 
-### Token-Based
+### Token-based
 
 ```typescript
-import { createAgentMemory, createTokenBasedStrategy } from "@directive-run/ai";
+import { createTokenBasedStrategy } from "@directive-run/ai";
 
 const memory = createAgentMemory({
   strategy: createTokenBasedStrategy({
@@ -237,57 +233,54 @@ const memory = createAgentMemory({
 });
 ```
 
-### Hybrid (Both Constraints)
+### Hybrid (both constraints)
 
 ```typescript
-import { createAgentMemory, createHybridStrategy } from "@directive-run/ai";
+import { createHybridStrategy } from "@directive-run/ai";
 
 const memory = createAgentMemory({
   strategy: createHybridStrategy({
     maxMessages: 100,
-    maxTokens: 16000,
+    maxTokens: 16_000,
   }),
 });
 ```
 
 ## Summarizers
 
-When messages are evicted, a summarizer condenses them:
+When messages are evicted, a summarizer condenses them.
 
-### Truncation (Default)
+### Truncation (drop, no summary)
 
 ```typescript
 import { createTruncationSummarizer } from "@directive-run/ai";
 
-// Simply drops old messages – no summary generated
 const summarizer = createTruncationSummarizer();
 ```
 
-### Key Points Extraction
+### Key-points (rule-based, no LLM call)
 
 ```typescript
 import { createKeyPointsSummarizer } from "@directive-run/ai";
 
-// Extracts bullet points from evicted messages (rule-based, no LLM)
 const summarizer = createKeyPointsSummarizer();
 ```
 
-### LLM-Based Summarization
+### LLM-based (async)
 
 ```typescript
 import { createLLMSummarizer } from "@directive-run/ai";
 
-// Uses the runner to summarize evicted messages via LLM
 const summarizer = createLLMSummarizer(runner);
 ```
 
-### Applying to Memory
+### Wiring memory to an orchestrator
 
 ```typescript
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 50 }),
   summarizer: createKeyPointsSummarizer(),
-  autoManage: true, // Automatically trim + summarize (default: true)
+  autoManage: true, // automatically trim + summarize after each run (default: true)
 });
 
 const orchestrator = createAgentOrchestrator({
@@ -296,37 +289,74 @@ const orchestrator = createAgentOrchestrator({
 });
 ```
 
-## Anti-Pattern #31: Async Summarizer Without autoManage: false
+## Anti-patterns
+
+### Calling guardrails by old field names
 
 ```typescript
-// WRONG – LLM summarizer is async but autoManage runs synchronously
-const memory = createAgentMemory({
+// WRONG — these option names don't exist
+createOutputSchemaGuardrail({ schema: jsonSchema, retries: 2 })   // → use validate + outputSchema on the orchestrator for retry
+createToolGuardrail({ allowedTools: [...] })                       // → use allowlist
+createLengthGuardrail({ minChars, maxChars, minTokens, maxTokens })// → only maxCharacters + maxTokens
+createContentFilterGuardrail({ patterns, action: "redact" })       // → blockedPatterns; this guardrail BLOCKS only
+```
+
+### Catching `Error` instead of `GuardrailError`
+
+```typescript
+// WRONG — loses code, guardrailName, guardrailType, userMessage
+try { await orch.run(agent, prompt); } catch (e) {
+  if (e instanceof Error) console.log(e.message);
+}
+
+// CORRECT — narrow to GuardrailError
+try { await orch.run(agent, prompt); } catch (e) {
+  if (e instanceof GuardrailError) {
+    console.log(e.code, e.guardrailName, e.userMessage);
+  } else {
+    throw e;
+  }
+}
+```
+
+### Reading the wrong error fields
+
+```typescript
+// WRONG — these don't exist on GuardrailError
+error.errorCode   // → use error.code
+error.reason      // → use error.message (or userMessage for user-facing)
+```
+
+### LLM summarizer with `autoManage: true`
+
+```typescript
+// WRONG — autoManage runs synchronously; the async summarizer is never awaited
+createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 20 }),
   summarizer: createLLMSummarizer(runner),
-  autoManage: true, // Will not await the summarizer properly
-});
+  autoManage: true,
+})
 
-// CORRECT – disable autoManage, call memory.manage() manually
+// CORRECT — disable autoManage, call memory.manage() after each run
 const memory = createAgentMemory({
   strategy: createSlidingWindowStrategy({ maxMessages: 20 }),
   summarizer: createLLMSummarizer(runner),
   autoManage: false,
 });
 
-// After each run, manually manage memory
-const result = await orchestrator.run(agent, prompt);
-await memory.manage(); // Awaits the async summarizer
+await orchestrator.run(agent, prompt);
+await memory.manage(); // awaits the async summarizer
 ```
 
-## Quick Reference
+## Quick reference
 
-| Guardrail | Input/Output | Key Option |
+| Guardrail | Phase | Required options |
 |---|---|---|
-| `createPIIGuardrail` | Both | `redact`, `patterns` |
-| `createModerationGuardrail` | Both | `checkFn` |
-| `createRateLimitGuardrail` | Input | `maxTokensPerMinute` |
-| `createToolGuardrail` | Input | `allowedTools` |
-| `createOutputSchemaGuardrail` | Output | `schema`, `retries` |
-| `createOutputTypeGuardrail` | Output | `type` |
-| `createLengthGuardrail` | Output | `minChars`, `maxChars` |
-| `createContentFilterGuardrail` | Both | `patterns`, `action` |
+| `createPIIGuardrail` | input | (none — sensible defaults) |
+| `createModerationGuardrail` | input + output | `checkFn` |
+| `createRateLimitGuardrail` | input | (none — defaults 100K tokens/60 requests per minute) |
+| `createToolGuardrail` | toolCall | `allowlist` or `denylist` |
+| `createOutputSchemaGuardrail` | output | `validate` (`SchemaValidator<T>`) |
+| `createOutputTypeGuardrail` | output | `type` |
+| `createLengthGuardrail` | output | one of `maxCharacters` or `maxTokens` |
+| `createContentFilterGuardrail` | output | `blockedPatterns` |

@@ -18,6 +18,39 @@ export function generateClaudeRules(): string {
 > https://directive.run | \`npm install @directive-run/core\`
 > Full reference with examples: https://directive.run/llms.txt
 
+## When to reach for Directive
+
+Directive is to **business state and agent orchestration** what XState
+is to state machines and React Query is to server state — a runtime
+that takes declarative rules ("what must be true") and runs the
+resolvers ("how to make it true"). The unique claim only Directive can
+make: **state and AI agents share the same runtime**. \`@directive-run/ai\`
+is the only state-library ecosystem that ships LLM orchestration as a
+sibling concept to facts/constraints/resolvers.
+
+It is NOT a Redux replacement for cross-cutting global UI state. It is
+a constraint engine you compose alongside Redux / Zustand / Jotai /
+React Query / TanStack Query.
+
+**Reach for Directive when:**
+
+- The same business rule has to fire across React, Vue, server, and
+  background workers. Directive runs the same module in every runtime.
+- A constraint should drive a side-effect (fetch, validate, cancel,
+  retry) declaratively, without writing imperative thunks.
+- You are orchestrating LLM agents and need typed, replayable state +
+  guardrails + budgets + audit trails + checkpoints.
+- You want time-travel debugging, audit logs, or rules-diff replay on
+  state mutations without instrumenting every component.
+
+**Do NOT reach for Directive for:**
+
+- Plain UI state (use signals / Zustand / Jotai).
+- Server-state caching only (use React Query / TanStack Query
+  — though you can layer \`@directive-run/query\` on top when you need
+  the constraint engine alongside fetching).
+- State machines that don't react to external facts (use XState).
+
 ## Core Patterns
 
 ${corePatterns}
@@ -36,7 +69,7 @@ ${antiPatterns}
 | 22 | \`facts.cache.push(item)\` in orchestrator | \`facts.cache = [...facts.cache, item]\` |
 | 23 | Returning data from orchestrator \`resolve\` | Resolvers return \`void\` — mutate \`context.facts\` |
 | 24 | Forgetting \`orchestrator.start()\` multi-agent | Single: implicit. Multi: must call \`start()\` |
-| 25 | Catching \`Error\` not \`GuardrailError\` | \`GuardrailError\` has \`.guardrailName\`, \`.errorCode\` |
+| 25 | Catching \`Error\` not \`GuardrailError\` | \`GuardrailError\` has \`.guardrailName\`, \`.code\`, \`.userMessage\` |
 | 26 | \`from '@directive-run/ai'\` for adapters | Subpath: \`from '@directive-run/ai/openai'\` |
 | 27 | Assuming \`{ input_tokens }\` structure | Normalized: \`{ inputTokens, outputTokens }\` |
 | 28 | Same CircuitBreaker across agents | Create separate instances per dependency |

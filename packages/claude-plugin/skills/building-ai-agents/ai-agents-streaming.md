@@ -1,41 +1,33 @@
-# AI Agents and Streaming
+# AI agents + streaming
 
-Defines the AgentLike interface (what runners receive), RunResult (what runners return), StreamChunk union types, backpressure strategies, and SSE transport.
+Defines the `AgentLike` shape, the `RunResult` returned by every runner, the `StreamChunk` discriminated union, backpressure strategies, the streaming runner wrapper, and the SSE transport for piping tokens to a browser.
 
-## Decision Tree: "How do I get output from an agent?"
+## Decision tree
 
 ```
 Need the complete result?
-├── Yes → orchestrator.run(agent, prompt) → RunResult
+├── Yes                          → orchestrator.run(agent, prompt) → Promise<RunResult>
 └── No, need incremental output
-    ├── AsyncIterable → orchestrator.runStream(agent, prompt)
-    ├── Callback-based → StreamingCallbackRunner
-    └── Server-Sent Events → createSSEResponse()
-        │
-        Backpressure concern?
-        ├── Consumer is slow → strategy: "block"
-        ├── Can drop tokens  → strategy: "drop"
-        └── Default          → strategy: "buffer"
+    ├── Async-iterator stream    → orchestrator.runStream(agent, prompt) → { stream, result, abort }
+    ├── Wrap a base runner       → createStreamingRunner(baseRunner, opts) → StreamRunner
+    └── Server-Sent Events to HTTP → createSSETransport(config) → { toResponse, toStream }
+
+Backpressure concern?
+├── Consumer is slow             → backpressure: "buffer" (default)
+├── Need every token             → backpressure: "block"
+└── Real-time, can drop          → backpressure: "drop"
 ```
 
-## AgentLike – What the Runner Receives
+## `AgentLike`
 
 ```typescript
 interface AgentLike {
-  // Required – unique identifier
-  name: string;
-
-  // System prompt / instructions
-  instructions?: string;
-
-  // Model identifier (adapter-specific)
-  model?: string;
-
-  // Tools the agent can use
-  tools?: unknown[];
+  name: string;            // required — unique identifier
+  instructions?: string;   // system prompt
+  model?: string;          // adapter-specific model id
+  tools?: unknown[];       // tools the agent can call
 }
 
-// Usage
 const agent: AgentLike = {
   name: "analyst",
   instructions: "You analyze data and provide insights.",
@@ -44,71 +36,47 @@ const agent: AgentLike = {
 };
 ```
 
-## RunResult – What the Runner Returns
+## `RunResult<T>`
+
+Every runner — wrapped, mocked, real — resolves to this shape.
 
 ```typescript
 interface RunResult<T = unknown> {
-  // The agent's final output
-  output: T;
-
-  // Full message history from this run
-  messages: Message[];
-
-  // Tool calls made during this run
-  toolCalls: ToolCall[];
-
-  // Total tokens consumed (input + output)
-  totalTokens: number;
-
-  // Detailed token breakdown
-  tokenUsage?: {
-    inputTokens: number;
-    outputTokens: number;
-  };
+  output: T;                 // the agent's final output
+  messages: Message[];       // full message history from this run
+  toolCalls: ToolCall[];     // tool calls executed during this run
+  totalTokens: number;       // cumulative tokens
+  tokenUsage?: TokenUsage;   // optional input/output breakdown when the provider supplies it
+  isCached?: boolean;        // true when served from a semantic cache hit
 }
 
-// Usage
-const result = await orchestrator.run(agent, "Analyze sales data");
-console.log(result.output);
-console.log(`Tokens used: ${result.totalTokens}`);
-console.log(`Tool calls: ${result.toolCalls.length}`);
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  // Note: NO `total` field — sum `inputTokens + outputTokens` when needed, or use `result.totalTokens`.
+}
 ```
 
-## StreamChunk Union Types
-
-Each chunk from `runStream` is one of these discriminated union types:
+## `StreamChunk` discriminated union
 
 ```typescript
 type StreamChunk =
-  // Text token from the model
-  | { type: "token"; data: string; tokenCount: number }
-
-  // Tool execution started
-  | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }
-
-  // Tool execution completed
-  | { type: "tool_end"; tool: string; toolCallId: string; result: string }
-
-  // Complete message added to history
-  | { type: "message"; message: Message }
-
-  // Guardrail was triggered during streaming
-  | { type: "guardrail_triggered"; guardrailName: string; reason: string; stopped: boolean }
-
-  // Progress indicator
-  | { type: "progress"; phase: "starting" | "generating" | "tool_calling" | "finishing" }
-
-  // Stream completed
-  | { type: "done"; totalTokens: number; duration: number; droppedTokens: number }
-
-  // Error during streaming
-  | { type: "error"; error: Error };
+  | { type: "token"; data: string; tokenCount: number }                                   // a text token from the model
+  | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }            // tool started executing
+  | { type: "tool_end"; tool: string; toolCallId: string; result: string }                 // tool finished
+  | { type: "message"; message: Message }                                                  // a complete message added to history
+  | { type: "guardrail_triggered"; guardrailName: string; reason: string; stopped: boolean } // a guardrail fired during streaming
+  | { type: "progress"; phase: "starting" | "generating" | "tool_calling" | "finishing" }   // coarse progress
+  | { type: "done"; totalTokens: number; duration: number; droppedTokens: number }          // stream complete
+  | { type: "error"; error: Error };                                                       // stream aborted with an error
 ```
 
-## Consuming a Stream
+## Consuming `runStream`
+
+`orchestrator.runStream(agent, input, options?)` returns **`OrchestratorStreamResult<T>`** — a `{ stream, result, abort }` triple, NOT an `AsyncIterable` directly. Destructure it before iterating.
 
 ```typescript
-const stream = orchestrator.runStream(agent, "Write a report");
+const { stream, result, abort } = orchestrator.runStream(agent, "Write a report");
 
 for await (const chunk of stream) {
   switch (chunk.type) {
@@ -116,154 +84,217 @@ for await (const chunk of stream) {
       process.stdout.write(chunk.data);
       break;
     case "tool_start":
-      console.log(`\nCalling tool: ${chunk.tool}`);
+      console.log(`\ntool: ${chunk.tool}`);
       break;
     case "tool_end":
-      console.log(`Tool result: ${chunk.result.slice(0, 100)}`);
+      console.log(`result: ${chunk.result.slice(0, 100)}`);
       break;
     case "guardrail_triggered":
-      console.warn(`Guardrail ${chunk.guardrailName}: ${chunk.reason}`);
+      console.warn(`guardrail ${chunk.guardrailName}: ${chunk.reason}`);
       if (chunk.stopped) {
-        console.error("Stream stopped by guardrail");
+        console.error("stream stopped by guardrail");
       }
       break;
     case "done":
-      console.log(`\nTokens: ${chunk.totalTokens}, Duration: ${chunk.duration}ms`);
+      console.log(`\ntokens: ${chunk.totalTokens}, ${chunk.duration}ms`);
       break;
     case "error":
-      console.error("Stream error:", chunk.error);
+      console.error("stream error:", chunk.error);
       break;
   }
 }
+
+const final = await result; // RunResult<T>
+
+// Cancel mid-stream
+abort();
 ```
 
-## Backpressure Strategies
+## Backpressure strategies
 
-Control behavior when the consumer cannot keep up with token production:
+Configure how the stream behaves when the consumer can't keep up. Pass via `runStream`'s `options` (orchestrator-side) or via the `StreamRunOptions` if you're calling a `StreamRunner` directly.
 
 ```typescript
-const stream = orchestrator.runStream(agent, "Generate long report", {
-  backpressure: "buffer",  // default – buffer all tokens in memory
-});
-
-const stream = orchestrator.runStream(agent, "Generate long report", {
-  backpressure: "block",   // pause generation until consumer catches up
-});
-
-const stream = orchestrator.runStream(agent, "Generate long report", {
-  backpressure: "drop",    // drop tokens consumer cannot process in time
+const { stream, result } = orchestrator.runStream(agent, "Generate a long report", {
+  signal: abortController.signal,
+  backpressure: "buffer",   // default — buffer all tokens
+  // backpressure: "block"   // pause generation until consumer catches up
+  // backpressure: "drop"    // drop unprocessed tokens; `done.droppedTokens` reports the count
+  bufferSize: 1000,
+  stopOnGuardrail: true,
+  guardrailCheckInterval: 100,
 });
 ```
 
-| Strategy | Behavior | Use When |
+| Strategy | Behavior | Use when |
 |---|---|---|
-| `"buffer"` | Buffers all tokens in memory | Consumer is slightly slow, memory is available |
+| `"buffer"` | Buffers all tokens in memory | Consumer is slightly slow; memory is available |
 | `"block"` | Pauses model generation | Consumer must process every token |
-| `"drop"` | Drops unprocessed tokens | Real-time display, some loss acceptable |
+| `"drop"` | Drops unprocessed tokens | Real-time display; some loss acceptable |
 
-When using `"drop"`, the `done` chunk reports `droppedTokens` count.
+## `createStreamingRunner(baseRunner, options?)`
 
-## StreamingCallbackRunner
-
-For callback-based streaming (instead of AsyncIterable):
+Wrap a base streaming runner (a `StreamingCallbackRunner` — the callback-based adapter interface) into a `StreamRunner` that produces the async-iterator chunks shown above. The factory is `createStreamingRunner`, NOT `createStreamingCallbackRunner` (the "callback" form is the INPUT to this wrapper, not a separate factory).
 
 ```typescript
-import { createStreamingCallbackRunner } from "@directive-run/ai";
+import { createStreamingRunner, type StreamingCallbackRunner } from "@directive-run/ai";
 
-const callbackRunner = createStreamingCallbackRunner(runner, {
-  onToken: (token) => process.stdout.write(token),
-  onToolStart: (tool, id) => console.log(`Tool: ${tool}`),
-  onToolEnd: (tool, id, result) => console.log(`Result: ${result}`),
-  onComplete: (result) => console.log("Done:", result.totalTokens),
-  onError: (error) => console.error(error),
+// The base runner is callback-driven. You supply this from your provider adapter.
+const callbackBased: StreamingCallbackRunner = (agent, input, { onToken, onToolStart, onToolEnd, onComplete, signal }) => {
+  // … call your provider's streaming API; invoke the callbacks as tokens arrive
+};
+
+const streamRunner = createStreamingRunner(callbackBased, {
+  streamingGuardrails: [],
 });
 
-// Use in orchestrator
-const orchestrator = createAgentOrchestrator({
-  runner: callbackRunner,
-});
+// Use it directly — returns the same { stream, result, abort } shape
+const { stream, result, abort } = streamRunner(agent, "prompt", { backpressure: "buffer" });
 ```
 
-## SSE Transport (Server-Sent Events)
+## `createSSETransport(config?)`
 
-Pipe agent streaming to HTTP responses for web servers:
+Pipes a token stream to Server-Sent Events for browser consumption. `createSSEResponse` does NOT exist — the real factory is `createSSETransport`, and it returns `{ toResponse, toStream }`.
 
 ```typescript
-import { createSSEResponse } from "@directive-run/ai";
+import { createSSETransport } from "@directive-run/ai";
 
-// Express / Node HTTP handler
+const sse = createSSETransport({
+  maxResponseChars: 50_000,
+  truncationMessage: "\n\n*[Response truncated]*",
+  heartbeatIntervalMs: 15_000,
+  headers: { "X-AI-Service": "directive" },
+  errorMessages: { rate_limit: "Service busy — please retry shortly." },
+});
+
+// Modern web frameworks (Hono, Next.js, Bun, Deno) — return a Response directly
+export async function POST(req: Request) {
+  const { prompt } = await req.json();
+  const { stream } = orchestrator.runStream(agent, prompt);
+
+  return sse.toResponse(stream, agent.name, prompt);
+}
+
+// Express / Koa — write to res via the ReadableStream
 app.post("/api/chat", async (req, res) => {
-  const stream = orchestrator.runStream(agent, req.body.prompt);
-
-  // Creates a ReadableStream of SSE-formatted events
-  const sseResponse = createSSEResponse(stream);
+  const { stream } = orchestrator.runStream(agent, req.body.prompt);
+  const readable = sse.toStream(stream, agent.name, req.body.prompt);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  for await (const event of sseResponse) {
-    res.write(event);
+  for await (const chunk of readable) {
+    res.write(chunk);
   }
-
   res.end();
 });
 ```
 
-Client-side consumption:
+Client-side consumption is plain SSE:
 
 ```typescript
 const eventSource = new EventSource("/api/chat");
 
-eventSource.onmessage = (event) => {
-  const chunk = JSON.parse(event.data);
-  if (chunk.type === "token") {
-    appendToDisplay(chunk.data);
-  }
-};
+eventSource.addEventListener("text", (event) => {
+  const data = JSON.parse(event.data) as { type: "text"; text: string };
+  appendToDisplay(data.text);
+});
+
+eventSource.addEventListener("done", () => eventSource.close());
 ```
 
-## Common Mistakes
+## Anti-patterns
 
-### Not checking chunk.type before accessing fields
+### Iterating `runStream` directly
 
 ```typescript
-// WRONG – not all chunks have .data
+// WRONG — runStream returns { stream, result, abort }, not the iterator itself
+const stream = orchestrator.runStream(agent, prompt);
+for await (const chunk of stream) { /* won't iterate the right thing */ }
+
+// CORRECT — destructure
+const { stream, result, abort } = orchestrator.runStream(agent, prompt);
+for await (const chunk of stream) { /* … */ }
+const final = await result;
+```
+
+### Importing `createStreamingCallbackRunner`
+
+```typescript
+// WRONG — no factory by that name
+import { createStreamingCallbackRunner } from "@directive-run/ai";
+
+// CORRECT — wrap a callback-based runner with createStreamingRunner
+import { createStreamingRunner } from "@directive-run/ai";
+const wrapped = createStreamingRunner(callbackBasedRunner, { streamingGuardrails: [] });
+```
+
+### Importing `createSSEResponse`
+
+```typescript
+// WRONG — no factory by that name
+import { createSSEResponse } from "@directive-run/ai";
+const sse = createSSEResponse(stream);
+
+// CORRECT — createSSETransport returns { toResponse, toStream }
+import { createSSETransport } from "@directive-run/ai";
+const sse = createSSETransport({ heartbeatIntervalMs: 15_000 });
+return sse.toResponse(stream, agentId, prompt);
+```
+
+### Reading `tokenUsage.total`
+
+```typescript
+// WRONG — TokenUsage has no `total` field
+console.log(result.tokenUsage?.total);
+
+// CORRECT — sum, or use the top-level totalTokens
+console.log(result.totalTokens);
+console.log((result.tokenUsage?.inputTokens ?? 0) + (result.tokenUsage?.outputTokens ?? 0));
+```
+
+### Not checking `chunk.type` before accessing fields
+
+```typescript
+// WRONG — not every chunk has .data; this is undefined for tool_start/done/etc.
 for await (const chunk of stream) {
-  console.log(chunk.data); // undefined for non-token chunks
+  console.log(chunk.data);
 }
 
-// CORRECT – switch on chunk.type
+// CORRECT — switch / narrow on chunk.type
 for await (const chunk of stream) {
   if (chunk.type === "token") {
-    console.log(chunk.data);
+    process.stdout.write(chunk.data);
   }
 }
 ```
 
-### Ignoring the stopped flag on guardrail chunks
+### Ignoring `guardrail_triggered.stopped`
 
 ```typescript
-// WRONG – continuing after a stopping guardrail
+// WRONG — continuing after a stopping guardrail
 case "guardrail_triggered":
-  console.log("Guardrail triggered, continuing...");
+  console.log("guardrail fired, continuing…");
   break;
 
-// CORRECT – check if the stream was stopped
+// CORRECT — `stopped: true` means the stream was terminated by the guardrail
 case "guardrail_triggered":
   if (chunk.stopped) {
-    console.error(`Stopped by ${chunk.guardrailName}: ${chunk.reason}`);
-    // Handle stream termination
+    console.error(`stopped by ${chunk.guardrailName}: ${chunk.reason}`);
+    abort();
+    return;
   }
   break;
 ```
 
-## Quick Reference
+## Quick reference
 
-| Type | Interface | Purpose |
+| Type / API | Path | Purpose |
 |---|---|---|
-| `AgentLike` | `{ name, instructions?, model?, tools? }` | Agent definition |
-| `RunResult` | `{ output, messages, toolCalls, totalTokens }` | Complete run result |
-| `StreamChunk` | Discriminated union (8 types) | Incremental output |
-| `StreamingCallbackRunner` | Callback-based adapter | Alternative to AsyncIterable |
-| `createSSEResponse` | SSE formatter | Web server streaming |
+| `AgentLike` | `@directive-run/ai` | `{ name, instructions?, model?, tools? }` — what runners receive |
+| `RunResult<T>` | `@directive-run/ai` | `{ output, messages, toolCalls, totalTokens, tokenUsage?, isCached? }` |
+| `StreamChunk` | `@directive-run/ai` | 8-way discriminated union for streaming output |
+| `orchestrator.runStream(agent, input, opts?)` | instance method | Returns `{ stream, result, abort }` |
+| `createStreamingRunner(baseRunner, opts?)` | `@directive-run/ai` | Wrap a `StreamingCallbackRunner` into a `StreamRunner` |
+| `createSSETransport(config?)` | `@directive-run/ai` | `{ toResponse, toStream }` for piping a stream to SSE |

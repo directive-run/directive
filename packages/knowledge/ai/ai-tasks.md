@@ -65,7 +65,7 @@ interface TaskContext {
 ## Registering Tasks
 
 ```typescript
-import { createMultiAgentOrchestrator } from "@directive-run/ai";
+import { createMultiAgentOrchestrator } from "@directive-run/ai/multi-agent";
 
 const orchestrator = createMultiAgentOrchestrator({
   agents: {

@@ -94,10 +94,10 @@ const trafficLight = createModule("traffic", {
     transition: {
       requirement: "TRANSITION",
       key: ["to"],
-      resolve: async (req, ctx) => {
-        ctx.facts.phase = req.to;
-        ctx.facts.elapsed = 0;
-        ctx.facts.transitionCount = ctx.facts.transitionCount + 1;
+      resolve: async (req, context) => {
+        context.facts.phase = req.to;
+        context.facts.elapsed = 0;
+        context.facts.transitionCount = context.facts.transitionCount + 1;
       },
     },
   },

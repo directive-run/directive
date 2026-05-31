@@ -68,14 +68,19 @@ resolve: async (req, ctx) => { /* ... */ },
 
 ## Return Style
 
-### Always Use Braces
+### Always Use Braces (for `if` blocks with `return`)
 
-No single-line returns. Always wrap in braces.
+The brace rule applies to control-flow blocks — not to arrow-expression bodies.
+
+**Arrow expressions** (single-line derivations, predicates, computed
+requirements): the concise form is preferred. No braces, no explicit
+`return`.
 
 ```typescript
-// WRONG
+// CORRECT — single-line arrow expressions stay concise
 derive: {
   isReady: (facts) => facts.phase === "ready",
+  greeting: (facts) => `Hi, ${facts.name}!`,
 },
 
 constraints: {
@@ -84,14 +89,16 @@ constraints: {
     require: { type: "PROCESS" },
   },
 },
+```
 
-// Wait -- the above IS correct for one-line arrow expressions.
-// The brace rule applies to if/return blocks:
+**Control-flow statements** (`if`, `for`, `while`): braces required, even
+for single-line bodies. Single-line `if (x) return y` shapes are never used.
 
+```typescript
 // WRONG – single-line if return
 if (facts.user) return "ready";
 
-// CORRECT – always use braces
+// CORRECT – always wrap the body in braces
 if (facts.user) {
   return "ready";
 }
