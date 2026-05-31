@@ -237,10 +237,28 @@ runs.
 - **Multi-fact reads/writes that aren't related.** Snapshot only the
   facts you actually optimistically wrote.
 
+## Composes with
+
+- [`@directive-run/mutator`](../mutator) — `defineMutator` handlers wrapped with `withOptimisticHandlers` get rollback for free
+- [`@directive-run/query`](../query) — when an optimistic mutation invalidates a query tag, the rollback also reverts the invalidation
+- [`@directive-run/timeline`](../timeline) — records optimistic writes and rollbacks so test failures are reproducible byte-for-byte
+- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) — the underlying runtime
+
+## Use this package with your AI assistant
+
+`withOptimisticHandlers` solves the optimistic-rollback pattern AI assistants get wrong by default — pair it with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant knows how to wire snapshot + rollback alongside `defineMutator`.
+
+```
+# Claude Code
+/plugin marketplace add directive-run/directive
+/plugin install directive@directive-plugins
+
+# Cursor / Copilot / Windsurf / Cline / Codex
+npx directive ai-rules init
+```
+
 ## See also
 
-- [`@directive-run/mutator`](https://www.npmjs.com/package/@directive-run/mutator) – composes with this for full optimistic-UI flows
-- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) – the runtime
 - [JSON-fact contract](https://docs.directive.run/api/facts#json-roundtrippability-is-required)
 - [`MIGRATION_FEEDBACK.md` item 19](https://github.com/directive-run/directive/blob/main/docs/MIGRATION_FEEDBACK.md)
 

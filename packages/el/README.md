@@ -363,6 +363,31 @@ and hydrates on the client is on the roadmap; it does not exist today.
 - `@directive-run/core` (optional – only needed for `bind`, `bindText`, `mount`)
 - `htm` >= 3 (optional – only needed for `@directive-run/el/htm`)
 
+## Composes with
+
+The framework-free sibling of:
+
+- [`@directive-run/react`](../react) — React hooks
+- [`@directive-run/vue`](../vue) — Vue composables
+- [`@directive-run/svelte`](../svelte) — Svelte stores
+- [`@directive-run/solid`](../solid) — Solid signals
+- [`@directive-run/lit`](../lit) — Lit reactive controllers
+
+Use `el` when you don't want a framework, or for a server-emitted island that hydrates with plain DOM. Use one of the others when you're already in their ecosystem.
+
+## Use this package with your AI assistant
+
+Framework-free DOM bindings are what AI scaffolds produce when they don't know your framework yet — pair `el` with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant produces `bind` / `bindText` / `mount` calls instead of imperative `document.querySelector` wiring.
+
+```
+# Claude Code
+/plugin marketplace add directive-run/directive
+/plugin install directive@directive-plugins
+
+# Cursor / Copilot / Windsurf / Cline / Codex
+npx directive ai-rules init
+```
+
 ## Documentation
 
 - [Vanilla Adapter Guide](https://directive.run/docs/adapters/vanilla)

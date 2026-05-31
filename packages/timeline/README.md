@@ -363,10 +363,29 @@ Future versions explore:
 These all rest on the recorder + JSON. If the data model is right,
 the frontends compose.
 
+## Composes with
+
+- [`@directive-run/mutator`](../mutator) — every mutation cycle records into the timeline; replay a failed test's exact mutation sequence
+- [`@directive-run/optimistic`](../optimistic) — captures optimistic writes AND rollbacks, so flaky tests reproduce byte-for-byte
+- [`@directive-run/query`](../query) — recorded refetches and tag invalidations turn data-fetching tests into deterministic replays
+- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) — the substrate
+- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) — runtime inspector (orthogonal: that's for live apps; this is for test failures)
+
+## Use this package with your AI assistant
+
+Recorded timelines make AI debugging reproducible byte-for-byte — when an AI assistant proposes a fix to a flaky test, the timeline tells you whether the fix actually changes the failing event sequence. Pair with [Directive's IDE Integration](https://directive.run/docs/ide-integration).
+
+```
+# Claude Code
+/plugin marketplace add directive-run/directive
+/plugin install directive@directive-plugins
+
+# Cursor / Copilot / Windsurf / Cline / Codex
+npx directive ai-rules init
+```
+
 ## See also
 
-- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) – the substrate
-- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) – runtime inspector (orthogonal: that's for live apps; this is for test failures)
 - [Testing chained pipelines](https://docs.directive.run/testing/chained-pipelines)
 
 ## License

@@ -305,6 +305,26 @@ interface ResourceState<T> {
 - [Data Fetching with Directive](https://directive.run/blog/data-fetching-with-directive) – the complete guide to caching, invalidation, deduplication, and polling
 - [Building a Real-Time Dashboard with Directive](https://directive.run/blog/real-time-dashboard) – multiple async data sources, WebSocket updates, and cross-module derivations
 
+## Composes with
+
+- [`@directive-run/mutator`](../mutator) — discriminated-union mutators that pair with query's invalidation tags for end-to-end optimistic writes
+- [`@directive-run/optimistic`](../optimistic) — `withOptimistic` / `withOptimisticHandlers` for client-side rollback when a mutation fails
+- [`@directive-run/timeline`](../timeline) — recorded timelines that capture every query refetch, so AI debugging is reproducible byte-for-byte
+- [Data Fetching docs](https://directive.run/docs/data-fetching/overview) — the full caching, invalidation, and dedup story
+
+## Use this package with your AI assistant
+
+Causal cache invalidation gives AI agents a deterministic story for why a refetch fires — pair query with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant generates correct invalidation tags first try.
+
+```
+# Claude Code
+/plugin marketplace add directive-run/directive
+/plugin install directive@directive-plugins
+
+# Cursor / Copilot / Windsurf / Cline / Codex
+npx directive ai-rules init
+```
+
 ## License
 
 [MIT OR Apache-2.0](../../LICENSE)

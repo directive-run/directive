@@ -68,6 +68,12 @@ Request bodies are capped at **10 MB** (`MAX_BODY_BYTES`). Larger uploads are re
 
 **This is a dev-only plugin.** It runs inside Vite's middleware and is not bundled into your client build. In production, use a real reverse proxy – Cloudflare Workers, a Node server, Nginx with auth headers, or a managed gateway – that you can monitor, rate-limit, and lock down per-route. Never ship a bundled API key.
 
+## Composes with
+
+- [`@directive-run/query`](../query) — declarative data fetching that this proxy unblocks during dev (CORS preflight + key handling)
+- [`@directive-run/mutator`](../mutator) — mutation handlers calling AI providers route through this proxy in dev
+- [`@directive-run/ai`](../ai) — when you call an LLM adapter from the browser in dev, this plugin is what lets the request leave
+
 ## License
 
 [MIT OR Apache-2.0](../../LICENSE)
