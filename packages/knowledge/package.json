@@ -20,12 +20,7 @@
   "engines": {
     "node": ">=18"
   },
-  "keywords": [
-    "directive",
-    "knowledge",
-    "ai-rules",
-    "examples"
-  ],
+  "keywords": ["directive", "knowledge", "ai-rules", "examples"],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -37,14 +32,7 @@
       "import": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "core",
-    "ai",
-    "examples",
-    "api-skeleton.md",
-    "sitemap.md"
-  ],
+  "files": ["dist", "core", "ai", "examples", "api-skeleton.md", "sitemap.md"],
   "scripts": {
     "build": "tsx scripts/generate-api-skeleton.ts && tsx scripts/generate-sitemap.ts && tsx scripts/extract-examples.ts && tsup",
     "generate": "tsx scripts/generate-api-skeleton.ts",
