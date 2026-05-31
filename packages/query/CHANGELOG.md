@@ -1,5 +1,86 @@
 # @directive-run/query
 
+## 1.2.0
+
+### Minor Changes
+
+- [`b529dfe`](https://github.com/directive-run/directive/commit/b529dfebb47c0bc0b1dd12765af575202c041254) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createSubscription` gains an `onComplete` callback for stream-terminal signalling.
+
+  Push-based subscriptions previously had no way to say "the stream is done"
+  distinct from "another value just arrived." Every `onData` call set
+  `status: "success"` / `isFetching: false`, so streaming consumers couldn't
+  tell a partial chunk from the final one. AI streaming code that finalised
+  on the first success status would tear the underlying transport down after
+  one or two tokens.
+
+  ```ts
+  const chat = createSubscription({
+    name: "reply",
+    key: (f) => (f.prompt ? { prompt: f.prompt } : null),
+    subscribe: (params, { onData, onError, onComplete, signal }) => {
+      const es = new EventSource(`/api/chat?prompt=${params.prompt}`);
+      es.onmessage = (e) => {
+        const frame = JSON.parse(e.data);
+        if (frame.type === "done") {
+          onComplete();
+          es.close();
+        } else {
+          onData((prev) => (prev ?? "") + frame.text);
+        }
+      };
+      es.onerror = () => onError(new Error("stream error"));
+      signal.addEventListener("abort", () => es.close());
+    },
+  });
+  ```
+
+  `ResourceState<T>` now carries an `isComplete: boolean` flag:
+
+  - `isSuccess && !isComplete` – data updated, more chunks may arrive
+  - `isComplete` – stream ended cleanly, no further values will be pushed
+
+  The flag is reset to `false` whenever the subscription is re-keyed.
+
+  Also fixes a long-standing bug where the subscription effect re-ran on its
+  own writes, firing the cleanup and aborting the live `AbortController` on
+  the first emission. Prev-key bookkeeping now lives in a closure
+  `WeakMap<facts, string>` instead of in the fact store, and prev state
+  reads are untracked. The auto-tracked deps now match what `keyFn(facts)`
+  reads, which is the right identity for a subscription.
+
+  For one-shot queries and mutations, `isComplete` is always `false`.
+
+### Patch Changes
+
+- [`0a7326a`](https://github.com/directive-run/directive/commit/0a7326ad52e8c6123d78f1de30e881c8254d7ab6) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Subscription cleanup, atomic tag invalidation, louder matcher registration.
+
+  Also includes a `@directive-run/vite-plugin-api-proxy` enhancement —
+  new `cors?: boolean | CorsOptions` per-route option that wires up an
+  opt-in OPTIONS preflight responder. The package is `"private": true`
+  (not published to npm) so the bump is tracked only in this repo's
+  internal history.
+
+  - `@directive-run/query`: subscriptions whose `key()` returns `null` now
+    reset both the in-memory prev-key bookkeeping and the resource state back
+    to idle, so a future re-key to the same value establishes a fresh
+    subscription (instead of the early-return skipping setup). Tag
+    invalidation in `withQueries` now runs the "clear invalidated tags +
+    fire each matching query trigger" sequence inside `$store.batch(...)`
+    so a subscriber listening on both sides cannot observe a half-applied
+    state.
+  - `@directive-run/timeline`: matcher auto-registration emits a clear
+    `console.warn` when `globalThis.__vitest_expect` isn't available
+    instead of failing silently. The explicit `registerMatchers(expect)`
+    path suppresses the duplicate warning. A new `isAutoRegistered()`
+    helper lets tests assert the side-effect path took effect.
+
+- [`9472c51`](https://github.com/directive-run/directive/commit/9472c51fc4dd5b513373bc019a5eff5bc134039f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `serializeKey` filters `__proto__`, `constructor`, and `prototype` out of
+  input keys. The internal accumulator was already null-prototype but the
+  input itself wasn't sanitised, which left a prototype-pollution surface
+  the next time the serialized JSON was parsed and merged upstream. With
+  the filter, a cache key shape that includes one of those names produces
+  the same serialised string as one that does not.
+
 ## 1.1.0
 
 ### Minor Changes

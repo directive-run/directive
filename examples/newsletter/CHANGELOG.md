@@ -1,5 +1,13 @@
 # @directive-run/example-newsletter
 
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies [[`c0391ac`](https://github.com/directive-run/directive/commit/c0391acca4d4051e390bf5d9e0d193d39d2c171e), [`3cc61df`](https://github.com/directive-run/directive/commit/3cc61df7aed8dd7f5b7f7faa190849b810650f99)]:
+  - @directive-run/el@1.1.0
+  - @directive-run/core@1.15.0
+
 ## 0.0.37
 
 ### Patch Changes
