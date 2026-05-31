@@ -1,288 +1,286 @@
-# AI MCP and RAG
+# AI MCP + RAG
 
-MCP (Model Context Protocol) server integration and RAG (Retrieval-Augmented Generation) enrichment for Directive AI agents.
+Model Context Protocol (MCP) server integration and Retrieval-Augmented Generation (RAG) enrichment for Directive AI agents. Import from `@directive-run/ai/mcp` for the MCP adapter (the main barrel re-exports it with `@deprecated` notices for v2 removal), and from `@directive-run/ai` for the RAG enricher + embedder utilities.
 
-## Decision Tree: "How do I connect external tools or knowledge?"
+## Decision tree
 
 ```
 What do you need?
-├── External tool servers (MCP) → createMCPAdapter({ servers: [...] })
-│   ├── stdio transport      → command-based MCP servers
-│   └── SSE transport        → HTTP-based MCP servers
+├── External tool servers (MCP)        → createMCPAdapter({ servers, ... })
+│   ├── stdio transport                  → command-based MCP servers
+│   └── SSE transport                    → HTTP-based MCP servers
 │
-├── Knowledge retrieval (RAG) → createRAGEnricher({ embedder, storage })
-│   ├── Need embeddings       → createOpenAIEmbedder() or createAnthropicEmbedder()
-│   ├── Need vector storage   → createJSONFileStore() or custom VectorStore
-│   └── Need chunk ingestion  → enricher.ingest(documents)
-│
-Where do I import from?
-├── MCP adapter → import { createMCPAdapter } from '@directive-run/ai'
-├── RAG enricher → import { createRAGEnricher } from '@directive-run/ai'
-└── Embedders → import from '@directive-run/ai/openai' (subpath)
+├── Knowledge retrieval (RAG)          → createRAGEnricher({ embedder, storage })
+│   ├── User-supplied embeddings        → EmbedderFn = (text) => Promise<number[]>
+│   ├── Batched embedding calls         → createBatchedEmbedder({ embed, batchSize, ... })
+│   ├── Vector storage                  → createJSONFileStore(opts) or your own RAGStorage
+│   └── Ingest documents                → enricher.ingest(documents)
 ```
 
-## MCP Server Integration
+## MCP server integration
 
-Connect to MCP servers to give agents access to external tools:
+The MCP adapter manages connections to one or more MCP servers, exposes their tools to your agents, and provides constraint-driven approval + risk-scoring for tool calls.
 
 ```typescript
-import { createMCPAdapter } from "@directive-run/ai";
+import { createMCPAdapter, type MCPTool } from "@directive-run/ai/mcp";
 
 const mcp = createMCPAdapter({
   servers: [
-    // stdio transport – runs a local process
-    {
-      name: "tools",
-      transport: "stdio",
-      command: "npx mcp-server-tools",
-    },
-    // SSE transport – connects to an HTTP server
-    {
-      name: "data",
-      transport: "sse",
-      url: "http://localhost:3001/sse",
-    },
+    { name: "tools", transport: "stdio", command: "npx", args: ["mcp-server-tools"] },
+    { name: "data",  transport: "sse",   url: "http://localhost:3001/sse" },
   ],
-
-  // Per-tool constraints
   toolConstraints: {
-    "tools/dangerous-tool": {
-      requireApproval: true,
-      maxAttempts: 3,
-    },
-    "tools/read-only": {
-      requireApproval: false,
-    },
+    "tools/dangerous-tool": { requireApproval: true, maxAttempts: 3 },
+    "tools/read-only":      { requireApproval: false },
   },
-
-  // Connection options
-  connectionTimeout: 10000,
-  reconnect: true,
+  autoConnect: false,           // default false — opt-in to connecting on creation
+  autoReconnect: true,          // default false — opt-in to reconnect on disconnect
+  approvalTimeoutMs: 5 * 60 * 1000, // default 300_000
+  allowDirectCalls: false,      // default false — must be true to use callToolDirect()
+  clientFactory: (cfg) => new Client(cfg), // optional — supply a real MCP SDK client
+  events: {
+    onConnect:    ({ server }) => console.log(`mcp:${server} up`),
+    onDisconnect: ({ server, reason }) => console.warn(`mcp:${server} down — ${reason}`),
+    onToolCall:   ({ server, tool, args }) => log("mcp:tool", { server, tool }),
+    onApproval:   (request) => showApprovalDialog(request),
+  },
 });
 
-// Connect to all servers
 await mcp.connect();
 
-// Get available tools (normalized for Directive agents)
-const tools = mcp.getTools();
+// Get available tools — returns Map<serverName, MCPTool[]>, NOT a flat array
+const toolsMap: Map<string, MCPTool[]> = mcp.getTools();
+const flatTools = Array.from(toolsMap.values()).flat();
 
 // Use tools with an agent
 const agent = {
   name: "researcher",
   instructions: "Use available tools to research topics.",
   model: "claude-sonnet-4-5",
-  tools: tools,
+  tools: flatTools,
 };
 ```
 
-### Anti-Pattern #36: Importing MCP from subpath
+## MCP server lifecycle
+
+The lifecycle verbs are `connect` / `connectServer(name)` for opening connections, and `disconnect()` / `disconnectServer(name)` for closing them. There is no `mcp.disconnect("name")` mixed form, no `mcp.disconnectAll()`, and no `mcp.getStatus()`.
 
 ```typescript
-// WRONG – there is no /mcp subpath export
-import { createMCPToolProvider } from "@directive-run/ai/mcp";
+// Connect everything
+await mcp.connect();
 
-// CORRECT – MCP adapter is exported from the main package
-import { createMCPAdapter } from "@directive-run/ai";
+// Or one server at a time
+await mcp.connectServer("tools");
+
+// Status — typed per-server
+const single: MCPServerState | undefined = mcp.getServerStatus("tools");
+const all:    Map<string, MCPServerState> = mcp.getAllServerStatuses();
+
+// Disconnect one server
+await mcp.disconnectServer("tools");
+
+// Disconnect all
+await mcp.disconnect();
 ```
 
-## MCP Server Lifecycle
+## Calling MCP tools with constraints
+
+`callTool(server, tool, args, facts)` applies per-tool constraints (rate limits, approvals, argument-size caps). Use this in resolvers. `callToolDirect(server, tool, args)` bypasses the constraint pipeline — only available when `allowDirectCalls: true`.
 
 ```typescript
-// Connect to all configured servers
-await mcp.connect();
+const result = await mcp.callTool(
+  "tools",
+  "search-docs",
+  { query: "directive constraints" },
+  context.facts, // for constraint evaluation
+);
 
-// Check server status
-const status = mcp.getStatus();
-// { tools: "connected", data: "connected" }
-
-// Disconnect a specific server
-await mcp.disconnect("tools");
-
-// Disconnect all servers
-await mcp.disconnectAll();
-
-// Reconnect after disconnect
-await mcp.connect();
+// For trusted internal calls only:
+const direct = await mcp.callToolDirect("tools", "internal-ping", {});
 ```
 
-## MCP with Orchestrator
+## Approval workflow for sensitive tools
+
+When `toolConstraints[…].requireApproval: true`, the adapter queues an `MCPApprovalRequest` instead of executing immediately. Surface it via `events.onApproval` and resolve via the instance methods.
 
 ```typescript
-import { createAgentOrchestrator } from "@directive-run/ai";
+const pending = mcp.getPendingApprovals();
+mcp.approve(request.id);
+mcp.reject(request.id, "violates data policy");
 
-const mcp = createMCPAdapter({
-  servers: [
-    { name: "tools", transport: "stdio", command: "npx mcp-server-tools" },
-  ],
-});
+// Read the rejection reason for a previously-resolved request
+const reason = mcp.getRejectionReason(request.id);
+```
 
-await mcp.connect();
+## Resource sync
 
-const orchestrator = createAgentOrchestrator({
-  runner,
-  hooks: {
-    onStart: async () => {
-      await mcp.connect();
-    },
-  },
-});
+MCP also exposes resources (read-only content the agent can pull). `syncResources` materializes them into Directive facts so constraints can react to them.
 
-const agent = {
-  name: "worker",
-  instructions: "Complete tasks using available tools.",
-  model: "claude-sonnet-4-5",
-  tools: mcp.getTools(),
+```typescript
+const resourcesMap = mcp.getResources();          // Map<serverName, MCPResource[]>
+const oneResource  = await mcp.readResource("data", "file://config.yaml");
+await mcp.syncResources(system.facts);
+```
+
+## RAG enrichment
+
+`createRAGEnricher` wires an embedder + a vector store into an agent's input pipeline, retrieving relevant context chunks before the agent runs.
+
+```typescript
+import {
+  createRAGEnricher,
+  createJSONFileStore,
+  createBatchedEmbedder,
+  createTestEmbedder,
+  type EmbedderFn,
+  type RAGEnricher,
+} from "@directive-run/ai";
+
+// 1. Supply an embedder. EmbedderFn = (text: string) => Promise<number[]>
+//    There is no createOpenAIEmbedder / createAnthropicEmbedder factory —
+//    you bring your own and pass it through createBatchedEmbedder for production.
+const rawEmbed: EmbedderFn = async (text) => {
+  const res = await myEmbedAPI.embed(text);
+  return res.embedding;
 };
 
-const result = await orchestrator.run(agent, "Search for recent AI papers");
-```
-
----
-
-## RAG Enrichment
-
-Augment agent prompts with relevant context from a knowledge base:
-
-```typescript
-import { createRAGEnricher } from "@directive-run/ai";
-import { createOpenAIEmbedder } from "@directive-run/ai/openai";
-
-const enricher = createRAGEnricher({
-  // Embedder for similarity search
-  embedder: createOpenAIEmbedder({
-    apiKey: process.env.OPENAI_API_KEY,
-  }),
-
-  // Vector storage backend
-  storage: createJSONFileStore({ filePath: "./chunks.json" }),
-
-  // Retrieval settings
-  topK: 5,              // Max chunks to retrieve
-  minSimilarity: 0.3,   // Minimum cosine similarity threshold
-
-  // Format each retrieved chunk
-  formatChunk: (chunk, similarity) => {
-    return `[${similarity.toFixed(2)}] ${chunk.content}`;
-  },
+const { embed } = createBatchedEmbedder({
+  embed: rawEmbed,
+  batchSize: 16,
+  flushIntervalMs: 50,
 });
-```
 
-## Ingesting Documents
+// 2. Storage — a JSON file store for prototyping, or your own RAGStorage adapter
+const storage = createJSONFileStore({ path: "./rag-store.json" });
 
-```typescript
-// Ingest raw text with metadata
+const enricher: RAGEnricher = createRAGEnricher({
+  embedder: embed,
+  storage,
+  topK: 5,
+  minSimilarity: 0.7,
+});
+
+// 3. Ingest documents
 await enricher.ingest([
-  {
-    content: "Directive uses proxy-based facts for auto-tracking.",
-    metadata: { source: "docs", topic: "facts" },
-  },
-  {
-    content: "Derivations are auto-tracked computed values.",
-    metadata: { source: "docs", topic: "derivations" },
-  },
+  { id: "doc-1", text: "Directive is a constraint-driven runtime…", metadata: { source: "README.md" } },
+  { id: "doc-2", text: "Auto-tracked derivations recompute on read…", metadata: { source: "concepts" } },
 ]);
 
-// Ingest from files (chunks automatically)
-await enricher.ingestFile("./docs/architecture.md", {
-  chunkSize: 500,
-  chunkOverlap: 50,
-  metadata: { source: "architecture" },
-});
-```
-
-## Enriching Prompts
-
-```typescript
-// Basic enrichment – prepends relevant context
-const enrichedInput = await enricher.enrich("How do facts work?", {
-  prefix: "Use this context to answer:\n",
-});
-// Result: "Use this context to answer:\n[0.92] Directive uses proxy-based..."
-
-// With conversation history for better retrieval
-const enrichedInput = await enricher.enrich("Tell me more about that", {
-  prefix: "Use this context:\n",
-  history: messages,
-});
-```
-
-## RAG with Orchestrator
-
-```typescript
-import { createAgentOrchestrator } from "@directive-run/ai";
-
-const orchestrator = createAgentOrchestrator({
-  runner,
-  hooks: {
-    onBeforeRun: async (agent, prompt) => {
-      // Enrich every prompt with relevant context
-      const enriched = await enricher.enrich(prompt, {
-        prefix: "Relevant context:\n",
-      });
-
-      return { approved: true, modifiedPrompt: enriched };
-    },
-  },
-});
-```
-
-## Custom Embedders
-
-Implement the `Embedder` interface for any provider:
-
-```typescript
-import type { Embedder } from "@directive-run/ai";
-
-const customEmbedder: Embedder = {
-  embed: async (texts: string[]) => {
-    // Return float arrays, one per input text
-    const embeddings = await myEmbeddingAPI.embed(texts);
-
-    return embeddings.map((e) => e.vector);
-  },
-
-  dimensions: 1536, // Vector dimensions
+// 4. Use the enricher in your runner pipeline
+const enrichedRunner: AgentRunner = async (agent, input, opts) => {
+  const enriched = await enricher.enrich(input);
+  return baseRunner(agent, enriched, opts);
 };
 
-const enricher = createRAGEnricher({
-  embedder: customEmbedder,
-  storage: createJSONFileStore({ filePath: "./chunks.json" }),
-  topK: 5,
-  minSimilarity: 0.3,
-});
+const orchestrator = createAgentOrchestrator({ runner: enrichedRunner });
 ```
 
-## Custom Vector Storage
+For testing without API calls, use `createTestEmbedder(dimensions?)` — deterministic, no network.
 
-Implement the `VectorStore` interface for any backend:
+## Anti-patterns
+
+### `mcp.disconnect(name)` / `mcp.disconnectAll()`
 
 ```typescript
-import type { VectorStore } from "@directive-run/ai";
+// WRONG — neither shape exists
+await mcp.disconnect("tools");
+await mcp.disconnectAll();
 
-const pgStore: VectorStore = {
-  add: async (chunks) => {
-    await db.query("INSERT INTO chunks ...", chunks);
-  },
-  search: async (vector, topK) => {
-    const results = await db.query(
-      "SELECT * FROM chunks ORDER BY embedding <=> $1 LIMIT $2",
-      [vector, topK],
-    );
-
-    return results.rows;
-  },
-  clear: async () => {
-    await db.query("DELETE FROM chunks");
-  },
-};
+// CORRECT
+await mcp.disconnectServer("tools");
+await mcp.disconnect();
 ```
 
-## Quick Reference
+### `mcp.getStatus()`
 
-| API | Import Path | Purpose |
-|---|---|---|
-| `createMCPAdapter` | `@directive-run/ai` | Connect to MCP tool servers |
-| `createRAGEnricher` | `@directive-run/ai` | RAG pipeline for prompt enrichment |
-| `createOpenAIEmbedder` | `@directive-run/ai/openai` | OpenAI text embeddings |
-| `createAnthropicEmbedder` | `@directive-run/ai/anthropic` | Anthropic text embeddings |
-| `createJSONFileStore` | `@directive-run/ai` | File-based vector storage |
+```typescript
+// WRONG — no flat-object status method
+const status = mcp.getStatus(); // ?? { tools: "connected", data: "connected" }
+
+// CORRECT — typed per-server
+const all = mcp.getAllServerStatuses(); // Map<name, MCPServerState>
+const one = mcp.getServerStatus("tools"); // MCPServerState | undefined
+```
+
+### Treating `mcp.getTools()` as a flat array
+
+```typescript
+// WRONG — getTools() returns Map<serverName, MCPTool[]>
+const flat: MCPTool[] = mcp.getTools();
+agent.tools = flat;
+
+// CORRECT — flatten if your agent expects a flat list
+const flat = Array.from(mcp.getTools().values()).flat();
+agent.tools = flat;
+```
+
+### Importing from `@directive-run/ai` only
+
+```typescript
+// WORKS, but fires v2-deprecation notices
+import { createMCPAdapter } from "@directive-run/ai";
+
+// PREFERRED — the subpath barrel is the v2-stable import
+import { createMCPAdapter } from "@directive-run/ai/mcp";
+```
+
+### `MCPAdapterConfig` option names from a different library
+
+```typescript
+// WRONG — these options don't exist
+createMCPAdapter({
+  servers,
+  connectionTimeout: 10_000,
+  reconnect: true,
+})
+
+// CORRECT — the real names
+createMCPAdapter({
+  servers,
+  autoConnect: true,
+  autoReconnect: true,
+  approvalTimeoutMs: 300_000,
+  allowDirectCalls: false,
+  clientFactory: (cfg) => new Client(cfg),
+})
+```
+
+### `createOpenAIEmbedder` / `createAnthropicEmbedder`
+
+```typescript
+// WRONG — no provider-specific embedder factories ship from @directive-run/ai
+import { createOpenAIEmbedder } from "@directive-run/ai/openai";
+const embedder = createOpenAIEmbedder({ apiKey });
+
+// CORRECT — supply your own EmbedderFn, optionally batched
+const rawEmbed: EmbedderFn = async (text) => (await openai.embeddings.create({ input: text, model: "text-embedding-3-small" })).data[0].embedding;
+const { embed } = createBatchedEmbedder({ embed: rawEmbed, batchSize: 16 });
+```
+
+### Treating `Embedder` as an object with `embed(texts[]): number[][]`
+
+```typescript
+// WRONG — there is no Embedder interface; the EmbedderFn signature takes ONE string
+type Embedder = { embed(texts: string[]): Promise<number[][]>; dimensions: number };
+
+// CORRECT — single string in, single vector out
+type EmbedderFn = (text: string) => Promise<number[]>;
+```
+
+## Quick reference
+
+| API | Path | Returns | Purpose |
+|---|---|---|---|
+| `createMCPAdapter(config)` | `@directive-run/ai/mcp` | `MCPAdapter` | Connect to MCP servers, expose tools |
+| `mcp.connect()` / `connectServer(name)` | instance method | `Promise<void>` | Open one or all connections |
+| `mcp.disconnect()` / `disconnectServer(name)` | instance method | `Promise<void>` | Close one or all connections |
+| `mcp.getTools()` | instance method | `Map<string, MCPTool[]>` | All tools, keyed by server |
+| `mcp.getResources()` | instance method | `Map<string, MCPResource[]>` | All resources, keyed by server |
+| `mcp.callTool(server, tool, args, facts)` | instance method | `Promise<MCPToolResult>` | Constraint-checked tool call |
+| `mcp.callToolDirect(server, tool, args)` | instance method | `Promise<MCPToolResult>` | Bypass constraints (requires `allowDirectCalls: true`) |
+| `mcp.getServerStatus(name)` / `getAllServerStatuses()` | instance method | `MCPServerState` | Per-server connection state |
+| `mcp.approve(id)` / `reject(id, reason?)` | instance method | `void` | Resolve a pending approval |
+| `createRAGEnricher(config)` | `@directive-run/ai` | `RAGEnricher` | Embedding-driven context retrieval |
+| `createBatchedEmbedder(config)` | `@directive-run/ai` | `{ embed, flush, dispose }` | Wrap an EmbedderFn with batching |
+| `createTestEmbedder(dim?)` | `@directive-run/ai` | `EmbedderFn` | Deterministic embedder for tests |
+| `createJSONFileStore(options)` | `@directive-run/ai` | `RAGStorage` | File-backed vector store for prototyping |

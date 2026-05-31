@@ -1,293 +1,393 @@
-# AI Security
+# AI security
 
-PII detection/redaction, prompt injection defense, audit trails, GDPR/CCPA compliance, and security best practices for Directive AI applications.
+PII detection and redaction, prompt-injection defense, audit trails with non-repudiation, and GDPR/CCPA compliance — all wired in via Directive's guardrail and instance APIs. Import the audit + compliance instances from `@directive-run/ai` (NOT `@directive-run/core/plugins`); import the security guardrails from `@directive-run/ai/guardrails`.
 
-## Decision Tree: "What security do I need?"
+## Decision tree
 
 ```
 What are you protecting against?
-├── PII leakage in prompts/outputs → createPIIGuardrail()
-├── Prompt injection attacks → createPromptInjectionGuardrail()
-├── Audit/compliance requirements → createAuditTrailPlugin()
-├── GDPR/CCPA data handling → createCompliancePlugin()
-│
-Where do guardrails go?
-├── Before agent receives prompt → guardrails.input
-├── After agent produces output → guardrails.output
-└── Both directions → guardrails.input + guardrails.output
-│
-Where do plugins go?
-└── Always → plugins: [createAuditTrailPlugin(), ...]
-    (Plugins are Directive core plugins, not AI-specific)
+├── PII in input        → createPIIGuardrail() or createEnhancedPIIGuardrail()
+├── PII in output       → createOutputPIIGuardrail()
+├── Prompt injection    → createPromptInjectionGuardrail()
+├── Audit / forensics   → createAuditTrail(config)
+├── GDPR / CCPA         → createCompliance(config)
+├── Tool restriction    → createToolGuardrail({ allowlist | denylist })
+└── Sensitive content   → createContentFilterGuardrail({ blockedPatterns })
+
+Where do these go?
+├── Guardrails → orchestrator.guardrails.input / output / toolCall
+├── Audit      → record into auditInstance from your call sites (NOT a plugins:[…] entry)
+└── Compliance → instance you call directly (exportData, deleteData, consent.*)
 ```
 
-## PII Detection and Redaction
+## PII detection + redaction
 
-Enhanced PII guardrail with built-in patterns and custom regex support:
+### Basic PII guardrail (input only)
+
+`createPIIGuardrail` returns a `GuardrailFn<InputGuardrailData>` — input only. For output PII protection, use `createOutputPIIGuardrail`.
 
 ```typescript
-import { createPIIGuardrail } from "@directive-run/ai";
+import { createPIIGuardrail } from "@directive-run/ai/guardrails";
 
-const piiGuardrail = createPIIGuardrail({
-  // Redact PII instead of blocking (default: false = block)
-  redact: true,
-
-  // Replacement string (default: "[REDACTED]")
-  redactReplacement: "[REDACTED]",
-
-  // Additional custom patterns beyond built-ins
+const piiInput = createPIIGuardrail({
   patterns: [
-    /\b\d{3}-\d{2}-\d{4}\b/,         // SSN
+    /\b\d{3}-\d{2}-\d{4}\b/,         // SSN — already a default, here as a custom example
     /\b[A-Z]{2}\d{6,8}\b/,           // Passport
-    /ACCT-\d{10}/,                     // Internal account IDs
+    /ACCT-\d{10}/,                   // Internal account IDs
   ],
+  redact: true,                       // default: false (block instead of redact)
+  redactReplacement: "[REDACTED]",
 });
 ```
 
-Built-in patterns detect:
-- Email addresses
-- Phone numbers (US, international)
-- Credit card numbers (Visa, MC, Amex, Discover)
-- IP addresses (v4, v6)
-- Dates of birth (common formats)
+Built-in default patterns: SSN, credit card numbers, email addresses. Custom `patterns` are added on top.
 
-### Using PII Guardrail
+### Enhanced PII guardrails (input + output)
+
+For production scenarios — context-aware detection, multi-region defaults, output coverage — use the enhanced factories:
+
+```typescript
+import { createEnhancedPIIGuardrail, createOutputPIIGuardrail } from "@directive-run/ai/guardrails";
+
+const piiInput  = createEnhancedPIIGuardrail({ /* …config… */ });
+const piiOutput = createOutputPIIGuardrail({  /* …config… */ });
+
+const orchestrator = createAgentOrchestrator({
+  runner,
+  guardrails: {
+    input:  [piiInput],
+    output: [piiOutput],
+  },
+});
+```
+
+### Wiring it in
 
 ```typescript
 const orchestrator = createAgentOrchestrator({
   runner,
   guardrails: {
-    // Redact PII before the agent sees it
-    input: [piiGuardrail],
-
-    // Catch any PII the agent generates
-    output: [piiGuardrail],
+    input:  [piiInput],
+    output: [piiOutput],
   },
 });
 ```
 
-## Prompt Injection Detection
+## Prompt-injection defense
 
-Detect and block common prompt injection patterns:
-
-```typescript
-import { createPromptInjectionGuardrail } from "@directive-run/ai";
-
-const injectionGuardrail = createPromptInjectionGuardrail({
-  // Sensitivity: "low" | "medium" | "high" (default: "medium")
-  sensitivity: "high",
-
-  // Custom patterns to detect
-  additionalPatterns: [
-    /ignore previous instructions/i,
-    /you are now/i,
-    /system prompt/i,
-  ],
-
-  // Allow-list specific phrases that look like injections but are safe
-  allowlist: [
-    "you are now ready to proceed",
-  ],
-});
-```
-
-### Sensitivity Levels
-
-| Level | Detects | False Positives |
-|---|---|---|
-| `"low"` | Obvious injections (role overrides, ignore instructions) | Rare |
-| `"medium"` | Common patterns + encoded attacks | Occasional |
-| `"high"` | Aggressive detection + heuristic analysis | More frequent |
-
-### Applying Injection Defense
+`createPromptInjectionGuardrail` ships with default + strict pattern sets and a 0–100 risk score. The real options are `strictMode`, `blockThreshold`, `additionalPatterns`, `replacePatterns`, `sanitize`, `onBlocked`, `ignoreCategories`. There is no `sensitivity` field and no `allowlist`.
 
 ```typescript
-const orchestrator = createAgentOrchestrator({
-  runner,
-  guardrails: {
-    // Check user input for injection attempts
-    input: [injectionGuardrail],
+import { createPromptInjectionGuardrail } from "@directive-run/ai/guardrails";
+
+// Basic — uses default patterns + 50 block threshold
+const injection = createPromptInjectionGuardrail();
+
+// Strict — for high-security applications
+const strictInjection = createPromptInjectionGuardrail({
+  strictMode: true,        // use STRICT_INJECTION_PATTERNS instead of DEFAULT
+  blockThreshold: 25,      // lower threshold — more aggressive blocking
+  additionalPatterns: [    // your own patterns layered on top
+    { name: "custom_role_override", regex: /you are now a /i, score: 70, category: "role_manipulation" },
+  ],
+  sanitize: false,         // when true, attempts to neutralize the input instead of blocking
+  onBlocked: (input, result) => {
+    metrics.increment("prompt_injection_blocked", { risk: result.riskScore });
   },
 });
 
-// Handle blocked input
-import { GuardrailError } from "@directive-run/ai";
+// Roleplay app — allow role-manipulation patterns, keep everything else
+const roleplayInjection = createPromptInjectionGuardrail({
+  ignoreCategories: ["role_manipulation"],
+});
+
+// Replace all defaults
+const customOnly = createPromptInjectionGuardrail({
+  replacePatterns: myPatternList,
+});
+```
+
+### Catching the block
+
+```typescript
+import { isGuardrailError } from "@directive-run/ai";
 
 try {
-  const result = await orchestrator.run(agent, userInput);
+  await orchestrator.run(agent, userInput);
 } catch (error) {
-  if (error instanceof GuardrailError) {
-    console.log(error.guardrailName);  // "prompt-injection"
-    console.log(error.errorCode);      // "GUARDRAIL_INPUT_BLOCKED"
-    console.log(error.reason);         // "Prompt injection detected: role override"
+  if (isGuardrailError(error)) {
+    console.log(error.guardrailName); // "prompt-injection"
+    console.log(error.code);          // "INPUT_GUARDRAIL_FAILED"
+    console.log(error.userMessage);   // safe-to-display rejection reason
+    // error.input and error.data are NON-enumerable (won't leak via JSON.stringify)
   }
 }
 ```
 
-## Audit Trail Plugin
+`GuardrailError` does not expose `errorCode` (it's `code`) or `reason` (the rejection reason becomes the error `message` / `userMessage`). See `ai-guardrails-memory.md` for the full error shape.
 
-Log all AI interactions for compliance and forensics:
+## Audit trail
+
+`createAuditTrail(config)` returns an `AuditInstance` you record into from your call sites — it is NOT a plugin you put in `plugins: […]`. The factory is named `createAuditTrail`, NOT `createAuditTrailPlugin`, and it lives in `@directive-run/ai`, NOT `@directive-run/core/plugins`.
 
 ```typescript
-import { createAuditTrailPlugin } from "@directive-run/core/plugins";
+import { createAuditTrail } from "@directive-run/ai";
 
-const auditPlugin = createAuditTrailPlugin({
-  // Where to store audit logs
-  storage: "file",           // "file" | "console" | custom handler
-  filePath: "./audit.jsonl", // For file storage
-
-  // What to log
-  logInputs: true,
-  logOutputs: true,
-  logToolCalls: true,
-  logTokenUsage: true,
-
-  // Redact sensitive data in logs (recommended)
-  redactPII: true,
-
-  // Custom log handler (alternative to file/console)
-  onLog: async (entry) => {
-    await sendToSIEM(entry);
+const audit = createAuditTrail({
+  maxEntries: 10_000,                    // default 10000
+  retentionMs: 7 * 24 * 60 * 60 * 1000,  // default: 7 days
+  exportInterval: 60_000,                // default 60s — async exporter cadence
+  exporter: async (entries) => {
+    await sendToSIEM(entries);
   },
+  piiMasking: {
+    enabled: true,
+    fields: ["input", "output"],
+  },
+  signing: {                              // optional non-repudiation chain
+    signFn:   (hash) => signWithHSM(hash),
+    verifyFn: (hash, sig) => verifyWithHSM(hash, sig),
+  },
+  sessionId: currentSessionId,
+  actorId:   currentUserId,
+  events: {
+    onEntryAdded:   (entry) => log("audit:entry", entry.eventType),
+    onChainBroken:  (result) => alertOnTamper(result),
+    onExportError:  (err, entries) => log("audit:export:fail", err, entries.length),
+  },
+});
+
+// Query
+const failed = audit.getEntries({ eventType: "guardrail_check" });
+const verified = await audit.verifyChain();
+const exported = await audit.export(Date.now() - 24 * 60 * 60 * 1000);
+```
+
+Each `AuditEntry` carries a hash-chained sequence number so `verifyChain()` can prove no entries were dropped or rewritten in flight.
+
+### Recording entries
+
+For most workflows the orchestrator records relevant events automatically when an audit instance is attached via your own integration code. The bare minimum from a call site:
+
+```typescript
+// In your resolver / event handler / orchestrator hook
+audit.record({
+  eventType: "agent_run",
+  agentName: agent.name,
+  input,
+  output: result.output,
+  tokenUsage: result.tokenUsage,
 });
 ```
 
-### Audit Log Entry Shape
+See the API skeleton for the full `AuditEntry` shape.
+
+## GDPR / CCPA compliance
+
+`createCompliance(config)` returns a `ComplianceInstance` you call directly. The factory is named `createCompliance`, NOT `createCompliancePlugin`, and lives in `@directive-run/ai`. **`storage` is required.**
 
 ```typescript
-interface AuditLogEntry {
-  timestamp: string;
-  eventType: "agent_run" | "tool_call" | "guardrail_check" | "error";
-  agentName: string;
-  input?: string;         // Redacted if redactPII: true
-  output?: string;        // Redacted if redactPII: true
-  toolCalls?: ToolCall[];
-  tokenUsage?: { inputTokens: number; outputTokens: number };
-  duration: number;
-  guardrails?: { name: string; passed: boolean; reason?: string }[];
-  error?: { message: string; code: string };
-}
-```
+import { createCompliance } from "@directive-run/ai";
 
-## GDPR/CCPA Compliance Plugin
-
-Enforce data handling policies at the system level:
-
-```typescript
-import { createCompliancePlugin } from "@directive-run/core/plugins";
-
-const compliancePlugin = createCompliancePlugin({
-  // Data retention policy
+const compliance = createCompliance({
+  storage: myComplianceStorage,           // REQUIRED — your ComplianceStorage adapter
   retention: {
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in ms
-    autoDelete: true,
+    maxAgeMs: 30 * 24 * 60 * 60 * 1000,    // 30 days
+    autoEnforce: true,
   },
-
-  // Right to deletion
-  onDeletionRequest: async (userId) => {
-    await deleteUserData(userId);
-    await deleteConversationHistory(userId);
+  consentPurposes: ["analytics", "personalization", "training"],
+  exportExpirationMs: 24 * 60 * 60 * 1000, // signed export links expire in 24h (default)
+  auditOperations: true,                    // mirror every compliance op into the audit trail
+  events: {
+    onExport:           (result) => log("gdpr:export", result.subjectId),
+    onDelete:           (result) => log("gdpr:delete", result.certificate),
+    onConsentChange:    (record) => log("consent:change", record),
+    onRetentionEnforced: (category, count) => log("retention:enforced", category, count),
   },
-
-  // Data export (right to portability)
-  onExportRequest: async (userId) => {
-    const data = await getUserData(userId);
-
-    return JSON.stringify(data);
-  },
-
-  // Consent tracking
-  requireConsent: true,
-  consentCategories: ["analytics", "personalization", "training"],
 });
+
+// GDPR Article 20 — right to data portability
+const exportResult = await compliance.exportData({ subjectId: "user-42", format: "json" });
+
+// GDPR Article 17 — right to erasure (returns a signed deletion certificate)
+const deletion = await compliance.deleteData({ subjectId: "user-42", scope: "all" });
+console.log(deletion.certificate.signature);
+
+// Consent
+compliance.consent.grant({ subjectId: "user-42", purpose: "analytics" });
+compliance.consent.revoke({ subjectId: "user-42", purpose: "personalization" });
+const consents = compliance.consent.list("user-42");
 ```
 
-## Applying Security Plugins
+The `storage` adapter is your responsibility — Directive provides the policy + signed-receipt machinery; you provide the database. The `ComplianceStorage` interface lives in `@directive-run/ai`.
 
-Plugins go on the orchestrator (they are Directive core plugins):
+## Combining the surface
 
 ```typescript
 import { createAgentOrchestrator } from "@directive-run/ai";
+import { createAuditTrail, createCompliance } from "@directive-run/ai";
+import {
+  createPIIGuardrail,
+  createOutputPIIGuardrail,
+  createPromptInjectionGuardrail,
+  createToolGuardrail,
+} from "@directive-run/ai/guardrails";
+
+const audit      = createAuditTrail({ /* ... */ });
+const compliance = createCompliance({ storage: myStorage });
 
 const orchestrator = createAgentOrchestrator({
   runner,
   guardrails: {
-    input: [piiGuardrail, injectionGuardrail],
-    output: [piiGuardrail],
+    input:    [createPIIGuardrail({ redact: true }), createPromptInjectionGuardrail({ strictMode: true })],
+    output:   [createOutputPIIGuardrail()],
+    toolCall: [createToolGuardrail({ allowlist: ["search", "calculator"] })],
   },
-  plugins: [auditPlugin, compliancePlugin],
-});
-```
-
-## Security Best Practices
-
-### Input Validation
-
-```typescript
-// WRONG – passing raw user input to the agent
-const result = await orchestrator.run(agent, userInput);
-
-// CORRECT – validate and sanitize input first
-const sanitized = sanitizeInput(userInput);
-const result = await orchestrator.run(agent, sanitized);
-```
-
-### Token Budget Limits
-
-```typescript
-// Always set a token budget to prevent runaway costs
-const orchestrator = createAgentOrchestrator({
-  runner,
-  maxTokenBudget: 100000,
+  maxTokenBudget: 100_000,
   budgetWarningThreshold: 0.8,
 });
+
+// Wire audit + compliance into your orchestrator hooks
+orchestrator.run = (orig => async (agent, input, opts) => {
+  audit.record({ eventType: "agent_run", agentName: agent.name, input });
+  return orig(agent, input, opts);
+})(orchestrator.run);
 ```
 
-### Tool Approval Workflows
+## Security best practices
+
+### Validate input before dispatch
 
 ```typescript
-import { createToolGuardrail } from "@directive-run/ai";
+// WRONG — raw user input goes straight to the agent
+await orchestrator.run(agent, userInput);
 
-// Restrict which tools the agent can call
-const toolGuardrail = createToolGuardrail({
-  allowedTools: ["search", "calculator", "readFile"],
-  // Tools not in this list are blocked
-});
-
-// For MCP tools, use toolConstraints
-const mcp = createMCPAdapter({
-  servers: [...],
-  toolConstraints: {
-    "tools/write-file": { requireApproval: true },
-    "tools/delete": { requireApproval: true, maxAttempts: 1 },
-  },
-});
+// CORRECT — sanitize / shape-check first, even with guardrails
+const sanitized = sanitizeInput(userInput);
+await orchestrator.run(agent, sanitized);
 ```
 
-### Output Sanitization
+### Always set a token budget
 
 ```typescript
-// Always validate agent output before using it
+createAgentOrchestrator({
+  runner,
+  maxTokenBudget: 100_000,
+  budgetWarningThreshold: 0.8,
+  onBudgetWarning: (e) => alertOps(e),
+})
+```
+
+### Restrict tool access
+
+```typescript
+import { createToolGuardrail } from "@directive-run/ai/guardrails";
+
+const tools = createToolGuardrail({
+  allowlist: ["search", "calculator", "readFile"],
+});
+
 const orchestrator = createAgentOrchestrator({
+  runner,
+  guardrails: { toolCall: [tools] },
+});
+```
+
+For MCP-mediated tools, see `ai-mcp-rag.md` for per-tool approval + risk-scoring.
+
+### Always validate output
+
+```typescript
+import {
+  createOutputSchemaGuardrail,
+  createContentFilterGuardrail,
+  createOutputPIIGuardrail,
+} from "@directive-run/ai/guardrails";
+
+createAgentOrchestrator({
   runner,
   guardrails: {
     output: [
-      createOutputSchemaGuardrail({ schema: expectedSchema, retries: 2 }),
-      createContentFilterGuardrail({ patterns: [/eval\(/, /<script/i], action: "block" }),
-      createPIIGuardrail({ redact: true }),
+      createOutputSchemaGuardrail({ validate: zodAdapter(expectedSchema) }),
+      createContentFilterGuardrail({ blockedPatterns: [/eval\(/, /<script/i] }),
+      createOutputPIIGuardrail(),
     ],
   },
 });
 ```
 
-## Quick Reference
+(`createOutputSchemaGuardrail` takes `validate` — not `schema` + `retries`. For automatic retry on schema failure, set `outputSchema` + `maxSchemaRetries` directly on the orchestrator.)
 
-| API | Import Path | Purpose |
-|---|---|---|
-| `createPIIGuardrail` | `@directive-run/ai` | Detect/redact PII |
-| `createPromptInjectionGuardrail` | `@directive-run/ai` | Block injection attacks |
-| `createAuditTrailPlugin` | `@directive-run/core/plugins` | Log all AI interactions |
-| `createCompliancePlugin` | `@directive-run/core/plugins` | GDPR/CCPA data policies |
-| `createToolGuardrail` | `@directive-run/ai` | Restrict tool access |
-| `createContentFilterGuardrail` | `@directive-run/ai` | Block unsafe content patterns |
-| `GuardrailError` | `@directive-run/ai` | Catch guardrail failures |
+## Anti-patterns
+
+### Importing audit/compliance from `@directive-run/core/plugins`
+
+```typescript
+// WRONG — these names + path don't exist
+import { createAuditTrailPlugin, createCompliancePlugin } from "@directive-run/core/plugins";
+
+// CORRECT — createAuditTrail / createCompliance from @directive-run/ai
+import { createAuditTrail, createCompliance } from "@directive-run/ai";
+```
+
+### Putting `createAuditTrail()` into `plugins: [...]`
+
+```typescript
+// WRONG — createAuditTrail returns an AuditInstance, not a Directive Plugin
+plugins: [createAuditTrail({ /* … */ })],
+
+// CORRECT — keep the instance, record into it
+const audit = createAuditTrail({ /* … */ });
+audit.record({ /* … */ });
+```
+
+### `createPromptInjectionGuardrail({ sensitivity, allowlist })`
+
+```typescript
+// WRONG — sensitivity + allowlist are hallucinated
+createPromptInjectionGuardrail({ sensitivity: "high", allowlist: ["safe phrase"] })
+
+// CORRECT — strictMode + blockThreshold + ignoreCategories + replacePatterns
+createPromptInjectionGuardrail({
+  strictMode: true,
+  blockThreshold: 25,
+  ignoreCategories: ["role_manipulation"],
+})
+```
+
+### Using `createPIIGuardrail` for output
+
+```typescript
+// WRONG — createPIIGuardrail is input-only (GuardrailFn<InputGuardrailData>)
+guardrails: { output: [createPIIGuardrail({ redact: true })] }
+
+// CORRECT — createOutputPIIGuardrail for output
+guardrails: { output: [createOutputPIIGuardrail()] }
+```
+
+### `createCompliance` without `storage`
+
+```typescript
+// WRONG — storage is required
+createCompliance({ retention: { maxAgeMs: 30 * 24 * 60 * 60 * 1000 } })
+
+// CORRECT — pass your ComplianceStorage adapter
+createCompliance({
+  storage: myStorage,
+  retention: { maxAgeMs: 30 * 24 * 60 * 60 * 1000, autoEnforce: true },
+})
+```
+
+## Quick reference
+
+| API | Import path | Returns | Purpose |
+|---|---|---|---|
+| `createPIIGuardrail` | `@directive-run/ai/guardrails` | `GuardrailFn<InputGuardrailData>` | Basic input PII detection (block or redact) |
+| `createEnhancedPIIGuardrail` | `@directive-run/ai/guardrails` | guardrail | Context-aware input PII |
+| `createOutputPIIGuardrail` | `@directive-run/ai/guardrails` | guardrail | Output PII coverage |
+| `createPromptInjectionGuardrail` | `@directive-run/ai/guardrails` | guardrail | Risk-scored injection defense (`strictMode`, `blockThreshold`) |
+| `createAuditTrail` | `@directive-run/ai` | `AuditInstance` | Hash-chained audit log w/ signing + PII masking + async export |
+| `createCompliance` | `@directive-run/ai` | `ComplianceInstance` | GDPR exportData / deleteData / consent + retention enforcement |
+| `createToolGuardrail` | `@directive-run/ai/guardrails` | guardrail | Tool allow/deny lists |
+| `createContentFilterGuardrail` | `@directive-run/ai/guardrails` | guardrail | Block sensitive patterns (block-only — no redact) |
+| `GuardrailError` / `isGuardrailError` | `@directive-run/ai` | error class + guard | Carries `code`, `guardrailName`, `userMessage` |

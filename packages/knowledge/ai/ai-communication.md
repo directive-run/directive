@@ -1,281 +1,296 @@
-# AI Communication
+# AI inter-agent communication
 
-Cross-agent messaging, agent networks, shared state via derivations, scratchpad coordination, and handoff patterns.
+`createMessageBus` for typed pub/sub, `createAgentNetwork` for capability-based discovery and request/response patterns, plus the scratchpad and cross-agent state access available via a multi-agent orchestrator. Import from `@directive-run/ai`.
 
-## Decision Tree: "How do agents communicate?"
+## Decision tree
 
 ```
-What kind of communication?
-├── Fire-and-forget notification → bus.publish({ type: "INFORM", ... })
-├── Request-response (await reply) → bus.request({ type: "REQUEST", ... })
-├── Delegate work to another agent → bus.publish({ type: "DELEGATION", ... })
-├── Subscribe to ongoing updates → bus.publish({ type: "SUBSCRIBE", ... })
-│
-How do agents share state?
-├── Read another agent's facts → orchestrator.system.facts.agentName.key
-├── Cross-agent derivations → orchestrator.derive.agentName.derivation
-├── Ephemeral key-value store → context.scratchpad
-│
-How do agents hand off work?
-├── One-time transfer → handoff pattern (DELEGATION + await DELEGATION_RESULT)
-├── Ongoing collaboration → agent network with capabilities
-└── Conditional routing → reroute in supervisor pattern
+What do you need?
+├── Typed pub/sub between agents          → createMessageBus(config?)
+├── Capability lookup + request/response  → createAgentNetwork({ bus, agents? })
+├── Per-pattern ephemeral state           → context.scratchpad inside tasks/agents
+├── Reading another agent's facts         → orchestrator.system.facts[agentId].x
+└── Cross-agent derived state             → orchestrator.system.derive[agentId].x
 ```
 
-## Message Bus
+## `createMessageBus(config?)`
 
-The message bus enables structured communication between agents:
+Fire-and-forget pub/sub keyed by `agentId`. `publish()` is synchronous — it returns the message id before delivery completes. Use `onDelivery` / `onDeliveryError` in config to observe delivery status.
 
 ```typescript
-import { createMessageBus } from "@directive-run/ai";
+import { createMessageBus, type TypedAgentMessage } from "@directive-run/ai";
 
-const bus = createMessageBus();
-```
+const bus = createMessageBus({
+  maxHistory: 1000,
+  defaultTtlMs: 60 * 60 * 1000,
+  maxPendingPerAgent: 100,
+  onDelivery:      (msg, recipients) => log("delivered", msg.id, recipients),
+  onDeliveryError: (msg, error) => log("delivery_failed", msg.id, error.message),
+});
 
-## Publishing Messages
+// Subscribe — returns a Subscription object with an .unsubscribe() method
+const sub = bus.subscribe("writer", (message: TypedAgentMessage) => {
+  console.log(`writer received: ${message.type}`);
+});
 
-```typescript
-// Fire-and-forget notification
-bus.publish({
-  type: "INFORM",
+// Later
+sub.unsubscribe();
+
+// Publish — returns the message id (sync)
+const id = bus.publish({
+  type: "DELEGATION",
   from: "researcher",
   to: "writer",
-  content: "Found 5 relevant sources",
-  metadata: { sourceCount: 5, topics: ["AI", "ML"] },
+  task: "Summarize the findings",
+  context: { sources: 12 },
 });
 
-// Broadcast to all agents (omit "to")
-bus.publish({
-  type: "INFORM",
-  from: "coordinator",
-  content: "System entering maintenance mode",
-});
+// Inspect
+bus.getHistory({ from: "researcher" }, 50);
+bus.getMessage(id);
+bus.getPending("writer"); // messages queued for an offline subscriber
+
+bus.clear();
+bus.destroy();
 ```
 
-## Request-Response Pattern
+There is no `bus.request(...)` method — request/response lives on the AgentNetwork (next section).
+
+## `createAgentNetwork({ bus, agents? })`
+
+Wraps a MessageBus with registry, capability lookup, and request/response patterns. **Capability lookup returns `AgentInfo[]`, not `string[]`.** Request/response shapes — `request`, `delegate`, `query`, `broadcast`, `listen`, `send` — are all on the network, NOT on the bus.
 
 ```typescript
-// Send a request and await the response
-const response = await bus.request({
-  type: "REQUEST",
-  from: "writer",
-  to: "researcher",
-  action: "verify_claim",
-  payload: { claim: "Transformers were invented in 2017" },
-  timeout: 5000, // Throws after 5s if no response
-});
-
-console.log(response.content); // "Verified: correct"
-console.log(response.metadata); // { confidence: 0.95, source: "..." }
-```
-
-## Message Types
-
-All 11 message types in the system:
-
-| Type | Direction | Purpose |
-|---|---|---|
-| `REQUEST` | Agent-to-agent | Ask another agent to do something |
-| `RESPONSE` | Agent-to-agent | Reply to a REQUEST |
-| `DELEGATION` | Agent-to-agent | Hand off a task to another agent |
-| `DELEGATION_RESULT` | Agent-to-agent | Return result of delegated work |
-| `QUERY` | Agent-to-agent | Ask for information without side effects |
-| `INFORM` | Agent-to-agent/all | Share information, no response expected |
-| `SUBSCRIBE` | Agent-to-agent | Request ongoing updates on a topic |
-| `UNSUBSCRIBE` | Agent-to-agent | Stop receiving updates |
-| `UPDATE` | Agent-to-subscriber | Push update to a subscriber |
-| `ACK` | Agent-to-agent | Acknowledge receipt |
-| `NACK` | Agent-to-agent | Reject or refuse a message |
-
-## Subscribing to Messages
-
-```typescript
-// Subscribe to all messages for an agent
-const unsubscribe = bus.subscribe("writer", (message) => {
-  switch (message.type) {
-    case "INFORM":
-      console.log(`Info from ${message.from}: ${message.content}`);
-      break;
-    case "REQUEST":
-      // Handle and respond
-      bus.publish({
-        type: "RESPONSE",
-        from: "writer",
-        to: message.from,
-        correlationId: message.id,
-        content: "Done",
-      });
-      break;
-  }
-});
-
-// Clean up
-unsubscribe();
-```
-
-## Agent Network
-
-Higher-level abstraction for capability-based agent discovery:
-
-```typescript
-import { createAgentNetwork } from "@directive-run/ai";
+import { createAgentNetwork, type AgentInfo } from "@directive-run/ai";
 
 const network = createAgentNetwork({
   bus,
   agents: {
-    researcher: {
-      capabilities: ["search", "verify", "cite"],
-    },
-    writer: {
-      capabilities: ["draft", "edit", "summarize"],
-    },
-    analyst: {
-      capabilities: ["analyze", "chart", "report"],
-    },
+    researcher: { capabilities: ["search", "verify", "cite"] },
+    writer:     { capabilities: ["draft", "edit", "summarize"] },
+    analyst:    { capabilities: ["analyze", "chart", "report"] },
   },
+  defaultTimeout: 30_000,
+  onAgentOnline:  (id) => log(`${id} online`),
+  onAgentOffline: (id) => log(`${id} offline`),
 });
 
-// Find agents by capability
-const writers = network.findByCapability("draft");
-// ["writer"]
+// Find — returns AgentInfo[], not string[]
+const verifiers: AgentInfo[] = network.findByCapability("verify");
+verifiers.forEach((info) => console.log(info.id, info.capabilities));
 
-const verifiers = network.findByCapability("verify");
-// ["researcher"]
-
-// Route a request to the best agent for a capability
-const result = await network.route("verify", {
+// Request/response with timeout
+const reply = await network.request("coordinator", "researcher", "verify-claim", {
   claim: "GPT-4 has 1.8T parameters",
-});
+}, 10_000);
+console.log(reply.payload);
+
+// Delegate a task and await its result
+const result = await network.delegate(
+  "coordinator",
+  "writer",
+  "Draft a 200-word summary",
+  { source: reply.payload },
+);
+
+// Question / answer
+const answer = await network.query("coordinator", "analyst", "What's the median latency?", { window: "24h" });
+
+// Broadcast to all agents
+network.broadcast("coordinator", { type: "INFORM", content: "Cache cleared" });
+
+// Plain fire-and-forget through the network (returns message id)
+network.send("coordinator", "writer", { type: "INFORM", content: "Starting batch" });
+
+// Subscribe an agent — same as bus.subscribe but registered through the network
+const sub = network.listen("writer", (msg) => console.log(msg.type));
+sub.unsubscribe();
+
+network.destroy();
 ```
 
-## Cross-Agent State via Derivations
+There is no `network.route(capability, payload)` — pick the agent yourself via `findByCapability(...)`, then call `request` / `delegate` against the chosen `agent.id`.
 
-Agents can read each other's facts and derivations through the shared system:
+```typescript
+const candidates = network.findByCapability("verify");
+if (candidates.length === 0) throw new Error("no verifier available");
+const target = candidates[0];
+
+const result = await network.request("coordinator", target.id, "verify", { claim });
+```
+
+## Cross-agent state via facts + derivations
+
+Each agent in a multi-agent orchestrator becomes a namespaced module, so its facts and derivations are readable on `orchestrator.system`.
 
 ```typescript
 const orchestrator = createMultiAgentOrchestrator({
-  agents: {
-    researcher: {
-      name: "researcher",
-      instructions: "...",
-      model: "claude-sonnet-4-5",
-    },
-    writer: {
-      name: "writer",
-      instructions: "...",
-      model: "claude-sonnet-4-5",
-    },
-  },
+  agents: { researcher, writer },
   runner,
 });
 
 orchestrator.start();
 
-// Read another agent's facts (read-only)
-const researchStatus = orchestrator.system.facts.researcher.status;
-const writerOutput = orchestrator.system.facts.writer.lastOutput;
-
-// Cross-agent derivations react to fact changes
-const isReady = orchestrator.system.derive.researcher.isComplete;
+// Read another agent's namespaced state (read-only outside its own resolvers)
+const status   = orchestrator.system.facts.researcher.status;
+const output   = orchestrator.system.facts.writer.output;
+const isReady  = orchestrator.system.derive.researcher.isComplete;
 ```
 
-## Scratchpad Coordination
+For a deeper treatment of multi-module fact access + cross-module dependencies, see `multi-module.md`.
 
-The scratchpad is an ephemeral key-value store scoped to a single pattern execution. Tasks and agents in the same pattern share it:
+## Scratchpad — per-pattern ephemeral state
+
+The scratchpad is a read-only context object shared across tasks/agents inside a single pattern execution. **You cannot mutate `context.scratchpad` directly** — pass updates back through the task's return value, or use `network.send` / `bus.publish` for messages that outlive the pattern.
 
 ```typescript
-// In a task – write to scratchpad
 tasks: {
   gather: {
-    run: async (input, context) => {
-      const data = JSON.parse(input);
-      context.scratchpad.researchData = data;
-      context.scratchpad.timestamp = Date.now();
-
-      return input;
+    run: async (input, signal, context) => {
+      // context.scratchpad is Readonly — do NOT do context.scratchpad.x = …
+      const seed = context.scratchpad.seed;
+      return JSON.stringify({ seed, data: await fetchData(seed) });
     },
   },
   format: {
-    run: async (input, context) => {
-      // Read from scratchpad set by earlier task
-      const data = context.scratchpad.researchData;
-      const ts = context.scratchpad.timestamp as number;
-
-      return JSON.stringify({ data, processedAt: ts });
+    run: async (input, signal, context) => {
+      // Read scratchpad written by the pattern config
+      const region = context.scratchpad.region;
+      const parsed = JSON.parse(input);
+      return JSON.stringify({ ...parsed, region });
     },
   },
 },
 ```
 
-## Handoff Patterns
+For full task surface, see `ai-tasks.md`.
 
-### One-Time Delegation
+## Message bus + orchestrator wiring
 
-```typescript
-// Agent A delegates work to Agent B
-bus.publish({
-  type: "DELEGATION",
-  from: "coordinator",
-  to: "researcher",
-  content: "Research the topic: quantum computing",
-  metadata: { priority: "high", deadline: Date.now() + 60000 },
-});
-
-// Agent B returns the result
-bus.publish({
-  type: "DELEGATION_RESULT",
-  from: "researcher",
-  to: "coordinator",
-  correlationId: originalMessage.id,
-  content: "Research findings: ...",
-  metadata: { sourcesFound: 12 },
-});
-```
-
-### Supervisor Reroute
-
-In a supervisor pattern, the supervisor can reroute work mid-execution:
+The orchestrator does NOT accept a `bus:` option directly — wire the bus alongside the orchestrator and route messages explicitly.
 
 ```typescript
-const managed = supervisor("editor", ["researcher", "writer"], {
-  onReroute: (from, to, reason) => {
-    console.log(`Rerouting from ${from} to ${to}: ${reason}`);
+import { createMultiAgentOrchestrator, createMessageBus, createAgentNetwork } from "@directive-run/ai";
+
+const bus = createMessageBus({ maxHistory: 1000 });
+const network = createAgentNetwork({
+  bus,
+  agents: {
+    researcher: { capabilities: ["search", "verify"] },
+    writer:     { capabilities: ["draft", "edit"] },
   },
 });
-```
-
-## Message Bus with Orchestrator
-
-```typescript
-import { createMultiAgentOrchestrator, createMessageBus } from "@directive-run/ai";
-
-const bus = createMessageBus();
 
 const orchestrator = createMultiAgentOrchestrator({
   agents: { researcher, writer },
   runner,
-  bus, // Attach the message bus
+  hooks: {
+    onAgentStart: (e) => {
+      bus.publish({
+        type: "AGENT_START",
+        from: "orchestrator",
+        to: e.agentName,
+        input: e.input,
+      });
+    },
+  },
 });
 
 orchestrator.start();
 
-// External systems can also publish to the bus
+// External systems can publish to the bus directly
 bus.publish({
   type: "INFORM",
-  from: "external",
+  from: "external-pipeline",
   to: "researcher",
-  content: "New data available",
+  content: "New corpus available",
 });
 ```
 
-## Quick Reference
+## Anti-patterns
 
-| API | Purpose | Key Options |
+### `bus.request(...)`
+
+```typescript
+// WRONG — there is no request method on MessageBus
+const reply = await bus.request({ type: "REQUEST", from: "a", to: "b", action: "verify", timeout: 10_000 });
+
+// CORRECT — request/response is on AgentNetwork
+const reply = await network.request("a", "b", "verify", { /* payload */ }, 10_000);
+```
+
+### `const unsub = bus.subscribe(...); unsub();`
+
+```typescript
+// WRONG — subscribe returns a Subscription object, not the unsubscribe function
+const unsub = bus.subscribe("writer", handler);
+unsub();
+
+// CORRECT — call .unsubscribe() on the returned Subscription
+const sub = bus.subscribe("writer", handler);
+sub.unsubscribe();
+```
+
+### `network.findByCapability(...)` returning strings
+
+```typescript
+// WRONG — assumes the return is string[]
+const writers = network.findByCapability("draft"); // ["writer"]?
+network.send("coordinator", writers[0], message);   // passes a string where AgentInfo was expected? No — but we lost capabilities/metadata
+
+// CORRECT — it returns AgentInfo[]; use .id when you need the string
+const candidates = network.findByCapability("draft");
+network.send("coordinator", candidates[0].id, message);
+```
+
+### `network.route(capability, payload)`
+
+```typescript
+// WRONG — no such method
+await network.route("verify", { claim });
+
+// CORRECT — pick an agent via findByCapability, then request/delegate
+const verifiers = network.findByCapability("verify");
+if (verifiers.length === 0) throw new Error("no verifier");
+const result = await network.request("coordinator", verifiers[0].id, "verify", { claim });
+```
+
+### `createMultiAgentOrchestrator({ bus })`
+
+```typescript
+// WRONG — bus is not an option on MultiAgentOrchestratorOptions
+createMultiAgentOrchestrator({ agents, runner, bus })
+
+// CORRECT — wire the bus separately and publish through hooks/handlers
+createMultiAgentOrchestrator({
+  agents,
+  runner,
+  hooks: {
+    onAgentComplete: (e) => bus.publish({ type: "AGENT_COMPLETE", from: "orchestrator", to: e.agentName, output: e.output }),
+  },
+});
+```
+
+### Mutating `context.scratchpad`
+
+```typescript
+// WRONG — context.scratchpad is Readonly
+context.scratchpad.researchData = data;
+context.scratchpad.timestamp = Date.now();
+
+// CORRECT — return new state from the task; or use bus.publish to broadcast
+return JSON.stringify({ ...JSON.parse(input), researchData: data, timestamp: Date.now() });
+```
+
+## Quick reference
+
+| API | Purpose | Notes |
 |---|---|---|
-| `createMessageBus()` | Agent-to-agent messaging | subscribe, publish, request |
-| `createAgentNetwork()` | Capability-based discovery | agents with capabilities |
-| `bus.publish()` | Fire-and-forget message | type, from, to, content |
-| `bus.request()` | Request-response with timeout | action, payload, timeout |
-| `bus.subscribe()` | Listen for messages | agentName, callback |
-| `network.findByCapability()` | Find agents by skill | capability string |
-| `network.route()` | Route work to capable agent | capability, payload |
+| `createMessageBus(config?)` | Pub/sub primitive | `publish` / `subscribe` / `getHistory` / `getMessage` / `getPending` / `clear` / `destroy` |
+| `bus.subscribe(id, handler, filter?)` | Subscribe | returns a `Subscription` — call `sub.unsubscribe()` |
+| `createAgentNetwork({ bus, agents? })` | Capability-aware coordination | `request` / `delegate` / `query` / `broadcast` / `send` / `listen` / `findByCapability` |
+| `network.findByCapability(cap)` | Discovery | returns `AgentInfo[]` (NOT `string[]`) |
+| `network.request(from, to, action, payload, timeout?)` | Request/response | `Promise<ResponseMessage>` |
+| `network.delegate(from, to, task, context)` | Delegated task with result | `Promise<DelegationResultMessage>` |
+| `orchestrator.system.facts[agentId].x` | Cross-agent fact read | each agent is a namespaced module |
+| `context.scratchpad` | Per-pattern ephemeral state | Readonly inside tasks/agents |
