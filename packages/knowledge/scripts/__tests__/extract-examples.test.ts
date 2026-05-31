@@ -4,9 +4,9 @@ import { addHeader, isDomLine, stripDomWiring } from "../extract-examples";
 describe("isDomLine", () => {
   it("flags document query selectors", () => {
     expect(isDomLine("const el = document.getElementById('root');")).toBe(true);
-    expect(
-      isDomLine("const card = document.querySelector('.card');"),
-    ).toBe(true);
+    expect(isDomLine("const card = document.querySelector('.card');")).toBe(
+      true,
+    );
   });
 
   it("flags element property mutations", () => {
@@ -37,9 +37,9 @@ describe("isDomLine", () => {
 
   it("flags HTMLElement casts", () => {
     expect(isDomLine("const node = el as HTMLButtonElement;")).toBe(true);
-    expect(
-      isDomLine("function paint(el: HTMLElement) { return el; }"),
-    ).toBe(true);
+    expect(isDomLine("function paint(el: HTMLElement) { return el; }")).toBe(
+      true,
+    );
   });
 });
 

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseFrontmatterArrays,
-  stripBuildFrontmatter,
-} from "../build-skills";
+import { parseFrontmatterArrays, stripBuildFrontmatter } from "../build-skills";
 
 describe("parseFrontmatterArrays", () => {
   it("parses inline arrays for both fields", () => {

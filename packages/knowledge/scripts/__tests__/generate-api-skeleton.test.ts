@@ -73,9 +73,9 @@ describe("formatEntries", () => {
     const lines = formatEntries(entries);
 
     expect(lines.some((l) => l.includes("```ts"))).toBe(true);
-    expect(
-      lines.some((l) => l.includes("function useFact<K>(key: K)")),
-    ).toBe(true);
+    expect(lines.some((l) => l.includes("function useFact<K>(key: K)"))).toBe(
+      true,
+    );
   });
 
   it("omits the signature fence when the signature is too long", () => {
