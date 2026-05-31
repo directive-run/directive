@@ -1316,6 +1316,12 @@ Build the v2 surface – SHA-256 chain, Ed25519 signing keys + rotation, RFC 316
 
 **[2 days – DX HIGH, compound MAX]**
 
+**[CORE HELPERS + `el` ADOPTION SHIPPED 2026-05-31]**
+
+**Status:** `SystemFacts<T>` and `SystemDerived<T>` exported from `@directive-run/core` (work on `SingleModuleSystem<S>`, `NamespacedSystem<Modules>`, and raw `ModuleSchema`). `@directive-run/el`'s `bind`, `bindText`, and `mount` now thread schema typing into updater params — `facts.phase` is `"red" | "green" | "yellow"`, not `unknown`.
+
+**Remaining:** The 5 framework adapters (`react`, `vue`, `svelte`, `solid`, `lit`) still pass `Record<string, unknown>` through their internal selector cache machinery — those internals can adopt the helpers as a follow-on track without an API break. The public helpers are available for user code to type their own selector/render callbacks today.
+
 Every framework adapter (`react`, `vue`, `svelte`, `solid`, `lit`, `el`) weak-types updater params as `Record<string, unknown>`, dropping the schema typing that `system.facts` already carries. Add two type helpers in core (`SystemFacts<S>`, `SystemDerived<S>`) and have every adapter use them in `bind`/`selector`/`useFact`/etc. One change in core, six adapters get typed updaters for free.
 
 **Headline:** *"Typed updaters across every adapter. One helper in core, every package wakes up smarter."*

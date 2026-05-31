@@ -5,10 +5,15 @@
  * Uses the same subscription patterns as the Lit adapter (store.subscribeAll).
  */
 
-import type { SingleModuleSystem } from "@directive-run/core";
+import type {
+  ModuleSchema,
+  SingleModuleSystem,
+  SystemDerived,
+  SystemFacts,
+} from "@directive-run/core";
 import { assertSystem } from "@directive-run/core/adapter-utils";
 
-// biome-ignore lint/suspicious/noExplicitAny: System schema varies across consumers
+// biome-ignore lint/suspicious/noExplicitAny: internal helper accepts any schema
 type AnySystem = SingleModuleSystem<any>;
 
 // ============================================================================
@@ -48,25 +53,28 @@ function getState(system: AnySystem): {
  * });
  * ```
  */
-export function bind<E extends HTMLElement>(
-  system: AnySystem,
+export function bind<E extends HTMLElement, S extends ModuleSchema>(
+  system: SingleModuleSystem<S>,
   element: E,
   updater: (
     el: E,
-    facts: Record<string, unknown>,
-    derived: Record<string, unknown>,
+    facts: SystemFacts<SingleModuleSystem<S>>,
+    derived: SystemDerived<SingleModuleSystem<S>>,
   ) => void,
 ): () => void {
   assertSystem("bind", system);
 
+  type Facts = SystemFacts<SingleModuleSystem<S>>;
+  type Derived = SystemDerived<SingleModuleSystem<S>>;
+
   // Initial render
   const { facts, derived } = getState(system);
-  updater(element, facts, derived);
+  updater(element, facts as Facts, derived as Derived);
 
   // Subscribe to all fact changes
   const unsubscribe = system.facts.$store.subscribeAll(() => {
     const { facts, derived } = getState(system);
-    updater(element, facts, derived);
+    updater(element, facts as Facts, derived as Derived);
   });
 
   return unsubscribe;
@@ -87,12 +95,12 @@ export function bind<E extends HTMLElement>(
  * });
  * ```
  */
-export function bindText(
-  system: AnySystem,
+export function bindText<S extends ModuleSchema>(
+  system: SingleModuleSystem<S>,
   element: HTMLElement,
   selector: (
-    facts: Record<string, unknown>,
-    derived: Record<string, unknown>,
+    facts: SystemFacts<SingleModuleSystem<S>>,
+    derived: SystemDerived<SingleModuleSystem<S>>,
   ) => string,
 ): () => void {
   return bind(system, element, (el, facts, derived) => {
@@ -117,27 +125,34 @@ export function bindText(
  * });
  * ```
  */
-export function mount(
-  system: AnySystem,
+export function mount<S extends ModuleSchema>(
+  system: SingleModuleSystem<S>,
   container: HTMLElement,
   renderer: (
-    facts: Record<string, unknown>,
-    derived: Record<string, unknown>,
+    facts: SystemFacts<SingleModuleSystem<S>>,
+    derived: SystemDerived<SingleModuleSystem<S>>,
   ) => Node | Node[],
 ): () => void {
   assertSystem("mount", system);
+
+  type Facts = SystemFacts<SingleModuleSystem<S>>;
+  type Derived = SystemDerived<SingleModuleSystem<S>>;
 
   const normalize = (result: Node | Node[]): Node[] =>
     Array.isArray(result) ? result : [result];
 
   // Initial render
   const { facts, derived } = getState(system);
-  container.replaceChildren(...normalize(renderer(facts, derived)));
+  container.replaceChildren(
+    ...normalize(renderer(facts as Facts, derived as Derived)),
+  );
 
   // Subscribe to changes
   const unsubscribe = system.facts.$store.subscribeAll(() => {
     const { facts, derived } = getState(system);
-    container.replaceChildren(...normalize(renderer(facts, derived)));
+    container.replaceChildren(
+      ...normalize(renderer(facts as Facts, derived as Derived)),
+    );
   });
 
   return unsubscribe;

@@ -245,6 +245,9 @@ export type {
   // Type guards
   SystemMode,
   AnySystem,
+  // Schema-extraction helpers for adapter authors
+  SystemFacts,
+  SystemDerived,
 } from "./composition.js";
 
 // Type guard functions

@@ -73,6 +73,9 @@ export type {
   // Type Guards
   SystemMode,
   AnySystem,
+  // Schema-extraction helpers
+  SystemFacts,
+  SystemDerived,
   // Cross-Module Dependencies
   CrossModuleDeps,
   // Dynamic Definitions

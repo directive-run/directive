@@ -888,3 +888,56 @@ export function isSingleModuleSystem(system: AnySystem): boolean {
 export function isNamespacedSystem(system: AnySystem): boolean {
   return system._mode === "namespaced";
 }
+
+/**
+ * Extract the typed facts shape from a Directive system or module schema.
+ *
+ * Useful in framework adapter callbacks (`bind`, `useSelector`, etc.) so an
+ * updater that receives a facts snapshot inherits the schema's narrow types
+ * instead of falling back to `Record<string, unknown>`.
+ *
+ * Accepts any of:
+ * - `SingleModuleSystem<S>` — returns `InferFacts<S>`
+ * - `NamespacedSystem<Modules>` — returns the namespaced facts shape
+ * - A raw `ModuleSchema` — returns `InferFacts<M>`
+ *
+ * @example
+ * ```ts
+ * const system = createSystem({ module: trafficLight });
+ *
+ * function paintLight(facts: SystemFacts<typeof system>) {
+ *   // facts.phase is "red" | "green" | "yellow", not unknown
+ * }
+ * ```
+ */
+export type SystemFacts<T> = T extends SingleModuleSystem<infer S>
+  ? InferFacts<S>
+  : T extends NamespacedSystem<infer Modules>
+    ? NamespacedFacts<Modules>
+    : T extends ModuleSchema
+      ? InferFacts<T>
+      : never;
+
+/**
+ * Extract the typed derivations shape from a Directive system or module schema.
+ *
+ * Mirrors {@link SystemFacts} but for `system.derive`. The `DerivationsControl`
+ * runtime-control methods (`assign`/`register`/`restore`) are stripped — what
+ * adapter callbacks need is the derived value shape, not the control surface.
+ *
+ * @example
+ * ```ts
+ * const system = createSystem({ module: trafficLight });
+ *
+ * function statusLine(derived: SystemDerived<typeof system>) {
+ *   return derived.isRed ? "STOP" : "GO";
+ * }
+ * ```
+ */
+export type SystemDerived<T> = T extends SingleModuleSystem<infer S>
+  ? InferDerivations<S>
+  : T extends NamespacedSystem<infer Modules>
+    ? NamespacedDerivations<Modules>
+    : T extends ModuleSchema
+      ? InferDerivations<T>
+      : never;
