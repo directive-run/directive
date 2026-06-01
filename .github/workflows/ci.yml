@@ -65,9 +65,23 @@ jobs:
 
       - name: Check knowledge freshness
         if: steps.fetch_api_reference.outputs.fetched == 'true'
+        # Soft-warns instead of failing CI. The check IS valuable for
+        # catching mid-cycle drift (someone edited a source export
+        # without regenerating api-skeleton.md), but EVERY first commit
+        # after a release trips it — the just-published release contains
+        # the new exports' api-reference.json, but the committed
+        # api-skeleton.md was generated against the previous release. We
+        # don't want a recurring red CI on every post-release commit; we
+        # do want the drift surfaced for human review. Annotation +
+        # truncated diff give the reviewer enough to decide.
         run: |
           pnpm --filter @directive-run/knowledge generate
-          git diff --exit-code packages/knowledge/api-skeleton.md
+          if ! git diff --quiet packages/knowledge/api-skeleton.md; then
+            echo "::warning title=api-skeleton.md drift::Knowledge api-skeleton.md does not match regeneration against the latest release's api-reference.json. This is EXPECTED on the first commit after a release (new exports just shipped). If you see it mid-cycle, run \`pnpm --filter @directive-run/knowledge generate\` locally and commit the result."
+            echo "---drift diff (truncated to 60 lines)---"
+            git diff packages/knowledge/api-skeleton.md | head -60
+            echo "---end drift diff---"
+          fi
 
       - name: Check plugin skills freshness
         run: |

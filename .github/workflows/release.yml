@@ -50,7 +50,14 @@ jobs:
         id: changesets
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
-          version: pnpm changeset version
+          # `changeset version` rewrites packages/*/package.json with the
+          # bumped versions and expands `"files": ["dist"]` onto multiple
+          # lines. Biome's JSON formatter prefers the inline form, so
+          # without this auto-fix every post-merge CI run lint-fails on
+          # 14 format errors until someone re-runs `biome check --write`
+          # locally and pushes. Chaining biome to the version step lands
+          # the Version Packages PR with already-canonical formatting.
+          version: pnpm changeset version && pnpm exec biome check --write packages/*/package.json
           publish: pnpm changeset publish
           createGithubReleases: true
         env:
