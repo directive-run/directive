@@ -1373,4 +1373,52 @@ This session shipped 5 concept docs + 5 site mirrors. The mirror transform (fron
 
 Three packages serialize "this thing for stable comparison" differently: `mutator` uses `kind`-keyed lookup, `query` uses `serializeKey({...})` with prototype-pollution-safe `Object.create(null)`, `timeline` uses ad-hoc `safeStringify` in `diffTimelines`. Three serializers for one concept. Hoist to `@directive-run/core/utils` so the chain is consistent and the safety guarantees are written once.
 
+---
+
+## v1.16 follow-on items (deferred from v1.15 release, 2026-05-31)
+
+These are committed-to roadmap items the v1.15 release notes explicitly named so users don't ask. Track until shipped.
+
+### v1.16.A – Knowledge `## See also` cross-link footers across the 25 hand-authored docs
+
+**[2-3 sessions – DX HIGH, compound MEDIUM]**
+
+Phase D2 from the v1.15 plan. Add a `## See also` footer with 3-5 bidirectional cross-links to each of the 13 core + 12 ai knowledge files. Bidirectionality matters — if `constraints.md` links `resolvers.md`, `resolvers.md` must link back. The 1-line package breadcrumb shipped in v1.15 (commit `532a8426`); the see-also footer is the second pass that was honest-scoped as 2-3 sessions, not one.
+
+### v1.16.B – `@directive-run/claude-plugin` npm publication evaluation
+
+**[half day – strategic LOW, compound LOW]**
+
+The plugin currently ships only via Claude Code's plugin marketplace (`/plugin marketplace add directive-run/directive` then `/plugin install directive@directive-plugins`). Some users will ask whether they can `npm install @directive-run/claude-plugin` and consume the bundled skills programmatically. Evaluate: does it make sense to drop `"private": true` and publish, or does the Claude Code path stay the only sanctioned install? Decision can be revisited per-cycle.
+
+### v1.16.C – MCP SSE server (`mcp.directive.run`) for live agent retrieval
+
+**[1 week – DX HIGH, viral MEDIUM]**
+
+Stand up an MCP server (Server-Sent Events transport) that exposes the knowledge package's `getKnowledge` / `getExample` / `getAllExamples` as MCP tools. Agents in production query MCP at retrieval time instead of bundling a static knowledge snapshot. Directive's programmatic API maps 1:1 to MCP tool calls — small lift, outsized discoverability. Borrowed pattern: zustand's `docs.pmnd.rs/api/sse` MCP server (the Agent 6 audit's top-3 borrowable pattern).
+
+### v1.16.D – `npx @directive-run/cli install` one-shot AI rules installer
+
+**[1 day – DX MEDIUM, compound LOW]**
+
+Currently `directive ai-rules init` generates `.cursorrules`, `.clinerules`, `copilot-instructions.md`, etc. tuned per assistant. A `npx @directive-run/cli install` one-shot would drop ALL of them in one command without prompting per assistant. Mirrors TanStack's `npx @tanstack/intent@latest install` UX. Small but high-discoverability — the user surface promise is "one command and you're done."
+
+### v1.16.E – Release workflow auto-formats post-version package.jsons
+
+**[half day – hygiene MAX, compound HIGH]**
+
+The v1.15 cycle surfaced a recurring failure: `changesets version` rewrites `packages/*/package.json` and expands `"files": ["dist"]` to multi-line; biome wants it inline; CI on the merge commit lint-fails until manually fixed. Add a `pnpm exec biome check --write packages/*/package.json` step to `.github/workflows/release.yml` between the version bump and the publish, so the post-version commit is already in biome-canonical shape. Eliminates the recurring post-release manual format-fix.
+
+### v1.16.F – Release workflow auto-regenerates post-release api-skeleton.md
+
+**[half day – hygiene HIGH, compound HIGH]**
+
+Companion to v1.16.E. Every first post-release CI run hits the knowledge-freshness gate because the newly-published release's `api-reference.json` contains the just-shipped exports but the committed `api-skeleton.md` was generated against the previous release. Either auto-run `pnpm --filter @directive-run/knowledge generate` in the release workflow's post-publish step (and commit the result), or downgrade the freshness gate to a warning for the first commit after a release. Eliminates the recurring post-release "regenerate api-skeleton" patch.
+
+### v1.16.G – `naming.md` rewrite from forbidden-vocabulary list to "alias map"
+
+**[1 day – DX HIGH, compound MEDIUM]**
+
+R7 audit Agent 5 finding: `core/naming.md` aggressively forbids vocabulary that an evaluator would search for (`selectors`, `actions`, `stores`, `atoms`, `reducers`). A developer searching the knowledge package for "what's the Directive equivalent of Zustand selectors?" finds NOTHING — the strict naming rules make the package un-searchable for cross-paradigm queries. Rewrite as an "alias map": each Directive term gets a `## What other libraries call this` block listing 3-5 cross-paradigm aliases, so retrieval works regardless of which vocabulary the user comes from.
+
 
