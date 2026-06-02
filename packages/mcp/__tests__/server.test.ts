@@ -1,14 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createDirectiveKnowledgeServer } from "../src/server.js";
+import { createDirectiveServer } from "../src/server.js";
 
-describe("createDirectiveKnowledgeServer", () => {
+describe("createDirectiveServer", () => {
   let client: Client;
   let cleanup: () => Promise<void>;
 
   beforeEach(async () => {
-    const server = createDirectiveKnowledgeServer();
+    const server = createDirectiveServer();
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
 

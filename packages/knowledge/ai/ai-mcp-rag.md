@@ -4,6 +4,8 @@
 
 Model Context Protocol (MCP) server integration and Retrieval-Augmented Generation (RAG) enrichment for Directive AI agents. Import from `@directive-run/ai/mcp` for the MCP adapter (the main barrel re-exports it with `@deprecated` notices for v2 removal), and from `@directive-run/ai` for the RAG enricher + embedder utilities.
 
+> **Client vs. server, two different packages.** This page covers the MCP **client** side — Directive AI agents calling out to external MCP servers. For the **server** side — exposing Directive itself (knowledge files, code examples, Claude Code skills) so other AI clients can consume it — that's `@directive-run/mcp`. Same protocol, opposite arrows.
+
 ## Decision tree
 
 ```

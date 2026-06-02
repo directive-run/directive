@@ -1399,9 +1399,9 @@ Decision: publish. Dropped the `private` flag, added a tsup dual-build (ESM + CJ
 
 **[1 week – DX HIGH, viral MEDIUM]**
 
-**[SHIPPED 2026-06-01 — new package `@directive-run/knowledge-mcp`]**
+**[SHIPPED 2026-06-02 — new package `@directive-run/mcp`]**
 
-Shipped as `@directive-run/knowledge-mcp` with seven MCP tools: `list_knowledge`, `get_knowledge`, `list_examples`, `get_example`, `search_knowledge`, `list_skills`, `get_skill`. Two transports in one binary — `directive-knowledge-mcp` runs stdio by default (Claude Desktop, Cursor MCP, MCP Inspector) and `--sse --port <port> --host <host>` runs the HTTP SSE server for hosting at `mcp.directive.run`. Hosting on the production domain is a separate ops task; the package is shippable today via npm + npx. Pattern matches zustand's `docs.pmnd.rs/api/sse`.
+Shipped as `@directive-run/mcp` (originally named `knowledge-mcp`, renamed pre-publish to leave room for non-knowledge MCP tools) with seven MCP tools: `list_knowledge`, `get_knowledge`, `list_examples`, `get_example`, `search_knowledge`, `list_skills`, `get_skill`. Two transports in one binary — `directive-mcp` runs stdio by default (Claude Desktop, Cursor MCP, MCP Inspector) and `--sse --port <port> --host <host>` runs the HTTP SSE server for hosting at `mcp.directive.run`. Hosting on the production domain is a separate ops task; the package is shippable today via npm + npx. Pattern matches zustand's `docs.pmnd.rs/api/sse`. Distinct from `@directive-run/ai/mcp`, which is the MCP client side (Directive agents calling out to external MCP servers) — same protocol, opposite arrows.
 
 ### v1.16.D – `npx @directive-run/cli install` one-shot AI rules installer
 

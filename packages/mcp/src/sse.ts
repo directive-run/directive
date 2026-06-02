@@ -20,7 +20,7 @@
 
 import { type IncomingMessage, type Server, createServer } from "node:http";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { createDirectiveKnowledgeServer } from "./server.js";
+import { createDirectiveServer } from "./server.js";
 
 const MESSAGES_PATH = "/messages";
 const SSE_PATH = "/sse";
@@ -48,7 +48,7 @@ async function handleSseConnect(
   logger: Logger,
 ): Promise<void> {
   const transport = new SSEServerTransport(MESSAGES_PATH, res);
-  const server = createDirectiveKnowledgeServer();
+  const server = createDirectiveServer();
   sessions.set(transport.sessionId, { transport });
 
   const cleanup = () => {
@@ -58,7 +58,7 @@ async function handleSseConnect(
   transport.onclose = cleanup;
 
   await server.connect(transport);
-  logger.log(`[knowledge-mcp] sse session opened: ${transport.sessionId}`);
+  logger.log(`[directive-mcp] sse session opened: ${transport.sessionId}`);
 }
 
 async function handlePostMessage(
@@ -131,7 +131,7 @@ export async function startSseServer(
     try {
       await routeRequest(req, res, sessions, logger, host);
     } catch (err) {
-      logger.error("[knowledge-mcp] request error:", err);
+      logger.error("[directive-mcp] request error:", err);
       if (!res.headersSent) {
         res.writeHead(500, { "Content-Type": "text/plain" });
       }
@@ -142,7 +142,7 @@ export async function startSseServer(
   await new Promise<void>((resolve) => {
     httpServer.listen(port, host, () => {
       logger.log(
-        `[knowledge-mcp] sse server listening at http://${host}:${port}${SSE_PATH}`,
+        `[directive-mcp] sse server listening at http://${host}:${port}${SSE_PATH}`,
       );
       resolve();
     });

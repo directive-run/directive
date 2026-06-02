@@ -1,18 +1,20 @@
-# `@directive-run/knowledge-mcp`
+# `@directive-run/mcp`
 
-A Model Context Protocol server that exposes the Directive knowledge package as MCP tools — every knowledge doc, code example, and Claude Code skill bundle, queryable at retrieval time instead of bundled as a static snapshot.
+A Model Context Protocol server that exposes Directive to AI clients. Today's tools cover knowledge files, code examples, and Claude Code skill bundles — queryable at retrieval time instead of bundled as a static snapshot. The package is the umbrella for "Directive as an MCP server," with room to grow into runtime introspection, system state, and tooling.
 
 Two transports ship in the same binary:
 
 - **stdio** — the canonical MCP local-client pattern. Plugs into Claude Desktop, Cursor MCP, the MCP Inspector, and any other client that spawns an MCP server as a subprocess.
 - **SSE (HTTP)** — for hosting at `mcp.directive.run` or a private MCP gateway. Production AI agents query the hosted endpoint at runtime; no embedding pipeline, no bundle bloat.
 
+> **Client vs. server, two different packages.** This package is the MCP **server** side — it serves Directive to outside clients. If you want the **client** side — Directive AI agents calling out to external MCP servers (filesystem, GitHub, etc.) — that's `@directive-run/ai/mcp` (`createMCPAdapter`). Same protocol, opposite arrows.
+
 ## Install
 
 ```bash
-npm install -g @directive-run/knowledge-mcp
+npm install -g @directive-run/mcp
 # or run directly without installing:
-npx @directive-run/knowledge-mcp --help
+npx @directive-run/mcp --help
 ```
 
 ## stdio transport (local clients)
@@ -24,7 +26,7 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
   "mcpServers": {
     "directive": {
       "command": "npx",
-      "args": ["-y", "@directive-run/knowledge-mcp"]
+      "args": ["-y", "@directive-run/mcp"]
     }
   }
 }
@@ -33,13 +35,13 @@ Add to your Claude Desktop config (`claude_desktop_config.json`):
 Or test with the MCP Inspector:
 
 ```bash
-npx @modelcontextprotocol/inspector npx -y @directive-run/knowledge-mcp
+npx @modelcontextprotocol/inspector npx -y @directive-run/mcp
 ```
 
 ## SSE transport (hosted)
 
 ```bash
-directive-knowledge-mcp --sse --port 3000 --host 0.0.0.0
+directive-mcp --sse --port 3000 --host 0.0.0.0
 ```
 
 Endpoints:
@@ -65,11 +67,11 @@ Endpoints:
 For tool authors who want to mount the server inside their own host process:
 
 ```typescript
-import { createDirectiveKnowledgeServer, startSseServer } from "@directive-run/knowledge-mcp";
+import { createDirectiveServer, startSseServer } from "@directive-run/mcp";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 // stdio
-const server = createDirectiveKnowledgeServer();
+const server = createDirectiveServer();
 await server.connect(new StdioServerTransport());
 
 // SSE — returns the underlying http.Server
@@ -78,6 +80,7 @@ const httpServer = await startSseServer({ port: 3000, host: "0.0.0.0" });
 
 ## See also
 
+- [`@directive-run/ai/mcp`](../ai) — the MCP **client** side of Directive. Use it inside a Directive AI agent to call out to external MCP servers.
 - [`@directive-run/knowledge`](../knowledge) — the knowledge package this server fronts.
 - [`@directive-run/claude-plugin`](../claude-plugin) — the Claude Code skill bundles also exposed.
 - [`@directive-run/cli`](../cli) — generate static `.cursorrules` / `CLAUDE.md` / `.windsurfrules` files for assistants that don't speak MCP.

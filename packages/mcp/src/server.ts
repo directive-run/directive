@@ -1,11 +1,14 @@
 /**
- * Build a Model Context Protocol server that exposes the Directive
- * knowledge package as MCP tools. Transport-agnostic — call
- * `createDirectiveKnowledgeServer()` to get a configured `McpServer`,
- * then connect it to a stdio transport (local clients) or an SSE
- * transport (hosted at `mcp.directive.run`).
+ * Build a Model Context Protocol server that exposes Directive to MCP
+ * clients. Transport-agnostic — call `createDirectiveServer()` to get a
+ * configured `McpServer`, then connect it to a stdio transport (local
+ * clients) or an SSE transport (hosted at `mcp.directive.run`).
  *
- * Tool surface:
+ * This is the SERVER side of the protocol. For the CLIENT side —
+ * Directive AI agents calling out to external MCP servers — see
+ * `@directive-run/ai/mcp` (`createMCPAdapter`).
+ *
+ * Current tool surface (knowledge + skill bundles):
  *
  * - `list_knowledge` — every knowledge file name (core + AI + skeleton).
  * - `get_knowledge` — read one knowledge file by name.
@@ -17,8 +20,9 @@
  * - `get_skill` — read one skill's `SKILL.md` plus its supporting
  *   files as a single concatenated document.
  *
- * The package version is read from the consuming package.json so
- * the MCP handshake reports an accurate server version.
+ * The package is the umbrella for "Directive as an MCP server" — future
+ * additions can expose runtime introspection, system state, CLI
+ * commands, and debug snapshots through the same binary.
  */
 
 import { getAllSkills, getSkill } from "@directive-run/claude-plugin";
@@ -67,15 +71,15 @@ function collectSearchHits(
 }
 
 /**
- * Build the MCP server with every Directive knowledge tool registered.
+ * Build the MCP server with every Directive tool registered.
  *
  * The returned server has no transport attached — connect it to
  * `StdioServerTransport` for local clients or an SSE transport for
  * hosted deployments.
  */
-export function createDirectiveKnowledgeServer(): McpServer {
+export function createDirectiveServer(): McpServer {
   const server = new McpServer({
-    name: "directive-knowledge",
+    name: "directive",
     version: PKG_VERSION,
   });
 

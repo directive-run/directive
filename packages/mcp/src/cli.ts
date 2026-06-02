@@ -1,5 +1,5 @@
 /**
- * CLI entry for `@directive-run/knowledge-mcp`.
+ * CLI entry for `@directive-run/mcp`.
  *
  * Default transport is stdio — the canonical MCP local-client
  * pattern (Claude Desktop, Cursor MCP, MCP Inspector). Pass `--sse`
@@ -8,26 +8,26 @@
  *
  * Usage:
  *
- *   directive-knowledge-mcp                # stdio
- *   directive-knowledge-mcp --sse          # SSE on 127.0.0.1:3000
- *   directive-knowledge-mcp --sse \
+ *   directive-mcp                # stdio
+ *   directive-mcp --sse          # SSE on 127.0.0.1:3000
+ *   directive-mcp --sse \
  *     --port 8080 --host 0.0.0.0           # SSE on 0.0.0.0:8080
- *   directive-knowledge-mcp --help
- *   directive-knowledge-mcp --version
+ *   directive-mcp --help
+ *   directive-mcp --version
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createDirectiveKnowledgeServer } from "./server.js";
+import { createDirectiveServer } from "./server.js";
 import { startSseServer } from "./sse.js";
 
 const VERSION = "0.1.0";
 
-const USAGE = `directive-knowledge-mcp — MCP server for Directive knowledge
+const USAGE = `directive-mcp — MCP server exposing Directive to AI clients
 
 Usage:
-  directive-knowledge-mcp                Run stdio transport (default)
-  directive-knowledge-mcp --sse          Run SSE transport on 127.0.0.1:3000
-  directive-knowledge-mcp --sse --port 8080 --host 0.0.0.0
+  directive-mcp                Run stdio transport (default)
+  directive-mcp --sse          Run SSE transport on 127.0.0.1:3000
+  directive-mcp --sse --port 8080 --host 0.0.0.0
 
 Options:
   --sse              Use HTTP SSE transport instead of stdio
@@ -131,14 +131,14 @@ async function main(): Promise<void> {
     return;
   }
 
-  const server = createDirectiveKnowledgeServer();
+  const server = createDirectiveServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
 main().catch((err: unknown) => {
   process.stderr.write(
-    `[knowledge-mcp] fatal: ${(err as Error).stack ?? String(err)}\n`,
+    `[directive-mcp] fatal: ${(err as Error).stack ?? String(err)}\n`,
   );
   process.exit(1);
 });
