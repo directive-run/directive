@@ -354,3 +354,8 @@ persistencePlugin({
   exclude: ["authToken", "isLoading", "error"],
 })
 ```
+
+## See also
+
+- [`system-api.md`](./system-api.md) — `plugins:` option on `createSystem` and the lifecycle hooks plugins observe
+- [`error-boundaries.md`](./error-boundaries.md) — `createCircuitBreaker` and the resilience plugins that pair with error boundaries

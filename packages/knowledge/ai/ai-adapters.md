@@ -250,3 +250,8 @@ const orchestrator = createAgentOrchestrator({ runner });
 | Gemini | `@directive-run/ai/gemini` | `apiKey`, `defaultModel` |
 
 All adapters support: `baseURL`, `defaultHeaders`, `hooks`, streaming variant.
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — where the `AgentRunner` an adapter produces gets consumed
+- [`ai-agents-streaming.md`](./ai-agents-streaming.md) — the `StreamingCallbackRunner` shape each adapter's streaming variant satisfies

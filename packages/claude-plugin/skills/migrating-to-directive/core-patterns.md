@@ -228,3 +228,13 @@ const typed = createModule("typed", {
   },
 });
 ```
+
+## See also
+
+- [`constraints.md`](./constraints.md) — the demand side of the constraint-resolver loop
+- [`resolvers.md`](./resolvers.md) — the supply side that fulfills requirements
+- [`schema-types.md`](./schema-types.md) — the `t.*()` builders that define fact and derivation types
+- [`multi-module.md`](./multi-module.md) — when a single module isn't enough
+- [`system-api.md`](./system-api.md) — `createSystem` and the runtime instance once your module is defined
+- [`naming.md`](./naming.md) — terminology conventions every example here follows
+- [`testing.md`](./testing.md) — `createTestSystem` for the modules you're learning to write

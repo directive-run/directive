@@ -362,3 +362,9 @@ await memory.manage(); // awaits the async summarizer
 | `createOutputTypeGuardrail` | output | `type` |
 | `createLengthGuardrail` | output | one of `maxCharacters` or `maxTokens` |
 | `createContentFilterGuardrail` | output | `blockedPatterns` |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — `guardrails: { input, output, toolCall }` and `memory:` options on `createAgentOrchestrator`
+- [`ai-security.md`](./ai-security.md) — `createPIIGuardrail`, `createPromptInjectionGuardrail`, `createAuditTrail`, `createCompliance` — the security-flavored guardrails
+- [`ai-budget-resilience.md`](./ai-budget-resilience.md) — `createSemanticCache` pairs with `createSemanticCacheGuardrail` for caching-as-guardrail

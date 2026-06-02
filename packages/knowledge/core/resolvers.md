@@ -357,3 +357,11 @@ system.start();
 await system.settle();
 console.log(system.facts.data); // Resolved value
 ```
+
+## See also
+
+- [`constraints.md`](./constraints.md) — the demand side of the loop; what emits the requirements this resolver fulfills
+- [`core-patterns.md`](./core-patterns.md) — how resolvers fit into the module shape
+- [`error-boundaries.md`](./error-boundaries.md) — recovery strategies when a resolver throws (retry, fallback, circuit breaker)
+- [`testing.md`](./testing.md) — mock resolvers via `mocks.resolvers` and the programmatic `mockResolver(type)` helper
+- [`anti-patterns.md`](./anti-patterns.md) — the resolver-shaped mistakes (returning data from `resolve`, abbreviating `context` to `ctx`)

@@ -321,3 +321,9 @@ timeline.subscribe((e) => {
 | `createOtelPlugin(config)` | Plugin that emits spans for orchestrator activity |
 | `createOTLPExporter(config)` | Returns `{ exportMetrics, exportTraces }` for OTel backends |
 | `createDevtoolsServer({ timeline, port })` | WebSocket-bridged timeline for browser devtools |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — `debug: { verboseTimeline }` config + `orchestrator.timeline` access + breakpoint surface
+- [`ai-budget-resilience.md`](./ai-budget-resilience.md) — retry storms, circuit-breaker state changes, and budget warnings all flow through the debug timeline
+- [`ai-testing-evals.md`](./ai-testing-evals.md) — `createTestTimeline` and `assertTimelineEvents` for asserting against recorded events

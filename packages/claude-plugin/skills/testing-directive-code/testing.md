@@ -404,3 +404,9 @@ resolve: (req, context) => { context.facts.x = 1; }
 | `system.assertFactSet(key, value?)` | instance method | Assert a fact value |
 | `system.assertFactChanges(key, n)` | instance method | Assert the change count for a fact |
 | `system.waitForIdle(maxWait?)` | instance method | Wait for in-flight resolvers (default 5000ms) |
+
+## See also
+
+- [`resolvers.md`](./resolvers.md) — the resolver shape `mocks.resolvers` replaces and the retry/cancel semantics tests need to know about
+- [`core-patterns.md`](./core-patterns.md) — the module shape `createTestSystem({ module })` is testing
+- [`history.md`](./history.md) — recorded snapshots for replay-based testing patterns

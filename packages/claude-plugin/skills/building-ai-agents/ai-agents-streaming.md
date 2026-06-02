@@ -300,3 +300,8 @@ case "guardrail_triggered":
 | `orchestrator.runStream(agent, input, opts?)` | instance method | Returns `{ stream, result, abort }` |
 | `createStreamingRunner(baseRunner, opts?)` | `@directive-run/ai` | Wrap a `StreamingCallbackRunner` into a `StreamRunner` |
 | `createSSETransport(config?)` | `@directive-run/ai` | `{ toResponse, toStream }` for piping a stream to SSE |
+
+## See also
+
+- [`ai-adapters.md`](./ai-adapters.md) — provider runners that produce the streams this file consumes
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — `orchestrator.runStream(agent, input)` returns the `{ stream, result, abort }` triple this file documents

@@ -313,3 +313,9 @@ Two-way lookup. Search the term you know.
 | **`context`** (parameter) | ctx, c, resolverContext |
 
 The forbidden direction is also non-negotiable: in code Directive ships, the columns reverse. Do NOT use `state`, `store`, `selectors`, `computed`, `actions`, `reducers`, `subscriptions`, `slices`, `request`, or `ctx` in `@directive-run/*` source. The alias map is for retrieval — the canonical names are for code.
+
+## See also
+
+- [`core-patterns.md`](./core-patterns.md) — the actual code shapes every naming rule here applies to
+- [`multi-module.md`](./multi-module.md) — `facts.self.*` convention and dot-notation rules
+- [`anti-patterns.md`](./anti-patterns.md) — naming-shaped mistakes (`request` for `req`, `ctx` for `context`, hallucinated TS schema types)

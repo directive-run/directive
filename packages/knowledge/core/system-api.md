@@ -453,3 +453,11 @@ system.start();
 system.stop();
 system.destroy();
 ```
+
+## See also
+
+- [`core-patterns.md`](./core-patterns.md) — the modules that go into `createSystem({ module: ... })`
+- [`multi-module.md`](./multi-module.md) — `createSystem({ modules: { ... } })` for namespaced systems
+- [`history.md`](./history.md) — the `history:` config and the `system.history.*` time-travel surface
+- [`plugins.md`](./plugins.md) — the `plugins:` config and the lifecycle hooks plugins observe
+- [`react-adapter.md`](./react-adapter.md) — consuming a system from React components

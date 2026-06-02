@@ -477,3 +477,9 @@ const suite = createEvalSuite({
 | `assertOrchestratorState` / `assertMultiAgentState` / `assertScratchpadState` / `assertDerivedValues` / `assertTimelineEvents` / `assertDagExecution` / `assertBreakpointHit` / `assertRerouted` / `assertAgentHealth` / `assertCheckpoint` / `assertMultiplexedStream` | `@directive-run/ai/testing` | State/topology/event assertions |
 | `createEvalSuite` | `@directive-run/ai/evals` | Dataset-driven multi-criterion eval runner |
 | `evalCost` / `evalLatency` / `evalOutputLength` / `evalSafety` / `evalStructure` / `evalMatch` / `evalJudge` / `evalFaithfulness` / `evalRelevance` / `evalCoherence` / `evalAssert` | `@directive-run/ai/evals` | Built-in criterion factories |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — `createTestOrchestrator` wraps this orchestrator; the prod surface is what your tests are exercising
+- [`ai-multi-agent.md`](./ai-multi-agent.md) — `createTestMultiAgentOrchestrator` for testing pattern execution
+- [`ai-debug-observability.md`](./ai-debug-observability.md) — recorded debug events feed `assertTimelineEvents` / `assertDagExecution` / `assertBreakpointHit`

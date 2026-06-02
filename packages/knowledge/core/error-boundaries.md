@@ -322,3 +322,9 @@ try {
 6. Add `onError` callback for logging/monitoring
 7. Use `"throw"` for derivation errors (they indicate bugs)
 8. Use `"skip"` for non-critical effects (logging, analytics)
+
+## See also
+
+- [`resolvers.md`](./resolvers.md) — retry policies and cancellation; the most common error source
+- [`plugins.md`](./plugins.md) — `createCircuitBreaker` lives in `@directive-run/core/plugins`; pair it with error boundaries for cascading-failure isolation
+- [`anti-patterns.md`](./anti-patterns.md) — common error-handling mistakes (catching the wrong type, swallowing recoverable errors)

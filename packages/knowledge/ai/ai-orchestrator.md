@@ -455,3 +455,12 @@ const final = await result;
 | `orch.facts.agent.*` | Read built-in agent state |
 | `orch.totalTokens` | Cumulative token count |
 | `orch.timeline` | DebugTimeline (when `debug: true`); `null` otherwise |
+
+## See also
+
+- [`ai-multi-agent.md`](./ai-multi-agent.md) — the multi-agent flavor; 8 composition patterns and pattern factories
+- [`ai-adapters.md`](./ai-adapters.md) — provider runners that produce the `runner` this orchestrator wraps
+- [`ai-guardrails-memory.md`](./ai-guardrails-memory.md) — full surface of the `guardrails:` and `memory:` options on this orchestrator
+- [`ai-budget-resilience.md`](./ai-budget-resilience.md) — full surface of the `circuitBreaker:`, `selfHealing:`, `agentRetry:`, `maxTokenBudget:` options
+- [`ai-debug-observability.md`](./ai-debug-observability.md) — full surface of the `debug:`, `breakpoints:`, `onBreakpoint:` options + `orchestrator.timeline`
+- [`ai-testing-evals.md`](./ai-testing-evals.md) — `createTestOrchestrator` for unit testing this surface

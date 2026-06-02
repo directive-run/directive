@@ -286,3 +286,8 @@ type EmbedderFn = (text: string) => Promise<number[]>;
 | `createBatchedEmbedder(config)` | `@directive-run/ai` | `{ embed, flush, dispose }` | Wrap an EmbedderFn with batching |
 | `createTestEmbedder(dim?)` | `@directive-run/ai` | `EmbedderFn` | Deterministic embedder for tests |
 | `createJSONFileStore(options)` | `@directive-run/ai` | `RAGStorage` | File-backed vector store for prototyping |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — where MCP-supplied tools and RAG-enriched runners flow into agent runs
+- [`ai-security.md`](./ai-security.md) — `toolConstraints[…].requireApproval` and the per-tool approval workflow the MCP adapter exposes

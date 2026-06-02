@@ -261,3 +261,8 @@ tasks: {
 | Concurrency control | Via patterns | `maxConcurrent` |
 | Scratchpad access | No | Yes |
 | Works in all patterns | Yes | Yes |
+
+## See also
+
+- [`ai-multi-agent.md`](./ai-multi-agent.md) — tasks share the `handler:` namespace with agents inside `dag` / `sequential` / `parallel` patterns
+- [`ai-communication.md`](./ai-communication.md) — tasks read the scratchpad this file's `context.scratchpad` surface exposes

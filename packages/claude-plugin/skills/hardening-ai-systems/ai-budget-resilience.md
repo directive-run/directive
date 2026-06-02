@@ -400,3 +400,9 @@ const orchestrator = createAgentOrchestrator({ runner: baseRunner, guardrails: {
 | `createHealthMonitor(config?)` | returns `HealthMonitor`; push outcomes in via `recordSuccess/Failure` | — |
 | `createSemanticCache(config)` | returns `SemanticCache`; use via `createSemanticCacheGuardrail({ cache })` | — |
 | `createConstraintRouter(config)` | returns an `AgentRunner` that picks providers at call time | — |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — `circuitBreaker` / `selfHealing` / `agentRetry` / `maxTokenBudget` options on `createAgentOrchestrator`
+- [`ai-guardrails-memory.md`](./ai-guardrails-memory.md) — `createSemanticCacheGuardrail({ cache })` wires this file's `SemanticCache` into the orchestrator
+- [`ai-debug-observability.md`](./ai-debug-observability.md) — recording retry storms, circuit-breaker state changes, and budget warnings in the debug timeline

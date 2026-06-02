@@ -318,3 +318,10 @@ system.events.cart.addItem({ id: "item-1", qty: 1 });
 // object form is valid.
 system.dispatch({ type: "login", token: "abc" });
 ```
+
+## See also
+
+- [`core-patterns.md`](./core-patterns.md) — start here for the single-module shape before going namespaced
+- [`system-api.md`](./system-api.md) — `createSystem({ modules: { ... } })` and the namespaced facts proxy
+- [`constraints.md`](./constraints.md) — `crossModuleDeps` for constraints that fire on facts owned by another module
+- [`naming.md`](./naming.md) — `facts.self.*` convention; dot-notation vs bracket-notation rules

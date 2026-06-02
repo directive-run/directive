@@ -344,3 +344,8 @@ const system = createSystem({
   history: true,
 });
 ```
+
+## See also
+
+- [`system-api.md`](./system-api.md) — `history` config in `createSystem` + the full `system.history.*` API
+- [`testing.md`](./testing.md) — replay-driven testing patterns that pair with recorded snapshots

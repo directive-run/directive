@@ -297,3 +297,8 @@ return JSON.stringify({ ...JSON.parse(input), researchData: data, timestamp: Dat
 | `network.delegate(from, to, task, context)` | Delegated task with result | `Promise<DelegationResultMessage>` |
 | `orchestrator.system.facts[agentId].x` | Cross-agent fact read | each agent is a namespaced module |
 | `context.scratchpad` | Per-pattern ephemeral state | Readonly inside tasks/agents |
+
+## See also
+
+- [`ai-multi-agent.md`](./ai-multi-agent.md) — the orchestrator that owns the namespaced facts this file's primitives read
+- [`ai-tasks.md`](./ai-tasks.md) — tasks share the scratchpad surface this file documents

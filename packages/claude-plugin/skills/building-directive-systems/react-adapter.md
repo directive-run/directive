@@ -368,3 +368,9 @@ const handleClick = useCallback(() => events.increment(), [events]);
 const events = useEvents(system);
 <button onClick={() => events.increment()}>+</button>
 ```
+
+## See also
+
+- [`system-api.md`](./system-api.md) — the system instance the hooks here read from + the SSR/hydration story
+- [`core-patterns.md`](./core-patterns.md) — the module shape every React example here assumes you've built
+- [`anti-patterns.md`](./anti-patterns.md) — the hallucinated React hooks (`useEvent`, `useSystem`, `DirectiveProvider`) that AI assistants reach for

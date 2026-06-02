@@ -265,3 +265,10 @@ constraints: {
 "Whenever X changes, log it" → Effect
 "X is always facts.a + facts.b" → Derivation
 ```
+
+## See also
+
+- [`resolvers.md`](./resolvers.md) — the other half of the constraint-resolver loop; the supply side that fulfills the requirements constraints emit
+- [`core-patterns.md`](./core-patterns.md) — how constraints fit into the module shape alongside facts, derivations, events, and effects
+- [`multi-module.md`](./multi-module.md) — `crossModuleDeps` for constraints that fire on facts owned by another module
+- [`anti-patterns.md`](./anti-patterns.md) — the constraint-shaped mistakes AI assistants reliably make

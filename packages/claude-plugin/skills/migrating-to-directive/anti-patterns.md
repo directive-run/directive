@@ -371,3 +371,12 @@ Before generating any Directive code, verify:
 8. Multi-module uses `facts.self.*` for own facts
 9. Imports from `@directive-run/core`, not deep paths
 10. `await system.settle()` after `system.start()`
+
+## See also
+
+- [`naming.md`](./naming.md) — the strict canonical-term rules AND the alias map for cross-paradigm searches
+- [`constraints.md`](./constraints.md) — the constraint shape these anti-patterns reference (`facts` not in scope inside static `require:`, etc.)
+- [`resolvers.md`](./resolvers.md) — the resolver shape these anti-patterns reference (return `void`, mutate `context.facts`, `(req, context)` not `(req, ctx)`)
+- [`schema-types.md`](./schema-types.md) — the `t.*()` builders that exist and the hallucinated ones (`t.map`, `t.set`, `t.promise`, `t.date`) that don't
+- [`react-adapter.md`](./react-adapter.md) — the React hooks that exist and the hallucinated ones (`useEvent`, `useSystem`, `DirectiveProvider`) that don't
+- [`error-boundaries.md`](./error-boundaries.md) — error-handling shapes AI assistants sometimes invent

@@ -366,3 +366,10 @@ orch.start();
 | `race(handlers, options?)` | `string[], { timeout?, minSuccess?, extract? }` | — |
 | `debate(config)` | `{ handlers, evaluator, maxRounds?, extract?, parseJudgement? }` | — (single arg) |
 | `goal(nodes, when, options?)` | `Record<string, GoalNode>, (facts) => boolean, { maxSteps?, extract?, satisfaction? }` | when |
+
+## See also
+
+- [`ai-orchestrator.md`](./ai-orchestrator.md) — the single-agent flavor; covers options and lifecycle this file builds on
+- [`ai-communication.md`](./ai-communication.md) — `createMessageBus` / `createAgentNetwork` for inter-agent messaging within a pattern
+- [`ai-tasks.md`](./ai-tasks.md) — deterministic task handlers that compose with agents inside `dag` / `sequential` patterns
+- [`ai-testing-evals.md`](./ai-testing-evals.md) — `createTestMultiAgentOrchestrator` and pattern-shape assertions

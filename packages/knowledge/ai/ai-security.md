@@ -393,3 +393,8 @@ createCompliance({
 | `createToolGuardrail` | `@directive-run/ai/guardrails` | guardrail | Tool allow/deny lists |
 | `createContentFilterGuardrail` | `@directive-run/ai/guardrails` | guardrail | Block sensitive patterns (block-only — no redact) |
 | `GuardrailError` / `isGuardrailError` | `@directive-run/ai` | error class + guard | Carries `code`, `guardrailName`, `userMessage` |
+
+## See also
+
+- [`ai-guardrails-memory.md`](./ai-guardrails-memory.md) — the broader guardrail surface (length, schema, content filter, tool allowlist) this file's security-flavored guardrails compose with
+- [`ai-mcp-rag.md`](./ai-mcp-rag.md) — `toolConstraints[…].requireApproval` is where MCP tool calls thread into the approval workflow surfaced here

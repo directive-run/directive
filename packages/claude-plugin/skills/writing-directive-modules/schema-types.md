@@ -265,3 +265,9 @@ const myModule = createModule("simple", {
 ```
 
 This gives full TypeScript inference but skips runtime validation. Use `t.*()` when you want dev-mode validation, transforms, or self-documenting schemas.
+
+## See also
+
+- [`core-patterns.md`](./core-patterns.md) — where the schemas these builders define get attached (modules)
+- [`system-api.md`](./system-api.md) — schema flows through `createSystem` and shows up on `system.facts.*`
+- [`anti-patterns.md`](./anti-patterns.md) — hallucinated schema types (`t.map`, `t.set`, `t.date`, `t.promise`, `t.tuple`, `t.record`, `t.any`) that don't exist
