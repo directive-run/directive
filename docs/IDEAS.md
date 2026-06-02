@@ -1383,7 +1383,9 @@ These are committed-to roadmap items the v1.15 release notes explicitly named so
 
 **[2-3 sessions – DX HIGH, compound MEDIUM]**
 
-Phase D2 from the v1.15 plan. Add a `## See also` footer with 3-5 bidirectional cross-links to each of the 13 core + 12 ai knowledge files. Bidirectionality matters — if `constraints.md` links `resolvers.md`, `resolvers.md` must link back. The 1-line package breadcrumb shipped in v1.15 (commit `532a8426`); the see-also footer is the second pass that was honest-scoped as 2-3 sessions, not one.
+**[SHIPPED 2026-06-01 — commit `92d79304`]**
+
+All 25 hand-authored knowledge files now end with a bidirectional `## See also` footer linking 2-7 sibling files with a one-clause "what this adds" hint. The cross-link graph follows the conceptual pair-ups that recurred across the v1.15 knowledge audit — constraint-resolver loop, module/system shape, testing+history, plugins+error-boundaries, AI orchestrator+multi-agent, AI orchestrator config surface, AI security. Skill bundles rebuilt atomically; cross-link paths are relative so they resolve inside both the published knowledge package and inside Claude Code skill bundles.
 
 ### v1.16.B – `@directive-run/claude-plugin` npm publication evaluation
 
