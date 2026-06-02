@@ -1401,7 +1401,9 @@ Stand up an MCP server (Server-Sent Events transport) that exposes the knowledge
 
 **[1 day – DX MEDIUM, compound LOW]**
 
-Currently `directive ai-rules init` generates `.cursorrules`, `.clinerules`, `copilot-instructions.md`, etc. tuned per assistant. A `npx @directive-run/cli install` one-shot would drop ALL of them in one command without prompting per assistant. Mirrors TanStack's `npx @tanstack/intent@latest install` UX. Small but high-discoverability — the user surface promise is "one command and you're done."
+**[SHIPPED 2026-06-01 — commit `06be54d8`]**
+
+Top-level `directive install` (with `ai-rules install` sibling alias) drops rules into every supported assistant in one non-interactive command. Idempotent: HTML-comment section markers wrap each file so subsequent runs merge cleanly. Matches TanStack's `@tanstack/intent install` UX. For Claude Code users, the plugin path stays canonical; the generated `CLAUDE.md` is the fallback for repos without the plugin system.
 
 ### v1.16.E – Release workflow auto-formats post-version package.jsons
 
@@ -1423,6 +1425,8 @@ The CI workflow's `Check knowledge freshness` step soft-warns instead of failing
 
 **[1 day – DX HIGH, compound MEDIUM]**
 
-R7 audit Agent 5 finding: `core/naming.md` aggressively forbids vocabulary that an evaluator would search for (`selectors`, `actions`, `stores`, `atoms`, `reducers`). A developer searching the knowledge package for "what's the Directive equivalent of Zustand selectors?" finds NOTHING — the strict naming rules make the package un-searchable for cross-paradigm queries. Rewrite as an "alias map": each Directive term gets a `## What other libraries call this` block listing 3-5 cross-paradigm aliases, so retrieval works regardless of which vocabulary the user comes from.
+**[SHIPPED 2026-06-01 — commit `06be54d8`]**
+
+Leads with a "Coming from another library? Start here" table mapping every common alias from Redux / Zustand / Jotai / XState / MobX / TanStack Query / NgRx / Pinia / LangChain to the Directive canonical term, with a one-line "why the name" hint. The strict naming rules for code Directive ships stay non-negotiable; the bidirectional terminology table at the bottom lists both directions so retrieval works regardless of which vocabulary the searcher knows. ~2KB added to the Claude Code template; template-output size cap raised 40KB → 50KB.
 
 
