@@ -1391,13 +1391,17 @@ All 25 hand-authored knowledge files now end with a bidirectional `## See also` 
 
 **[half day – strategic LOW, compound LOW]**
 
-The plugin currently ships only via Claude Code's plugin marketplace (`/plugin marketplace add directive-run/directive` then `/plugin install directive@directive-plugins`). Some users will ask whether they can `npm install @directive-run/claude-plugin` and consume the bundled skills programmatically. Evaluate: does it make sense to drop `"private": true` and publish, or does the Claude Code path stay the only sanctioned install? Decision can be revisited per-cycle.
+**[SHIPPED 2026-06-01 — commit `2cee19e9`]**
+
+Decision: publish. Dropped the `private` flag, added a tsup dual-build (ESM + CJS + `.d.ts`), and exposed a small programmatic API (`listSkills`, `getSkill`, `getAllSkills`, `getSkillFile`, `clearCache`, `Skill` interface) over the pre-built `skills/` directory. The marketplace path remains canonical for end users; the npm path targets tool authors who need the bundles in their own pipelines — skill registries, doc-generation pipelines, eval harnesses, multi-agent routers.
 
 ### v1.16.C – MCP SSE server (`mcp.directive.run`) for live agent retrieval
 
 **[1 week – DX HIGH, viral MEDIUM]**
 
-Stand up an MCP server (Server-Sent Events transport) that exposes the knowledge package's `getKnowledge` / `getExample` / `getAllExamples` as MCP tools. Agents in production query MCP at retrieval time instead of bundling a static knowledge snapshot. Directive's programmatic API maps 1:1 to MCP tool calls — small lift, outsized discoverability. Borrowed pattern: zustand's `docs.pmnd.rs/api/sse` MCP server (the Agent 6 audit's top-3 borrowable pattern).
+**[SHIPPED 2026-06-01 — new package `@directive-run/knowledge-mcp`]**
+
+Shipped as `@directive-run/knowledge-mcp` with seven MCP tools: `list_knowledge`, `get_knowledge`, `list_examples`, `get_example`, `search_knowledge`, `list_skills`, `get_skill`. Two transports in one binary — `directive-knowledge-mcp` runs stdio by default (Claude Desktop, Cursor MCP, MCP Inspector) and `--sse --port <port> --host <host>` runs the HTTP SSE server for hosting at `mcp.directive.run`. Hosting on the production domain is a separate ops task; the package is shippable today via npm + npx. Pattern matches zustand's `docs.pmnd.rs/api/sse`.
 
 ### v1.16.D – `npx @directive-run/cli install` one-shot AI rules installer
 
