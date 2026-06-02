@@ -2,14 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { CLI_NAME } from "../lib/constants.js";
+import { CLI_NAME, SECTION_END, SECTION_START } from "../lib/constants.js";
 import {
   type DetectedTool,
   detectTools,
   getAllToolIds,
   getToolConfig,
 } from "../lib/detect.js";
-import { SECTION_END, SECTION_START } from "../lib/constants.js";
 import { hasDirectiveSection, mergeSection } from "../lib/merge.js";
 import { detectMonorepo } from "../lib/monorepo.js";
 import { getTemplate } from "../templates/index.js";
@@ -392,9 +391,7 @@ export async function aiRulesInstallCommand(args: string[]) {
   console.log("");
   console.log(pc.dim("Next steps:"));
   console.log(
-    pc.dim(
-      `  • Restart your AI assistant so it picks up the new rules file.`,
-    ),
+    pc.dim("  • Restart your AI assistant so it picks up the new rules file."),
   );
   console.log(
     pc.dim(
