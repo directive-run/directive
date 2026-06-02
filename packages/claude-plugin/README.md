@@ -1,8 +1,10 @@
-# Directive Claude Code Plugin
+# `@directive-run/claude-plugin`
 
 Claude Code plugin providing coding guidance for the [Directive](https://directive.run) runtime. Delivers 12 skills that Claude automatically invokes when you're working with Directive code.
 
-## Installation
+The package has two install paths: **Claude Code's plugin marketplace** for end users (the canonical path), and **npm** for tool authors who want to consume the skill bundles programmatically.
+
+## Install for Claude Code (canonical)
 
 Two steps in a Claude Code session — first register the marketplace, then install the plugin:
 
@@ -12,6 +14,41 @@ Two steps in a Claude Code session — first register the marketplace, then inst
 ```
 
 After install, verify the plugin is active with `/plugins` — you should see `directive` in the list.
+
+## Install for tool authors (npm)
+
+```bash
+npm install @directive-run/claude-plugin
+```
+
+The npm package ships the pre-built `skills/` directory and exposes it through a small programmatic API. Use this when you're building a custom skill registry, doc-generation pipeline, evals harness, or AI orchestrator that wants to expose Directive skills via its own routing layer.
+
+```typescript
+import {
+  listSkills,
+  getSkill,
+  getAllSkills,
+  getSkillFile,
+  type Skill,
+} from "@directive-run/claude-plugin";
+
+// All skill names, alphabetical
+const names = listSkills();
+// → ["building-ai-agents", "building-ai-orchestrators", ...]
+
+// One skill — manifest + supporting files
+const skill = getSkill("building-ai-orchestrators");
+skill?.manifest;            // SKILL.md (with YAML frontmatter)
+skill?.files.get("examples"); // examples.md contents
+
+// All skills, keyed by name
+const all = getAllSkills(); // Map<string, Skill>
+
+// One supporting file
+const ex = getSkillFile("building-ai-orchestrators", "examples");
+```
+
+The npm install path is not a replacement for the Claude Code plugin install — it does not register the skills with Claude Code itself. It only exposes the same `skills/` directory as a typed module so other tools can read it.
 
 ## What happens after install
 

@@ -1,20 +1,60 @@
 {
   "name": "@directive-run/claude-plugin",
   "version": "1.15.0",
-  "private": true,
-  "description": "Claude Code plugin for Directive — coding guidance via skills.",
+  "description": "Claude Code plugin for Directive — 12 skills covering modules, constraints, resolvers, derivations, AI orchestration, and adapters. Installable via Claude Code's plugin marketplace or consumable programmatically as an npm package.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/claude-plugin"
+  },
+  "homepage": "https://directive.run/docs/ide-integration",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "claude",
+    "claude-code",
+    "skills",
+    "ai-rules",
+    "plugin",
+    "agents",
+    "knowledge"
+  ],
   "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "skills", ".claude-plugin"],
   "scripts": {
-    "build": "tsx scripts/build-skills.ts",
+    "build": "tsx scripts/build-skills.ts && tsup",
+    "build:skills": "tsx scripts/build-skills.ts",
     "test": "vitest run",
-    "clean": "rm -rf skills/*"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf skills/* dist"
   },
   "devDependencies": {
     "@directive-run/knowledge": "workspace:*",
     "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
     "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
     "vitest": "^3.0.0"
   }
 }
