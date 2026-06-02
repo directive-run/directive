@@ -18,7 +18,7 @@
     "test:e2e:headed": "npx playwright test --config e2e/playwright.config.ts --headed",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "changeset": "changeset",
-    "changeset:version": "changeset version",
+    "changeset:version": "changeset version && biome check --write packages/*/package.json",
     "changeset:publish": "pnpm changeset publish",
     "lint:tsdoc": "npx tsx scripts/validate-tsdoc.ts",
     "size": "npx tsx scripts/size-check.ts",

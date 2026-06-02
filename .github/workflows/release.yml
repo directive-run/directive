@@ -55,9 +55,13 @@ jobs:
           # lines. Biome's JSON formatter prefers the inline form, so
           # without this auto-fix every post-merge CI run lint-fails on
           # 14 format errors until someone re-runs `biome check --write`
-          # locally and pushes. Chaining biome to the version step lands
-          # the Version Packages PR with already-canonical formatting.
-          version: pnpm changeset version && pnpm exec biome check --write packages/*/package.json
+          # locally and pushes. The `changeset:version` script chains
+          # `biome check --write packages/*/package.json` after the
+          # version step so the Version Packages PR lands with
+          # already-canonical formatting. `version:` is forwarded to
+          # `execFile`, not a shell, so the `&&` must live inside a
+          # package.json script — not on this line.
+          version: pnpm run changeset:version
           publish: pnpm changeset publish
           createGithubReleases: true
         env:
