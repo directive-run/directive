@@ -86,8 +86,14 @@ jobs:
             echo "No publishedPackages output — skipping verify."
             exit 0
           fi
+          # Use process substitution so the loop runs in this shell —
+          # piping into `while` puts the loop in a subshell, where
+          # `fail=1` cannot escape to the parent's `exit $fail`. The
+          # previous form silently exited 0 even when every package
+          # 404'd; the 2026-06-02 release of claude-plugin@1.16.0 and
+          # knowledge-mcp@0.1.0 shipped green CI but never reached npm.
           fail=0
-          echo "$published" | jq -c '.[]' | while read -r pkg; do
+          while read -r pkg; do
             name=$(echo "$pkg" | jq -r '.name')
             version=$(echo "$pkg" | jq -r '.version')
             url="https://registry.npmjs.org/${name}/${version}"
@@ -97,7 +103,7 @@ jobs:
               echo "::error title=Publish verification failed::${name}@${version} returned HTTP ${status} from npm registry. Token likely lacks 'create new package' permission for @directive-run/* scope."
               fail=1
             fi
-          done
+          done < <(echo "$published" | jq -c '.[]')
           exit $fail
 
   docs-artifacts:
