@@ -8,9 +8,15 @@ describe("template output", () => {
       expect(content.length).toBeLessThan(10 * 1024);
     });
 
-    it("claude output is under 40KB", () => {
+    it("claude output is under 50KB", () => {
+      // Claude Code's CLAUDE.md ingestion budget is much larger than this;
+      // the cap protects against runaway template growth, not against
+      // Claude's context window. Raised from 40KB → 50KB to accommodate
+      // the naming.md alias map (Zustand-selector → Directive-derivation,
+      // Redux-action → Directive-event, etc.) which is high-value content
+      // for retrieval but adds ~2KB to the bundle.
       const content = getTemplate("claude");
-      expect(content.length).toBeLessThan(40 * 1024);
+      expect(content.length).toBeLessThan(50 * 1024);
     });
 
     it("copilot output is under 15KB", () => {

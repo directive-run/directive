@@ -9,6 +9,7 @@ import {
   getAllToolIds,
   getToolConfig,
 } from "../lib/detect.js";
+import { SECTION_END, SECTION_START } from "../lib/constants.js";
 import { hasDirectiveSection, mergeSection } from "../lib/merge.js";
 import { detectMonorepo } from "../lib/monorepo.js";
 import { getTemplate } from "../templates/index.js";
@@ -276,6 +277,135 @@ function writeFile(filePath: string, content: string) {
   }
 
   writeFileSync(filePath, content, "utf-8");
+}
+
+// ---------------------------------------------------------------------------
+// ai-rules install — one-shot non-interactive install for every supported tool
+// ---------------------------------------------------------------------------
+
+interface InstallOptions {
+  dir: string;
+  force: boolean;
+}
+
+function parseInstallArgs(args: string[]): InstallOptions {
+  const opts: InstallOptions = { dir: process.cwd(), force: false };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--force") {
+      opts.force = true;
+    } else if (arg === "--dir") {
+      const val = args[++i];
+      if (val) {
+        opts.dir = val;
+      }
+    }
+  }
+
+  return opts;
+}
+
+export async function aiRulesInstallCommand(args: string[]) {
+  const opts = parseInstallArgs(args);
+
+  const mono = detectMonorepo(opts.dir);
+  const targetDir =
+    mono.isMonorepo && mono.rootDir !== opts.dir ? mono.rootDir : opts.dir;
+
+  if (targetDir !== opts.dir) {
+    console.log(
+      pc.dim(
+        `Monorepo detected — installing at root (${relative(opts.dir, targetDir) || "."})`,
+      ),
+    );
+  }
+
+  const toolIds = getAllToolIds();
+  const tools = toolIds.map((id) => {
+    const config = getToolConfig(id);
+
+    return {
+      id: config.id,
+      name: config.name,
+      outputPath: join(targetDir, config.outputPath),
+    };
+  });
+
+  let written = 0;
+  let merged = 0;
+  let skipped = 0;
+
+  for (const tool of tools) {
+    const content = getTemplate(tool.id);
+    // Wrap the content in Directive section markers so the next
+    // `install` / `ai-rules update` can find and refresh exactly this
+    // block, even if the user has added their own rules above or below.
+    // Markers are HTML comments, invisible in rendered markdown.
+    const wrapped = `${SECTION_START}\n${content}\n${SECTION_END}`;
+    const filePath = tool.outputPath;
+    const rel = relative(targetDir, filePath);
+
+    if (!existsSync(filePath)) {
+      writeFile(filePath, `${wrapped}\n`);
+      console.log(`${pc.green("✓")} ${tool.name.padEnd(20)} ${pc.dim(rel)}`);
+      written++;
+      continue;
+    }
+
+    const existing = readFileSync(filePath, "utf-8");
+
+    if (opts.force) {
+      writeFile(filePath, `${wrapped}\n`);
+      console.log(
+        `${pc.yellow("↻")} ${tool.name.padEnd(20)} ${pc.dim(rel)} ${pc.dim("(overwrote)")}`,
+      );
+      written++;
+      continue;
+    }
+
+    if (hasDirectiveSection(existing)) {
+      writeFile(filePath, mergeSection(existing, content));
+      console.log(
+        `${pc.green("✓")} ${tool.name.padEnd(20)} ${pc.dim(rel)} ${pc.dim("(merged section)")}`,
+      );
+      merged++;
+      continue;
+    }
+
+    // File exists without a Directive section — leave it alone to avoid
+    // clobbering manually-authored rules. User must opt in with --force.
+    console.log(
+      `${pc.dim("·")} ${tool.name.padEnd(20)} ${pc.dim(rel)} ${pc.dim("(exists, no Directive section — pass --force to overwrite)")}`,
+    );
+    skipped++;
+  }
+
+  console.log("");
+  console.log(
+    pc.green(`Installed Directive AI rules for ${tools.length} tools.`),
+  );
+  console.log(
+    pc.dim(
+      `  ${written} written · ${merged} merged · ${skipped} skipped (existing non-Directive content preserved)`,
+    ),
+  );
+  console.log("");
+  console.log(pc.dim("Next steps:"));
+  console.log(
+    pc.dim(
+      `  • Restart your AI assistant so it picks up the new rules file.`,
+    ),
+  );
+  console.log(
+    pc.dim(
+      `  • Run ${pc.cyan(`${CLI_NAME} ai-rules update`)} after each ${pc.cyan("@directive-run/*")} version bump.`,
+    ),
+  );
+  console.log(
+    pc.dim(
+      `  • For Claude Code, the plugin (${pc.cyan("/plugin install directive@directive-plugins")}) is the canonical install — these files are the fallback for non-Claude editors.`,
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

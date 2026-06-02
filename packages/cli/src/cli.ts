@@ -1,6 +1,7 @@
 import {
   aiRulesCheckCommand,
   aiRulesCommand,
+  aiRulesInstallCommand,
   aiRulesUpdateCommand,
 } from "./commands/ai-rules.js";
 import { bisectCommand } from "./commands/bisect.js";
@@ -34,7 +35,12 @@ Commands:
   explain <file> [req-id]       Explain why a requirement exists
   graph <file>                  Visual dependency graph
   doctor                        Health check for project setup
-  ai-rules init                 Install AI coding rules
+  install                       One-shot: drop AI rules for every
+                                supported assistant (Cursor, Copilot,
+                                Windsurf, Cline, Codex, Claude). No
+                                prompts. Alias for ai-rules install.
+  ai-rules install              Same as above (non-interactive)
+  ai-rules init                 Interactive install (prompts per tool)
   ai-rules update               Refresh rules to latest version
   ai-rules check                Validate rules are current (CI)
   examples list                 Browse available examples
@@ -75,6 +81,12 @@ graph options:
   --ascii                       Terminal-only output
   --no-open                     Don't open in browser
   --output <path>               Output file path
+
+install / ai-rules install options:
+  --force                       Overwrite existing files (default: merge
+                                Directive section when present, otherwise
+                                skip files without a Directive section)
+  --dir <path>                  Target directory (default: cwd)
 
 ai-rules init options:
   --force                       Overwrite existing files without asking
@@ -172,11 +184,21 @@ async function main() {
       break;
     }
 
+    case "install": {
+      // Top-level alias for `ai-rules install` — matches TanStack's
+      // `npx @tanstack/intent install` UX. One command, every detected
+      // assistant gets its rules file.
+      await aiRulesInstallCommand(args.slice(1));
+      break;
+    }
+
     case "ai-rules": {
       const subcommand = args[1];
 
       if (subcommand === "init") {
         await aiRulesCommand(args.slice(2));
+      } else if (subcommand === "install") {
+        await aiRulesInstallCommand(args.slice(2));
       } else if (subcommand === "update") {
         await aiRulesUpdateCommand(args.slice(2));
       } else if (subcommand === "check") {
@@ -184,7 +206,8 @@ async function main() {
       } else {
         console.error(
           `Unknown subcommand: ${subcommand ?? "(none)"}\n` +
-            `Usage: ${CLI_NAME} ai-rules init\n` +
+            `Usage: ${CLI_NAME} ai-rules install\n` +
+            `       ${CLI_NAME} ai-rules init\n` +
             `       ${CLI_NAME} ai-rules update\n` +
             `       ${CLI_NAME} ai-rules check`,
         );
