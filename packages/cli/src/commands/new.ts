@@ -1,5 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import {
+  MODULE_SECTIONS,
+  type ModuleSection,
+  generateModule,
+  generateOrchestrator,
+  suggestFileNames,
+  validateModuleName,
+} from "@directive-run/scaffold";
 import pc from "picocolors";
 
 interface NewOptions {
@@ -42,274 +50,6 @@ function parseArgs(args: string[]): NewOptions {
   return opts;
 }
 
-// ---------------------------------------------------------------------------
-// Module generator
-// ---------------------------------------------------------------------------
-
-type Section = "derive" | "events" | "constraints" | "resolvers" | "effects";
-
-const ALL_SECTIONS: Section[] = [
-  "derive",
-  "events",
-  "constraints",
-  "resolvers",
-  "effects",
-];
-
-function generateModule(name: string, sections: Section[]): string {
-  const camelName = toCamelCase(name);
-  const hasConstraints = sections.includes("constraints");
-  const hasResolvers = sections.includes("resolvers");
-
-  const imports = ["type ModuleSchema", "createModule", "t"];
-
-  let code = `import { ${imports.join(", ")} } from "@directive-run/core";\n\n`;
-
-  // Schema
-  code += "const schema = {\n";
-  code += "  facts: {\n";
-  code += "    // Add your facts here\n";
-  code += "    status: t.string(),\n";
-  code += "  },\n";
-
-  if (sections.includes("derive")) {
-    code += "  derivations: {\n";
-    code += "    // Add derivation types here\n";
-    code += "    isReady: t.boolean(),\n";
-    code += "  },\n";
-  }
-
-  if (sections.includes("events")) {
-    code += "  events: {\n";
-    code += "    // Add event shapes here\n";
-    code += "    setStatus: { value: t.string() },\n";
-    code += "  },\n";
-  }
-
-  if (hasConstraints || hasResolvers) {
-    code += "  requirements: {\n";
-    code += "    // Add requirement shapes here\n";
-    code += "    PROCESS: { input: t.string() },\n";
-    code += "  },\n";
-  }
-
-  code += "} satisfies ModuleSchema;\n\n";
-
-  // Module
-  code += `export const ${camelName} = createModule("${name}", {\n`;
-  code += "  schema,\n\n";
-
-  code += "  init: (facts) => {\n";
-  code += `    facts.status = "idle";\n`;
-  code += "  },\n";
-
-  if (sections.includes("derive")) {
-    code += "\n  derive: {\n";
-    code += `    isReady: (facts) => facts.status === "ready",\n`;
-    code += "  },\n";
-  }
-
-  if (sections.includes("events")) {
-    code += "\n  events: {\n";
-    code += "    setStatus: (facts, { value }) => {\n";
-    code += "      facts.status = value;\n";
-    code += "    },\n";
-    code += "  },\n";
-  }
-
-  if (hasConstraints) {
-    code += "\n  constraints: {\n";
-    code += "    needsProcessing: {\n";
-    code += "      priority: 100,\n";
-    code += `      when: (facts) => facts.status === "pending",\n`;
-    code += "      require: (facts) => ({\n";
-    code += `        type: "PROCESS",\n`;
-    code += "        input: facts.status,\n";
-    code += "      }),\n";
-    code += "    },\n";
-    code += "  },\n";
-  }
-
-  if (hasResolvers) {
-    code += "\n  resolvers: {\n";
-    code += "    process: {\n";
-    code += `      requirement: "PROCESS",\n`;
-    code += "      resolve: async (req, context) => {\n";
-    code += "        // Implement resolution logic here\n";
-    code += `        context.facts.status = "done";\n`;
-    code += "      },\n";
-    code += "    },\n";
-    code += "  },\n";
-  }
-
-  if (sections.includes("effects")) {
-    code += "\n  effects: {\n";
-    code += "    logChange: {\n";
-    code += `      deps: ["status"],\n`;
-    code += "      run: (facts, prev) => {\n";
-    code += "        if (prev && prev.status !== facts.status) {\n";
-    code +=
-      "          console.log(`Status: ${prev.status} → ${facts.status}`);\n";
-    code += "        }\n";
-    code += "      },\n";
-    code += "    },\n";
-    code += "  },\n";
-  }
-
-  code += "});\n";
-
-  return code;
-}
-
-// ---------------------------------------------------------------------------
-// Orchestrator generator
-// ---------------------------------------------------------------------------
-
-function generateOrchestrator(name: string): string {
-  const camelName = toCamelCase(name);
-
-  return `import { type ModuleSchema, createModule, createSystem, t } from "@directive-run/core";
-import {
-  createAgentOrchestrator,
-  createAgentMemory,
-  createSlidingWindowStrategy,
-} from "@directive-run/ai";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-type AgentStatus = "idle" | "thinking" | "done" | "error";
-
-// ============================================================================
-// Schema
-// ============================================================================
-
-const schema = {
-  facts: {
-    input: t.string(),
-    output: t.string(),
-    status: t.string<AgentStatus>(),
-    error: t.string(),
-    totalTokens: t.number(),
-  },
-  derivations: {
-    isThinking: t.boolean(),
-    hasOutput: t.boolean(),
-  },
-  events: {
-    setInput: { value: t.string() },
-    requestRun: {},
-    reset: {},
-  },
-  requirements: {
-    RUN_AGENT: { input: t.string() },
-  },
-} satisfies ModuleSchema;
-
-// ============================================================================
-// Module
-// ============================================================================
-
-export const ${camelName} = createModule("${name}", {
-  schema,
-
-  init: (facts) => {
-    facts.input = "";
-    facts.output = "";
-    facts.status = "idle";
-    facts.error = "";
-    facts.totalTokens = 0;
-  },
-
-  derive: {
-    isThinking: (facts) => facts.status === "thinking",
-    hasOutput: (facts) => facts.output !== "",
-  },
-
-  events: {
-    setInput: (facts, { value }) => {
-      facts.input = value;
-    },
-    requestRun: (facts) => {
-      facts.status = "thinking";
-      facts.output = "";
-      facts.error = "";
-    },
-    reset: (facts) => {
-      facts.input = "";
-      facts.output = "";
-      facts.status = "idle";
-      facts.error = "";
-      facts.totalTokens = 0;
-    },
-  },
-
-  constraints: {
-    needsRun: {
-      priority: 100,
-      when: (facts) => facts.status === "thinking",
-      require: (facts) => ({
-        type: "RUN_AGENT",
-        input: facts.input,
-      }),
-    },
-  },
-
-  resolvers: {
-    runAgent: {
-      requirement: "RUN_AGENT",
-      timeout: 30000,
-      resolve: async (req, context) => {
-        // TODO: Replace with your agent runner
-        const result = \`Echo: \${req.input}\`;
-
-        context.facts.output = result;
-        context.facts.status = "done";
-      },
-    },
-  },
-});
-
-// ============================================================================
-// AI Features
-// ============================================================================
-
-export const memory = createAgentMemory({
-  strategy: createSlidingWindowStrategy(),
-  strategyConfig: { maxMessages: 30, preserveRecentCount: 6 },
-  autoManage: true,
-});
-
-// TODO: Add your agent runner and configure the orchestrator
-// export const orchestrator = createAgentOrchestrator({
-//   runner: yourAgentRunner,
-//   maxTokenBudget: 50000,
-//   memory,
-//   guardrails: {
-//     input: [],
-//     output: [],
-//   },
-// });
-
-// ============================================================================
-// System
-// ============================================================================
-
-export const system = createSystem({
-  module: ${camelName},
-});
-`;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function toCamelCase(name: string): string {
-  return name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
 function writeFile(filePath: string, content: string) {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
@@ -322,34 +62,42 @@ function findModulesDir(dir: string): string {
   return join(dir, "src");
 }
 
-// ---------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------
+function reportInvalidName(
+  kind: "module" | "orchestrator",
+  name: string,
+): never {
+  const reason = validateModuleName(name);
+  const detail = reason === true ? "" : `: ${reason}`;
+  console.error(`Invalid ${kind} name: ${name || "(none)"}${detail}`);
+  console.error(
+    "Must start with a lowercase letter, use lowercase letters, numbers, and hyphens.",
+  );
+  process.exit(1);
+}
 
 export async function newModuleCommand(name: string, args: string[]) {
   const opts = parseArgs(args);
 
-  if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
-    console.error(
-      `Invalid module name: ${name || "(none)"}\nMust start with a letter, use lowercase letters, numbers, and hyphens.`,
-    );
-    process.exit(1);
+  if (validateModuleName(name) !== true) {
+    reportInvalidName("module", name);
+    return;
   }
 
-  let sections: Section[];
+  let sections: ModuleSection[];
 
   if (opts.minimal) {
     sections = [];
   } else if (opts.with.length > 0) {
-    sections = opts.with.filter((s) =>
-      ALL_SECTIONS.includes(s as Section),
-    ) as Section[];
+    sections = opts.with.filter((s): s is ModuleSection =>
+      (MODULE_SECTIONS as readonly string[]).includes(s),
+    );
   } else {
-    sections = ALL_SECTIONS;
+    sections = [...MODULE_SECTIONS];
   }
 
+  const { sourceFileName } = suggestFileNames(name, "module");
   const targetDir = findModulesDir(opts.dir);
-  const filePath = join(targetDir, `${name}.ts`);
+  const filePath = join(targetDir, sourceFileName);
 
   if (existsSync(filePath)) {
     console.error(`File already exists: ${relative(opts.dir, filePath)}`);
@@ -372,15 +120,14 @@ export async function newModuleCommand(name: string, args: string[]) {
 export async function newOrchestratorCommand(name: string, args: string[]) {
   const opts = parseArgs(args);
 
-  if (!name || !/^[a-z][a-z0-9-]*$/.test(name)) {
-    console.error(
-      `Invalid orchestrator name: ${name || "(none)"}\nMust start with a letter, use lowercase letters, numbers, and hyphens.`,
-    );
-    process.exit(1);
+  if (validateModuleName(name) !== true) {
+    reportInvalidName("orchestrator", name);
+    return;
   }
 
+  const { sourceFileName } = suggestFileNames(name, "orchestrator");
   const targetDir = findModulesDir(opts.dir);
-  const filePath = join(targetDir, `${name}.ts`);
+  const filePath = join(targetDir, sourceFileName);
 
   if (existsSync(filePath)) {
     console.error(`File already exists: ${relative(opts.dir, filePath)}`);

@@ -956,6 +956,9 @@ importers:
       '@directive-run/knowledge':
         specifier: workspace:*
         version: link:../knowledge
+      '@directive-run/scaffold':
+        specifier: workspace:*
+        version: link:../scaffold
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -1171,6 +1174,24 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+
+  packages/scaffold:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.2.0
+        version: 25.2.0
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@25.2.0)(happy-dom@20.8.3)(lightningcss@1.31.1)(sass@1.51.0)
 
   packages/solid:
     devDependencies:
