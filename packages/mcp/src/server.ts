@@ -52,6 +52,11 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { PACKAGE_REGISTRY_BUILT_AT } from "./generated/package-registry.js";
+import {
+  LintRunnerError,
+  applyFixInWorker,
+  runLintInWorker,
+} from "./lint-runner.js";
 import { getPackageInfo, listPackages } from "./packages.js";
 
 const PKG_VERSION = "0.2.0";
@@ -745,6 +750,111 @@ export function createDirectiveServer(): McpServer {
           },
         ],
       };
+    },
+  );
+
+  server.registerTool(
+    "review_source",
+    {
+      title: "Review Directive code with ts-morph rules",
+      description:
+        "Run the @directive-run/lint rule registry against a TypeScript source string. Returns structured findings (line, column, severity, message, fixable) for every match. Use this when the user asks 'review this Directive code' or 'lint this'. Source is parsed in a worker thread with a 5-second budget and 200 KB cap.",
+      inputSchema: {
+        source: z
+          .string()
+          .min(1)
+          .max(200_000)
+          .describe(
+            "TypeScript source to review. Max 200,000 bytes; longer inputs are rejected pre-parse.",
+          ),
+        fileName: z
+          .string()
+          .regex(/^[\w./-]{1,128}$/)
+          .optional()
+          .describe(
+            "Optional file name shown in findings. Must match /^[\\w./-]{1,128}$/.",
+          ),
+        ruleFilter: z
+          .array(z.string().max(64))
+          .max(32)
+          .optional()
+          .describe(
+            "Optional whitelist of rule ids to run. Discover valid ids via list_review_rules.",
+          ),
+      },
+    },
+    async ({ source, fileName, ruleFilter }) => {
+      try {
+        const result = await runLintInWorker({ source, fileName, ruleFilter });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `<directive-data>\n${JSON.stringify(result, null, 2)}\n</directive-data>`,
+            },
+          ],
+        };
+      } catch (err) {
+        const reason =
+          err instanceof LintRunnerError
+            ? `${err.code}: ${err.message}`
+            : (err as Error).message;
+        return {
+          isError: true,
+          content: [{ type: "text", text: `review_source failed — ${reason}` }],
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "fix_code",
+    {
+      title: "Apply a mechanical fix for a Directive review finding",
+      description:
+        "Given a source string and a Finding returned by review_source, run the rule's mechanical fix and return { ok, diff, fixedSource, explanation } — or { ok: false, reason } when the rule has no fix. Useful for closing the loop: review_source → user picks → fix_code. The fixed source is NOT written to disk — the caller decides.",
+      inputSchema: {
+        source: z
+          .string()
+          .min(1)
+          .max(200_000)
+          .describe("The same source you passed to review_source."),
+        finding: z
+          .object({
+            ruleId: z.string().min(1).max(64),
+            severity: z.enum(["error", "warning", "info"]),
+            line: z.number().int().nonnegative(),
+            column: z.number().int().nonnegative(),
+            message: z.string(),
+            findingId: z.string(),
+            suggestion: z.string().optional(),
+          })
+          .describe(
+            "The Finding returned by review_source. Pass the WHOLE object — the worker uses ruleId + line + column to locate the AST node.",
+          ),
+      },
+    },
+    async ({ source, finding }) => {
+      try {
+        const result = await applyFixInWorker({ source, finding });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `<directive-data>\n${JSON.stringify(result, null, 2)}\n</directive-data>`,
+            },
+          ],
+        };
+      } catch (err) {
+        const reason =
+          err instanceof LintRunnerError
+            ? `${err.code}: ${err.message}`
+            : (err as Error).message;
+        return {
+          isError: true,
+          content: [{ type: "text", text: `fix_code failed — ${reason}` }],
+        };
+      }
     },
   );
 

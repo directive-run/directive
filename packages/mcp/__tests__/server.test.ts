@@ -34,6 +34,7 @@ describe("createDirectiveServer", () => {
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      "fix_code",
       "generate_module",
       "get_composable_packages",
       "get_example",
@@ -50,6 +51,7 @@ describe("createDirectiveServer", () => {
       "list_packages",
       "list_review_rules",
       "list_skills",
+      "review_source",
       "search_examples",
       "search_knowledge",
     ]);
@@ -387,6 +389,70 @@ describe("createDirectiveServer", () => {
     });
     expect(result.isError).toBe(true);
   });
+
+  it("review_source returns findings for code that violates a rule", async () => {
+    const result = await client.callTool({
+      name: "review_source",
+      arguments: {
+        source: 'createModule("trafficLight", { schema: { phase: 0 } });',
+      },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    expect(text).toContain("module-name-not-kebab");
+    expect(text).toContain("module-missing-facts-schema");
+  }, 15_000);
+
+  it("review_source returns empty findings for clean code", async () => {
+    const result = await client.callTool({
+      name: "review_source",
+      arguments: {
+        source: `createModule("traffic-light", { schema: { facts: { phase: 0 } } });`,
+      },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain('"findings": []');
+  }, 15_000);
+
+  it("review_source rejects oversize source pre-parse", async () => {
+    const huge = "x".repeat(200_001);
+    const result = await client.callTool({
+      name: "review_source",
+      arguments: { source: huge },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  it("fix_code applies a known fix and returns a diff", async () => {
+    const reviewResult = await client.callTool({
+      name: "review_source",
+      arguments: {
+        source: 'createModule("trafficLight", { schema: {} });',
+        ruleFilter: ["module-name-not-kebab"],
+      },
+    });
+    const reviewText = extractText(reviewResult);
+    const parsed = JSON.parse(
+      reviewText.replace(/^<directive-data>\n|\n<\/directive-data>$/g, ""),
+    );
+    expect(parsed.findings.length).toBeGreaterThan(0);
+    const finding = parsed.findings[0];
+
+    const fixResult = await client.callTool({
+      name: "fix_code",
+      arguments: {
+        source: 'createModule("trafficLight", { schema: {} });',
+        finding,
+      },
+    });
+    expect(fixResult.isError).toBeFalsy();
+    const fixText = extractText(fixResult);
+    expect(fixText).toContain('"ok": true');
+    expect(fixText).toContain("traffic-light");
+    expect(fixText).toContain('"diff"');
+  }, 15_000);
 
   it("get_server_info returns version + transport + hash manifest", async () => {
     const result = await client.callTool({

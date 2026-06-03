@@ -1093,6 +1093,9 @@ importers:
       '@directive-run/knowledge':
         specifier: workspace:*
         version: link:../knowledge
+      '@directive-run/lint':
+        specifier: workspace:*
+        version: link:../lint
       '@directive-run/scaffold':
         specifier: workspace:*
         version: link:../scaffold
@@ -1102,6 +1105,10 @@ importers:
       zod:
         specifier: ^3.23.0
         version: 3.25.76
+    optionalDependencies:
+      ts-morph:
+        specifier: ^25.0.0
+        version: 25.0.1
     devDependencies:
       '@types/node':
         specifier: ^25.2.0
