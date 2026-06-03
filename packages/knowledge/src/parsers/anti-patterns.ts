@@ -17,7 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = resolve(__dirname, "..", "..");
+const PKG_ROOT = resolve(__dirname, "..");
 
 export type AntiPatternSeverity = "error" | "warning" | "info";
 export type AntiPatternCategory =

@@ -20,7 +20,7 @@
 
 import { type IncomingMessage, type Server, createServer } from "node:http";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { createDirectiveServer } from "./server.js";
+import { createDirectiveServer, setServerInfo } from "./server.js";
 
 const MESSAGES_PATH = "/messages";
 const SSE_PATH = "/sse";
@@ -50,9 +50,19 @@ async function handleSseConnect(
   const transport = new SSEServerTransport(MESSAGES_PATH, res);
   const server = createDirectiveServer();
   sessions.set(transport.sessionId, { transport });
+  setServerInfo({
+    transport: "sse",
+    authEnabled: false,
+    sessionCount: sessions.size,
+  });
 
   const cleanup = () => {
     sessions.delete(transport.sessionId);
+    setServerInfo({
+      transport: "sse",
+      authEnabled: false,
+      sessionCount: sessions.size,
+    });
   };
   res.on("close", cleanup);
   transport.onclose = cleanup;

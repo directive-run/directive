@@ -45,10 +45,11 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsup",
+    "build": "tsx scripts/build-package-registry.ts && tsup",
+    "build:registry": "tsx scripts/build-package-registry.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist src/generated"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

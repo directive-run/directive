@@ -34,12 +34,17 @@ describe("createDirectiveServer", () => {
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      "get_composable_packages",
       "get_example",
       "get_knowledge",
+      "get_package_info",
+      "get_server_info",
       "get_skill",
       "list_examples",
       "list_knowledge",
+      "list_packages",
       "list_skills",
+      "search_examples",
       "search_knowledge",
     ]);
   });
@@ -145,6 +150,103 @@ describe("createDirectiveServer", () => {
 
     expect(result.isError).toBe(true);
     expect(extractText(result)).toMatch(/at least 1 character/i);
+  });
+
+  it("search_knowledge rejects queries longer than 512 chars", async () => {
+    const huge = "a".repeat(513);
+    const result = await client.callTool({
+      name: "search_knowledge",
+      arguments: { query: huge },
+    });
+    expect(result.isError).toBe(true);
+  });
+
+  it("search_examples finds hits for an example concept", async () => {
+    const result = await client.callTool({
+      name: "search_examples",
+      arguments: { query: "createModule" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(extractText(result)).toMatch(/^\d+(\+)? matches/);
+  });
+
+  it("search_examples reports no matches for nonsense", async () => {
+    const result = await client.callTool({
+      name: "search_examples",
+      arguments: { query: "zxqzxqzxqzxqzxq" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(extractText(result)).toMatch(/no matches/i);
+  });
+
+  it("list_packages returns every @directive-run/* package", async () => {
+    const result = await client.callTool({
+      name: "list_packages",
+      arguments: {},
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toMatch(/^\d+ packages:/);
+    expect(text).toContain("@directive-run/core");
+    expect(text).toContain("@directive-run/mcp");
+    expect(text).toContain("@directive-run/scaffold");
+    expect(text).toContain("@directive-run/lint");
+  });
+
+  it("get_package_info returns detail for a known package", async () => {
+    const result = await client.callTool({
+      name: "get_package_info",
+      arguments: { name: "@directive-run/core" },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("@directive-run/core");
+    expect(text).toMatch(/Version \(baked\):/);
+    expect(text).toMatch(/npm:|Published/);
+  }, 8000);
+
+  it("get_package_info returns an error for unknown package", async () => {
+    const result = await client.callTool({
+      name: "get_package_info",
+      arguments: { name: "@directive-run/does-not-exist" },
+    });
+    expect(result.isError).toBe(true);
+    expect(extractText(result)).toMatch(/not found/i);
+  });
+
+  it("get_composable_packages returns siblings for a known package", async () => {
+    const result = await client.callTool({
+      name: "get_composable_packages",
+      arguments: { name: "@directive-run/query" },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    expect(text).toContain("# @directive-run/query");
+    expect(text).toMatch(/Composes with:|Composed by:/);
+  });
+
+  it("get_composable_packages reports cleanly for unknown package", async () => {
+    const result = await client.callTool({
+      name: "get_composable_packages",
+      arguments: { name: "@directive-run/not-a-real-pkg" },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(extractText(result)).toMatch(/no composition data/i);
+  });
+
+  it("get_server_info returns version + transport + hash manifest", async () => {
+    const result = await client.callTool({
+      name: "get_server_info",
+      arguments: {},
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toMatch(/@directive-run\/mcp@/);
+    expect(text).toMatch(/Transport:/);
+    expect(text).toMatch(/Auth enabled:/);
+    expect(text).toMatch(/Bundled knowledge hash:/);
+    expect(text).toMatch(/Package registry built at:/);
   });
 });
 

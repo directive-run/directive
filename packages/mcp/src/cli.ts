@@ -17,10 +17,10 @@
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createDirectiveServer } from "./server.js";
+import { createDirectiveServer, setServerInfo } from "./server.js";
 import { startSseServer } from "./sse.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const USAGE = `directive-mcp — MCP server exposing Directive to AI clients
 
@@ -131,6 +131,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  setServerInfo({ transport: "stdio", authEnabled: false });
   const server = createDirectiveServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

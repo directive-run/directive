@@ -11,7 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = resolve(__dirname, "..", "..");
+const PKG_ROOT = resolve(__dirname, "..");
 
 /** Supported source-library identifiers. */
 export const MIGRATION_SOURCES = [

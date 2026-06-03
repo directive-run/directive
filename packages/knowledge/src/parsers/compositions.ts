@@ -13,7 +13,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = resolve(__dirname, "..", "..");
+// After bundling, all parsers live in dist/index.js — one level up
+// from dist reaches the package root. In src/ during dev, the file is
+// two levels up; the fallback in `resolveSourcePath` handles that.
+const PKG_ROOT = resolve(__dirname, "..");
 
 export interface CompositionEdge {
   from: string;

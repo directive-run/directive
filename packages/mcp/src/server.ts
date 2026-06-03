@@ -25,20 +25,25 @@
  * commands, and debug snapshots through the same binary.
  */
 
+import { createHash } from "node:crypto";
 import { getAllSkills, getSkill } from "@directive-run/claude-plugin";
 import {
   getAllExamples,
   getAllKnowledge,
+  getCompositionsFor,
   getExample,
   getKnowledge,
+  getReverseCompositionsFor,
 } from "@directive-run/knowledge";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PACKAGE_REGISTRY_BUILT_AT } from "./generated/package-registry.js";
+import { getPackageInfo, listPackages } from "./packages.js";
 
-const PKG_VERSION = "0.1.0";
-
+const PKG_VERSION = "0.2.0";
 const MAX_SEARCH_RESULTS = 50;
 const MAX_LINE_PREVIEW = 200;
+const MAX_QUERY_LENGTH = 512;
 
 function formatLinePreview(line: string): string {
   return line.length > MAX_LINE_PREVIEW
@@ -48,19 +53,20 @@ function formatLinePreview(line: string): string {
 
 function collectSearchHits(
   query: string,
-  knowledge: ReadonlyMap<string, string>,
+  corpus: ReadonlyMap<string, string>,
+  fileExtension: string,
 ): string[] {
   const lowered = query.toLowerCase();
   const hits: string[] = [];
 
-  for (const [name, content] of knowledge) {
+  for (const [name, content] of corpus) {
     const lines = content.split("\n");
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
       if (!line.toLowerCase().includes(lowered)) {
         continue;
       }
-      hits.push(`${name}.md:${i + 1}: ${formatLinePreview(line)}`);
+      hits.push(`${name}${fileExtension}:${i + 1}: ${formatLinePreview(line)}`);
       if (hits.length >= MAX_SEARCH_RESULTS) {
         return hits;
       }
@@ -68,6 +74,97 @@ function collectSearchHits(
   }
 
   return hits;
+}
+
+function formatSearchResponse(query: string, hits: string[]): string {
+  if (hits.length === 0) {
+    return `No matches for '${query}'.`;
+  }
+  const header =
+    hits.length === MAX_SEARCH_RESULTS
+      ? `${hits.length}+ matches (truncated):`
+      : `${hits.length} matches:`;
+  return `${header}\n${hits.join("\n")}`;
+}
+
+let bundledKnowledgeHash: string | null = null;
+function computeBundledKnowledgeHash(): string {
+  if (bundledKnowledgeHash) {
+    return bundledKnowledgeHash;
+  }
+  const hash = createHash("sha256");
+  for (const [name, content] of Array.from(getAllKnowledge()).sort(([a], [b]) =>
+    a.localeCompare(b),
+  )) {
+    hash.update(name);
+    hash.update("\0");
+    hash.update(content);
+    hash.update("\0");
+  }
+  bundledKnowledgeHash = hash.digest("hex").slice(0, 16);
+  return bundledKnowledgeHash;
+}
+
+interface ServerInfoOptions {
+  transport: "stdio" | "sse";
+  authEnabled: boolean;
+  sessionCount?: number;
+}
+
+let serverInfoOptions: ServerInfoOptions = {
+  transport: "stdio",
+  authEnabled: false,
+};
+
+/** Set transport-specific server info shown by `get_server_info`. */
+export function setServerInfo(options: ServerInfoOptions): void {
+  serverInfoOptions = options;
+}
+
+function renderDepSection(
+  out: string[],
+  heading: string,
+  deps: readonly string[],
+): void {
+  if (deps.length === 0) {
+    return;
+  }
+  out.push("", `**${heading}:**`, ...deps.map((d) => `- ${d}`));
+}
+
+function renderPackageInfo(info: {
+  name: string;
+  description: string;
+  homepage?: string;
+  npmUrl?: string;
+  bakedVersion: string;
+  liveVersion?: string;
+  stale: boolean;
+  published: boolean;
+  dependencies: readonly string[];
+  peerDependencies: readonly string[];
+  optionalDependencies: readonly string[];
+  exports: readonly string[];
+}): string {
+  const lines: string[] = [
+    `# ${info.name}`,
+    info.description,
+    "",
+    `**Version (live):** ${info.liveVersion ?? "unknown"}`,
+    `**Version (baked):** ${info.bakedVersion}${info.stale ? " (live fetch failed; using baked)" : ""}`,
+    `**Published to npm:** ${info.published ? "yes" : "no (private workspace package)"}`,
+  ];
+  if (info.homepage) {
+    lines.push(`**Homepage:** ${info.homepage}`);
+  }
+  if (info.npmUrl) {
+    lines.push(`**npm:** ${info.npmUrl}`);
+  }
+  renderDepSection(lines, "Dependencies", info.dependencies);
+  renderDepSection(lines, "Peer dependencies", info.peerDependencies);
+  renderDepSection(lines, "Optional dependencies", info.optionalDependencies);
+  renderDepSection(lines, "Exports", info.exports);
+  return lines.join("\n");
 }
 
 /**
@@ -206,32 +303,185 @@ export function createDirectiveServer(): McpServer {
     {
       title: "Search Directive knowledge files",
       description:
-        "Case-insensitive substring search across every knowledge file. Returns up to 50 matching lines with the file name and line context. Useful for discovering which knowledge file covers a topic before calling get_knowledge for the full document.",
+        "Case-insensitive substring search across every knowledge file. Returns existing reference material; does NOT generate code. Use this to find which knowledge file covers a topic before calling get_knowledge for the full document.",
       inputSchema: {
         query: z
           .string()
           .min(1)
+          .max(MAX_QUERY_LENGTH)
           .describe(
             "The search string. Matched case-insensitively against every line of every knowledge file.",
           ),
       },
     },
     async ({ query }) => {
-      const hits = collectSearchHits(query, getAllKnowledge());
+      const hits = collectSearchHits(query, getAllKnowledge(), ".md");
+      return {
+        content: [{ type: "text", text: formatSearchResponse(query, hits) }],
+      };
+    },
+  );
 
-      if (hits.length === 0) {
+  server.registerTool(
+    "search_examples",
+    {
+      title: "Search Directive code examples",
+      description:
+        "Case-insensitive substring search across every bundled code example (.ts files in @directive-run/knowledge). Returns existing reference material; does NOT generate code. Use this to find which example demonstrates a concept before calling get_example for the full source.",
+      inputSchema: {
+        query: z
+          .string()
+          .min(1)
+          .max(MAX_QUERY_LENGTH)
+          .describe(
+            "The search string. Matched case-insensitively against every line of every example file.",
+          ),
+      },
+    },
+    async ({ query }) => {
+      const hits = collectSearchHits(query, getAllExamples(), ".ts");
+      return {
+        content: [{ type: "text", text: formatSearchResponse(query, hits) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_packages",
+    {
+      title: "List @directive-run/* packages",
+      description:
+        "Enumerate every @directive-run/* package known to this MCP server. Returns name + one-line description. Use this to answer 'what should I install for X?' and to discover names to pass to get_package_info or get_composable_packages. Returns existing reference material; does NOT generate code.",
+      inputSchema: {},
+    },
+    async () => {
+      const packages = listPackages();
+      const lines = packages.map(
+        (p) => `${p.name}${p.published ? "" : " (private)"} — ${p.summary}`,
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${packages.length} packages:\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_package_info",
+    {
+      title: "Get @directive-run/* package detail",
+      description:
+        "Fetch detailed info for one @directive-run/* package: description, dependencies, peerDependencies, exports, npm URL. Returns the version baked into this MCP build AND the live-from-npm version when available (1-hour cache, 3-second timeout, falls back to baked version on network failure). Returns existing reference material; does NOT generate code.",
+      inputSchema: {
+        name: z
+          .string()
+          .min(1)
+          .max(128)
+          .describe(
+            "Package name (e.g. '@directive-run/core'). Call list_packages first to discover valid names.",
+          ),
+      },
+    },
+    async ({ name }) => {
+      const info = await getPackageInfo(name);
+      if (!info) {
         return {
-          content: [{ type: "text", text: `No matches for '${query}'.` }],
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Package not found: '${name}'. Call list_packages to see available names.`,
+            },
+          ],
         };
       }
-
-      const header =
-        hits.length === MAX_SEARCH_RESULTS
-          ? `${hits.length}+ matches (truncated):`
-          : `${hits.length} matches:`;
-
       return {
-        content: [{ type: "text", text: `${header}\n${hits.join("\n")}` }],
+        content: [{ type: "text", text: renderPackageInfo(info) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_composable_packages",
+    {
+      title: "Get composition siblings for a package",
+      description:
+        "Given a @directive-run/* package name, return the sibling packages it composes with (outgoing edges) AND the packages that compose with IT (incoming edges). Each edge carries a one-line reason. Returns existing reference material; does NOT generate code. Use this to answer 'what should I pair @directive-run/X with?' or 'who else uses @directive-run/Y?'.",
+      inputSchema: {
+        name: z
+          .string()
+          .min(1)
+          .max(128)
+          .describe(
+            "Package name (e.g. '@directive-run/query'). Call list_packages first to discover valid names.",
+          ),
+      },
+    },
+    async ({ name }) => {
+      const outgoing = getCompositionsFor(name);
+      const incoming = getReverseCompositionsFor(name);
+      if (outgoing.length === 0 && incoming.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No composition data for '${name}'. Call list_packages to see available names.`,
+            },
+          ],
+        };
+      }
+      const lines: string[] = [`# ${name}`, ""];
+      if (outgoing.length > 0) {
+        lines.push("## Composes with:");
+        for (const e of outgoing) {
+          lines.push(`- ${e.to} — ${e.reason}`);
+        }
+        lines.push("");
+      }
+      if (incoming.length > 0) {
+        lines.push("## Composed by:");
+        for (const e of incoming) {
+          lines.push(`- ${e.from} — ${e.reason}`);
+        }
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: `<directive-data>\n${lines.join("\n")}\n</directive-data>`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_server_info",
+    {
+      title: "Get directive MCP server info",
+      description:
+        "Return version manifest for this MCP server build — package version, transport (stdio or SSE), whether auth is enabled, bundled-knowledge hash, package-registry build timestamp, and (for SSE) the current session count. Returns existing reference material; does NOT generate code. Use this to verify the client is talking to the expected build.",
+      inputSchema: {},
+    },
+    async () => {
+      const lines = [
+        `# @directive-run/mcp@${PKG_VERSION}`,
+        `**Transport:** ${serverInfoOptions.transport}`,
+        `**Auth enabled:** ${serverInfoOptions.authEnabled ? "yes" : "no"}`,
+        `**Bundled knowledge hash:** ${computeBundledKnowledgeHash()}`,
+        `**Package registry built at:** ${PACKAGE_REGISTRY_BUILT_AT}`,
+      ];
+      if (serverInfoOptions.sessionCount !== undefined) {
+        lines.push(
+          `**Active SSE sessions:** ${serverInfoOptions.sessionCount}`,
+        );
+      }
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
       };
     },
   );
