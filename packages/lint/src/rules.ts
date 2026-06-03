@@ -1,47 +1,40 @@
 /**
- * Executable rules — each entry knows how to walk a ts-morph
- * `SourceFile` and emit findings, and (optionally) how to apply a
- * mechanical fix for one of those findings.
+ * Aggregates every executable rule that ships in this version. Used
+ * by `runRules` and `applyFix` in `./index.ts`.
  *
- * v0.1.0 ships an empty list. Phase 5a populates the 10 rules:
- *
- * - no-single-line-if-return (fixable)
- * - module-missing-facts-schema
- * - resolver-not-async (fixable)
- * - derivation-uses-imported-state
- * - effect-mutates-facts
- * - useState-alongside-facts (fixable)
- * - constraint-without-when-or-require
- * - resolver-naming-mismatch (fixable)
- * - module-name-not-kebab (fixable)
- * - imperative-task-in-effect
+ * v0.2.0 ships these 10 rules. Adding a new rule:
+ *   1. Drop a new file under `./rules/<id>.ts` exporting `rule: ExecutableRule`.
+ *   2. Import it here, push into `EXECUTABLE_RULES`.
+ *   3. Add a fixture test in `__tests__/rules/<id>.test.ts`.
+ *   4. The `list_review_rules` MCP tool's output flips `executable: true`
+ *      automatically because it reads from `getRules()`, which reflects
+ *      what this file registers.
  */
 
-import type { Finding, RuleMetadata } from "./types.js";
-
-/**
- * Minimal SourceFile interface — declared as `unknown` so
- * `./types.ts` and `./registry.ts` can be consumed without ts-morph
- * installed (a `list_review_rules` caller is read-only and doesn't
- * need the runtime). The actual implementations in `./worker.ts`
- * import ts-morph and cast.
- */
-export type SourceFileLike = unknown;
-
-export interface ExecutableRule {
-  metadata: RuleMetadata;
-  check(sourceFile: SourceFileLike): Finding[];
-  fix?(
-    sourceFile: SourceFileLike,
-    finding: Finding,
-  ): {
-    fixedSource: string;
-  };
-}
+import { rule as constraintWithoutWhenOrRequire } from "./rules/constraint-without-when-or-require.js";
+import { rule as derivationUsesImportedState } from "./rules/derivation-uses-imported-state.js";
+import { rule as effectMutatesFacts } from "./rules/effect-mutates-facts.js";
+import { rule as imperativeTaskInEffect } from "./rules/imperative-task-in-effect.js";
+import { rule as moduleMissingFactsSchema } from "./rules/module-missing-facts-schema.js";
+import { rule as moduleNameNotKebab } from "./rules/module-name-not-kebab.js";
+import { rule as noSingleLineIfReturn } from "./rules/no-single-line-if-return.js";
+import { rule as resolverNamingMismatch } from "./rules/resolver-naming-mismatch.js";
+import { rule as resolverNotAsync } from "./rules/resolver-not-async.js";
+import type { ExecutableRule } from "./rules/types.js";
+import { rule as useStateAlongsideFacts } from "./rules/useState-alongside-facts.js";
 
 const EXECUTABLE_RULES: readonly ExecutableRule[] = Object.freeze([
-  // Populated in Phase 5a.
-] satisfies ExecutableRule[]);
+  noSingleLineIfReturn,
+  moduleMissingFactsSchema,
+  resolverNotAsync,
+  derivationUsesImportedState,
+  effectMutatesFacts,
+  useStateAlongsideFacts,
+  constraintWithoutWhenOrRequire,
+  resolverNamingMismatch,
+  moduleNameNotKebab,
+  imperativeTaskInEffect,
+]);
 
 export function getExecutableRules(): readonly ExecutableRule[] {
   return EXECUTABLE_RULES;
@@ -50,3 +43,5 @@ export function getExecutableRules(): readonly ExecutableRule[] {
 export function getExecutableRuleById(id: string): ExecutableRule | undefined {
   return EXECUTABLE_RULES.find((r) => r.metadata.id === id);
 }
+
+export type { ExecutableRule } from "./rules/types.js";

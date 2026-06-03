@@ -8,19 +8,24 @@ import {
 } from "../src/index.js";
 
 describe("getRules / getRuleById", () => {
-  it("returns the metadata registry (empty in v0.1.0)", () => {
+  it("returns the 10 v0.2.0 rules", () => {
     const rules = getRules();
-    expect(Array.isArray(rules)).toBe(true);
-    expect(rules).toEqual([]);
+    expect(rules.length).toBe(10);
   });
 
   it("returns undefined for unknown ids", () => {
     expect(getRuleById("not-a-rule")).toBeUndefined();
   });
+
+  it("round-trips every id via getRuleById", () => {
+    for (const rule of getRules()) {
+      expect(getRuleById(rule.id)?.id).toBe(rule.id);
+    }
+  });
 });
 
 describe("runRules", () => {
-  it("returns empty findings when registry is empty", async () => {
+  it("returns empty findings for clean code", async () => {
     const result = await runRules("const x = 1;");
     expect(result.findings).toEqual([]);
     expect(result.summary).toEqual({

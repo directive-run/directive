@@ -20,6 +20,7 @@
  * remediation message when ts-morph is missing.
  */
 
+import type { SourceFile } from "ts-morph";
 import { getAllRuleMetadata, getRuleMetadataById } from "./registry.js";
 import type {
   Finding,
@@ -131,7 +132,10 @@ export async function runRules(
     return emptyRunResult(unknownRules);
   }
 
-  const sourceFile = await parseSource(source, options.fileName);
+  const sourceFile = (await parseSource(
+    source,
+    options.fileName,
+  )) as SourceFile;
   const findings: Finding[] = [];
   for (const rule of activeRules) {
     try {
@@ -171,7 +175,7 @@ export async function applyFix(
   if (!rule.fix) {
     return { ok: false, reason: `rule ${finding.ruleId} is not fixable` };
   }
-  const sourceFile = await parseSource(source);
+  const sourceFile = (await parseSource(source)) as SourceFile;
   const { fixedSource } = rule.fix(sourceFile, finding);
   return {
     ok: true,
