@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/vue",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "imports": {
     "#is-development": {
       "production": "./src/dev-false.ts",
