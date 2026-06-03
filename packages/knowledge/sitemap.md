@@ -15,6 +15,12 @@ Website: https://directive.run
 - [Comparison](https://directive.run/docs/comparison)
 - [Choosing Primitives](https://directive.run/docs/choosing-primitives)
 
+### AI Tooling
+- [IDE Integration](https://directive.run/docs/ide-integration)
+- [Claude Code plugin](https://directive.run/docs/ide-integration#claude-code)
+- [CLI ai-rules](https://directive.run/docs/ide-integration#cli-ai-rules)
+- [Knowledge package](https://directive.run/docs/ide-integration#knowledge-package)
+
 ### Core API
 - [Overview](https://directive.run/docs/core-api)
 - [Module & System](https://directive.run/docs/module-system)

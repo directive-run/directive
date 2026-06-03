@@ -1,0 +1,216 @@
+{
+  "$schema": "./compositions.schema.json",
+  "version": 1,
+  "edges": [
+    {
+      "from": "@directive-run/query",
+      "to": "@directive-run/mutator",
+      "reason": "discriminated-union mutators pair with query's invalidation tags for end-to-end optimistic writes"
+    },
+    {
+      "from": "@directive-run/query",
+      "to": "@directive-run/optimistic",
+      "reason": "withOptimistic / withOptimisticHandlers add client-side rollback when a mutation fails"
+    },
+    {
+      "from": "@directive-run/query",
+      "to": "@directive-run/timeline",
+      "reason": "timeline captures every cache invalidation + refetch so flaky tests reproduce byte-for-byte"
+    },
+    {
+      "from": "@directive-run/mutator",
+      "to": "@directive-run/query",
+      "reason": "pair mutators with query's invalidation tags so a successful mutation refetches the right resources"
+    },
+    {
+      "from": "@directive-run/mutator",
+      "to": "@directive-run/optimistic",
+      "reason": "withOptimisticHandlers wraps a defineMutator handler with snapshot + rollback in one call"
+    },
+    {
+      "from": "@directive-run/mutator",
+      "to": "@directive-run/timeline",
+      "reason": "every mutation cycle records into the timeline for replay-based test reproduction"
+    },
+    {
+      "from": "@directive-run/optimistic",
+      "to": "@directive-run/mutator",
+      "reason": "defineMutator handlers wrapped with withOptimisticHandlers get rollback for free"
+    },
+    {
+      "from": "@directive-run/optimistic",
+      "to": "@directive-run/query",
+      "reason": "an optimistic mutation that invalidates a query tag also reverts the invalidation on rollback"
+    },
+    {
+      "from": "@directive-run/optimistic",
+      "to": "@directive-run/timeline",
+      "reason": "optimistic writes AND their rollbacks both record into the timeline"
+    },
+    {
+      "from": "@directive-run/timeline",
+      "to": "@directive-run/mutator",
+      "reason": "every mutation cycle records into the timeline; replay a failed test's exact mutation sequence"
+    },
+    {
+      "from": "@directive-run/timeline",
+      "to": "@directive-run/optimistic",
+      "reason": "captures optimistic writes AND rollbacks for byte-for-byte test reproduction"
+    },
+    {
+      "from": "@directive-run/timeline",
+      "to": "@directive-run/query",
+      "reason": "every query invalidation + refetch records into the timeline"
+    },
+    {
+      "from": "@directive-run/timeline",
+      "to": "@directive-run/core",
+      "reason": "core's reconciliation cycles are the source events the timeline captures"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/react",
+      "reason": "useFact / useDerived / useEvents hooks subscribe to the core system from React components"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/vue",
+      "reason": "useFact / useDerived composables expose the core system to Vue components"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/svelte",
+      "reason": "Svelte store adapters wrap the core system for component subscription"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/solid",
+      "reason": "Solid signal adapters wrap the core system"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/lit",
+      "reason": "Lit controllers wrap the core system for Web Component subscription"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/el",
+      "reason": "framework-free DOM bindings — bind, bindText, mount thread schema typing into vanilla DOM updaters"
+    },
+    {
+      "from": "@directive-run/core",
+      "to": "@directive-run/ai",
+      "reason": "AI orchestrator modules ARE Directive modules — constraints trigger agent runs, resolvers execute them"
+    },
+    {
+      "from": "@directive-run/ai",
+      "to": "@directive-run/core",
+      "reason": "agent orchestrators are built on core's constraint-resolver loop with custom resolvers that call LLMs"
+    },
+    {
+      "from": "@directive-run/ai",
+      "to": "@directive-run/knowledge",
+      "reason": "knowledge package is the source of truth for the rules + examples that ai/mcp's RAG enricher serves"
+    },
+    {
+      "from": "@directive-run/ai",
+      "to": "@directive-run/mcp",
+      "reason": "ai/mcp is the CLIENT side (createMCPAdapter); @directive-run/mcp is the SERVER side — opposite arrows, same protocol"
+    },
+    {
+      "from": "@directive-run/mcp",
+      "to": "@directive-run/knowledge",
+      "reason": "MCP server tools (list_knowledge, get_knowledge, search_knowledge) front the knowledge package's data APIs"
+    },
+    {
+      "from": "@directive-run/mcp",
+      "to": "@directive-run/claude-plugin",
+      "reason": "MCP server tools (list_skills, get_skill) expose the Claude Code skill bundles to non-Claude MCP clients"
+    },
+    {
+      "from": "@directive-run/mcp",
+      "to": "@directive-run/scaffold",
+      "reason": "generate_module MCP tool wraps the scaffold package's pure generators and returns source as a string"
+    },
+    {
+      "from": "@directive-run/mcp",
+      "to": "@directive-run/lint",
+      "reason": "review_source and fix_code MCP tools wrap the lint package's ts-morph rule registry"
+    },
+    {
+      "from": "@directive-run/cli",
+      "to": "@directive-run/scaffold",
+      "reason": "directive new <name> delegates to scaffold's generators and writes the result to disk"
+    },
+    {
+      "from": "@directive-run/cli",
+      "to": "@directive-run/knowledge",
+      "reason": "directive ai-rules bundles the knowledge package's content into per-assistant rule files (.cursorrules, CLAUDE.md, etc.)"
+    },
+    {
+      "from": "@directive-run/cli",
+      "to": "@directive-run/claude-plugin",
+      "reason": "directive ai-rules can install the Claude Code plugin bundle as one of its targets"
+    },
+    {
+      "from": "@directive-run/claude-plugin",
+      "to": "@directive-run/knowledge",
+      "reason": "skill bundles copy supporting files from the knowledge package at build time"
+    },
+    {
+      "from": "@directive-run/scaffold",
+      "to": "@directive-run/core",
+      "reason": "generated modules import createModule, t, and ModuleSchema from core"
+    },
+    {
+      "from": "@directive-run/lint",
+      "to": "@directive-run/knowledge",
+      "reason": "rule IDs match the anti-pattern IDs parsed from knowledge/core/anti-patterns.md"
+    },
+    {
+      "from": "@directive-run/react",
+      "to": "@directive-run/core",
+      "reason": "all React hooks consume systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/vue",
+      "to": "@directive-run/core",
+      "reason": "all Vue composables consume systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/svelte",
+      "to": "@directive-run/core",
+      "reason": "Svelte adapter consumes systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/solid",
+      "to": "@directive-run/core",
+      "reason": "Solid adapter consumes systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/lit",
+      "to": "@directive-run/core",
+      "reason": "Lit controllers consume systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/el",
+      "to": "@directive-run/core",
+      "reason": "framework-free DOM bindings consume systems built with @directive-run/core"
+    },
+    {
+      "from": "@directive-run/knowledge",
+      "to": "@directive-run/cli",
+      "reason": "knowledge ships as the data layer for directive ai-rules / directive install"
+    },
+    {
+      "from": "@directive-run/knowledge",
+      "to": "@directive-run/mcp",
+      "reason": "knowledge ships as the data layer for MCP tools (list_knowledge, get_knowledge, etc.)"
+    },
+    {
+      "from": "@directive-run/knowledge",
+      "to": "@directive-run/claude-plugin",
+      "reason": "knowledge ships as the data layer for Claude Code skill bundles"
+    }
+  ]
+}

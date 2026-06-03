@@ -32,7 +32,16 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "core", "ai", "examples", "api-skeleton.md", "sitemap.md"],
+  "files": [
+    "dist",
+    "core",
+    "ai",
+    "examples",
+    "api-skeleton.md",
+    "sitemap.md",
+    "compositions.json",
+    "migration.json"
+  ],
   "scripts": {
     "build": "tsx scripts/generate-api-skeleton.ts && tsx scripts/generate-sitemap.ts && tsx scripts/extract-examples.ts && tsup",
     "generate": "tsx scripts/generate-api-skeleton.ts",

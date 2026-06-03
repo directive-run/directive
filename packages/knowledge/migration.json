@@ -1,0 +1,277 @@
+{
+  "$schema": "./migration.schema.json",
+  "version": 1,
+  "sources": [
+    {
+      "id": "redux",
+      "name": "Redux",
+      "conceptMap": [
+        {
+          "from": "Store",
+          "to": "System",
+          "note": "createSystem() wraps modules"
+        },
+        {
+          "from": "Slice / Reducer",
+          "to": "Module",
+          "note": "createModule() with schema + init"
+        },
+        {
+          "from": "State fields",
+          "to": "Facts",
+          "note": "Schema keys with t.*() type builders"
+        },
+        {
+          "from": "Selectors",
+          "to": "Derivations",
+          "note": "Auto-tracked, no createSelector needed"
+        },
+        {
+          "from": "Actions",
+          "to": "Requirements",
+          "note": "Typed with UPPER_SNAKE_CASE"
+        },
+        {
+          "from": "Thunks / Sagas",
+          "to": "Resolvers",
+          "note": "Async handlers with retry, dedup"
+        },
+        { "from": "Middleware", "to": "Plugins", "note": "Lifecycle hooks" },
+        {
+          "from": "useSelector",
+          "to": "useSelector",
+          "note": "From @directive-run/react"
+        },
+        {
+          "from": "dispatch(action)",
+          "to": "system.dispatch(event)",
+          "note": "Or constraint auto-triggers"
+        },
+        {
+          "from": "configureStore",
+          "to": "createSystem",
+          "note": "With plugins instead of middleware"
+        }
+      ],
+      "steps": [
+        "Replace createStore / configureStore with createSystem({ module })",
+        "Convert each slice into a createModule call with schema + init",
+        "Rewrite reducers as direct mutations on facts (immer-style nested writes are fine)",
+        "Rewrite thunks/sagas as constraint + resolver pairs",
+        "Replace useSelector(state.x) calls with useFact(\"x\") / useDerived(\"y\")",
+        "Drop the action-type constants — requirement types are colocated with the resolver"
+      ],
+      "before": "import { createSlice } from \"@reduxjs/toolkit\";\n\nconst counterSlice = createSlice({\n  name: \"counter\",\n  initialState: { value: 0, status: \"idle\" },\n  reducers: {\n    increment: (state) => { state.value += 1; },\n  },\n  extraReducers: (builder) => {\n    builder.addCase(fetchCount.fulfilled, (state, action) => {\n      state.value = action.payload;\n      state.status = \"loaded\";\n    });\n  },\n});",
+      "after": "import { createModule, t } from \"@directive-run/core\";\n\nexport const counter = createModule(\"counter\", {\n  schema: {\n    facts: {\n      value: t.number(),\n      status: t.string<\"idle\" | \"loading\" | \"loaded\">(),\n    },\n    requirements: {\n      FETCH_COUNT: {},\n    },\n  },\n  init: (facts) => {\n    facts.value = 0;\n    facts.status = \"idle\";\n  },\n  constraints: {\n    needsData: {\n      when: (facts) => facts.status === \"idle\",\n      require: { type: \"FETCH_COUNT\" },\n    },\n  },\n  resolvers: {\n    fetchCount: {\n      requirement: \"FETCH_COUNT\",\n      retry: { attempts: 3, backoff: \"exponential\" },\n      resolve: async (req, context) => {\n        context.facts.status = \"loading\";\n        const response = await fetch(\"/api/count\");\n        const data = await response.json();\n        context.facts.value = data.count;\n        context.facts.status = \"loaded\";\n      },\n    },\n  },\n});"
+    },
+    {
+      "id": "zustand",
+      "name": "Zustand",
+      "conceptMap": [
+        {
+          "from": "create()",
+          "to": "createModule()",
+          "note": "Module is more structured"
+        },
+        {
+          "from": "Set callbacks",
+          "to": "Direct mutation in init / events",
+          "note": "facts.x = value"
+        },
+        {
+          "from": "Get callbacks",
+          "to": "Read from facts proxy",
+          "note": "facts.x in a derive function"
+        },
+        {
+          "from": "Slices via spread",
+          "to": "Multiple modules + crossModuleDeps",
+          "note": "Composition is structural, not spread-based"
+        },
+        {
+          "from": "Persist middleware",
+          "to": "persistencePlugin",
+          "note": "From @directive-run/core/plugins"
+        },
+        {
+          "from": "subscribe()",
+          "to": "system.subscribe() or useFact()",
+          "note": "Auto-cleanup with React hooks"
+        }
+      ],
+      "steps": [
+        "Replace create((set, get) => ({ ... })) with createModule + schema",
+        "Move state fields into schema.facts with t.*() builders",
+        "Convert setter functions into events with direct mutation",
+        "Replace get().x reads inside derived values with derive: { x: (facts) => facts.x }",
+        "Wire the system to React via useFact / useDerived"
+      ],
+      "before": "import { create } from \"zustand\";\n\nconst useCounter = create((set, get) => ({\n  value: 0,\n  increment: () => set({ value: get().value + 1 }),\n  reset: () => set({ value: 0 }),\n}));",
+      "after": "import { createModule, t } from \"@directive-run/core\";\n\nexport const counter = createModule(\"counter\", {\n  schema: {\n    facts: { value: t.number() },\n    events: {\n      increment: {},\n      reset: {},\n    },\n  },\n  init: (facts) => {\n    facts.value = 0;\n  },\n  events: {\n    increment: (facts) => {\n      facts.value += 1;\n    },\n    reset: (facts) => {\n      facts.value = 0;\n    },\n  },\n});"
+    },
+    {
+      "id": "xstate",
+      "name": "XState",
+      "conceptMap": [
+        {
+          "from": "createMachine",
+          "to": "createModule",
+          "note": "States become discriminated facts"
+        },
+        {
+          "from": "States as nodes",
+          "to": "Status fact with t.string<Union>()",
+          "note": "Union types make the state space explicit"
+        },
+        {
+          "from": "Transitions on event",
+          "to": "events: { eventName: (facts, payload) => mutation }",
+          "note": "Direct mutation drives reconciliation"
+        },
+        {
+          "from": "Guards",
+          "to": "when in constraints",
+          "note": "Constraints are guards on requirement emission"
+        },
+        {
+          "from": "Actions",
+          "to": "Direct fact mutation or constraint-triggered resolvers",
+          "note": ""
+        },
+        {
+          "from": "Services / actors",
+          "to": "Resolvers",
+          "note": "Async work with retry, dedup, timeout"
+        },
+        {
+          "from": "Hierarchical states",
+          "to": "Multiple modules + crossModuleDeps",
+          "note": "Composition over nesting"
+        },
+        {
+          "from": "interpret(machine).start()",
+          "to": "system.start()",
+          "note": "Or auto-started via createSystem"
+        }
+      ],
+      "steps": [
+        "Identify the state union — those become a Status fact with t.string<Union>()",
+        "Map each state-to-state transition into an event or constraint",
+        "Move side-effecting services into resolvers with retry policies",
+        "Replace guards with constraint when functions",
+        "If the machine is hierarchical, split into multiple modules"
+      ],
+      "before": "import { createMachine } from \"xstate\";\n\nconst trafficLight = createMachine({\n  id: \"traffic\",\n  initial: \"red\",\n  states: {\n    red: { on: { TIMER: \"green\" } },\n    yellow: { on: { TIMER: \"red\" } },\n    green: { on: { TIMER: \"yellow\" } },\n  },\n});",
+      "after": "import { createModule, t } from \"@directive-run/core\";\n\ntype Phase = \"red\" | \"yellow\" | \"green\";\nconst NEXT: Record<Phase, Phase> = { red: \"green\", green: \"yellow\", yellow: \"red\" };\n\nexport const trafficLight = createModule(\"traffic-light\", {\n  schema: {\n    facts: { phase: t.string<Phase>() },\n    events: { timer: {} },\n  },\n  init: (facts) => {\n    facts.phase = \"red\";\n  },\n  events: {\n    timer: (facts) => {\n      facts.phase = NEXT[facts.phase];\n    },\n  },\n});"
+    },
+    {
+      "id": "mobx",
+      "name": "MobX",
+      "conceptMap": [
+        {
+          "from": "Observable",
+          "to": "Fact",
+          "note": "All facts are reactive"
+        },
+        {
+          "from": "Computed",
+          "to": "Derivation",
+          "note": "Auto-tracked, no decorator needed"
+        },
+        {
+          "from": "Action / runInAction",
+          "to": "Event handler",
+          "note": "Mutations batch into one reconciliation"
+        },
+        {
+          "from": "Class store",
+          "to": "createModule",
+          "note": "No this binding"
+        },
+        {
+          "from": "Reaction / autorun",
+          "to": "Effect",
+          "note": "Fire-and-forget side effects"
+        }
+      ],
+      "steps": [
+        "Convert observable class fields into schema.facts",
+        "Convert @computed methods into derive functions",
+        "Convert @action methods into events with direct mutation",
+        "Move autorun / reaction blocks into effects"
+      ],
+      "before": "import { makeAutoObservable } from \"mobx\";\n\nclass CounterStore {\n  value = 0;\n  get isHigh() { return this.value > 10; }\n  increment() { this.value += 1; }\n  constructor() { makeAutoObservable(this); }\n}",
+      "after": "import { createModule, t } from \"@directive-run/core\";\n\nexport const counter = createModule(\"counter\", {\n  schema: {\n    facts: { value: t.number() },\n    derivations: { isHigh: t.boolean() },\n    events: { increment: {} },\n  },\n  init: (facts) => {\n    facts.value = 0;\n  },\n  derive: {\n    isHigh: (facts) => facts.value > 10,\n  },\n  events: {\n    increment: (facts) => {\n      facts.value += 1;\n    },\n  },\n});"
+    },
+    {
+      "id": "jotai",
+      "name": "Jotai",
+      "conceptMap": [
+        { "from": "atom()", "to": "Fact", "note": "Schema.facts entry" },
+        {
+          "from": "derivedAtom",
+          "to": "Derivation",
+          "note": "Auto-tracked computed value"
+        },
+        {
+          "from": "useAtom",
+          "to": "useFact / useDerived",
+          "note": "From @directive-run/react"
+        },
+        {
+          "from": "atomWithReducer",
+          "to": "Module with events",
+          "note": "Direct fact mutation in event handlers"
+        },
+        {
+          "from": "Provider",
+          "to": "DirectiveProvider",
+          "note": "From @directive-run/react"
+        }
+      ],
+      "steps": [
+        "Group related atoms into a single module's schema.facts",
+        "Convert derivedAtom into derive function",
+        "Replace useAtom() with useFact() / useDerived()",
+        "Wrap the React tree in DirectiveProvider"
+      ],
+      "before": "import { atom, useAtom } from \"jotai\";\n\nconst countAtom = atom(0);\nconst doubledAtom = atom((get) => get(countAtom) * 2);\n\nfunction Counter() {\n  const [count, setCount] = useAtom(countAtom);\n  const [doubled] = useAtom(doubledAtom);\n  return <button onClick={() => setCount(count + 1)}>{count} ({doubled})</button>;\n}",
+      "after": "import { createModule, createSystem, t } from \"@directive-run/core\";\nimport { createDirectiveContext } from \"@directive-run/react\";\n\nconst counter = createModule(\"counter\", {\n  schema: {\n    facts: { count: t.number() },\n    derivations: { doubled: t.number() },\n    events: { increment: {} },\n  },\n  init: (facts) => { facts.count = 0; },\n  derive: { doubled: (facts) => facts.count * 2 },\n  events: { increment: (facts) => { facts.count += 1; } },\n});\n\nconst system = createSystem({ module: counter });\nconst { useFact, useDerived, useEvents } = createDirectiveContext(system);\n\nfunction Counter() {\n  const count = useFact(\"count\");\n  const doubled = useDerived(\"doubled\");\n  const { increment } = useEvents();\n  return <button onClick={() => increment({})}>{count} ({doubled})</button>;\n}"
+    },
+    {
+      "id": "recoil",
+      "name": "Recoil",
+      "conceptMap": [
+        { "from": "atom", "to": "Fact", "note": "Schema.facts entry" },
+        {
+          "from": "selector",
+          "to": "Derivation",
+          "note": "Auto-tracked, async via resolvers"
+        },
+        {
+          "from": "useRecoilState",
+          "to": "useFact + useEvents",
+          "note": "Mutation is event dispatch"
+        },
+        {
+          "from": "selectorFamily",
+          "to": "Parameterized derivation or constraint+resolver pair",
+          "note": ""
+        },
+        {
+          "from": "RecoilRoot",
+          "to": "DirectiveProvider",
+          "note": "From @directive-run/react"
+        }
+      ],
+      "steps": [
+        "Map every Recoil atom to a fact in a module's schema",
+        "Convert selectors into derive functions",
+        "For async selectors, model as constraint + resolver",
+        "Replace useRecoilState / useRecoilValue with useFact / useDerived"
+      ],
+      "before": "import { atom, selector, useRecoilState } from \"recoil\";\n\nconst countState = atom({ key: \"count\", default: 0 });\nconst doubledState = selector({\n  key: \"doubled\",\n  get: ({ get }) => get(countState) * 2,\n});",
+      "after": "import { createModule, t } from \"@directive-run/core\";\n\nexport const counter = createModule(\"counter\", {\n  schema: {\n    facts: { count: t.number() },\n    derivations: { doubled: t.number() },\n    events: { increment: {} },\n  },\n  init: (facts) => { facts.count = 0; },\n  derive: { doubled: (facts) => facts.count * 2 },\n  events: { increment: (facts) => { facts.count += 1; } },\n});"
+    }
+  ]
+}

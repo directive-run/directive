@@ -129,3 +129,37 @@ export function clearCache(): void {
   knowledgeCache = null;
   exampleCache = null;
 }
+
+// ---------------------------------------------------------------------------
+// Structured data APIs (v1.16.0 — back the MCP `list_review_rules`,
+// `get_review_rule`, `list_migration_sources`, `get_migration_pattern`,
+// `get_composable_packages` tools).
+// ---------------------------------------------------------------------------
+
+export {
+  type AntiPattern,
+  type AntiPatternCategory,
+  type AntiPatternSeverity,
+  clearAntiPatternCache,
+  getAntiPatternById,
+  getAntiPatterns,
+} from "./parsers/anti-patterns.js";
+
+export {
+  type MigrationConceptRow,
+  type MigrationPattern,
+  type MigrationSourceId,
+  MIGRATION_SOURCES,
+  clearMigrationCache,
+  getMigrationPattern,
+  getMigrationPatterns,
+  getMigrationSources,
+} from "./parsers/migration.js";
+
+export {
+  type CompositionEdge,
+  clearCompositionsCache,
+  getCompositions,
+  getCompositionsFor,
+  getReverseCompositionsFor,
+} from "./parsers/compositions.js";
