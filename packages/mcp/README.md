@@ -41,8 +41,16 @@ npx @modelcontextprotocol/inspector npx -y @directive-run/mcp
 ## SSE transport (hosted)
 
 ```bash
-directive-mcp --sse --port 3000 --host 0.0.0.0
+# Loopback (local dev) — no token required
+directive-mcp --sse --port 3000
+
+# Public host — token is mandatory
+directive-mcp --sse --port 3000 --host 0.0.0.0 \
+  --token "$DIRECTIVE_MCP_TOKEN" \
+  --allow-origin https://app.example.com
 ```
+
+The SSE server **refuses to start** on a non-loopback host without `--token` (or `DIRECTIVE_MCP_TOKEN`). When a token is set, every request to `/sse` and `/messages` must carry `Authorization: Bearer <token>`. Body size is capped at 1 MB; concurrent sessions at 64; idle sessions are pruned at 5 minutes.
 
 Endpoints:
 
@@ -50,17 +58,62 @@ Endpoints:
 - `POST /messages?sessionId=…` — client→server JSON-RPC messages.
 - `GET /healthz` — liveness probe.
 
-## Tools
+## Tools (20)
+
+### Knowledge
 
 | Tool | Purpose |
 |---|---|
 | `list_knowledge` | Every knowledge file name (core + AI + skeleton). |
 | `get_knowledge` | Read one knowledge file by name. |
+| `search_knowledge` | Case-insensitive substring search across every knowledge file. |
 | `list_examples` | Every code example name. |
 | `get_example` | Read one example by name (returned as a TypeScript code block). |
-| `search_knowledge` | Case-insensitive substring search across every knowledge file. |
+| `search_examples` | Case-insensitive substring search across the 37 bundled example .ts files. |
+
+### Packages
+
+| Tool | Purpose |
+|---|---|
+| `list_packages` | Every `@directive-run/*` package with one-line description. |
+| `get_package_info` | Single-package detail (baked metadata + live npm version, 1 h cache). |
+| `get_composable_packages` | Outgoing and incoming composition edges for one package. |
+
+### Generate
+
+| Tool | Purpose |
+|---|---|
+| `generate_module` | Generate NEW Directive module or AI orchestrator source. Returns the source string; never writes to disk. |
+| `list_module_sections` | Enumerate the valid `sections` values for `generate_module`. |
+
+### Review
+
+| Tool | Purpose |
+|---|---|
+| `list_review_rules` | Directive anti-patterns and ts-morph rules as structured data. |
+| `get_review_rule` | One rule's full detail: WRONG/CORRECT example pair + explanation. |
+| `review_source` | Run the rule registry against a TypeScript source string. Returns structured findings. |
+| `fix_code` | Apply a rule's mechanical fix; returns diff + fixed source. |
+
+### Migration
+
+| Tool | Purpose |
+|---|---|
+| `list_migration_sources` | Source libraries `get_migration_pattern` accepts. |
+| `get_migration_pattern` | Concept map + steps + before/after for migrating from Redux / Zustand / XState / MobX / Jotai / Recoil. |
+
+### Skills
+
+| Tool | Purpose |
+|---|---|
 | `list_skills` | Every Claude Code skill bundled in `@directive-run/claude-plugin`. |
 | `get_skill` | One skill's `SKILL.md` + supporting knowledge files as a single document. |
+
+### Server
+
+| Tool | Purpose |
+|---|---|
+| `get_server_info` | Version + transport + auth state + bundled-knowledge hash + session count. |
 
 ## Programmatic embedding
 

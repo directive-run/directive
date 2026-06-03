@@ -1435,4 +1435,25 @@ The CI workflow's `Check knowledge freshness` step soft-warns instead of failing
 
 Leads with a "Coming from another library? Start here" table mapping every common alias from Redux / Zustand / Jotai / XState / MobX / TanStack Query / NgRx / Pinia / LangChain to the Directive canonical term, with a one-line "why the name" hint. The strict naming rules for code Directive ships stay non-negotiable; the bidirectional terminology table at the bottom lists both directions so retrieval works regardless of which vocabulary the searcher knows. ~2KB added to the Claude Code template; template-output size cap raised 40KB → 50KB.
 
+### v1.16.H – `@directive-run/mcp@0.2.0` write-tier expansion + ts-morph review + fix_code
+
+**[2 days – DX HIGH, viral HIGH]**
+
+**[SHIPPED 2026-06-02]**
+
+Closes the v0.2.0 plan that ran through an upfront AE multi-agent design review (security / architecture / DX / innovation). The MCP server goes from 7 read-only tools to 20, with three new supporting packages and a hardened SSE transport.
+
+**Two new packages:**
+
+- `@directive-run/scaffold@0.1.0` — pure source generators extracted from `cli/new.ts`. Zero runtime deps. Consumed by `cli` and `mcp`.
+- `@directive-run/lint@0.1.0` — ts-morph rule registry with 10 rules and 6 mechanical autofixes. ts-morph as `optionalDependencies` so metadata-only consumers don't pay the ~25 MB install cost.
+
+**`@directive-run/knowledge` minor:** structured composition graph (42 edges) and migration patterns (6 source libraries) ship as JSON in the tarball; new parsers expose `getAntiPatterns`, `getCompositions`, `getMigrationPattern`, etc.
+
+**13 new MCP tools:** `search_examples`, `list_packages`, `get_package_info` (hybrid baked + live npm version, 1 h cache), `get_composable_packages`, `generate_module`, `list_module_sections`, `list_review_rules`, `get_review_rule`, `list_migration_sources`, `get_migration_pattern`, `review_source` (ts-morph AST analyzer, 200 KB cap), `fix_code` (mechanical autofixes; 6 of 10 rules fixable), `get_server_info`.
+
+**SSE hardening (AE Security P0 #4):** bearer token auth mandatory on non-loopback hosts, 1 MB body cap with streaming guard, 64 concurrent-session cap, 5-minute idle-session pruning, optional `--allow-origin` allowlist.
+
+Net: 60 new tests across the workspace, 5 changesets queued. The viral tool of the round is `fix_code` — the "Claude paste broken Directive code, get a working diff" loop runs end-to-end in one MCP session.
+
 
