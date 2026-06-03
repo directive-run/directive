@@ -13,11 +13,13 @@ export type Severity = "error" | "warning" | "info";
 /** Rule category — matches the `reviewing-directive-code` skill taxonomy. */
 export type RuleCategory =
   | "module"
+  | "schema"
   | "constraint"
   | "resolver"
   | "derivation"
   | "effect"
   | "naming"
+  | "react"
   | "composition";
 
 /**

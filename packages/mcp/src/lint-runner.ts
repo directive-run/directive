@@ -89,7 +89,7 @@ async function runInWorker<TIn, TOut>(payload: TIn): Promise<TOut> {
           }
         },
       );
-      worker.once("error", (err) => {
+      worker.once("error", (err: Error) => {
         resolved = true;
         reject(new LintRunnerError(err.message, "worker-error"));
       });
