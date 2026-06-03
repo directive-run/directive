@@ -38,13 +38,17 @@ describe("createDirectiveServer", () => {
       "get_composable_packages",
       "get_example",
       "get_knowledge",
+      "get_migration_pattern",
       "get_package_info",
+      "get_review_rule",
       "get_server_info",
       "get_skill",
       "list_examples",
       "list_knowledge",
+      "list_migration_sources",
       "list_module_sections",
       "list_packages",
+      "list_review_rules",
       "list_skills",
       "search_examples",
       "search_knowledge",
@@ -298,6 +302,90 @@ describe("createDirectiveServer", () => {
     expect(text).toContain("@directive-run/ai");
     expect(text).toContain("chatAgent");
     expect(text).toContain("RUN_AGENT");
+  });
+
+  it("list_review_rules returns a non-empty JSON list of rules", async () => {
+    const result = await client.callTool({
+      name: "list_review_rules",
+      arguments: {},
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    expect(text).toMatch(/^.*?\d+ review rules:/m);
+    expect(text).toContain('"id":');
+    expect(text).toContain('"severity":');
+  });
+
+  it("get_review_rule returns a known rule", async () => {
+    const list = await client.callTool({
+      name: "list_review_rules",
+      arguments: {},
+    });
+    const listText = extractText(list);
+    const firstId = listText.match(/"id":\s*"([^"]+)"/)?.[1];
+    expect(firstId).toBeTruthy();
+
+    const result = await client.callTool({
+      name: "get_review_rule",
+      arguments: { id: firstId! },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    expect(text).toContain(`**id:** ${firstId}`);
+    expect(text).toMatch(/\*\*severity:\*\*/);
+  });
+
+  it("get_review_rule errors on unknown id", async () => {
+    const result = await client.callTool({
+      name: "get_review_rule",
+      arguments: { id: "not-a-real-rule-12345" },
+    });
+    expect(result.isError).toBe(true);
+    expect(extractText(result)).toMatch(/not found/i);
+  });
+
+  it("list_migration_sources enumerates the 6 source libs", async () => {
+    const result = await client.callTool({
+      name: "list_migration_sources",
+      arguments: {},
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    for (const src of [
+      "redux",
+      "zustand",
+      "xstate",
+      "mobx",
+      "jotai",
+      "recoil",
+    ]) {
+      expect(text).toContain(src);
+    }
+  });
+
+  it("get_migration_pattern returns concept map + steps + examples", async () => {
+    const result = await client.callTool({
+      name: "get_migration_pattern",
+      arguments: { source: "redux" },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    expect(text).toContain("Migrating from Redux");
+    expect(text).toContain("Concept map");
+    expect(text).toContain("Steps");
+    expect(text).toContain("createSlice");
+    expect(text).toContain("createModule");
+  });
+
+  it("get_migration_pattern rejects unknown source via enum schema", async () => {
+    const result = await client.callTool({
+      name: "get_migration_pattern",
+      arguments: { source: "not-a-lib" },
+    });
+    expect(result.isError).toBe(true);
   });
 
   it("get_server_info returns version + transport + hash manifest", async () => {

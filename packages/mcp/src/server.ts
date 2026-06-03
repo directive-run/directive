@@ -28,11 +28,16 @@
 import { createHash } from "node:crypto";
 import { getAllSkills, getSkill } from "@directive-run/claude-plugin";
 import {
+  MIGRATION_SOURCES,
+  type MigrationSourceId,
   getAllExamples,
   getAllKnowledge,
+  getAntiPatternById,
+  getAntiPatterns,
   getCompositionsFor,
   getExample,
   getKnowledge,
+  getMigrationPattern,
   getReverseCompositionsFor,
 } from "@directive-run/knowledge";
 import {
@@ -578,6 +583,168 @@ export function createDirectiveServer(): McpServer {
           content: [{ type: "text", text: (err as Error).message }],
         };
       }
+    },
+  );
+
+  server.registerTool(
+    "list_review_rules",
+    {
+      title: "List Directive code-review rules",
+      description:
+        "Enumerate every anti-pattern Directive code can violate, parsed from @directive-run/knowledge. Each entry carries an id, severity, category, title, badExample, goodExample, and explanation. Use this to discover rule ids before calling get_review_rule or before passing ruleFilter to review_source. Returns existing reference material; does NOT generate code.",
+      inputSchema: {},
+    },
+    async () => {
+      const rules = getAntiPatterns();
+      const compact = rules.map((r) => ({
+        id: r.id,
+        severity: r.severity,
+        category: r.category,
+        title: r.title,
+      }));
+      return {
+        content: [
+          {
+            type: "text",
+            text: `<directive-data>\n${rules.length} review rules:\n${JSON.stringify(compact, null, 2)}\n</directive-data>`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_review_rule",
+    {
+      title: "Get a Directive code-review rule",
+      description:
+        "Fetch one anti-pattern's full detail: title, severity, category, explanation, and the WRONG/CORRECT code-example pair. Use list_review_rules first to discover valid ids. Returns existing reference material; does NOT generate code.",
+      inputSchema: {
+        id: z
+          .string()
+          .min(1)
+          .max(128)
+          .describe(
+            "Rule id (a kebab-case slug — e.g. 'flat-schema-missing-facts-wrapper'). Call list_review_rules first to discover valid ids.",
+          ),
+      },
+    },
+    async ({ id }) => {
+      const rule = getAntiPatternById(id);
+      if (!rule) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Rule not found: '${id}'. Call list_review_rules to see available ids.`,
+            },
+          ],
+        };
+      }
+      const lines: string[] = [
+        `# ${rule.title}`,
+        `**id:** ${rule.id}`,
+        `**severity:** ${rule.severity}`,
+        `**category:** ${rule.category}`,
+      ];
+      if (rule.explanation) {
+        lines.push("", rule.explanation);
+      }
+      if (rule.badExample) {
+        lines.push("", "## Wrong", "```typescript", rule.badExample, "```");
+      }
+      if (rule.goodExample) {
+        lines.push("", "## Correct", "```typescript", rule.goodExample, "```");
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: `<directive-data>\n${lines.join("\n")}\n</directive-data>`,
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_migration_sources",
+    {
+      title: "List supported migration source libraries",
+      description:
+        "Enumerate the source libraries get_migration_pattern accepts: redux, zustand, xstate, mobx, jotai, recoil. Call this before get_migration_pattern so the source list comes from the server (no hallucination risk). Returns existing reference material; does NOT generate code.",
+      inputSchema: {},
+    },
+    async () => ({
+      content: [
+        {
+          type: "text",
+          text: `${MIGRATION_SOURCES.length} sources:\n${MIGRATION_SOURCES.join("\n")}`,
+        },
+      ],
+    }),
+  );
+
+  server.registerTool(
+    "get_migration_pattern",
+    {
+      title: "Get migration pattern from a state-management library",
+      description:
+        "Fetch the concept-mapping table + step list + before/after exemplars for migrating from a popular state-management library to Directive. Use this when a user asks 'how do I migrate from Redux / Zustand / XState / MobX / Jotai / Recoil'. Returns existing reference material; does NOT generate code.",
+      inputSchema: {
+        source: z
+          .enum(MIGRATION_SOURCES)
+          .describe(
+            "Source library. Discover valid values via list_migration_sources.",
+          ),
+      },
+    },
+    async ({ source }) => {
+      const pattern = getMigrationPattern(source as MigrationSourceId);
+      if (!pattern) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Migration pattern not found: '${source}'. Call list_migration_sources to see valid values.`,
+            },
+          ],
+        };
+      }
+      const lines: string[] = [
+        `# Migrating from ${pattern.name} to Directive`,
+        "",
+        "## Concept map",
+        "",
+        "| From | To | Note |",
+        "|---|---|---|",
+        ...pattern.conceptMap.map(
+          (row) => `| ${row.from} | ${row.to} | ${row.note} |`,
+        ),
+        "",
+        "## Steps",
+        ...pattern.steps.map((s, i) => `${i + 1}. ${s}`),
+        "",
+        "## Before",
+        "```typescript",
+        pattern.before,
+        "```",
+        "",
+        "## After",
+        "```typescript",
+        pattern.after,
+        "```",
+      ];
+      return {
+        content: [
+          {
+            type: "text",
+            text: `<directive-data>\n${lines.join("\n")}\n</directive-data>`,
+          },
+        ],
+      };
     },
   );
 

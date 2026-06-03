@@ -523,4 +523,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-03T02:16:52.882Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-03T04:16:08.216Z";
