@@ -25,16 +25,22 @@ const VERSION = "0.2.0";
 const USAGE = `directive-mcp — MCP server exposing Directive to AI clients
 
 Usage:
-  directive-mcp                Run stdio transport (default)
-  directive-mcp --sse          Run SSE transport on 127.0.0.1:3000
-  directive-mcp --sse --port 8080 --host 0.0.0.0
+  directive-mcp                                  Run stdio transport (default)
+  directive-mcp --sse                            Run SSE transport on 127.0.0.1:3000
+  directive-mcp --sse --port 8080 --host 0.0.0.0 \\
+    --token <secret> --allow-origin https://app.example.com
 
 Options:
-  --sse              Use HTTP SSE transport instead of stdio
-  --port <port>      SSE port (default: 3000)
-  --host <host>      SSE bind host (default: 127.0.0.1)
-  --help, -h         Show this help
-  --version, -v      Show package version
+  --sse                       Use HTTP SSE transport instead of stdio
+  --port <port>               SSE port (default: 3000)
+  --host <host>               SSE bind host (default: 127.0.0.1)
+  --token <value>             Bearer token required on /sse and /messages requests.
+                              MANDATORY when --host is not loopback. Can also be
+                              passed via the DIRECTIVE_MCP_TOKEN env var.
+  --allow-origin <origin>     Permitted Origin header value. Repeatable. When
+                              omitted, no Origin check is performed.
+  --help, -h                  Show this help
+  --version, -v               Show package version
 
 Docs: https://directive.run/docs/ide-integration
 `;
@@ -45,6 +51,24 @@ interface ParsedArgs {
   host: string;
   help: boolean;
   version: boolean;
+  token?: string;
+  allowOrigins: string[];
+}
+
+function requireValue(argv: string[], index: number, flag: string): string {
+  const next = argv[index];
+  if (!next) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return next;
+}
+
+function parsePort(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0 || n > 65535) {
+    throw new Error(`invalid --port: ${value}`);
+  }
+  return n;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -54,6 +78,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     host: "127.0.0.1",
     help: false,
     version: false,
+    allowOrigins: [],
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -62,26 +87,18 @@ function parseArgs(argv: string[]): ParsedArgs {
       case "--sse":
         result.sse = true;
         break;
-      case "--port": {
-        const next = argv[++i];
-        if (!next) {
-          throw new Error("--port requires a value");
-        }
-        const n = Number(next);
-        if (!Number.isInteger(n) || n <= 0 || n > 65535) {
-          throw new Error(`invalid --port: ${next}`);
-        }
-        result.port = n;
+      case "--port":
+        result.port = parsePort(requireValue(argv, ++i, "--port"));
         break;
-      }
-      case "--host": {
-        const next = argv[++i];
-        if (!next) {
-          throw new Error("--host requires a value");
-        }
-        result.host = next;
+      case "--host":
+        result.host = requireValue(argv, ++i, "--host");
         break;
-      }
+      case "--token":
+        result.token = requireValue(argv, ++i, "--token");
+        break;
+      case "--allow-origin":
+        result.allowOrigins.push(requireValue(argv, ++i, "--allow-origin"));
+        break;
       case "--help":
       case "-h":
         result.help = true;
@@ -120,6 +137,8 @@ async function main(): Promise<void> {
     const httpServer = await startSseServer({
       port: args.port,
       host: args.host,
+      token: args.token,
+      allowOrigins: args.allowOrigins,
     });
 
     const shutdown = () => {
