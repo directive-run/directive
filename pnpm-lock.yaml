@@ -1093,6 +1093,9 @@ importers:
       '@directive-run/knowledge':
         specifier: workspace:*
         version: link:../knowledge
+      '@directive-run/scaffold':
+        specifier: workspace:*
+        version: link:../scaffold
       '@modelcontextprotocol/sdk':
         specifier: ^1.0.0
         version: 1.29.0(zod@3.25.76)

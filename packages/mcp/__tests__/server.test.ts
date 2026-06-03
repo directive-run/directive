@@ -34,6 +34,7 @@ describe("createDirectiveServer", () => {
     const names = tools.map((t) => t.name).sort();
 
     expect(names).toEqual([
+      "generate_module",
       "get_composable_packages",
       "get_example",
       "get_knowledge",
@@ -42,6 +43,7 @@ describe("createDirectiveServer", () => {
       "get_skill",
       "list_examples",
       "list_knowledge",
+      "list_module_sections",
       "list_packages",
       "list_skills",
       "search_examples",
@@ -233,6 +235,69 @@ describe("createDirectiveServer", () => {
     });
     expect(result.isError).toBeFalsy();
     expect(extractText(result)).toMatch(/no composition data/i);
+  });
+
+  it("list_module_sections returns the canonical 5", async () => {
+    const result = await client.callTool({
+      name: "list_module_sections",
+      arguments: {},
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("derive");
+    expect(text).toContain("events");
+    expect(text).toContain("constraints");
+    expect(text).toContain("resolvers");
+    expect(text).toContain("effects");
+  });
+
+  it("generate_module returns a sensible module source", async () => {
+    const result = await client.callTool({
+      name: "generate_module",
+      arguments: { name: "traffic-light", kind: "module" },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("traffic-light.ts");
+    expect(text).toContain("@directive-run/core");
+    expect(text).toContain('createModule("traffic-light"');
+    expect(text).toContain("export const trafficLight");
+  });
+
+  it("generate_module respects sections enum", async () => {
+    const result = await client.callTool({
+      name: "generate_module",
+      arguments: {
+        name: "minimal-mod",
+        kind: "module",
+        sections: ["derive"],
+      },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("derive:");
+    expect(text).not.toContain("effects:");
+  });
+
+  it("generate_module rejects invalid names", async () => {
+    const result = await client.callTool({
+      name: "generate_module",
+      arguments: { name: "../etc/passwd", kind: "module" },
+    });
+    expect(result.isError).toBe(true);
+    expect(extractText(result)).toMatch(/invalid name|must start/i);
+  });
+
+  it("generate_module orchestrator pulls in @directive-run/ai", async () => {
+    const result = await client.callTool({
+      name: "generate_module",
+      arguments: { name: "chat-agent", kind: "orchestrator" },
+    });
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("@directive-run/ai");
+    expect(text).toContain("chatAgent");
+    expect(text).toContain("RUN_AGENT");
   });
 
   it("get_server_info returns version + transport + hash manifest", async () => {

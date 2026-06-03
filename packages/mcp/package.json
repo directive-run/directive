@@ -55,6 +55,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@directive-run/knowledge": "workspace:*",
     "@directive-run/claude-plugin": "workspace:*",
+    "@directive-run/scaffold": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -35,6 +35,15 @@ import {
   getKnowledge,
   getReverseCompositionsFor,
 } from "@directive-run/knowledge";
+import {
+  MODULE_SECTIONS,
+  type ModuleSection,
+  generateModule,
+  generateOrchestrator,
+  requiredPackages,
+  suggestFileNames,
+  validateModuleName,
+} from "@directive-run/scaffold";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { PACKAGE_REGISTRY_BUILT_AT } from "./generated/package-registry.js";
@@ -483,6 +492,92 @@ export function createDirectiveServer(): McpServer {
       return {
         content: [{ type: "text", text: lines.join("\n") }],
       };
+    },
+  );
+
+  server.registerTool(
+    "list_module_sections",
+    {
+      title: "List valid module sections for generate_module",
+      description:
+        "Enumerate the valid `sections` values that `generate_module` accepts: derive, events, constraints, resolvers, effects. Call this before generate_module so the section list comes from the server (no hallucination risk). Returns existing reference material; does NOT generate code.",
+      inputSchema: {},
+    },
+    async () => ({
+      content: [
+        {
+          type: "text",
+          text: `${MODULE_SECTIONS.length} module sections:\n${MODULE_SECTIONS.join("\n")}`,
+        },
+      ],
+    }),
+  );
+
+  server.registerTool(
+    "generate_module",
+    {
+      title: "Generate NEW Directive module source code",
+      description:
+        'Generate the source string for a new Directive module or AI orchestrator. Use this when the user wants to CREATE a module, not learn about one. Returns the source as text; never writes to disk — the caller decides where to put it. Strict regex on `name` (kebab-case, ≤64 chars). For `kind: "module"`, optionally pass `sections` to pick which blocks to include (default: every section). Discover valid section values via list_module_sections.',
+      inputSchema: {
+        name: z
+          .string()
+          .min(1)
+          .max(64)
+          .describe(
+            "Kebab-case identifier (e.g. 'traffic-light'). Must start with a lowercase letter and contain only lowercase letters, digits, and hyphens.",
+          ),
+        kind: z
+          .enum(["module", "orchestrator"])
+          .default("module")
+          .describe(
+            "What to generate. 'module' for a plain Directive module; 'orchestrator' for an AI agent orchestrator module with memory + guardrails scaffolding.",
+          ),
+        sections: z
+          .array(z.enum(MODULE_SECTIONS))
+          .optional()
+          .describe(
+            "Which module sections to include. Defaults to every section. Only honored when kind === 'module'. Discover valid values via list_module_sections.",
+          ),
+      },
+    },
+    async ({ name, kind, sections }) => {
+      const validation = validateModuleName(name);
+      if (validation !== true) {
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `Invalid name '${name}': ${validation}` },
+          ],
+        };
+      }
+      try {
+        const source =
+          kind === "orchestrator"
+            ? generateOrchestrator(name)
+            : generateModule(
+                name,
+                (sections as readonly ModuleSection[]) ?? MODULE_SECTIONS,
+              );
+        const { sourceFileName, testFileName } = suggestFileNames(name, kind);
+        const needed = requiredPackages(kind);
+        const lines: string[] = [
+          `// Suggested file: src/${sourceFileName}`,
+          `// Suggested test: src/${testFileName}`,
+          `// Required packages: ${needed.join(", ")}`,
+          `// Run: pnpm add ${needed.join(" ")}`,
+          "",
+          source,
+        ];
+        return {
+          content: [{ type: "text", text: lines.join("\n") }],
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: (err as Error).message }],
+        };
+      }
     },
   );
 

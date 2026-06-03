@@ -269,6 +269,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
     "dependencies": [
       "@directive-run/claude-plugin",
       "@directive-run/knowledge",
+      "@directive-run/scaffold",
       "@modelcontextprotocol/sdk",
       "zod"
     ],
@@ -522,4 +523,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-03T02:14:00.785Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-03T02:16:52.882Z";
