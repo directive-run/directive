@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/lint",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "ts-morph-based static analysis for Directive code. Rule registry + executable checks + autofixes. Consumed by @directive-run/mcp (review_source, fix_code tools) and the future `directive doctor lint` CLI command. Anti-pattern data sourced from @directive-run/knowledge so rule IDs stay in lock-step.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
