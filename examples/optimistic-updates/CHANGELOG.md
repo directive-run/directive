@@ -1,5 +1,13 @@
 # @directive-run/example-optimistic-updates
 
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.17.0
+  - @directive-run/el@1.1.0
+
 ## 0.0.38
 
 ### Patch Changes

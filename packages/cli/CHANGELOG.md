@@ -1,5 +1,17 @@
 # @directive-run/cli
 
+## 1.17.0
+
+### Patch Changes
+
+- [`f98c183`](https://github.com/directive-run/directive/commit/f98c1835e6c13f382420bd93412ff4a54b586d2a) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Internal refactor: `directive new <name>` and `directive new-orchestrator <name>` now delegate to the new `@directive-run/scaffold` package. End-user behavior is unchanged — same generated source, same file paths, same error messages — but the generators are now reusable from `@directive-run/mcp`'s `generate_module` tool, and the kebab-case naming rule lives in one place.
+
+  No public API additions or removals. Workspace dep added.
+
+- Updated dependencies [[`f98c183`](https://github.com/directive-run/directive/commit/f98c1835e6c13f382420bd93412ff4a54b586d2a), [`f98c183`](https://github.com/directive-run/directive/commit/f98c1835e6c13f382420bd93412ff4a54b586d2a)]:
+  - @directive-run/knowledge@1.17.0
+  - @directive-run/scaffold@0.1.0
+
 ## 1.16.0
 
 ### Minor Changes
