@@ -17,7 +17,7 @@ export interface PackageRegistryEntry {
 export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   {
     "name": "@directive-run/ai",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "AI guardrails and orchestration for Directive. Prompt injection, PII detection, cost tracking, multi-agent patterns.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -62,7 +62,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/claude-plugin",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Claude Code plugin for Directive — 12 skills covering modules, constraints, resolvers, derivations, AI orchestration, and adapters. Installable via Claude Code's plugin marketplace or consumable programmatically as an npm package.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -86,7 +86,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/cli",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -119,7 +119,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/core",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "The constraint-driven runtime for TypeScript. Declare what must be true — the runtime makes it happen.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -184,7 +184,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/knowledge",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Knowledge files, examples, and validation for Directive — the constraint-driven TypeScript runtime.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -229,7 +229,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/lit",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Lit web components adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -254,7 +254,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mcp",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -358,7 +358,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/react",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "React hooks and components for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -404,7 +404,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/solid",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Solid.js signals adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -431,7 +431,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/svelte",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Svelte stores adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -500,7 +500,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/vue",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "description": "Vue composition API adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -526,4 +526,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-03T04:50:03.046Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-04T00:14:10.722Z";

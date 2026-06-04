@@ -59,7 +59,11 @@ import {
 } from "./lint-runner.js";
 import { getPackageInfo, listPackages } from "./packages.js";
 
-const PKG_VERSION = "0.2.0";
+// Injected at build time by tsup's `define` from package.json so the
+// MCP handshake + get_server_info always match the published version.
+// In dev (tsx, no build) falls back to a sentinel so handshakes don't
+// claim a real version.
+const PKG_VERSION = process.env.DIRECTIVE_MCP_VERSION ?? "0.0.0-dev";
 const MAX_SEARCH_RESULTS = 50;
 const MAX_LINE_PREVIEW = 200;
 const MAX_QUERY_LENGTH = 512;

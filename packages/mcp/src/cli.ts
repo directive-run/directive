@@ -20,7 +20,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createDirectiveServer, setServerInfo } from "./server.js";
 import { startSseServer } from "./sse.js";
 
-const VERSION = "0.2.0";
+// Injected at build time from package.json — see packages/mcp/tsup.config.ts.
+const VERSION = process.env.DIRECTIVE_MCP_VERSION ?? "0.0.0-dev";
 
 const USAGE = `directive-mcp — MCP server exposing Directive to AI clients
 
