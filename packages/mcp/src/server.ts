@@ -448,11 +448,19 @@ export function createDirectiveServer(): McpServer {
       const outgoing = getCompositionsFor(name);
       const incoming = getReverseCompositionsFor(name);
       if (outgoing.length === 0 && incoming.length === 0) {
+        // No edges either direction means the package name isn't known
+        // to the graph at all (every shipped @directive-run/* package
+        // has at least one edge). Surface as isError so LLM clients
+        // can distinguish "you typed it wrong" from "no data."
+        const knownPackage = listPackages().some((p) => p.name === name);
         return {
+          isError: true,
           content: [
             {
               type: "text",
-              text: `No composition data for '${name}'. Call list_packages to see available names.`,
+              text: knownPackage
+                ? `NO_COMPOSITIONS: '${name}' is a known package but has no composition edges yet. This is a coverage gap in compositions.json.`
+                : `NOT_FOUND: '${name}' is not a known @directive-run/* package. Call list_packages to see available names.`,
             },
           ],
         };

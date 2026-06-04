@@ -49,7 +49,8 @@
     "build:registry": "tsx scripts/build-package-registry.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist src/generated"
+    "clean": "rm -rf dist src/generated",
+    "prepublishOnly": "pnpm clean && pnpm build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

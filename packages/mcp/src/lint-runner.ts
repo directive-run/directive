@@ -123,7 +123,17 @@ async function runInWorker<TIn, TOut>(payload: TIn): Promise<TOut> {
 }
 
 function shouldUseWorker(): boolean {
-  return process.env.DIRECTIVE_MCP_USE_LINT_WORKER === "1";
+  // Default ON in production so synchronous ts-morph parses cannot pin
+  // the event loop past the 5-second budget (AE v0.2.0 P0 #3). Disable
+  // inside vitest (Vitest's pool model conflicts with spawned Workers)
+  // or via explicit DIRECTIVE_MCP_USE_LINT_WORKER=0.
+  if (process.env.DIRECTIVE_MCP_USE_LINT_WORKER === "0") {
+    return false;
+  }
+  if (process.env.VITEST === "true") {
+    return false;
+  }
+  return true;
 }
 
 export async function runLintInWorker(input: LintRunInput): Promise<RunResult> {

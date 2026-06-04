@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getExecutableRules } from "../src/executable.js";
 import {
   type Finding,
   applyFix,
@@ -20,6 +21,21 @@ describe("getRules / getRuleById", () => {
   it("round-trips every id via getRuleById", () => {
     for (const rule of getRules()) {
       expect(getRuleById(rule.id)?.id).toBe(rule.id);
+    }
+  });
+
+  it("metadata array matches executable rules' metadata (no drift)", () => {
+    const fromRegistry = getRules();
+    const fromExecutable = getExecutableRules().map((r) => r.metadata);
+    // Same set of ids
+    expect(new Set(fromRegistry.map((r) => r.id))).toEqual(
+      new Set(fromExecutable.map((r) => r.id)),
+    );
+    // Per-rule field equality
+    for (const meta of fromRegistry) {
+      const exec = fromExecutable.find((r) => r.id === meta.id);
+      expect(exec, `executable rule missing: ${meta.id}`).toBeDefined();
+      expect(exec).toEqual(meta);
     }
   });
 });

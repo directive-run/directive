@@ -111,7 +111,7 @@ export async function runRules(
   source: string,
   options: RunOptions = {},
 ): Promise<RunResult> {
-  const { getExecutableRules } = await import("./rules.js");
+  const { getExecutableRules } = await import("./executable.js");
   const allRules = getExecutableRules();
 
   const filter = options.ruleFilter;
@@ -167,7 +167,7 @@ export async function applyFix(
   source: string,
   finding: Finding,
 ): Promise<FixResult> {
-  const { getExecutableRuleById } = await import("./rules.js");
+  const { getExecutableRuleById } = await import("./executable.js");
   const rule = getExecutableRuleById(finding.ruleId);
   if (!rule) {
     return { ok: false, reason: `unknown rule: ${finding.ruleId}` };

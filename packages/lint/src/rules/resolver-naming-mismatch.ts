@@ -35,11 +35,11 @@ function expectedKeyForRequirement(reqType: string): string {
 export const rule: ExecutableRule = {
   metadata: {
     id: ID,
-    severity: "warning",
+    severity: "info",
     category: "resolver",
-    title: "Resolver key does not match its requirement",
+    title: "Resolver key does not match its requirement (informational)",
     explanation:
-      "Each resolver key should be the camelCase version of the requirement type it handles. Mismatched names work at runtime but make grep / dev-tools wrong, and is the #1 source of 'why isn't my resolver firing?' confusion.",
+      "A common stylistic convention names the resolver key as the camelCase version of the requirement type it handles (e.g. `fetchUser` for `FETCH_USER`). This is informational only — no canonical Directive doc requires it — but matching names make grep + dev-tools navigation faster and reduce 'why isn't my resolver firing?' confusion when there are many requirements. Disable via `ruleFilter` if your project uses semantic keys instead.",
     badExample: `resolvers: {
   processItem: {
     requirement: "FETCH_USER",
@@ -85,11 +85,11 @@ export const rule: ExecutableRule = {
         );
         findings.push({
           ruleId: ID,
-          severity: "warning",
+          severity: "info",
           line,
           column,
-          message: `Resolver key "${actualKey}" does not match requirement "${reqType}" — expected "${expected}".`,
-          suggestion: `Rename the key to "${expected}".`,
+          message: `Resolver key "${actualKey}" does not match requirement "${reqType}" — convention suggests "${expected}".`,
+          suggestion: `Optionally rename the key to "${expected}". This is stylistic only; semantic keys also work.`,
           findingId: makeFindingId(ID, line, column),
         });
       }

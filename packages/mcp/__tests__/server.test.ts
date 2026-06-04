@@ -234,13 +234,13 @@ describe("createDirectiveServer", () => {
     expect(text).toMatch(/Composes with:|Composed by:/);
   });
 
-  it("get_composable_packages reports cleanly for unknown package", async () => {
+  it("get_composable_packages flags unknown package as NOT_FOUND error", async () => {
     const result = await client.callTool({
       name: "get_composable_packages",
       arguments: { name: "@directive-run/not-a-real-pkg" },
     });
-    expect(result.isError).toBeFalsy();
-    expect(extractText(result)).toMatch(/no composition data/i);
+    expect(result.isError).toBe(true);
+    expect(extractText(result)).toMatch(/not_found/i);
   });
 
   it("list_module_sections returns the canonical 5", async () => {

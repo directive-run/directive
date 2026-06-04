@@ -165,6 +165,13 @@ function updateSetServerInfo(sessions: Sessions, authEnabled: boolean): void {
   });
 }
 
+// Synchronous claim counter — every connect path that has not yet hit
+// `sessions.set` increments this BEFORE any code that could yield. The
+// cap check sums sessions.size + pendingConnects, so even if a future
+// SDK version makes SSEServerTransport's constructor async-leaky, the
+// count is correctly reserved.
+let pendingConnects = 0;
+
 async function handleSseConnect(
   req: IncomingMessage,
   res: ServerResponse,
@@ -179,30 +186,40 @@ async function handleSseConnect(
     reject(res, 403, "origin not allowed");
     return;
   }
-  if (sessions.size >= config.maxSessions) {
+  if (sessions.size + pendingConnects >= config.maxSessions) {
     reject(res, 429, "session cap reached", { "Retry-After": "60" });
     return;
   }
+  pendingConnects += 1;
 
-  const transport = new SSEServerTransport(MESSAGES_PATH, res);
-  const server = createDirectiveServer();
-  sessions.set(transport.sessionId, {
-    transport,
-    lastActivity: Date.now(),
-  });
-  updateSetServerInfo(sessions, Boolean(config.token));
-
-  const cleanup = () => {
-    sessions.delete(transport.sessionId);
+  let claimed = false;
+  try {
+    const transport = new SSEServerTransport(MESSAGES_PATH, res);
+    const server = createDirectiveServer();
+    sessions.set(transport.sessionId, {
+      transport,
+      lastActivity: Date.now(),
+    });
+    claimed = true;
     updateSetServerInfo(sessions, Boolean(config.token));
-  };
-  res.on("close", cleanup);
-  transport.onclose = cleanup;
 
-  await server.connect(transport);
-  config.logger.log(
-    `[directive-mcp] sse session opened: ${transport.sessionId}`,
-  );
+    const cleanup = () => {
+      sessions.delete(transport.sessionId);
+      updateSetServerInfo(sessions, Boolean(config.token));
+    };
+    res.on("close", cleanup);
+    transport.onclose = cleanup;
+
+    await server.connect(transport);
+    config.logger.log(
+      `[directive-mcp] sse session opened: ${transport.sessionId}`,
+    );
+  } finally {
+    pendingConnects -= 1;
+    if (!claimed) {
+      // Connection rejected before sessions.set ran; nothing to clean up.
+    }
+  }
 }
 
 async function handlePostMessage(

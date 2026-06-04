@@ -1456,4 +1456,99 @@ Closes the v0.2.0 plan that ran through an upfront AE multi-agent design review 
 
 Net: 60 new tests across the workspace, 5 changesets queued. The viral tool of the round is `fix_code` — the "Claude paste broken Directive code, get a working diff" loop runs end-to-end in one MCP session.
 
+### v1.16.I – Post-0.2.2 production-readiness audit + 0.2.3 patch
+
+**[1 day – hygiene MAX, foundation HIGH]**
+
+**[SHIPPED 2026-06-03]**
+
+13-lens AE deep dive on the shipped `@directive-run/mcp@0.2.2` surface. Full audit at `docs/AE-AUDIT-0.2.2.md`. 12 P0s identified; the 0.2.3 patch closed all of them: lazy ts-morph fixed at the bundle level (the README's optionalDependencies story is finally true), `worker_threads` ON by default (only disabled inside vitest), SSE session-cap race hardened with synchronous `pendingConnects` counter, error-envelope consistency on `get_composable_packages` (returns `isError: true` with `NOT_FOUND` prefix), `prepublishOnly` hook on mcp package, `resolver-naming-mismatch` dropped to `info` severity (was lint-blasting real codebases), `module-missing-facts-schema` explanation rewritten to be accurate (facts are silently empty, not a runtime error), Redux migration `useSelector → useFact/useDerived` mapping corrected, README rebuilt around a 3-step Try it block + architecture diagram + troubleshooting section. Rule-metadata extracted to its own no-ts-morph file so `getRules()` stays sync-cheap.
+
+## v0.3.0 candidates
+
+Ranked from the AE Audit 0.2.2 synthesis. Composite = **viral × foundation × effort (lower=better) × moat**.
+
+### 1. `playground_link` MCP tool — **[1 week — viral MAX, effort LOW]**
+
+Returns a `directive.run/play/?gist=…` URL pre-populated with broken source AND the proposed fix. Every `fix_code` result becomes a shareable artifact: paste in chat, recipient clicks, recipient runs in browser. Zero-install distribution loop. The Karpathy quote-tweet asset. AE Innovation #1.
+
+### 2. DevTools ↔ MCP runtime bridge — **[4 weeks — viral MAX, moat MAX]**
+
+`inspect_running_system`, `why_constraint_failed`, `snapshot_diff` tools that let Claude read live facts + constraints + derivations from a running Directive app. "Claude, why is my orchestrator stuck?" → Claude points at the constraint. First **agent-debuggable runtime** in the state-management category. AE Architecture + AE Innovation both flagged this as v0.3.0 headline.
+
+### 3. `explain_finding` MCP tool — **[2 days — viral HIGH, effort LOW]**
+
+One round trip = explanation + minimal-repro + the exact 3 lines of fixed code. Today the LLM has to chain `review_source` → `get_review_rule` → `fix_code`. Compress to one tool. Pedagogy in a single call.
+
+### 4. Slim cold-start — **[1 week — foundational, unblocks #1-3]**
+
+- Drop ts-morph from mcp's `optionalDependencies` (now lives in lint where it belongs). Saves ~85 MB install + ~10 s cold start.
+- Drop sourcemaps from published tarballs (~300-400 KB).
+- Split `@directive-run/claude-plugin` skill bundles into `@directive-run/claude-plugin-skills` (2 MB) loaded lazily by `get_skill`.
+- Warm `computeBundledKnowledgeHash` off the handshake hot path via `setImmediate`.
+
+### 5. MCP Resources for knowledge / examples / rules — **[1 week — agent UX]**
+
+`directive://knowledge/{name}`, `directive://rules/{id}`, `directive://examples/{name}` as MCP Resources (cacheable, discoverable via `resources/list`). Cuts round-trips, lets clients prefetch.
+
+### 6. MCP Prompts for common flows — **[3 days — agent UX]**
+
+`review-and-fix`, `migrate-from-redux`, `scaffold-orchestrator` as prompt templates. Removes orchestration burden from the LLM.
+
+### 7. `apply_review` macro tool — **[3 days — agent UX]**
+
+Single call: source in → source with all fixable findings applied + remaining unfixable findings out. Closes the review→fix loop server-side; one round-trip instead of N.
+
+### 8. Anonymous telemetry foundation — **[1 week — foundational for v0.4 decisions]**
+
+`withTelemetry` middleware in `server.ts`. Anonymous UUID at `~/.config/directive/telemetry-id`. Local NDJSON only (`~/.cache/directive/telemetry.log`) in v0.3.0 beta. Opt-out via `DIRECTIVE_TELEMETRY=0` or `--no-telemetry`. v0.3.0-rc adds Cloudflare Worker collector behind explicit `directive-mcp telemetry enable`. v0.3.0 GA flips default to opt-in-with-clear-banner (Next.js pattern). Privacy red lines: never user code, knowledge content, paths, tokens, hostnames.
+
+### 9. New lint rules — **[1 week — directive-domain correctness]**
+
+Per domain-expert audit:
+
+- **`fact-in-place-mutation`** (error, fixable) — `facts.x.push()`, `facts.x.y = z`, `Object.assign(facts.x, …)`. Top production bug.
+- **`init-is-async`** (error, not fixable) — anti-pattern #12.
+- **`async-constraint-missing-deps`** (error, partially fixable) — anti-pattern #18.
+
+Also: tighten `effect-mutates-facts` to catch `++`/`--`/`Object.assign` (P1-25), reduce `derivation-uses-imported-state` false-positive rate via symbol resolution (P1-24).
+
+### 10. `review_source` streaming via `notifications/progress` — **[1 week — perf/UX]**
+
+Emit each `Finding` as a progress notification mid-call. Cuts perceived latency on large source by 40-60%. River's #1 streaming opportunity. Backwards-compatible: clients without `progressToken` get today's behavior.
+
+### 11. `mcp.directive.run` hosted SSE — **[2 weeks — strategic, unlocks team usage]**
+
+Per harper's MVP spec: Fly.io shared-cpu-1x, Cloudflare in front (orange-cloud, Full-Strict TLS, WAF rate-limit), bearer tokens minted at `directive.run/mcp/connect` (90-day TTL, rotatable, hashed storage), pino → Fly Logs → Sentry/BetterStack. Pre-host requirements: per-IP rate limiter + constant-time token compare + per-IP session cap + structured request logs + `/metrics` endpoint + real `/readyz`. **Requires #8 (telemetry foundation) AND #4 (slim cold-start) AND P1-1/P1-2/P1-3 from the AE audit.**
+
+### 12. Subpath exports (`@directive-run/mcp/tools/*`) — **[1 week — architectural]**
+
+Split tools into subpath exports so tree-shaken consumers (a hosted SSE deployment exposing only knowledge tools, an embedded read-only server) drop ~40% bundle. Each tool registers via `registerTools(server, opts)`. Reuses the same lazy-load pattern that fixed P0-1.
+
+### 13. Tighter migration patterns — **[2 days — directive-domain correctness]**
+
+Per domain-expert audit:
+- Rewrite XState `before/after` with a 2-region machine + service + guard (current example throws away every reason teams use XState).
+- Zustand: add a 2-store-merged example or drop the `crossModuleDeps` claim.
+- MobX: add "effects can't mutate facts" pitfall note.
+- Anti-patterns: add #20 "Reading facts inside resolve() that races" + #21 "Putting computed state in init".
+
+### 14. Composition graph completeness — **[1 day — directive-domain correctness]**
+
+Add missing edges flagged by domain-expert: `react → query` (most common React composition), `ai → timeline` (agent-run replay). Drop incorrect `core → ai` edge (wrong direction).
+
+### v0.3.0 ship order
+
+- **Alpha (week 1-2):** `playground_link` + `explain_finding` + `apply_review` + slim cold-start + telemetry NDJSON-only + 3 new lint rules + migration tightening.
+- **Beta (week 3-6):** DevTools↔MCP runtime bridge + MCP Resources + MCP Prompts + `review_source` streaming.
+- **GA (week 7-8):** `mcp.directive.run` SSE hosting + telemetry Cloudflare Worker collector + subpath exports.
+
+### Deferred to v0.4
+
+- Codemod-driven `migrate_from` (real source-to-source transformation, complements the data-only `get_migration_pattern`).
+- Semantic knowledge search (embedding-based; substring search holds until ~150 examples).
+- `validate_module_schema` companion to `generate_module`.
+- Single-pass AST traversal in lint (3-5× perf win; significant refactor).
+- Persistent worker pool for lint (vs spawn-per-call).
+
 

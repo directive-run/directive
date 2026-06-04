@@ -204,7 +204,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/lint",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "ts-morph-based static analysis for Directive code. Rule registry + executable checks + autofixes. Consumed by @directive-run/mcp (review_source, fix_code tools) and the future `directive doctor lint` CLI command. Anti-pattern data sourced from @directive-run/knowledge so rule IDs stay in lock-step.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -222,6 +222,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
     ],
     "exports": [
       ".",
+      "./executable",
       "./worker"
     ],
     "directory": "lint",
@@ -254,7 +255,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mcp",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -526,4 +527,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-04T00:14:10.722Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-04T03:39:14.288Z";

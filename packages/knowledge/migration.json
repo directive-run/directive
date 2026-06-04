@@ -38,9 +38,9 @@
         },
         { "from": "Middleware", "to": "Plugins", "note": "Lifecycle hooks" },
         {
-          "from": "useSelector",
-          "to": "useSelector",
-          "note": "From @directive-run/react"
+          "from": "useSelector(state => state.x)",
+          "to": "useFact(\"x\") / useDerived(\"y\")",
+          "note": "From @directive-run/react. Subscribe directly to a fact or derivation by key — no Provider, no createSelector"
         },
         {
           "from": "dispatch(action)",

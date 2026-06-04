@@ -24,7 +24,7 @@ export const rule: ExecutableRule = {
     category: "schema",
     title: "Flat schema — missing `facts` wrapper",
     explanation:
-      "Every createModule schema must nest facts under `schema.facts`. Top-level keys without the wrapper produce a runtime error and is the #1 cause of new-module bug reports.",
+      "Every createModule schema must nest facts under `schema.facts`. Top-level keys without the wrapper register no facts at all — the module loads, runs, and silently has nothing to observe, which is the #1 cause of new-module bug reports.",
     badExample: `createModule("x", {
   schema: { phase: t.string() },
 });`,
