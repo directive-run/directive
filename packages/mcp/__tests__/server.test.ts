@@ -51,6 +51,7 @@ describe("createDirectiveServer", () => {
       "list_packages",
       "list_review_rules",
       "list_skills",
+      "playground_link",
       "review_source",
       "search_examples",
       "search_knowledge",
@@ -126,6 +127,49 @@ describe("createDirectiveServer", () => {
 
     expect(result.isError).toBe(true);
     expect(extractText(result)).toMatch(/not found/i);
+  });
+
+  it("playground_link returns a directive.run/playground URL with the source", async () => {
+    const result = await client.callTool({
+      name: "playground_link",
+      arguments: {
+        source: 'console.log("hello directive");\n',
+        title: "Hello",
+      },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = extractText(result);
+    expect(text).toContain("<directive-data>");
+    const payload = JSON.parse(
+      text.replace("<directive-data>\n", "").replace("\n</directive-data>", ""),
+    ) as { url: string; sizeBytes: number; urlBytes: number; title: string };
+
+    expect(payload.url.startsWith("https://directive.run/playground#")).toBe(
+      true,
+    );
+    expect(payload.url).toContain("src=");
+    expect(payload.url).toContain("t=Hello");
+    expect(payload.sizeBytes).toBe(32);
+    expect(payload.title).toBe("Hello");
+  });
+
+  it("playground_link rejects empty source", async () => {
+    const result = await client.callTool({
+      name: "playground_link",
+      arguments: { source: "" },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  it("playground_link rejects source larger than the 8KB cap", async () => {
+    const result = await client.callTool({
+      name: "playground_link",
+      arguments: { source: "x".repeat(8001) },
+    });
+
+    expect(result.isError).toBe(true);
   });
 
   it("search_knowledge finds hits for a common term", async () => {

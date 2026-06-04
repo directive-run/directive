@@ -166,7 +166,7 @@ Endpoints:
 - `POST /messages?sessionId=…` — client→server JSON-RPC messages.
 - `GET /healthz` — liveness probe.
 
-## Tools (20)
+## Tools (21)
 
 ### Knowledge
 
@@ -222,6 +222,12 @@ Endpoints:
 | Tool | Purpose |
 |---|---|
 | `get_server_info` | Version + transport + auth state + bundled-knowledge hash + session count + package-registry timestamp. |
+
+### Playground
+
+| Tool | Purpose |
+|---|---|
+| `playground_link` | Turn any TypeScript snippet (≤ 8 KB) into a `directive.run/playground` URL. The page decompresses the source from the URL hash, shows it with syntax highlighting, and offers a one-click **Open in StackBlitz** button that boots a real running Directive project with the snippet as `src/main.ts`. Pair it with any tool that returns code — `generate_module`, `get_example`, `fix_code` — to give the user a "try it now" link in chat. |
 
 ## Troubleshooting
 

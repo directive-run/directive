@@ -43,7 +43,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsx scripts/build-package-registry.ts && tsup",
     "build:registry": "tsx scripts/build-package-registry.ts",
@@ -53,11 +55,12 @@
     "prepublishOnly": "pnpm clean && pnpm build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "@directive-run/knowledge": "workspace:*",
     "@directive-run/claude-plugin": "workspace:*",
-    "@directive-run/scaffold": "workspace:*",
+    "@directive-run/knowledge": "workspace:*",
     "@directive-run/lint": "workspace:*",
+    "@directive-run/scaffold": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "lz-string": "1.5.0",
     "zod": "^3.23.0"
   },
   "optionalDependencies": {

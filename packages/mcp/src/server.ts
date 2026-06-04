@@ -58,6 +58,11 @@ import {
   runLintInWorker,
 } from "./lint-runner.js";
 import { getPackageInfo, listPackages } from "./packages.js";
+import {
+  MAX_PLAYGROUND_SOURCE_BYTES,
+  PlaygroundLinkError,
+  buildPlaygroundLink,
+} from "./playground.js";
 
 // Injected at build time by tsup's `define` from package.json so the
 // MCP handshake + get_server_info always match the published version.
@@ -930,6 +935,62 @@ export function createDirectiveServer(): McpServer {
       return {
         content: [{ type: "text", text: parts.join("\n\n") }],
       };
+    },
+  );
+
+  server.registerTool(
+    "playground_link",
+    {
+      title: "Build a shareable playground link for a Directive snippet",
+      description:
+        "Turn a TypeScript snippet (from generate_module, get_example, fix_code, or anywhere) into a directive.run/playground URL. The page decompresses the source, renders it with syntax highlighting, and offers a one-click 'Open in StackBlitz' button that boots a real running Directive project with the snippet as src/main.ts. Hand this URL to the user when you want to say 'try it now'. Source is encoded in the URL hash (not query) so it never hits server logs.",
+      inputSchema: {
+        source: z
+          .string()
+          .min(1)
+          .max(MAX_PLAYGROUND_SOURCE_BYTES)
+          .describe(
+            `The TypeScript source to embed. Max ${MAX_PLAYGROUND_SOURCE_BYTES} bytes — anything larger should be opened in a real sandbox directly.`,
+          ),
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .optional()
+          .describe(
+            "Optional short label shown as the editor tab title on the playground page. Defaults to 'Untitled snippet'.",
+          ),
+      },
+    },
+    async ({ source, title }) => {
+      try {
+        const result = buildPlaygroundLink({ source, title });
+        const payload = {
+          url: result.url,
+          sizeBytes: result.sizeBytes,
+          urlBytes: result.urlBytes,
+          title: result.title ?? null,
+        };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `<directive-data>\n${JSON.stringify(payload, null, 2)}\n</directive-data>`,
+            },
+          ],
+        };
+      } catch (err) {
+        const reason =
+          err instanceof PlaygroundLinkError
+            ? `${err.code}: ${err.message}`
+            : (err as Error).message;
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `playground_link failed — ${reason}` },
+          ],
+        };
+      }
     },
   );
 
