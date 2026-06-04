@@ -1,5 +1,13 @@
 # @directive-run/example-permissions
 
+## 0.0.41
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.17.1
+  - @directive-run/el@1.1.0
+
 ## 0.0.40
 
 ### Patch Changes
