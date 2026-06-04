@@ -1468,9 +1468,11 @@ Net: 60 new tests across the workspace, 5 changesets queued. The viral tool of t
 
 Ranked from the AE Audit 0.2.2 synthesis. Composite = **viral × foundation × effort (lower=better) × moat**.
 
-### 1. `playground_link` MCP tool — **[1 week — viral MAX, effort LOW]**
+### 1. `playground_link` MCP tool — **SHIPPED v0.3.0 (2026-06-04)**
 
-Returns a `directive.run/play/?gist=…` URL pre-populated with broken source AND the proposed fix. Every `fix_code` result becomes a shareable artifact: paste in chat, recipient clicks, recipient runs in browser. Zero-install distribution loop. The Karpathy quote-tweet asset. AE Innovation #1.
+Returns a `directive.run/playground#src=<lz>&t=<title>` URL. The page decompresses the source from the URL hash, renders it with syntax highlighting, and offers a one-click **Open in StackBlitz** button that boots a real running Directive project with the snippet as `src/main.ts`. Source travels in the URL fragment (never sent to the server) and is compressed with lz-string. 8 KB cap on raw source. Pair it with any tool that returns code (`generate_module`, `get_example`, `fix_code`) for a "try it now" chat link.
+
+Ships via `@directive-run/mcp@0.3.0` (tool registration + URL builder) and `directive.run/playground` (route in directive-docs that wires the existing `StackBlitzOpen` component with a stock `@directive-run/core` project shell).
 
 ### 2. DevTools ↔ MCP runtime bridge — **[4 weeks — viral MAX, moat MAX]**
 
@@ -1539,9 +1541,14 @@ Add missing edges flagged by domain-expert: `react → query` (most common React
 
 ### v0.3.0 ship order
 
-- **Alpha (week 1-2):** `playground_link` + `explain_finding` + `apply_review` + slim cold-start + telemetry NDJSON-only + 3 new lint rules + migration tightening.
+- **Alpha (week 1-2):** `playground_link` ✅ (shipped 2026-06-04) + `explain_finding` + `apply_review` + slim cold-start + telemetry NDJSON-only + 3 new lint rules + migration tightening.
 - **Beta (week 3-6):** DevTools↔MCP runtime bridge + MCP Resources + MCP Prompts + `review_source` streaming.
 - **GA (week 7-8):** `mcp.directive.run` SSE hosting + telemetry Cloudflare Worker collector + subpath exports.
+
+### Tabled mid-session (2026-06-04)
+
+- Mobile-MCP path (Claude iOS app via cloudflared/ngrok tunnel against the SSE transport). Tabled in favor of waiting for `mcp.directive.run` hosted SSE (item #11) — once that ships, mobile is just "add connector URL".
+- `explain_finding` (item #3) was the next recommended alpha pick; the user tabled it pending broader direction on the v0.3.0 beat. Re-pick from this section when work resumes.
 
 ### Deferred to v0.4
 
