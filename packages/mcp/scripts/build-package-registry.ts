@@ -10,7 +10,7 @@
 // fields. Field allowlist mirrors AE security review #6 — never bake
 // absolute paths, file: dependencies, or scripts.
 
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -170,6 +170,10 @@ if (entries.length === 0) {
   console.error("package-registry build: no @directive-run/* packages found");
   process.exit(1);
 }
+// `pnpm prepublishOnly` clears src/generated before this script runs;
+// recreate the directory so writeFileSync doesn't ENOENT on the publish
+// runner (the 0.2.3 publish hit this exact path).
+mkdirSync(dirname(OUT_FILE), { recursive: true });
 writeFileSync(OUT_FILE, render(entries), "utf-8");
 console.log(
   `package-registry build: wrote ${entries.length} entries → ${OUT_FILE.replace(WORKSPACE_ROOT, ".")}`,

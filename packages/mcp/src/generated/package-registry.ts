@@ -255,7 +255,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mcp",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -527,4 +527,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-04T03:39:14.288Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-04T03:48:53.378Z";
