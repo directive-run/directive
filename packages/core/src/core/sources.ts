@@ -14,6 +14,11 @@
  * immediately; sources declared before the next `start` queue up and attach
  * with the rest.
  *
+ * The manager invokes per-source lifecycle callbacks (`onAttach`,
+ * `onPublish`, `onDetach`, `onError`) so the engine can emit accurate plugin
+ * observation events — including correct per-source attribution even when
+ * two sources publish the same event name.
+ *
  * See {@link SourceDef} for the primitive's full semantics + rationale.
  */
 
@@ -27,12 +32,6 @@ import type {
 // Sources Manager
 // ============================================================================
 
-/**
- * Internal record kept per attached source. Used for ordered teardown and
- * idempotency. `moduleId` carries the owning module so error messages can
- * disambiguate (with N modules each declaring a source named "ticker", the
- * operator needs to know which one threw).
- */
 interface AttachedSource {
   readonly id: string;
   readonly moduleId: string;
@@ -40,12 +39,6 @@ interface AttachedSource {
   detached: boolean;
 }
 
-/**
- * Internal record for a declared (but not yet attached) source. Held in the
- * definitions map so `registerDefinitions` can grow the catalogue between
- * lifecycle cycles. The `moduleId` is captured at registration so attach
- * errors can name the owning module.
- */
 interface SourceDefinition {
   readonly def: SourceDef;
   readonly moduleId: string;
@@ -53,45 +46,84 @@ interface SourceDefinition {
 
 type LifecyclePhase = "idle" | "attached" | "stopped";
 
+/**
+ * Engine-side dispatcher invoked when a source publishes an event. The
+ * manager wraps each source's publish callback in a closure that closes
+ * over the source id + moduleId so the engine cannot mis-attribute
+ * publishes (a naive "look up the source by event name" approach fails
+ * when multiple sources publish the same event).
+ */
+export type SourceDispatch = (
+  sourceId: string,
+  moduleId: string,
+  eventName: string,
+  payload: unknown,
+) => void;
+
+/**
+ * Per-source lifecycle callbacks the engine wires into the plugin manager.
+ * All are optional — manager-only consumers can omit them. The manager
+ * GUARANTEES:
+ *
+ * - `onAttach(id, moduleId)` runs ONLY when `attach()` returned a function
+ *   (i.e. the source successfully attached). Sources that threw or returned
+ *   non-functions invoke `onError` instead.
+ * - `onPublish(id, moduleId, eventName)` runs BEFORE the engine's dispatch,
+ *   per publish call, with correct per-source attribution.
+ * - `onDetach(id, moduleId)` runs BEFORE the source's unsubscribe is called
+ *   so observers see the detach intent before any teardown side effects.
+ *   (If unsubscribe throws, `onError` fires afterward.)
+ * - `onError(id, moduleId, phase, error)` runs on attach OR cleanup failures.
+ *   Always logged via `console.error` regardless of whether this callback
+ *   is supplied.
+ */
+export interface SourcesManagerCallbacks {
+  readonly onAttach?: (id: string, moduleId: string) => void;
+  readonly onPublish?: (
+    id: string,
+    moduleId: string,
+    eventName: string,
+  ) => void;
+  readonly onDetach?: (id: string, moduleId: string) => void;
+  readonly onError?: (
+    id: string,
+    moduleId: string,
+    phase: "attach" | "cleanup",
+    error: Error,
+  ) => void;
+}
+
 export interface SourcesManager {
-  /**
-   * Register additional source definitions. Called by `engine.registerModule`
-   * when a module is added after `createSystem`. If the system is already in
-   * the `attached` phase (i.e. `system.start()` has run), the new sources
-   * attach immediately using the cached publisher; otherwise they queue for
-   * the next `attachAll`.
-   *
-   * `moduleId` carries through into error messages so attach failures are
-   * unambiguous across modules.
-   */
   registerDefinitions(
     moduleId: string,
     definitions: Record<string, SourceDef>,
   ): void;
   /**
-   * Attach every registered source against the supplied publisher. Runs once
-   * at `system.start()`. On a re-start (`stop → start` cycle), this re-arms
-   * the manager: the previous cycle's `attached` array is dropped and every
-   * source attaches afresh. If `attach` throws, the failure is logged and
-   * the remaining sources still attempt to attach — partial-failure
-   * semantics mirror effects + resolvers.
+   * Attach every registered source against the supplied dispatcher. Runs at
+   * `system.start()`. On a re-start, this re-arms the manager: the previous
+   * cycle's `attached` array is dropped and every source attaches afresh.
+   *
+   * The manager wraps each source's publish callback with a closure that
+   * forwards to `dispatch(sourceId, moduleId, eventName, payload)`. Sources
+   * that successfully attach also trigger the `onAttach` callback; failures
+   * trigger `onError`.
    */
-  attachAll(publish: SourcePublish): void;
+  attachAll(dispatch: SourceDispatch): void;
   /**
    * Invoke every recorded unsubscribe, in reverse-registration order. Runs at
    * `system.stop()`. Idempotent within a single attach cycle — calling twice
-   * in the same cycle is a no-op on the second call. The flag clears at the
-   * next `attachAll` so a fresh start cleanly attaches + cleans up again.
-   * Failures inside an unsubscribe are caught + logged so other sources still
-   * tear down.
+   * is a no-op on the second call. The flag clears at the next `attachAll`.
+   *
+   * `onDetach` fires BEFORE each unsubscribe runs. `onError` fires AFTER if
+   * the unsubscribe throws.
    */
   cleanupAll(): void;
-  /** Number of sources currently attached. Used by `system.inspect()` + tests. */
+  /** Number of sources currently attached. Used by `system.inspect()`. */
   attachedCount(): number;
   /**
    * List the declared source definitions for `system.inspect()`. Returns
    * `{ id, moduleId, meta }` rows in registration order. Mirrors how
-   * effects are surfaced in `system.inspect()`.
+   * effects are surfaced.
    */
   listDefinitions(): Array<{
     id: string;
@@ -104,19 +136,11 @@ export interface SourcesManager {
  * Create a sources manager bound to a (mutable) catalogue of source
  * definitions. The catalogue grows when modules are registered dynamically;
  * the static modules at `createSystem` time seed it via the engine.
- *
- * Errors are surfaced through both `console.error` (always) and the optional
- * `onError` callback (for plugins / error-boundary integration).
  */
 export function createSourcesManager(
   initialDefinitions: Record<string, SourceDef> = {},
   initialModuleIds: Record<string, string> = {},
-  onError?: (
-    id: string,
-    moduleId: string,
-    phase: "attach" | "cleanup",
-    error: Error,
-  ) => void,
+  callbacks: SourcesManagerCallbacks = {},
 ): SourcesManager {
   const definitions = new Map<string, SourceDefinition>();
   for (const [id, def] of Object.entries(initialDefinitions)) {
@@ -124,16 +148,34 @@ export function createSourcesManager(
   }
   let attached: AttachedSource[] = [];
   let phase: LifecyclePhase = "idle";
-  let livePublish: SourcePublish | null = null;
+  let liveDispatch: SourceDispatch | null = null;
   let attachedDefinitionIds: Set<string> = new Set();
+
+  function reportError(
+    id: string,
+    moduleId: string,
+    pErr: "attach" | "cleanup",
+    error: Error,
+  ): void {
+    callbacks.onError?.(id, moduleId, pErr, error);
+  }
 
   function attachOne(
     id: string,
     record: SourceDefinition,
-    publish: SourcePublish,
+    dispatch: SourceDispatch,
   ): void {
+    // Closure-wrap the publish callback per-source so the engine receives
+    // accurate `(sourceId, moduleId)` attribution on every publish — this is
+    // what makes the observation pipeline correct even when N sources
+    // publish the same event name.
+    const perSourcePublish: SourcePublish = (eventName, payload) => {
+      callbacks.onPublish?.(id, record.moduleId, eventName);
+      dispatch(id, record.moduleId, eventName, payload);
+    };
+
     try {
-      const unsubscribe = record.def.attach(publish);
+      const unsubscribe = record.def.attach(perSourcePublish);
       if (typeof unsubscribe !== "function") {
         const err = new Error(
           `[Directive] Module "${record.moduleId}" → Source "${id}" did not return an unsubscribe function from attach(). ` +
@@ -141,7 +183,7 @@ export function createSourcesManager(
             "If the source needs no teardown, return `() => undefined`, not `undefined`.",
         );
         console.error(err);
-        onError?.(id, record.moduleId, "attach", err);
+        reportError(id, record.moduleId, "attach", err);
         return;
       }
       attached.push({
@@ -151,6 +193,9 @@ export function createSourcesManager(
         detached: false,
       });
       attachedDefinitionIds.add(id);
+      // Emit AFTER successful attach so observers cannot see attach for a
+      // source that failed or returned a non-function unsubscribe.
+      callbacks.onAttach?.(id, record.moduleId);
     } catch (rawError) {
       const error =
         rawError instanceof Error ? rawError : new Error(String(rawError));
@@ -158,7 +203,7 @@ export function createSourcesManager(
         `[Directive] Module "${record.moduleId}" → Source "${id}" attach() threw:`,
         error,
       );
-      onError?.(id, record.moduleId, "attach", error);
+      reportError(id, record.moduleId, "attach", error);
     }
   }
 
@@ -170,44 +215,40 @@ export function createSourcesManager(
       for (const [id, def] of Object.entries(newDefinitions)) {
         definitions.set(id, { def, moduleId });
         // If the system is already running (attached phase), attach the new
-        // source immediately using the live publisher. Otherwise it queues
-        // for the next `attachAll`.
+        // source immediately using the live dispatcher. `onAttach` fires
+        // from inside `attachOne` so the engine emits the plugin event with
+        // correct attribution — closes the registerModule observability gap.
         if (
           phase === "attached" &&
-          livePublish &&
+          liveDispatch &&
           !attachedDefinitionIds.has(id)
         ) {
-          attachOne(id, { def, moduleId }, livePublish);
+          attachOne(id, { def, moduleId }, liveDispatch);
         }
       }
     },
 
-    attachAll(publish: SourcePublish): void {
-      // Re-entry support: drop any residual records from a prior cycle. The
-      // cleanup contract is that `cleanupAll` ran first; if a consumer
-      // bypassed it the records are stale and we forget them here.
+    attachAll(dispatch: SourceDispatch): void {
       attached = [];
       attachedDefinitionIds = new Set();
-      livePublish = publish;
+      liveDispatch = dispatch;
       phase = "attached";
       for (const [id, record] of definitions) {
-        attachOne(id, record, publish);
+        attachOne(id, record, dispatch);
       }
     },
 
     cleanupAll(): void {
-      // Idempotent within a phase: once we've cleaned up in this cycle, the
-      // next `attachAll` re-arms us. A second `cleanupAll` in the same phase
-      // is a no-op (no double-unsubscribe).
       if (phase !== "attached") return;
       phase = "stopped";
-      // Reverse-order teardown so resources release in LIFO order — matches
-      // the convention for `useEffect` cleanup, RAII, and most subscription
-      // libraries.
+      // Reverse-order teardown so resources release in LIFO order.
       for (let i = attached.length - 1; i >= 0; i--) {
         const record = attached[i];
         if (!record || record.detached) continue;
         record.detached = true;
+        // Emit detach BEFORE the unsubscribe runs so observers see the
+        // intent before any teardown side effects.
+        callbacks.onDetach?.(record.id, record.moduleId);
         try {
           record.unsubscribe();
         } catch (rawError) {
@@ -217,14 +258,12 @@ export function createSourcesManager(
             `[Directive] Module "${record.moduleId}" → Source "${record.id}" unsubscribe threw:`,
             error,
           );
-          onError?.(record.id, record.moduleId, "cleanup", error);
+          reportError(record.id, record.moduleId, "cleanup", error);
         }
       }
-      // Drop references so the GC can reclaim closures held by long-running
-      // subscriptions. We rebuild on the next attachAll.
       attached = [];
       attachedDefinitionIds = new Set();
-      livePublish = null;
+      liveDispatch = null;
     },
 
     attachedCount(): number {

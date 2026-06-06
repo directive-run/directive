@@ -59,26 +59,39 @@ describe("createSourcesManager", () => {
     ]);
   });
 
-  it("publish callback dispatches events into the supplied publisher", () => {
-    const publisher = vi.fn();
+  it("publish callback dispatches events into the supplied dispatcher with per-source attribution", () => {
+    const dispatcher = vi.fn();
     const captured: SourcePublish[] = [];
-    const manager = createSourcesManager({
-      s: {
-        attach: (publish) => {
-          captured.push(publish);
-          // Synchronous publish during attach is allowed.
-          publish("HELLO", { ok: true });
-          return () => undefined;
+    const manager = createSourcesManager(
+      {
+        s: {
+          attach: (publish) => {
+            captured.push(publish);
+            // Synchronous publish during attach is allowed.
+            publish("HELLO", { ok: true });
+            return () => undefined;
+          },
         },
       },
-    });
+      { s: "module-X" },
+    );
 
-    manager.attachAll(publisher);
-    expect(publisher).toHaveBeenCalledWith("HELLO", { ok: true });
+    manager.attachAll(dispatcher);
+    expect(dispatcher).toHaveBeenCalledWith(
+      "s",
+      "module-X",
+      "HELLO",
+      { ok: true },
+    );
     // Authoring code can also publish asynchronously via the captured
     // reference — assert the same reference is still callable.
     captured[0]?.("LATER", undefined);
-    expect(publisher).toHaveBeenCalledWith("LATER", undefined);
+    expect(dispatcher).toHaveBeenCalledWith(
+      "s",
+      "module-X",
+      "LATER",
+      undefined,
+    );
   });
 
   it("isolates attach failures — one bad source does not block others", () => {
@@ -189,7 +202,7 @@ describe("createSourcesManager", () => {
         },
       },
       { attachFail: "mod-a", cleanFail: "mod-b" },
-      onError,
+      { onError },
     );
 
     manager.attachAll(() => undefined);
@@ -386,6 +399,393 @@ describe("createSourcesManager", () => {
     expect(manager.attachedCount()).toBe(0);
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Round-2 fixes: per-source attribution + lifecycle callbacks
+  // ==========================================================================
+
+  it("onAttach fires ONLY for sources whose attach succeeded (not for those that threw)", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onAttach = vi.fn();
+    const manager = createSourcesManager(
+      {
+        good: { attach: () => () => undefined },
+        bad: {
+          attach: () => {
+            throw new Error("boom");
+          },
+        },
+      },
+      { good: "mg", bad: "mb" },
+      { onAttach },
+    );
+
+    manager.attachAll(() => undefined);
+    expect(onAttach).toHaveBeenCalledTimes(1);
+    expect(onAttach).toHaveBeenCalledWith("good", "mg");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("onAttach does NOT fire for sources that return a non-function (forgotten cleanup)", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onAttach = vi.fn();
+    const manager = createSourcesManager(
+      {
+        // @ts-expect-error — author error
+        forgot: { attach: () => undefined },
+      },
+      { forgot: "m1" },
+      { onAttach },
+    );
+    manager.attachAll(() => undefined);
+    expect(onAttach).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("onPublish fires with per-source attribution (not by event-name lookup)", () => {
+    const onPublish = vi.fn();
+    const manager = createSourcesManager(
+      {
+        // Two sources publishing the SAME event name — proves the manager
+        // closure-wraps per-source so the engine knows which one fired.
+        sourceA: {
+          attach: (publish) => {
+            publish("SHARED_EVENT", { from: "A" });
+            return () => undefined;
+          },
+        },
+        sourceB: {
+          attach: (publish) => {
+            publish("SHARED_EVENT", { from: "B" });
+            return () => undefined;
+          },
+        },
+      },
+      { sourceA: "mod-A", sourceB: "mod-B" },
+      { onPublish },
+    );
+    manager.attachAll(() => undefined);
+    const calls = onPublish.mock.calls.map(([id, mod, evt]) => ({
+      id,
+      mod,
+      evt,
+    }));
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { id: "sourceA", mod: "mod-A", evt: "SHARED_EVENT" },
+        { id: "sourceB", mod: "mod-B", evt: "SHARED_EVENT" },
+      ]),
+    );
+  });
+
+  it("onDetach fires in reverse-registration order before each unsubscribe", () => {
+    const order: string[] = [];
+    const manager = createSourcesManager(
+      {
+        first: {
+          attach: () => () => {
+            order.push("unsub:first");
+          },
+        },
+        second: {
+          attach: () => () => {
+            order.push("unsub:second");
+          },
+        },
+        third: {
+          attach: () => () => {
+            order.push("unsub:third");
+          },
+        },
+      },
+      { first: "m", second: "m", third: "m" },
+      {
+        onDetach: (id) => order.push(`detach:${id}`),
+      },
+    );
+    manager.attachAll(() => undefined);
+    manager.cleanupAll();
+    expect(order).toEqual([
+      "detach:third",
+      "unsub:third",
+      "detach:second",
+      "unsub:second",
+      "detach:first",
+      "unsub:first",
+    ]);
+  });
+
+  it("registerDefinitions during attached phase fires onAttach immediately for new sources", () => {
+    const onAttach = vi.fn();
+    const manager = createSourcesManager(
+      {},
+      {},
+      { onAttach },
+    );
+    manager.attachAll(() => undefined);
+    expect(onAttach).not.toHaveBeenCalled();
+
+    manager.registerDefinitions("late-mod", {
+      late: { attach: () => () => undefined },
+    });
+    expect(onAttach).toHaveBeenCalledTimes(1);
+    expect(onAttach).toHaveBeenCalledWith("late", "late-mod");
+  });
+});
+
+// ============================================================================
+// Integration tests — observability via system.observe()
+// ============================================================================
+
+describe("source primitive — observability via system.observe()", () => {
+  it("emits source.attach + source.publish + source.detach events with correct attribution", () => {
+    const events: Array<{
+      type: string;
+      id?: string;
+      moduleId?: string;
+      eventName?: string;
+    }> = [];
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("observed", {
+      schema: {
+        facts: { count: t.number() },
+        events: { TICK: { delta: t.number() } },
+      },
+      init: (f) => {
+        f.count = 0;
+      },
+      events: {
+        TICK: (f, payload) => {
+          f.count = f.count + payload.delta;
+        },
+      },
+      sources: {
+        ticker: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.observe((event) => {
+      if (
+        event.type === "source.attach" ||
+        event.type === "source.publish" ||
+        event.type === "source.detach"
+      ) {
+        const payload: {
+          type: string;
+          id?: string;
+          moduleId?: string;
+          eventName?: string;
+        } = { type: event.type };
+        if ("id" in event) payload.id = event.id;
+        if ("moduleId" in event) payload.moduleId = event.moduleId;
+        if ("eventName" in event)
+          payload.eventName = (event as { eventName: string }).eventName;
+        events.push(payload);
+      }
+    });
+
+    system.start();
+    capturedRef.current?.("TICK", { delta: 3 });
+    system.stop();
+
+    expect(events).toEqual([
+      { type: "source.attach", id: "ticker", moduleId: "observed" },
+      {
+        type: "source.publish",
+        id: "ticker",
+        moduleId: "observed",
+        eventName: "TICK",
+      },
+      { type: "source.detach", id: "ticker", moduleId: "observed" },
+    ]);
+  });
+
+  it("emits source.error for sources that throw on attach (without firing source.attach)", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const events: Array<{ type: string; id?: string; phase?: string }> = [];
+    const module = createModule("err-mod", {
+      schema: { facts: { ready: t.boolean() } },
+      init: (f) => {
+        f.ready = false;
+      },
+      sources: {
+        bad: {
+          attach: () => {
+            throw new Error("attach failed");
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.observe((event) => {
+      if (event.type === "source.attach" || event.type === "source.error") {
+        const payload: { type: string; id?: string; phase?: string } = {
+          type: event.type,
+        };
+        if ("id" in event) payload.id = event.id;
+        if ("phase" in event)
+          payload.phase = (event as { phase: string }).phase;
+        events.push(payload);
+      }
+    });
+
+    system.start();
+    expect(events).toEqual([
+      { type: "source.error", id: "bad", phase: "attach" },
+    ]);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("emits source.attach immediately when a module is registered after start", () => {
+    const events: Array<{ type: string; id?: string; moduleId?: string }> = [];
+    const baseModule = createModule("base", {
+      schema: { facts: { v: t.number() } },
+      init: (f) => {
+        f.v = 0;
+      },
+    });
+    const system = createSystem({ module: baseModule });
+    system.observe((event) => {
+      if (event.type === "source.attach") {
+        events.push({
+          type: event.type,
+          id: event.id,
+          moduleId: event.moduleId,
+        });
+      }
+    });
+    system.start();
+    expect(events).toHaveLength(0);
+
+    const lateModule = createModule("late", {
+      schema: { facts: { w: t.number() } },
+      init: (f) => {
+        f.w = 0;
+      },
+      sources: {
+        ticker: { attach: () => () => undefined },
+      },
+    });
+    (
+      system as unknown as {
+        registerModule: (m: typeof lateModule) => void;
+      }
+    ).registerModule(lateModule);
+
+    expect(events).toEqual([
+      { type: "source.attach", id: "ticker", moduleId: "late" },
+    ]);
+  });
+
+  it("system.inspect().sources surfaces the declared sources with attachedSourceCount", () => {
+    const module = createModule("inspected", {
+      schema: { facts: { v: t.number() } },
+      init: (f) => {
+        f.v = 0;
+      },
+      sources: {
+        a: { attach: () => () => undefined },
+        b: { attach: () => () => undefined },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    const inspection = (
+      system as unknown as {
+        inspect: () => {
+          sources: Array<{ id: string; moduleId: string }>;
+          attachedSourceCount: number;
+        };
+      }
+    ).inspect();
+    expect(inspection.sources).toEqual([
+      { id: "a", moduleId: "inspected", meta: undefined },
+      { id: "b", moduleId: "inspected", meta: undefined },
+    ]);
+    expect(inspection.attachedSourceCount).toBe(2);
+    system.stop();
+  });
+
+  it("post-destroy publish is a silent no-op (does not crash, does not dispatch)", () => {
+    const handler = vi.fn();
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("ghost", {
+      schema: {
+        facts: { c: t.number() },
+        events: { GHOST: {} },
+      },
+      init: (f) => {
+        f.c = 0;
+      },
+      events: {
+        GHOST: () => {
+          handler();
+        },
+      },
+      sources: {
+        s: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    capturedRef.current?.("GHOST");
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    system.destroy();
+    // Stale publish reference is still callable but does NOT dispatch.
+    expect(() => capturedRef.current?.("GHOST")).not.toThrow();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects source ids that match BLOCKED_PROPS (prototype pollution defense)", () => {
+    // `__proto__` via object literal is treated as the prototype setter not a
+    // property key by JavaScript itself, so Object.keys() never sees it. The
+    // BLOCKED_PROPS check defends against `constructor` and `prototype`,
+    // which DO show up as enumerable keys.
+    expect(() =>
+      createSystem({
+        module: createModule("attack-sys", {
+          schema: { facts: { v: t.number() } },
+          init: (f) => {
+            f.v = 0;
+          },
+          sources: {
+            constructor: { attach: () => () => undefined },
+          },
+        }),
+      }),
+    ).toThrowError(/dangerous key|Security/);
+
+    expect(() =>
+      createSystem({
+        module: createModule("attack-sys-2", {
+          schema: { facts: { v: t.number() } },
+          init: (f) => {
+            f.v = 0;
+          },
+          sources: {
+            prototype: { attach: () => () => undefined },
+          },
+        }),
+      }),
+    ).toThrowError(/dangerous key|Security/);
   });
 });
 

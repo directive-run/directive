@@ -542,17 +542,29 @@ export function createEngine<S extends Schema>(
   // Create sources manager — attaches external event sources at
   // `system.start()`, tears them down at `system.stop()`. Sources are
   // lifecycle-only (no reconciliation pass; no fact-dependency tracking),
-  // so the manager is a flat list with try/catch isolation. Attach +
-  // cleanup failures are logged via `console.error` and forwarded to the
-  // observation protocol so plugins (audit-ledger, devtools, etc.) can see
-  // them via `onSourceError`.
+  // so the manager is a flat list with try/catch isolation. The manager
+  // invokes per-source lifecycle callbacks (onAttach / onPublish /
+  // onDetach / onError) so the engine can emit accurate plugin events
+  // with per-source attribution — closes the "shared publish callback
+  // can't tell which source emitted" attribution bug.
   const sourcesManager: SourcesManager = createSourcesManager(
     mergedSources,
     sourceModuleIds,
-    (id, moduleId, phase, error) => {
-      if (hasPlugins()) {
-        pluginManager.emitSourceError(id, moduleId, phase, error);
-      }
+    {
+      onAttach: (id, moduleId) => {
+        if (hasPlugins()) pluginManager.emitSourceAttach(id, moduleId);
+      },
+      onPublish: (id, moduleId, eventName) => {
+        if (hasPlugins())
+          pluginManager.emitSourcePublish(id, moduleId, eventName);
+      },
+      onDetach: (id, moduleId) => {
+        if (hasPlugins()) pluginManager.emitSourceDetach(id, moduleId);
+      },
+      onError: (id, moduleId, phase, error) => {
+        if (hasPlugins())
+          pluginManager.emitSourceError(id, moduleId, phase, error);
+      },
     },
   );
 
@@ -1571,46 +1583,22 @@ export function createEngine<S extends Schema>(
         module.hooks?.onStart?.(system as any);
       }
 
-      // Attach external event sources. The publish callback dispatches into
-      // the same event queue as `system.events.X(payload)`. Sources attach
-      // AFTER `onStart` hooks so authors can perform last-mile fact init in
-      // `onStart` before any external event arrives. Source attach errors
-      // are isolated by the manager; one failed source does not prevent the
-      // others from attaching, and a failure during attach never aborts
-      // `start()` itself. After attach succeeds, each source emits a
-      // `source.attach` observation event for plugins. The publish callback
-      // emits `source.publish` per call AND guards against post-destroy
-      // dispatch — a source author who retains the publish reference past
-      // `destroy()` cannot dispatch into the torn-down store.
-      const beforeAttachDefs = sourcesManager.listDefinitions();
-      sourcesManager.attachAll((eventName: string, payload?: unknown) => {
+      // Attach external event sources. The dispatcher receives accurate
+      // per-source attribution (sourceId, moduleId) from the manager — the
+      // manager closure-wraps each source's publish callback with its own
+      // identity so the engine's plugin emission cannot mis-attribute when
+      // two sources publish the same event name. The post-destroy guard
+      // prevents stale source callbacks from dispatching into a torn-down
+      // store. `onAttach` plugin events fire from inside the manager (one
+      // per successful attach), so the static-start path AND the
+      // `registerModule` immediate-attach path emit consistently.
+      sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
         if (state.isDestroyed) return;
-        // Observation: every source publish is observable so plugins can
-        // route source-originated events through audit + devtools fabric.
-        // We emit BEFORE dispatching so observers see the cause before the
-        // resulting fact changes.
-        if (hasPlugins()) {
-          pluginManager.emitSourcePublish(
-            eventName,
-            sourceModuleIds[eventName] ?? "<source>",
-            eventName,
-          );
-        }
         dispatchEventByName(
           eventName,
           (payload ?? {}) as Record<string, unknown>,
         );
       });
-      // Emit attach events for every source whose attach succeeded. The
-      // manager's `attachedCount()` reflects the live count; we list the
-      // declared definitions in registration order. (When attach throws
-      // for a specific source, the manager already invoked the error
-      // callback so the failure is visible separately.)
-      if (hasPlugins()) {
-        for (const row of beforeAttachDefs) {
-          pluginManager.emitSourceAttach(row.id, row.moduleId);
-        }
-      }
 
       // Emit start event
       pluginManager.emitStart(system);
@@ -1659,19 +1647,10 @@ export function createEngine<S extends Schema>(
       // Detach external event sources BEFORE running effect cleanups so any
       // sources that share resources with effects (rare but possible) see
       // the source-side first. Failures inside individual unsubscribes are
-      // isolated by the manager — one bad unsubscribe never blocks teardown
-      // of the rest. We snapshot the active sources BEFORE cleanup so the
-      // observation events carry attached ids; the manager clears its array
-      // during cleanupAll.
-      const beforeDetachDefs = sourcesManager.listDefinitions();
+      // isolated by the manager. `onDetach` plugin events fire from inside
+      // the manager (one per source, in reverse-registration order) so we
+      // don't need to iterate-and-emit here.
       sourcesManager.cleanupAll();
-      if (hasPlugins()) {
-        for (let i = beforeDetachDefs.length - 1; i >= 0; i--) {
-          const row = beforeDetachDefs[i];
-          if (!row) continue;
-          pluginManager.emitSourceDetach(row.id, row.moduleId);
-        }
-      }
 
       // Run all effect cleanups
       effectsManager.cleanupAll();
