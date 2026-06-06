@@ -536,6 +536,45 @@ describe("createSourcesManager", () => {
     expect(onAttach).toHaveBeenCalledTimes(1);
     expect(onAttach).toHaveBeenCalledWith("late", "late-mod");
   });
+
+  it("re-registering an attached source unsubscribes the old one before attaching the new one", () => {
+    // Hot-reload scenario: registerDefinitions called with a source id that is
+    // already attached. The previous implementation would leave the old
+    // subscription running AND silently drop the new definition (because the
+    // `attachedDefinitionIds.has(id)` guard blocked re-attach). Fixed in R3.
+    const onAttach = vi.fn();
+    const onDetach = vi.fn();
+    const oldUnsub = vi.fn();
+    const newUnsub = vi.fn();
+    const manager = createSourcesManager(
+      {},
+      {},
+      { onAttach, onDetach },
+    );
+    manager.attachAll(() => undefined);
+
+    manager.registerDefinitions("mod-v1", {
+      hot: { attach: () => oldUnsub },
+    });
+    expect(onAttach).toHaveBeenCalledWith("hot", "mod-v1");
+    expect(manager.attachedCount()).toBe(1);
+
+    // Re-register the same source id with a NEW definition + new module.
+    manager.registerDefinitions("mod-v2", {
+      hot: { attach: () => newUnsub },
+    });
+    // The old definition was unmounted (detach event + unsubscribe call) AND
+    // the new definition attached. Live count stays at 1, not 2.
+    expect(oldUnsub).toHaveBeenCalledTimes(1);
+    expect(onDetach).toHaveBeenCalledWith("hot", "mod-v1");
+    expect(onAttach).toHaveBeenCalledWith("hot", "mod-v2");
+    expect(manager.attachedCount()).toBe(1);
+
+    // Cleanup tears down the NEW unsub (not the old one again).
+    manager.cleanupAll();
+    expect(newUnsub).toHaveBeenCalledTimes(1);
+    expect(oldUnsub).toHaveBeenCalledTimes(1); // not double-called
+  });
 });
 
 // ============================================================================

@@ -812,6 +812,23 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * Observe all lifecycle events as a typed stream.
    * Returns an unsubscribe function.
    *
+   * ## Timing semantics
+   *
+   * Observers receive events that fire **from the moment they subscribe
+   * onwards**. Past events are NOT replayed. Consequences:
+   *
+   * - An observer registered BEFORE `system.start()` sees the initial
+   *   `system.start`, `source.attach`, etc. events emitted during start.
+   * - An observer registered AFTER `system.start()` does NOT see those
+   *   initial events. To reconstruct the current state, use
+   *   `system.inspect()` (`facts`, `sources`, `constraints`, etc.) at
+   *   subscription time, then layer the live observer stream on top.
+   * - The unsubscribe function is idempotent — calling it more than once
+   *   is safe.
+   *
+   * This mirrors RxJS Subject + DOM EventTarget conventions; there is no
+   * hidden replay buffer.
+   *
    * @example
    * ```typescript
    * const unsub = system.observe((event) => {
@@ -819,6 +836,13 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    *     console.log(event.resolver, event.duration);
    *   }
    * });
+   * ```
+   *
+   * @example Reconstructing state on late subscription
+   * ```typescript
+   * const snapshot = system.inspect();
+   * console.log('active sources:', snapshot.attachedSourceCount);
+   * const unsub = system.observe((event) => { ... }); // forward-only
    * ```
    */
   observe(observer: (event: ObservationEvent) => void): () => void;

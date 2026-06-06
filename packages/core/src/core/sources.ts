@@ -213,11 +213,45 @@ export function createSourcesManager(
       newDefinitions: Record<string, SourceDef>,
     ): void {
       for (const [id, def] of Object.entries(newDefinitions)) {
+        // Re-registration semantics: if this source id is ALREADY attached
+        // (hot-reload scenario, or a module bringing the same source id as
+        // another), unsubscribe the old definition first so the new one
+        // takes its place cleanly. Without this guard the old subscription
+        // would stay running (its `unsubscribe` only runs at cleanupAll)
+        // AND the new definition would never attach (the
+        // `attachedDefinitionIds.has(id)` check below would block it). The
+        // result is a "ghost subscription + dead definition" leak.
+        if (phase === "attached" && attachedDefinitionIds.has(id)) {
+          for (let i = 0; i < attached.length; i++) {
+            const old = attached[i];
+            if (!old || old.detached || old.id !== id) continue;
+            old.detached = true;
+            callbacks.onDetach?.(old.id, old.moduleId);
+            try {
+              old.unsubscribe();
+            } catch (rawError) {
+              const error =
+                rawError instanceof Error
+                  ? rawError
+                  : new Error(String(rawError));
+              console.error(
+                `[Directive] Module "${old.moduleId}" → Source "${old.id}" unsubscribe threw during re-registration:`,
+                error,
+              );
+              callbacks.onError?.(old.id, old.moduleId, "cleanup", error);
+            }
+            attached.splice(i, 1);
+            break;
+          }
+          attachedDefinitionIds.delete(id);
+        }
+
         definitions.set(id, { def, moduleId });
-        // If the system is already running (attached phase), attach the new
-        // source immediately using the live dispatcher. `onAttach` fires
-        // from inside `attachOne` so the engine emits the plugin event with
-        // correct attribution — closes the registerModule observability gap.
+        // If the system is already running, attach the new source
+        // immediately using the live dispatcher. `onAttach` fires from
+        // inside `attachOne` so the engine emits the plugin event with
+        // correct attribution — closes the registerModule observability
+        // gap (R2-CR3) AND the re-registration leak (R3-M1).
         if (
           phase === "attached" &&
           liveDispatch &&
