@@ -287,6 +287,14 @@ export interface SystemInspection {
   }>;
   /** All defined effect names with optional metadata */
   effects: Array<{ id: string; meta?: DefinitionMeta }>;
+  /**
+   * All declared source names with the module that owns each. `attachedCount`
+   * is the live count of sources currently bound to the system (>= 0,
+   * <= sources.length). Mirrors how effects are surfaced.
+   */
+  sources: Array<{ id: string; moduleId: string; meta?: DefinitionMeta }>;
+  /** Number of sources currently attached (i.e. system is in the `attached` phase + their attach() succeeded). */
+  attachedSourceCount: number;
   /** All defined derivation names with optional metadata */
   derivations: Array<{ id: string; meta?: DefinitionMeta }>;
   /** All registered modules with optional metadata */
@@ -751,6 +759,33 @@ export type ObservationEvent =
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
+  /**
+   * Source attached at `system.start()` (or at registerModule when the
+   * system was already running). Carries the source id + the module that
+   * declared it so plugins can attribute per-module sources.
+   */
+  | { type: "source.attach"; id: string; moduleId: string }
+  /**
+   * A source published an event into the system's event queue. Fires
+   * BEFORE the event handler runs; pair with `fact.change` events to
+   * trace the downstream effect.
+   */
+  | {
+      type: "source.publish";
+      id: string;
+      moduleId: string;
+      eventName: string;
+    }
+  /** Source detached at `system.stop()` (reverse-registration order). */
+  | { type: "source.detach"; id: string; moduleId: string }
+  /** Source `attach` or unsubscribe threw — handled, isolated, observable. */
+  | {
+      type: "source.error";
+      id: string;
+      moduleId: string;
+      phase: "attach" | "cleanup";
+      error: unknown;
+    }
   | { type: "derivation.compute"; id: string; value: unknown }
   | { type: "reconcile.start" }
   | {

@@ -29,6 +29,7 @@ Website: https://directive.run
 - [Constraints](https://directive.run/docs/constraints)
 - [Resolvers](https://directive.run/docs/resolvers)
 - [Effects](https://directive.run/docs/effects)
+- [Sources](https://directive.run/docs/sources)
 - [Events](https://directive.run/docs/events)
 - [Schema & Types](https://directive.run/docs/schema-overview)
 - [API Reference](https://directive.run/docs/api/core)

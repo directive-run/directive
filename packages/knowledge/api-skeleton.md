@@ -345,6 +345,25 @@
   ```ts
   export interface DynamicResolverDef<M extends ModuleSchema = ModuleSchema> {
   ```
+- `SourceDef` — Typed external event source: declares an inbound subscription that attaches at `system.start()` and tears down at `system.stop()`. The inbound dual of `EffectDef`.
+  ```ts
+  export interface SourceDef {
+    attach: (publish: SourcePublish) => SourceUnsubscribe;
+    meta?: DefinitionMeta;
+  }
+  ```
+- `SourcesDef` — Map of source name → `SourceDef`. Used as `sources?: SourcesDef` on `ModuleConfig` / `ModuleConfigWithDeps`.
+  ```ts
+  export type SourcesDef = Record<string, SourceDef>;
+  ```
+- `SourcePublish` — Event dispatcher passed to a source's `attach`. Same dispatch path as `system.events.X(payload)`; unknown event names drop silently in production (wrap in a typed factory for compile-time safety).
+  ```ts
+  export type SourcePublish = (event: string, payload?: unknown) => void;
+  ```
+- `SourceUnsubscribe` — Cleanup function returned by `attach`; runs at `system.stop()` in reverse-registration order.
+  ```ts
+  export type SourceUnsubscribe = () => void;
+  ```
 - `ErrorBoundaryConfig` — Error boundary configuration
   ```ts
   export interface ErrorBoundaryConfig {

@@ -55,10 +55,38 @@
  * }
  * ```
  *
- * @example No-op (test) source
+ * @example No-op (test) source — note the `() => () => undefined` shape:
+ * `attach` MUST return a function. Returning `() => undefined` (one level)
+ * would return `undefined`, which the manager logs as "did not return an
+ * unsubscribe function" and skips. Always two levels.
  * ```typescript
  * sources: {
  *   ignored: { attach: () => () => undefined },
+ *   //                  ^^^^^^^^^^^^^^^^^^^
+ *   //                  | the function that's the unsubscribe
+ *   //                  the function that's `attach`'s return value
+ * }
+ * ```
+ *
+ * @example Typed publish — wrap once for compile-time event-name + payload safety
+ * ```typescript
+ * import type { SourcePublish } from '@directive-run/core';
+ *
+ * function createPublisher(publish: SourcePublish) {
+ *   return {
+ *     TICK: (delta: number) => publish('TICK', { delta }),
+ *     HEARTBEAT: () => publish('HEARTBEAT'),
+ *   };
+ * }
+ *
+ * sources: {
+ *   ticker: {
+ *     attach: (publish) => {
+ *       const p = createPublisher(publish);
+ *       const id = setInterval(() => p.TICK(1), 1000); // ← typed
+ *       return () => clearInterval(id);
+ *     },
+ *   },
  * }
  * ```
  */
@@ -71,9 +99,19 @@ import type { DefinitionMeta } from "./meta.js";
 
 /**
  * Cleanup function returned by a source's `attach`.
- * Called once at `system.stop()` (or before re-attach, currently unsupported).
- * Idempotent: callers may invoke it multiple times safely; implementations
- * SHOULD guard repeated teardown.
+ *
+ * Called once at `system.stop()`. On the next `system.start()` (the manager
+ * supports the full start → stop → start lifecycle), the source's `attach`
+ * runs again and returns a FRESH unsubscribe. Implementations SHOULD guard
+ * repeated teardown defensively, but the manager will only invoke the
+ * captured unsubscribe once per attach cycle.
+ *
+ * The name is intentional — sources are typically wrapping a stateful
+ * external subscription (Supabase channel, WebSocket, browser listener), so
+ * "unsubscribe" is the verb authors recognise. Note that effects use
+ * `EffectCleanup` instead; the asymmetric naming captures the asymmetric
+ * concern (an effect cleans up a side effect; a source unsubscribes from
+ * an external stream).
  */
 export type SourceUnsubscribe = () => void;
 
@@ -81,10 +119,23 @@ export type SourceUnsubscribe = () => void;
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
  * dispatch queue used by `system.events.X(payload)`.
  *
- * The string event name is unchecked at this level (kept as `string` to avoid
- * coupling the source primitive to the consuming module's event schema). The
- * authoring module typically wraps `publish` in a typed helper or uses string
- * literals matching its own `events:` map.
+ * The string event name is unchecked at this level (kept as `string` to
+ * avoid coupling the source primitive to the consuming module's event
+ * schema). The authoring module typically wraps `publish` in a typed helper
+ * — see the {@link SourceDef} example for the recommended pattern. The
+ * runtime semantics:
+ *
+ * - `publish('KNOWN_EVENT', payload)` — dispatches into the module's event
+ *   handler. The payload is augmented with `{ type: eventName, ...payload }`
+ *   before passing to the handler (same shape as `system.events.X(payload)`).
+ * - `publish('UNKNOWN_EVENT', ...)` — in development, logs a
+ *   `[Directive] Unknown event type` warning and drops the dispatch.
+ *   In production, silently drops. **This is a footgun for sources** —
+ *   strongly prefer wrapping `publish` in a typed factory (per the example).
+ * - `publish(event, undefined)` — dispatches with an empty payload object.
+ * - Calling `publish` after `system.destroy()` — silently no-ops. The
+ *   engine guards against post-destroy dispatch so stale source callbacks
+ *   cannot mutate a torn-down store.
  */
 export type SourcePublish = (event: string, payload?: unknown) => void;
 
@@ -101,15 +152,23 @@ export type SourcePublish = (event: string, payload?: unknown) => void;
  *
  * ## Restrictions
  *
- * - `attach` is synchronous. Async setup (await an auth refresh, fetch a
- *   token) belongs inside the subscription's own internals — `attach` returns
- *   immediately with the unsubscribe function.
+ * - `attach` is **synchronous**. Returning a `Promise<Unsubscribe>` does NOT
+ *   work — the engine discards the Promise and treats it as "no cleanup
+ *   function returned" (logs an error + skips the source). Do async setup
+ *   inside the subscription's own internals; `attach` returns immediately
+ *   with the synchronous unsubscribe function.
  * - Sources cannot subscribe to system facts. Use {@link EffectDef effects}
- *   for fact-reactive behavior.
+ *   for fact-reactive behavior. If you need to re-subscribe when a fact
+ *   changes, use `system.registerModule()` to swap the source's owning
+ *   module, OR drive the subscription via an effect that owns its own
+ *   channel.
  * - The publish callback dispatches events normally — resolvers, fact
  *   handlers, and downstream effects all run. Authors SHOULD throttle /
  *   debounce inside the source if the inbound rate may exceed the system's
  *   reconciliation budget.
+ * - **Don't subscribe to the same external channel from both a source AND
+ *   an effect.** The effect will re-run on fact changes, the source mounts
+ *   once — you'll get 2× messages with silent duplicates. Pick one.
  */
 export interface SourceDef {
   /**

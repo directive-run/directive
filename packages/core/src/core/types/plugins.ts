@@ -309,6 +309,52 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onEffectError?: (id: string, error: unknown) => void;
 
   // ============================================================================
+  // Source Hooks
+  // ============================================================================
+
+  /**
+   * Called when a typed external event source attaches at `system.start()`
+   * (or when a dynamically registered module brings new sources to an
+   * already-running system).
+   * @param id - The source ID (key on the module's `sources:` map).
+   * @param moduleId - The owning module's id.
+   */
+  onSourceAttach?: (id: string, moduleId: string) => void;
+
+  /**
+   * Called when a source publishes an event into the system's event queue.
+   * Fires BEFORE the event handler runs. Pair with `onFactChange` to trace
+   * the downstream state mutation.
+   * @param id - The source ID.
+   * @param moduleId - The owning module's id.
+   * @param eventName - The dispatched event name (the first arg to `publish`).
+   */
+  onSourcePublish?: (id: string, moduleId: string, eventName: string) => void;
+
+  /**
+   * Called when a source detaches at `system.stop()` (reverse-registration
+   * order across all modules).
+   * @param id - The source ID.
+   * @param moduleId - The owning module's id.
+   */
+  onSourceDetach?: (id: string, moduleId: string) => void;
+
+  /**
+   * Called when a source's `attach` or unsubscribe throws. Errors are
+   * isolated (one bad source never blocks others) but observable here.
+   * @param id - The source ID.
+   * @param moduleId - The owning module's id.
+   * @param phase - Which lifecycle stage threw.
+   * @param error - The thrown value (normalized to Error inside the manager).
+   */
+  onSourceError?: (
+    id: string,
+    moduleId: string,
+    phase: "attach" | "cleanup",
+    error: unknown,
+  ) => void;
+
+  // ============================================================================
   // History Hooks
   // ============================================================================
 

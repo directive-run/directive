@@ -357,6 +357,49 @@ const system = createSystem({
 });
 ```
 
+## 20. Hand-Rolling a Subscription Instead of Declaring a `source`
+
+When wrapping an external event stream (Supabase realtime, WebSocket, polling timer, browser listener) into a Directive system, do NOT write a React `useEffect` that owns the subscription and dispatches `sys.events.X()` from the callback — declare a `source` on the module instead. The lifecycle is engine-owned; the hook collapses to `useFact` reads.
+
+```typescript
+// WRONG – hand-rolled subscription as useEffect with manual dispatch
+function useGameUpdates(gameId: string) {
+  const sys = useMemo(() => createSystem({ module }), []);
+  useEffect(() => {
+    const ch = supabase.channel(`game:${gameId}`).on(
+      "postgres_changes", { /* ... */ },
+      (p) => sys.events.REALTIME_UPDATE({ payload: p.new }),
+    ).subscribe();
+    return () => ch.unsubscribe();
+  }, [gameId, sys]);
+  return useFact(sys, "gameState");
+}
+
+// CORRECT – declare a source on the module; the engine owns the lifecycle
+const gameUpdateModule = createModule("gameUpdate", {
+  schema: { facts: { gameState: t.object<GameState>().nullable() } },
+  events: {
+    REALTIME_UPDATE: (f, p) => { f.gameState = p.payload; },
+  },
+  sources: {
+    updates: {
+      attach: (publish) => deps.subscribeToGameUpdates(
+        (payload) => publish("REALTIME_UPDATE", { payload })
+      ),
+    },
+  },
+});
+
+function useGameUpdates() {
+  const sys = useMemo(() => createSystem({ module: gameUpdateModule }), []);
+  return useFact(sys, "gameState");  // ← that's the entire hook now
+}
+```
+
+**Why:** the hook-as-bridge pattern duplicates lifecycle code at every call site. Cleanup correctness drifts. `system.observe()` can't see the subscription. With a `source`, the engine attaches at `start()`, detaches at `stop()`, isolates failures, and emits `source.attach` / `.publish` / `.detach` / `.error` observation events for plugins.
+
+**Don't subscribe in both an effect AND a source on the same channel** — the effect re-runs on fact changes, the source mounts once, you'll get 2× messages with silent duplicates. Pick one. See `sources.md` for the full guidance.
+
 ## Quick Reference Checklist
 
 Before generating any Directive code, verify:

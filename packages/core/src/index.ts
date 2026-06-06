@@ -82,6 +82,11 @@ export type {
   DynamicConstraintDef,
   DynamicEffectDef,
   DynamicResolverDef,
+  // Sources — typed external event sources (inbound dual of effects).
+  SourceDef,
+  SourcesDef,
+  SourcePublish,
+  SourceUnsubscribe,
   // Definition Meta
   DefinitionMeta,
   DerivationDefWithMeta,

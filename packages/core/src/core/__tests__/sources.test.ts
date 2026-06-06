@@ -188,19 +188,203 @@ describe("createSourcesManager", () => {
           },
         },
       },
+      { attachFail: "mod-a", cleanFail: "mod-b" },
       onError,
     );
 
     manager.attachAll(() => undefined);
     manager.cleanupAll();
 
-    const phases = onError.mock.calls.map(([id, phase]) => ({ id, phase }));
+    const phases = onError.mock.calls.map(
+      ([id, moduleId, phase]) => ({ id, moduleId, phase }),
+    );
     expect(phases).toEqual(
       expect.arrayContaining([
-        { id: "attachFail", phase: "attach" },
-        { id: "cleanFail", phase: "cleanup" },
+        { id: "attachFail", moduleId: "mod-a", phase: "attach" },
+        { id: "cleanFail", moduleId: "mod-b", phase: "cleanup" },
       ]),
     );
+    consoleErrorSpy.mockRestore();
+  });
+
+  // ==========================================================================
+  // Round-1 fixes: lifecycle re-entry + observability + dynamic registration
+  // ==========================================================================
+
+  it("supports start→stop→start→stop lifecycle without leaking subscriptions", () => {
+    const attachSpy = vi.fn();
+    const cleanupSpy = vi.fn();
+    const manager = createSourcesManager({
+      cycler: {
+        attach: () => {
+          attachSpy();
+          return cleanupSpy;
+        },
+      },
+    });
+
+    manager.attachAll(() => undefined);
+    expect(attachSpy).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(1);
+    manager.cleanupAll();
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(0);
+
+    // Second cycle: attach + cleanup again.
+    manager.attachAll(() => undefined);
+    expect(attachSpy).toHaveBeenCalledTimes(2);
+    expect(manager.attachedCount()).toBe(1);
+    manager.cleanupAll();
+    expect(cleanupSpy).toHaveBeenCalledTimes(2);
+    expect(manager.attachedCount()).toBe(0);
+  });
+
+  it("cleanupAll on an idle manager (never started) is a safe no-op", () => {
+    const cleanup = vi.fn();
+    const manager = createSourcesManager({
+      idle: { attach: () => cleanup },
+    });
+    expect(() => manager.cleanupAll()).not.toThrow();
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(manager.attachedCount()).toBe(0);
+  });
+
+  it("clears the attached array after cleanup so memory does not grow across cycles", () => {
+    const manager = createSourcesManager({
+      gc: { attach: () => () => undefined },
+    });
+    for (let i = 0; i < 100; i++) {
+      manager.attachAll(() => undefined);
+      manager.cleanupAll();
+    }
+    expect(manager.attachedCount()).toBe(0);
+  });
+
+  it("listDefinitions surfaces all registered sources with their moduleId", () => {
+    const manager = createSourcesManager(
+      {
+        a: { attach: () => () => undefined, meta: { tag: "first" } },
+        b: { attach: () => () => undefined },
+      },
+      { a: "mod-1", b: "mod-2" },
+    );
+    const rows = manager.listDefinitions();
+    expect(rows).toEqual([
+      { id: "a", moduleId: "mod-1", meta: { tag: "first" } },
+      { id: "b", moduleId: "mod-2", meta: undefined },
+    ]);
+  });
+
+  it("registerDefinitions adds new sources before start; they attach at start", () => {
+    const attachSpy = vi.fn();
+    const manager = createSourcesManager();
+    manager.registerDefinitions("late-mod", {
+      late: {
+        attach: () => {
+          attachSpy();
+          return () => undefined;
+        },
+      },
+    });
+    expect(attachSpy).not.toHaveBeenCalled();
+    manager.attachAll(() => undefined);
+    expect(attachSpy).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(1);
+  });
+
+  it("registerDefinitions attaches immediately if the system is already running", () => {
+    const attachSpy = vi.fn();
+    const manager = createSourcesManager();
+    manager.attachAll(() => undefined);
+    expect(manager.attachedCount()).toBe(0);
+
+    manager.registerDefinitions("dynamic-mod", {
+      dyn: {
+        attach: () => {
+          attachSpy();
+          return () => undefined;
+        },
+      },
+    });
+    expect(attachSpy).toHaveBeenCalledTimes(1);
+    expect(manager.attachedCount()).toBe(1);
+
+    manager.cleanupAll();
+    expect(manager.attachedCount()).toBe(0);
+  });
+
+  it("error messages name the module so multi-module collisions are debuggable", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const manager = createSourcesManager(
+      {
+        boom: {
+          attach: () => {
+            throw new Error("oops");
+          },
+        },
+      },
+      { boom: "game-engine" },
+    );
+    manager.attachAll(() => undefined);
+    const matched = consoleErrorSpy.mock.calls.some((call) => {
+      const head = call[0];
+      return (
+        typeof head === "string" &&
+        head.includes('Module "game-engine"') &&
+        head.includes('Source "boom"')
+      );
+    });
+    expect(matched).toBe(true);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("error message on missing unsubscribe function names the module", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const manager = createSourcesManager(
+      {
+        // @ts-expect-error — author error
+        forgot: { attach: () => undefined },
+      },
+      { forgot: "the-mod" },
+    );
+    manager.attachAll(() => undefined);
+    const matched = consoleErrorSpy.mock.calls.some((call) => {
+      const arg = call[0];
+      const text =
+        typeof arg === "string"
+          ? arg
+          : arg instanceof Error
+            ? arg.message
+            : "";
+      return (
+        text.includes('Module "the-mod"') &&
+        text.includes('Source "forgot"') &&
+        text.includes("did not return an unsubscribe function")
+      );
+    });
+    expect(matched).toBe(true);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("attach that returns null / number / string is treated as missing cleanup", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const manager = createSourcesManager({
+      // @ts-expect-error — null is not a function
+      retNull: { attach: () => null },
+      // @ts-expect-error — number is not a function
+      retNumber: { attach: () => 0 },
+      // @ts-expect-error — string is not a function
+      retString: { attach: () => "no" },
+    });
+    manager.attachAll(() => undefined);
+    expect(manager.attachedCount()).toBe(0);
+    expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
 });
@@ -211,7 +395,7 @@ describe("createSourcesManager", () => {
 
 describe("source primitive — end-to-end with createSystem", () => {
   it("source publish dispatches into the system's event handlers", () => {
-    let captured: SourcePublish | null = null;
+    const capturedRef: { current: SourcePublish | null } = { current: null };
     const handler = vi.fn();
     const module = createModule("test", {
       schema: {
@@ -230,7 +414,7 @@ describe("source primitive — end-to-end with createSystem", () => {
       sources: {
         external: {
           attach: (publish) => {
-            captured = publish;
+            capturedRef.current = publish;
             return () => undefined;
           },
         },
@@ -240,8 +424,8 @@ describe("source primitive — end-to-end with createSystem", () => {
     const system = createSystem({ module });
     system.start();
 
-    expect(captured).not.toBeNull();
-    captured?.("TICK", { delta: 5 });
+    expect(capturedRef.current).not.toBeNull();
+    capturedRef.current?.("TICK", { delta: 5 });
     // Engine augments the payload with the event `type` discriminator
     // before passing it to the handler — same shape as `system.events.TICK`.
     expect(handler).toHaveBeenCalledWith(
