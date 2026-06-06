@@ -255,7 +255,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mcp",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -271,6 +271,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
       "@directive-run/claude-plugin",
       "@directive-run/knowledge",
       "@directive-run/lint",
+      "@directive-run/sandbox",
       "@directive-run/scaffold",
       "@modelcontextprotocol/sdk",
       "lz-string",
@@ -382,6 +383,33 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
       "."
     ],
     "directory": "react",
+    "published": true
+  },
+  {
+    "name": "@directive-run/sandbox",
+    "version": "0.0.0",
+    "description": "Execute Directive snippets server-side and return a structured transcript (logs + facts + errors). Consumed by @directive-run/mcp's run_in_sandbox tool and directive.run/playground's live DevTools panel. Uses worker_threads + esbuild bundling + an AST allowlist validator so user-supplied TypeScript runs with a bounded surface (allowlisted imports, allowlisted API calls, 5s wall clock, 32 MB heap).",
+    "homepage": "https://directive.run/docs/ide-integration",
+    "keywords": [
+      "directive",
+      "sandbox",
+      "worker-threads",
+      "execute",
+      "transcript"
+    ],
+    "dependencies": [
+      "@directive-run/core"
+    ],
+    "peerDependencies": [],
+    "optionalDependencies": [
+      "esbuild",
+      "ts-morph"
+    ],
+    "exports": [
+      ".",
+      "./worker"
+    ],
+    "directory": "sandbox",
     "published": true
   },
   {
@@ -528,4 +556,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-06T14:53:58.784Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-06T20:02:37.839Z";

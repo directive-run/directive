@@ -63,6 +63,7 @@ import {
   PlaygroundLinkError,
   buildPlaygroundLink,
 } from "./playground.js";
+import { SandboxRunnerError, runInSandboxTool } from "./sandbox-runner.js";
 
 // Injected at build time by tsup's `define` from package.json so the
 // MCP handshake + get_server_info always match the published version.
@@ -1034,6 +1035,104 @@ export function createDirectiveServer(): McpServer {
           isError: true,
           content: [
             { type: "text", text: `playground_link failed — ${reason}` },
+          ],
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "run_in_sandbox",
+    {
+      title: "Execute a Directive snippet and return its observed behavior",
+      description:
+        "Execute a Directive snippet inside a bounded worker_threads sandbox and return its observed behavior: console.log/warn/error output, the post-settle facts snapshot, any errors that occurred, and a `playgroundUrl` the user can click to edit the same snippet in StackBlitz.\n\nPair with `generate_module` to show the user what the generated module ACTUALLY DID when it ran (not just what it declares). Two input shapes match `playground_link`: pass `source` (single string) for already-runnable snippets (`get_example`, `fix_code`, hand-written demos), OR pass `files: [{path, source}]` for paired output from `generate_module` (the runner ends up at `src/main.ts` and is what tsx runs).\n\nSandbox boundary: an AST allowlist validator rejects imports outside `@directive-run/{core,ai,query}` and identifier references to FS / network / eval surfaces (process, require, fetch, fs, etc.); the worker has a 5-second wall-clock budget (clamped to [100ms, 10s]) and a 32 MB heap ceiling. Validator rejection, bundle failure, runtime error, and timeout all return structured results in `errors` rather than throwing.",
+      inputSchema: {
+        source: z
+          .string()
+          .min(1)
+          .max(MAX_PLAYGROUND_SOURCE_BYTES)
+          .optional()
+          .describe(
+            `Single-file source (mutually exclusive with \`files\`). Use for already-runnable code. Max ${MAX_PLAYGROUND_SOURCE_BYTES} bytes.`,
+          ),
+        files: z
+          .array(
+            z.object({
+              path: z
+                .string()
+                .min(1)
+                .max(120)
+                .describe(
+                  "Relative path inside the sandbox, e.g. 'src/counter.ts'. One file MUST be 'src/main.ts' — that's the entry point the worker imports.",
+                ),
+              source: z.string().min(1).describe("File contents."),
+            }),
+          )
+          .min(1)
+          .max(10)
+          .optional()
+          .describe(
+            "Multi-file payload (mutually exclusive with `source`). Use for `generate_module` paired output.",
+          ),
+        timeoutMs: z
+          .number()
+          .int()
+          .min(100)
+          .max(10_000)
+          .optional()
+          .describe(
+            "Wall-clock execution budget in milliseconds. Default 5000. Clamped to [100, 10000].",
+          ),
+      },
+    },
+    async ({ source, files, timeoutMs }) => {
+      try {
+        const result = await runInSandboxTool({
+          source,
+          files: files as { path: string; source: string }[] | undefined,
+          timeoutMs,
+        });
+        // Build a playgroundUrl alongside the transcript so the LLM can
+        // hand the user a click-through to edit the same snippet in
+        // StackBlitz if the transcript is interesting (or if it errored
+        // and the user wants to debug interactively).
+        let playgroundUrl: string | null = null;
+        try {
+          const link = buildPlaygroundLink({
+            source,
+            files: files as { path: string; source: string }[] | undefined,
+          });
+          playgroundUrl = link.url;
+        } catch {
+          // Playground URL is a convenience; failing to build one
+          // shouldn't gate the transcript response.
+        }
+        const payload = {
+          logs: result.logs,
+          facts: result.facts,
+          errors: result.errors,
+          durationMs: result.durationMs,
+          timedOut: result.timedOut,
+          playgroundUrl,
+        };
+        return {
+          content: [
+            {
+              type: "text",
+              text: `<directive-data>\n${JSON.stringify(payload, null, 2)}\n</directive-data>`,
+            },
+          ],
+        };
+      } catch (err) {
+        const reason =
+          err instanceof SandboxRunnerError
+            ? `${err.code}: ${err.message}`
+            : (err as Error).message;
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `run_in_sandbox failed — ${reason}` },
           ],
         };
       }

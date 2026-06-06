@@ -53,6 +53,7 @@ describe("createDirectiveServer", () => {
       "list_skills",
       "playground_link",
       "review_source",
+      "run_in_sandbox",
       "search_examples",
       "search_knowledge",
     ]);
