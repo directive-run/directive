@@ -104,8 +104,10 @@ export async function newModuleCommand(name: string, args: string[]) {
     process.exit(1);
   }
 
-  const content = generateModule(name, sections);
-  writeFile(filePath, content);
+  // CLI writes a library file to disk; the paired runnerSource is the
+  // MCP playground's concern and is ignored here.
+  const { moduleSource } = generateModule(name, sections);
+  writeFile(filePath, moduleSource);
 
   const rel = relative(opts.dir, filePath);
   console.log(`${pc.green("Created")} ${pc.dim(rel)}`);
@@ -134,8 +136,8 @@ export async function newOrchestratorCommand(name: string, args: string[]) {
     process.exit(1);
   }
 
-  const content = generateOrchestrator(name);
-  writeFile(filePath, content);
+  const { moduleSource } = generateOrchestrator(name);
+  writeFile(filePath, moduleSource);
 
   const rel = relative(opts.dir, filePath);
   console.log(`${pc.green("Created")} ${pc.dim(rel)}`);

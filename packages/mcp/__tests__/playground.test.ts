@@ -106,4 +106,71 @@ describe("buildPlaygroundLink", () => {
     expect(result.url.includes("&t=")).toBe(false);
     expect(result.url.includes("t=")).toBe(false);
   });
+
+  it("defaults mode to 'preview' and routes to /playground", () => {
+    const result = buildPlaygroundLink({ source: "x" });
+    expect(result.mode).toBe("preview");
+    expect(result.url.startsWith("https://directive.run/playground#")).toBe(
+      true,
+    );
+    expect(result.fileCount).toBe(1);
+  });
+
+  it("routes to /run when mode is 'instant'", () => {
+    const result = buildPlaygroundLink({ source: "x", mode: "instant" });
+    expect(result.mode).toBe("instant");
+    expect(result.url.startsWith("https://directive.run/run#")).toBe(true);
+  });
+
+  describe("multi-file payload", () => {
+    const counterFiles = [
+      {
+        path: "src/counter.ts",
+        source:
+          'import { createModule, t } from "@directive-run/core";\nexport const counter = createModule("counter", { schema: { facts: { count: t.number() } }, init: f => { f.count = 0; } });\n',
+      },
+      {
+        path: "src/main.ts",
+        source:
+          'import { createSystem } from "@directive-run/core";\nimport { counter } from "./counter.js";\nconst system = createSystem({ module: counter });\nsystem.start();\nconsole.log(system.facts);\n',
+      },
+    ];
+
+    it("returns a URL with files= hash field and round-trips the array", () => {
+      const result = buildPlaygroundLink({ files: counterFiles });
+      expect(result.fileCount).toBe(2);
+      const hash = parseHash(result.url);
+      const encoded = hash.get("files");
+      expect(encoded).not.toBeNull();
+      const decoded = decompressFromEncodedURIComponent(encoded ?? "");
+      expect(JSON.parse(decoded)).toEqual(counterFiles);
+    });
+
+    it("rejects when both source and files are passed", () => {
+      expect(() =>
+        buildPlaygroundLink({ source: "x", files: counterFiles }),
+      ).toThrow(/both/i);
+    });
+
+    it("rejects when neither source nor files is passed", () => {
+      expect(() => buildPlaygroundLink({})).toThrow(/either/i);
+    });
+
+    it("rejects when a file has empty path or source", () => {
+      expect(() =>
+        buildPlaygroundLink({ files: [{ path: "", source: "x" }] }),
+      ).toThrow(/path/i);
+      expect(() =>
+        buildPlaygroundLink({ files: [{ path: "x.ts", source: "" }] }),
+      ).toThrow(/source/i);
+    });
+
+    it("respects mode for the multi-file route too", () => {
+      const result = buildPlaygroundLink({
+        files: counterFiles,
+        mode: "instant",
+      });
+      expect(result.url.startsWith("https://directive.run/run#")).toBe(true);
+    });
+  });
 });

@@ -227,7 +227,9 @@ Endpoints:
 
 | Tool | Purpose |
 |---|---|
-| `playground_link` | Turn any TypeScript snippet (≤ 8 KB) into a `directive.run/playground` URL. The page decompresses the source from the URL hash, shows it with syntax highlighting, and offers a one-click **Open in StackBlitz** button that boots a real running Directive project with the snippet as `src/main.ts`. Pair it with any tool that returns code — `generate_module`, `get_example`, `fix_code` — to give the user a "try it now" link in chat. |
+| `playground_link` | Turn TypeScript source into a clickable URL that boots a real Directive project in StackBlitz. Two shapes: pass `source` (single string) for already-runnable snippets from `get_example` / `fix_code`, OR pass `files: [{path, source}, …]` for the paired library + runner output from `generate_module`. Optional `mode: "preview" \| "instant"` — `"preview"` (default) lands on `directive.run/playground` with code + Open-in-StackBlitz button; `"instant"` lands on `directive.run/run` which auto-submits the StackBlitz form (no preview UI). 8 KB cap on raw input. Payload travels in the URL hash so it never reaches server logs. |
+
+**Composition for a "try it now" link:** `generate_module` returns paired `{moduleSource, runnerSource, suggestedFilenames}` — pass both to `playground_link` as a `files` array (the runner is the entry point at `src/main.ts`) and the user clicks ONE URL that boots a project where `tsx src/main.ts` actually logs Directive facts to the StackBlitz terminal. For `get_example` / `fix_code` output (already runnable), pass the single `source` string instead.
 
 ## Troubleshooting
 

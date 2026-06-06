@@ -111,35 +111,35 @@ describe("generateModule", () => {
   });
 
   it("produces output containing the camelCase export name", () => {
-    const src = generateModule("traffic-light");
-    expect(src).toContain("export const trafficLight = createModule(");
-    expect(src).toContain(`"traffic-light"`);
+    const { moduleSource } = generateModule("traffic-light");
+    expect(moduleSource).toContain("export const trafficLight = createModule(");
+    expect(moduleSource).toContain(`"traffic-light"`);
   });
 
   it("imports from @directive-run/core", () => {
-    expect(generateModule("x")).toMatch(
+    expect(generateModule("x").moduleSource).toMatch(
       /import \{[^}]*\} from "@directive-run\/core"/,
     );
   });
 
   it("with all sections, includes every section block", () => {
-    const src = generateModule("x", MODULE_SECTIONS);
-    expect(src).toContain("derive:");
-    expect(src).toContain("events:");
-    expect(src).toContain("constraints:");
-    expect(src).toContain("resolvers:");
-    expect(src).toContain("effects:");
+    const { moduleSource } = generateModule("x", MODULE_SECTIONS);
+    expect(moduleSource).toContain("derive:");
+    expect(moduleSource).toContain("events:");
+    expect(moduleSource).toContain("constraints:");
+    expect(moduleSource).toContain("resolvers:");
+    expect(moduleSource).toContain("effects:");
   });
 
   it("with empty sections, includes only schema + init", () => {
-    const src = generateModule("x", []);
-    expect(src).toContain("schema");
-    expect(src).toContain("init:");
-    expect(src).not.toContain("derive:");
-    expect(src).not.toContain("events:");
-    expect(src).not.toContain("constraints:");
-    expect(src).not.toContain("resolvers:");
-    expect(src).not.toContain("effects:");
+    const { moduleSource } = generateModule("x", []);
+    expect(moduleSource).toContain("schema");
+    expect(moduleSource).toContain("init:");
+    expect(moduleSource).not.toContain("derive:");
+    expect(moduleSource).not.toContain("events:");
+    expect(moduleSource).not.toContain("constraints:");
+    expect(moduleSource).not.toContain("resolvers:");
+    expect(moduleSource).not.toContain("effects:");
   });
 
   it.each<ModuleSection>([
@@ -149,23 +149,53 @@ describe("generateModule", () => {
     "resolvers",
     "effects",
   ])("includes only the %s section when requested", (section) => {
-    const src = generateModule("x", [section]);
-    expect(src).toContain(`${section}:`);
+    const { moduleSource } = generateModule("x", [section]);
+    expect(moduleSource).toContain(`${section}:`);
     for (const other of MODULE_SECTIONS) {
       if (other !== section) {
-        expect(src).not.toContain(`\n  ${other}: {`);
+        expect(moduleSource).not.toContain(`\n  ${other}: {`);
       }
     }
   });
 
   it("constraints alone still emits the requirements block in schema", () => {
-    const src = generateModule("x", ["constraints"]);
-    expect(src).toContain("requirements:");
+    const { moduleSource } = generateModule("x", ["constraints"]);
+    expect(moduleSource).toContain("requirements:");
   });
 
   it("resolvers alone still emits the requirements block in schema", () => {
-    const src = generateModule("x", ["resolvers"]);
-    expect(src).toContain("requirements:");
+    const { moduleSource } = generateModule("x", ["resolvers"]);
+    expect(moduleSource).toContain("requirements:");
+  });
+
+  it("returns a non-null runner driver for plain library output", () => {
+    const result = generateModule("counter", ["events"]);
+    expect(result.runnable).toBe(false);
+    expect(result.runnerSource).not.toBeNull();
+    expect(result.runnerSource).toContain('from "@directive-run/core"');
+    expect(result.runnerSource).toContain('from "./counter.js"');
+    expect(result.runnerSource).toContain("createSystem({ module: counter })");
+    expect(result.runnerSource).toContain("system.start()");
+    expect(result.runnerSource).toContain("await system.settle()");
+  });
+
+  it("suggests conventional filenames for module + runner pair", () => {
+    const { suggestedFilenames } = generateModule("traffic-light");
+    expect(suggestedFilenames).toEqual({
+      module: "traffic-light.ts",
+      runner: "main.ts",
+    });
+  });
+
+  it("emits a dispatch call for every detected event key", () => {
+    const { runnerSource } = generateModule("x", ["events"]);
+    expect(runnerSource).toContain("system.events.setStatus({})");
+  });
+
+  it("emits a no-events comment when the module has no events section", () => {
+    const { runnerSource } = generateModule("x", []);
+    expect(runnerSource).toContain("No events detected");
+    expect(runnerSource).not.toContain("system.events.");
   });
 });
 
@@ -176,22 +206,53 @@ describe("generateOrchestrator", () => {
   });
 
   it("produces the camelCase export name and kebab module id", () => {
-    const src = generateOrchestrator("chat-agent");
-    expect(src).toContain("export const chatAgent = createModule(");
-    expect(src).toContain(`"chat-agent"`);
+    const { moduleSource } = generateOrchestrator("chat-agent");
+    expect(moduleSource).toContain("export const chatAgent = createModule(");
+    expect(moduleSource).toContain(`"chat-agent"`);
   });
 
   it("imports from core and ai", () => {
-    const src = generateOrchestrator("x");
-    expect(src).toMatch(/import \{[^}]*\} from "@directive-run\/core"/);
-    expect(src).toMatch(/import \{[\s\S]*?\} from "@directive-run\/ai"/);
+    const { moduleSource } = generateOrchestrator("x");
+    expect(moduleSource).toMatch(
+      /import \{[^}]*\} from "@directive-run\/core"/,
+    );
+    expect(moduleSource).toMatch(
+      /import \{[\s\S]*?\} from "@directive-run\/ai"/,
+    );
   });
 
   it("includes the AgentStatus type and the RUN_AGENT requirement", () => {
-    const src = generateOrchestrator("x");
-    expect(src).toContain("AgentStatus");
-    expect(src).toContain(`"RUN_AGENT"`);
-    expect(src).toContain("requestRun");
-    expect(src).toContain("memory");
+    const { moduleSource } = generateOrchestrator("x");
+    expect(moduleSource).toContain("AgentStatus");
+    expect(moduleSource).toContain(`"RUN_AGENT"`);
+    expect(moduleSource).toContain("requestRun");
+    expect(moduleSource).toContain("memory");
+  });
+
+  it("returns a non-null runner driver despite the library exporting a system", () => {
+    // The orchestrator template includes `export const system = createSystem(...)`
+    // but does NOT call `.start()`, so it's still library shape and needs the
+    // runner to actually demo behavior.
+    const result = generateOrchestrator("chat-agent");
+    expect(result.runnable).toBe(false);
+    expect(result.runnerSource).not.toBeNull();
+    expect(result.runnerSource).toContain('from "./chat-agent.js"');
+    expect(result.runnerSource).toContain("system.start()");
+  });
+});
+
+describe("generateRunner", () => {
+  it("returns a no-op comment when the input already calls system.start()", async () => {
+    const { generateRunner } = await import("../src/index.js");
+    const out = generateRunner(
+      "const system = createSystem({}); system.start();",
+    );
+    expect(out).toContain("already creates its own system");
+  });
+
+  it("falls back to generic binding names when regex extraction fails", async () => {
+    const { generateRunner } = await import("../src/index.js");
+    const out = generateRunner("// no createModule here");
+    expect(out).toContain('import { myModule } from "./module.js"');
   });
 });

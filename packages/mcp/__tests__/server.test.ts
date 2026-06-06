@@ -129,7 +129,7 @@ describe("createDirectiveServer", () => {
     expect(extractText(result)).toMatch(/not found/i);
   });
 
-  it("playground_link returns a directive.run/playground URL with the source", async () => {
+  it("playground_link single-source mode returns a /playground URL", async () => {
     const result = await client.callTool({
       name: "playground_link",
       arguments: {
@@ -139,28 +139,77 @@ describe("createDirectiveServer", () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const text = extractText(result);
-    expect(text).toContain("<directive-data>");
-    const payload = JSON.parse(
-      text.replace("<directive-data>\n", "").replace("\n</directive-data>", ""),
-    ) as { url: string; sizeBytes: number; urlBytes: number; title: string };
+    const payload = parseDirectiveData<{
+      url: string;
+      mode: string;
+      fileCount: number;
+      sizeBytes: number;
+      urlBytes: number;
+      title: string;
+    }>(result);
 
     expect(payload.url.startsWith("https://directive.run/playground#")).toBe(
       true,
     );
     expect(payload.url).toContain("src=");
     expect(payload.url).toContain("t=Hello");
+    expect(payload.mode).toBe("preview");
+    expect(payload.fileCount).toBe(1);
     expect(payload.sizeBytes).toBe(32);
     expect(payload.title).toBe("Hello");
   });
 
-  it("playground_link rejects empty source", async () => {
+  it("playground_link multi-file mode returns a URL with files= hash field", async () => {
     const result = await client.callTool({
       name: "playground_link",
-      arguments: { source: "" },
+      arguments: {
+        files: [
+          {
+            path: "src/counter.ts",
+            source: 'export const counter = "x";\n',
+          },
+          { path: "src/main.ts", source: 'console.log("hi");\n' },
+        ],
+        title: "Counter demo",
+      },
     });
 
+    expect(result.isError).toBeFalsy();
+    const payload = parseDirectiveData<{
+      url: string;
+      fileCount: number;
+      mode: string;
+    }>(result);
+    expect(payload.url.startsWith("https://directive.run/playground#")).toBe(
+      true,
+    );
+    expect(payload.url).toContain("files=");
+    expect(payload.fileCount).toBe(2);
+    expect(payload.mode).toBe("preview");
+  });
+
+  it("playground_link mode=instant routes to /run", async () => {
+    const result = await client.callTool({
+      name: "playground_link",
+      arguments: { source: "console.log(1);", mode: "instant" },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = parseDirectiveData<{ url: string; mode: string }>(result);
+    expect(payload.url.startsWith("https://directive.run/run#")).toBe(true);
+    expect(payload.mode).toBe("instant");
+  });
+
+  it("playground_link rejects when both source and files are provided", async () => {
+    const result = await client.callTool({
+      name: "playground_link",
+      arguments: {
+        source: "x",
+        files: [{ path: "src/main.ts", source: "y" }],
+      },
+    });
     expect(result.isError).toBe(true);
+    expect(extractText(result)).toMatch(/both/i);
   });
 
   it("playground_link rejects source larger than the 8KB cap", async () => {
@@ -301,17 +350,27 @@ describe("createDirectiveServer", () => {
     expect(text).toContain("effects");
   });
 
-  it("generate_module returns a sensible module source", async () => {
+  it("generate_module returns paired moduleSource + runnerSource", async () => {
     const result = await client.callTool({
       name: "generate_module",
       arguments: { name: "traffic-light", kind: "module" },
     });
     expect(result.isError).toBeFalsy();
-    const text = extractText(result);
-    expect(text).toContain("traffic-light.ts");
-    expect(text).toContain("@directive-run/core");
-    expect(text).toContain('createModule("traffic-light"');
-    expect(text).toContain("export const trafficLight");
+    const payload = parseDirectiveData(result);
+    expect(payload.moduleSource).toContain("@directive-run/core");
+    expect(payload.moduleSource).toContain('createModule("traffic-light"');
+    expect(payload.moduleSource).toContain("export const trafficLight");
+    expect(payload.runnerSource).toContain(
+      "createSystem({ module: trafficLight })",
+    );
+    expect(payload.runnerSource).toContain("system.start()");
+    expect(payload.runnerSource).toContain("await system.settle()");
+    expect(payload.runnable).toBe(false);
+    expect(payload.suggestedFilenames).toEqual({
+      module: "src/traffic-light.ts",
+      runner: "src/main.ts",
+      test: "src/traffic-light.test.ts",
+    });
   });
 
   it("generate_module respects sections enum", async () => {
@@ -324,9 +383,9 @@ describe("createDirectiveServer", () => {
       },
     });
     expect(result.isError).toBeFalsy();
-    const text = extractText(result);
-    expect(text).toContain("derive:");
-    expect(text).not.toContain("effects:");
+    const payload = parseDirectiveData(result);
+    expect(payload.moduleSource).toContain("derive:");
+    expect(payload.moduleSource).not.toContain("effects:");
   });
 
   it("generate_module rejects invalid names", async () => {
@@ -344,10 +403,12 @@ describe("createDirectiveServer", () => {
       arguments: { name: "chat-agent", kind: "orchestrator" },
     });
     expect(result.isError).toBeFalsy();
-    const text = extractText(result);
-    expect(text).toContain("@directive-run/ai");
-    expect(text).toContain("chatAgent");
-    expect(text).toContain("RUN_AGENT");
+    const payload = parseDirectiveData(result);
+    expect(payload.moduleSource).toContain("@directive-run/ai");
+    expect(payload.moduleSource).toContain("chatAgent");
+    expect(payload.moduleSource).toContain("RUN_AGENT");
+    expect(payload.runnerSource).toContain('from "./chat-agent.js"');
+    expect(payload.runnable).toBe(false);
   });
 
   it("list_review_rules returns a non-empty JSON list of rules", async () => {
@@ -520,4 +581,17 @@ function extractText(result: unknown): string {
     .filter((c) => c.type === "text")
     .map((c) => c.text)
     .join("\n");
+}
+
+// Tools that return structured data wrap the JSON payload in a
+// <directive-data>...</directive-data> fence; pull it out and parse.
+function parseDirectiveData<T = Record<string, unknown>>(result: unknown): T {
+  const text = extractText(result);
+  const match = text.match(/<directive-data>\n([\s\S]*?)\n<\/directive-data>/);
+  if (!match) {
+    throw new Error(
+      `response did not contain a <directive-data> block: ${text}`,
+    );
+  }
+  return JSON.parse(match[1]!) as T;
 }

@@ -97,16 +97,196 @@ export function requiredPackages(kind: ScaffoldKind): string[] {
 }
 
 /**
+ * Paired output returned by every scaffold generator: the library
+ * module the consumer was asking for, PLUS a runnable driver that
+ * wraps it in `createSystem` + lifecycle calls. The MCP `playground_link`
+ * tool ships both as separate files (`src/<name>.ts` + `src/main.ts`) so
+ * StackBlitz boots a project that actually logs facts to the terminal
+ * instead of an empty `export` statement.
+ *
+ * When the module source already contains a `createSystem(...)` call,
+ * the generator skips emitting a runner and returns `runnerSource: null`
+ * with `runnable: true`. The MCP tool then ships a single-file playground.
+ */
+export interface GeneratedScaffold {
+  /** The module / library source — the artifact the consumer originally asked for. */
+  moduleSource: string;
+  /**
+   * A driver that imports `moduleSource`, builds a system, starts it,
+   * settles, logs facts. Null when `moduleSource` is already runnable.
+   */
+  runnerSource: string | null;
+  /** Conventional filenames so the consumer can drop the strings on disk. */
+  suggestedFilenames: { module: string; runner: string };
+  /**
+   * True when `moduleSource` already calls `createSystem` — the runner
+   * is redundant and was not generated.
+   */
+  runnable: boolean;
+}
+
+// We say a source is "already runnable" only when it calls `.start()`
+// on its system — exporting a system constant via `createSystem(...)`
+// alone is library shape (no driver, no dispatch, no log). The
+// orchestrator template, for example, has a `createSystem` export but
+// still needs the paired runner to actually log anything.
+const RUNNABLE_MARKERS = /system\.start\s*\(/;
+
+/**
+ * Pull `export const <bindingName> = createModule("<kebabName>", ...)`
+ * out of a module source. Returns null when the regex doesn't match;
+ * callers fall back to a generic runner template.
+ */
+function extractModuleBinding(
+  source: string,
+): { bindingName: string; kebabName: string } | null {
+  const match = source.match(
+    /export\s+const\s+(\w+)\s*=\s*createModule\(\s*["']([^"']+)["']/,
+  );
+  if (!match) {
+    return null;
+  }
+  return { bindingName: match[1]!, kebabName: match[2]! };
+}
+
+/**
+ * Pull event keys out of a `events: { … }` block. Order is preserved.
+ * Returns [] when no events block is present — the runner then just
+ * logs initial + settled facts and quits.
+ */
+function extractEventKeys(source: string): string[] {
+  // Find the events: { ... } block at the top of the schema OR inside
+  // createModule({ ... events: { ... } }). The simplest robust pass is
+  // to find any `events: {` then capture keys until the matching `}`.
+  const eventsBlockStart = source.search(/\bevents\s*:\s*\{/);
+  if (eventsBlockStart === -1) {
+    return [];
+  }
+  const openBrace = source.indexOf("{", eventsBlockStart);
+  if (openBrace === -1) {
+    return [];
+  }
+  // Walk forward, brace-balanced, until the matching close.
+  let depth = 0;
+  let i = openBrace;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === "{") {
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        break;
+      }
+    }
+    i += 1;
+  }
+  const block = source.slice(openBrace + 1, i);
+  // Pull top-level keys (depth-0 identifiers at start of line, before `:`).
+  const keys: string[] = [];
+  let lineStart = 0;
+  let braceDepth = 0;
+  for (let j = 0; j < block.length; j++) {
+    const ch = block[j];
+    if (ch === "{") {
+      braceDepth += 1;
+    } else if (ch === "}") {
+      braceDepth -= 1;
+    } else if (ch === "\n") {
+      const line = block.slice(lineStart, j).trim();
+      lineStart = j + 1;
+      if (braceDepth !== 0) {
+        continue;
+      }
+      const keyMatch = line.match(/^(\w+)\s*:/);
+      if (keyMatch) {
+        keys.push(keyMatch[1]!);
+      }
+    }
+  }
+  return keys;
+}
+
+/**
+ * Emit the runnable driver. Imports the module by its detected binding
+ * name from `./<kebabName>.js` (the conventional ESM extension StackBlitz
+ * + tsx both resolve), instantiates a system, starts it, dispatches each
+ * detected event with an empty payload (so users see how the event
+ * surface is wired — TS errors guide them to fill in real shapes), then
+ * settles and logs.
+ *
+ * When the source has no detectable binding, returns a generic template
+ * the user can hand-edit. Detection failure is rare but should never
+ * crash the generator.
+ */
+export function generateRunner(moduleSource: string): string {
+  if (RUNNABLE_MARKERS.test(moduleSource)) {
+    // Caller should have skipped this; emit a stub so a stray call
+    // still produces compileable output.
+    return [
+      "// Module source already creates its own system — no runner emitted.",
+      "// See the module file for the runnable entry point.",
+      "",
+    ].join("\n");
+  }
+
+  const binding = extractModuleBinding(moduleSource);
+  const events = extractEventKeys(moduleSource);
+
+  const bindingName = binding?.bindingName ?? "myModule";
+  const kebabName = binding?.kebabName ?? "module";
+
+  const lines: string[] = [];
+  lines.push(`import { createSystem } from "@directive-run/core";`);
+  lines.push(`import { ${bindingName} } from "./${kebabName}.js";`);
+  lines.push("");
+  lines.push(`const system = createSystem({ module: ${bindingName} });`);
+  lines.push("system.start();");
+  lines.push("");
+  lines.push(`console.log("[start] facts:", system.facts);`);
+  lines.push("");
+
+  if (events.length > 0) {
+    lines.push("// Dispatch each detected event with an empty payload so you");
+    lines.push("// can see the wiring. Fill in real payloads to drive the");
+    lines.push("// module from the StackBlitz terminal.");
+    for (const eventName of events) {
+      lines.push(
+        `// @ts-expect-error — fill in the real payload shape for "${eventName}"`,
+      );
+      lines.push(`system.events.${eventName}({});`);
+    }
+    lines.push("");
+  } else {
+    lines.push("// No events detected in the module — extend this file to");
+    lines.push("// dispatch requirements or mutate facts directly.");
+    lines.push("");
+  }
+
+  lines.push("// Wait for resolvers, async constraints, and effects to drain.");
+  lines.push("await system.settle();");
+  lines.push("");
+  lines.push(`console.log("[settled] facts:", system.facts);`);
+  lines.push("system.destroy();");
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/**
  * Generate a Directive module source file from a kebab-case name and
- * a list of sections to include. Returns the source as a string;
- * does not touch the filesystem.
+ * a list of sections to include. Returns paired output: the library
+ * `moduleSource` PLUS a `runnerSource` driver that wraps it in
+ * `createSystem` + `start` + dispatch + settle + log, so a downstream
+ * consumer (the MCP `playground_link` tool, the CLI, a docs example)
+ * can ship both files into a real running project.
  *
  * `sections` defaults to every supported section.
  */
 export function generateModule(
   name: string,
   sections: readonly ModuleSection[] = MODULE_SECTIONS,
-): string {
+): GeneratedScaffold {
   assertValidName(name);
 
   const camelName = toCamelCase(name);
@@ -213,25 +393,30 @@ export function generateModule(
 
   code += "});\n";
 
-  return code;
+  const runnable = RUNNABLE_MARKERS.test(code);
+  return {
+    moduleSource: code,
+    runnerSource: runnable ? null : generateRunner(code),
+    suggestedFilenames: { module: `${name}.ts`, runner: "main.ts" },
+    runnable,
+  };
 }
 
 /**
  * Generate a Directive AI-orchestrator module source file from a
- * kebab-case name. Returns the source as a string; does not touch
- * the filesystem.
+ * kebab-case name. Returns paired output (see {@link generateModule}).
  *
  * The generated module includes an `AgentStatus` type, full schema
  * with input/output/status/error/tokens facts, derivations, events,
  * a single `RUN_AGENT` requirement and resolver, plus commented-out
  * memory + orchestrator configuration the consumer fills in.
  */
-export function generateOrchestrator(name: string): string {
+export function generateOrchestrator(name: string): GeneratedScaffold {
   assertValidName(name);
 
   const camelName = toCamelCase(name);
 
-  return `import { type ModuleSchema, createModule, createSystem, t } from "@directive-run/core";
+  const moduleSource = `import { type ModuleSchema, createModule, createSystem, t } from "@directive-run/core";
 import {
   createAgentOrchestrator,
   createAgentMemory,
@@ -363,4 +548,12 @@ export const system = createSystem({
   module: ${camelName},
 });
 `;
+
+  const runnable = RUNNABLE_MARKERS.test(moduleSource);
+  return {
+    moduleSource,
+    runnerSource: runnable ? null : generateRunner(moduleSource),
+    suggestedFilenames: { module: `${name}.ts`, runner: "main.ts" },
+    runnable,
+  };
 }

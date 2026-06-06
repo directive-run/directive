@@ -543,9 +543,10 @@ export function createDirectiveServer(): McpServer {
   server.registerTool(
     "generate_module",
     {
-      title: "Generate NEW Directive module source code",
+      title:
+        "Generate NEW Directive module source code (paired with a runnable driver)",
       description:
-        'Generate the source string for a new Directive module or AI orchestrator. Use this when the user wants to CREATE a module, not learn about one. Returns the source as text; never writes to disk — the caller decides where to put it. Strict regex on `name` (kebab-case, ≤64 chars). For `kind: "module"`, optionally pass `sections` to pick which blocks to include (default: every section). Discover valid section values via list_module_sections.',
+        'Generate a new Directive module or AI orchestrator as a paired source bundle: a library `moduleSource` (the `createModule(...)` definition) AND a `runnerSource` that wraps it in `createSystem` + `start()` + dispatch + settle + log so the playground boots a project that actually demonstrates behavior. Pipe BOTH into `playground_link` as a `files` array for a clickable runnable URL. Never writes to disk — the caller decides. Strict regex on `name` (kebab-case, ≤64 chars). For `kind: "module"`, optionally pass `sections` to pick which blocks to include. Discover valid section values via list_module_sections.',
       inputSchema: {
         name: z
           .string()
@@ -579,25 +580,36 @@ export function createDirectiveServer(): McpServer {
         };
       }
       try {
-        const source =
+        const scaffold =
           kind === "orchestrator"
             ? generateOrchestrator(name)
             : generateModule(
                 name,
                 (sections as readonly ModuleSection[]) ?? MODULE_SECTIONS,
               );
-        const { sourceFileName, testFileName } = suggestFileNames(name, kind);
+        const { testFileName } = suggestFileNames(name, kind);
         const needed = requiredPackages(kind);
-        const lines: string[] = [
-          `// Suggested file: src/${sourceFileName}`,
-          `// Suggested test: src/${testFileName}`,
-          `// Required packages: ${needed.join(", ")}`,
-          `// Run: pnpm add ${needed.join(" ")}`,
-          "",
-          source,
-        ];
+        const payload = {
+          moduleSource: scaffold.moduleSource,
+          runnerSource: scaffold.runnerSource,
+          suggestedFilenames: {
+            module: `src/${scaffold.suggestedFilenames.module}`,
+            runner: `src/${scaffold.suggestedFilenames.runner}`,
+            test: `src/${testFileName}`,
+          },
+          runnable: scaffold.runnable,
+          requiredPackages: needed,
+          installCommand: `pnpm add ${needed.join(" ")}`,
+          nextStep:
+            "Pipe `moduleSource` AND `runnerSource` into `playground_link` as a `files` array to give the user a runnable URL.",
+        };
         return {
-          content: [{ type: "text", text: lines.join("\n") }],
+          content: [
+            {
+              type: "text",
+              text: `<directive-data>\n${JSON.stringify(payload, null, 2)}\n</directive-data>`,
+            },
+          ],
         };
       } catch (err) {
         return {
@@ -941,16 +953,37 @@ export function createDirectiveServer(): McpServer {
   server.registerTool(
     "playground_link",
     {
-      title: "Build a shareable playground link for a Directive snippet",
+      title:
+        "Build a shareable playground link for a Directive snippet (single- or multi-file)",
       description:
-        "Turn a TypeScript snippet (from generate_module, get_example, fix_code, or anywhere) into a directive.run/playground URL. The page decompresses the source, renders it with syntax highlighting, and offers a one-click 'Open in StackBlitz' button that boots a real running Directive project with the snippet as src/main.ts. Hand this URL to the user when you want to say 'try it now'. Source is encoded in the URL hash (not query) so it never hits server logs.",
+        "Turn TypeScript source into a directive.run URL the user can click to open a real running project. Two input shapes:\n\n• `source` (single string) — for snippets that are already runnable (`get_example`, `fix_code` output, hand-written demos). Lands as `src/main.ts` in a StackBlitz project preloaded with @directive-run/core.\n\n• `files` (array of {path, source}) — for paired output from `generate_module` (which returns both a library `moduleSource` AND a runnable `runnerSource`). Pass `[{path: 'src/<name>.ts', source: moduleSource}, {path: 'src/main.ts', source: runnerSource}]` so the playground boots a project that actually demonstrates behavior. THIS IS THE NORMAL WAY TO HAND OFF `generate_module` OUTPUT.\n\nOptional `mode`: `'preview'` (default — code + Open-in-StackBlitz button, the only Directive-branded surface, recommended for first-time users) or `'instant'` (thin auto-submit redirect, lands in StackBlitz in ~600ms with no preview UI). Use `'instant'` after the user has road-tested one link, or when they explicitly want 'just open it'.\n\nPayload travels in the URL hash so it never reaches server logs. 8 KB cap on raw input.",
       inputSchema: {
         source: z
           .string()
           .min(1)
           .max(MAX_PLAYGROUND_SOURCE_BYTES)
+          .optional()
           .describe(
-            `The TypeScript source to embed. Max ${MAX_PLAYGROUND_SOURCE_BYTES} bytes — anything larger should be opened in a real sandbox directly.`,
+            `Single-file source (mutually exclusive with \`files\`). Use for already-runnable code from \`get_example\` / \`fix_code\`. Max ${MAX_PLAYGROUND_SOURCE_BYTES} bytes.`,
+          ),
+        files: z
+          .array(
+            z.object({
+              path: z
+                .string()
+                .min(1)
+                .max(120)
+                .describe(
+                  "Relative path inside the StackBlitz project, e.g. 'src/counter.ts' or 'src/main.ts'. One file should be 'src/main.ts' (the entry point tsx runs).",
+                ),
+              source: z.string().min(1).describe("File contents."),
+            }),
+          )
+          .min(1)
+          .max(10)
+          .optional()
+          .describe(
+            `Multi-file payload (mutually exclusive with \`source\`). Use for \`generate_module\` paired output. JSON-encoded array gets compressed; the encoded payload must stay under ${MAX_PLAYGROUND_SOURCE_BYTES} bytes.`,
           ),
         title: z
           .string()
@@ -960,13 +993,26 @@ export function createDirectiveServer(): McpServer {
           .describe(
             "Optional short label shown as the editor tab title on the playground page. Defaults to 'Untitled snippet'.",
           ),
+        mode: z
+          .enum(["preview", "instant"])
+          .optional()
+          .describe(
+            "URL flavor: 'preview' (default) routes via directive.run/playground (preview + Open-in-StackBlitz button). 'instant' routes via directive.run/run (thin auto-submit redirect, lands directly in StackBlitz).",
+          ),
       },
     },
-    async ({ source, title }) => {
+    async ({ source, files, title, mode }) => {
       try {
-        const result = buildPlaygroundLink({ source, title });
+        const result = buildPlaygroundLink({
+          source,
+          files: files as { path: string; source: string }[] | undefined,
+          title,
+          mode,
+        });
         const payload = {
           url: result.url,
+          mode: result.mode,
+          fileCount: result.fileCount,
           sizeBytes: result.sizeBytes,
           urlBytes: result.urlBytes,
           title: result.title ?? null,
