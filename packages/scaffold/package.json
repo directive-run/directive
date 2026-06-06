@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/scaffold",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pure source-string generators for Directive modules and orchestrators. Shared substrate consumed by @directive-run/cli (its `directive new` command) and @directive-run/mcp (its `generate_module` tool). Zero runtime dependencies.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

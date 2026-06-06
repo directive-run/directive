@@ -1,5 +1,13 @@
 # @directive-run/cli
 
+## 1.17.2
+
+### Patch Changes
+
+- Updated dependencies [[`fcb6c9c`](https://github.com/directive-run/directive/commit/fcb6c9cf54c744fdbcfbef96a0806ae994261336)]:
+  - @directive-run/scaffold@0.2.0
+  - @directive-run/knowledge@1.17.2
+
 ## 1.17.1
 
 ### Patch Changes
