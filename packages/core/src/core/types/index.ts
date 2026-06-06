@@ -69,6 +69,14 @@ export type {
 // Effect types
 export type { EffectDef, EffectsDef, EffectCleanup } from "./effects.js";
 
+// Source types — typed external event sources (inbound dual of effects).
+export type {
+  SourceDef,
+  SourcesDef,
+  SourcePublish,
+  SourceUnsubscribe,
+} from "./sources.js";
+
 // Event types
 export type {
   // Events accessor from schema

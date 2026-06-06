@@ -25,6 +25,7 @@ import {
   createDerivationsManager,
 } from "./derivations.js";
 import { type EffectsManager, createEffectsManager } from "./effects.js";
+import { type SourcesManager, createSourcesManager } from "./sources.js";
 import {
   createDeriveAccessor,
   createEventsAccessor,
@@ -60,6 +61,7 @@ import type {
   SystemInspection,
   TraceEntry,
 } from "./types.js";
+import type { SourcesDef } from "./types/sources.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
 
 // ============================================================================
@@ -185,6 +187,7 @@ export function createEngine<S extends Schema>(
   const mergedEvents: EventsDef<S> = Object.create(null);
   const mergedDerive: DerivationsDef<S> = Object.create(null);
   const mergedEffects: EffectsDef<S> = Object.create(null);
+  const mergedSources: SourcesDef = Object.create(null);
   const mergedConstraints: ConstraintsDef<S> = Object.create(null);
   const mergedResolvers: ResolversDef<S> = Object.create(null);
 
@@ -222,6 +225,7 @@ export function createEngine<S extends Schema>(
     validateKeys(module.events, "events");
     validateKeys(module.derive, "derive");
     validateKeys(module.effects, "effects");
+    validateKeys((module as { sources?: object }).sources, "sources");
     validateKeys(module.constraints, "constraints");
     validateKeys(module.resolvers, "resolvers");
 
@@ -254,6 +258,10 @@ export function createEngine<S extends Schema>(
     };
     checkCollisions(module.derive, "derivation");
     checkCollisions(module.effects, "effect");
+    checkCollisions(
+      (module as { sources?: Record<string, unknown> }).sources,
+      "source",
+    );
     checkCollisions(module.constraints, "constraint");
     checkCollisions(module.resolvers, "resolver");
     checkCollisions(module.events, "event");
@@ -268,6 +276,10 @@ export function createEngine<S extends Schema>(
     }
     if (module.derive) Object.assign(mergedDerive, module.derive);
     if (module.effects) Object.assign(mergedEffects, module.effects);
+    {
+      const moduleSources = (module as { sources?: SourcesDef }).sources;
+      if (moduleSources) Object.assign(mergedSources, moduleSources);
+    }
     if (module.constraints)
       Object.assign(mergedConstraints, module.constraints);
     if (module.resolvers) {
@@ -517,6 +529,15 @@ export function createEngine<S extends Schema>(
       }
     },
   });
+
+  // Create sources manager — attaches external event sources at
+  // `system.start()`, tears them down at `system.stop()`. Sources are
+  // lifecycle-only (no reconciliation pass; no fact-dependency tracking),
+  // so the manager is a flat list with try/catch isolation. Attach +
+  // cleanup failures are logged via `console.error` and isolated — the
+  // engine's `ErrorSource` union does not gain new variants so the public
+  // error-boundary contract stays additive-free for v0.x.
+  const sourcesManager: SourcesManager = createSourcesManager(mergedSources);
 
   /**
    * Normalize `key`: a function passes through, an array `KeySelector`
@@ -1520,6 +1541,20 @@ export function createEngine<S extends Schema>(
         module.hooks?.onStart?.(system as any);
       }
 
+      // Attach external event sources. The publish callback dispatches into
+      // the same event queue as `system.events.X(payload)`. Sources attach
+      // AFTER `onStart` hooks so authors can perform last-mile fact init in
+      // `onStart` before any external event arrives. Source attach errors
+      // are isolated by the manager; one failed source does not prevent the
+      // others from attaching, and a failure during attach never aborts
+      // `start()` itself.
+      sourcesManager.attachAll((eventName: string, payload?: unknown) => {
+        dispatchEventByName(
+          eventName,
+          (payload ?? {}) as Record<string, unknown>,
+        );
+      });
+
       // Emit start event
       pluginManager.emitStart(system);
 
@@ -1563,6 +1598,13 @@ export function createEngine<S extends Schema>(
 
       // Cancel all resolvers
       resolversManager.cancelAll();
+
+      // Detach external event sources BEFORE running effect cleanups so any
+      // sources that share resources with effects (rare but possible) see
+      // the source-side first. Failures inside individual unsubscribes are
+      // isolated by the manager — one bad unsubscribe never blocks teardown
+      // of the rest.
+      sourcesManager.cleanupAll();
 
       // Run all effect cleanups
       effectsManager.cleanupAll();
