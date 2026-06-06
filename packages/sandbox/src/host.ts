@@ -142,7 +142,7 @@ export async function execInWorker(
         }
       });
 
-      worker.once("error", (err) => {
+      worker.once("error", (err: Error) => {
         settled = true;
         reject(new WorkerExecError(err.message, "worker-error"));
       });
