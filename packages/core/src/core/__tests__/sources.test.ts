@@ -23,7 +23,7 @@ describe("createSourcesManager", () => {
     const manager = createSourcesManager({ s: { attach } });
 
     expect(manager.attachedCount()).toBe(0);
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(attach).toHaveBeenCalledTimes(1);
     expect(manager.attachedCount()).toBe(1);
 
@@ -46,7 +46,7 @@ describe("createSourcesManager", () => {
       third: make("third"),
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
 
     expect(order).toEqual([
@@ -60,7 +60,7 @@ describe("createSourcesManager", () => {
   });
 
   it("publish callback dispatches events into the supplied dispatcher with per-source attribution", () => {
-    const dispatcher = vi.fn();
+    const dispatcher = vi.fn().mockReturnValue({ accepted: true });
     const captured: SourcePublish[] = [];
     const manager = createSourcesManager(
       {
@@ -110,7 +110,7 @@ describe("createSourcesManager", () => {
       },
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     // Bad source threw → never gets tracked. Good source attached normally.
     expect(manager.attachedCount()).toBe(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe("createSourcesManager", () => {
       forgot: { attach: () => undefined },
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(manager.attachedCount()).toBe(0);
     expect(consoleErrorSpy).toHaveBeenCalled();
     expect(
@@ -162,7 +162,7 @@ describe("createSourcesManager", () => {
       },
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
     // Reverse-order: last → bad (throws) → first. The throw is caught + logged.
     expect(orderedCleanups).toEqual(["last", "first"]);
@@ -176,7 +176,7 @@ describe("createSourcesManager", () => {
       s: { attach: () => unsubscribe },
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
     manager.cleanupAll();
     manager.cleanupAll();
@@ -205,7 +205,7 @@ describe("createSourcesManager", () => {
       { onError },
     );
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
 
     const phases = onError.mock.calls.map(
@@ -236,7 +236,7 @@ describe("createSourcesManager", () => {
       },
     });
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(attachSpy).toHaveBeenCalledTimes(1);
     expect(manager.attachedCount()).toBe(1);
     manager.cleanupAll();
@@ -244,7 +244,7 @@ describe("createSourcesManager", () => {
     expect(manager.attachedCount()).toBe(0);
 
     // Second cycle: attach + cleanup again.
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(attachSpy).toHaveBeenCalledTimes(2);
     expect(manager.attachedCount()).toBe(1);
     manager.cleanupAll();
@@ -267,7 +267,7 @@ describe("createSourcesManager", () => {
       gc: { attach: () => () => undefined },
     });
     for (let i = 0; i < 100; i++) {
-      manager.attachAll(() => undefined);
+      manager.attachAll(() => ({ accepted: true }));
       manager.cleanupAll();
     }
     expect(manager.attachedCount()).toBe(0);
@@ -316,7 +316,7 @@ describe("createSourcesManager", () => {
       },
     });
     expect(attachSpy).not.toHaveBeenCalled();
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(attachSpy).toHaveBeenCalledTimes(1);
     expect(manager.attachedCount()).toBe(1);
   });
@@ -324,7 +324,7 @@ describe("createSourcesManager", () => {
   it("registerDefinitions attaches immediately if the system is already running", () => {
     const attachSpy = vi.fn();
     const manager = createSourcesManager();
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(manager.attachedCount()).toBe(0);
 
     manager.registerDefinitions("dynamic-mod", {
@@ -356,7 +356,7 @@ describe("createSourcesManager", () => {
       },
       { boom: "game-engine" },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     const matched = consoleErrorSpy.mock.calls.some((call) => {
       const head = call[0];
       return (
@@ -380,7 +380,7 @@ describe("createSourcesManager", () => {
       },
       { forgot: "the-mod" },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     const matched = consoleErrorSpy.mock.calls.some((call) => {
       const arg = call[0];
       const text =
@@ -411,7 +411,7 @@ describe("createSourcesManager", () => {
       // @ts-expect-error — string is not a function
       retString: { attach: () => "no" },
     });
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(manager.attachedCount()).toBe(0);
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
@@ -439,7 +439,7 @@ describe("createSourcesManager", () => {
       { onAttach },
     );
 
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(onAttach).toHaveBeenCalledTimes(1);
     expect(onAttach).toHaveBeenCalledWith("good", "mg");
     consoleErrorSpy.mockRestore();
@@ -458,7 +458,7 @@ describe("createSourcesManager", () => {
       { forgot: "m1" },
       { onAttach },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(onAttach).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
@@ -485,7 +485,7 @@ describe("createSourcesManager", () => {
       { sourceA: "mod-A", sourceB: "mod-B" },
       { onPublish },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     const calls = onPublish.mock.calls.map(([id, mod, evt]) => ({
       id,
       mod,
@@ -524,7 +524,7 @@ describe("createSourcesManager", () => {
         onDetach: (id) => order.push(`detach:${id}`),
       },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
     expect(order).toEqual([
       "detach:third",
@@ -543,7 +543,7 @@ describe("createSourcesManager", () => {
       {},
       { onAttach },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
     expect(onAttach).not.toHaveBeenCalled();
 
     manager.registerDefinitions("late-mod", {
@@ -567,7 +567,7 @@ describe("createSourcesManager", () => {
       {},
       { onAttach, onDetach },
     );
-    manager.attachAll(() => undefined);
+    manager.attachAll(() => ({ accepted: true }));
 
     manager.registerDefinitions("mod-v1", {
       hot: { attach: () => oldUnsub },
@@ -1109,6 +1109,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     );
     manager.attachAll((id, moduleId, eventName) => {
       dispatched.push({ id, moduleId, eventName });
+      return { accepted: true };
     });
     // Live publish through the OLD closure reaches the dispatcher.
     capturedOld.current?.("TICK", undefined);
@@ -1141,7 +1142,7 @@ describe("source primitive — end-to-end with createSystem", () => {
           attach: (async (_publish: SourcePublish) => () => undefined) as any,
         },
       });
-      manager.attachAll(() => undefined);
+      manager.attachAll(() => ({ accepted: true }));
       expect(errorSpy).toHaveBeenCalled();
       const recordedError = errorSpy.mock.calls[0]?.[0];
       const message =
@@ -1199,5 +1200,115 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(timerRow?.publishCount).toBe(3);
     expect(typeof timerRow?.lastPublishAt).toBe("number");
     system.destroy();
+  });
+
+  // R6 fix: drop telemetry on inspect().sources for rejected publishes.
+  it("rejected publishes bump dropCount + lastDropReason on inspect()", () => {
+    const handler = vi.fn();
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("probed", {
+      schema: {
+        facts: { c: t.number() },
+        events: { OK: {} },
+      },
+      init: (f) => {
+        f.c = 0;
+      },
+      events: {
+        OK: () => handler(),
+      },
+      sources: {
+        probe: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    // Each of these should drop with a specific reason.
+    capturedRef.current?.("__proto__", {});
+    capturedRef.current?.("constructor", {});
+    capturedRef.current?.("", {});
+    capturedRef.current?.("OK", {});
+    expect(handler).toHaveBeenCalledTimes(1);
+    const inspection = (
+      system as unknown as {
+        inspect: () => {
+          sources: Array<{
+            id: string;
+            publishCount: number;
+            dropCount: number;
+            lastDropReason: string | null;
+            lastDropAt: number | null;
+          }>;
+        };
+      }
+    ).inspect();
+    const probeRow = inspection.sources.find((row) => row.id === "probe");
+    expect(probeRow?.publishCount).toBe(1);
+    expect(probeRow?.dropCount).toBe(3);
+    expect(probeRow?.lastDropReason).toBe("invalid-event-name");
+    expect(typeof probeRow?.lastDropAt).toBe("number");
+    system.destroy();
+  });
+
+  // R6 fix: onPublish plugin hook does NOT fire for engine-rejected publishes.
+  it("onPublish only fires for accepted publishes (not for engine-rejected drops)", () => {
+    const onPublish = vi.fn();
+    const dispatch = vi
+      .fn()
+      .mockImplementation(
+        (_id, _moduleId, eventName) => ({
+          accepted: eventName === "OK",
+          ...(eventName === "OK"
+            ? {}
+            : { reason: "blocked-event-name" as const }),
+        }),
+      );
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        s: {
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+      { s: "mod" },
+      { onPublish },
+    );
+    manager.attachAll(dispatch);
+    captured.current?.("OK", {});
+    captured.current?.("BAD", {});
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(onPublish).toHaveBeenCalledWith("s", "mod", "OK");
+  });
+
+  // R6 fix: error.message truncation prevents unbounded payload leakage.
+  it("lastError.message is truncated at SOURCE_ERROR_MESSAGE_MAX (256) chars", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const huge = "X".repeat(1024);
+    const manager = createSourcesManager({
+      attackerSource: {
+        attach: () => {
+          throw new Error(huge);
+        },
+      },
+    });
+    manager.attachAll(() => ({ accepted: true }));
+    const rows = manager.listDefinitions();
+    const row = rows.find((r) => r.id === "attackerSource");
+    expect(row?.errorCount).toBe(1);
+    // Truncated message has the 256-char prefix + a "[768 chars truncated]" marker.
+    expect(row?.lastError?.message.length).toBeLessThan(huge.length);
+    expect(row?.lastError?.message).toMatch(/chars truncated/);
+    expect(row?.lastError?.message.startsWith("X".repeat(256))).toBe(true);
+    consoleErrorSpy.mockRestore();
   });
 });

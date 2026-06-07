@@ -35,7 +35,13 @@ import type {
 interface AttachedSource {
   readonly id: string;
   readonly moduleId: string;
-  readonly unsubscribe: SourceUnsubscribe;
+  // Mutated once during `attachOne` — pre-built record with a placeholder
+  // unsubscribe so the per-source publish closure can close over the record
+  // identity (for the `detached` re-registration race guard). The real
+  // unsubscribe is installed immediately after `attach()` returns
+  // successfully. Not `readonly` because the late-bind is honest about the
+  // mutation rather than smuggling it through `Object.assign`.
+  unsubscribe: SourceUnsubscribe;
   detached: boolean;
 }
 
@@ -44,10 +50,32 @@ interface SourceDefinition {
   readonly moduleId: string;
 }
 
+/** Maximum characters preserved from a source error message before truncation. */
+const SOURCE_ERROR_MESSAGE_MAX = 256;
+
+/**
+ * Hard-cap any error message we record to a fixed length so a source whose
+ * `attach()` throws with a payload-embedded message
+ * (`throw new Error(\`bad row: ${JSON.stringify(piiRow)}\`)`) doesn't write
+ * unbounded PII into `inspect().sources[i].lastError.message` AND the audit
+ * ledger. Source authors who need the full message in development can opt
+ * into a logging plugin that captures the raw `Error` object.
+ */
+function truncateSourceErrorMessage(message: string): string {
+  if (message.length <= SOURCE_ERROR_MESSAGE_MAX) return message;
+  return `${message.slice(0, SOURCE_ERROR_MESSAGE_MAX)}…[${message.length - SOURCE_ERROR_MESSAGE_MAX} chars truncated]`;
+}
+
 /**
  * Per-source counters surfaced via `system.inspect().sources[i]`. Operators
  * read these to answer "is this source publishing?" "when did it last fire?"
  * "is it errored?" without having to wire a custom plugin first.
+ *
+ * `dropCount` + `lastDropReason` count publishes the engine's dispatch guard
+ * rejected (post-stop, BLOCKED_PROPS event name, empty / non-string event
+ * name). Without these, attackers could probe the BLOCKED_PROPS list or the
+ * isRunning guard invisibly — telemetry would never advance and no plugin
+ * hook would fire.
  *
  * All counters reset at the next `attachAll` (i.e. each `system.start()` cycle
  * starts fresh) so a stop → start sequence does not leak counts across cycles.
@@ -55,6 +83,9 @@ interface SourceDefinition {
 interface SourceCounters {
   publishCount: number;
   lastPublishAt: number | null;
+  dropCount: number;
+  lastDropReason: "post-destroy" | "post-stop" | "blocked-event-name" | "invalid-event-name" | null;
+  lastDropAt: number | null;
   errorCount: number;
   lastError: {
     phase: "attach" | "cleanup";
@@ -69,6 +100,9 @@ function emptyCounters(): SourceCounters {
   return {
     publishCount: 0,
     lastPublishAt: null,
+    dropCount: 0,
+    lastDropReason: null,
+    lastDropAt: null,
     errorCount: 0,
     lastError: null,
     attachedAt: null,
@@ -84,13 +118,44 @@ type LifecyclePhase = "idle" | "attached" | "stopped";
  * over the source id + moduleId so the engine cannot mis-attribute
  * publishes (a naive "look up the source by event name" approach fails
  * when multiple sources publish the same event).
+ *
+ * Returns a {@link SourceDispatchResult} indicating whether the engine
+ * accepted the publish. The manager uses the result to gate counter bumps
+ * + `onPublish` plugin emission: an accepted publish bumps `publishCount`
+ * and fires `onPublish`; a rejected publish bumps `dropCount` /
+ * `lastDropReason` and stays out of the plugin hook (otherwise observers
+ * would see "publish happened" for events the engine swallowed).
  */
 export type SourceDispatch = (
   sourceId: string,
   moduleId: string,
   eventName: string,
   payload: unknown,
-) => void;
+) => SourceDispatchResult;
+
+/**
+ * Outcome of a single source publish handed back to the manager. `"accepted"`
+ * means the engine dispatched into the event handler chain. Rejection
+ * reasons name the specific drop path so per-source telemetry can attribute
+ * the drop precisely:
+ *
+ * - `"post-destroy"` — publish arrived after `system.destroy()`.
+ * - `"post-stop"` — publish arrived between `system.stop()` and the next
+ *   `system.start()`.
+ * - `"blocked-event-name"` — event name was `__proto__` / `constructor` /
+ *   `prototype` (BLOCKED_PROPS guard, parity with `system.dispatch`).
+ * - `"invalid-event-name"` — event name was non-string or empty string.
+ */
+export type SourceDispatchResult =
+  | { accepted: true }
+  | {
+      accepted: false;
+      reason:
+        | "post-destroy"
+        | "post-stop"
+        | "blocked-event-name"
+        | "invalid-event-name";
+    };
 
 /**
  * Per-source lifecycle callbacks the engine wires into the plugin manager.
@@ -155,26 +220,54 @@ export interface SourcesManager {
   /**
    * List the declared source definitions for `system.inspect()`. Returns
    * `{ id, moduleId, meta, attached, publishCount, lastPublishAt,
-   * errorCount, lastError, attachedAt, detachedAt }` rows in registration
-   * order. Mirrors how effects are surfaced, with per-source telemetry an
-   * operator can read without registering a custom plugin.
+   * dropCount, lastDropReason, lastDropAt, errorCount, lastError,
+   * attachedAt, detachedAt }` rows in registration order. Mirrors how
+   * effects are surfaced, with per-source telemetry an operator can read
+   * without registering a custom plugin.
    */
-  listDefinitions(): Array<{
-    id: string;
-    moduleId: string;
-    meta?: unknown;
-    attached: boolean;
-    publishCount: number;
-    lastPublishAt: number | null;
-    errorCount: number;
-    lastError: {
-      phase: "attach" | "cleanup";
-      message: string;
-      at: number;
-    } | null;
-    attachedAt: number | null;
-    detachedAt: number | null;
-  }>;
+  listDefinitions(): SourceInspectionRow[];
+}
+
+/**
+ * Public per-source telemetry row returned by
+ * `SourcesManager.listDefinitions()` and surfaced unchanged on
+ * `SystemInspection.sources[i]`. Exported so consumers can name the type
+ * when writing helpers over the inspect output.
+ */
+export interface SourceInspectionRow {
+  id: string;
+  moduleId: string;
+  meta?: unknown;
+  attached: boolean;
+  publishCount: number;
+  lastPublishAt: number | null;
+  /** Publishes the engine's dispatch guard rejected this cycle. */
+  dropCount: number;
+  /** Reason for the most recent rejected publish, or `null`. */
+  lastDropReason:
+    | "post-destroy"
+    | "post-stop"
+    | "blocked-event-name"
+    | "invalid-event-name"
+    | null;
+  /** Wall-clock ms of the most recent rejected publish, or `null`. */
+  lastDropAt: number | null;
+  errorCount: number;
+  lastError: SourceLastError | null;
+  attachedAt: number | null;
+  detachedAt: number | null;
+}
+
+/**
+ * The most recent attach or cleanup error a source has recorded this cycle.
+ * `message` is truncated to a fixed length so a source that throws with a
+ * payload-embedded message does not write unbounded data into inspect
+ * output (and downstream into the audit ledger).
+ */
+export interface SourceLastError {
+  phase: "attach" | "cleanup";
+  message: string;
+  at: number;
 }
 
 /**
@@ -206,7 +299,11 @@ export function createSourcesManager(
   ): void {
     const c = counters.get(id) ?? emptyCounters();
     c.errorCount += 1;
-    c.lastError = { phase: pErr, message: error.message, at: Date.now() };
+    c.lastError = {
+      phase: pErr,
+      message: truncateSourceErrorMessage(error.message),
+      at: Date.now(),
+    };
     counters.set(id, c);
   }
 
@@ -239,20 +336,44 @@ export function createSourcesManager(
       detached: false,
     };
 
+    // Seed the counters entry BEFORE invoking `record.def.attach()` so a
+    // source whose `attach` synchronously publishes (the seed-initial-state
+    // pattern) gets its counter bumped + onPublish fired even though
+    // attach hasn't returned yet. The matching `attachedAt` / `detachedAt`
+    // updates happen post-attach so they reflect the actual lifecycle
+    // transitions, not the seeding step.
+    if (!counters.has(id)) counters.set(id, emptyCounters());
+
     // Closure-wrap the publish callback per-source so the engine receives
     // accurate `(sourceId, moduleId)` attribution on every publish — this is
     // what makes the observation pipeline correct even when N sources
     // publish the same event name. The `detached` flag closes the
     // re-registration race window: an OLD source's in-flight callback fired
     // after unsubscribe will hit the `detached` guard and no-op.
+    //
+    // Counter bump + `onPublish` plugin emission fire ONLY when the engine
+    // accepts the publish. Rejection (post-stop, BLOCKED_PROPS event name,
+    // empty / non-string name) increments `dropCount` + `lastDropReason`
+    // instead. Without this split, observers and per-source telemetry would
+    // see "publish happened" for events the engine silently swallowed —
+    // attackers could probe BLOCKED_PROPS / `isRunning` invisibly.
     const perSourcePublish: SourcePublish = (eventName, payload) => {
       if (attachedRecord.detached) return;
-      const c = counters.get(id) ?? emptyCounters();
-      c.publishCount += 1;
-      c.lastPublishAt = Date.now();
-      counters.set(id, c);
-      callbacks.onPublish?.(id, record.moduleId, eventName);
-      dispatch(id, record.moduleId, eventName, payload);
+      const result = dispatch(id, record.moduleId, eventName, payload);
+      // Counter is seeded at the top of attachOne, so the lookup never
+      // misses for any publish that originates from this source.
+      const c = counters.get(id);
+      if (!c) return; // unreachable; defensive no-op
+      const now = Date.now();
+      if (result.accepted) {
+        c.publishCount += 1;
+        c.lastPublishAt = now;
+        callbacks.onPublish?.(id, record.moduleId, eventName);
+      } else {
+        c.dropCount += 1;
+        c.lastDropReason = result.reason;
+        c.lastDropAt = now;
+      }
     };
 
     try {
@@ -279,13 +400,16 @@ export function createSourcesManager(
         return;
       }
       // Late-bind the real unsubscribe + push the live record.
-      Object.assign(attachedRecord, { unsubscribe });
+      attachedRecord.unsubscribe = unsubscribe;
       attached.push(attachedRecord);
       attachedDefinitionIds.add(id);
-      const c = counters.get(id) ?? emptyCounters();
-      c.attachedAt = Date.now();
-      c.detachedAt = null;
-      counters.set(id, c);
+      // The counters entry was seeded at the top of attachOne (so publish-
+      // during-attach is counted). Record the actual attach timestamp now.
+      const c = counters.get(id);
+      if (c) {
+        c.attachedAt = Date.now();
+        c.detachedAt = null;
+      }
       // Emit AFTER successful attach so observers cannot see attach for a
       // source that failed or returned a non-function unsubscribe.
       callbacks.onAttach?.(id, record.moduleId);
@@ -411,38 +535,8 @@ export function createSourcesManager(
       return attached.filter((r) => !r.detached).length;
     },
 
-    listDefinitions(): Array<{
-      id: string;
-      moduleId: string;
-      meta?: unknown;
-      attached: boolean;
-      publishCount: number;
-      lastPublishAt: number | null;
-      errorCount: number;
-      lastError: {
-        phase: "attach" | "cleanup";
-        message: string;
-        at: number;
-      } | null;
-      attachedAt: number | null;
-      detachedAt: number | null;
-    }> {
-      const out: Array<{
-        id: string;
-        moduleId: string;
-        meta?: unknown;
-        attached: boolean;
-        publishCount: number;
-        lastPublishAt: number | null;
-        errorCount: number;
-        lastError: {
-          phase: "attach" | "cleanup";
-          message: string;
-          at: number;
-        } | null;
-        attachedAt: number | null;
-        detachedAt: number | null;
-      }> = [];
+    listDefinitions(): SourceInspectionRow[] {
+      const out: SourceInspectionRow[] = [];
       for (const [id, record] of definitions) {
         const c = counters.get(id) ?? emptyCounters();
         out.push({
@@ -452,6 +546,9 @@ export function createSourcesManager(
           attached: attachedDefinitionIds.has(id),
           publishCount: c.publishCount,
           lastPublishAt: c.lastPublishAt,
+          dropCount: c.dropCount,
+          lastDropReason: c.lastDropReason,
+          lastDropAt: c.lastDropAt,
           errorCount: c.errorCount,
           lastError: c.lastError,
           attachedAt: c.attachedAt,

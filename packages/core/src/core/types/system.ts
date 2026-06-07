@@ -290,12 +290,19 @@ export interface SystemInspection {
   /**
    * All declared source names with the module that owns each, plus per-source
    * telemetry surfaced for production-debug ("which source is publishing?",
-   * "when did this source last fire?", "is this source errored?") without
-   * requiring a custom plugin to be installed first.
+   * "when did this source last fire?", "is this source errored?", "is the
+   * engine silently dropping publishes from this source?") without requiring
+   * a custom plugin to be installed first.
    *
    * Counters reset at every `system.start()` cycle — a stop → start does not
    * carry "ghost" counts from the previous cycle. Timestamps are wall-clock
    * milliseconds (Date.now()); `null` means "never happened in this cycle".
+   *
+   * `dropCount` / `lastDropReason` / `lastDropAt` count publishes the
+   * engine's dispatch guard rejected (post-stop, BLOCKED_PROPS event name,
+   * empty / non-string event name). Without these, attackers — or a buggy
+   * source — could probe BLOCKED_PROPS / the isRunning guard invisibly:
+   * telemetry would never advance and no plugin hook would fire.
    *
    * `attachedSourceCount` (below) is the aggregate count of `attached: true`
    * rows; both must stay in lockstep.
@@ -310,13 +317,33 @@ export interface SystemInspection {
     attachedAt: number | null;
     /** Wall-clock ms when the source most recently detached, or null. */
     detachedAt: number | null;
-    /** Total publish() invocations against this source since the last attachAll. */
+    /** Total publish() invocations the engine accepted since the last attachAll. */
     publishCount: number;
-    /** Wall-clock ms of the most recent publish() call, or null. */
+    /** Wall-clock ms of the most recent accepted publish() call, or null. */
     lastPublishAt: number | null;
+    /**
+     * Total publish() invocations the engine's dispatch guard rejected this
+     * cycle. Operators monitor this to spot misconfigured sources (wrong
+     * event names) or probing of the BLOCKED_PROPS / isRunning guards.
+     */
+    dropCount: number;
+    /** Reason for the most recent rejected publish, or `null`. */
+    lastDropReason:
+      | "post-destroy"
+      | "post-stop"
+      | "blocked-event-name"
+      | "invalid-event-name"
+      | null;
+    /** Wall-clock ms of the most recent rejected publish, or `null`. */
+    lastDropAt: number | null;
     /** Total attach + cleanup errors since the last attachAll. */
     errorCount: number;
-    /** The most recent error from this source, or null. */
+    /**
+     * The most recent error from this source, or `null`. `message` is
+     * truncated to a fixed maximum length so a source whose `attach()`
+     * throws with a payload-embedded message does not write unbounded data
+     * here AND downstream into the audit ledger.
+     */
     lastError: {
       phase: "attach" | "cleanup";
       message: string;

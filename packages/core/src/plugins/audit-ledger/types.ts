@@ -152,6 +152,25 @@ export type AuditEntry =
       error: string;
     })
   | (AuditEntryBase & {
+      kind: "source.attach" | "source.detach";
+      sourceId: string;
+      moduleId: string;
+    })
+  | (AuditEntryBase & {
+      kind: "source.error";
+      sourceId: string;
+      moduleId: string;
+      phase: "attach" | "cleanup";
+      /**
+       * Truncated error message — capped at a fixed length by the source
+       * manager before it reaches the ledger. Source authors who embed
+       * payloads in error messages get a bounded leak surface rather than
+       * an unbounded one. Pair with the matching `source.attach` /
+       * `source.detach` entries for full lifecycle context.
+       */
+      error: string;
+    })
+  | (AuditEntryBase & {
       kind: "system.init" | "system.start" | "system.stop" | "system.destroy";
     })
   | (AuditEntryBase & {

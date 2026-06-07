@@ -1603,17 +1603,23 @@ export function createEngine<S extends Schema>(
         //     BLOCKED_PROPS check `system.dispatch` already enforces
         //   - drop empty / non-string event names so log/audit sinks aren't
         //     forced to render placeholder rows
-        if (state.isDestroyed || !state.isRunning) return;
-        if (
-          typeof eventName !== "string" ||
-          eventName.length === 0 ||
-          BLOCKED_PROPS.has(eventName)
-        )
-          return;
+        //
+        // Return the outcome to the manager so per-source telemetry can
+        // attribute the drop to a specific reason and so plugin `onPublish`
+        // does NOT fire for swallowed events.
+        if (state.isDestroyed) return { accepted: false, reason: "post-destroy" };
+        if (!state.isRunning) return { accepted: false, reason: "post-stop" };
+        if (typeof eventName !== "string" || eventName.length === 0) {
+          return { accepted: false, reason: "invalid-event-name" };
+        }
+        if (BLOCKED_PROPS.has(eventName)) {
+          return { accepted: false, reason: "blocked-event-name" };
+        }
         dispatchEventByName(
           eventName,
           (payload ?? {}) as Record<string, unknown>,
         );
+        return { accepted: true };
       });
 
       // Emit start event
@@ -1902,6 +1908,9 @@ export function createEngine<S extends Schema>(
           detachedAt: row.detachedAt,
           publishCount: row.publishCount,
           lastPublishAt: row.lastPublishAt,
+          dropCount: row.dropCount,
+          lastDropReason: row.lastDropReason,
+          lastDropAt: row.lastDropAt,
           errorCount: row.errorCount,
           lastError: row.lastError,
         })),
@@ -2583,18 +2592,34 @@ export function createEngine<S extends Schema>(
       for (const sourceId of Object.keys(module.sources)) {
         sourceModuleIds[sourceId] = module.id;
       }
+      // Surface the privilege change to plugins BEFORE attach so observers
+      // see `definition.register` → `source.attach` in the same order
+      // constraints / resolvers / derivations / effects publish. Reversing
+      // would let an audit consumer record an attach for a source the
+      // ledger never saw registered.
+      //
+      // We deliberately do NOT pass the raw `SourceDef` (whose `attach`
+      // callback is the live external-subscription primitive). A malicious
+      // or buggy plugin receiving the live def could call `def.attach(...)`
+      // to install a parallel subscription bypassing the manager — the
+      // manager wouldn't track it, wouldn't tear it down at stop(), and
+      // wouldn't surface it via `inspect()`. Instead, hand plugins an
+      // opaque descriptor that names the source but exposes nothing
+      // callable. Plugins that need to react beyond the
+      // attach/publish/detach hooks can subscribe to `system.observe()`
+      // (forward-only) — they cannot reach the live attach callback.
+      for (const [sourceId, def] of Object.entries(module.sources)) {
+        const meta = (def as { meta?: DefinitionMeta }).meta;
+        pluginManager.emitDefinitionRegister("source", sourceId, {
+          moduleId: module.id,
+          ...(meta !== undefined ? { meta } : {}),
+        });
+      }
       // The manager attaches new sources immediately when the system is in
       // the `attached` phase (i.e. `system.start()` has already run);
       // otherwise they queue for the next `attachAll`. Either way the
       // catalogue grows so `system.inspect().sources` reflects them.
       sourcesManager.registerDefinitions(module.id, module.sources);
-      // Surface runtime source registration to plugins so audit-ledger /
-      // observability / devtools record the privilege change. Mirrors the
-      // existing emissions for constraints / resolvers / derivations /
-      // effects in their respective `registerDefinitions` paths.
-      for (const [sourceId, def] of Object.entries(module.sources)) {
-        pluginManager.emitDefinitionRegister("source", sourceId, def);
-      }
     }
     if (module.constraints) {
       for (const def of Object.values(module.constraints)) {
