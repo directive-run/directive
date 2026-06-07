@@ -13,7 +13,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 import type {
   SandboxResult,
@@ -26,11 +26,25 @@ const MAX_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 async function resolveWorkerPath(): Promise<string> {
-  // Use createRequire instead of `import.meta.resolve` — Vitest's SSR
-  // shim of import.meta exposes a `resolve` that isn't callable, and
-  // `createRequire` works in both real Node ESM and Vitest dev mode.
-  // The worker subpath export points at dist/worker.js; CJS resolution
-  // picks up the "default" condition we set in package.json.
+  // PRIMARY: static URL relative to this module's own file. Bundlers
+  // (Next.js outputFileTracing, esbuild, webpack, etc.) follow this
+  // static reference at build time and include `worker.js` in the
+  // output bundle automatically. Works on Vercel + AWS Lambda + Cloud
+  // Run without any consumer-side config.
+  //
+  // FALLBACK (Vitest dev path): `import.meta.url` resolves to the
+  // .ts source file in tests, so `./worker.js` doesn't exist there —
+  // fall through to `createRequire(import.meta.url).resolve(...)`
+  // which Vitest handles correctly via its SSR loader.
+  try {
+    const staticUrl = new URL("./worker.js", import.meta.url);
+    const path = fileURLToPath(staticUrl);
+    if (existsSync(path)) {
+      return path;
+    }
+  } catch {
+    // fall through
+  }
   const { createRequire } = await import("node:module");
   const require = createRequire(import.meta.url);
   return require.resolve("@directive-run/sandbox/worker");
