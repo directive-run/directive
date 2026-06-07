@@ -95,13 +95,54 @@ export type FactPIICategory = "ssn" | "credit_card" | "email";
 interface SyncPattern {
   type: FactPIICategory;
   regex: RegExp;
+  /**
+   * Optional post-regex validator. Returning false drops the match.
+   * Used by credit-card detection to apply the Luhn algorithm (mirrors
+   * the validator in `pii-enhanced.ts`) so phone numbers / tracking IDs
+   * formatted with separators don't mass-redact as credit cards.
+   */
+  validate?: (value: string) => boolean;
   redactionToken: string;
+}
+
+/**
+ * Luhn checksum — drops credit-card false positives the regex would
+ * otherwise pull in (any 13-19 digit sequence with separators). Mirrors
+ * the validator in `pii-enhanced.ts` so the two detection paths agree.
+ */
+function luhnValid(value: string): boolean {
+  const digits = value.replace(/[\s-]/g, "");
+  if (digits.length < 13 || digits.length > 19) return false;
+  if (!/^\d+$/.test(digits)) return false;
+  let sum = 0;
+  let isEven = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    const ch = digits[i];
+    if (!ch) continue;
+    let d = Number.parseInt(ch, 10);
+    if (isEven) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+    isEven = !isEven;
+  }
+  return sum % 10 === 0;
 }
 
 // Synchronous patterns. These mirror the highest-volume categories from
 // pii-enhanced.ts; richer detection (addresses, names, phones) is the
 // caller's responsibility via `customDetector` because they require
 // context-aware logic that's a poor fit for a per-fact-write hook.
+//
+// SSN pattern accepts the canonical XXX-XX-XXXX format. Internal IDs
+// formatted the same way will false-positive; the trade-off favors
+// safety (the redaction token is harmless if applied to a non-SSN).
+//
+// Credit-card pattern combines the broad 13-19-digit regex with a Luhn
+// validator so phone numbers, tracking IDs, and other long digit
+// sequences with separators are NOT swept up. This mirrors how
+// `pii-enhanced.ts` keeps its credit-card detection accurate.
 const SYNC_PATTERNS: SyncPattern[] = [
   {
     type: "ssn",
@@ -110,8 +151,9 @@ const SYNC_PATTERNS: SyncPattern[] = [
   },
   {
     type: "credit_card",
-    // 13-19 digit numbers grouped 4-4-4-4 with optional separators.
-    regex: /\b(?:\d[ -]?){13,19}\b/g,
+    regex:
+      /\b((?:\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})|\d{13,19})\b/g,
+    validate: luhnValid,
     redactionToken: "[CREDIT_CARD]",
   },
   {
@@ -129,6 +171,7 @@ function scanText(text: string, types: ReadonlySet<FactPIICategory>): FactPIIMat
     let match: RegExpExecArray | null;
     // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic exec loop
     while ((match = pattern.regex.exec(text)) !== null) {
+      if (pattern.validate && !pattern.validate(match[0])) continue;
       out.push({
         type: pattern.type,
         value: match[0],
@@ -223,6 +266,24 @@ export interface FactPIIGuardrailOptions {
    * await deferred work.
    */
   customDetector?: (text: string) => readonly FactPIIMatch[];
+  /**
+   * Maximum nesting depth to walk when scanning an object-shaped fact
+   * value. Default `1` — only the top-level string properties of an
+   * object are scanned. Deeper structures (nested objects, arrays of
+   * objects, Maps, Sets) are NOT walked by the built-in scanner; PII
+   * embedded at depth > `walkDepth` will pass through unredacted.
+   *
+   * Consumers with deeply-nested PII shapes have two options:
+   * 1. Pass `walkDepth: 2` (or higher) — the scanner walks plain
+   *    objects to that depth. Arrays, Maps, and Sets are still skipped.
+   * 2. Pass a `customDetector` that walks the consumer-specific shape
+   *    and returns concrete matches — the right answer for
+   *    domain-specific structures.
+   *
+   * Maximum is `5` to prevent pathological recursion on cyclic
+   * structures. Passing anything higher clamps to `5`.
+   */
+  walkDepth?: number;
 }
 
 // ============================================================================
@@ -259,11 +320,16 @@ export function createFactPIIGuardrail(
     excludeKeys = [],
     onBlocked,
     customDetector,
+    walkDepth = 1,
   } = options;
 
   const typeSet = new Set<FactPIICategory>(types);
   const screenedKeys = new Set<string>(includeKeys);
   const excludedSet = new Set(excludeKeys);
+  // Clamp walkDepth to [1, 5]. Lower bound prevents accidental no-op
+  // scans (`walkDepth: 0` would skip even top-level string members);
+  // upper bound caps pathological recursion on cyclic structures.
+  const effectiveWalkDepth = Math.max(1, Math.min(5, Math.floor(walkDepth)));
   let initialized = false;
   let systemRef: System | null = null;
 
@@ -299,6 +365,7 @@ export function createFactPIIGuardrail(
 
   function inspect(
     value: unknown,
+    depth: number = effectiveWalkDepth,
   ):
     | { matched: false }
     | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
@@ -307,21 +374,33 @@ export function createFactPIIGuardrail(
       if (detected.length === 0) return { matched: false };
       return { matched: true, redacted: redactText(value, detected), detected };
     }
+    if (depth <= 0) return { matched: false };
     if (value && typeof value === "object" && !Array.isArray(value)) {
-      // Walk one level deep so a source publishing `{ email, ssn }` is
-      // still screened. Deeper structures are out of scope — pass a
+      // Walk plain objects up to `walkDepth` levels deep so a source
+      // publishing a nested PII shape (e.g. `{ profile: { email } }`) is
+      // screened when the consumer opts into `walkDepth: 2+`. Arrays,
+      // Maps, and Sets are out of scope at any depth — pass a
       // `customDetector` that walks the shape itself.
       let mutated: Record<string, unknown> | null = null;
       const all: FactPIIMatch[] = [];
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        if (typeof v !== "string") continue;
-        const detected = runScan(v);
-        if (detected.length === 0) continue;
-        if (mutated === null) {
-          mutated = { ...(value as Record<string, unknown>) };
+        if (typeof v === "string") {
+          const detected = runScan(v);
+          if (detected.length === 0) continue;
+          if (mutated === null) {
+            mutated = { ...(value as Record<string, unknown>) };
+          }
+          mutated[k] = redactText(v, detected);
+          for (const d of detected) all.push(d);
+        } else if (depth > 1 && v && typeof v === "object" && !Array.isArray(v)) {
+          const nested = inspect(v, depth - 1);
+          if (!nested.matched) continue;
+          if (mutated === null) {
+            mutated = { ...(value as Record<string, unknown>) };
+          }
+          mutated[k] = nested.redacted;
+          for (const d of nested.detected) all.push(d);
         }
-        mutated[k] = redactText(v, detected);
-        for (const d of detected) all.push(d);
       }
       if (mutated === null) return { matched: false };
       return { matched: true, redacted: mutated, detected: all };

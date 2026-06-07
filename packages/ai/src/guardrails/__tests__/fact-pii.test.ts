@@ -81,7 +81,7 @@ describe("createFactPIIGuardrail — redact mode", () => {
     system.destroy();
   });
 
-  it("redacts credit card numbers", () => {
+  it("redacts credit card numbers (Luhn-valid)", () => {
     const cardModule = createModule("payment", {
       schema: {
         facts: {
@@ -103,8 +103,31 @@ describe("createFactPIIGuardrail — redact mode", () => {
       plugins: [createFactPIIGuardrail({ mode: "redact" })],
     });
     system.start();
+    // 4111 1111 1111 1111 is the canonical Visa test number (Luhn-valid).
     system.events.wire({ payload: "Card 4111 1111 1111 1111" });
     expect(system.facts.payload).toBe("Card [CREDIT_CARD]");
+    system.destroy();
+  });
+
+  it("does NOT redact non-Luhn-valid 16-digit sequences (phone numbers, tracking IDs)", () => {
+    const cardModule = createModule("payment", {
+      schema: {
+        facts: { payload: t.string().meta({ tags: ["pii"] }) },
+        events: { wire: { payload: t.string() } },
+      },
+      init: (f) => { f.payload = ""; },
+      events: { wire: (f, p) => { f.payload = p.payload; } },
+    });
+    const system = createSystem({
+      module: cardModule,
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+    // 1234 5678 9012 3456 — 16 digits, NOT Luhn-valid.
+    // A naive regex would mis-classify this as a credit card. With the
+    // Luhn validator it stays put.
+    system.events.wire({ payload: "Tracking 1234 5678 9012 3456" });
+    expect(system.facts.payload).toBe("Tracking 1234 5678 9012 3456");
     system.destroy();
   });
 });
@@ -252,6 +275,57 @@ describe("createFactPIIGuardrail — object payloads", () => {
     system.start();
     system.events.wire({ profile: { email: "leak@example.com", name: "Alice" } });
     expect(system.facts.profile).toEqual({ email: "[EMAIL]", name: "Alice" });
+    system.destroy();
+  });
+
+  it("does NOT walk past walkDepth (default 1) — deeper PII passes through", () => {
+    interface Nested {
+      meta: { email: string };
+    }
+    const module = createModule("deep", {
+      schema: {
+        facts: { account: t.object<Nested>().meta({ tags: ["pii"] }) },
+        events: { wire: { account: t.object<Nested>() } },
+      },
+      init: (f) => {
+        f.account = { meta: { email: "" } };
+      },
+      events: { wire: (f, p) => { f.account = p.account; } },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+    system.events.wire({ account: { meta: { email: "deep@example.com" } } });
+    // At default walkDepth: 1, the nested `meta.email` is NOT walked.
+    expect(system.facts.account.meta.email).toBe("deep@example.com");
+    system.destroy();
+  });
+
+  it("walkDepth: 3 walks deeper objects", () => {
+    interface Nested {
+      meta: { contact: { email: string } };
+    }
+    const module = createModule("deep3", {
+      schema: {
+        facts: { account: t.object<Nested>().meta({ tags: ["pii"] }) },
+        events: { wire: { account: t.object<Nested>() } },
+      },
+      init: (f) => {
+        f.account = { meta: { contact: { email: "" } } };
+      },
+      events: { wire: (f, p) => { f.account = p.account; } },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 3 })],
+    });
+    system.start();
+    system.events.wire({
+      account: { meta: { contact: { email: "deep@example.com" } } },
+    });
+    expect(system.facts.account.meta.contact.email).toBe("[EMAIL]");
     system.destroy();
   });
 });

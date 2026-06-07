@@ -216,5 +216,20 @@ export function attachSourcesToOtel(
     }
   }
 
-  return (system as ObservableLike).observe(handle);
+  const unobserve = (system as ObservableLike).observe(handle);
+
+  return () => {
+    unobserve();
+    // End every active source span the consumer subscribed for. Without
+    // this, calling `unsubscribe()` mid-stream leaks spans (they stay
+    // "in-flight" forever in collectors that retain unfinished spans).
+    // Status `OK` with a `directive.detached: true` attribute marks the
+    // close as observer-initiated rather than a normal detach.
+    for (const [, active] of activeByKey) {
+      active.span.setAttribute("directive.detached", true);
+      active.span.setStatus({ code: StatusCodeValues.OK });
+      active.span.end();
+    }
+    activeByKey.clear();
+  };
 }

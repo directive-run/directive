@@ -159,7 +159,7 @@ describe("attachSourcesToOtel", () => {
     system.destroy();
   });
 
-  it("unsubscribe stops new spans from being recorded", () => {
+  it("unsubscribe ends every active source span (no span leak)", () => {
     const { tracer, spans } = makeFakeTracer();
     const module = createModule("m", {
       schema: { facts: { v: t.number() }, events: { TICK: {} } },
@@ -177,10 +177,23 @@ describe("attachSourcesToOtel", () => {
     });
     system.start();
     expect(spans.length).toBe(2); // attach for a + b
+    expect(spans.every((s) => !s.ended)).toBe(true);
+    // The consumer detaches the OTel wiring mid-stream. Active spans
+    // MUST end so the collector doesn't carry them forever as
+    // "in-flight". They close as `OK` with `directive.detached: true`
+    // marking the close as observer-initiated rather than a normal
+    // source.detach lifecycle event.
     unsub();
-    system.stop(); // would have ended both spans, but we already unsubscribed
     const stillOpen = spans.filter((s) => !s.ended);
-    expect(stillOpen.length).toBe(2);
+    expect(stillOpen.length).toBe(0);
+    expect(spans.every((s) => s.attributes["directive.detached"] === true)).toBe(
+      true,
+    );
+    // After unsubscribe, system.stop() does not emit new source spans
+    // through this helper.
+    const countBefore = spans.length;
+    system.stop();
+    expect(spans.length).toBe(countBefore);
     system.destroy();
   });
 });
