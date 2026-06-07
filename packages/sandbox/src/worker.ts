@@ -20,6 +20,7 @@
 
 import { performance } from "node:perf_hooks";
 import { parentPort } from "node:worker_threads";
+import { installFetchWrapper } from "./fetch-wrapper.js";
 import type {
   SandboxResult,
   WorkerInputMessage,
@@ -32,7 +33,66 @@ if (!parentPort) {
   );
 }
 
+// Phase A audit P0-S2: install the SSRF fetch wrapper BEFORE the
+// bundle is imported so @directive-run/query's / @directive-run/ai's
+// internal fetch calls (which the validator can't see because they
+// live in external module bodies) hit the loopback / private-IP /
+// IMDS blocklist.
+installFetchWrapper();
+
 const port = parentPort;
+
+/**
+ * Format a single console.log argument. Directive's `system.facts` is
+ * a Proxy over a `FactsStore`; the audit (P0-DM1) found that
+ * `JSON.stringify(system.facts)` produces `"{}"` (or store internals)
+ * because the proxy has no `toJSON`. So `console.log("[start] facts:",
+ * system.facts)` rendered as `[start] facts: {}` in the transcript
+ * while `result.facts` correctly showed the snapshot — two
+ * contradictory views in the same response.
+ *
+ * Fix: detect Directive's facts/derive proxies via the `$store` or
+ * `$snapshot` escape hatches the proxy DOES expose, snapshot via the
+ * store's `toObject()` (the same call result.facts uses), and JSON-
+ * stringify the snapshot. Falls back to JSON.stringify for any value
+ * that doesn't look like a Directive proxy.
+ */
+function serializeArg(arg: unknown): string {
+  if (typeof arg === "string") {
+    return arg;
+  }
+  if (arg === null || arg === undefined) {
+    return String(arg);
+  }
+  // Directive facts/derive proxy fingerprints. `.$store` is the
+  // internal FactsStore; `.$snapshot` is the alternate accessor.
+  // Either returns a plain object when called.
+  if (typeof arg === "object") {
+    const obj = arg as {
+      $store?: { toObject?: () => Record<string, unknown> };
+      $snapshot?: () => Record<string, unknown>;
+    };
+    if (obj.$store && typeof obj.$store.toObject === "function") {
+      try {
+        return JSON.stringify(obj.$store.toObject());
+      } catch {
+        // fall through
+      }
+    }
+    if (typeof obj.$snapshot === "function") {
+      try {
+        return JSON.stringify(obj.$snapshot());
+      } catch {
+        // fall through
+      }
+    }
+  }
+  try {
+    return JSON.stringify(arg);
+  } catch {
+    return String(arg);
+  }
+}
 
 /**
  * Replace console.{log,info,warn,error,debug} with capture functions
@@ -51,16 +111,7 @@ function captureConsole(
     debug: console.debug,
   };
   const format = (label: string, args: unknown[]) => {
-    const text = args
-      .map((a) => {
-        if (typeof a === "string") return a;
-        try {
-          return JSON.stringify(a);
-        } catch {
-          return String(a);
-        }
-      })
-      .join(" ");
+    const text = args.map((a) => serializeArg(a)).join(" ");
     buffer.push(label ? `${label} ${text}` : text);
   };
   console.log = (...a: unknown[]) => format(prefix.log, a);
@@ -93,6 +144,7 @@ function captureConsole(
  */
 interface SandboxSystem {
   facts: { $store: { toObject(): Record<string, unknown> } };
+  derive: Record<string, unknown>;
   destroy(): void;
 }
 
@@ -127,6 +179,7 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
   const durationMs = performance.now() - startMs;
 
   let facts: Record<string, unknown> = {};
+  const derived: Record<string, unknown> = {};
   // Cast through unknown because TS narrows `globalThis.X` to `null`
   // after the earlier assignment, even though the bundle's epilogue
   // may have populated it before we read here.
@@ -136,6 +189,25 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
       facts = system.facts.$store.toObject();
     } catch (err) {
       errors.push(`facts snapshot failed: ${(err as Error).message}`);
+    }
+    // Phase A audit P0-DM2: snapshot derivations. The host pre-extracts
+    // the key names from the source files (system.derive's proxy has no
+    // ownKeys trap) and passes them via message.derivationKeys; we read
+    // each via `system.derive[key]`, swallowing per-key errors so one
+    // bad derivation doesn't kill the whole snapshot.
+    if (message.derivationKeys.length > 0 && system.derive) {
+      for (const key of message.derivationKeys) {
+        try {
+          const value = (system.derive as Record<string, unknown>)[key];
+          if (value !== undefined) {
+            derived[key] = value;
+          }
+        } catch (err) {
+          errors.push(
+            `derivation "${key}" snapshot failed: ${(err as Error).message}`,
+          );
+        }
+      }
     }
     try {
       system.destroy();
@@ -148,6 +220,7 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
   return {
     logs,
     facts,
+    derived,
     errors,
     durationMs,
     timedOut: false,

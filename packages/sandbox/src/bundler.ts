@@ -14,8 +14,33 @@
  * level await, and ESM linking in one pass.
  */
 
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import type { PlaygroundFile } from "./types.js";
+
+/**
+ * Resolve a `@directive-run/*` bare specifier to an absolute file://
+ * URL using the host process's node_modules. Required because the
+ * worker imports the bundle from `/tmp` (Phase A P0-A1) where Node's
+ * ESM resolver can't walk up to find `@directive-run/*`. By rewriting
+ * to absolute file URLs at bundle time, the worker doesn't need a
+ * node_modules anchor.
+ *
+ * Returns null when the package can't be resolved (e.g. consumer has
+ * a different install layout); the caller falls back to leaving the
+ * bare specifier in place, which works when the worker IS next to
+ * node_modules.
+ */
+function resolveDirectivePackageToFileUrl(specifier: string): string | null {
+  try {
+    const require = createRequire(import.meta.url);
+    const resolved = require.resolve(specifier);
+    return pathToFileURL(resolved).href;
+  } catch {
+    return null;
+  }
+}
 
 const ENTRY_PATH = "src/main.ts";
 const VIRTUAL_NAMESPACE = "directive-sandbox-vfs";
@@ -91,11 +116,11 @@ export async function bundleSandboxFiles(
       platform: "node",
       write: false,
       logLevel: "silent",
-      // Wildcard pattern lets ANY @directive-run/* import the validator
-      // permits resolve at worker runtime against the worker's
-      // node_modules. The validator gates which packages can be
-      // imported in the first place; the bundler just doesn't try to
-      // inline them.
+      // The plugin's onResolve below intercepts every `@directive-run/*`
+      // import and rewrites it to an absolute file:// URL (so the
+      // worker can import the bundle from /tmp without needing
+      // node_modules above it). The wildcard external is the safety
+      // net for any specifier the plugin doesn't recognize.
       external: ["@directive-run/*"],
       // Top-level await is required (the runner does `await system.settle()`)
       // and node20 supports it natively.
@@ -113,7 +138,16 @@ export async function bundleSandboxFiles(
                 return null;
               }
               if (args.path.startsWith("@directive-run/")) {
-                // External — let esbuild's external list handle it.
+                // Phase A audit P0-A1: rewrite to absolute file:// URL
+                // so the worker's `/tmp/.../bundle.mjs` can import the
+                // package without needing node_modules above /tmp.
+                // Falls back to the bare specifier when resolution
+                // fails — the legacy "write next to node_modules"
+                // pattern still works as a backup.
+                const resolved = resolveDirectivePackageToFileUrl(args.path);
+                if (resolved) {
+                  return { external: true, path: resolved };
+                }
                 return { external: true, path: args.path };
               }
               if (args.path.startsWith("./") || args.path.startsWith("../")) {

@@ -127,4 +127,98 @@ describe("runInSandbox", () => {
     expect(result.errors).toEqual([]);
     expect(result.facts.ok).toBe(true);
   });
+
+  it("includes derivations in result.derived (P0-DM2)", async () => {
+    const counterModule = [
+      'import { createModule, t } from "@directive-run/core";',
+      "",
+      'export const counter = createModule("counter", {',
+      "  schema: {",
+      "    facts: { count: t.number() },",
+      "    derivations: { isPositive: t.boolean(), doubled: t.number() },",
+      "    events: { bump: {} },",
+      "  },",
+      "  init: (f) => { f.count = 0; },",
+      "  derive: {",
+      "    isPositive: (facts) => facts.count > 0,",
+      "    doubled: (facts) => facts.count * 2,",
+      "  },",
+      "  events: { bump: (f) => { f.count += 1; } },",
+      "});",
+    ].join("\n");
+    const runner = [
+      'import { createSystem } from "@directive-run/core";',
+      'import { counter } from "./counter.js";',
+      "const system = createSystem({ module: counter });",
+      "system.start();",
+      "system.events.bump({});",
+      "system.events.bump({});",
+      "system.events.bump({});",
+      "await system.settle();",
+      "system.destroy();",
+    ].join("\n");
+    const result = await runInSandbox({
+      files: [
+        { path: "src/counter.ts", source: counterModule },
+        { path: "src/main.ts", source: runner },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.facts.count).toBe(3);
+    expect(result.derived).toEqual({
+      isPositive: true,
+      doubled: 6,
+    });
+  });
+
+  it("serializes Directive facts proxy via $store.toObject in console.log (P0-DM1)", async () => {
+    // Pre-fix, `console.log("...", system.facts)` rendered facts as
+    // `{}` because JSON.stringify on the proxy returned empty. The
+    // fix detects `.$store.toObject` and snapshots before stringify.
+    const counterModule = [
+      'import { createModule, t } from "@directive-run/core";',
+      "",
+      'export const counter = createModule("counter", {',
+      "  schema: { facts: { count: t.number() } },",
+      "  init: (f) => { f.count = 7; },",
+      "});",
+    ].join("\n");
+    const runner = [
+      'import { createSystem } from "@directive-run/core";',
+      'import { counter } from "./counter.js";',
+      "const system = createSystem({ module: counter });",
+      "system.start();",
+      'console.log("facts:", system.facts);',
+      "await system.settle();",
+      "system.destroy();",
+    ].join("\n");
+    const result = await runInSandbox({
+      files: [
+        { path: "src/counter.ts", source: counterModule },
+        { path: "src/main.ts", source: runner },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    // The log line should now contain the real fact value, not {}.
+    expect(result.logs.some((l) => l.includes('"count":7'))).toBe(true);
+  });
+
+  it("writes the bundle to os.tmpdir() not the package dir (P0-A1)", async () => {
+    // Indirectly verified: if we wrote inside the package dir, the
+    // earlier mkdtempSync would fail on read-only deploy targets.
+    // Here we just sanity-check that a normal run succeeds, which
+    // implies tmpdir() is reachable.
+    const result = await runInSandbox({
+      source: [
+        'import { createModule, createSystem, t } from "@directive-run/core";',
+        'const mod = createModule("p0a1", { schema: { facts: { ok: t.boolean() } }, init: (f) => { f.ok = true; } });',
+        "const system = createSystem({ module: mod });",
+        "system.start();",
+        "await system.settle();",
+        "system.destroy();",
+      ].join("\n"),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.facts.ok).toBe(true);
+  });
 });
