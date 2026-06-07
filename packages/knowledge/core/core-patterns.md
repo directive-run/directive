@@ -11,6 +11,8 @@ User wants to...
 ├── Store state → schema.facts + init()
 ├── Compute derived values → schema.derivations + derive
 ├── React to state changes → effects
+├── Subscribe to an external event stream (WebSocket, Supabase realtime,
+│   browser events, MCP server lifecycle) → sources
 ├── Trigger side effects when conditions are met → constraints + resolvers
 ├── Handle user actions → schema.events + events handlers
 └── Coordinate multiple modules → createSystem({ modules: {} })
@@ -233,6 +235,7 @@ const typed = createModule("typed", {
 
 - [`constraints.md`](./constraints.md) — the demand side of the constraint-resolver loop
 - [`resolvers.md`](./resolvers.md) — the supply side that fulfills requirements
+- [`sources.md`](./sources.md) — typed external event sources (the inbound dual of effects)
 - [`schema-types.md`](./schema-types.md) — the `t.*()` builders that define fact and derivation types
 - [`multi-module.md`](./multi-module.md) — when a single module isn't enough
 - [`system-api.md`](./system-api.md) — `createSystem` and the runtime instance once your module is defined

@@ -357,6 +357,49 @@ const system = createSystem({
 });
 ```
 
+## 20. Hand-Rolled External Subscriptions Inside React/`useEffect`
+
+```typescript
+// WRONG – subscription lives in component code; module never knows about it.
+// On every remount you get duplicate channels; on unmount you can leak.
+function Game({ system, gameId }: Props) {
+  useEffect(() => {
+    const ch = supabase
+      .channel(`game:${gameId}`)
+      .on('postgres_changes', { event: 'UPDATE', table: 'games' }, (payload) => {
+        system.events.realtimeUpdate({ snapshot: mapRow(payload.new) });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [gameId]);
+  return <Board snapshot={useFact(system, 'snapshot')} />;
+}
+
+// CORRECT – declare a `source` on the module. The runtime owns the mount /
+// unmount lifecycle and observability. The component collapses to fact reads.
+const gameModule = createModule('game', {
+  schema: {
+    facts: { snapshot: t.object<GameSnapshot>().nullable() },
+    events: { realtimeUpdate: { snapshot: t.object<GameSnapshot>() } },
+  },
+  sources: {
+    realtime: {
+      attach: (publish) => {
+        const ch = supabase
+          .channel(`game:${gameId}`)
+          .on('postgres_changes', { event: 'UPDATE', table: 'games' },
+            (p) => publish('realtimeUpdate', { snapshot: mapRow(p.new) }))
+          .subscribe();
+        return () => { supabase.removeChannel(ch); };
+      },
+    },
+  },
+  on: { realtimeUpdate: (f, p) => { f.snapshot = p.snapshot; } },
+});
+```
+
+See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
+
 ## Quick Reference Checklist
 
 Before generating any Directive code, verify:
@@ -371,10 +414,12 @@ Before generating any Directive code, verify:
 8. Multi-module uses `facts.self.*` for own facts
 9. Imports from `@directive-run/core`, not deep paths
 10. `await system.settle()` after `system.start()`
+11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
 
 ## See also
 
 - [`naming.md`](./naming.md) — the strict canonical-term rules AND the alias map for cross-paradigm searches
+- [`sources.md`](./sources.md) — the source primitive (the right answer for #20)
 - [`constraints.md`](./constraints.md) — the constraint shape these anti-patterns reference (`facts` not in scope inside static `require:`, etc.)
 - [`resolvers.md`](./resolvers.md) — the resolver shape these anti-patterns reference (return `void`, mutate `context.facts`, `(req, context)` not `(req, ctx)`)
 - [`schema-types.md`](./schema-types.md) — the `t.*()` builders that exist and the hallucinated ones (`t.map`, `t.set`, `t.promise`, `t.date`) that don't
