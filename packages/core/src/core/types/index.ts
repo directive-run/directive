@@ -260,3 +260,74 @@ export type {
 
 // Type guard functions
 export { isSingleModuleSystem, isNamespacedSystem } from "./composition.js";
+
+// ============================================================================
+// RFC 0006 — `*Definition` aliases for the `*Def` cohort
+// ============================================================================
+//
+// These aliases let consumers migrate from the abbreviated `*Def` names
+// to the spelled-out `*Definition` names today, without breaking
+// change. The `*Def` types stay canonical through 1.x; 2.0 swaps which
+// name is canonical and which is the deprecated alias.
+//
+// Rationale (per RFC 0006): `*Def` is an abbreviation. The workspace's
+// own `anti-patterns.md` entry #5 forbids abbreviating `context` to
+// `ctx`; the same logic applies to type names. Minifiers handle the
+// bytes; source-code readability does not.
+//
+// The re-export-with-rename pattern (`export type { X as Y }`)
+// preserves the underlying type's generic parameters and TS inference
+// rules — `ModuleDefinition<S>` resolves identically to `ModuleDef<S>`
+// in mapped types, conditional distribution, tagged-union literals,
+// and barrel re-exports.
+
+export type {
+  ConstraintDef as ConstraintDefinition,
+  ConstraintsDef as ConstraintsDefinition,
+} from "./requirements.js";
+
+export type {
+  DerivationDef as DerivationDefinition,
+  DerivationDefWithMeta as DerivationDefinitionWithMeta,
+  DerivationsDef as DerivationsDefinition,
+} from "./derivations.js";
+
+export type {
+  EffectDef as EffectDefinition,
+  EffectsDef as EffectsDefinition,
+} from "./effects.js";
+
+export type { EventsDef as EventsDefinition } from "./events.js";
+
+export type {
+  ModuleDef as ModuleDefinition,
+  TypedEventsDef as TypedEventsDefinition,
+  TypedDerivationsDef as TypedDerivationsDefinition,
+  TypedConstraintDef as TypedConstraintDefinition,
+  TypedConstraintsDef as TypedConstraintsDefinition,
+  TypedResolverDef as TypedResolverDefinition,
+  TypedResolversDef as TypedResolversDefinition,
+  CrossModuleConstraintDef as CrossModuleConstraintDefinition,
+  CrossModuleConstraintsDef as CrossModuleConstraintsDefinition,
+  CrossModuleEffectDef as CrossModuleEffectDefinition,
+  CrossModuleEffectsDef as CrossModuleEffectsDefinition,
+  CrossModuleDerivationsDef as CrossModuleDerivationsDefinition,
+} from "./module.js";
+
+export type {
+  ResolverDef as ResolverDefinition,
+  ResolversDef as ResolversDefinition,
+  SchemaTypedResolversDef as SchemaTypedResolversDefinition,
+} from "./resolvers.js";
+
+export type {
+  DynamicConstraintDef as DynamicConstraintDefinition,
+  DynamicResolverDef as DynamicResolverDefinition,
+} from "./system.js";
+
+export type {
+  SourceDef as SourceDefinition,
+  SourcesDef as SourcesDefinition,
+  SourcePublish as SourcePublishFn,
+  SourceUnsubscribe as SourceUnsubscribeFn,
+} from "./sources.js";

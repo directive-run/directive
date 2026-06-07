@@ -2,7 +2,7 @@
 
 > Covers `@directive-run/core` and `@directive-run/react` — hallucination-prone API patterns to avoid.
 
-20 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
+21 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
 
 ## 1. Unnecessary Type Casting on Facts/Derivations
 
@@ -399,6 +399,47 @@ function useGameUpdates() {
 **Why:** the hook-as-bridge pattern duplicates lifecycle code at every call site. Cleanup correctness drifts. `system.observe()` can't see the subscription. With a `source`, the engine attaches at `start()`, detaches at `stop()`, isolates failures, and emits `source.attach` / `.publish` / `.detach` / `.error` observation events for plugins.
 
 **Don't subscribe in both an effect AND a source on the same channel** — the effect re-runs on fact changes, the source mounts once, you'll get 2× messages with silent duplicates. Pick one. See `sources.md` for the full guidance.
+
+## 21. Abbreviating Type Names (`*Def` instead of `*Definition`)
+
+```typescript
+// WRONG – `Def` is short for `Definition`. Same anti-pattern as `ctx`
+// → `context` (entry #5). Source code reads better with spelled-out
+// names; the minifier handles the bytes either way.
+import type { ModuleDef, SourceDef, ResolverDef } from "@directive-run/core";
+
+// CORRECT – use the spelled-out aliases. `*Def` stays canonical in 1.x
+// for back-compat; consumers can migrate today.
+import type {
+  ModuleDefinition,
+  SourceDefinition,
+  ResolverDefinition,
+} from "@directive-run/core";
+```
+
+The `*Definition` aliases ship in 1.x via `export type { X as XDefinition }`
+in `packages/core/src/core/types/index.ts`, so generic forwarding +
+TS inference rules (mapped types, conditional distribution, tagged-
+union discrimination, barrel re-exports) match the canonical `*Def`
+form bit-for-bit. **2.0 swaps:** `*Definition` becomes canonical and
+`*Def` becomes the deprecated alias. Start writing `*Definition` in
+new code today so the 2.0 migration is a no-op.
+
+Per RFC 0006, this applies to:
+
+- `ModuleDef` → `ModuleDefinition`
+- `ConstraintDef` / `ConstraintsDef` → `ConstraintDefinition` / `ConstraintsDefinition`
+- `ResolverDef` / `ResolversDef` → `ResolverDefinition` / `ResolversDefinition`
+- `DerivationDef` / `DerivationsDef` → `DerivationDefinition` / `DerivationsDefinition`
+- `EffectDef` / `EffectsDef` → `EffectDefinition` / `EffectsDefinition`
+- `EventsDef` → `EventsDefinition`
+- `SourceDef` / `SourcesDef` → `SourceDefinition` / `SourcesDefinition`
+- `SourcePublish` → `SourcePublishFn`, `SourceUnsubscribe` → `SourceUnsubscribeFn`
+- Plus all `Typed*Def`, `CrossModule*Def`, `Dynamic*Def` variants.
+
+`EffectCleanup`, `MetaAccessor`, `EventsAccessor`, `DeriveAccessor`,
+`Snapshot` are explicitly kept as-is (each has reasoning recorded in
+RFC 0006).
 
 ## Quick Reference Checklist
 
