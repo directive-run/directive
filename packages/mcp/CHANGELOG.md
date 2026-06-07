@@ -1,5 +1,12 @@
 # @directive-run/mcp
 
+## 0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`039f8c0`](https://github.com/directive-run/directive/commit/039f8c0d2138ac483f4e40b46a8882552a94a8f4)]:
+  - @directive-run/sandbox@0.3.1
+
 ## 0.5.2
 
 ### Patch Changes
