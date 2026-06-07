@@ -131,4 +131,76 @@ describe("validateSandboxInput", () => {
     ]);
     expect(errors).toEqual([]);
   });
+
+  describe("@directive-run/* allowlist (widened)", () => {
+    const ALLOWED = [
+      "@directive-run/core",
+      "@directive-run/ai",
+      "@directive-run/query",
+      "@directive-run/react",
+      "@directive-run/vue",
+      "@directive-run/svelte",
+      "@directive-run/solid",
+      "@directive-run/lit",
+      "@directive-run/el",
+      "@directive-run/optimistic",
+      "@directive-run/timeline",
+      "@directive-run/mutator",
+      "@directive-run/knowledge",
+      "@directive-run/scaffold",
+      "@directive-run/claude-plugin",
+      "@directive-run/lint",
+    ];
+
+    it.each(ALLOWED)("permits `%s`", (specifier) => {
+      const errors = validateSandboxInput([
+        {
+          path: "src/main.ts",
+          source: `import * as x from "${specifier}";\nconsole.log(x);\n`,
+        },
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    it("permits subpath imports of allowlisted packages", () => {
+      // `@directive-run/ai/openai`, `@directive-run/react/hooks`, etc.
+      // The validator extracts the package segment and ignores the
+      // subpath when checking the allowlist.
+      const errors = validateSandboxInput([
+        {
+          path: "src/main.ts",
+          source: 'import { x } from "@directive-run/ai/openai";\n',
+        },
+      ]);
+      expect(errors).toEqual([]);
+    });
+
+    const DENIED = [
+      "@directive-run/cli",
+      "@directive-run/mcp",
+      "@directive-run/sandbox",
+      "@directive-run/vite-plugin-api-proxy",
+    ];
+
+    it.each(DENIED)("denies `%s` as build/CLI/sandbox tooling", (specifier) => {
+      const errors = validateSandboxInput([
+        {
+          path: "src/main.ts",
+          source: `import * as x from "${specifier}";\nconsole.log(x);\n`,
+        },
+      ]);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0]!.message).toMatch(/denied/i);
+    });
+
+    it("denies @sizls/* (no current scope)", () => {
+      const errors = validateSandboxInput([
+        {
+          path: "src/main.ts",
+          source: 'import { x } from "@sizls/somepackage";\n',
+        },
+      ]);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
 });

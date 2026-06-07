@@ -26,11 +26,79 @@
 import { Project, SyntaxKind } from "ts-morph";
 import type { PlaygroundFile } from "./types.js";
 
-const ALLOWED_IMPORT_PATTERNS: RegExp[] = [
-  /^@directive-run\/(core|ai|query)(\/.+)?$/,
-  /^\.\/.+\.js$/,
-  /^\.\.\/.+\.js$/,
-];
+/**
+ * Consumer-safe @directive-run/* packages. These are the things a
+ * realistic Directive demo might import: the runtime + UI adapters +
+ * data primitives. Each has been audited for whether it can pull in a
+ * sandbox-escape surface (process, fs, child_process, etc.); the ones
+ * listed here can't.
+ *
+ * Packages deliberately EXCLUDED:
+ *
+ * - `@directive-run/cli` — uses process.argv + fs.write.
+ * - `@directive-run/mcp` — speaks MCP over process.stdin/stdout; we
+ *   don't want sandboxed snippets opening a transport.
+ * - `@directive-run/sandbox` — sandbox-in-sandbox; needs esbuild +
+ *   worker_threads. No legitimate use case.
+ * - `@directive-run/vite-plugin-api-proxy` — build tooling, expects a
+ *   vite config that isn't present.
+ *
+ * The denylist below catches anyone who tries to import one of these
+ * by pattern; the allowlist catches everything else.
+ */
+const ALLOWED_DIRECTIVE_PACKAGES = new Set<string>([
+  "core",
+  "ai",
+  "query",
+  "el",
+  "react",
+  "vue",
+  "svelte",
+  "solid",
+  "lit",
+  "optimistic",
+  "timeline",
+  "mutator",
+  "knowledge",
+  "scaffold",
+  "claude-plugin",
+  "lint",
+]);
+
+const DENIED_DIRECTIVE_PACKAGES = new Set<string>([
+  "cli",
+  "mcp",
+  "sandbox",
+  "vite-plugin-api-proxy",
+]);
+
+/**
+ * Extract the package name segment from a @directive-run/* specifier.
+ *
+ *   "@directive-run/core"          → "core"
+ *   "@directive-run/ai/openai"     → "ai"
+ *   "@directive-run/react/hooks"   → "react"
+ *
+ * Returns null when the specifier doesn't match the scope.
+ */
+function extractDirectivePackage(specifier: string): string | null {
+  const match = specifier.match(/^@directive-run\/([^/]+)/);
+  return match ? match[1]! : null;
+}
+
+function isAllowedImport(specifier: string): boolean {
+  if (/^\.{1,2}\/.+\.js$/.test(specifier)) {
+    return true;
+  }
+  const dpkg = extractDirectivePackage(specifier);
+  if (dpkg === null) {
+    return false;
+  }
+  if (DENIED_DIRECTIVE_PACKAGES.has(dpkg)) {
+    return false;
+  }
+  return ALLOWED_DIRECTIVE_PACKAGES.has(dpkg);
+}
 
 /**
  * Globals/identifiers the snippet may touch at top level. The runner
@@ -103,6 +171,18 @@ export interface ValidationError {
   message: string;
 }
 
+function importRejectionMessage(specifier: string): string {
+  const dpkg = extractDirectivePackage(specifier);
+  if (dpkg && DENIED_DIRECTIVE_PACKAGES.has(dpkg)) {
+    return `import "${specifier}" is denied — @directive-run/${dpkg} is a build/CLI/sandbox tool, not for use inside a sandboxed demo`;
+  }
+  return `import "${specifier}" is not allowed in the sandbox. Allowed: relative "./X.js" paths or any of @directive-run/{${Array.from(
+    ALLOWED_DIRECTIVE_PACKAGES,
+  )
+    .sort()
+    .join(",")}}.`;
+}
+
 function checkImports(
   fileLabel: string,
   project: Project,
@@ -111,10 +191,7 @@ function checkImports(
   const sourceFile = project.getSourceFileOrThrow(fileLabel);
   for (const decl of sourceFile.getImportDeclarations()) {
     const moduleSpecifier = decl.getModuleSpecifierValue();
-    const allowed = ALLOWED_IMPORT_PATTERNS.some((re) =>
-      re.test(moduleSpecifier),
-    );
-    if (!allowed) {
+    if (!isAllowedImport(moduleSpecifier)) {
       const { line, column } = sourceFile.getLineAndColumnAtPos(
         decl.getStart(),
       );
@@ -122,7 +199,7 @@ function checkImports(
         path: fileLabel,
         line,
         column,
-        message: `import "${moduleSpecifier}" is not allowed in the sandbox. Allowed: @directive-run/{core,ai,query} or relative "./X.js" paths.`,
+        message: importRejectionMessage(moduleSpecifier),
       });
     }
   }

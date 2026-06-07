@@ -22,7 +22,10 @@ The bundler injects an early-capture immediately after `createSystem(...)`, so t
 
 Three layers:
 
-1. **AST allowlist validator** (`ts-morph`). Rejects imports outside `@directive-run/{core,ai,query}` or relative `./*.js`; rejects identifier references to FS / network / eval surfaces (`process`, `require`, `fetch`, `fs`, `child_process`, `eval`, `new Function`, `setTimeout`, etc.).
+1. **AST allowlist validator** (`ts-morph`). Imports are restricted to a curated `@directive-run/*` set + relative `./*.js`:
+   - **Allowed:** `core`, `ai`, `query`, `react`, `vue`, `svelte`, `solid`, `lit`, `el`, `optimistic`, `timeline`, `mutator`, `knowledge`, `scaffold`, `claude-plugin`, `lint` (16 packages — anything an end-user demo realistically composes from).
+   - **Denied:** `cli`, `mcp`, `sandbox`, `vite-plugin-api-proxy` (build / CLI / sandbox-meta tooling — no legitimate use inside a sandboxed demo).
+   - Everything else (`node:fs`, `express`, `@sizls/*`, etc.) is rejected. Identifier references to FS / network / eval surfaces (`process`, `require`, `fetch`, `fs`, `child_process`, `eval`, `new Function`, `setTimeout`, etc.) are also rejected.
 2. **esbuild bundler**. Virtualizes the multi-file payload into a single ESM string with `@directive-run/*` externalized. Throws on imports that can't be resolved against the in-memory file map.
 3. **`worker_threads.Worker`** with `resourceLimits` (32 MB heap, 16 MB code) and a clamped wall-clock budget (`[100ms, 10s]`, default 5s). The worker is hard-terminated on timeout — no cooperative cancellation needed.
 

@@ -91,11 +91,12 @@ export async function bundleSandboxFiles(
       platform: "node",
       write: false,
       logLevel: "silent",
-      external: [
-        "@directive-run/core",
-        "@directive-run/ai",
-        "@directive-run/query",
-      ],
+      // Wildcard pattern lets ANY @directive-run/* import the validator
+      // permits resolve at worker runtime against the worker's
+      // node_modules. The validator gates which packages can be
+      // imported in the first place; the bundler just doesn't try to
+      // inline them.
+      external: ["@directive-run/*"],
       // Top-level await is required (the runner does `await system.settle()`)
       // and node20 supports it natively.
       supported: { "top-level-await": true },
