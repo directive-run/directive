@@ -25,7 +25,9 @@ Three layers:
 1. **AST allowlist validator** (`ts-morph`). Imports are restricted to a curated `@directive-run/*` set + relative `./*.js`:
    - **Allowed:** `core`, `ai`, `query`, `react`, `vue`, `svelte`, `solid`, `lit`, `el`, `optimistic`, `timeline`, `mutator`, `knowledge`, `scaffold`, `claude-plugin`, `lint` (16 packages — anything an end-user demo realistically composes from).
    - **Denied:** `cli`, `mcp`, `sandbox`, `vite-plugin-api-proxy` (build / CLI / sandbox-meta tooling — no legitimate use inside a sandboxed demo).
-   - Everything else (`node:fs`, `express`, `@sizls/*`, etc.) is rejected. Identifier references to FS / network / eval surfaces (`process`, `require`, `fetch`, `fs`, `child_process`, `eval`, `new Function`, `setTimeout`, etc.) are also rejected.
+   - Everything else (`node:fs`, `express`, `@sizls/*`, etc.) is rejected.
+   - **Identifier references** to FS / network / eval surfaces (`process`, `require`, `fetch`, `fs`, `child_process`, `eval`, `new Function`, `setTimeout`, `Buffer`, etc.) are rejected as free identifiers.
+   - **Property-access bypass chains** are rejected (v0.3.0): `globalThis.process`, `globalThis.fetch`, `globalThis["X"]` bracket access with string literal, `.constructor` access on any value, `Function(...)` call without `new`, `Reflect.get/has/getOwnPropertyDescriptor(globalThis, "X")` smuggle chains. The AE security audit in `docs/AE-AUDIT-SANDBOX.md` traces these PoCs and how v0.3.0 closes them.
 2. **esbuild bundler**. Virtualizes the multi-file payload into a single ESM string with `@directive-run/*` externalized. Throws on imports that can't be resolved against the in-memory file map.
 3. **`worker_threads.Worker`** with `resourceLimits` (32 MB heap, 16 MB code) and a clamped wall-clock budget (`[100ms, 10s]`, default 5s). The worker is hard-terminated on timeout — no cooperative cancellation needed.
 

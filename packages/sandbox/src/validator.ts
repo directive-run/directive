@@ -245,6 +245,179 @@ function checkDynamicImportsAndCalls(
   });
 }
 
+/**
+ * The Phase A AE security audit (docs/AE-AUDIT-SANDBOX.md) found that
+ * the original "skip identifiers in property-access position" rule
+ * (added to avoid `{module: x}` false-positives) was a TOTAL bypass:
+ * `globalThis.process.exit()` worked because `process` was a property
+ * name and got skipped. This pass closes that hole.
+ *
+ * The threat model: an allowed receiver (`globalThis`, `Object`,
+ * `Reflect`, an allowed class) is reached freely, but accessing any
+ * denied identifier name on it OR `.constructor` on any value OR
+ * calling Function via property-access must be rejected.
+ *
+ * Rules:
+ *
+ * 1. Property access (`a.b`) where `b` is in DENIED_GLOBALS — reject.
+ *    Catches `globalThis.process`, `globalThis.fetch`, `obj.eval`,
+ *    `mod.Function`, etc.
+ * 2. Property access where `b` is `constructor` — reject. Catches the
+ *    `({}).constructor.constructor("...")()` Function-smuggle chain.
+ *    No legitimate Directive use.
+ * 3. Element access (`a["b"]`) where `b` is a STRING LITERAL matching
+ *    a denied name — reject. Catches `globalThis["process"]`,
+ *    `globalThis["fetch"]`, etc. String concatenation
+ *    (`globalThis["proc" + "ess"]`) isn't catchable at AST time;
+ *    documented as a known gap.
+ * 4. Element access on `globalThis` with ANY string literal — reject.
+ *    Stricter than (3); `globalThis["Object"]` is denied even though
+ *    `Object` is allowlisted because there's no legitimate reason
+ *    to reach Object via bracket syntax.
+ * 5. Call expression where callee is `Function` (free identifier or
+ *    property access on globalThis/Object) — reject. Catches
+ *    `Function("return process")()` without `new`.
+ * 6. `Reflect.get(globalThis, "X")` / `Reflect.has(globalThis, "X")` /
+ *    `Object.getOwnPropertyDescriptor(globalThis, "X")` — reject when
+ *    first arg is `globalThis` (or any allowed global) and second arg
+ *    is a string literal matching a denied name OR `constructor`.
+ */
+function checkPropertyAccessEscapes(
+  fileLabel: string,
+  project: Project,
+  errors: ValidationError[],
+): void {
+  const sourceFile = project.getSourceFileOrThrow(fileLabel);
+
+  const report = (node: import("ts-morph").Node, message: string) => {
+    const { line, column } = sourceFile.getLineAndColumnAtPos(node.getStart());
+    errors.push({ path: fileLabel, line, column, message });
+  };
+
+  const stripStringLiteral = (text: string): string | null => {
+    const trimmed = text.trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+      (trimmed.startsWith("`") && trimmed.endsWith("`"))
+    ) {
+      return trimmed.slice(1, -1);
+    }
+    return null;
+  };
+
+  sourceFile.forEachDescendant((node) => {
+    const kind = node.getKind();
+
+    // Rule 1 + 2: PropertyAccessExpression — receiver.name
+    if (kind === SyntaxKind.PropertyAccessExpression) {
+      const name = (node as { getName?: () => string }).getName?.();
+      if (!name) {
+        return;
+      }
+      if (name === "constructor") {
+        report(
+          node,
+          "`.constructor` access is denied in the sandbox (Function-constructor smuggle vector)",
+        );
+        return;
+      }
+      if (DENIED_GLOBALS.has(name)) {
+        report(
+          node,
+          `\`.${name}\` access is denied in the sandbox (FS/network/eval surface) — accessing a denied global via property syntax was the property-access bypass closed in v0.3.0`,
+        );
+        return;
+      }
+    }
+
+    // Rule 3 + 4: ElementAccessExpression — receiver["string-literal"]
+    if (kind === SyntaxKind.ElementAccessExpression) {
+      const expression = (
+        node as { getExpression?: () => { getText: () => string } }
+      ).getExpression?.();
+      const argument = (
+        node as {
+          getArgumentExpression?: () => { getText: () => string } | undefined;
+        }
+      ).getArgumentExpression?.();
+      const receiverText = expression?.getText() ?? "";
+      const argText = argument?.getText() ?? "";
+      const literal = stripStringLiteral(argText);
+
+      // Rule 4: ANY bracket access on globalThis with a string literal.
+      if (receiverText === "globalThis" && literal !== null) {
+        report(
+          node,
+          "bracket-access on `globalThis` with a string literal is denied in the sandbox (use direct identifier reference for allowlisted names)",
+        );
+        return;
+      }
+      // Rule 3: bracket access whose literal matches a denied name OR
+      // `constructor`, on ANY receiver.
+      if (literal !== null) {
+        if (literal === "constructor" || DENIED_GLOBALS.has(literal)) {
+          report(
+            node,
+            `bracket-access \`["${literal}"]\` is denied in the sandbox (would reach a denied name)`,
+          );
+          return;
+        }
+      }
+    }
+
+    // Rule 5: CallExpression with callee `Function(...)` (no `new`).
+    if (kind === SyntaxKind.CallExpression) {
+      const expression = (
+        node as {
+          getExpression?: () => {
+            getKind: () => number;
+            getText: () => string;
+          };
+        }
+      ).getExpression?.();
+      const exprText = expression?.getText() ?? "";
+      if (exprText === "Function") {
+        report(node, "`Function(...)` call is denied in the sandbox");
+        return;
+      }
+      // Rule 6: Reflect.get / Reflect.has / Object.getOwnPropertyDescriptor
+      // with `globalThis` (or any allowed global) + denied string-literal.
+      const reflectAccess = exprText.match(/^(Reflect|Object)\.(\w+)$/);
+      if (reflectAccess) {
+        const callExpr = node as {
+          getArguments?: () => { getText: () => string }[];
+        };
+        const args = callExpr.getArguments?.() ?? [];
+        if (args.length >= 2) {
+          const firstArg = args[0]!.getText();
+          const secondArgLiteral = stripStringLiteral(args[1]!.getText());
+          const denyMethods = new Set([
+            "get",
+            "has",
+            "getOwnPropertyDescriptor",
+            "getOwnPropertyDescriptors",
+            "ownKeys",
+            "getPrototypeOf",
+          ]);
+          if (
+            denyMethods.has(reflectAccess[2]!) &&
+            (firstArg === "globalThis" || ALLOWED_GLOBALS.has(firstArg)) &&
+            secondArgLiteral !== null &&
+            (secondArgLiteral === "constructor" ||
+              DENIED_GLOBALS.has(secondArgLiteral))
+          ) {
+            report(
+              node,
+              `\`${reflectAccess[1]}.${reflectAccess[2]}(${firstArg}, "${secondArgLiteral}")\` would reach a denied name`,
+            );
+          }
+        }
+      }
+    }
+  });
+}
+
 function checkGlobalIdentifiers(
   fileLabel: string,
   project: Project,
@@ -387,6 +560,7 @@ export function validateSandboxInput(
   for (const file of files) {
     checkImports(file.path, project, errors);
     checkDynamicImportsAndCalls(file.path, project, errors);
+    checkPropertyAccessEscapes(file.path, project, errors);
     checkGlobalIdentifiers(file.path, project, errors);
   }
 
