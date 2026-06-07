@@ -1698,3 +1698,30 @@ hardening pass.
 > them together. Use the PR-force-push (or live-ticker-mid-stream) video.
 > The two together are 10× the launch of either alone.
 
+
+---
+
+## Deferred (2026-06): devtools-server source-event integration
+
+The R5 observability reviewer flagged `@directive-run/ai/devtools-server.ts`
+as blind to core source events. `attachSourcesToOtel` (shipped in Phase G)
+covers the OTel side — the operationally critical path. Wiring the
+devtools-server WebSocket stream to surface `source.attach/publish/detach/error`
+requires extending `DevToolsServerMessage` with four new variants AND
+updating the devtools UI consumer. Both are doable as a follow-up but
+expand the message-protocol surface; defer to a dedicated PR with its
+own AE round.
+
+**Scope** (when picked up):
+- Extend `DevToolsServerMessage` union in `packages/ai/src/devtools-server.ts`
+  with `source.attach`, `source.publish`, `source.detach`, `source.error`.
+- Wire `system.observe()` in `createDevToolsServer` to broadcast the
+  source events (mirror the OTel helper's pattern with cardinality
+  budget — bound active spans per source).
+- Add devtools-UI rendering (separate repo / package surface).
+
+Until then: SREs get full source visibility via OTel + `system.inspect()`
+(per-source telemetry); devtools UI users get the source primitive's
+behavior through the constraint/resolver effects that follow each
+publish (since the existing `fact.change` / `resolver.start` / etc.
+events already render).
