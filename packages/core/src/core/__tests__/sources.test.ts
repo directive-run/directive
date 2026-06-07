@@ -37,7 +37,9 @@ describe("createSourcesManager", () => {
     const make = (name: string): SourceDef => ({
       attach: () => {
         order.push(`attach:${name}`);
-        return () => order.push(`detach:${name}`);
+        return () => {
+          order.push(`detach:${name}`);
+        };
       },
     });
     const manager = createSourcesManager({
@@ -957,7 +959,9 @@ describe("source primitive — end-to-end with createSystem", () => {
         sourceA: {
           attach: () => {
             order.push("attach:a");
-            return () => order.push("detach:a");
+            return () => {
+              order.push("detach:a");
+            };
           },
         },
       },
@@ -971,7 +975,9 @@ describe("source primitive — end-to-end with createSystem", () => {
         sourceB: {
           attach: () => {
             order.push("attach:b");
-            return () => order.push("detach:b");
+            return () => {
+              order.push("detach:b");
+            };
           },
         },
       },
@@ -1340,5 +1346,267 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(observedError.message.startsWith("Z".repeat(256))).toBe(true);
     // Short errors pass through unchanged (no allocation overhead).
     consoleErrorSpy.mockRestore();
+  });
+
+  // RFC 0007: SourceDef.coalesce: "lastWriteWins" debounces same-event-name
+  // publishes within a single microtask. Dropped publishes bump dropCount
+  // + lastDropReason = "coalesced". The final payload wins.
+  it("coalesce: lastWriteWins debounces same-event-name publishes per microtask", async () => {
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        ticker: {
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+          coalesce: "lastWriteWins",
+        },
+      },
+      { ticker: "mod" },
+    );
+    manager.attachAll(dispatch);
+    // Five publishes in one tick → ONE dispatch on next microtask.
+    captured.current?.("TICK", { v: 1 });
+    captured.current?.("TICK", { v: 2 });
+    captured.current?.("TICK", { v: 3 });
+    captured.current?.("TICK", { v: 4 });
+    captured.current?.("TICK", { v: 5 });
+    expect(dispatch).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    // Last payload wins.
+    expect(dispatch).toHaveBeenCalledWith("ticker", "mod", "TICK", { v: 5 });
+    // 4 raw publishes coalesced into 1.
+    const row = manager.listDefinitions().find((r) => r.id === "ticker");
+    expect(row?.publishCount).toBe(1);
+    expect(row?.dropCount).toBe(4);
+    expect(row?.lastDropReason).toBe("coalesced");
+  });
+
+  // Different event names debounce independently — a priceTick storm
+  // does not drop a one-shot connected event.
+  it("coalesce: lastWriteWins keys per-event-name (storm does not drop one-shots)", async () => {
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        s: {
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+          coalesce: "lastWriteWins",
+        },
+      },
+      { s: "mod" },
+    );
+    manager.attachAll(dispatch);
+    captured.current?.("PRICE_TICK", { v: 1 });
+    captured.current?.("PRICE_TICK", { v: 2 });
+    captured.current?.("CONNECTED", {});
+    captured.current?.("PRICE_TICK", { v: 3 });
+    expect(dispatch).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    const calls = dispatch.mock.calls.map(([, , eventName, payload]) => ({
+      eventName,
+      payload,
+    }));
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { eventName: "PRICE_TICK", payload: { v: 3 } },
+        { eventName: "CONNECTED", payload: {} },
+      ]),
+    );
+  });
+
+  // coalesce: "all" and undefined both behave like "none" — every publish
+  // dispatches synchronously, no microtask deferral.
+  it('coalesce: "all" and unset behave like "none" — every publish dispatches synchronously', () => {
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        explicit: {
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+          coalesce: "all",
+        },
+      },
+      { explicit: "mod" },
+    );
+    manager.attachAll(dispatch);
+    captured.current?.("E", { v: 1 });
+    captured.current?.("E", { v: 2 });
+    expect(dispatch).toHaveBeenCalledTimes(2);
+  });
+
+  // RFC 0008: attach receives `reportError` as a second arg. Errors
+  // routed through it fire onError with phase: "runtime" and bump
+  // errorCount / lastError on the inspect row — same sinks as attach
+  // and cleanup failures, distinct phase.
+  it("RFC 0008: reportError routes mid-flight errors with phase: 'runtime'", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    let captured: ((err: Error) => void) | null = null;
+    const manager = createSourcesManager(
+      {
+        ws: {
+          attach: (_publish, reportError) => {
+            captured = reportError;
+            return () => undefined;
+          },
+        },
+      },
+      { ws: "wsmod" },
+      { onError },
+    );
+    manager.attachAll(() => ({ accepted: true }));
+    expect(typeof captured).toBe("function");
+    // Simulate the source's underlying stream erroring mid-flight.
+    (captured as unknown as (err: Error) => void)(new Error("socket closed"));
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(
+      "ws",
+      "wsmod",
+      "runtime",
+      expect.objectContaining({ message: expect.stringContaining("socket closed") }),
+    );
+    const row = manager.listDefinitions().find((r) => r.id === "ws");
+    expect(row?.errorCount).toBe(1);
+    expect(row?.lastError?.phase).toBe("runtime");
+    expect(row?.lastError?.message).toContain("socket closed");
+    consoleErrorSpy.mockRestore();
+  });
+
+  // After detach, reportError is a no-op — the source's transport may
+  // still hold a reference, but the manager treats the source as gone.
+  it("RFC 0008: reportError after detach is a silent no-op (matches publish-detached semantics)", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    let captured: ((err: Error) => void) | null = null;
+    const manager = createSourcesManager(
+      {
+        ws: {
+          attach: (_publish, reportError) => {
+            captured = reportError;
+            return () => undefined;
+          },
+        },
+      },
+      { ws: "wsmod" },
+      { onError },
+    );
+    manager.attachAll(() => ({ accepted: true }));
+    manager.cleanupAll();
+    (captured as unknown as (err: Error) => void)(new Error("late"));
+    // onError was NOT called for the post-detach runtime error.
+    const runtimeCalls = onError.mock.calls.filter(
+      ([, , phase]) => phase === "runtime",
+    );
+    expect(runtimeCalls.length).toBe(0);
+    consoleErrorSpy.mockRestore();
+  });
+
+  // RFC 0009: cleanupAllAsync awaits Promise-returning unsubscribes
+  // so external transports (Supabase channel.unsubscribe()) actually
+  // complete before the caller continues. Sync cleanupAll fire-and-
+  // forgets them (back-compat).
+  it("RFC 0009: cleanupAllAsync awaits async unsubscribes; cleanupAll fire-and-forgets them", async () => {
+    let unsubResolved = false;
+    const manager = createSourcesManager(
+      {
+        s: {
+          attach: () => async () => {
+            await new Promise((r) => setTimeout(r, 10));
+            unsubResolved = true;
+          },
+        },
+      },
+      { s: "mod" },
+    );
+
+    // First cycle: sync cleanupAll — Promise NOT awaited.
+    manager.attachAll(() => ({ accepted: true }));
+    manager.cleanupAll();
+    expect(unsubResolved).toBe(false);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(unsubResolved).toBe(true); // resolved eventually
+
+    // Second cycle: cleanupAllAsync — Promise IS awaited.
+    unsubResolved = false;
+    manager.attachAll(() => ({ accepted: true }));
+    await manager.cleanupAllAsync();
+    expect(unsubResolved).toBe(true);
+  });
+
+  // RFC 0009: evictAll fires every source's onEvict in registration
+  // order. Errors are caught + reported as phase: "runtime".
+  it("RFC 0009: evictAll fires onEvict in registration order, isolates failures", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    const order: string[] = [];
+    const manager = createSourcesManager(
+      {
+        first: {
+          attach: () => () => undefined,
+          onEvict: async () => {
+            await new Promise((r) => setTimeout(r, 5));
+            order.push("evict:first");
+          },
+        },
+        bad: {
+          attach: () => () => undefined,
+          onEvict: () => {
+            order.push("evict:bad");
+            throw new Error("eviction failed");
+          },
+        },
+        last: {
+          attach: () => () => undefined,
+          onEvict: () => {
+            order.push("evict:last");
+          },
+        },
+      },
+      { first: "mod-a", bad: "mod-b", last: "mod-c" },
+      { onError },
+    );
+
+    manager.attachAll(() => ({ accepted: true }));
+    await manager.evictAll();
+
+    // Registration order — bad's throw doesn't block last.
+    expect(order).toEqual(["evict:first", "evict:bad", "evict:last"]);
+    const runtimeErrors = onError.mock.calls.filter(
+      ([, , phase]) => phase === "runtime",
+    );
+    expect(runtimeErrors.length).toBe(1);
+    expect(runtimeErrors[0]?.[0]).toBe("bad");
+    consoleErrorSpy.mockRestore();
+  });
+
+  // RFC 0009: sources without onEvict are silently skipped — the new
+  // hook is purely opt-in. A system with NO source declaring onEvict
+  // sees evictAll resolve immediately.
+  it("RFC 0009: evictAll is a no-op for sources without onEvict", async () => {
+    const manager = createSourcesManager(
+      {
+        plain: { attach: () => () => undefined },
+      },
+      { plain: "mod" },
+    );
+    manager.attachAll(() => ({ accepted: true }));
+    await expect(manager.evictAll()).resolves.toBeUndefined();
   });
 });

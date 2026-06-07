@@ -327,12 +327,21 @@ export interface SystemInspection {
      * event names) or probing of the BLOCKED_PROPS / isRunning guards.
      */
     dropCount: number;
-    /** Reason for the most recent rejected publish, or `null`. */
+    /**
+     * Reason for the most recent rejected publish, or `null`.
+     * - `"post-destroy"` / `"post-stop"` — leaked transport firing
+     *   outside the running lifecycle window
+     * - `"blocked-event-name"` / `"invalid-event-name"` — engine
+     *   dispatch guard rejected the publish (BLOCKED_PROPS / empty)
+     * - `"coalesced"` — manager debounced a same-event-name publish
+     *   when `SourceDef.coalesce === "lastWriteWins"`
+     */
     lastDropReason:
       | "post-destroy"
       | "post-stop"
       | "blocked-event-name"
       | "invalid-event-name"
+      | "coalesced"
       | null;
     /** Wall-clock ms of the most recent rejected publish, or `null`. */
     lastDropAt: number | null;
@@ -342,10 +351,14 @@ export interface SystemInspection {
      * The most recent error from this source, or `null`. `message` is
      * truncated to a fixed maximum length so a source whose `attach()`
      * throws with a payload-embedded message does not write unbounded data
-     * here AND downstream into the audit ledger.
+     * here AND downstream into the audit ledger. `phase: "runtime"`
+     * (RFC 0008) flags errors that the source reported mid-flight via
+     * the `reportError` callback `attach` receives as its second
+     * argument (distinct from lifecycle `"attach"` / `"cleanup"`
+     * failures).
      */
     lastError: {
-      phase: "attach" | "cleanup";
+      phase: "attach" | "cleanup" | "runtime";
       message: string;
       at: number;
     } | null;
@@ -835,12 +848,19 @@ export type ObservationEvent =
     }
   /** Source detached at `system.stop()` (reverse-registration order). */
   | { type: "source.detach"; id: string; moduleId: string }
-  /** Source `attach` or unsubscribe threw — handled, isolated, observable. */
+  /**
+   * Source `attach` / unsubscribe threw, OR the source called the
+   * `reportError` callback that `attach` received as its second
+   * argument (RFC 0008) — handled, isolated, observable.
+   * `phase: "runtime"` distinguishes mid-flight stream errors
+   * (WebSocket disconnect, Supabase channel goes stale) from lifecycle
+   * `"attach"` / `"cleanup"` failures so observers attribute correctly.
+   */
   | {
       type: "source.error";
       id: string;
       moduleId: string;
-      phase: "attach" | "cleanup";
+      phase: "attach" | "cleanup" | "runtime";
       error: unknown;
     }
   | { type: "derivation.compute"; id: string; value: unknown }
@@ -911,6 +931,35 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   start(): void;
   stop(): void;
   destroy(): void;
+  /**
+   * RFC 0009: async-aware variant of `stop()`. Awaits each source's
+   * unsubscribe before resolving. Use when sources have async
+   * unsubscribes (Supabase `channel.unsubscribe()`, Cloudflare DO
+   * storage flushes) and the caller needs to know teardown actually
+   * completed before continuing.
+   */
+  stopAsync(): Promise<void>;
+  /**
+   * RFC 0009: async-aware variant of `destroy()`. Equivalent to
+   * `stopAsync` followed by `destroy`. Use in DO `webSocketClose` /
+   * `alarm` handlers where the caller must let the runtime evict the
+   * isolate cleanly.
+   */
+  destroyAsync(): Promise<void>;
+  /**
+   * RFC 0009: signal the host runtime is about to evict this isolate.
+   * Fires every source's `onEvict()` in registration order (so sources
+   * with downstream dependencies close in the right order), then calls
+   * `destroyAsync()`. Cloudflare DO consumers call this from their
+   * `alarm()` / `webSocketClose()` handlers BEFORE letting the
+   * runtime evict so external brokers don't accumulate ghost
+   * subscriptions.
+   *
+   * @param deadline - Optional wall-clock ms deadline. If supplied,
+   *   evicts that have not resolved by `deadline` are abandoned (the
+   *   isolate will die anyway). Defaults to no deadline.
+   */
+  evict(deadline?: number): Promise<void>;
 
   readonly isRunning: boolean;
   readonly isSettled: boolean;

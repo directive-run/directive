@@ -113,7 +113,7 @@ import type { DefinitionMeta } from "./meta.js";
  * concern (an effect cleans up a side effect; a source unsubscribes from
  * an external stream).
  */
-export type SourceUnsubscribe = () => void;
+export type SourceUnsubscribe = () => void | Promise<void>;
 
 /**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
@@ -137,7 +137,16 @@ export type SourceUnsubscribe = () => void;
  *   engine guards against post-destroy dispatch so stale source callbacks
  *   cannot mutate a torn-down store.
  */
-export type SourcePublish = (event: string, payload?: unknown) => void;
+/**
+ * Type-wrapped as an interface (rather than a bare function type) so
+ * additive minors can attach optional methods (`error`, `complete` —
+ * see RFC 0008 Observer-protocol posture) without a major bump. The
+ * call signature is unchanged: existing `publish('EVENT', payload)`
+ * call sites keep working.
+ */
+export interface SourcePublish {
+  (event: string, payload?: unknown): void;
+}
 
 /**
  * A source definition — attaches an external event stream to the system
@@ -170,16 +179,90 @@ export type SourcePublish = (event: string, payload?: unknown) => void;
  *   an effect.** The effect will re-run on fact changes, the source mounts
  *   once — you'll get 2× messages with silent duplicates. Pick one.
  */
+/**
+ * Source-side runtime-error reporter. Optional second argument to
+ * `attach` per RFC 0008. Authors call this when the underlying stream
+ * errors mid-flight (WebSocket disconnect, Supabase channel goes
+ * stale, polling fetch throws) instead of publishing magic event names
+ * like `STREAM_ERROR`. The manager forwards the error through the same
+ * sinks as attach/cleanup failures, with `phase: "runtime"`.
+ *
+ * @example
+ * ```ts
+ * sources: {
+ *   ws: {
+ *     attach: (publish, reportError) => {
+ *       const sock = new WebSocket(url);
+ *       sock.addEventListener('error', () => reportError(new Error('WS error')));
+ *       sock.addEventListener('message', (e) => publish('MSG', JSON.parse(e.data)));
+ *       return () => sock.close();
+ *     },
+ *   },
+ * }
+ * ```
+ */
+export type SourceReportError = (error: Error) => void;
+
 export interface SourceDef {
   /**
    * Mount the source against the system. Runs once at `system.start()`.
    *
    * @param publish - dispatch typed events into the system's event queue.
+   * @param reportError - report a runtime error from the source's
+   *   underlying stream. Fires `source.error` observation events with
+   *   `phase: "runtime"` (distinct from `"attach"` and `"cleanup"`)
+   *   so observers can attribute the failure correctly. Optional —
+   *   sources that never error mid-flight don't need it.
    * @returns a cleanup function that runs at `system.stop()`.
    */
-  attach: (publish: SourcePublish) => SourceUnsubscribe;
+  attach: (publish: SourcePublish, reportError: SourceReportError) => SourceUnsubscribe;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
+  /**
+   * How the manager absorbs publishes that would overwhelm the
+   * reconcile loop. Default: `"none"` — every publish dispatches
+   * straight through to the engine.
+   *
+   * Set `"lastWriteWins"` for high-frequency sources (cursor movement,
+   * sensor telemetry, channel storms). The manager coalesces publishes
+   * with the same event name within a single microtask: only the last
+   * payload of the cycle dispatches; earlier ones bump `dropCount` and
+   * record `lastDropReason: "coalesced"` per source so operators can
+   * see the rate of debouncing on `system.inspect().sources`.
+   *
+   * `"all"` is a no-op equivalent to `"none"` — it names the intent
+   * (no coalesce, every publish counts) for readers.
+   *
+   * Choose `"none"` (default) for low-frequency lifecycle sources
+   * (MCP connect, DO alarm, WebSocket open/close). Choose
+   * `"lastWriteWins"` for any source that could publish faster than
+   * the reconcile loop can drain. See `RFC 0007` for throughput
+   * budgets per coalesce strategy and the rationale.
+   *
+   * Coalescing applies per-event-name: two different event names from
+   * the same source coalesce independently, so a `"priceTick"` storm
+   * doesn't drop a one-shot `"connected"` event.
+   */
+  coalesce?: "none" | "lastWriteWins" | "all";
+  /**
+   * Called when the host runtime signals the isolate is about to be
+   * evicted (Cloudflare DO hibernation, Workers memory pressure, etc.).
+   * Use this to actively close external subscriptions BEFORE the
+   * isolate dies, so the broker / remote service doesn't accumulate
+   * ghost subscriptions visible as "phantom presence" bugs at fleet
+   * scale.
+   *
+   * Distinct from `unsubscribe()`: eviction can fire WITHOUT a
+   * `system.stop()` having been called. The host runtime invokes this
+   * via `system.evict()`, which fires every source's `onEvict()` in
+   * registration order, then `destroyAsync()`. The entire call is
+   * awaitable up to a runtime-supplied deadline.
+   *
+   * Optional — sources whose underlying transport is short-lived
+   * (browser WebSocket, in-process EventEmitter) don't need it. RFC
+   * 0009 documents the full DO-eviction recipe.
+   */
+  onEvict?: () => void | Promise<void>;
 }
 
 /**

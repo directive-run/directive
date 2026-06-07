@@ -84,11 +84,17 @@ interface SourceCounters {
   publishCount: number;
   lastPublishAt: number | null;
   dropCount: number;
-  lastDropReason: "post-destroy" | "post-stop" | "blocked-event-name" | "invalid-event-name" | null;
+  lastDropReason:
+    | "post-destroy"
+    | "post-stop"
+    | "blocked-event-name"
+    | "invalid-event-name"
+    | "coalesced"
+    | null;
   lastDropAt: number | null;
   errorCount: number;
   lastError: {
-    phase: "attach" | "cleanup";
+    phase: "attach" | "cleanup" | "runtime";
     message: string;
     at: number;
   } | null;
@@ -154,7 +160,8 @@ export type SourceDispatchResult =
         | "post-destroy"
         | "post-stop"
         | "blocked-event-name"
-        | "invalid-event-name";
+        | "invalid-event-name"
+        | "coalesced";
     };
 
 /**
@@ -185,7 +192,7 @@ export interface SourcesManagerCallbacks {
   readonly onError?: (
     id: string,
     moduleId: string,
-    phase: "attach" | "cleanup",
+    phase: "attach" | "cleanup" | "runtime",
     error: Error,
   ) => void;
 }
@@ -213,8 +220,34 @@ export interface SourcesManager {
    *
    * `onDetach` fires BEFORE each unsubscribe runs. `onError` fires AFTER if
    * the unsubscribe throws.
+   *
+   * Sync variant kept for back-compat: async unsubscribes are kicked off
+   * (the Promise is captured but not awaited). Use {@link cleanupAllAsync}
+   * when you need to await the actual transport teardown (e.g. Supabase
+   * `channel.unsubscribe()` returns a Promise that must complete before
+   * the broker drops the subscription).
    */
   cleanupAll(): void;
+  /**
+   * RFC 0009: async-aware cleanup. Awaits each source's unsubscribe in
+   * reverse-registration order. Errors are caught + reported as
+   * `phase: "cleanup"` so a single failing unsubscribe cannot block the
+   * rest of the teardown.
+   *
+   * The host runtime calls this from `System.stopAsync()` /
+   * `System.destroyAsync()`. For sync `system.stop()` callers, the sync
+   * `cleanupAll` is still used (Promises from async unsubscribes are
+   * fire-and-forget).
+   */
+  cleanupAllAsync(): Promise<void>;
+  /**
+   * RFC 0009: signal eviction to every source whose definition declares
+   * `onEvict`. Runs in registration order so sources with downstream
+   * dependencies close in the right order. Errors are caught + reported
+   * as `phase: "runtime"`. After `evictAll`, the host runtime calls
+   * `cleanupAllAsync`.
+   */
+  evictAll(): Promise<void>;
   /** Number of sources currently attached. Used by `system.inspect()`. */
   attachedCount(): number;
   /**
@@ -241,14 +274,27 @@ export interface SourceInspectionRow {
   attached: boolean;
   publishCount: number;
   lastPublishAt: number | null;
-  /** Publishes the engine's dispatch guard rejected this cycle. */
+  /**
+   * Publishes the engine's dispatch guard rejected OR the manager
+   * coalesced this cycle. Operators monitor this to spot misconfigured
+   * sources (wrong event names) and to verify the coalesce strategy is
+   * actually debouncing the high-frequency sources it was meant to.
+   */
   dropCount: number;
-  /** Reason for the most recent rejected publish, or `null`. */
+  /**
+   * Reason for the most recent rejected publish, or `null`.
+   * - `"post-destroy"` / `"post-stop"` — leaked transport
+   * - `"blocked-event-name"` / `"invalid-event-name"` — guard probe
+   * - `"coalesced"` — manager debounced a same-event-name publish
+   *   ahead of the microtask flush (only when `SourceDef.coalesce`
+   *   is `"lastWriteWins"`)
+   */
   lastDropReason:
     | "post-destroy"
     | "post-stop"
     | "blocked-event-name"
     | "invalid-event-name"
+    | "coalesced"
     | null;
   /** Wall-clock ms of the most recent rejected publish, or `null`. */
   lastDropAt: number | null;
@@ -265,7 +311,7 @@ export interface SourceInspectionRow {
  * output (and downstream into the audit ledger).
  */
 export interface SourceLastError {
-  phase: "attach" | "cleanup";
+  phase: "attach" | "cleanup" | "runtime";
   message: string;
   at: number;
 }
@@ -294,7 +340,7 @@ export function createSourcesManager(
 
   function bumpError(
     id: string,
-    pErr: "attach" | "cleanup",
+    pErr: "attach" | "cleanup" | "runtime",
     error: Error,
   ): void {
     const c = counters.get(id) ?? emptyCounters();
@@ -310,7 +356,7 @@ export function createSourcesManager(
   function reportError(
     id: string,
     moduleId: string,
-    pErr: "attach" | "cleanup",
+    pErr: "attach" | "cleanup" | "runtime",
     error: Error,
   ): void {
     bumpError(id, pErr, error);
@@ -364,24 +410,17 @@ export function createSourcesManager(
     // transitions, not the seeding step.
     if (!counters.has(id)) counters.set(id, emptyCounters());
 
-    // Closure-wrap the publish callback per-source so the engine receives
-    // accurate `(sourceId, moduleId)` attribution on every publish — this is
-    // what makes the observation pipeline correct even when N sources
-    // publish the same event name. The `detached` flag closes the
-    // re-registration race window: an OLD source's in-flight callback fired
-    // after unsubscribe will hit the `detached` guard and no-op.
-    //
-    // Counter bump + `onPublish` plugin emission fire ONLY when the engine
-    // accepts the publish. Rejection (post-stop, BLOCKED_PROPS event name,
-    // empty / non-string name) increments `dropCount` + `lastDropReason`
-    // instead. Without this split, observers and per-source telemetry would
-    // see "publish happened" for events the engine silently swallowed —
-    // attackers could probe BLOCKED_PROPS / `isRunning` invisibly.
-    const perSourcePublish: SourcePublish = (eventName, payload) => {
+    // Inner publish — runs after the optional coalesce queue drains.
+    // Closure-wrap per-source so the engine receives accurate
+    // `(sourceId, moduleId)` attribution on every publish. The `detached`
+    // flag closes the re-registration race window: an OLD source's
+    // in-flight callback fired after unsubscribe will hit the guard and
+    // no-op. Counter bump + `onPublish` plugin emission fire ONLY when
+    // the engine accepts the publish — split prevents attackers probing
+    // BLOCKED_PROPS / `isRunning` invisibly.
+    const innerPublish: SourcePublish = (eventName, payload) => {
       if (attachedRecord.detached) return;
       const result = dispatch(id, record.moduleId, eventName, payload);
-      // Counter is seeded at the top of attachOne, so the lookup never
-      // misses for any publish that originates from this source.
       const c = counters.get(id);
       if (!c) return; // unreachable; defensive no-op
       const now = Date.now();
@@ -396,8 +435,77 @@ export function createSourcesManager(
       }
     };
 
+    // Optional coalesce wrap: when the source declares
+    // `coalesce: "lastWriteWins"`, the manager queues at most ONE
+    // publish per event name per microtask. Subsequent publishes with
+    // the same event name within the same microtask cycle overwrite the
+    // pending payload and bump `dropCount` / `lastDropReason: "coalesced"`.
+    // The microtask flush drains every pending entry through
+    // `innerPublish`. Per-event-name keying means a `priceTick` storm
+    // can debounce while a one-shot `connected` event still dispatches.
+    let perSourcePublish: SourcePublish;
+    if (record.def.coalesce === "lastWriteWins") {
+      const pending = new Map<string, unknown>();
+      let flushScheduled = false;
+      perSourcePublish = (eventName, payload) => {
+        if (attachedRecord.detached) return;
+        // The manager's coalesce drop fires BEFORE the engine guard so a
+        // detected drop is attributed to coalescing, not to the engine
+        // rejecting an event name. Operators who see `lastDropReason:
+        // "coalesced"` know to look at the source's publish rate, not
+        // their event-name spelling.
+        if (pending.has(eventName)) {
+          const c = counters.get(id);
+          if (c) {
+            c.dropCount += 1;
+            c.lastDropReason = "coalesced";
+            c.lastDropAt = Date.now();
+          }
+        }
+        pending.set(eventName, payload);
+        if (!flushScheduled) {
+          flushScheduled = true;
+          queueMicrotask(() => {
+            flushScheduled = false;
+            if (attachedRecord.detached) {
+              pending.clear();
+              return;
+            }
+            // Snapshot + clear so a publish INSIDE innerPublish's
+            // downstream handler can re-enter the queue cleanly.
+            const drained = Array.from(pending);
+            pending.clear();
+            for (const [eventName, payload] of drained) {
+              innerPublish(eventName, payload);
+            }
+          });
+        }
+      };
+    } else {
+      // "none" (default) and "all" share the unbuffered path.
+      perSourcePublish = innerPublish;
+    }
+
     try {
-      const unsubscribe = record.def.attach(perSourcePublish);
+      // RFC 0008: hand the source a `reportError` callback so authors
+      // can route runtime errors (WebSocket disconnect, stale Supabase
+      // channel, fetch failure) through `phase: "runtime"` instead of
+      // inventing magic event names like `STREAM_ERROR`. Runtime errors
+      // share the same sinks as attach/cleanup failures
+      // (audit-ledger source.error, logging plugin onSourceError,
+      // inspect().sources[i].lastError) so observers correlate the
+      // failure with the source lifecycle automatically.
+      const reportRuntimeError: import("./types/sources.js").SourceReportError = (
+        runtimeError,
+      ) => {
+        if (attachedRecord.detached) return;
+        const safeRuntimeError =
+          runtimeError instanceof Error
+            ? runtimeError
+            : new Error(String(runtimeError));
+        reportError(id, record.moduleId, "runtime", safeRuntimeError);
+      };
+      const unsubscribe = record.def.attach(perSourcePublish, reportRuntimeError);
       if (typeof unsubscribe !== "function") {
         // Distinguish "returned a thenable" (almost always: author wrote
         // `attach: async (publish) => () => {}`) from "returned non-function"
@@ -535,6 +643,9 @@ export function createSourcesManager(
         c.detachedAt = Date.now();
         counters.set(record.id, c);
         try {
+          // Sync caller. Promise return values are discarded (the
+          // unsubscribe runs to completion in the background); use
+          // `cleanupAllAsync` when you need to await the teardown.
           record.unsubscribe();
         } catch (rawError) {
           const error =
@@ -549,6 +660,63 @@ export function createSourcesManager(
       attached = [];
       attachedDefinitionIds = new Set();
       liveDispatch = null;
+    },
+
+    async cleanupAllAsync(): Promise<void> {
+      if (phase !== "attached") return;
+      phase = "stopped";
+      // Reverse-order teardown so resources release in LIFO order.
+      // Await each unsubscribe so external transports (Supabase
+      // channel.unsubscribe(), Cloudflare DO storage flushes) complete
+      // before the manager reports cleanup done.
+      for (let i = attached.length - 1; i >= 0; i--) {
+        const record = attached[i];
+        if (!record || record.detached) continue;
+        record.detached = true;
+        callbacks.onDetach?.(record.id, record.moduleId);
+        const c = counters.get(record.id) ?? emptyCounters();
+        c.detachedAt = Date.now();
+        counters.set(record.id, c);
+        try {
+          await record.unsubscribe();
+        } catch (rawError) {
+          const error =
+            rawError instanceof Error ? rawError : new Error(String(rawError));
+          console.error(
+            `[Directive] Module "${record.moduleId}" → Source "${record.id}" unsubscribe threw:`,
+            error,
+          );
+          reportError(record.id, record.moduleId, "cleanup", error);
+        }
+      }
+      attached = [];
+      attachedDefinitionIds = new Set();
+      liveDispatch = null;
+    },
+
+    async evictAll(): Promise<void> {
+      if (phase !== "attached") return;
+      // Eviction runs in registration order so sources with downstream
+      // dependencies close in the right order (the dual of unsubscribe's
+      // reverse-registration order — same rationale as start vs. stop).
+      // Each onEvict runs in a try/catch so a single failing eviction
+      // cannot block the rest.
+      for (const record of attached) {
+        if (record.detached) continue;
+        const def = definitions.get(record.id)?.def;
+        if (!def?.onEvict) continue;
+        try {
+          await def.onEvict();
+        } catch (rawError) {
+          const error =
+            rawError instanceof Error ? rawError : new Error(String(rawError));
+          console.error(
+            `[Directive] Module "${record.moduleId}" → Source "${record.id}" onEvict threw:`,
+            error,
+          );
+          reportError(record.id, record.moduleId, "runtime", error);
+        }
+      }
     },
 
     attachedCount(): number {

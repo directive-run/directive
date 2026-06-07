@@ -1506,7 +1506,7 @@ export function createEngine<S extends Schema>(
         onSourceError: (
           id: string,
           moduleId: string,
-          phase: "attach" | "cleanup",
+          phase: "attach" | "cleanup" | "runtime",
           error: unknown,
         ) =>
           observer({ type: "source.error", id, moduleId, phase, error }),
@@ -1708,6 +1708,68 @@ export function createEngine<S extends Schema>(
       // Drop any pending ctx.requeue() requests
       pendingRequeueIds.clear();
       pluginManager.emitDestroy(system);
+    },
+
+    async stopAsync(): Promise<void> {
+      // RFC 0009: async-aware variant of stop(). Mirrors sync stop()
+      // step-for-step but awaits the source unsubscribes so external
+      // transports (Supabase channel.unsubscribe(), DO storage flush)
+      // actually complete before the caller continues.
+      if (!state.isRunning) return;
+      state.isRunning = false;
+      if (retryLaterTimer !== null) {
+        clearInterval(retryLaterTimer);
+        retryLaterTimer = null;
+      }
+      errorBoundary.getRetryLaterManager().clearAll();
+      resolversManager.cancelAll();
+      await sourcesManager.cleanupAllAsync();
+      effectsManager.cleanupAll();
+      for (const module of config.modules) {
+        module.hooks?.onStop?.(system);
+      }
+      pluginManager.emitStop(system);
+    },
+
+    async destroyAsync(): Promise<void> {
+      if (state.isDestroyed) return;
+      await this.stopAsync();
+      state.isDestroyed = true;
+      (store as unknown as Record<string, () => void>).destroy?.();
+      resolversManager.destroy();
+      errorBoundary.clearErrors();
+      settlementListeners.clear();
+      historyListeners.clear();
+      traceManager.destroy();
+      definitions.destroy();
+      moduleMeta.clear();
+      eventMeta.clear();
+      pendingRequeueIds.clear();
+      pluginManager.emitDestroy(system);
+    },
+
+    async evict(deadline?: number): Promise<void> {
+      // RFC 0009: signal that the host runtime is about to evict.
+      // Fires every source's onEvict in registration order (so sources
+      // with downstream dependencies close in the right order), then
+      // delegates to destroyAsync to complete teardown. If `deadline`
+      // is supplied, the entire eviction is raced against the deadline
+      // — a partial teardown is better than a hang while the runtime
+      // is impatient to evict.
+      const evictWork = (async () => {
+        await sourcesManager.evictAll();
+        await this.destroyAsync();
+      })();
+      if (deadline === undefined) {
+        await evictWork;
+        return;
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return;
+      await Promise.race([
+        evictWork,
+        new Promise<void>((resolve) => setTimeout(resolve, remaining)),
+      ]);
     },
 
     dispatch(event: SystemEvent): void {
