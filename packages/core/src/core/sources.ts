@@ -314,7 +314,27 @@ export function createSourcesManager(
     error: Error,
   ): void {
     bumpError(id, pErr, error);
-    callbacks.onError?.(id, moduleId, pErr, error);
+    // Hand plugins (audit-ledger, logging, devtools) an `Error` whose
+    // `message` is already truncated at the manager boundary. The
+    // privacy invariant is "one bounded message ceiling across all
+    // three sinks" — `inspect().sources[i].lastError.message`, the
+    // audit-ledger `source.error` entry, and the logging plugin's
+    // `error`-level emission. Without this, a source whose `attach()`
+    // throws with a payload-embedded message would have leaked the
+    // payload into the immutable hash-chained ledger AND the operator's
+    // structured log backend even after R6 closed the inspect path.
+    //
+    // The original `Error` (with full message + stack) is still
+    // `console.error`'d for dev visibility upstream of this call —
+    // that's a developer tool, not a privacy sink.
+    const safeError =
+      error.message.length <= SOURCE_ERROR_MESSAGE_MAX
+        ? error
+        : Object.assign(
+            new Error(truncateSourceErrorMessage(error.message)),
+            { name: error.name, stack: error.stack },
+          );
+    callbacks.onError?.(id, moduleId, pErr, safeError);
   }
 
   function attachOne(

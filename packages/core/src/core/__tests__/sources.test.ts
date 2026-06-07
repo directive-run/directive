@@ -1311,4 +1311,34 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(row?.lastError?.message.startsWith("X".repeat(256))).toBe(true);
     consoleErrorSpy.mockRestore();
   });
+
+  // R7 fix: truncation applies at the manager boundary so plugins (audit-ledger,
+  // logging) see a bounded `error.message` too — not just inspect().
+  it("onError callback receives an Error whose message is truncated to SOURCE_ERROR_MESSAGE_MAX", () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    const huge = "Z".repeat(2048);
+    const manager = createSourcesManager(
+      {
+        leaky: {
+          attach: () => {
+            throw new Error(huge);
+          },
+        },
+      },
+      { leaky: "mod-x" },
+      { onError },
+    );
+    manager.attachAll(() => ({ accepted: true }));
+    expect(onError).toHaveBeenCalledTimes(1);
+    const observedError = onError.mock.calls[0]?.[3];
+    expect(observedError).toBeInstanceOf(Error);
+    expect(observedError.message.length).toBeLessThan(huge.length);
+    expect(observedError.message).toMatch(/chars truncated/);
+    expect(observedError.message.startsWith("Z".repeat(256))).toBe(true);
+    // Short errors pass through unchanged (no allocation overhead).
+    consoleErrorSpy.mockRestore();
+  });
 });

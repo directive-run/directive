@@ -38,6 +38,9 @@ export {
   type SourcesManager,
   type SourcesManagerCallbacks,
   type SourceDispatch,
+  type SourceDispatchResult,
+  type SourceInspectionRow,
+  type SourceLastError,
 } from "./core/sources.js";
 export { createPluginManager } from "./core/plugins.js";
 export {

@@ -1631,6 +1631,15 @@ hardening pass.
   array so context updates evaluate guardrails BEFORE emitting
   `context_updated` chunks. Without this, `liveContext` itself ships the
   bypass into more code paths.
+- **Interim ceiling shipped in R6:** the source manager now truncates
+  every `lastError.message` at **256 chars** (`SOURCE_ERROR_MESSAGE_MAX`
+  in `packages/core/src/core/sources.ts`) so a source author who throws
+  with a payload-embedded message gets a bounded leak rather than an
+  unbounded one. The bound applies across all three sinks — `inspect()`,
+  audit-ledger, and the logging plugin — via a sanitized Error
+  constructed at the `reportError` boundary. The full PII-aware
+  redaction story is still blocked on `createFactPIIGuardrail`; the
+  256-char cap is the floor, not the ceiling.
 
 ### Tier 2 — Document now, build after Tier 0/1
 

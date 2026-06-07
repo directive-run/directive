@@ -270,8 +270,10 @@ const unsub = system.observe((event: ObservationEvent) => {
   if (event.type === "fact.change") console.log(event.key, event.prev, "→", event.next);
 });
 
-// 18 event types: fact.change, constraint.evaluate/error, requirement.created/met/canceled,
-// resolver.start/complete/error, effect.run/error, derivation.compute,
+// 23 event types: fact.change, constraint.evaluate/error,
+// requirement.created/met/canceled, resolver.start/complete/error/write.rejected,
+// effect.run/error, derivation.compute,
+// source.attach/publish/detach/error,
 // reconcile.start/end, system.init/start/stop/destroy
 
 unsub(); // Stop observing
