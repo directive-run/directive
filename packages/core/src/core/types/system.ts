@@ -288,11 +288,41 @@ export interface SystemInspection {
   /** All defined effect names with optional metadata */
   effects: Array<{ id: string; meta?: DefinitionMeta }>;
   /**
-   * All declared source names with the module that owns each. `attachedCount`
-   * is the live count of sources currently bound to the system (>= 0,
-   * <= sources.length). Mirrors how effects are surfaced.
+   * All declared source names with the module that owns each, plus per-source
+   * telemetry surfaced for production-debug ("which source is publishing?",
+   * "when did this source last fire?", "is this source errored?") without
+   * requiring a custom plugin to be installed first.
+   *
+   * Counters reset at every `system.start()` cycle — a stop → start does not
+   * carry "ghost" counts from the previous cycle. Timestamps are wall-clock
+   * milliseconds (Date.now()); `null` means "never happened in this cycle".
+   *
+   * `attachedSourceCount` (below) is the aggregate count of `attached: true`
+   * rows; both must stay in lockstep.
    */
-  sources: Array<{ id: string; moduleId: string; meta?: DefinitionMeta }>;
+  sources: Array<{
+    id: string;
+    moduleId: string;
+    meta?: DefinitionMeta;
+    /** True while the source's attach succeeded and its unsubscribe is held. */
+    attached: boolean;
+    /** Wall-clock ms when the source most recently attached, or null. */
+    attachedAt: number | null;
+    /** Wall-clock ms when the source most recently detached, or null. */
+    detachedAt: number | null;
+    /** Total publish() invocations against this source since the last attachAll. */
+    publishCount: number;
+    /** Wall-clock ms of the most recent publish() call, or null. */
+    lastPublishAt: number | null;
+    /** Total attach + cleanup errors since the last attachAll. */
+    errorCount: number;
+    /** The most recent error from this source, or null. */
+    lastError: {
+      phase: "attach" | "cleanup";
+      message: string;
+      at: number;
+    } | null;
+  }>;
   /** Number of sources currently attached (i.e. system is in the `attached` phase + their attach() succeeded). */
   attachedSourceCount: number;
   /** All defined derivation names with optional metadata */

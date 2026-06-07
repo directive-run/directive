@@ -313,7 +313,8 @@ sources: {
 
 ## Related
 
-- `effects.md` — outbound side effects on fact changes (the dual of sources).
+- `core-patterns.md` — where sources sit in the constraint-driven module model (decision tree).
 - `multi-module.md` — declaring sources on multiple modules; collision rules.
 - `system-api.md` — `system.start()` / `system.stop()` / `system.inspect()` / `system.observe()`.
-- `anti-patterns.md` — "subscribe inside an effect" anti-pattern; prefer sources.
+- `anti-patterns.md` (#20) — "subscribe inside an effect / useEffect" anti-pattern; prefer sources.
+- `naming.md` — canonical-term entry for `sources` + cross-paradigm aliases (RxJS Observable, DOM EventTarget, XState callback actor, Supabase realtime).

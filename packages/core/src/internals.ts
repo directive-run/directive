@@ -33,6 +33,12 @@ export { createDerivationsManager } from "./core/derivations.js";
 export { createEffectsManager } from "./core/effects.js";
 export { createConstraintsManager } from "./core/constraints.js";
 export { createResolversManager, type InflightInfo } from "./core/resolvers.js";
+export {
+  createSourcesManager,
+  type SourcesManager,
+  type SourcesManagerCallbacks,
+  type SourceDispatch,
+} from "./core/sources.js";
 export { createPluginManager } from "./core/plugins.js";
 export {
   createErrorBoundaryManager,

@@ -273,7 +273,7 @@ describe("createSourcesManager", () => {
     expect(manager.attachedCount()).toBe(0);
   });
 
-  it("listDefinitions surfaces all registered sources with their moduleId", () => {
+  it("listDefinitions surfaces all registered sources with their moduleId and per-source telemetry", () => {
     const manager = createSourcesManager(
       {
         a: { attach: () => () => undefined, meta: { tag: "first" } },
@@ -282,10 +282,26 @@ describe("createSourcesManager", () => {
       { a: "mod-1", b: "mod-2" },
     );
     const rows = manager.listDefinitions();
-    expect(rows).toEqual([
-      { id: "a", moduleId: "mod-1", meta: { tag: "first" } },
-      { id: "b", moduleId: "mod-2", meta: undefined },
-    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: "a",
+      moduleId: "mod-1",
+      meta: { tag: "first" },
+      attached: false,
+      publishCount: 0,
+      lastPublishAt: null,
+      errorCount: 0,
+      lastError: null,
+      attachedAt: null,
+      detachedAt: null,
+    });
+    expect(rows[1]).toMatchObject({
+      id: "b",
+      moduleId: "mod-2",
+      meta: undefined,
+      attached: false,
+      publishCount: 0,
+    });
   });
 
   it("registerDefinitions adds new sources before start; they attach at start", () => {
@@ -728,7 +744,7 @@ describe("source primitive — observability via system.observe()", () => {
     ]);
   });
 
-  it("system.inspect().sources surfaces the declared sources with attachedSourceCount", () => {
+  it("system.inspect().sources surfaces the declared sources with attachedSourceCount + per-source telemetry", () => {
     const module = createModule("inspected", {
       schema: { facts: { v: t.number() } },
       init: (f) => {
@@ -744,15 +760,33 @@ describe("source primitive — observability via system.observe()", () => {
     const inspection = (
       system as unknown as {
         inspect: () => {
-          sources: Array<{ id: string; moduleId: string }>;
+          sources: Array<{
+            id: string;
+            moduleId: string;
+            attached: boolean;
+            publishCount: number;
+            lastPublishAt: number | null;
+            errorCount: number;
+            lastError: unknown;
+            attachedAt: number | null;
+            detachedAt: number | null;
+          }>;
           attachedSourceCount: number;
         };
       }
     ).inspect();
-    expect(inspection.sources).toEqual([
-      { id: "a", moduleId: "inspected", meta: undefined },
-      { id: "b", moduleId: "inspected", meta: undefined },
-    ]);
+    expect(inspection.sources).toHaveLength(2);
+    for (const row of inspection.sources) {
+      expect(row.moduleId).toBe("inspected");
+      expect(row.attached).toBe(true);
+      expect(row.publishCount).toBe(0);
+      expect(row.lastPublishAt).toBeNull();
+      expect(row.errorCount).toBe(0);
+      expect(row.lastError).toBeNull();
+      expect(typeof row.attachedAt).toBe("number");
+      expect(row.detachedAt).toBeNull();
+    }
+    expect(inspection.sources.map((row) => row.id)).toEqual(["a", "b"]);
     expect(inspection.attachedSourceCount).toBe(2);
     system.stop();
   });
@@ -974,5 +1008,196 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(() =>
       createSystem({ modules: { a: moduleA, b: moduleB } }),
     ).toThrowError(/Definition collision: source "shared"/);
+  });
+
+  // R5 fix: BLOCKED_PROPS check on event names (parity with system.dispatch)
+  it("dispatcher drops publishes whose event names walk the prototype chain", () => {
+    const handler = vi.fn();
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("evil", {
+      schema: {
+        facts: { c: t.number() },
+        events: { OK: {} },
+      },
+      init: (f) => {
+        f.c = 0;
+      },
+      events: {
+        OK: () => handler(),
+      },
+      sources: {
+        attacker: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    expect(capturedRef.current).toBeTypeOf("function");
+    // Each of these should silently no-op rather than dispatch into the engine.
+    capturedRef.current?.("__proto__", { type: "OK" });
+    capturedRef.current?.("constructor", {});
+    capturedRef.current?.("prototype", {});
+    capturedRef.current?.("", {});
+    expect(handler).not.toHaveBeenCalled();
+    // Legitimate publishes still work.
+    capturedRef.current?.("OK", {});
+    expect(handler).toHaveBeenCalledTimes(1);
+    system.destroy();
+  });
+
+  // R5 fix: dispatcher honors !state.isRunning between stop() and the next start()
+  it("publishes between stop() and the next start() silently drop", () => {
+    const handler = vi.fn();
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("paused", {
+      schema: {
+        facts: { c: t.number() },
+        events: { TICK: {} },
+      },
+      init: (f) => {
+        f.c = 0;
+      },
+      events: {
+        TICK: () => handler(),
+      },
+      sources: {
+        leak: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    capturedRef.current?.("TICK", {});
+    expect(handler).toHaveBeenCalledTimes(1);
+    system.stop();
+    // External transport keeps firing the captured publish ref AFTER stop().
+    capturedRef.current?.("TICK", {});
+    capturedRef.current?.("TICK", {});
+    expect(handler).toHaveBeenCalledTimes(1);
+    system.destroy();
+  });
+
+  // R5 fix: per-record detached flag closes the in-flight re-registration race.
+  // Exercised against the manager directly because the engine-level
+  // registerModule path hits a schema collision when the same module id is
+  // re-registered (covered by separate engine tests).
+  it("manager: OLD source's captured publish ref no-ops after re-registration replaces the source", () => {
+    const dispatched: Array<{
+      id: string;
+      moduleId: string;
+      eventName: string;
+    }> = [];
+    const capturedOld: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        racer: {
+          attach: (publish) => {
+            capturedOld.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+      { racer: "mod-1" },
+    );
+    manager.attachAll((id, moduleId, eventName) => {
+      dispatched.push({ id, moduleId, eventName });
+    });
+    // Live publish through the OLD closure reaches the dispatcher.
+    capturedOld.current?.("TICK", undefined);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toEqual({ id: "racer", moduleId: "mod-1", eventName: "TICK" });
+
+    // Re-register the same source id with a different attach impl. The R3
+    // registry swap unsubscribes the old definition; this R5 fix also flips
+    // the per-record `detached` flag so the OLD `perSourcePublish` closure
+    // no-ops even though the external transport still holds a reference.
+    manager.registerDefinitions("mod-2", {
+      racer: { attach: () => () => undefined },
+    });
+
+    // Stale external transport fires the OLD closure — should silently no-op
+    // (the R3 fix unsubscribed the old definition; the R5 detached flag
+    // silences the closure too).
+    capturedOld.current?.("TICK", undefined);
+    capturedOld.current?.("TICK", undefined);
+    expect(dispatched).toHaveLength(1);
+  });
+
+  // R5 fix: Promise-shaped unsubscribe gets a targeted diagnostic.
+  it("returning a Promise from attach() gets a Promise-specific error", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const manager = createSourcesManager({
+        bad: {
+          // biome-ignore lint/suspicious/noExplicitAny: deliberate async attack
+          attach: (async (_publish: SourcePublish) => () => undefined) as any,
+        },
+      });
+      manager.attachAll(() => undefined);
+      expect(errorSpy).toHaveBeenCalled();
+      const recordedError = errorSpy.mock.calls[0]?.[0];
+      const message =
+        recordedError instanceof Error
+          ? recordedError.message
+          : String(recordedError);
+      expect(message).toMatch(/Promise/);
+      expect(message).toMatch(/attach\(\) must be synchronous/);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  // R5 fix: per-source counters track publishCount + lastPublishAt
+  it("per-source counters bump on publish and surface via inspect()", async () => {
+    const handler = vi.fn();
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("counted", {
+      schema: {
+        facts: { c: t.number() },
+        events: { TICK: {} },
+      },
+      init: (f) => {
+        f.c = 0;
+      },
+      events: {
+        TICK: () => handler(),
+      },
+      sources: {
+        timer: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.start();
+    capturedRef.current?.("TICK", {});
+    capturedRef.current?.("TICK", {});
+    capturedRef.current?.("TICK", {});
+    const inspection = (
+      system as unknown as {
+        inspect: () => {
+          sources: Array<{
+            id: string;
+            publishCount: number;
+            lastPublishAt: number | null;
+          }>;
+        };
+      }
+    ).inspect();
+    const timerRow = inspection.sources.find((row) => row.id === "timer");
+    expect(timerRow?.publishCount).toBe(3);
+    expect(typeof timerRow?.lastPublishAt).toBe("number");
+    system.destroy();
   });
 });

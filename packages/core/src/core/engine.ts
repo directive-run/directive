@@ -1593,7 +1593,23 @@ export function createEngine<S extends Schema>(
       // per successful attach), so the static-start path AND the
       // `registerModule` immediate-attach path emit consistently.
       sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
-        if (state.isDestroyed) return;
+        // Guards parity with the system.dispatch path (engine.ts:1692):
+        //   - drop publishes after `system.destroy()` (engine-wide invariant)
+        //   - drop publishes after `system.stop()` and before the next
+        //     `system.start()` — a leaked external transport firing in that
+        //     window would otherwise mutate facts on a stopped system
+        //   - drop publishes whose event name would walk the prototype chain
+        //     (`__proto__`, `constructor`, `prototype`) — mirrors the
+        //     BLOCKED_PROPS check `system.dispatch` already enforces
+        //   - drop empty / non-string event names so log/audit sinks aren't
+        //     forced to render placeholder rows
+        if (state.isDestroyed || !state.isRunning) return;
+        if (
+          typeof eventName !== "string" ||
+          eventName.length === 0 ||
+          BLOCKED_PROPS.has(eventName)
+        )
+          return;
         dispatchEventByName(
           eventName,
           (payload ?? {}) as Record<string, unknown>,
@@ -1881,6 +1897,13 @@ export function createEngine<S extends Schema>(
           id: row.id,
           moduleId: row.moduleId,
           meta: row.meta as DefinitionMeta | undefined,
+          attached: row.attached,
+          attachedAt: row.attachedAt,
+          detachedAt: row.detachedAt,
+          publishCount: row.publishCount,
+          lastPublishAt: row.lastPublishAt,
+          errorCount: row.errorCount,
+          lastError: row.lastError,
         })),
         attachedSourceCount: sourcesManager.attachedCount(),
         derivations: Object.keys(mergedDerive).map((id) => ({
@@ -2565,6 +2588,13 @@ export function createEngine<S extends Schema>(
       // otherwise they queue for the next `attachAll`. Either way the
       // catalogue grows so `system.inspect().sources` reflects them.
       sourcesManager.registerDefinitions(module.id, module.sources);
+      // Surface runtime source registration to plugins so audit-ledger /
+      // observability / devtools record the privilege change. Mirrors the
+      // existing emissions for constraints / resolvers / derivations /
+      // effects in their respective `registerDefinitions` paths.
+      for (const [sourceId, def] of Object.entries(module.sources)) {
+        pluginManager.emitDefinitionRegister("source", sourceId, def);
+      }
     }
     if (module.constraints) {
       for (const def of Object.values(module.constraints)) {

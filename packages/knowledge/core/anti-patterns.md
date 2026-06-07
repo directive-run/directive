@@ -2,7 +2,7 @@
 
 > Covers `@directive-run/core` and `@directive-run/react` — hallucination-prone API patterns to avoid.
 
-19 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
+20 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
 
 ## 1. Unnecessary Type Casting on Facts/Derivations
 

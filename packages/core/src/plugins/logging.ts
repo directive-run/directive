@@ -223,6 +223,25 @@ export function loggingPlugin<M extends ModuleSchema = ModuleSchema>(
       log("error", "effect.error", { id, error });
     },
 
+    onSourceAttach: (id, moduleId) => {
+      log("debug", "source.attach", { id, moduleId });
+    },
+
+    // `debug` level by default: at typical "info"-level logger config the high
+    // publish-rate sources (Supabase realtime, polling timers) would dominate
+    // the log; opt-in via `level: "debug"` for the noisy variant.
+    onSourcePublish: (id, moduleId, eventName) => {
+      log("debug", "source.publish", { id, moduleId, eventName });
+    },
+
+    onSourceDetach: (id, moduleId) => {
+      log("debug", "source.detach", { id, moduleId });
+    },
+
+    onSourceError: (id, moduleId, phase, error) => {
+      log("error", "source.error", { id, moduleId, phase, error });
+    },
+
     onSnapshot: (snapshot) => {
       log("debug", "timetravel.snapshot", {
         id: snapshot.id,
