@@ -110,6 +110,18 @@ export {
   createContentFilterGuardrail,
 } from "../builtin-guardrails.js";
 
+// Fact-store boundary guardrail — closes the source → fact → agent
+// prompt PII bypass. Sits in `createSystem({ plugins: [...] })`, not in
+// the agent orchestrator's input chain, because the bypass happens BEFORE
+// the input guardrails ever run.
+export {
+  createFactPIIGuardrail,
+  type FactPIIGuardrailMode,
+  type FactPIIGuardrailOptions,
+  type FactPIICategory,
+  type FactPIIMatch,
+} from "./fact-pii.js";
+
 // ============================================================================
 // Output Sanitization
 // ============================================================================

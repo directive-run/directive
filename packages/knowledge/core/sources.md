@@ -318,3 +318,5 @@ sources: {
 - `system-api.md` — `system.start()` / `system.stop()` / `system.inspect()` / `system.observe()`.
 - `anti-patterns.md` (#20) — "subscribe inside an effect / useEffect" anti-pattern; prefer sources.
 - `naming.md` — canonical-term entry for `sources` + cross-paradigm aliases (RxJS Observable, DOM EventTarget, XState callback actor, Supabase realtime).
+- [`../ai/ai-sources.md`](../ai/ai-sources.md) — AI integration: `runStream({ liveContext })`, MCP lifecycle as a source, the `@directive-run/sources/*` adapter subpaths.
+- [`../ai/ai-security.md`](../ai/ai-security.md#sources-pii--closing-the-fact-injection-bypass) — `createFactPIIGuardrail`: closes the source → fact → agent-prompt PII bypass. Wire whenever sources publish into facts the agent reads.
