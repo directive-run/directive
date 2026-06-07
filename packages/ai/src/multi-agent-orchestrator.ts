@@ -2622,6 +2622,12 @@ export function createMultiAgentOrchestrator(
         abort: () => {
           taskAbortController.abort();
         },
+        // RFC 0005: multi-agent task streams don't carry liveContext
+        // bindings of their own — interruption maps to abort here.
+        // Single-agent runStream is where liveContext lives.
+        interrupt: () => {
+          taskAbortController.abort();
+        },
       } as OrchestratorStreamResult<T>;
     }
 
@@ -2784,6 +2790,13 @@ export function createMultiAgentOrchestrator(
       stream,
       result: resultPromise,
       abort: () => {
+        abortController.abort();
+        closeStream();
+      },
+      // RFC 0005: multi-agent delegate streams don't bind liveContext
+      // — interruption maps to abort. Single-agent runStream is the
+      // surface where liveContext lives.
+      interrupt: () => {
         abortController.abort();
         closeStream();
       },
