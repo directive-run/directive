@@ -282,6 +282,11 @@ export interface FactPIIGuardrailOptions {
    *
    * Maximum is `5` to prevent pathological recursion on cyclic
    * structures. Passing anything higher clamps to `5`.
+   *
+   * Property iteration uses `Object.entries`, which skips
+   * Symbol-keyed properties and non-enumerable string keys. If you
+   * store PII under a Symbol key (unusual), a `customDetector` is the
+   * right escape hatch.
    */
   walkDepth?: number;
 }
