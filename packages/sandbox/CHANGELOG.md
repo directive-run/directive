@@ -1,5 +1,63 @@
 # @directive-run/sandbox
 
+## 0.3.1
+
+### Patch Changes
+
+- [`039f8c0`](https://github.com/directive-run/directive/commit/039f8c0d2138ac483f4e40b46a8882552a94a8f4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Resolve the worker entry via a static `new URL("./worker.js", import.meta.url)` reference before falling back to `createRequire().resolve()`. Bundlers (Next.js `outputFileTracing`, esbuild, webpack) follow static URL references at build time and now include `worker.js` in the output bundle automatically — fixing "Cannot find module worker.js" 500s on Vercel, AWS Lambda, and Cloud Run without any consumer-side config. The fallback path preserves Vitest dev-mode resolution where `import.meta.url` points at the `.ts` source.
+
+## 0.3.0
+
+### Minor Changes
+
+- [`4237df7`](https://github.com/directive-run/directive/commit/4237df771965e29f7f4eec3005d35811cc6d0fbc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Close the remaining 4 P0s from the Phase A AE audit (`docs/AE-AUDIT-SANDBOX.md`). With the v0.3.0 property-access bypass already closed, this release lands the SSRF defense, Vercel-compatible temp-file location, facts-proxy console serialization, and derivations in the snapshot.
+
+  - **P0-A1 — Temp-file location works on Vercel read-only FS.** Bundle now writes to `os.tmpdir()` (with a fallback to the package dir if `/tmp` is somehow unwritable). Bundler rewrites `@directive-run/*` imports to absolute `file://` URLs via `createRequire(...).resolve()` so the worker doesn't need a `node_modules` chain above the temp file. Unblocks `directive.run/api/run-sandbox` and any other deploy target with a read-only filesystem outside `/tmp`.
+  - **P0-S2 — SSRF wrapper.** New `installFetchWrapper()` patches `globalThis.fetch` in the worker BEFORE the user's bundle imports anything. Rejects loopback (127.0.0.0/8, `::1`, `localhost`), link-local (169.254.0.0/16 — includes AWS/GCP/Azure IMDS at `.169.254`), RFC-1918 private (10/8, 172.16-31/12, 192.168/16), multicast / reserved, IPv4-mapped IPv6 in literal or hex form (`::ffff:a9fe:a9fe`), and non-HTTP(S) protocols. Catches `@directive-run/query`'s internal fetch calls — the validator never saw them because they live in external module bodies.
+  - **P0-DM1 — `console.log(system.facts)` no longer renders `{}`.** Worker's `captureConsole` now detects Directive's facts proxy via the `$store.toObject()` and `$snapshot()` escape hatches, serializes via the snapshot, falls back to `JSON.stringify` for non-Directive values. Pre-fix, `console.log("[start] facts:", system.facts)` rendered as `[start] facts: {}` because `JSON.stringify` on the FactsStore proxy returned `"{}"` while `result.facts` correctly held the snapshot — two contradictory views in the same response.
+  - **P0-DM2 — Derivations in `SandboxResult.derived`.** Host pre-extracts derivation key names from source files via a brace/paren-balanced scanner that handles both multi-line and compact `derive: { isPositive: ... }` forms. Worker iterates `system.derive[key]` after settle for each key. Modules whose primary product is a derivation (`status`, `isReady`, `total`, etc.) now surface the computed value alongside facts.
+
+  New unit suites at `__tests__/fetch-wrapper.test.ts` (18 cases — protocols, IPv4 ranges, IPv6 ranges, localhost variants) and `__tests__/key-extractor.test.ts` (8 cases — multi-line, single-line, multi-file dedupe, quoted-key tolerance). Extended `__tests__/run-in-sandbox.test.ts` with end-to-end derivation + facts-proxy verification.
+
+  **Remaining P0:** P0-S3 (Origin allowlist + per-IP rate limit on `/api/run-sandbox`) lives in the `directive-docs` repo; that commit ships alongside this release.
+
+## 0.2.0
+
+### Minor Changes
+
+- [`51f721e`](https://github.com/directive-run/directive/commit/51f721eefc265d5f5d97120c6976556c39595d1c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Widen the AST allowlist validator from the initial `@directive-run/{core,ai,query}` set to every consumer-safe `@directive-run/*` package, with an explicit denylist for build / CLI / sandbox-meta tooling.
+
+  - **Allowed (16):** `core`, `ai`, `query`, `react`, `vue`, `svelte`, `solid`, `lit`, `el`, `optimistic`, `timeline`, `mutator`, `knowledge`, `scaffold`, `claude-plugin`, `lint` — anything an end-user Directive demo realistically composes from.
+  - **Denied (4):** `cli` (uses `process.argv` + `fs.write`), `mcp` (speaks MCP over stdio, would let a sandboxed snippet open a transport), `sandbox` (sandbox-in-sandbox), `vite-plugin-api-proxy` (build tooling). Each gets a clear rejection message distinguishing "denied" from "not in allowlist."
+  - Subpath imports like `@directive-run/ai/openai` and `@directive-run/react/hooks` are honored — the validator extracts the package segment before checking the allowlist.
+  - Bundler's `external` list switched from the explicit three-package enumeration to a wildcard `@directive-run/*` so any allowlisted package resolves at worker runtime against the worker's `node_modules`.
+  - 22 new validator tests covering each allowlisted package, subpath import handling, each denied package, and `@sizls/*` rejection (no current scope).
+
+  No runtime-behavior change for snippets that were already passing (the v0.1.0 set is a subset of v0.2.0's). The strict-by-default rule documented in `validator.ts` was always "expand on real failures"; this is the first deliberate expansion.
+
+- [`9801112`](https://github.com/directive-run/directive/commit/980111207191e013eb127f4e01349bd0aecc2115) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Security hotfix.** Closes critical AST property-access bypass in `@directive-run/sandbox@0.1.0` and `@0.2.0` where `globalThis.process.exit()`, `Reflect.get(globalThis, "process")`, and `({}).constructor.constructor("return process")()` all bypassed the validator. The original "skip identifiers in property-access position" rule (added to avoid `{module: x}` false-positives) was a total bypass — `process` was a property name and got skipped. v0.3.0 closes this with a dedicated `checkPropertyAccessEscapes` pass.
+
+  Full Phase A AE audit at `docs/AE-AUDIT-SANDBOX.md` (5 lenses: security, architecture, agent-UX, DX, domain-correctness). This release ships the P0-S1 (property-access bypass) + P0-D1 (tool description misdocumented allowlist) fixes; P0-S2/S3 (SSRF, rate-limiting on `/api/run-sandbox`) and the remaining P1/P2 items are tracked for follow-on minors.
+
+  **v0.3.0 validator additions:**
+
+  - Rejects `globalThis.process` / `globalThis.fetch` / `globalThis.Buffer` / `globalThis.setTimeout` etc. — any property-access whose `.name` matches a denied identifier.
+  - Rejects `.constructor` access on any value — closes the `({}).constructor.constructor("...")()` Function-constructor smuggle.
+  - Rejects `Function(...)` call expression (in addition to the existing `new Function(...)` denial).
+  - Rejects `globalThis["X"]` bracket access with a string literal — including allowlisted names, since there's no legitimate bracket-access use.
+  - Rejects bracket access with a denied-name string literal on any value.
+  - Rejects `Reflect.get(globalThis, "X")` / `Reflect.has(globalThis, "X")` / `Object.getOwnPropertyDescriptor(globalThis, "X")` when X is a denied name or `constructor`.
+  - Legitimate property keys in object literals (`createSystem({ module: counter })`) and Directive system surface (`system.events.foo`, `system.facts.count`) still permitted.
+
+  **`@directive-run/mcp@0.5.1` (patch):**
+
+  - Tool description for `run_in_sandbox` rewritten with the full 16-package allowlist (was incorrectly documented as `@directive-run/{core,ai,query}` in v0.5.0).
+  - Decoding-errors section so the LLM knows how to distinguish validation / bundle / runtime / timeout failure modes.
+  - Note about react/vue/svelte/solid/lit imports working but their runtime hooks throwing in Node — directs the LLM to `playground_link` for UI demos.
+  - README Playground section updated with the same allowlist.
+
+  **Audit lens grades (Phase A):** Security D → A (after this patch), Architecture B+, Agent-UX B-, DX B-, Domain-Correctness C+. Remaining grades will be addressed in Phase A-2 and Phase B per the audit doc's incident-response priorities.
+
 ## 0.1.0
 
 ### Minor Changes

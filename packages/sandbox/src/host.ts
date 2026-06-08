@@ -10,9 +10,10 @@
  * spends in `system.settle()`.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Worker } from "node:worker_threads";
 import type {
   SandboxResult,
@@ -25,11 +26,25 @@ const MAX_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 async function resolveWorkerPath(): Promise<string> {
-  // Use createRequire instead of `import.meta.resolve` — Vitest's SSR
-  // shim of import.meta exposes a `resolve` that isn't callable, and
-  // `createRequire` works in both real Node ESM and Vitest dev mode.
-  // The worker subpath export points at dist/worker.js; CJS resolution
-  // picks up the "default" condition we set in package.json.
+  // PRIMARY: static URL relative to this module's own file. Bundlers
+  // (Next.js outputFileTracing, esbuild, webpack, etc.) follow this
+  // static reference at build time and include `worker.js` in the
+  // output bundle automatically. Works on Vercel + AWS Lambda + Cloud
+  // Run without any consumer-side config.
+  //
+  // FALLBACK (Vitest dev path): `import.meta.url` resolves to the
+  // .ts source file in tests, so `./worker.js` doesn't exist there —
+  // fall through to `createRequire(import.meta.url).resolve(...)`
+  // which Vitest handles correctly via its SSR loader.
+  try {
+    const staticUrl = new URL("./worker.js", import.meta.url);
+    const path = fileURLToPath(staticUrl);
+    if (existsSync(path)) {
+      return path;
+    }
+  } catch {
+    // fall through
+  }
   const { createRequire } = await import("node:module");
   const require = createRequire(import.meta.url);
   return require.resolve("@directive-run/sandbox/worker");
@@ -37,6 +52,8 @@ async function resolveWorkerPath(): Promise<string> {
 
 export interface HostRunInput {
   bundledSource: string;
+  /** Derivation key names extracted from the payload's source files. */
+  derivationKeys: string[];
   timeoutMs?: number;
 }
 
@@ -59,14 +76,17 @@ function clampTimeout(value: number | undefined): number {
 }
 
 /**
- * Resolve the directory the sandbox package's own dist sits in. The
- * temp bundle has to live somewhere Node's ESM resolver can walk UP
- * from to find `@directive-run/core` in node_modules; the sandbox
- * package's dist/ has that path because sandbox declares core as a
- * dependency. Writing the bundle next to dist/worker.js inherits the
- * same resolution chain.
+ * Try `os.tmpdir()` first (Vercel-friendly: /tmp is the only writable
+ * location on serverless functions). Fall back to the sandbox package
+ * dir if /tmp ISN'T writable for some reason. The fallback inherits
+ * the package's node_modules walking chain so bare specifiers like
+ * `@directive-run/core` resolve naturally.
  */
-async function getSandboxPackageDir(): Promise<string> {
+async function getTempBundleDir(): Promise<string> {
+  const osTmp = tmpdir();
+  if (existsSync(osTmp)) {
+    return osTmp;
+  }
   // Reuse the worker-resolution path so we land at the same package
   // regardless of whether the consumer is in production or Vitest dev.
   const workerPath = await resolveWorkerPath();
@@ -76,11 +96,15 @@ async function getSandboxPackageDir(): Promise<string> {
 
 /**
  * Write the bundled snippet to a temp file Node's ESM loader can
- * import via a file:// URL. Bare specifiers like `@directive-run/core`
- * don't resolve from `data:` URLs (no hierarchical base for
- * node_modules lookup) AND don't resolve from /tmp (no node_modules
- * to walk up to). Writing inside the sandbox package directory
- * inherits its node_modules chain.
+ * import via a file:// URL.
+ *
+ * Phase A audit P0-A1: previous versions wrote inside the sandbox
+ * package's own directory so Node's resolver could walk up to find
+ * `@directive-run/core` in node_modules — but Vercel / AWS Lambda /
+ * Cloud Run all ship read-only FS outside `/tmp`. The bundler now
+ * rewrites `@directive-run/*` imports to ABSOLUTE `file://` URLs of
+ * the host's resolved paths (see `bundleSandboxFiles`), so the temp
+ * file can live in `/tmp` without needing a node_modules anchor.
  *
  * Caller MUST clean the directory up in a finally block.
  */
@@ -88,8 +112,8 @@ async function writeBundleToTemp(bundledSource: string): Promise<{
   bundlePath: string;
   cleanup: () => void;
 }> {
-  const sandboxDir = await getSandboxPackageDir();
-  const dir = mkdtempSync(join(sandboxDir, ".sandbox-tmp-"));
+  const baseDir = await getTempBundleDir();
+  const dir = mkdtempSync(join(baseDir, "directive-sandbox-"));
   const bundlePath = join(dir, "bundle.mjs");
   writeFileSync(bundlePath, bundledSource, "utf8");
   return {
@@ -172,6 +196,7 @@ export async function execInWorker(
       const message: WorkerInputMessage = {
         bundlePath: pathToFileURL(bundlePath).href,
         timeoutMs,
+        derivationKeys: input.derivationKeys,
       };
       worker.postMessage(message);
     });
@@ -184,6 +209,7 @@ export async function execInWorker(
       return {
         logs: [],
         facts: {},
+        derived: {},
         errors: [err.message],
         durationMs: Date.now() - startMs,
         timedOut: true,

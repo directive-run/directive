@@ -17,6 +17,7 @@
 
 import { BundleError, bundleSandboxFiles } from "./bundler.js";
 import { WorkerExecError, execInWorker } from "./host.js";
+import { extractDerivationKeys } from "./key-extractor.js";
 import { SandboxError } from "./types.js";
 import type {
   PlaygroundFile,
@@ -106,6 +107,7 @@ export async function runInSandbox(
       return {
         logs: [],
         facts: {},
+        derived: {},
         errors: [err.message],
         durationMs: 0,
         timedOut: false,
@@ -119,6 +121,7 @@ export async function runInSandbox(
     return {
       logs: [],
       facts: {},
+      derived: {},
       errors: validationErrors.map(
         (e) => `${e.path}:${e.line}:${e.column} — ${e.message}`,
       ),
@@ -126,6 +129,11 @@ export async function runInSandbox(
       timedOut: false,
     };
   }
+
+  // Phase A audit P0-DM2: pre-extract derivation key names from the
+  // source files so the worker can iterate them after settle. The
+  // `system.derive` proxy has no `ownKeys` trap.
+  const derivationKeys = extractDerivationKeys(files);
 
   let bundled: { source: string; bytes: number };
   try {
@@ -135,6 +143,7 @@ export async function runInSandbox(
       return {
         logs: [],
         facts: {},
+        derived: {},
         errors: [err.message],
         durationMs: 0,
         timedOut: false,
@@ -146,6 +155,7 @@ export async function runInSandbox(
   try {
     const result = await execInWorker({
       bundledSource: bundled.source,
+      derivationKeys,
       timeoutMs: input.timeoutMs,
     });
     return result;
@@ -154,6 +164,7 @@ export async function runInSandbox(
       return {
         logs: [],
         facts: {},
+        derived: {},
         errors: [err.message],
         durationMs: 0,
         timedOut: err.code === "timeout",

@@ -41,6 +41,16 @@ export interface SandboxResult {
    */
   facts: Record<string, unknown>;
   /**
+   * Final `system.derive` snapshot — every derivation declared in the
+   * module config, evaluated by reading `system.derive[key]`. Empty
+   * when the module has no `derive:` block or when validation rejected
+   * before bundle. The Phase A AE audit (P0-DM2) flagged the original
+   * sandbox for snapshotting only facts; modules whose primary product
+   * is a derivation (`status`, `isReady`, etc.) returned an empty-
+   * looking transcript.
+   */
+  derived: Record<string, unknown>;
+  /**
    * Structured error messages from validation, bundling, or runtime
    * exceptions. Empty on a clean run.
    */
@@ -79,6 +89,14 @@ export interface WorkerInputMessage {
   /** `file://` URL of the temp .mjs bundle the host wrote. */
   bundlePath: string;
   timeoutMs: number;
+  /**
+   * Derivation key names the host extracted from the source files.
+   * `system.derive` is a Proxy with no `ownKeys` trap, so we can't
+   * enumerate from the worker; the host's pre-bundle pass scans the
+   * source for `derive:` and `derivations:` blocks and forwards the
+   * keys here. Worker reads `system.derive[key]` for each.
+   */
+  derivationKeys: string[];
 }
 
 /** Wire shape for messages from worker → host. */

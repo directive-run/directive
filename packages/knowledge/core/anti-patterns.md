@@ -357,48 +357,55 @@ const system = createSystem({
 });
 ```
 
-## 20. Hand-Rolling a Subscription Instead of Declaring a `source`
+## 20. Hand-Rolled External Subscriptions Inside React/`useEffect`
 
-When wrapping an external event stream (Supabase realtime, WebSocket, polling timer, browser listener) into a Directive system, do NOT write a React `useEffect` that owns the subscription and dispatches `sys.events.X()` from the callback — declare a `source` on the module instead. The lifecycle is engine-owned; the hook collapses to `useFact` reads.
+When wrapping an external event stream (Supabase realtime, WebSocket, polling timer, browser listener) into a Directive system, do NOT write a React `useEffect` that owns the subscription and dispatches `sys.events.X()` from the callback — declare a `source` on the module instead. The runtime owns the mount / unmount lifecycle and observability. The component collapses to fact reads.
 
 ```typescript
-// WRONG – hand-rolled subscription as useEffect with manual dispatch
-function useGameUpdates(gameId: string) {
-  const sys = useMemo(() => createSystem({ module }), []);
+// WRONG – subscription lives in component code; module never knows about it.
+// On every remount you get duplicate channels; on unmount you can leak.
+function Game({ system, gameId }: Props) {
   useEffect(() => {
-    const ch = supabase.channel(`game:${gameId}`).on(
-      "postgres_changes", { /* ... */ },
-      (p) => sys.events.REALTIME_UPDATE({ payload: p.new }),
-    ).subscribe();
-    return () => ch.unsubscribe();
-  }, [gameId, sys]);
-  return useFact(sys, "gameState");
+    const ch = supabase
+      .channel(`game:${gameId}`)
+      .on('postgres_changes', { event: 'UPDATE', table: 'games' }, (payload) => {
+        system.events.realtimeUpdate({ snapshot: mapRow(payload.new) });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [gameId]);
+  return <Board snapshot={useFact(system, 'snapshot')} />;
 }
 
-// CORRECT – declare a source on the module; the engine owns the lifecycle
-const gameUpdateModule = createModule("gameUpdate", {
-  schema: { facts: { gameState: t.object<GameState>().nullable() } },
-  events: {
-    REALTIME_UPDATE: (f, p) => { f.gameState = p.payload; },
+// CORRECT – declare a `source` on the module. The runtime owns the
+// mount / unmount lifecycle and observability. The component collapses
+// to fact reads.
+const gameModule = createModule('game', {
+  schema: {
+    facts: { snapshot: t.object<GameSnapshot>().nullable() },
+    events: { realtimeUpdate: { snapshot: t.object<GameSnapshot>() } },
   },
   sources: {
-    updates: {
-      attach: (publish) => deps.subscribeToGameUpdates(
-        (payload) => publish("REALTIME_UPDATE", { payload })
-      ),
+    realtime: {
+      attach: (publish) => {
+        const ch = supabase
+          .channel(`game:${gameId}`)
+          .on('postgres_changes', { event: 'UPDATE', table: 'games' },
+            (p) => publish('realtimeUpdate', { snapshot: mapRow(p.new) }))
+          .subscribe();
+        return () => { supabase.removeChannel(ch); };
+      },
     },
   },
+  on: { realtimeUpdate: (f, p) => { f.snapshot = p.snapshot; } },
 });
-
-function useGameUpdates() {
-  const sys = useMemo(() => createSystem({ module: gameUpdateModule }), []);
-  return useFact(sys, "gameState");  // ← that's the entire hook now
-}
 ```
 
 **Why:** the hook-as-bridge pattern duplicates lifecycle code at every call site. Cleanup correctness drifts. `system.observe()` can't see the subscription. With a `source`, the engine attaches at `start()`, detaches at `stop()`, isolates failures, and emits `source.attach` / `.publish` / `.detach` / `.error` observation events for plugins.
 
-**Don't subscribe in both an effect AND a source on the same channel** — the effect re-runs on fact changes, the source mounts once, you'll get 2× messages with silent duplicates. Pick one. See `sources.md` for the full guidance.
+**Don't subscribe in both an effect AND a source on the same channel** — the effect re-runs on fact changes, the source mounts once, you'll get 2× messages with silent duplicates. Pick one.
+
+See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
 
 ## 21. Abbreviating Type Names (`*Def` instead of `*Definition`)
 
@@ -455,10 +462,12 @@ Before generating any Directive code, verify:
 8. Multi-module uses `facts.self.*` for own facts
 9. Imports from `@directive-run/core`, not deep paths
 10. `await system.settle()` after `system.start()`
+11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
 
 ## See also
 
 - [`naming.md`](./naming.md) — the strict canonical-term rules AND the alias map for cross-paradigm searches
+- [`sources.md`](./sources.md) — the source primitive (the right answer for #20)
 - [`constraints.md`](./constraints.md) — the constraint shape these anti-patterns reference (`facts` not in scope inside static `require:`, etc.)
 - [`resolvers.md`](./resolvers.md) — the resolver shape these anti-patterns reference (return `void`, mutate `context.facts`, `(req, context)` not `(req, ctx)`)
 - [`schema-types.md`](./schema-types.md) — the `t.*()` builders that exist and the hallucinated ones (`t.map`, `t.set`, `t.promise`, `t.date`) that don't
