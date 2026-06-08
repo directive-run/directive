@@ -33,6 +33,7 @@ import type {
   ModuleSchema,
   RequirementsSchema,
 } from "./schema.js";
+import type { SourcesDef } from "./sources.js";
 import type { System } from "./system.js";
 
 // ============================================================================
@@ -502,6 +503,15 @@ export interface ModuleDef<M extends ModuleSchema = ModuleSchema> {
   derive?: TypedDerivationsDef<M>;
   events?: TypedEventsDef<M>;
   effects?: EffectsDef<M["facts"]>;
+  /**
+   * Typed external event sources. See {@link SourceDef} for the primitive's
+   * lifecycle + rationale. Each source attaches at `system.start()` and
+   * tears down at `system.stop()`. Use for Supabase realtime channels,
+   * WebSocket message streams, polling timers, browser event listeners —
+   * any inbound external event the module needs to map into its own event
+   * dispatch surface.
+   */
+  sources?: SourcesDef;
   constraints?: TypedConstraintsDef<M>;
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;

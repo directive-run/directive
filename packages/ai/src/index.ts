@@ -806,3 +806,12 @@ export {
   type SpanData,
   type OtelPlugin,
 } from "./otel.js";
+
+// Source primitive × OpenTelemetry — pipe core `system.observe()` source.*
+// events into the same OtelTracer the AI plugin uses, so SREs can answer
+// "which source is publishing?" / "did source mcp error attach?" from
+// their tracing backend.
+export {
+  attachSourcesToOtel,
+  type SourcesOtelOptions,
+} from "./otel-sources.js";

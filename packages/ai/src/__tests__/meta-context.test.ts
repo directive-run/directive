@@ -18,6 +18,8 @@ function makeInspection(
     resolvers: {},
     resolverDefs: [],
     effects: [],
+    sources: [],
+    attachedSourceCount: 0,
     derivations: [],
     modules: [],
     traceEnabled: false,

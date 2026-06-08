@@ -182,6 +182,34 @@ inspection.derivations; // [{ id: "doubled", meta: { ... } }]
 inspection.modules;     // [{ id: "auth", meta: { ... } }]
 inspection.events;      // [{ name: "increment", meta: { ... } }]
 
+// Sources with per-source telemetry. Operators read these to answer
+// "is this source publishing?" / "did it error?" / "is the engine
+// silently dropping its publishes?" without registering a custom
+// plugin. Counters reset at every system.start() cycle.
+inspection.sources;
+// [{
+//   id: "supabaseRealtime",
+//   moduleId: "messages",
+//   attached: true,
+//   attachedAt: 1709000000,
+//   detachedAt: null,
+//   publishCount: 47,
+//   lastPublishAt: 1709000123,
+//   // dropCount counts publishes the engine's dispatch guard rejected
+//   // (post-stop, BLOCKED_PROPS event name, empty / non-string name).
+//   dropCount: 0,
+//   lastDropReason: null,        // | "post-destroy" | "post-stop"
+//                                 // | "blocked-event-name"
+//                                 // | "invalid-event-name"
+//   lastDropAt: null,
+//   errorCount: 0,
+//   lastError: null,             // { phase, message (truncated), at } | null
+//   meta: { label: "Supabase channel" },
+// }]
+
+// Aggregate — number of sources currently attached (== count of `attached: true` rows).
+inspection.attachedSourceCount;  // 3
+
 // Unmet requirements (no matching resolver)
 inspection.unmet;
 
@@ -242,8 +270,10 @@ const unsub = system.observe((event: ObservationEvent) => {
   if (event.type === "fact.change") console.log(event.key, event.prev, "→", event.next);
 });
 
-// 18 event types: fact.change, constraint.evaluate/error, requirement.created/met/canceled,
-// resolver.start/complete/error, effect.run/error, derivation.compute,
+// 23 event types: fact.change, constraint.evaluate/error,
+// requirement.created/met/canceled, resolver.start/complete/error/write.rejected,
+// effect.run/error, derivation.compute,
+// source.attach/publish/detach/error,
 // reconcile.start/end, system.init/start/stop/destroy
 
 unsub(); // Stop observing

@@ -356,11 +356,38 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       case "system.destroy":
         emit({ kind: event.type });
         break;
+      case "source.attach":
+      case "source.detach":
+        // Source attach/detach captures the privilege-change posture:
+        // a runtime-registered source is a new ingestion endpoint, an
+        // attach/detach pair bounds the period during which fact mutations
+        // could have originated from this source. `source.publish` is
+        // DELIBERATELY NOT captured — high-volume sources would blow up
+        // the ledger; the resulting fact.change entries already encode the
+        // outcome and remain queryable.
+        emit({
+          kind: event.type,
+          sourceId: event.id,
+          moduleId: event.moduleId,
+        });
+        break;
+      case "source.error":
+        emit({
+          kind: "source.error",
+          sourceId: event.id,
+          moduleId: event.moduleId,
+          phase: event.phase,
+          error:
+            event.error instanceof Error
+              ? event.error.message
+              : String(event.error),
+        });
+        break;
       default:
         // Other observation events ignored in v1 (derivation.compute,
         // requirement.created/met/canceled, effect.run/error,
-        // reconcile.start/end). They're available via .observe()
-        // directly if a consumer wants them.
+        // reconcile.start/end, source.publish). They're available via
+        // .observe() directly if a consumer wants them.
         break;
     }
   }

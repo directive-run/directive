@@ -281,6 +281,10 @@ const KIND_COLORS: Record<string, keyof typeof ANSI> = {
   "system.start": "dim",
   "system.stop": "dim",
   "system.destroy": "dim",
+  "source.attach": "magenta",
+  "source.publish": "cyan",
+  "source.detach": "magenta",
+  "source.error": "red",
 };
 
 /**
@@ -396,6 +400,14 @@ function formatEventDetail(
       return `${event.id} → ${preview(event.value, previewLen)}`;
     case "reconcile.end":
       return `(${event.resolversCompleted} completed${event.resolversCanceled > 0 ? `, ${event.resolversCanceled} canceled` : ""})`;
+    case "source.attach":
+      return `${c("bold", event.moduleId)}.${event.id}`;
+    case "source.publish":
+      return `${c("bold", event.moduleId)}.${event.id} → ${event.eventName}`;
+    case "source.detach":
+      return `${c("bold", event.moduleId)}.${event.id}`;
+    case "source.error":
+      return `${c("bold", event.moduleId)}.${event.id} [${event.phase}]: ${formatError(event.error)}`;
     default:
       return "";
   }

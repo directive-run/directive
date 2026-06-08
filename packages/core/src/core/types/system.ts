@@ -287,6 +287,84 @@ export interface SystemInspection {
   }>;
   /** All defined effect names with optional metadata */
   effects: Array<{ id: string; meta?: DefinitionMeta }>;
+  /**
+   * All declared source names with the module that owns each, plus per-source
+   * telemetry surfaced for production-debug ("which source is publishing?",
+   * "when did this source last fire?", "is this source errored?", "is the
+   * engine silently dropping publishes from this source?") without requiring
+   * a custom plugin to be installed first.
+   *
+   * Counters reset at every `system.start()` cycle — a stop → start does not
+   * carry "ghost" counts from the previous cycle. Timestamps are wall-clock
+   * milliseconds (Date.now()); `null` means "never happened in this cycle".
+   *
+   * `dropCount` / `lastDropReason` / `lastDropAt` count publishes the
+   * engine's dispatch guard rejected (post-stop, BLOCKED_PROPS event name,
+   * empty / non-string event name). Without these, attackers — or a buggy
+   * source — could probe BLOCKED_PROPS / the isRunning guard invisibly:
+   * telemetry would never advance and no plugin hook would fire.
+   *
+   * `attachedSourceCount` (below) is the aggregate count of `attached: true`
+   * rows; both must stay in lockstep.
+   */
+  sources: Array<{
+    id: string;
+    moduleId: string;
+    meta?: DefinitionMeta;
+    /** True while the source's attach succeeded and its unsubscribe is held. */
+    attached: boolean;
+    /** Wall-clock ms when the source most recently attached, or null. */
+    attachedAt: number | null;
+    /** Wall-clock ms when the source most recently detached, or null. */
+    detachedAt: number | null;
+    /** Total publish() invocations the engine accepted since the last attachAll. */
+    publishCount: number;
+    /** Wall-clock ms of the most recent accepted publish() call, or null. */
+    lastPublishAt: number | null;
+    /**
+     * Total publish() invocations the engine's dispatch guard rejected this
+     * cycle. Operators monitor this to spot misconfigured sources (wrong
+     * event names) or probing of the BLOCKED_PROPS / isRunning guards.
+     */
+    dropCount: number;
+    /**
+     * Reason for the most recent rejected publish, or `null`.
+     * - `"post-destroy"` / `"post-stop"` — leaked transport firing
+     *   outside the running lifecycle window
+     * - `"blocked-event-name"` / `"invalid-event-name"` — engine
+     *   dispatch guard rejected the publish (BLOCKED_PROPS / empty)
+     * - `"coalesced"` — manager debounced a same-event-name publish
+     *   when `SourceDef.coalesce === "lastWriteWins"`
+     */
+    lastDropReason:
+      | "post-destroy"
+      | "post-stop"
+      | "blocked-event-name"
+      | "invalid-event-name"
+      | "coalesced"
+      | null;
+    /** Wall-clock ms of the most recent rejected publish, or `null`. */
+    lastDropAt: number | null;
+    /** Total attach + cleanup errors since the last attachAll. */
+    errorCount: number;
+    /**
+     * The most recent error from this source, or `null`. `message` is
+     * truncated to a fixed maximum length so a source whose `attach()`
+     * throws with a payload-embedded message does not write unbounded data
+     * here AND downstream into the audit ledger. `phase: "runtime"`
+     * (RFC 0008) flags errors that the source reported mid-flight via
+     * the `reportError` callback `attach` receives as its second
+     * argument (distinct from lifecycle `"attach"` / `"cleanup"`
+     * failures).
+     */
+    lastError: {
+      phase: "attach" | "cleanup" | "runtime";
+      message: string;
+      at: number;
+    } | null;
+  }>;
+  /** Number of sources currently attached (i.e. system is in the `attached` phase + their attach() succeeded). */
+  attachedSourceCount: number;
   /** All defined derivation names with optional metadata */
   derivations: Array<{ id: string; meta?: DefinitionMeta }>;
   /** All registered modules with optional metadata */
@@ -751,6 +829,40 @@ export type ObservationEvent =
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
+  /**
+   * Source attached at `system.start()` (or at registerModule when the
+   * system was already running). Carries the source id + the module that
+   * declared it so plugins can attribute per-module sources.
+   */
+  | { type: "source.attach"; id: string; moduleId: string }
+  /**
+   * A source published an event into the system's event queue. Fires
+   * BEFORE the event handler runs; pair with `fact.change` events to
+   * trace the downstream effect.
+   */
+  | {
+      type: "source.publish";
+      id: string;
+      moduleId: string;
+      eventName: string;
+    }
+  /** Source detached at `system.stop()` (reverse-registration order). */
+  | { type: "source.detach"; id: string; moduleId: string }
+  /**
+   * Source `attach` / unsubscribe threw, OR the source called the
+   * `reportError` callback that `attach` received as its second
+   * argument (RFC 0008) — handled, isolated, observable.
+   * `phase: "runtime"` distinguishes mid-flight stream errors
+   * (WebSocket disconnect, Supabase channel goes stale) from lifecycle
+   * `"attach"` / `"cleanup"` failures so observers attribute correctly.
+   */
+  | {
+      type: "source.error";
+      id: string;
+      moduleId: string;
+      phase: "attach" | "cleanup" | "runtime";
+      error: unknown;
+    }
   | { type: "derivation.compute"; id: string; value: unknown }
   | { type: "reconcile.start" }
   | {
@@ -777,6 +889,23 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * Observe all lifecycle events as a typed stream.
    * Returns an unsubscribe function.
    *
+   * ## Timing semantics
+   *
+   * Observers receive events that fire **from the moment they subscribe
+   * onwards**. Past events are NOT replayed. Consequences:
+   *
+   * - An observer registered BEFORE `system.start()` sees the initial
+   *   `system.start`, `source.attach`, etc. events emitted during start.
+   * - An observer registered AFTER `system.start()` does NOT see those
+   *   initial events. To reconstruct the current state, use
+   *   `system.inspect()` (`facts`, `sources`, `constraints`, etc.) at
+   *   subscription time, then layer the live observer stream on top.
+   * - The unsubscribe function is idempotent — calling it more than once
+   *   is safe.
+   *
+   * This mirrors RxJS Subject + DOM EventTarget conventions; there is no
+   * hidden replay buffer.
+   *
    * @example
    * ```typescript
    * const unsub = system.observe((event) => {
@@ -784,6 +913,13 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    *     console.log(event.resolver, event.duration);
    *   }
    * });
+   * ```
+   *
+   * @example Reconstructing state on late subscription
+   * ```typescript
+   * const snapshot = system.inspect();
+   * console.log('active sources:', snapshot.attachedSourceCount);
+   * const unsub = system.observe((event) => { ... }); // forward-only
    * ```
    */
   observe(observer: (event: ObservationEvent) => void): () => void;
@@ -795,6 +931,35 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
   start(): void;
   stop(): void;
   destroy(): void;
+  /**
+   * RFC 0009: async-aware variant of `stop()`. Awaits each source's
+   * unsubscribe before resolving. Use when sources have async
+   * unsubscribes (Supabase `channel.unsubscribe()`, Cloudflare DO
+   * storage flushes) and the caller needs to know teardown actually
+   * completed before continuing.
+   */
+  stopAsync(): Promise<void>;
+  /**
+   * RFC 0009: async-aware variant of `destroy()`. Equivalent to
+   * `stopAsync` followed by `destroy`. Use in DO `webSocketClose` /
+   * `alarm` handlers where the caller must let the runtime evict the
+   * isolate cleanly.
+   */
+  destroyAsync(): Promise<void>;
+  /**
+   * RFC 0009: signal the host runtime is about to evict this isolate.
+   * Fires every source's `onEvict()` in registration order (so sources
+   * with downstream dependencies close in the right order), then calls
+   * `destroyAsync()`. Cloudflare DO consumers call this from their
+   * `alarm()` / `webSocketClose()` handlers BEFORE letting the
+   * runtime evict so external brokers don't accumulate ghost
+   * subscriptions.
+   *
+   * @param deadline - Optional wall-clock ms deadline. If supplied,
+   *   evicts that have not resolved by `deadline` are abandoned (the
+   *   isolate will die anyway). Defaults to no deadline.
+   */
+  evict(deadline?: number): Promise<void>;
 
   readonly isRunning: boolean;
   readonly isSettled: boolean;

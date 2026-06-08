@@ -122,6 +122,17 @@
           }
         }
       }
+    },
+    {
+      "include": ["**/*.test-d.ts"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
+          }
+        }
+      }
     }
   ]
 }

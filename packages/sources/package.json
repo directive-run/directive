@@ -1,0 +1,78 @@
+{
+  "name": "@directive-run/sources",
+  "version": "0.1.0",
+  "description": "Source adapters for Directive — wrap Supabase realtime, Cloudflare DO alarms, WebSocket, Sentry, etc. as typed `source` primitives. One package, one install, subpath exports per vendor.",
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Jason Comes",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/directive-run/directive",
+    "directory": "packages/sources"
+  },
+  "homepage": "https://directive.run",
+  "bugs": {
+    "url": "https://github.com/directive-run/directive/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "directive",
+    "source",
+    "supabase",
+    "cloudflare",
+    "realtime",
+    "websocket",
+    "state-management"
+  ],
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js"
+    },
+    "./supabase": {
+      "types": "./dist/supabase.d.ts",
+      "require": "./dist/supabase.cjs",
+      "import": "./dist/supabase.js"
+    },
+    "./cloudflare": {
+      "types": "./dist/cloudflare.d.ts",
+      "require": "./dist/cloudflare.cjs",
+      "import": "./dist/cloudflare.js"
+    }
+  },
+  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@directive-run/core": "^1.2.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "@cloudflare/workers-types": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@supabase/supabase-js": { "optional": true },
+    "@cloudflare/workers-types": { "optional": true }
+  },
+  "devDependencies": {
+    "@directive-run/core": "workspace:*",
+    "@types/node": "^25.2.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.9"
+  }
+}

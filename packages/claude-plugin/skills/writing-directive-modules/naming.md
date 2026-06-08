@@ -16,7 +16,8 @@ This file is both the rules and the bridge. Search for the term you already know
 | **thunk**, **saga**, **effect**, **middleware**, **listener** | Redux Toolkit, redux-saga, redux-observable, NgRx | **resolvers** | Async logic that mutates state in response to a requirement. Same role as a thunk; declared once, run by the runtime. |
 | **rule**, **condition**, **guard**, **trigger**, **policy** | XState guards, Cerbos, OPA, business-rule engines | **constraints** | Declarative "when X is true, Y must happen." Constraints emit requirements; resolvers fulfill them. |
 | **request**, **query**, **side-effect spec** | React Query / TanStack Query queries, Apollo queries | **requirements** | The object a constraint emits. The runtime dedupes them, dispatches to resolvers, tracks status. |
-| **subscription**, **listener**, **reaction**, **watcher** | Zustand subscribe, MobX reactions, Redux subscriptions | **effects** | Side-effects that run when watched facts change. Cleaner than `subscribe()` callbacks because effects auto-track. |
+| **subscription**, **listener**, **reaction**, **watcher** | Zustand subscribe, MobX reactions, Redux subscriptions | **effects** (for fact-change reactions) or **sources** (for external event streams) | Reacting to facts → **effects**; subscribing to an external stream that publishes INTO facts → **sources**. Both replace ad-hoc `subscribe()`/`useEffect` patterns. |
+| **observable**, **subject**, **event source**, **WebSocket/SSE subscription** | RxJS, DOM `addEventListener`, EventSource, Supabase Realtime | **sources** | The inbound dual of effects. Mount-once external event stream the runtime owns. Declared on a module; auto-detached on `system.stop()`. |
 | **slice**, **feature**, **domain**, **bounded context** | Redux Toolkit slices, NgRx feature modules | **modules** | Encapsulates facts + derivations + constraints + resolvers + events for one bounded slice of the system. |
 | **store**, **container**, **context**, **app state** | Redux Store, Pinia, React Context, NgRx Store | **system** | The runtime that wires modules together, evaluates constraints, dispatches resolvers, and exposes observation. |
 | **state machine**, **statechart**, **xstate machine** | XState | (closest: **module** + **constraints**) | Directive isn't a state machine — but if your XState `states` model business rules (not UI flow), constraints + facts express the same logic declaratively with no transition functions. |
@@ -53,6 +54,10 @@ Tagged union `{ type: "FETCH_USER", … }`. Constraints emit them; the runtime d
 ### `effects` — side effects from watched changes
 
 Declared via `effects: { name: { run: (facts, prev) => … } }`. Run on relevant fact changes. The auto-tracking dependency model means no `deps` array unless you specifically need a partial dep set.
+
+### `sources` — typed external event subscriptions
+
+The inbound dual of effects. Declared via `sources: { name: { attach: (publish) => cleanup } }`. The runtime mounts each source once at `system.start()` and unmounts at `system.stop()`. Inside `attach`, the source subscribes to an external event stream (WebSocket, Supabase realtime, browser events, MCP server lifecycle) and calls `publish(eventName, payload)` to dispatch into the system's event queue. Sources are the canonical replacement for `useEffect(() => subscribe(); return unsubscribe)` patterns. See [`sources.md`](./sources.md).
 
 ### `events` — typed mutation entry points
 

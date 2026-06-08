@@ -146,6 +146,19 @@ export interface PluginManager<_S extends Schema = any> {
   emitEffectRun(id: string): void;
   emitEffectError(id: string, error: unknown): void;
 
+  // Source hooks — inbound external event lifecycle (see SourceDef).
+  // Mirrors the effect-shape so observation plugins (audit-ledger, devtools)
+  // can route source events through the same dispatch fabric.
+  emitSourceAttach(id: string, moduleId: string): void;
+  emitSourcePublish(id: string, moduleId: string, eventName: string): void;
+  emitSourceDetach(id: string, moduleId: string): void;
+  emitSourceError(
+    id: string,
+    moduleId: string,
+    phase: "attach" | "cleanup" | "runtime",
+    error: unknown,
+  ): void;
+
   // History hooks
   emitSnapshot(snapshot: Snapshot): void;
   emitHistoryNavigate(from: number, to: number): void;
@@ -297,6 +310,12 @@ export function createPluginManager<
     // Effect hooks
     emitEffectRun: broadcast("onEffectRun"),
     emitEffectError: broadcast("onEffectError"),
+
+    // Source hooks
+    emitSourceAttach: broadcast("onSourceAttach"),
+    emitSourcePublish: broadcast("onSourcePublish"),
+    emitSourceDetach: broadcast("onSourceDetach"),
+    emitSourceError: broadcast("onSourceError"),
 
     // History hooks
     emitSnapshot: broadcast("onSnapshot"),

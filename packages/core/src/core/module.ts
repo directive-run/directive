@@ -22,6 +22,7 @@ import type {
   TypedEventsDef,
   TypedResolversDef,
 } from "./types.js";
+import type { SourcesDef } from "./types/sources.js";
 
 // ============================================================================
 // Module Configuration
@@ -38,6 +39,15 @@ export interface ModuleConfig<M extends ModuleSchema> {
   derive?: TypedDerivationsDef<M>;
   events?: TypedEventsDef<M>;
   effects?: EffectsDef<M["facts"]>;
+  /**
+   * Typed external event sources. See {@link SourceDef} for the primitive's
+   * lifecycle + rationale. Each source attaches at `system.start()` and
+   * tears down at `system.stop()`. Use for Supabase realtime channels,
+   * WebSocket message streams, polling timers, browser event listeners —
+   * any inbound external event the module needs to map into its own event
+   * dispatch surface.
+   */
+  sources?: SourcesDef;
   constraints?: TypedConstraintsDef<M>;
   resolvers?: TypedResolversDef<M>;
   hooks?: ModuleHooks<M>;
@@ -121,6 +131,12 @@ export interface ModuleConfigWithDeps<
   events?: TypedEventsDef<M>;
   /** Effects with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
   effects?: CrossModuleEffectsDef<M, Deps>;
+  /**
+   * Typed external event sources. Cross-module modules use the same
+   * primitive — sources never access facts, so they are not affected by
+   * the `facts.self.*` / `facts.{dep}.*` namespace split.
+   */
+  sources?: SourcesDef;
   /** Constraints with cross-module facts access (`facts.self.*` + `facts.{dep}.*`) */
   constraints?: CrossModuleConstraintsDef<M, Deps>;
   /** Resolvers. Uses flat access (`ctx.facts.myFact`) to keep async mutations scoped to own module. */
@@ -491,6 +507,7 @@ export function createModule<const M extends ModuleSchema>(
     derive: (config.derive ?? {}) as TypedDerivationsDef<M>,
     events: config.events ?? ({} as TypedEventsDef<M>),
     effects: config.effects as EffectsDef<M["facts"]> | undefined,
+    sources: (config as { sources?: SourcesDef }).sources,
     constraints: config.constraints as TypedConstraintsDef<M> | undefined,
     resolvers: config.resolvers,
     hooks: config.hooks,

@@ -1570,3 +1570,158 @@ Add missing edges flagged by domain-expert: `react → query` (most common React
 - Persistent worker pool for lint (vs spawn-per-call).
 
 
+
+---
+
+## R5 Source-primitive audit — game-changer queue (2026-06)
+
+A maximum-scope re-audit of the `source` primitive (14 parallel reviewers
+across security, lifecycle, observability, privacy, AI integration, docs,
+portability) shipped the high-leverage cross-cutting fixes inline (see
+the R5 hardening changeset). The findings below are deferred to their own
+audit cycles — each requires architectural decisions, public API surface
+additions, or cross-repo coordination beyond the scope of a single-primitive
+hardening pass.
+
+### Tier 1 — Build (compound directly on what just shipped)
+
+1. **`runStream({ liveContext })` — Reactive Agents.**
+   - Pitch: LLM tokens stop, context updates, agent resumes mid-stream — driven
+     by `source`s, not polling. Karpathy quote-tweet shape: "interrupt-driven
+     LLM agents — when the world changes mid-token, the agent updates context
+     and resumes correctly. 60 lines using @directive-run/ai. why isn't every
+     framework doing this?"
+   - Why now: every primitive needed already exists (sources publish into
+     facts; facts already expose `$store.subscribe([keys], cb)` at
+     `agent-orchestrator.ts:1309, 1474`; `runStream` already exposes
+     `abort()`). The `liveContext` recipe is a 3-line composition.
+   - Demo: live market dashboard / multi-step PR-summary agent — fact
+     ticks mid-generation, agent's NEXT token reflects the new state.
+   - Effort: 2 days (proof) / 4 days (polished + tweet-bait demo).
+   - Gating risk: needs a new public-API surface
+     (`OrchestratorStreamChunk` variants `context_updated`, `interrupted`;
+     `interrupt(reason?)` method on `OrchestratorStreamResult`). Requires
+     RFC + its own audit because of the security implications below.
+   - Mandatory companion: `createFactPIIGuardrail` (see Tier 0).
+
+2. **`sourceFromSupabaseChannel()` adapter — `@directive-run/supabase`.**
+   - Pitch: collapse the 7+ `useEffect`-as-bridge sites across Minglingo
+     into a one-liner. Lifts straight from `sources.md`'s Supabase recipe.
+   - Effort: 1 day.
+
+3. **`sourceFromDO()` — Cloudflare DO alarms as a first-class Source —
+   `@directive-run/cloudflare`.**
+   - Pitch: one-liner turns a DO alarm into a typed source. Owns the
+     "I want a durable timer on the edge" pain point.
+   - Effort: 1 day.
+
+### Tier 0 — Build BEFORE shipping liveContext
+
+**`createFactPIIGuardrail` — input guardrail at the fact-store boundary.**
+- Three reviewers (red-team, privacy, AI) flagged this as Critical: a source
+  can publish PII into a fact BEFORE `createPIIGuardrail` runs (the guardrail
+  inspects only the `data.input` string at `pii-enhanced.ts:732`). Devtools /
+  breakpoint snapshots / `fact.change` observers all receive raw PII via the
+  source path.
+- Recipe: subscribe to `onFactSet`, scan against `meta.byTag("pii")`, redact
+  or reject. Sits in the `effectiveInputGuardrails` chain.
+- Required cross-ref: new "Sources × PII" section in `ai-security.md`;
+  intent-organized `ai-sources.md` with the threat-chain explainer.
+- Required companion: extend `liveContext` options with optional `guardrails`
+  array so context updates evaluate guardrails BEFORE emitting
+  `context_updated` chunks. Without this, `liveContext` itself ships the
+  bypass into more code paths.
+- **Interim ceiling shipped in R6:** the source manager now truncates
+  every `lastError.message` at **256 chars** (`SOURCE_ERROR_MESSAGE_MAX`
+  in `packages/core/src/core/sources.ts`) so a source author who throws
+  with a payload-embedded message gets a bounded leak rather than an
+  unbounded one. The bound applies across all three sinks — `inspect()`,
+  audit-ledger, and the logging plugin — via a sanitized Error
+  constructed at the `reportError` boundary. The full PII-aware
+  redaction story is still blocked on `createFactPIIGuardrail`; the
+  256-char cap is the floor, not the ceiling.
+
+### Tier 2 — Document now, build after Tier 0/1
+
+4. `sourceFromAgentStream()` — agents publish back into the system
+   (closed loop; recursive observation).
+5. `source.replay()` — DVR for inbound events (record → fixture → deterministic
+   prod-bug repro).
+6. `source × Sentry` adapter — production errors as typed events into the
+   dev system.
+7. `directive sources scan` CLI — finds `useEffect`-as-bridge patterns and
+   auto-PRs the source extraction.
+
+### Architectural follow-ups (need RFCs)
+
+- **Naming sweep across `@directive-run/core`** — DX reviewer (and the
+  workspace's own anti-pattern #5: `context` → `ctx`) flagged `ModuleDef` /
+  `SourceDef` / `EffectsDef` / all `*Def` types as abbreviated. 22+ types
+  touched; back-compat aliases needed through 1.x; affects ~7 published
+  packages. Mechanical but high-blast-radius — ship as its own audit cycle.
+- **Source backpressure / coalesce strategy** — distributed-systems
+  reviewer flagged 10k events/sec into the reconcile loop as "melt". No
+  drop/queue/coalesce primitive today. Recommendation: optional
+  `SourceDef.coalesce: "lastWriteWins" | "all" | "none"` (default `"none"`
+  for back-compat) with manager-side debounce queue. Reserve the field
+  slot now; implement behind an RFC.
+- **`SourceDef.replay?: number`** for late-subscriber semantics — same
+  posture: reserve the slot in 1.x JSDoc so it can ship additively later.
+- **Observer protocol — `publish.error` / `publish.complete`** — protocol
+  reviewer flagged that today's `SourcePublish` is `next`-only. Pick a
+  posture for v1.0: either EventEmitter-style (documented as such) or
+  Observer-style with `.error` / `.complete` added now. Type-wrap
+  `SourcePublish` as `interface SourcePublish { (event, payload?): void }`
+  in the meantime to reserve the namespace.
+- **`SourceUnsubscribe = () => void | Promise<void>`** — distributed-systems
+  reviewer flagged that `system.stop()` does not await async unsubscribes.
+  Widen the type + make `cleanupAll` + `system.stop()` async-aware. Touches
+  React adapter + every consumer that calls `stop()` synchronously.
+- **Cloudflare DO eviction hook** — `onEvict?: () => void | Promise<void>`
+  on `SourceDef` for fleet runtimes. Or document explicitly that sources
+  do not survive DO hibernation.
+- **`createCoreOtelPlugin` / `coreToDebugBridgePlugin`** — observability
+  reviewer found ZERO downstream consumers of the `source.*` plugin hooks
+  (audit-ledger added in R5; OTel + devtools-server + timeline-renderer
+  still pending). Each needs its own scoped PR.
+- **Docs-site navigation entry for Sources** — `directive-docs/src/lib/
+  navigation.ts` does NOT list Sources under "Core API". The published
+  `/docs/sources` URL is a 404. `choosing-primitives` page's matrix does
+  NOT include a Source row. Cross-repo change.
+- **WebSocket + HTTP-polling recipes** for `sources.md` — promised in the
+  intro, only Supabase / browser events / setInterval delivered today. Add
+  `new WebSocket()` + `AbortController`-based polling examples.
+
+### Innovation reviewer's launch recommendation (verbatim)
+
+> Hold the source-primitive announcement until `liveContext` lands. Demo
+> them together. Use the PR-force-push (or live-ticker-mid-stream) video.
+> The two together are 10× the launch of either alone.
+
+
+---
+
+## Deferred (2026-06): devtools-server source-event integration
+
+The R5 observability reviewer flagged `@directive-run/ai/devtools-server.ts`
+as blind to core source events. `attachSourcesToOtel` (shipped in Phase G)
+covers the OTel side — the operationally critical path. Wiring the
+devtools-server WebSocket stream to surface `source.attach/publish/detach/error`
+requires extending `DevToolsServerMessage` with four new variants AND
+updating the devtools UI consumer. Both are doable as a follow-up but
+expand the message-protocol surface; defer to a dedicated PR with its
+own AE round.
+
+**Scope** (when picked up):
+- Extend `DevToolsServerMessage` union in `packages/ai/src/devtools-server.ts`
+  with `source.attach`, `source.publish`, `source.detach`, `source.error`.
+- Wire `system.observe()` in `createDevToolsServer` to broadcast the
+  source events (mirror the OTel helper's pattern with cardinality
+  budget — bound active spans per source).
+- Add devtools-UI rendering (separate repo / package surface).
+
+Until then: SREs get full source visibility via OTel + `system.inspect()`
+(per-source telemetry); devtools UI users get the source primitive's
+behavior through the constraint/resolver effects that follow each
+publish (since the existing `fact.change` / `resolver.start` / etc.
+events already render).

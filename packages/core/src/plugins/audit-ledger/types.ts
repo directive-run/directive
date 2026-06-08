@@ -38,6 +38,9 @@ export type AuditEntryKind =
   | "fact.change"
   | "resolver.complete"
   | "resolver.error"
+  | "source.attach"
+  | "source.detach"
+  | "source.error"
   | "system.init"
   | "system.start"
   | "system.stop"
@@ -146,6 +149,31 @@ export type AuditEntry =
       kind: "resolver.error";
       resolverId: string;
       requirementId: string;
+      error: string;
+    })
+  | (AuditEntryBase & {
+      kind: "source.attach" | "source.detach";
+      sourceId: string;
+      moduleId: string;
+    })
+  | (AuditEntryBase & {
+      kind: "source.error";
+      sourceId: string;
+      moduleId: string;
+      /**
+       * `phase: "runtime"` (RFC 0008) flags errors the source reported
+       * mid-flight via the `reportError` callback `attach` receives as
+       * its second argument — distinct from lifecycle `"attach"` /
+       * `"cleanup"` failures.
+       */
+      phase: "attach" | "cleanup" | "runtime";
+      /**
+       * Truncated error message — capped at a fixed length by the source
+       * manager before it reaches the ledger. Source authors who embed
+       * payloads in error messages get a bounded leak surface rather than
+       * an unbounded one. Pair with the matching `source.attach` /
+       * `source.detach` entries for full lifecycle context.
+       */
       error: string;
     })
   | (AuditEntryBase & {

@@ -40,6 +40,7 @@ import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
+import { type SourcesManager, createSourcesManager } from "./sources.js";
 import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   ConstraintsDef,
@@ -61,6 +62,7 @@ import type {
   TraceEntry,
 } from "./types.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
+import type { SourceDef, SourcesDef } from "./types/sources.js";
 
 // ============================================================================
 // Engine Implementation
@@ -185,6 +187,10 @@ export function createEngine<S extends Schema>(
   const mergedEvents: EventsDef<S> = Object.create(null);
   const mergedDerive: DerivationsDef<S> = Object.create(null);
   const mergedEffects: EffectsDef<S> = Object.create(null);
+  const mergedSources: SourcesDef = Object.create(null);
+  // Per-source moduleId map so the sources manager can attribute attach +
+  // unsubscribe failures to the owning module in operator-facing messages.
+  const sourceModuleIds: Record<string, string> = Object.create(null);
   const mergedConstraints: ConstraintsDef<S> = Object.create(null);
   const mergedResolvers: ResolversDef<S> = Object.create(null);
 
@@ -222,6 +228,7 @@ export function createEngine<S extends Schema>(
     validateKeys(module.events, "events");
     validateKeys(module.derive, "derive");
     validateKeys(module.effects, "effects");
+    validateKeys((module as { sources?: object }).sources, "sources");
     validateKeys(module.constraints, "constraints");
     validateKeys(module.resolvers, "resolvers");
 
@@ -254,6 +261,10 @@ export function createEngine<S extends Schema>(
     };
     checkCollisions(module.derive, "derivation");
     checkCollisions(module.effects, "effect");
+    checkCollisions(
+      (module as { sources?: Record<string, unknown> }).sources,
+      "source",
+    );
     checkCollisions(module.constraints, "constraint");
     checkCollisions(module.resolvers, "resolver");
     checkCollisions(module.events, "event");
@@ -268,6 +279,16 @@ export function createEngine<S extends Schema>(
     }
     if (module.derive) Object.assign(mergedDerive, module.derive);
     if (module.effects) Object.assign(mergedEffects, module.effects);
+    {
+      const moduleSources = (module as { sources?: SourcesDef }).sources;
+      if (moduleSources) {
+        Object.assign(mergedSources, moduleSources);
+        // Capture each source's owning moduleId for error attribution.
+        for (const sourceId of Object.keys(moduleSources)) {
+          sourceModuleIds[sourceId] = module.id;
+        }
+      }
+    }
     if (module.constraints)
       Object.assign(mergedConstraints, module.constraints);
     if (module.resolvers) {
@@ -517,6 +538,35 @@ export function createEngine<S extends Schema>(
       }
     },
   });
+
+  // Create sources manager — attaches external event sources at
+  // `system.start()`, tears them down at `system.stop()`. Sources are
+  // lifecycle-only (no reconciliation pass; no fact-dependency tracking),
+  // so the manager is a flat list with try/catch isolation. The manager
+  // invokes per-source lifecycle callbacks (onAttach / onPublish /
+  // onDetach / onError) so the engine can emit accurate plugin events
+  // with per-source attribution — closes the "shared publish callback
+  // can't tell which source emitted" attribution bug.
+  const sourcesManager: SourcesManager = createSourcesManager(
+    mergedSources,
+    sourceModuleIds,
+    {
+      onAttach: (id, moduleId) => {
+        if (hasPlugins()) pluginManager.emitSourceAttach(id, moduleId);
+      },
+      onPublish: (id, moduleId, eventName) => {
+        if (hasPlugins())
+          pluginManager.emitSourcePublish(id, moduleId, eventName);
+      },
+      onDetach: (id, moduleId) => {
+        if (hasPlugins()) pluginManager.emitSourceDetach(id, moduleId);
+      },
+      onError: (id, moduleId, phase, error) => {
+        if (hasPlugins())
+          pluginManager.emitSourceError(id, moduleId, phase, error);
+      },
+    },
+  );
 
   /**
    * Normalize `key`: a function passes through, an array `KeySelector`
@@ -1447,6 +1497,18 @@ export function createEngine<S extends Schema>(
         onEffectRun: (id: string) => observer({ type: "effect.run", id }),
         onEffectError: (id: string, error: unknown) =>
           observer({ type: "effect.error", id, error }),
+        onSourceAttach: (id: string, moduleId: string) =>
+          observer({ type: "source.attach", id, moduleId }),
+        onSourcePublish: (id: string, moduleId: string, eventName: string) =>
+          observer({ type: "source.publish", id, moduleId, eventName }),
+        onSourceDetach: (id: string, moduleId: string) =>
+          observer({ type: "source.detach", id, moduleId }),
+        onSourceError: (
+          id: string,
+          moduleId: string,
+          phase: "attach" | "cleanup" | "runtime",
+          error: unknown,
+        ) => observer({ type: "source.error", id, moduleId, phase, error }),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
         onReconcileStart: () => observer({ type: "reconcile.start" }),
@@ -1520,6 +1582,46 @@ export function createEngine<S extends Schema>(
         module.hooks?.onStart?.(system as any);
       }
 
+      // Attach external event sources. The dispatcher receives accurate
+      // per-source attribution (sourceId, moduleId) from the manager — the
+      // manager closure-wraps each source's publish callback with its own
+      // identity so the engine's plugin emission cannot mis-attribute when
+      // two sources publish the same event name. The post-destroy guard
+      // prevents stale source callbacks from dispatching into a torn-down
+      // store. `onAttach` plugin events fire from inside the manager (one
+      // per successful attach), so the static-start path AND the
+      // `registerModule` immediate-attach path emit consistently.
+      sourcesManager.attachAll((_sourceId, _moduleId, eventName, payload) => {
+        // Guards parity with the system.dispatch path (engine.ts:1692):
+        //   - drop publishes after `system.destroy()` (engine-wide invariant)
+        //   - drop publishes after `system.stop()` and before the next
+        //     `system.start()` — a leaked external transport firing in that
+        //     window would otherwise mutate facts on a stopped system
+        //   - drop publishes whose event name would walk the prototype chain
+        //     (`__proto__`, `constructor`, `prototype`) — mirrors the
+        //     BLOCKED_PROPS check `system.dispatch` already enforces
+        //   - drop empty / non-string event names so log/audit sinks aren't
+        //     forced to render placeholder rows
+        //
+        // Return the outcome to the manager so per-source telemetry can
+        // attribute the drop to a specific reason and so plugin `onPublish`
+        // does NOT fire for swallowed events.
+        if (state.isDestroyed)
+          return { accepted: false, reason: "post-destroy" };
+        if (!state.isRunning) return { accepted: false, reason: "post-stop" };
+        if (typeof eventName !== "string" || eventName.length === 0) {
+          return { accepted: false, reason: "invalid-event-name" };
+        }
+        if (BLOCKED_PROPS.has(eventName)) {
+          return { accepted: false, reason: "blocked-event-name" };
+        }
+        dispatchEventByName(
+          eventName,
+          (payload ?? {}) as Record<string, unknown>,
+        );
+        return { accepted: true };
+      });
+
       // Emit start event
       pluginManager.emitStart(system);
 
@@ -1564,6 +1666,14 @@ export function createEngine<S extends Schema>(
       // Cancel all resolvers
       resolversManager.cancelAll();
 
+      // Detach external event sources BEFORE running effect cleanups so any
+      // sources that share resources with effects (rare but possible) see
+      // the source-side first. Failures inside individual unsubscribes are
+      // isolated by the manager. `onDetach` plugin events fire from inside
+      // the manager (one per source, in reverse-registration order) so we
+      // don't need to iterate-and-emit here.
+      sourcesManager.cleanupAll();
+
       // Run all effect cleanups
       effectsManager.cleanupAll();
 
@@ -1598,6 +1708,90 @@ export function createEngine<S extends Schema>(
       // Drop any pending ctx.requeue() requests
       pendingRequeueIds.clear();
       pluginManager.emitDestroy(system);
+    },
+
+    async stopAsync(): Promise<void> {
+      // RFC 0009: async-aware variant of stop(). Mirrors sync stop()
+      // step-for-step but awaits the source unsubscribes so external
+      // transports (Supabase channel.unsubscribe(), DO storage flush)
+      // actually complete before the caller continues.
+      if (!state.isRunning) return;
+      state.isRunning = false;
+      if (retryLaterTimer !== null) {
+        clearInterval(retryLaterTimer);
+        retryLaterTimer = null;
+      }
+      errorBoundary.getRetryLaterManager().clearAll();
+      resolversManager.cancelAll();
+      await sourcesManager.cleanupAllAsync();
+      effectsManager.cleanupAll();
+      for (const module of config.modules) {
+        module.hooks?.onStop?.(system);
+      }
+      pluginManager.emitStop(system);
+    },
+
+    async destroyAsync(): Promise<void> {
+      if (state.isDestroyed) return;
+      await this.stopAsync();
+      state.isDestroyed = true;
+      (store as unknown as Record<string, () => void>).destroy?.();
+      resolversManager.destroy();
+      errorBoundary.clearErrors();
+      settlementListeners.clear();
+      historyListeners.clear();
+      traceManager.destroy();
+      definitions.destroy();
+      moduleMeta.clear();
+      eventMeta.clear();
+      pendingRequeueIds.clear();
+      pluginManager.emitDestroy(system);
+    },
+
+    async evict(deadline?: number): Promise<void> {
+      // RFC 0009: signal that the host runtime is about to evict.
+      // Fires every source's onEvict in registration order (so sources
+      // with downstream dependencies close in the right order), then
+      // delegates to destroyAsync to complete teardown. If `deadline`
+      // is supplied, the entire eviction is raced against the deadline
+      // — a partial teardown is better than a hang while the runtime
+      // is impatient to evict.
+      //
+      // Bug-fix per R11: deadline<=0 used to construct the IIFE,
+      // return synchronously, and let the IIFE run detached with no
+      // error path. Now we either await it or attach a swallow-catch
+      // so the unhandled-rejection surface is bounded.
+      if (deadline !== undefined && deadline - Date.now() <= 0) {
+        // Synchronous deadline: kick off the eviction with a
+        // swallow-catch (every per-source error already routes through
+        // the manager's `phase: "runtime"` sink, so silencing the
+        // composite promise here doesn't lose signal) and return
+        // immediately. The runtime evicts the isolate before the work
+        // would have completed anyway.
+        const detached = (async () => {
+          await sourcesManager.evictAll();
+          await this.destroyAsync();
+        })();
+        detached.catch(() => {});
+        return;
+      }
+      const evictWork = (async () => {
+        await sourcesManager.evictAll();
+        await this.destroyAsync();
+      })();
+      if (deadline === undefined) {
+        await evictWork;
+        return;
+      }
+      const remaining = deadline - Date.now();
+      // After the race, evictWork may still be running. Attach a
+      // swallow-catch so a late rejection doesn't surface as
+      // unhandledRejection in the host runtime.
+      evictWork.catch(() => {});
+      await Promise.race([
+        evictWork,
+        new Promise<void>((resolve) => setTimeout(resolve, remaining)),
+      ]);
     },
 
     dispatch(event: SystemEvent): void {
@@ -1789,6 +1983,22 @@ export function createEngine<S extends Schema>(
           id,
           meta: (def as { meta?: DefinitionMeta }).meta,
         })),
+        sources: sourcesManager.listDefinitions().map((row) => ({
+          id: row.id,
+          moduleId: row.moduleId,
+          meta: row.meta as DefinitionMeta | undefined,
+          attached: row.attached,
+          attachedAt: row.attachedAt,
+          detachedAt: row.detachedAt,
+          publishCount: row.publishCount,
+          lastPublishAt: row.lastPublishAt,
+          dropCount: row.dropCount,
+          lastDropReason: row.lastDropReason,
+          lastDropAt: row.lastDropAt,
+          errorCount: row.errorCount,
+          lastError: row.lastError,
+        })),
+        attachedSourceCount: sourcesManager.attachedCount(),
         derivations: Object.keys(mergedDerive).map((id) => ({
           id,
           meta: derivationsManager.getMeta(id as keyof DerivationsDef<S>),
@@ -2342,6 +2552,8 @@ export function createEngine<S extends Schema>(
     derive?: Record<string, (facts: unknown, derived: unknown) => unknown>;
     events?: Record<string, (facts: unknown, event: unknown) => void>;
     effects?: Record<string, unknown>;
+    /** Typed external event sources (parity with static module merge). */
+    sources?: Record<string, SourceDef>;
     constraints?: Record<string, unknown>;
     resolvers?: Record<string, unknown>;
     hooks?: {
@@ -2387,6 +2599,7 @@ export function createEngine<S extends Schema>(
     validateKeys(module.events, "events");
     validateKeys(module.derive, "derive");
     validateKeys(module.effects, "effects");
+    validateKeys(module.sources, "sources");
     validateKeys(module.constraints, "constraints");
     validateKeys(module.resolvers, "resolvers");
 
@@ -2457,6 +2670,40 @@ export function createEngine<S extends Schema>(
       Object.assign(mergedEffects, module.effects);
       // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       effectsManager.registerDefinitions(module.effects as any);
+    }
+    if (module.sources) {
+      Object.assign(mergedSources, module.sources);
+      for (const sourceId of Object.keys(module.sources)) {
+        sourceModuleIds[sourceId] = module.id;
+      }
+      // Surface the privilege change to plugins BEFORE attach so observers
+      // see `definition.register` → `source.attach` in the same order
+      // constraints / resolvers / derivations / effects publish. Reversing
+      // would let an audit consumer record an attach for a source the
+      // ledger never saw registered.
+      //
+      // We deliberately do NOT pass the raw `SourceDef` (whose `attach`
+      // callback is the live external-subscription primitive). A malicious
+      // or buggy plugin receiving the live def could call `def.attach(...)`
+      // to install a parallel subscription bypassing the manager — the
+      // manager wouldn't track it, wouldn't tear it down at stop(), and
+      // wouldn't surface it via `inspect()`. Instead, hand plugins an
+      // opaque descriptor that names the source but exposes nothing
+      // callable. Plugins that need to react beyond the
+      // attach/publish/detach hooks can subscribe to `system.observe()`
+      // (forward-only) — they cannot reach the live attach callback.
+      for (const [sourceId, def] of Object.entries(module.sources)) {
+        const meta = (def as { meta?: DefinitionMeta }).meta;
+        pluginManager.emitDefinitionRegister("source", sourceId, {
+          moduleId: module.id,
+          ...(meta !== undefined ? { meta } : {}),
+        });
+      }
+      // The manager attaches new sources immediately when the system is in
+      // the `attached` phase (i.e. `system.start()` has already run);
+      // otherwise they queue for the next `attachAll`. Either way the
+      // catalogue grows so `system.inspect().sources` reflects them.
+      sourcesManager.registerDefinitions(module.id, module.sources);
     }
     if (module.constraints) {
       for (const def of Object.values(module.constraints)) {

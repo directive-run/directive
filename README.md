@@ -11,6 +11,7 @@
 - **Constraint-Driven Resolution** &ndash; declare requirements, resolvers fulfill them automatically with retry, batching, and error boundaries
 - **AI Guardrails** &ndash; prompt injection detection, PII redaction, cost tracking, multi-agent orchestration with 4 LLM adapters (zero SDK dependencies)
 - **Auto-Tracking Derivations** &ndash; computed values that track their own dependencies, no manual dep arrays
+- **Typed Inbound Sources** &ndash; declare external event streams (Supabase, WebSocket, polling, browser events) as first-class module fields; engine owns the subscription lifecycle
 - **5 Framework Adapters + 1 Vanilla** &ndash; React, Vue, Svelte, Solid, Lit, plus `el()` for plain DOM &ndash; from a single state layer
 - **Zero Runtime Dependencies** &ndash; nothing to audit, nothing to break
 - **Time-Travel Debugging** &ndash; snapshot, rewind, replay, export/import system state

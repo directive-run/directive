@@ -40,6 +40,12 @@ export interface FlatModuleDefinition {
   derive: Record<string, unknown> | undefined;
   events: Record<string, unknown> | undefined;
   effects: Record<string, unknown> | undefined;
+  /**
+   * Typed external event sources — pass through unmodified from the
+   * module definition. Sources don't read facts, so they don't need
+   * namespace prefixing the way effects/constraints/derivations do.
+   */
+  sources: Record<string, unknown> | undefined;
   constraints: Record<string, unknown> | undefined;
   resolvers: Record<string, unknown> | undefined;
   hooks: ModuleDef<ModuleSchema>["hooks"];
@@ -775,6 +781,10 @@ export function prefixModuleDefinition(
     derive: prefixDerive(mod, namespace, hasCrossModuleDeps, depNamespaces),
     events: prefixEventHandlers(mod, namespace),
     effects: prefixEffects(mod, namespace, hasCrossModuleDeps, depNamespaces),
+    // Sources don't access facts, so no prefixing pass — copy through.
+    // The engine collision check still namespaces them per-module via the
+    // existing definitionOwners map.
+    sources: (mod as { sources?: Record<string, unknown> }).sources,
     constraints: prefixConstraints(
       mod,
       namespace,

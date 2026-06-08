@@ -119,6 +119,10 @@ describe("prefixModuleDefinition", () => {
         "requirements",
         "resolvers",
         "schema",
+        // Sources are a v1.18+ addition (typed external event sources).
+        // They flow through prefixModuleDefinition unchanged because they
+        // do not access facts and therefore need no namespace prefixing.
+        "sources",
       ]);
     });
   });
