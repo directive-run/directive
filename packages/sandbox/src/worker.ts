@@ -172,7 +172,22 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
     // it from here after execution.
     await import(message.bundlePath);
   } catch (err) {
-    errors.push((err as Error).message ?? String(err));
+    const e = err as Error & { code?: string; cause?: unknown };
+    const parts = [e.message ?? String(err)];
+    if (e.code) {
+      parts.push(`[code: ${e.code}]`);
+    }
+    if (e.stack) {
+      parts.push(e.stack);
+    }
+    if (e.cause) {
+      const cause = e.cause as Error;
+      parts.push(`Cause: ${cause.message ?? String(cause)}`);
+      if (cause.stack) {
+        parts.push(cause.stack);
+      }
+    }
+    errors.push(parts.join("\n"));
   } finally {
     restoreConsole();
   }
@@ -188,7 +203,9 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
     try {
       facts = system.facts.$store.toObject();
     } catch (err) {
-      errors.push(`facts snapshot failed: ${(err as Error).message}`);
+      errors.push(
+        `facts snapshot failed: ${(err as Error).message}\n${(err as Error).stack ?? ""}`,
+      );
     }
     // Phase A audit P0-DM2: snapshot derivations. The host pre-extracts
     // the key names from the source files (system.derive's proxy has no
