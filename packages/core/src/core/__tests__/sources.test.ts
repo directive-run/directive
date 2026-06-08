@@ -79,12 +79,9 @@ describe("createSourcesManager", () => {
     );
 
     manager.attachAll(dispatcher);
-    expect(dispatcher).toHaveBeenCalledWith(
-      "s",
-      "module-X",
-      "HELLO",
-      { ok: true },
-    );
+    expect(dispatcher).toHaveBeenCalledWith("s", "module-X", "HELLO", {
+      ok: true,
+    });
     // Authoring code can also publish asynchronously via the captured
     // reference — assert the same reference is still callable.
     captured[0]?.("LATER", undefined);
@@ -210,9 +207,11 @@ describe("createSourcesManager", () => {
     manager.attachAll(() => ({ accepted: true }));
     manager.cleanupAll();
 
-    const phases = onError.mock.calls.map(
-      ([id, moduleId, phase]) => ({ id, moduleId, phase }),
-    );
+    const phases = onError.mock.calls.map(([id, moduleId, phase]) => ({
+      id,
+      moduleId,
+      phase,
+    }));
     expect(phases).toEqual(
       expect.arrayContaining([
         { id: "attachFail", moduleId: "mod-a", phase: "attach" },
@@ -386,11 +385,7 @@ describe("createSourcesManager", () => {
     const matched = consoleErrorSpy.mock.calls.some((call) => {
       const arg = call[0];
       const text =
-        typeof arg === "string"
-          ? arg
-          : arg instanceof Error
-            ? arg.message
-            : "";
+        typeof arg === "string" ? arg : arg instanceof Error ? arg.message : "";
       return (
         text.includes('Module "the-mod"') &&
         text.includes('Source "forgot"') &&
@@ -540,11 +535,7 @@ describe("createSourcesManager", () => {
 
   it("registerDefinitions during attached phase fires onAttach immediately for new sources", () => {
     const onAttach = vi.fn();
-    const manager = createSourcesManager(
-      {},
-      {},
-      { onAttach },
-    );
+    const manager = createSourcesManager({}, {}, { onAttach });
     manager.attachAll(() => ({ accepted: true }));
     expect(onAttach).not.toHaveBeenCalled();
 
@@ -564,11 +555,7 @@ describe("createSourcesManager", () => {
     const onDetach = vi.fn();
     const oldUnsub = vi.fn();
     const newUnsub = vi.fn();
-    const manager = createSourcesManager(
-      {},
-      {},
-      { onAttach, onDetach },
-    );
+    const manager = createSourcesManager({}, {}, { onAttach, onDetach });
     manager.attachAll(() => ({ accepted: true }));
 
     manager.registerDefinitions("mod-v1", {
@@ -903,9 +890,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     capturedRef.current?.("TICK", { delta: 5 });
     // Engine augments the payload with the event `type` discriminator
     // before passing it to the handler — same shape as `system.events.TICK`.
-    expect(handler).toHaveBeenCalledWith(
-      expect.objectContaining({ delta: 5 }),
-    );
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ delta: 5 }));
     expect(system.facts.count).toBe(5);
 
     system.stop();
@@ -987,12 +972,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     system.start();
     system.stop();
 
-    expect(order).toEqual([
-      "attach:a",
-      "attach:b",
-      "detach:b",
-      "detach:a",
-    ]);
+    expect(order).toEqual(["attach:a", "attach:b", "detach:b", "detach:a"]);
   });
 
   it("source collision across modules throws at createSystem time", () => {
@@ -1120,7 +1100,11 @@ describe("source primitive — end-to-end with createSystem", () => {
     // Live publish through the OLD closure reaches the dispatcher.
     capturedOld.current?.("TICK", undefined);
     expect(dispatched).toHaveLength(1);
-    expect(dispatched[0]).toEqual({ id: "racer", moduleId: "mod-1", eventName: "TICK" });
+    expect(dispatched[0]).toEqual({
+      id: "racer",
+      moduleId: "mod-1",
+      eventName: "TICK",
+    });
 
     // Re-register the same source id with a different attach impl. The R3
     // registry swap unsubscribes the old definition; this R5 fix also flips
@@ -1266,14 +1250,12 @@ describe("source primitive — end-to-end with createSystem", () => {
     const onPublish = vi.fn();
     const dispatch = vi
       .fn()
-      .mockImplementation(
-        (_id, _moduleId, eventName) => ({
-          accepted: eventName === "OK",
-          ...(eventName === "OK"
-            ? {}
-            : { reason: "blocked-event-name" as const }),
-        }),
-      );
+      .mockImplementation((_id, _moduleId, eventName) => ({
+        accepted: eventName === "OK",
+        ...(eventName === "OK"
+          ? {}
+          : { reason: "blocked-event-name" as const }),
+      }));
     const captured: { current: SourcePublish | null } = { current: null };
     const manager = createSourcesManager(
       {
@@ -1476,7 +1458,9 @@ describe("source primitive — end-to-end with createSystem", () => {
       "ws",
       "wsmod",
       "runtime",
-      expect.objectContaining({ message: expect.stringContaining("socket closed") }),
+      expect.objectContaining({
+        message: expect.stringContaining("socket closed"),
+      }),
     );
     const row = manager.listDefinitions().find((r) => r.id === "ws");
     expect(row?.errorCount).toBe(1);

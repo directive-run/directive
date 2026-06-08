@@ -377,7 +377,10 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           sourceId: event.id,
           moduleId: event.moduleId,
           phase: event.phase,
-          error: event.error instanceof Error ? event.error.message : String(event.error),
+          error:
+            event.error instanceof Error
+              ? event.error.message
+              : String(event.error),
         });
         break;
       default:

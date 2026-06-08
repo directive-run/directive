@@ -115,8 +115,14 @@ describe("createFactPIIGuardrail — redact mode", () => {
         facts: { payload: t.string().meta({ tags: ["pii"] }) },
         events: { wire: { payload: t.string() } },
       },
-      init: (f) => { f.payload = ""; },
-      events: { wire: (f, p) => { f.payload = p.payload; } },
+      init: (f) => {
+        f.payload = "";
+      },
+      events: {
+        wire: (f, p) => {
+          f.payload = p.payload;
+        },
+      },
     });
     const system = createSystem({
       module: cardModule,
@@ -218,12 +224,22 @@ describe("createFactPIIGuardrail — customDetector", () => {
     const onBlocked = vi.fn();
     const accountPattern = /\bACC-\d{6}\b/g;
     const customDetector = (text: string) => {
-      const out: Array<{ type: "ssn"; value: string; start: number; end: number }> = [];
+      const out: Array<{
+        type: "ssn";
+        value: string;
+        start: number;
+        end: number;
+      }> = [];
       let m: RegExpExecArray | null;
       accountPattern.lastIndex = 0;
       // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic exec loop
       while ((m = accountPattern.exec(text)) !== null) {
-        out.push({ type: "ssn", value: m[0], start: m.index, end: m.index + m[0].length });
+        out.push({
+          type: "ssn",
+          value: m[0],
+          start: m.index,
+          end: m.index + m[0].length,
+        });
       }
       return out;
     };
@@ -256,8 +272,14 @@ describe("createFactPIIGuardrail — object payloads", () => {
   it("walks one level deep on object payloads", () => {
     const module = createModule("nested", {
       schema: {
-        facts: { profile: t.object<{ email: string; name: string }>().meta({ tags: ["pii"] }) },
-        events: { wire: { profile: t.object<{ email: string; name: string }>() } },
+        facts: {
+          profile: t
+            .object<{ email: string; name: string }>()
+            .meta({ tags: ["pii"] }),
+        },
+        events: {
+          wire: { profile: t.object<{ email: string; name: string }>() },
+        },
       },
       init: (f) => {
         f.profile = { email: "", name: "" };
@@ -273,7 +295,9 @@ describe("createFactPIIGuardrail — object payloads", () => {
       plugins: [createFactPIIGuardrail({ mode: "redact" })],
     });
     system.start();
-    system.events.wire({ profile: { email: "leak@example.com", name: "Alice" } });
+    system.events.wire({
+      profile: { email: "leak@example.com", name: "Alice" },
+    });
     expect(system.facts.profile).toEqual({ email: "[EMAIL]", name: "Alice" });
     system.destroy();
   });
@@ -290,7 +314,11 @@ describe("createFactPIIGuardrail — object payloads", () => {
       init: (f) => {
         f.account = { meta: { email: "" } };
       },
-      events: { wire: (f, p) => { f.account = p.account; } },
+      events: {
+        wire: (f, p) => {
+          f.account = p.account;
+        },
+      },
     });
     const system = createSystem({
       module,
@@ -315,7 +343,11 @@ describe("createFactPIIGuardrail — object payloads", () => {
       init: (f) => {
         f.account = { meta: { contact: { email: "" } } };
       },
-      events: { wire: (f, p) => { f.account = p.account; } },
+      events: {
+        wire: (f, p) => {
+          f.account = p.account;
+        },
+      },
     });
     const system = createSystem({
       module,

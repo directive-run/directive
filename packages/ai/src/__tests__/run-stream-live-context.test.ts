@@ -179,7 +179,9 @@ describe("LiveContextOptions — defensive contract", () => {
     ) => facts.price > facts.threshold;
     const unsub = store.subscribe(["price"], () => {
       const current = store.toObject() as { price: number; threshold: number };
-      const changed = ["price"].filter((k) => current[k as keyof typeof current] !== lastSnapshot[k]);
+      const changed = ["price"].filter(
+        (k) => current[k as keyof typeof current] !== lastSnapshot[k],
+      );
       lastSnapshot = current;
       if (changed.length === 0) return;
       if (interruptWhen(current, changed)) interruptCount += 1;
@@ -206,7 +208,12 @@ describe("AsyncIterable chunk pipe — end-to-end iteration", () => {
       partialOutput: "partial",
       changedKeys: ["k"],
     });
-    pipe.push({ type: "done", totalTokens: 42, duration: 100, droppedTokens: 0 });
+    pipe.push({
+      type: "done",
+      totalTokens: 42,
+      duration: 100,
+      droppedTokens: 0,
+    });
     pipe.close();
 
     for await (const chunk of pipe.stream) {

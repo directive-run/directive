@@ -77,7 +77,9 @@ interface SupabaseRealtimeChannel {
 
 interface SupabaseRealtimeClient {
   channel(name: string): SupabaseRealtimeChannel;
-  removeChannel(channel: SupabaseRealtimeChannel): Promise<"ok" | "timed out" | "error">;
+  removeChannel(
+    channel: SupabaseRealtimeChannel,
+  ): Promise<"ok" | "timed out" | "error">;
 }
 
 // ============================================================================

@@ -57,7 +57,7 @@
  * 10 long-lived spans — well within typical OTel collector budgets.
  */
 
-import type { OtelTracer, OtelSpan } from "./otel.js";
+import type { OtelSpan, OtelTracer } from "./otel.js";
 import { OtelStatusCode as StatusCodeValues } from "./otel.js";
 
 interface ObservableLike {
@@ -142,7 +142,10 @@ export function attachSourcesToOtel(
         const id = event.id as string;
         const moduleId = event.moduleId as string;
         const span = tracer.startSpan(`${spanPrefix}.attached`, {
-          attributes: { ...commonAttrs(id, moduleId), "directive.attached": true },
+          attributes: {
+            ...commonAttrs(id, moduleId),
+            "directive.attached": true,
+          },
         });
         activeByKey.set(keyOf(id, moduleId), { span, startedAt: Date.now() });
         break;

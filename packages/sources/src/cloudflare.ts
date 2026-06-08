@@ -169,11 +169,19 @@ interface CloudflareWebSocket {
   close(code?: number, reason?: string): void;
   addEventListener(
     type: "message" | "close" | "error",
-    handler: (event: { data?: unknown; code?: number; reason?: string }) => void,
+    handler: (event: {
+      data?: unknown;
+      code?: number;
+      reason?: string;
+    }) => void,
   ): void;
   removeEventListener(
     type: "message" | "close" | "error",
-    handler: (event: { data?: unknown; code?: number; reason?: string }) => void,
+    handler: (event: {
+      data?: unknown;
+      code?: number;
+      reason?: string;
+    }) => void,
   ): void;
 }
 
@@ -184,7 +192,9 @@ export interface WebSocketMessageSourceOptions {
    * Decode each `MessageEvent.data` into a typed Directive event.
    * Return `null` to drop the message (e.g. ping frames).
    */
-  decode: (data: unknown) => { name: string; payload: Record<string, unknown> } | null;
+  decode: (
+    data: unknown,
+  ) => { name: string; payload: Record<string, unknown> } | null;
   /**
    * Event name to publish when the socket closes. Default `"WEBSOCKET_CLOSED"`.
    * Set `null` to skip publishing on close.

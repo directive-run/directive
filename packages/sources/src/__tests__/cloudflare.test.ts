@@ -82,7 +82,11 @@ describe("sourceFromDOAlarm", () => {
       init: (f) => {
         f.v = 0;
       },
-      events: { TICK: (f, p) => { f.v = p.at; } },
+      events: {
+        TICK: (f, p) => {
+          f.v = p.at;
+        },
+      },
       sources: {
         alarm: sourceFromDOAlarm({
           storage,
@@ -121,7 +125,11 @@ describe("sourceFromDOAlarm", () => {
 describe("sourceFromWebSocketMessage", () => {
   interface Listener {
     type: "message" | "close" | "error";
-    handler: (event: { data?: unknown; code?: number; reason?: string }) => void;
+    handler: (event: {
+      data?: unknown;
+      code?: number;
+      reason?: string;
+    }) => void;
   }
   function makeFakeSocket() {
     const listeners: Listener[] = [];
@@ -131,7 +139,10 @@ describe("sourceFromWebSocketMessage", () => {
       addEventListener(type: Listener["type"], handler: Listener["handler"]) {
         listeners.push({ type, handler });
       },
-      removeEventListener(type: Listener["type"], handler: Listener["handler"]) {
+      removeEventListener(
+        type: Listener["type"],
+        handler: Listener["handler"],
+      ) {
         const idx = listeners.findIndex(
           (l) => l.type === type && l.handler === handler,
         );
@@ -203,7 +214,11 @@ describe("sourceFromWebSocketMessage", () => {
       init: (f) => {
         f.v = "";
       },
-      events: { MSG: (f, p) => { f.v = p.v; } },
+      events: {
+        MSG: (f, p) => {
+          f.v = p.v;
+        },
+      },
       sources: {
         s: sourceFromWebSocketMessage({
           socket: socket as unknown as Parameters<

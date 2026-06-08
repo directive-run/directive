@@ -169,8 +169,12 @@ describe("sourceFromSupabaseChannel", () => {
               table: "rows",
               // Only publish when the row contains a positive value.
               map: (payload) => {
-                if (typeof payload.new.v !== "number" || payload.new.v <= 0) return null;
-                return { name: "CHANGE", payload: { v: payload.new.v as number } };
+                if (typeof payload.new.v !== "number" || payload.new.v <= 0)
+                  return null;
+                return {
+                  name: "CHANGE",
+                  payload: { v: payload.new.v as number },
+                };
               },
             },
           ],

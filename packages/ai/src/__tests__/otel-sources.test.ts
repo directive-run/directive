@@ -9,7 +9,7 @@
 import { createModule, createSystem, t } from "@directive-run/core";
 import { describe, expect, it, vi } from "vitest";
 import { attachSourcesToOtel } from "../otel-sources.js";
-import { OtelStatusCode, type OtelSpan, type OtelTracer } from "../otel.js";
+import { type OtelSpan, OtelStatusCode, type OtelTracer } from "../otel.js";
 
 interface RecordedSpan {
   name: string;
@@ -61,8 +61,14 @@ describe("attachSourcesToOtel", () => {
         facts: { v: t.number() },
         events: { TICK: {} },
       },
-      init: (f) => { f.v = 0; },
-      events: { TICK: (f) => { f.v += 1; } },
+      init: (f) => {
+        f.v = 0;
+      },
+      events: {
+        TICK: (f) => {
+          f.v += 1;
+        },
+      },
       sources: {
         s: { attach: () => () => undefined },
       },
@@ -87,7 +93,9 @@ describe("attachSourcesToOtel", () => {
 
   it("publishes attach as span events on the active span, not new spans", () => {
     const { tracer, spans } = makeFakeTracer();
-    const captured: { publish: ((event: string, payload?: unknown) => void) | null } = {
+    const captured: {
+      publish: ((event: string, payload?: unknown) => void) | null;
+    } = {
       publish: null,
     };
     const module = createModule("ticker", {
@@ -95,8 +103,14 @@ describe("attachSourcesToOtel", () => {
         facts: { ticks: t.number() },
         events: { TICK: {} },
       },
-      init: (f) => { f.ticks = 0; },
-      events: { TICK: (f) => { f.ticks += 1; } },
+      init: (f) => {
+        f.ticks = 0;
+      },
+      events: {
+        TICK: (f) => {
+          f.ticks += 1;
+        },
+      },
       sources: {
         beat: {
           attach: (publish) => {
@@ -131,7 +145,9 @@ describe("attachSourcesToOtel", () => {
       .mockImplementation(() => undefined);
     const module = createModule("m", {
       schema: { facts: { v: t.number() }, events: {} },
-      init: (f) => { f.v = 0; },
+      init: (f) => {
+        f.v = 0;
+      },
       sources: {
         boom: {
           attach: () => {
@@ -163,8 +179,14 @@ describe("attachSourcesToOtel", () => {
     const { tracer, spans } = makeFakeTracer();
     const module = createModule("m", {
       schema: { facts: { v: t.number() }, events: { TICK: {} } },
-      init: (f) => { f.v = 0; },
-      events: { TICK: (f) => { f.v += 1; } },
+      init: (f) => {
+        f.v = 0;
+      },
+      events: {
+        TICK: (f) => {
+          f.v += 1;
+        },
+      },
       sources: {
         a: { attach: () => () => undefined },
         b: { attach: () => () => undefined },
@@ -186,9 +208,9 @@ describe("attachSourcesToOtel", () => {
     unsub();
     const stillOpen = spans.filter((s) => !s.ended);
     expect(stillOpen.length).toBe(0);
-    expect(spans.every((s) => s.attributes["directive.detached"] === true)).toBe(
-      true,
-    );
+    expect(
+      spans.every((s) => s.attributes["directive.detached"] === true),
+    ).toBe(true);
     // After unsubscribe, system.stop() does not emit new source spans
     // through this helper.
     const countBefore = spans.length;

@@ -1736,10 +1736,7 @@ export function createAgentOrchestrator<
       let liveContextUnsub: (() => void) | null = null;
       const liveCfg = options.liveContext;
       if (liveCfg) {
-        if (
-          debug &&
-          (liveCfg.system as unknown) === (system as unknown)
-        ) {
+        if (debug && (liveCfg.system as unknown) === (system as unknown)) {
           const bridgeKeys = ["agent", "conversation", "approvalState"];
           const overlap = liveCfg.keys.filter((k) =>
             bridgeKeys.some((bk) => k.startsWith(bk)),
@@ -1787,7 +1784,10 @@ export function createAgentOrchestrator<
             if (watchedChanged.length === 0) return;
             liveCfg.onContextUpdate?.(watchedChanged);
             // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
-            const shouldInterrupt = interruptWhen(current as any, watchedChanged);
+            const shouldInterrupt = interruptWhen(
+              current as any,
+              watchedChanged,
+            );
             if (shouldInterrupt) {
               pushChunk({
                 type: "interrupted",

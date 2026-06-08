@@ -7,7 +7,6 @@ import type {
   CrossModuleFactsWithSelf,
 } from "./composition.js";
 import type { EffectCleanup, EffectsDef } from "./effects.js";
-import type { SourcesDef } from "./sources.js";
 import type { DirectiveError } from "./errors.js";
 import type { Facts, FactsSnapshot } from "./facts.js";
 import type { DefinitionMeta } from "./meta.js";
@@ -34,6 +33,7 @@ import type {
   ModuleSchema,
   RequirementsSchema,
 } from "./schema.js";
+import type { SourcesDef } from "./sources.js";
 import type { System } from "./system.js";
 
 // ============================================================================

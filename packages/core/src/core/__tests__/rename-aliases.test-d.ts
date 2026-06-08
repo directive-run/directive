@@ -24,14 +24,17 @@
 import type {
   ModuleDefinition,
   SourceDefinition,
-  SourcesDefinition,
   SourcePublishFn,
   SourceUnsubscribeFn,
+  SourcesDefinition,
 } from "../types/index.js";
 // The remaining alias names that don't appear in the smoke
 // assertions below still need an import to verify the
 // `export type { X as Y }` pattern resolves. Renaming an alias to
-// a non-existent canonical would fail this import.
+// a non-existent canonical would fail this import. The underscore
+// prefix marks them as intentionally unused at the value level;
+// importing them is the assertion. `.test-d.ts` files are exempt
+// from `noUnusedImports` (see biome.json override).
 import type {
   ConstraintDefinition as _ConstraintDefinition,
   ConstraintsDefinition as _ConstraintsDefinition,
@@ -45,14 +48,10 @@ import type {
 import type {
   ModuleDef,
   SourceDef,
-  SourcesDef,
   SourcePublish,
   SourceUnsubscribe,
+  SourcesDef,
 } from "../types/index.js";
-// The "_unused" imports prove the corresponding aliases resolve to
-// a real type without forcing test-level fixtures for their generic
-// surfaces. Renaming an alias to a non-existent canonical would fail
-// the import.
 import type {
   ConstraintDef as _ConstraintDef,
   ConstraintsDef as _ConstraintsDef,
@@ -114,7 +113,7 @@ const _keys: KeysIdentical = true;
 type IsSourceAlias<T> = T extends SourceDefinition ? true : false;
 type IsSourceCanonical<T> = T extends SourceDef ? true : false;
 
-type Distrib = IsSourceAlias<SourceDef | string>;        // → true | false
+type Distrib = IsSourceAlias<SourceDef | string>; // → true | false
 type DistribCanonical = IsSourceCanonical<SourceDef | string>; // → true | false
 type DistribIdentical = Distrib extends DistribCanonical
   ? DistribCanonical extends Distrib

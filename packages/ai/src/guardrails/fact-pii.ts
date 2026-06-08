@@ -151,8 +151,7 @@ const SYNC_PATTERNS: SyncPattern[] = [
   },
   {
     type: "credit_card",
-    regex:
-      /\b((?:\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})|\d{13,19})\b/g,
+    regex: /\b((?:\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4})|\d{13,19})\b/g,
     validate: luhnValid,
     redactionToken: "[CREDIT_CARD]",
   },
@@ -163,7 +162,10 @@ const SYNC_PATTERNS: SyncPattern[] = [
   },
 ];
 
-function scanText(text: string, types: ReadonlySet<FactPIICategory>): FactPIIMatch[] {
+function scanText(
+  text: string,
+  types: ReadonlySet<FactPIICategory>,
+): FactPIIMatch[] {
   const out: FactPIIMatch[] = [];
   for (const pattern of SYNC_PATTERNS) {
     if (!types.has(pattern.type)) continue;
@@ -397,7 +399,12 @@ export function createFactPIIGuardrail(
           }
           mutated[k] = redactText(v, detected);
           for (const d of detected) all.push(d);
-        } else if (depth > 1 && v && typeof v === "object" && !Array.isArray(v)) {
+        } else if (
+          depth > 1 &&
+          v &&
+          typeof v === "object" &&
+          !Array.isArray(v)
+        ) {
           const nested = inspect(v, depth - 1);
           if (!nested.matched) continue;
           if (mutated === null) {

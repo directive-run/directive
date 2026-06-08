@@ -25,7 +25,6 @@ import {
   createDerivationsManager,
 } from "./derivations.js";
 import { type EffectsManager, createEffectsManager } from "./effects.js";
-import { type SourcesManager, createSourcesManager } from "./sources.js";
 import {
   createDeriveAccessor,
   createEventsAccessor,
@@ -41,6 +40,7 @@ import { type PluginManager, createPluginManager } from "./plugins.js";
 import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
+import { type SourcesManager, createSourcesManager } from "./sources.js";
 import { BLOCKED_PROPS } from "./tracking.js";
 import type {
   ConstraintsDef,
@@ -61,8 +61,8 @@ import type {
   SystemInspection,
   TraceEntry,
 } from "./types.js";
-import type { SourceDef, SourcesDef } from "./types/sources.js";
 import { type DefinitionMeta, freezeMeta } from "./types/meta.js";
+import type { SourceDef, SourcesDef } from "./types/sources.js";
 
 // ============================================================================
 // Engine Implementation
@@ -1508,8 +1508,7 @@ export function createEngine<S extends Schema>(
           moduleId: string,
           phase: "attach" | "cleanup" | "runtime",
           error: unknown,
-        ) =>
-          observer({ type: "source.error", id, moduleId, phase, error }),
+        ) => observer({ type: "source.error", id, moduleId, phase, error }),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
         onReconcileStart: () => observer({ type: "reconcile.start" }),
@@ -1607,7 +1606,8 @@ export function createEngine<S extends Schema>(
         // Return the outcome to the manager so per-source telemetry can
         // attribute the drop to a specific reason and so plugin `onPublish`
         // does NOT fire for swallowed events.
-        if (state.isDestroyed) return { accepted: false, reason: "post-destroy" };
+        if (state.isDestroyed)
+          return { accepted: false, reason: "post-destroy" };
         if (!state.isRunning) return { accepted: false, reason: "post-stop" };
         if (typeof eventName !== "string" || eventName.length === 0) {
           return { accepted: false, reason: "invalid-event-name" };

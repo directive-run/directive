@@ -376,10 +376,10 @@ export function createSourcesManager(
     const safeError =
       error.message.length <= SOURCE_ERROR_MESSAGE_MAX
         ? error
-        : Object.assign(
-            new Error(truncateSourceErrorMessage(error.message)),
-            { name: error.name, stack: error.stack },
-          );
+        : Object.assign(new Error(truncateSourceErrorMessage(error.message)), {
+            name: error.name,
+            stack: error.stack,
+          });
     callbacks.onError?.(id, moduleId, pErr, safeError);
   }
 
@@ -495,17 +495,19 @@ export function createSourcesManager(
       // (audit-ledger source.error, logging plugin onSourceError,
       // inspect().sources[i].lastError) so observers correlate the
       // failure with the source lifecycle automatically.
-      const reportRuntimeError: import("./types/sources.js").SourceReportError = (
-        runtimeError,
-      ) => {
-        if (attachedRecord.detached) return;
-        const safeRuntimeError =
-          runtimeError instanceof Error
-            ? runtimeError
-            : new Error(String(runtimeError));
-        reportError(id, record.moduleId, "runtime", safeRuntimeError);
-      };
-      const unsubscribe = record.def.attach(perSourcePublish, reportRuntimeError);
+      const reportRuntimeError: import("./types/sources.js").SourceReportError =
+        (runtimeError) => {
+          if (attachedRecord.detached) return;
+          const safeRuntimeError =
+            runtimeError instanceof Error
+              ? runtimeError
+              : new Error(String(runtimeError));
+          reportError(id, record.moduleId, "runtime", safeRuntimeError);
+        };
+      const unsubscribe = record.def.attach(
+        perSourcePublish,
+        reportRuntimeError,
+      );
       if (typeof unsubscribe !== "function") {
         // Distinguish "returned a thenable" (almost always: author wrote
         // `attach: async (publish) => () => {}`) from "returned non-function"
@@ -517,11 +519,11 @@ export function createSourcesManager(
         const err = new Error(
           looksLikePromise
             ? `[Directive] Module "${record.moduleId}" → Source "${id}" attach() returned a Promise. attach() must be synchronous; ` +
-              "rewrite as `attach: (publish) => { ... return () => unsubscribe(); }`. Do any async work inside the subscription's own internals — " +
-              "the cleanup function must be registered immediately so `system.stop()` can tear the source down."
+                "rewrite as `attach: (publish) => { ... return () => unsubscribe(); }`. Do any async work inside the subscription's own internals — " +
+                "the cleanup function must be registered immediately so `system.stop()` can tear the source down."
             : `[Directive] Module "${record.moduleId}" → Source "${id}" did not return an unsubscribe function from attach(). ` +
-              "Every source must return a cleanup function (e.g. `return () => undefined`) so the system can tear it down at stop(). " +
-              "If the source needs no teardown, return `() => undefined`, not `undefined`.",
+                "Every source must return a cleanup function (e.g. `return () => undefined`) so the system can tear it down at stop(). " +
+                "If the source needs no teardown, return `() => undefined`, not `undefined`.",
         );
         console.error(err);
         reportError(id, record.moduleId, "attach", err);

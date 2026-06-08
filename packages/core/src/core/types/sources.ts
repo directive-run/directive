@@ -215,7 +215,10 @@ export interface SourceDef {
    *   sources that never error mid-flight don't need it.
    * @returns a cleanup function that runs at `system.stop()`.
    */
-  attach: (publish: SourcePublish, reportError?: SourceReportError) => SourceUnsubscribe;
+  attach: (
+    publish: SourcePublish,
+    reportError?: SourceReportError,
+  ) => SourceUnsubscribe;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
   /**
