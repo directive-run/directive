@@ -1,5 +1,14 @@
 # @directive-run/example-checkers
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [[`dbbeb4b`](https://github.com/directive-run/directive/commit/dbbeb4b1e0cad1d209c1fc511c1754e6c5a243e5), [`e0ecd16`](https://github.com/directive-run/directive/commit/e0ecd160c9c947e6c9976dfc08fdac959eb46431), [`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac), [`dc30477`](https://github.com/directive-run/directive/commit/dc30477379def350bcf8998b9ce3883641e71bbd), [`901836e`](https://github.com/directive-run/directive/commit/901836ec59fdb7444b24695ff385b327376382e5), [`2109c31`](https://github.com/directive-run/directive/commit/2109c31b407dda9dbac5c587af745cb67f8b898e), [`ac879b5`](https://github.com/directive-run/directive/commit/ac879b5bbab111b27075da088826410064961b04), [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9), [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585), [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2), [`38d950a`](https://github.com/directive-run/directive/commit/38d950af9f02d2281f3b7b08285a3685e8afb2c0)]:
+  - @directive-run/ai@1.18.0
+  - @directive-run/core@1.18.0
+  - @directive-run/el@1.1.0
+
 ## 0.0.42
 
 ### Patch Changes

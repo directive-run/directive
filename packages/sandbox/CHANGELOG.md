@@ -1,5 +1,14 @@
 # @directive-run/sandbox
 
+## 0.3.2
+
+### Patch Changes
+
+- [`84117e8`](https://github.com/directive-run/directive/commit/84117e8203be19263da563ca2b3d9ea4ac4670d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Include the full stack trace, error `code`, and `cause` chain in `SandboxResult.errors` when the user's bundle throws during dynamic import. Previously only `err.message` was captured, which stripped the frame-by-frame location and made debugging crashes inside framework code (e.g. `createSystem`-time null derefs) impossible from the transcript alone. Facts-snapshot failures also now include their stack. No API change; only the strings inside `errors[]` get richer.
+
+- Updated dependencies [[`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac), [`2109c31`](https://github.com/directive-run/directive/commit/2109c31b407dda9dbac5c587af745cb67f8b898e), [`ac879b5`](https://github.com/directive-run/directive/commit/ac879b5bbab111b27075da088826410064961b04), [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9), [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585), [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2), [`38d950a`](https://github.com/directive-run/directive/commit/38d950af9f02d2281f3b7b08285a3685e8afb2c0)]:
+  - @directive-run/core@1.18.0
+
 ## 0.3.1
 
 ### Patch Changes
