@@ -380,6 +380,62 @@ createCompliance({
 })
 ```
 
+## Sources × PII — closing the fact-injection bypass
+
+`createPIIGuardrail` and `createEnhancedPIIGuardrail` only inspect the
+`data.input` argument passed to `runStream(agent, input, ...)`. When a
+source publishes PII into a fact and the agent's prompt template embeds
+that fact (`"Hello ${facts.email}..."`), the PII reaches the LLM call
+without hitting the input guardrail chain.
+
+This is the documented R5 audit finding (red team, privacy, AI-integration
+reviewers independently flagged it). The Tier 0 fix:
+
+```ts
+import { createSystem, createModule, t } from "@directive-run/core";
+import { createFactPIIGuardrail } from "@directive-run/ai/guardrails";
+
+const customer = createModule("customer", {
+  schema: {
+    facts: {
+      email: t.string().meta({ tags: ["pii"] }),  // ← tag pii-bearing facts
+      ssn: t.string().meta({ tags: ["pii"] }),
+    },
+  },
+  sources: { /* Supabase realtime, webhook, ... */ },
+});
+
+const system = createSystem({
+  module: customer,
+  plugins: [
+    createFactPIIGuardrail({
+      mode: "redact",            // 'redact' (safe default) | 'alert'
+      onBlocked: (key, detected) =>
+        Sentry.captureMessage(`pii redacted: ${key}`, {
+          extra: { count: detected.length },
+        }),
+    }),
+  ],
+});
+```
+
+The plugin scans every write to a `pii`-tagged fact (auto-discovered via
+`meta.byTag("pii")` at `onInit`) and either redacts the value (default —
+rewrites via a follow-up store write so the next read sees the redacted
+form) or alerts (fires `onBlocked` without mutating). Together with the
+input-guardrail chain on `runStream`, this closes the source → fact →
+prompt PII path.
+
+**Limitation:** hard rejection at the write boundary requires a
+pre-commit transform hook on the source primitive itself (Directive
+plugin hooks are wrapped by `safeCall` and a thrown error is
+swallowed). Tracked as a future RFC; today's `"redact"` mode is the
+safe-shipping posture.
+
+See [`ai-sources.md`](./ai-sources.md) for the full source primitive
+integration recipes, including the live-context pattern that
+`createFactPIIGuardrail` gates.
+
 ## Quick reference
 
 | API | Import path | Returns | Purpose |
@@ -387,6 +443,7 @@ createCompliance({
 | `createPIIGuardrail` | `@directive-run/ai/guardrails` | `GuardrailFn<InputGuardrailData>` | Basic input PII detection (block or redact) |
 | `createEnhancedPIIGuardrail` | `@directive-run/ai/guardrails` | guardrail | Context-aware input PII |
 | `createOutputPIIGuardrail` | `@directive-run/ai/guardrails` | guardrail | Output PII coverage |
+| `createFactPIIGuardrail` | `@directive-run/ai/guardrails` | `Plugin` | **Fact-boundary PII guardrail — closes the source → fact → prompt bypass. Wire at `createSystem({ plugins })`.** |
 | `createPromptInjectionGuardrail` | `@directive-run/ai/guardrails` | guardrail | Risk-scored injection defense (`strictMode`, `blockThreshold`) |
 | `createAuditTrail` | `@directive-run/ai` | `AuditInstance` | Hash-chained audit log w/ signing + PII masking + async export |
 | `createCompliance` | `@directive-run/ai` | `ComplianceInstance` | GDPR exportData / deleteData / consent + retention enforcement |

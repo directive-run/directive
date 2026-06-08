@@ -2,7 +2,7 @@
 
 > Covers `@directive-run/core` and `@directive-run/react` — hallucination-prone API patterns to avoid.
 
-19 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
+21 most common mistakes when generating Directive code, ranked by AI hallucination frequency. Every code generation MUST be checked against this list.
 
 ## 1. Unnecessary Type Casting on Facts/Derivations
 
@@ -357,6 +357,97 @@ const system = createSystem({
 });
 ```
 
+## 20. Hand-Rolled External Subscriptions Inside React/`useEffect`
+
+When wrapping an external event stream (Supabase realtime, WebSocket, polling timer, browser listener) into a Directive system, do NOT write a React `useEffect` that owns the subscription and dispatches `sys.events.X()` from the callback — declare a `source` on the module instead. The runtime owns the mount / unmount lifecycle and observability. The component collapses to fact reads.
+
+```typescript
+// WRONG – subscription lives in component code; module never knows about it.
+// On every remount you get duplicate channels; on unmount you can leak.
+function Game({ system, gameId }: Props) {
+  useEffect(() => {
+    const ch = supabase
+      .channel(`game:${gameId}`)
+      .on('postgres_changes', { event: 'UPDATE', table: 'games' }, (payload) => {
+        system.events.realtimeUpdate({ snapshot: mapRow(payload.new) });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [gameId]);
+  return <Board snapshot={useFact(system, 'snapshot')} />;
+}
+
+// CORRECT – declare a `source` on the module. The runtime owns the
+// mount / unmount lifecycle and observability. The component collapses
+// to fact reads.
+const gameModule = createModule('game', {
+  schema: {
+    facts: { snapshot: t.object<GameSnapshot>().nullable() },
+    events: { realtimeUpdate: { snapshot: t.object<GameSnapshot>() } },
+  },
+  sources: {
+    realtime: {
+      attach: (publish) => {
+        const ch = supabase
+          .channel(`game:${gameId}`)
+          .on('postgres_changes', { event: 'UPDATE', table: 'games' },
+            (p) => publish('realtimeUpdate', { snapshot: mapRow(p.new) }))
+          .subscribe();
+        return () => { supabase.removeChannel(ch); };
+      },
+    },
+  },
+  on: { realtimeUpdate: (f, p) => { f.snapshot = p.snapshot; } },
+});
+```
+
+**Why:** the hook-as-bridge pattern duplicates lifecycle code at every call site. Cleanup correctness drifts. `system.observe()` can't see the subscription. With a `source`, the engine attaches at `start()`, detaches at `stop()`, isolates failures, and emits `source.attach` / `.publish` / `.detach` / `.error` observation events for plugins.
+
+**Don't subscribe in both an effect AND a source on the same channel** — the effect re-runs on fact changes, the source mounts once, you'll get 2× messages with silent duplicates. Pick one.
+
+See [`sources.md`](./sources.md) for the full decision tree, recipes (Supabase / WebSocket / browser events / polling), and the typed-publish factory pattern.
+
+## 21. Abbreviating Type Names (`*Def` instead of `*Definition`)
+
+```typescript
+// WRONG – `Def` is short for `Definition`. Same anti-pattern as `ctx`
+// → `context` (entry #5). Source code reads better with spelled-out
+// names; the minifier handles the bytes either way.
+import type { ModuleDef, SourceDef, ResolverDef } from "@directive-run/core";
+
+// CORRECT – use the spelled-out aliases. `*Def` stays canonical in 1.x
+// for back-compat; consumers can migrate today.
+import type {
+  ModuleDefinition,
+  SourceDefinition,
+  ResolverDefinition,
+} from "@directive-run/core";
+```
+
+The `*Definition` aliases ship in 1.x via `export type { X as XDefinition }`
+in `packages/core/src/core/types/index.ts`, so generic forwarding +
+TS inference rules (mapped types, conditional distribution, tagged-
+union discrimination, barrel re-exports) match the canonical `*Def`
+form bit-for-bit. **2.0 swaps:** `*Definition` becomes canonical and
+`*Def` becomes the deprecated alias. Start writing `*Definition` in
+new code today so the 2.0 migration is a no-op.
+
+Per RFC 0006, this applies to:
+
+- `ModuleDef` → `ModuleDefinition`
+- `ConstraintDef` / `ConstraintsDef` → `ConstraintDefinition` / `ConstraintsDefinition`
+- `ResolverDef` / `ResolversDef` → `ResolverDefinition` / `ResolversDefinition`
+- `DerivationDef` / `DerivationsDef` → `DerivationDefinition` / `DerivationsDefinition`
+- `EffectDef` / `EffectsDef` → `EffectDefinition` / `EffectsDefinition`
+- `EventsDef` → `EventsDefinition`
+- `SourceDef` / `SourcesDef` → `SourceDefinition` / `SourcesDefinition`
+- `SourcePublish` → `SourcePublishFn`, `SourceUnsubscribe` → `SourceUnsubscribeFn`
+- Plus all `Typed*Def`, `CrossModule*Def`, `Dynamic*Def` variants.
+
+`EffectCleanup`, `MetaAccessor`, `EventsAccessor`, `DeriveAccessor`,
+`Snapshot` are explicitly kept as-is (each has reasoning recorded in
+RFC 0006).
+
 ## Quick Reference Checklist
 
 Before generating any Directive code, verify:
@@ -371,10 +462,12 @@ Before generating any Directive code, verify:
 8. Multi-module uses `facts.self.*` for own facts
 9. Imports from `@directive-run/core`, not deep paths
 10. `await system.settle()` after `system.start()`
+11. External event subscriptions live in `sources:`, not in `useEffect` or `onMount`
 
 ## See also
 
 - [`naming.md`](./naming.md) — the strict canonical-term rules AND the alias map for cross-paradigm searches
+- [`sources.md`](./sources.md) — the source primitive (the right answer for #20)
 - [`constraints.md`](./constraints.md) — the constraint shape these anti-patterns reference (`facts` not in scope inside static `require:`, etc.)
 - [`resolvers.md`](./resolvers.md) — the resolver shape these anti-patterns reference (return `void`, mutate `context.facts`, `(req, context)` not `(req, ctx)`)
 - [`schema-types.md`](./schema-types.md) — the `t.*()` builders that exist and the hallucinated ones (`t.map`, `t.set`, `t.promise`, `t.date`) that don't
