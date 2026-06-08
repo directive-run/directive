@@ -1,5 +1,13 @@
 # @directive-run/example-dashboard-loader
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [[`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac), [`2109c31`](https://github.com/directive-run/directive/commit/2109c31b407dda9dbac5c587af745cb67f8b898e), [`ac879b5`](https://github.com/directive-run/directive/commit/ac879b5bbab111b27075da088826410064961b04), [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9), [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585), [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2), [`38d950a`](https://github.com/directive-run/directive/commit/38d950af9f02d2281f3b7b08285a3685e8afb2c0)]:
+  - @directive-run/core@1.18.0
+  - @directive-run/el@1.1.0
+
 ## 0.0.42
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/sources",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Source adapters for Directive — wrap Supabase realtime, Cloudflare DO alarms, WebSocket, Sentry, etc. as typed `source` primitives. One package, one install, subpath exports per vendor.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
@@ -65,8 +65,12 @@
     "@cloudflare/workers-types": "^4.0.0"
   },
   "peerDependenciesMeta": {
-    "@supabase/supabase-js": { "optional": true },
-    "@cloudflare/workers-types": { "optional": true }
+    "@supabase/supabase-js": {
+      "optional": true
+    },
+    "@cloudflare/workers-types": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",

@@ -1,5 +1,575 @@
 # @directive-run/core
 
+## 1.18.0
+
+### Minor Changes
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`2109c31`](https://github.com/directive-run/directive/commit/2109c31b407dda9dbac5c587af745cb67f8b898e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `*Definition` aliases for the `*Def` cohort (RFC 0006 — 1.x forward-compat landing)
+
+  `@directive-run/core` now exports `*Definition` names alongside every
+  `*Def` type so consumers can migrate from the abbreviated form today
+  without breaking change. The `*Def` types stay canonical through 1.x;
+  **2.0** swaps which name is canonical and which is the deprecated
+  alias.
+
+  Rationale (per RFC 0006): `*Def` is an abbreviation. The workspace's
+  own `anti-patterns.md` entry #5 forbids abbreviating `context` to
+  `ctx`; the same logic applies to type names. Minifiers handle the
+  bytes; source-code readability does not.
+
+  ### What ships
+
+  The aliases live in `packages/core/src/core/types/index.ts` via the
+  `export type { X as Y }` re-export-rename pattern, which preserves all
+  generic forwarding + TS inference rules (mapped types, conditional
+  distribution, tagged-union discrimination, barrel re-exports). Each
+  alias resolves to the SAME type symbol as its canonical name — just
+  under a different label.
+
+  Aliased cohorts:
+
+  - `ModuleDef` → `ModuleDefinition`
+  - `ConstraintDef` / `ConstraintsDef` → `ConstraintDefinition` / `ConstraintsDefinition`
+  - `TypedConstraintDef` / `TypedConstraintsDef` → `TypedConstraintDefinition` / `TypedConstraintsDefinition`
+  - `CrossModuleConstraintDef` / `CrossModuleConstraintsDef` → `CrossModuleConstraintDefinition` / `CrossModuleConstraintsDefinition`
+  - `DynamicConstraintDef` → `DynamicConstraintDefinition`
+  - `ResolverDef` / `ResolversDef` → `ResolverDefinition` / `ResolversDefinition`
+  - `TypedResolverDef` / `TypedResolversDef` → `TypedResolverDefinition` / `TypedResolversDefinition`
+  - `SchemaTypedResolversDef` → `SchemaTypedResolversDefinition`
+  - `DynamicResolverDef` → `DynamicResolverDefinition`
+  - `DerivationDef` / `DerivationsDef` / `DerivationDefWithMeta` → `DerivationDefinition` / `DerivationsDefinition` / `DerivationDefinitionWithMeta`
+  - `TypedDerivationsDef` / `CrossModuleDerivationsDef` → `TypedDerivationsDefinition` / `CrossModuleDerivationsDefinition`
+  - `EffectDef` / `EffectsDef` → `EffectDefinition` / `EffectsDefinition`
+  - `CrossModuleEffectDef` / `CrossModuleEffectsDef` → `CrossModuleEffectDefinition` / `CrossModuleEffectsDefinition`
+  - `EventsDef` / `TypedEventsDef` → `EventsDefinition` / `TypedEventsDefinition`
+  - `SourceDef` / `SourcesDef` → `SourceDefinition` / `SourcesDefinition`
+  - `SourcePublish` → `SourcePublishFn`
+  - `SourceUnsubscribe` → `SourceUnsubscribeFn`
+
+  ### Explicit "no rename" decisions
+
+  - `EffectCleanup` — kept as-is (symmetric `EffectCleanupFn` rename
+    deferred to a separate sweep tracked in a follow-up issue;
+    asymmetry with `SourceUnsubscribeFn` documented).
+  - `MetaAccessor`, `EventsAccessor`, `DeriveAccessor` — `Meta` here is
+    the term-of-art for the metadata-accessor pattern, not an
+    abbreviation.
+  - `SchemaType`, `ModuleHooks`, `SystemConfig`, `SystemInspection`,
+    `Snapshot` — already spelled out.
+
+  ### Migration
+
+  ```ts
+  // 1.x — both work, pick whichever reads better
+  import type { ModuleDef, SourceDef } from "@directive-run/core"; // canonical
+  import type { ModuleDefinition, SourceDefinition } from "@directive-run/core"; // forward-compat
+  ```
+
+  ### Verification
+
+  `packages/core/src/core/__tests__/rename-aliases.test-d.ts` smoke-tests
+  the 5 TS-inference edge cases per RFC 0006 (direct structural
+  identity, generic-constraint position, mapped-key position,
+  conditional distribution, tagged-union literal discriminant, barrel
+  re-export). If any alias breaks identity, `tsc --noEmit` rejects.
+
+  `packages/knowledge/core/anti-patterns.md` adds entry #21
+  ("Abbreviating Type Names") so AI-generated code paths preferentially
+  emit the spelled-out names.
+
+  ### 2.0 plan
+
+  Canonical declarations rename to `*Definition`; the `*Def` names
+  become the deprecated `@deprecated` aliases (same `export type { X as
+Y }` shape, reversed direction). Touches ~21 packages across the
+  workspace; lands on its own dedicated 2.0 branch.
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`ac879b5`](https://github.com/directive-run/directive/commit/ac879b5bbab111b27075da088826410064961b04) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — RFC 0007 backpressure + RFC 0008 Observer protocol + RFC 0009 async-stop + DO eviction
+
+  Three additive RFCs land together on the source primitive. All changes
+  preserve existing source declarations bit-for-bit; consumers opt in
+  per source / per call.
+
+  ## RFC 0007 — `SourceDef.coalesce` backpressure
+
+  Additive `SourceDef.coalesce: "none" | "lastWriteWins" | "all"`
+  (default `"none"`). When set to `"lastWriteWins"`, the manager
+  queues at most ONE publish per event name per microtask. Subsequent
+  publishes with the same event name within the same microtask cycle
+  overwrite the pending payload and bump `dropCount` /
+  `lastDropReason: "coalesced"`. Per-event-name keying means a noisy
+  `priceTick` storm coalesces while a one-shot `connected` event still
+  dispatches in the same flush.
+
+  `"all"` is a no-op equivalent to `"none"` — it names the intent (no
+  coalesce, every publish counts) for readers. Choose `"lastWriteWins"`
+  for high-frequency sources (cursor movement, sensor telemetry,
+  channel storms); leave `coalesce` unset for low-frequency lifecycle
+  sources (MCP connect, DO alarm). `SystemInspection.sources[i]` now
+  exposes `lastDropReason: "coalesced"` so operators can verify the
+  debouncing is firing on the right sources.
+
+  ## RFC 0008 — Source publish Observer-protocol posture
+
+  `SourcePublish` is now an `interface` (was a bare callable type) so
+  additive minors can attach optional methods (e.g. `error`,
+  `complete`) without a major bump. The call signature is unchanged:
+  existing `publish('EVENT', payload)` call sites keep working.
+
+  `attach` gains an optional second argument: `reportError`. Authors
+  route runtime errors from the underlying stream (WebSocket disconnect,
+  Supabase channel goes stale, polling fetch throws) through this
+  callback instead of inventing magic event names like `STREAM_ERROR`.
+  The error fires `phase: "runtime"` — distinct from `"attach"` and
+  `"cleanup"` — so the audit ledger / logging plugin / `inspect()` can
+  attribute mid-flight failures correctly.
+
+  ```ts
+  sources: {
+    ws: {
+      attach: (publish, reportError) => {
+        const sock = new WebSocket(url);
+        sock.addEventListener('error', () => reportError(new Error('WS')));
+        sock.addEventListener('message', (e) => publish('MSG', JSON.parse(e.data)));
+        return () => sock.close();
+      },
+    },
+  }
+  ```
+
+  The new `phase: "runtime"` variant lands additively on:
+
+  - `ObservationEvent.source.error.phase`
+  - `Plugin.onSourceError` signature
+  - `SystemInspection.sources[i].lastError.phase`
+  - `AuditEntry` `source.error` arm
+
+  ## RFC 0009 — Async-aware `system.stop()` + DO eviction hook
+
+  `SourceUnsubscribe` widens from `() => void` to
+  `() => void | Promise<void>`. Existing sync unsubscribes continue to
+  satisfy the type.
+
+  `System` gains three parallel async methods (sync variants kept,
+  **not** deprecated yet — that cut waits for 2.0 per RFC 0009):
+
+  - `stopAsync(): Promise<void>` — awaits each source's unsubscribe in
+    reverse-registration order. Use when sources have async unsubscribes
+    (Supabase `channel.unsubscribe()`, Cloudflare DO storage flushes)
+    and the caller needs teardown to actually complete before continuing.
+  - `destroyAsync(): Promise<void>` — `stopAsync` + `destroy`.
+  - `evict(deadline?: number): Promise<void>` — fires every source's
+    `onEvict()` in registration order, then `destroyAsync`. Cloudflare
+    DO consumers call this from `alarm()` / `webSocketClose()` BEFORE
+    letting the runtime evict so external brokers don't accumulate ghost
+    subscriptions. Optional `deadline` races the eviction against a
+    wall-clock cutoff — a partial teardown beats a hang while the
+    runtime is impatient.
+
+  `SourceDef.onEvict?: () => void | Promise<void>` — new optional hook
+  on every source. Distinct from `unsubscribe()`: eviction can fire
+  without a `system.stop()` having been called. Sources whose
+  underlying transport is short-lived (browser WebSocket, in-process
+  EventEmitter) don't need it.
+
+  The `SourcesManager` interface gains `cleanupAllAsync` (matches the
+  sync `cleanupAll` step-for-step but awaits Promise returns) and
+  `evictAll` (fires every source's `onEvict` in registration order,
+  isolates failures as `phase: "runtime"` errors).
+
+  Sync `cleanupAll` is retained for back-compat (Promise returns from
+  unsubscribes are fire-and-forget). Consumers who need awaitable
+  teardown wire `system.stopAsync()`.
+
+  Eight regression tests cover the new behaviors: coalesce
+  last-write-wins (per microtask + per event name + `"all"` /
+  unset behave like `"none"`), `reportError` routes phase `"runtime"`
+  errors through the same sinks (after-detach no-op verified),
+  `cleanupAllAsync` awaits Promise-returning unsubscribes while sync
+  `cleanupAll` fire-and-forgets them, `evictAll` fires `onEvict` in
+  registration order with failure isolation, sources without `onEvict`
+  silently no-op through `evictAll`.
+
+  Core test suite: 2109 → 2117 passing.
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R5 hardening: lifecycle parity, audit-ledger coverage, per-source telemetry, internals export
+
+  Closes the gaps surfaced by a maximum-scope review of `@directive-run/core`'s
+  `source` primitive across security, lifecycle, observability, privacy, and
+  portability lenses. All changes are additive (no breaking changes for
+  existing source declarations).
+
+  What changed:
+
+  - **Dispatch guard parity with `system.dispatch`.** The engine's source
+    dispatcher now drops publishes that arrive after `system.stop()` (between
+    stop and the next start), drops publishes whose event names walk the
+    prototype chain (`__proto__`, `constructor`, `prototype`) — mirroring the
+    BLOCKED_PROPS check `system.dispatch` already enforces — and drops empty
+    / non-string event names so logging and audit sinks aren't forced to
+    render placeholder rows.
+
+  - **Per-record `detached` flag on the publish closure.** Closes the
+    re-registration race window: an OLD source's external transport firing an
+    in-flight callback AFTER the R3 registry swap now hits a `detached`
+    guard and no-ops, instead of dispatching with stale attribution. R3
+    closed the registry leak; this closes the in-flight publish leak.
+
+  - **`registerModule` emits `onDefinitionRegister("source", ...)`.** Runtime
+    source registration is now visible to plugins — including the
+    audit-ledger — closing the privilege-change blind spot that left
+    hot-reload and dynamic-module source attach unrecorded.
+
+  - **Audit-ledger captures `source.attach` / `source.detach` / `source.error`.**
+    Three new `AuditEntryKind` variants land in the ledger automatically.
+    `source.publish` is intentionally NOT captured — high-volume sources
+    would blow up the ledger, and the resulting `fact.change` entries
+    already encode the outcome and remain queryable.
+
+  - **Per-source telemetry on `system.inspect().sources`.** Each row now
+    carries `attached`, `attachedAt`, `detachedAt`, `publishCount`,
+    `lastPublishAt`, `errorCount`, and `lastError`, so operators can answer
+    "is this source publishing?" "when did it last fire?" "is it errored?"
+    without registering a custom plugin. Counters reset at every `system.start()`.
+
+  - **Logging plugin wires `onSourceAttach` / `onSourcePublish` /
+    `onSourceDetach` / `onSourceError`.** The default observability surface
+    now logs the full source lifecycle (attach/detach/error at the
+    configured level, publish at `debug` so high-rate sources don't dominate
+    the log at typical "info"-level config).
+
+  - **`createSourcesManager` re-exported from `@directive-run/core/internals`.**
+    Closes the parity gap with every other manager factory and unblocks
+    sandbox / sibling-package consumers that want to drive sources at the
+    lower level.
+
+  - **Promise-shaped unsubscribe returns get a targeted diagnostic.** Authors
+    who write `attach: async (publish) => () => undefined` now see a
+    Promise-specific error message ("attach() must be synchronous — rewrite
+    as `attach: (publish) => { ... return () => unsubscribe(); }`") instead
+    of the generic "did not return an unsubscribe function" diagnostic.
+
+  - **Anti-patterns + sources.md cross-references corrected.** The dead
+    `effects.md` link in sources.md's "Related" section is replaced with
+    `core-patterns.md` + `naming.md` + the now-canonical `anti-patterns.md #20`
+    entry. The stale "19 most common mistakes" intro line in
+    `anti-patterns.md` is updated to reflect the 20th entry on hand-rolled
+    subscriptions.
+
+  Five new regression tests cover the changes (BLOCKED_PROPS on event names,
+  post-stop dispatch guard, re-registration race detached flag, Promise
+  unsubscribe diagnostic, per-source publish counter).
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R6 hardening: dispatch ordering, drop telemetry, error truncation, AuditEntry coverage, timeline render
+
+  Closes a second round of cross-cutting findings against the source primitive
+  covering security, observability, privacy, and DX. All changes are additive
+  on top of R5.
+
+  **Engine — `emitDefinitionRegister("source", ...)` no longer leaks the live `def.attach` callback.**
+  The privilege-change emission now hands plugins an opaque descriptor
+  (`{ moduleId, meta }`) instead of the raw `SourceDef`. A malicious or buggy
+  plugin receiving the live def could call `def.attach(...)` to install a
+  parallel subscription bypassing the manager — the manager wouldn't track it,
+  wouldn't tear it down at stop, and wouldn't surface it via `inspect()`. The
+  descriptor exposes nothing callable; plugins that need to react beyond the
+  attach/publish/detach hooks can subscribe to `system.observe()`.
+
+  **Engine — emission order is now `register → attach`, matching constraints / resolvers / derivations / effects.**
+  Previously `sourcesManager.registerDefinitions` ran before
+  `emitDefinitionRegister("source", ...)`, so observers saw `source.attach`
+  before `definition.register`. Audit replays and devtools timelines now read
+  the source lifecycle in the same order as every other primitive.
+
+  **Manager — counter bump + `onPublish` fire ONLY for engine-accepted publishes.**
+  Pre-R6, `perSourcePublish` bumped `publishCount` + fired the `onPublish`
+  plugin hook BEFORE invoking the engine's dispatch lambda. When the lambda
+  silently rejected the publish (post-stop, BLOCKED_PROPS event name, empty /
+  non-string name), telemetry and observers saw "publish happened" for events
+  the engine swallowed. The dispatch lambda now returns a typed
+  `SourceDispatchResult` so the manager can split accepted / rejected: accepted
+  publishes bump `publishCount` + fire `onPublish`; rejected publishes bump
+  `dropCount` + record `lastDropReason` instead.
+
+  **`SystemInspection.sources[i]` gains `dropCount` / `lastDropReason` / `lastDropAt`.**
+  Operators can now diagnose "publishes happening, nothing changing" without a
+  custom plugin. The four drop reasons (`"post-destroy"`, `"post-stop"`,
+  `"blocked-event-name"`, `"invalid-event-name"`) attribute each rejection to a
+  specific guard. Closes the silent-block telemetry gap that let an attacker
+  probe BLOCKED_PROPS / the `isRunning` guard invisibly.
+
+  **Manager — error messages truncated at 256 characters.**
+  A source whose `attach()` throws with a payload-embedded message
+  (`throw new Error(\`bad row: ${JSON.stringify(piiRow)}\`)`) previously
+landed the full payload in (a) `inspect().sources[i].lastError.message`,
+(b) the audit ledger's `source.error`entry, and (c) the logging plugin's
+error-level emission. R6 caps the message at a fixed length with a`[N chars truncated]`marker so the leak surface is bounded. Source authors
+who need the full message in development can opt into a custom logging
+plugin that captures the raw`Error` object.
+
+  **Audit-ledger — `AuditEntry` discriminated union now includes `source.attach` / `source.detach` / `source.error`.**
+  The R5 `AuditEntryKind` listed these, but the `AuditEntry` union didn't
+  have matching arms — the `as AuditEntry` cast at `index.ts` masked the
+  type hole. Consumers can now `entry.kind === "source.*"` narrow on
+  `sourceId` / `moduleId` / `phase` / `error` without `as` escape hatches.
+
+  **Manager — late-bind unsubscribe via direct assignment.**
+  The R5 `Object.assign(attachedRecord, { unsubscribe })` was bypassing the
+  `readonly unsubscribe` declaration on `AttachedSource`. Drop the `readonly`
+  modifier to make the late-bind honest and remove the type-system lie.
+
+  **Hot-path allocation — `emptyCounters()` is no longer allocated per publish.**
+  `perSourcePublish` now relies on the counters entry being seeded at the top
+  of `attachOne` (so publish-during-attach is also counted). At 1M publishes
+  per tick the eliminated allocation removes ~1M small-object GC pressure.
+
+  **Timeline — source.\* events now render with detail + color.**
+  `@directive-run/timeline`'s `formatEventDetail` switch now has cases for
+  `source.attach`, `source.publish`, `source.detach`, `source.error`. Pre-R6,
+  the timeline showed bare `source.publish` with no module / id / event name.
+  Also added `KIND_COLORS` entries (magenta for attach/detach, cyan for
+  publish, red for error).
+
+  **Docs — `system-api.md` documents `inspection.sources` + `attachedSourceCount`.**
+  The R5 telemetry fields were the SystemInspection JSDoc but absent from the
+  canonical knowledge doc. R6 lands the full schema reference.
+
+  **Bundle gate — `packages/core/dist/index.js` added to `size-budgets.json` at 18 KB gz.**
+  Current 14.7 KB gz leaves ~22% headroom. The largest package in the
+  workspace was previously ungated; any future feature now lands measured.
+
+  Three new regression tests cover the changes: drop telemetry on
+  `inspect().sources`, `onPublish` only fires for accepted publishes, and
+  `lastError.message` truncation at 256 chars. Sources test file goes from
+  39 → 42; full core suite 2105 → 2108 passing.
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`38d950a`](https://github.com/directive-run/directive/commit/38d950af9f02d2281f3b7b08285a3685e8afb2c0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Add `source` primitive — typed external event sources, the inbound dual of effects.
+
+  A `source` declares an external event subscription (Supabase realtime channel, WebSocket message stream, polling timer, browser event listener) as a first-class module field. The engine owns the lifecycle:
+
+  - `attach(publish)` runs once at `system.start()`. The synchronous callback receives a typed `publish` that dispatches into the same event queue as `system.events.X(payload)`.
+  - The returned `Unsubscribe` runs at `system.stop()`, in reverse-registration order across all modules.
+  - The full **start → stop → start → stop** lifecycle is supported — each `attachAll` re-arms the manager and a fresh attach runs.
+  - Sources brought by `system.registerModule(...)` AFTER `start()` attach **immediately** using the captured publisher.
+  - Source attach + unsubscribe failures are isolated per source (logged via `console.error` AND forwarded to the new `onSourceError` plugin hook) — one bad source never blocks others.
+  - The publish callback **guards against post-destroy dispatch** — a source author who retains the callback past `destroy()` cannot dispatch into the torn-down store.
+
+  This formalises the "hook-as-bridge" pattern used in 7+ call sites across downstream consumers (Minglingo's `useActiveRoundSystem`, `useBattleRoyaleSystem`, `eventClaims.realtime.ts`, etc.) where a `useEffect` owned the realtime channel and manually dispatched events on each message. With `sources` declared on the module, the lifecycle is engine-owned and the React hook collapses to `useFact` reads.
+
+  Usage:
+
+  ```typescript
+  import { createModule, t, type SourcePublish } from "@directive-run/core";
+
+  const counter = createModule("counter", {
+    schema: {
+      facts: { count: t.number() },
+      events: { TICK: { delta: t.number() } },
+    },
+    init: (f) => {
+      f.count = 0;
+    },
+    events: {
+      TICK: (f, payload) => {
+        f.count = f.count + payload.delta;
+      },
+    },
+    sources: {
+      heartbeat: {
+        attach: (publish) => {
+          const id = setInterval(() => publish("TICK", { delta: 1 }), 1000);
+          return () => clearInterval(id);
+        },
+      },
+    },
+  });
+  ```
+
+  **Observability.** Source lifecycle is fully observable via `system.observe()`:
+
+  ```typescript
+  system.observe((event) => {
+    switch (event.type) {
+      case "source.attach":
+        /* { id, moduleId } */ break;
+      case "source.publish":
+        /* { id, moduleId, eventName } */ break;
+      case "source.detach":
+        /* { id, moduleId } */ break;
+      case "source.error":
+        /* { id, moduleId, phase, error } */ break;
+    }
+  });
+  ```
+
+  Or via the plugin API (`onSourceAttach`, `onSourcePublish`, `onSourceDetach`, `onSourceError`).
+
+  `system.inspect().sources` lists declared sources with their owning `moduleId`, and `system.inspect().attachedSourceCount` reports the live count.
+
+  New exports:
+
+  - `SourceDef`, `SourcesDef`, `SourcePublish`, `SourceUnsubscribe` (types).
+  - `ModuleConfig.sources?` and `ModuleConfigWithDeps.sources?` (cross-module dependency variant accepts sources too; sources don't access facts so they're not affected by the `facts.self.*` / `facts.{dep}.*` split).
+  - `system.registerModule({ sources })` — dynamic sources attach immediately when the system is already running.
+  - `system.inspect().sources` + `system.inspect().attachedSourceCount`.
+  - Four new `ObservationEvent` variants: `source.attach`, `source.publish`, `source.detach`, `source.error`.
+  - Four new Plugin hooks: `onSourceAttach`, `onSourcePublish`, `onSourceDetach`, `onSourceError`.
+
+  Documentation:
+
+  - New knowledge file `packages/knowledge/core/sources.md` with decision tree, recipes (Supabase, browser events), lifecycle table, observation snippet, common patterns + anti-patterns.
+  - `packages/knowledge/core/anti-patterns.md` gains a "hand-rolled subscription instead of `source`" entry.
+  - `packages/knowledge/sitemap.md` indexes sources under Core API.
+  - `packages/knowledge/api-skeleton.md` lists the four new exported types.
+
+  Non-breaking: modules without a `sources` field continue to work identically.
+
+### Patch Changes
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive RFCs — R11 close-out: public alias exports + interrupt() semantic + evict(deadline) detached-work + liveContext setup hoist + self-loop guard + docs drift
+
+  R11 audit on the 5 RFC implementations (0005-0009) surfaced one
+  Critical and several Major issues. All shipped without prior review
+  in the original implementation pass; this patch closes them.
+
+  ### Critical fixes
+
+  **Public alias exports** (RFC 0006): the 22+ `*Definition` aliases
+  landed in `packages/core/src/core/types/index.ts` but the curated
+  public barrel at `packages/core/src/index.ts` didn't re-export them.
+  `import type { ModuleDefinition } from "@directive-run/core"` — the
+  exact form anti-patterns.md #21 instructs consumers to write —
+  failed at the package boundary. Every alias is now re-exported from
+  the public barrel.
+
+  **`interrupt()` semantic** (RFC 0005): the headline feature of
+  liveContext — `interrupt()` cancels the LLM run but keeps the
+  subscription alive — was broken. `abortController.abort()` triggered
+  the IIFE catch path → reject → `resultPromise.finally(() =>
+tearDownLiveContext())` ran → subscription died. The distinction
+  between `abort` and `interrupt` collapsed.
+
+  Fix: a private `interruptInitiated` flag is set BEFORE
+  `abortController.abort()` in `interrupt()`. The `finally` callback
+  checks the flag and skips `tearDownLiveContext` when the abort came
+  from `interrupt`. The caller is now correctly responsible for either
+  re-prompting via a fresh `runStream` against the live subscription, or
+  calling `abort()` to fully tear down.
+
+  ### Major fixes
+
+  **`evict(deadline≤0)` detached work** (RFC 0009): when `evict` is
+  called with a synchronous deadline, the eviction IIFE used to be
+  constructed, then the function returned early — leaving the IIFE
+  running detached with no error path (unhandled-rejection risk if late
+  teardown threw). The two paths now both attach a swallow-catch:
+  synchronous-deadline kicks off detached work with a `.catch(() =>
+{})`; deadline-raced path attaches the same swallow before
+  `Promise.race`. Per-source errors still route through the manager's
+  `phase: "runtime"` sink, so the catch doesn't lose signal.
+
+  **liveContext setup hoist** (RFC 0005): the liveContext subscription
+  used to wire up AFTER the resultPromise IIFE was constructed (and had
+  already started running synchronously up to its first `await`). The
+  race is theoretical today (the IIFE's sync prefix doesn't mutate
+  facts), but a future IIFE prefix change could synchronously trigger
+  fact mutations before the subscription wires up. The block now runs
+  BEFORE the IIFE construction. The subscription callback closes over
+  `closed`, `pushChunk`, `accumulatedOutput`, `abortController` — all
+  declared above and reactive to mutations from inside the IIFE.
+
+  **Self-loop dev-mode guard** (RFC 0005): nothing prevented a consumer
+  from passing `liveContext.system === orchestrator.system` AND
+  watching bridge-state keys (`agent`, `conversation`, `approvalState`).
+  The orchestrator's own `setAgentState` / `setConversation` writes
+  would trigger `interruptWhen`, self-looping the run. The
+  orchestrator's `runStream` now warns in `debug: true` mode when the
+  overlap is detected.
+
+  **`mode: "restart"` dead code** (RFC 0005): the `mode` field was
+  declared on `LiveContextOptions` but the implementation never read
+  `liveCfg.mode` — both values produced identical behavior. The type
+  union order is now `"inject-system-message" | "restart"` (the
+  shipping default first), the JSDoc is honest that `"restart"` is
+  forward-compat-only, and the `@example` block uses
+  `"inject-system-message"`.
+
+  **`SourceReportError` export** (RFC 0008): the callback type that
+  authors need to type their reportError helpers wasn't re-exported.
+  Now exported from `@directive-run/core/types/index.ts` and from the
+  public barrel at `@directive-run/core`.
+
+  **`reportError` parameter optional** (RFC 0008): the type signature
+  of `SourceDef.attach` declared `reportError` as required, but the
+  JSDoc said it was optional. Made the parameter optional in the type
+  to match.
+
+  **Coalesce strategy uniformity** (RFC 0007): the JSDoc on
+  `SourceDef.coalesce` documented per-event-name coalescing but didn't
+  call out that the STRATEGY (lastWriteWins vs none) is uniform per
+  source. Added a "Limitation" subsection naming the constraint.
+
+  ### Documentation drift fixes
+
+  `packages/knowledge/ai/ai-sources.md` had multiple factual errors
+  against the shipped types:
+
+  - Documented a `liveContext.guardrails` field that doesn't exist
+    (removed — security companion is `createFactPIIGuardrail` wired at
+    `createSystem` time, documented in the Status section).
+  - Listed `mode` default as `"restart"` (flipped to
+    `"inject-system-message"`).
+  - Missing `changedKeys` field on `interrupted` chunk shape (added).
+  - Missing required `keys` field in the signature example (added).
+  - Never mentioned `result.interrupt(reason?)` method (added with
+    contrast vs `abort()`).
+  - "Status" section still in RFC-design-speak after ship (flipped to
+    "shipped").
+
+  `packages/knowledge/core/sources.md` gained three new sections per
+  RFC 0007/0008/0009 acceptance criteria:
+
+  - "Error handling — runtime errors via reportError" (RFC 0008).
+  - "Backpressure — coalesce: lastWriteWins" (RFC 0007).
+  - "Async-aware teardown — system.stopAsync() + DO onEvict" (RFC 0009).
+
+  Stale line references in `docs/rfcs/0005-live-context-agent.md`
+  (`agent-orchestrator.ts:1309, 1474`) replaced with symbolic
+  references.
+
+  Gates: core typecheck + 2117 tests passing; ai typecheck + 1511 tests
+  passing; sources typecheck clean; core dist 14,678 B gz (under
+  18,000 B budget).
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R7: error-message truncation applies at the manager
+  boundary so audit-ledger and logging plugin observe a bounded message too
+
+  R6's `lastError.message` truncation closed the inspect-output leak surface,
+  but the `onError` plugin callback continued to receive the raw `Error`
+  object. The audit-ledger's `source.error` entry read `event.error.message`
+  directly, and the logging plugin's `error`-level emission logged the raw
+  error — both still wrote the full payload into their respective sinks.
+
+  R7 truncates at the `reportError` boundary inside the source manager: any
+  `Error` whose `message` exceeds `SOURCE_ERROR_MESSAGE_MAX` (256 chars) is
+  replaced with a sanitized `Error` instance carrying the truncated message
+  before the `onError` callback fires. The privacy invariant is now "one
+  bounded message ceiling across all three sinks" — `inspect()`, the audit
+  ledger, and the logging plugin. Short errors pass through unchanged so the
+  sanitization has zero allocation overhead in the common case.
+
+  `SourceInspectionRow`, `SourceLastError`, and `SourceDispatchResult` are
+  also now re-exported from `@directive-run/core/internals` so consumers
+  writing helpers over `inspect().sources[i]` can name the types directly
+  (previously possible only via `SystemInspection["sources"][number]`).
+
+  Docs:
+
+  - `system-api.md`'s "23 event types" reference now lists the four
+    `source.*` variants (previously stale at "18 event types").
+  - `docs/IDEAS.md` Tier 0 entry cites the 256-char interim ceiling as
+    the floor that `createFactPIIGuardrail` will eventually lift.
+
 ## 1.17.2
 
 ## 1.17.1

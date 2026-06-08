@@ -1,5 +1,377 @@
 # @directive-run/ai
 
+## 1.18.0
+
+### Minor Changes
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`dbbeb4b`](https://github.com/directive-run/directive/commit/dbbeb4b1e0cad1d209c1fc511c1754e6c5a243e5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createFactPIIGuardrail` — fact-store boundary PII guardrail
+
+  Closes the source → fact → agent-prompt PII bypass surfaced by the R5
+  red-team / privacy / AI-integration reviewers: `createPIIGuardrail` and
+  `createEnhancedPIIGuardrail` only inspect the `data.input` argument
+  passed to `runStream(agent, input, ...)`. When a source publishes PII
+  into a fact and the agent's prompt template embeds that fact
+  (`"Hello ${facts.email}..."`), the PII reaches the LLM call without
+  hitting the input guardrail chain.
+
+  `createFactPIIGuardrail` is a Directive plugin (wired at
+  `createSystem({ plugins: [...] })`) that scans every write to a
+  `pii`-tagged fact, auto-discovered via `meta.byTag("pii")` at `onInit`.
+  Two modes:
+
+  - `"redact"` (default, safe shipping posture): rewrites the fact value
+    via a follow-up store write so the next read returns the redacted
+    form. The raw value briefly exists for one microtask while the
+    redaction lands; downstream subscribers that snapshot at that instant
+    see it; the LLM call after the next settle does not.
+  - `"alert"`: fires the `onBlocked` callback but does NOT mutate the
+    fact. Use for monitoring-only deployments where the source's
+    transport is already trusted and you want to page on every match
+    without modifying state.
+
+  The built-in regex covers SSN, credit-card, and email. Pass a
+  synchronous `customDetector` for domain-specific patterns (internal
+  account numbers, partner IDs). The full async detector at
+  `@directive-run/ai/guardrails/pii-enhanced` is unsuitable for this hook
+  because `onFactSet` is synchronous and a deferred detection would let
+  the raw PII reach observers + breakpoints + audit-ledger before the
+  redaction completed.
+
+  Wires as the Tier 0 prerequisite for the upcoming
+  `runStream({ liveContext })` recipe, which would otherwise expand the
+  fact-injection bypass surface into the mid-stream context updates the
+  agent reads while generating.
+
+  Hard rejection at the write boundary requires a pre-commit transform
+  hook on the source primitive itself (Directive plugin hooks are
+  wrapped by the plugin manager's `safeCall` and a thrown error is
+  swallowed). Tracked as a future RFC. Today's `"redact"` mode is the
+  safe-shipping posture.
+
+  Docs:
+
+  - New `packages/knowledge/ai/ai-sources.md` — AI × Sources patterns,
+    three-tier lifetime ladder, `runStream({ liveContext })` recipe
+    (RFC 0005 cross-ref), MCP lifecycle as a source, sources × security,
+    anti-patterns (no token streaming via source, no polling from a
+    constraint), `@directive-run/sources/*` adapter subpath inventory.
+  - `packages/knowledge/ai/ai-security.md` — new "Sources × PII" section
+    with the threat chain + the redact recipe, and a row in the quick
+    reference table.
+  - `packages/knowledge/core/sources.md` — "Related" links to the new
+    `ai-sources.md` + `ai-security.md` anchor.
+
+  Eight regression tests cover redact mode (string + object payloads),
+  alert mode, `includeKeys` / `excludeKeys` escape hatches, and the
+  custom detector composition path.
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`e0ecd16`](https://github.com/directive-run/directive/commit/e0ecd160c9c947e6c9976dfc08fdac959eb46431) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `attachSourcesToOtel` — pipe core source.\* observation events into the
+  same OTel tracer the AI plugin uses
+
+  The R5 observability reviewer found `@directive-run/ai/otel.ts`
+  subscribes only to the AI `DebugTimeline` event stream, so the four
+  `ObservationEvent.source.*` variants (`source.attach`,
+  `source.publish`, `source.detach`, `source.error`) shipped by the
+  source primitive never reached the OTel exporter. SREs running with
+  `createOtelPlugin` saw agent spans but could not answer "which source
+  is publishing?" or "did source `mcp` error attach?" from their
+  tracing backend.
+
+  `attachSourcesToOtel(system, { tracer, serviceName })` closes the gap
+  as a focused helper (not a second OTel plugin) so a single
+  `OtelTracer` carries both AI and core source spans. Wire it once at
+  `createSystem` time:
+
+  ```ts
+  import { trace } from "@opentelemetry/api";
+  import { createOtelPlugin, attachSourcesToOtel } from "@directive-run/ai";
+
+  const tracer = trace.getTracer("directive-app");
+  const otel = createOtelPlugin({ serviceName: "my-app", tracer });
+
+  const system = createSystem({ module });
+  otel.attach(orchestrator.timeline);
+  const unsub = attachSourcesToOtel(system, { tracer, serviceName: "my-app" });
+  ```
+
+  Spans emitted:
+
+  - `directive.source.attached` — long-lived span per (sourceId,
+    moduleId). Opened at attach; closed at detach with status `OK`.
+  - `publish` span events on the active span (NOT new spans per
+    publish — cardinality budget). At 10 sources × 100 publishes/sec
+    the exporter sees 1000 events/sec on 10 long-lived spans, well
+    within typical OTel collector budgets.
+  - `directive.source.error` — short-duration error-status span with
+    `directive.phase`, `error.message` (truncated by the manager at the
+    R7 boundary).
+
+  Optional `publishSampleRate` (default 1.0) sub-samples publish events
+  for very high-throughput sources.
+
+  Tests: 4 regression tests covering attach → detach span lifecycle,
+  publish-as-event-on-active-span, error span shape, and unsubscribe
+  behavior.
+
+  The complementary `@directive-run/ai/devtools-server.ts` integration
+  (extend `DevToolsServerMessage` with source.\* variants) is deferred to
+  its own PR — documented in `docs/IDEAS.md`.
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`901836e`](https://github.com/directive-run/directive/commit/901836ec59fdb7444b24695ff385b327376382e5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `runStream({ liveContext })` — Reactive Agents (RFC 0005)
+
+  Additive `liveContext` option on `orchestrator.runStream()` that turns
+  sources into a feedback loop for the in-flight LLM run. The agent's
+  view of the world stays in sync with reality: a source publishes a
+  fact update, the orchestrator emits a `context_updated` chunk, and
+  when `interruptWhen` returns `true` the LLM run is aborted and an
+  `interrupted` chunk lands on the stream.
+
+  The implementation is **231 LOC** in `agent-orchestrator.ts` —
+  comfortably under the RFC 0005 300-LOC scope guard. The bridge re-uses
+  the same `system.facts.$store.subscribe(keys, cb)` mechanism the
+  breakpoint + approval waiters already wire (no new primitives needed
+  on the core side).
+
+  ### Additive surfaces
+
+  **`OrchestratorStreamChunk` union** — two new variants:
+
+  - `{ type: "context_updated"; changedKeys: readonly string[] }` —
+    emitted on watched-fact changes. Always emitted when `notifyOn:
+"all-changes"`; emitted only for changes that trigger an interrupt
+    when `notifyOn: "interrupt-only"` (default).
+  - `{ type: "interrupted"; reason: string; partialOutput: string; changedKeys: readonly string[] }` —
+    emitted when `interruptWhen` returns `true` OR when the consumer
+    calls `result.interrupt(reason?)`. Carries the partial LLM output
+    accumulated up to the abort point so a consumer can stitch a
+    retry prompt.
+
+  **`OrchestratorStreamResult`** — new `interrupt(reason?: string): void`
+  method. Distinct from `abort()`: `abort` tears down the AsyncIterable
+  AND detaches `liveContext`; `interrupt` cancels the LLM run but leaves
+  fact subscriptions alive so the next caller-driven prompt continues
+  against fresh facts.
+
+  **`runStream` options** — accepts `liveContext: LiveContextOptions<F>`:
+
+  ```ts
+  const result = orchestrator.runStream(agent, input, {
+    liveContext: {
+      system: marketSystem,
+      keys: ["lastPrice", "lastVolume"],
+      interruptWhen: (facts, changedKeys) =>
+        Math.abs(facts.lastPrice - facts.openPrice) > 5,
+      mode: "restart", // reserved for follow-up minor; today's
+      // landing ships "inject-system-message"
+      // behavior (consumer re-prompts)
+      notifyOn: "interrupt-only", // default; "all-changes" is the noisier variant
+      onContextUpdate: (keys) =>
+        Sentry.addBreadcrumb(`liveContext: ${keys.join(",")}`),
+    },
+  });
+
+  for await (const chunk of result.stream) {
+    if (chunk.type === "token") process.stdout.write(chunk.data);
+    if (chunk.type === "interrupted") {
+      console.log(
+        `Agent interrupted: ${chunk.reason}; partial: ${chunk.partialOutput}`
+      );
+      // Optionally call orchestrator.runStream again with fresh context.
+    }
+  }
+  ```
+
+  ### Security companion
+
+  `createFactPIIGuardrail` (shipped in the prior phase) is the
+  **mandatory** companion when `liveContext` watches facts that may
+  carry PII. Without it, `liveContext` expands the source → fact →
+  prompt PII bypass surface into mid-stream context updates the agent
+  reads while generating. The new `ai-sources.md` recipe documents this
+  gating.
+
+  ### Multi-agent orchestrator
+
+  `OrchestratorStreamResult` shapes constructed inside
+  `multi-agent-orchestrator.ts` gain `interrupt()` stubs that map to
+  `abort()` — multi-agent delegate / task streams don't carry
+  `liveContext` bindings of their own, so the distinction collapses
+  there.
+
+  ### Tests
+
+  5 new regression tests covering the chunk variant shapes (type
+  narrowing + payload fields), the `interruptWhen` default
+  (`() => true` — any watched-key change interrupts), the false-path
+  ("interrupt only when threshold crossed") behavior, and end-to-end
+  AsyncIterable drainage of `context_updated` → `interrupted` →
+  `done`. AI suite: 1506 → 1511 passing.
+
+  ### Status
+
+  Ships the additive surface + the `liveContext` event loop. The
+  `mode: "restart"` variant ships the chunk-emission contract today
+  (consumer re-prompts via a fresh `runStream` call — matches the
+  documented `"inject-system-message"` mode); automatic re-invocation
+  on `"restart"` is reserved for a follow-up minor once the
+  multi-step prompt-merging strategy is locked in.
+
+### Patch Changes
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive RFCs — R11 close-out: public alias exports + interrupt() semantic + evict(deadline) detached-work + liveContext setup hoist + self-loop guard + docs drift
+
+  R11 audit on the 5 RFC implementations (0005-0009) surfaced one
+  Critical and several Major issues. All shipped without prior review
+  in the original implementation pass; this patch closes them.
+
+  ### Critical fixes
+
+  **Public alias exports** (RFC 0006): the 22+ `*Definition` aliases
+  landed in `packages/core/src/core/types/index.ts` but the curated
+  public barrel at `packages/core/src/index.ts` didn't re-export them.
+  `import type { ModuleDefinition } from "@directive-run/core"` — the
+  exact form anti-patterns.md #21 instructs consumers to write —
+  failed at the package boundary. Every alias is now re-exported from
+  the public barrel.
+
+  **`interrupt()` semantic** (RFC 0005): the headline feature of
+  liveContext — `interrupt()` cancels the LLM run but keeps the
+  subscription alive — was broken. `abortController.abort()` triggered
+  the IIFE catch path → reject → `resultPromise.finally(() =>
+tearDownLiveContext())` ran → subscription died. The distinction
+  between `abort` and `interrupt` collapsed.
+
+  Fix: a private `interruptInitiated` flag is set BEFORE
+  `abortController.abort()` in `interrupt()`. The `finally` callback
+  checks the flag and skips `tearDownLiveContext` when the abort came
+  from `interrupt`. The caller is now correctly responsible for either
+  re-prompting via a fresh `runStream` against the live subscription, or
+  calling `abort()` to fully tear down.
+
+  ### Major fixes
+
+  **`evict(deadline≤0)` detached work** (RFC 0009): when `evict` is
+  called with a synchronous deadline, the eviction IIFE used to be
+  constructed, then the function returned early — leaving the IIFE
+  running detached with no error path (unhandled-rejection risk if late
+  teardown threw). The two paths now both attach a swallow-catch:
+  synchronous-deadline kicks off detached work with a `.catch(() =>
+{})`; deadline-raced path attaches the same swallow before
+  `Promise.race`. Per-source errors still route through the manager's
+  `phase: "runtime"` sink, so the catch doesn't lose signal.
+
+  **liveContext setup hoist** (RFC 0005): the liveContext subscription
+  used to wire up AFTER the resultPromise IIFE was constructed (and had
+  already started running synchronously up to its first `await`). The
+  race is theoretical today (the IIFE's sync prefix doesn't mutate
+  facts), but a future IIFE prefix change could synchronously trigger
+  fact mutations before the subscription wires up. The block now runs
+  BEFORE the IIFE construction. The subscription callback closes over
+  `closed`, `pushChunk`, `accumulatedOutput`, `abortController` — all
+  declared above and reactive to mutations from inside the IIFE.
+
+  **Self-loop dev-mode guard** (RFC 0005): nothing prevented a consumer
+  from passing `liveContext.system === orchestrator.system` AND
+  watching bridge-state keys (`agent`, `conversation`, `approvalState`).
+  The orchestrator's own `setAgentState` / `setConversation` writes
+  would trigger `interruptWhen`, self-looping the run. The
+  orchestrator's `runStream` now warns in `debug: true` mode when the
+  overlap is detected.
+
+  **`mode: "restart"` dead code** (RFC 0005): the `mode` field was
+  declared on `LiveContextOptions` but the implementation never read
+  `liveCfg.mode` — both values produced identical behavior. The type
+  union order is now `"inject-system-message" | "restart"` (the
+  shipping default first), the JSDoc is honest that `"restart"` is
+  forward-compat-only, and the `@example` block uses
+  `"inject-system-message"`.
+
+  **`SourceReportError` export** (RFC 0008): the callback type that
+  authors need to type their reportError helpers wasn't re-exported.
+  Now exported from `@directive-run/core/types/index.ts` and from the
+  public barrel at `@directive-run/core`.
+
+  **`reportError` parameter optional** (RFC 0008): the type signature
+  of `SourceDef.attach` declared `reportError` as required, but the
+  JSDoc said it was optional. Made the parameter optional in the type
+  to match.
+
+  **Coalesce strategy uniformity** (RFC 0007): the JSDoc on
+  `SourceDef.coalesce` documented per-event-name coalescing but didn't
+  call out that the STRATEGY (lastWriteWins vs none) is uniform per
+  source. Added a "Limitation" subsection naming the constraint.
+
+  ### Documentation drift fixes
+
+  `packages/knowledge/ai/ai-sources.md` had multiple factual errors
+  against the shipped types:
+
+  - Documented a `liveContext.guardrails` field that doesn't exist
+    (removed — security companion is `createFactPIIGuardrail` wired at
+    `createSystem` time, documented in the Status section).
+  - Listed `mode` default as `"restart"` (flipped to
+    `"inject-system-message"`).
+  - Missing `changedKeys` field on `interrupted` chunk shape (added).
+  - Missing required `keys` field in the signature example (added).
+  - Never mentioned `result.interrupt(reason?)` method (added with
+    contrast vs `abort()`).
+  - "Status" section still in RFC-design-speak after ship (flipped to
+    "shipped").
+
+  `packages/knowledge/core/sources.md` gained three new sections per
+  RFC 0007/0008/0009 acceptance criteria:
+
+  - "Error handling — runtime errors via reportError" (RFC 0008).
+  - "Backpressure — coalesce: lastWriteWins" (RFC 0007).
+  - "Async-aware teardown — system.stopAsync() + DO onEvict" (RFC 0009).
+
+  Stale line references in `docs/rfcs/0005-live-context-agent.md`
+  (`agent-orchestrator.ts:1309, 1474`) replaced with symbolic
+  references.
+
+  Gates: core typecheck + 2117 tests passing; ai typecheck + 1511 tests
+  passing; sources typecheck clean; core dist 14,678 B gz (under
+  18,000 B budget).
+
+- [#52](https://github.com/directive-run/directive/pull/52) [`dc30477`](https://github.com/directive-run/directive/commit/dc30477379def350bcf8998b9ce3883641e71bbd) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `createFactPIIGuardrail` Luhn validation + `attachSourcesToOtel` span-leak fix + `walkDepth` option
+
+  Three targeted fixes against the Tier 1 phases shipped immediately
+  before this patch.
+
+  **`createFactPIIGuardrail` — credit-card false positives.** The R9
+  self-review found the inlined `\b(?:\d[ -]?){13,19}\b` regex would
+  sweep up phone numbers, tracking IDs, and any 13-19 digit sequence
+  formatted with separators as credit cards. The shipping path now
+  mirrors `pii-enhanced.ts`'s detection: a broader 4-4-4-4 / 13-19
+  unseparated regex paired with a synchronous Luhn checksum validator.
+  Phone numbers, sequence IDs, and other long digit runs that don't pass
+  Luhn are NOT redacted. The canonical Visa test number
+  (`4111 1111 1111 1111`) continues to redact correctly.
+
+  **`createFactPIIGuardrail` — `walkDepth` option for nested objects.**
+  The previous one-level object walk silently passed deeper PII (e.g.
+  `{ profile: { email } }`) through unredacted. The R9 review flagged
+  this as a security limitation that wasn't documented. The plugin now
+  accepts an optional `walkDepth: 1 | 2 | 3 | 4 | 5` (default `1`,
+  clamped to `[1, 5]` to prevent pathological recursion on cyclic
+  structures). Arrays, Maps, and Sets remain out of scope at any depth —
+  consumers with those shapes should pass a `customDetector` that walks
+  the consumer-specific structure.
+
+  **`attachSourcesToOtel` — active spans no longer leak on unsubscribe.**
+  The R9 review found the helper's returned unsubscribe just detached the
+  `system.observe()` subscriber, leaving every active `directive.source.attached`
+  span open forever in the collector. The helper now ends each active
+  span with status `OK` and a `directive.detached: true` attribute when
+  the consumer detaches the wiring. Collectors that retain unfinished
+  spans no longer accumulate them across `attachSourcesToOtel` /
+  unsubscribe cycles.
+
+  Tests: +3 regression tests (Luhn rejection on non-card 16-digit
+  sequences, `walkDepth: 1` default leaves nested PII alone, `walkDepth: 3`
+  walks deeper). Fact-PII test file 8 → 11; `otel-sources.test.ts` test 4
+  rewritten to assert the new no-leak contract; AI suite 1503 → 1506.
+
 ## 1.17.2
 
 ## 1.17.1
