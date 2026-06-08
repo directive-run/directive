@@ -1,6 +1,6 @@
 # RFC 0009 – Async-aware `system.stop()` + Durable Object eviction hook
 
-- **Status:** Draft (2026-06-07)
+- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** R5 distributed-systems reviewer findings (R5-CR1:
   `system.stop()` doesn't await async unsubscribes; R5-CR4: DO eviction

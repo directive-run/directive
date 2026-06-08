@@ -28,7 +28,7 @@
  * @example Defensive (redact PII writes into pii-tagged facts)
  * ```ts
  * import { createSystem, t } from '@directive-run/core';
- * import { createFactPIIGuardrail } from '@directive-run/ai';
+ * import { createFactPIIGuardrail } from '@directive-run/ai/guardrails';
  *
  * const customer = createModule('customer', {
  *   schema: {

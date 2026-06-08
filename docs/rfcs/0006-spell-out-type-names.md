@@ -1,6 +1,6 @@
 # RFC 0006 – Spell out `*Def` type names across `@directive-run/core`
 
-- **Status:** Draft (2026-06-07)
+- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the R5 DX-review finding (Major M1); anti-patterns
   entry #5 (`context` → `ctx` is wrong); the `docs/IDEAS.md` R5 Tier 1

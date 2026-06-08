@@ -1,6 +1,6 @@
 # RFC 0005 – `runStream({ liveContext })` — Reactive Agents
 
-- **Status:** Draft (2026-06-07)
+- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the `source` primitive in `@directive-run/core`; the
   Tier 0 prereq `createFactPIIGuardrail` (shipped); the live-context

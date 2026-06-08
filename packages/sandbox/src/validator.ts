@@ -63,6 +63,7 @@ const ALLOWED_DIRECTIVE_PACKAGES = new Set<string>([
   "scaffold",
   "claude-plugin",
   "lint",
+  "sources",
 ]);
 
 const DENIED_DIRECTIVE_PACKAGES = new Set<string>([
