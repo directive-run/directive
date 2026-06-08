@@ -9,6 +9,34 @@ unlocks next.
 
 ---
 
+## OPEN BUG — `createSystem` crashes inside @directive-run/sandbox on Vercel (2026-06-08)
+
+**Symptom:** every snippet that calls `createSystem({ module })` inside the worker fails with `"Cannot convert undefined or null to object"`. Confirmed by minimal repro: `console.log`, arithmetic, and `createModule` alone all succeed; the first call to `createSystem` blows up.
+
+**Confirmed NOT the cause:**
+- Worker.js bundling (fixed by sandbox 0.3.1's static `new URL("./worker.js", import.meta.url)` resolution — commit 039f8c0d on directive, b7d6797 on directive-docs)
+- Bare-specifier resolution of @directive-run/core (fixed by adding it to `serverExternalPackages` — commit 3dd3403 on directive-docs)
+- Lockfile carrying TWO @directive-run/core versions (fixed by bumping docs site deps to 1.17.2 — commit 47f2f84 on directive-docs)
+- Sandbox host/worker logic in general — the same code path runs locally without error in `pnpm test`
+
+**Live state on www.directive.run** (as of 2026-06-08):
+- `/blog/ai-that-runs-your-code` → 200 ✓
+- `/blog/inside-the-directive-sandbox` → 200 ✓
+- `/docs/sandbox` → 200 ✓
+- `/playground` → 200 ✓
+- `/api/sandbox` → 200 for trivial snippets, 500 with the createSystem error for any real Directive snippet
+
+**Most likely cause** (not yet confirmed): the sandbox bundler's import rewrite — `@directive-run/core` → `file:///var/task/node_modules/@directive-run/core/...` — produces a path whose resolved core module is initialized in a context where some global registry (event bus, plugin store, derivation graph) lands at `undefined`. Could be a Vercel-isolate/worker_threads interaction; could be a lazy-init in @directive-run/core that assumes a shared module identity the worker doesn't honor.
+
+**Next-step debug recipe** (when picked up again):
+1. Patch @directive-run/sandbox's worker to wrap `await import(bundlePath)` in a try/catch and print the FULL stack trace, not just `.message`. The current error string strips the stack so we can't see which createSystem line throws.
+2. Ship sandbox 0.3.2 with verbose error reporting, redeploy, retry the counter smoke. The stack frame will name the exact null-deref.
+3. From the stack, decide if the fix is in core (defensive init), sandbox (different bundler emit strategy — e.g., bundle Directive packages INTO the snippet rather than externalizing), or docs deployment (use `outputFileTracingIncludes` with a config shape Vercel actually accepts).
+
+**Compound effect** of fixing this: the playground's "Run snippet" DevTools panel finally has a working server, which makes the new `/blog/ai-that-runs-your-code` post truthful end-to-end (right now the post promises a transcript the live site can't quite deliver). Worth ~half a day of focused debug when the next sandbox session lands.
+
+---
+
 ## R1.A – `directive replay <prod-error-id>` → auto-derived vitest from a serialized timeline frame stream
 
 **[v0.1 SCAFFOLD SHIPPED 2026-04-29 – `@directive-run/timeline@0.2.0`]**
