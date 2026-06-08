@@ -1454,7 +1454,7 @@ describe("source primitive — end-to-end with createSystem", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     const onError = vi.fn();
-    let captured: ((err: Error) => void) | null = null;
+    let captured: ((err: Error) => void) | undefined;
     const manager = createSourcesManager(
       {
         ws: {
@@ -1492,7 +1492,7 @@ describe("source primitive — end-to-end with createSystem", () => {
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
     const onError = vi.fn();
-    let captured: ((err: Error) => void) | null = null;
+    let captured: ((err: Error) => void) | undefined;
     const manager = createSourcesManager(
       {
         ws: {

@@ -96,42 +96,75 @@ above), not a source. Wire it inside the orchestrator's constructor.
 
 ```ts
 const result = orchestrator.runStream(agent, input, {
-  signal,                         // existing AbortSignal — terminates stream
+  signal,                                     // existing AbortSignal — terminates stream
   liveContext: {
-    system,                       // the Directive system whose facts feed the agent
-    interruptWhen: (facts, changedKeys) => boolean,
-    mode: "restart" | "inject-system-message",  // default: "restart"
-    notifyOn: "all-changes" | "interrupt-only", // default: "interrupt-only"
-    guardrails?: GuardrailFn<...>[],            // optional — see Security
+    system,                                   // the Directive system whose facts feed the agent
+    keys: ["pr.headSha", "pr.state"],         // REQUIRED — fact keys to watch
+    interruptWhen: (facts, changedKeys) => boolean,  // optional; default: () => true
+    mode: "inject-system-message",            // shipped today (default behavior).
+                                              // "restart" reserved for follow-up minor;
+                                              // behaves identically to inject-system-message today.
+    notifyOn: "interrupt-only",               // default; "all-changes" emits chunk per watched change
+    onContextUpdate: (changedKeys) => void,   // optional logging hook
   },
 });
+
+// New methods on the returned result:
+result.interrupt(reason?);  // cancel in-flight LLM run, KEEP liveContext alive
+result.abort();             // tear down stream + detach liveContext
 ```
 
 Two new chunk variants land on the stream:
 
 ```ts
-| { type: "context_updated"; changedKeys: string[] }
-| { type: "interrupted"; reason: string; partialOutput: string }
+| { type: "context_updated"; changedKeys: readonly string[] }
+| {
+    type: "interrupted";
+    reason: string;
+    partialOutput: string;
+    changedKeys: readonly string[];
+  }
 ```
 
 ### Anatomy
 
 - The orchestrator subscribes to `system.facts.$store.subscribe(keys, ...)`
-  for the keys it depends on. (This is the bridge primitive that already
-  powers breakpoints and approvals at `agent-orchestrator.ts:1309,1474`.)
+  for the keys it depends on — the same bridge primitive that powers
+  breakpoints and approvals elsewhere in `agent-orchestrator.ts`.
+- The subscription wires up BEFORE the LLM run's IIFE starts, so a fact
+  change during the input-guardrail phase is observed correctly.
 - On each batch of fact changes that touches the watched keys:
-  - If `notifyOn === "all-changes"`, emit a `context_updated` chunk.
-  - If `interruptWhen(facts, changedKeys)` returns true, abort the current
-    LLM stream, emit an `interrupted` chunk with the partial output, and
-    (in `restart` mode) re-invoke the runner with the fresh facts merged
-    into the system message.
+  - `liveContext.onContextUpdate(changedKeys)` fires (logging hook).
+  - `interruptWhen(facts, changedKeys)` runs.
+  - If it returns `true`, the orchestrator emits an `interrupted` chunk
+    with the partial output captured so far + the changed keys, then
+    aborts the in-flight LLM stream. The consumer's `for await` sees
+    the `interrupted` chunk before the final `error` chunk lands.
+  - If it returns `false` and `notifyOn === "all-changes"`, a
+    `context_updated` chunk is emitted. With the default
+    `"interrupt-only"`, no chunk is emitted for non-interrupting
+    changes.
+- `result.interrupt(reason?)` is the CALLER-driven counterpart: same
+  `interrupted` chunk, same abort, but the subscription stays attached
+  so the next caller-driven `runStream` continues against the live
+  fact stream without re-subscribing.
 
-### Status
+### Status — shipped
 
 `runStream({ liveContext })` is the dedicated subject of
-[RFC 0005](../../docs/rfcs/0005-live-context-agent.md) — design + scope
-guard + acceptance criteria live there. Implementation lands behind the
-`createFactPIIGuardrail` prereq (see Security below).
+[RFC 0005](../../docs/rfcs/0005-live-context-agent.md). Today's
+implementation is **231 LOC in `agent-orchestrator.ts`** — under the
+RFC's 300-LOC scope guard. The `mode: "restart"` automatic
+re-invocation is reserved for a follow-up minor; today both `mode`
+values produce identical behavior (the chunk-emission contract +
+abort wiring; consumers re-prompt via a fresh `runStream` call).
+
+**Security companion (mandatory when watched facts may carry PII):**
+wire `createFactPIIGuardrail` on the same Directive system. Without
+it, `liveContext` expands the source → fact → prompt PII bypass
+surface into mid-stream context updates. See the
+["Sources × Security"](#sources--security) section below for the full
+threat model.
 
 ---
 

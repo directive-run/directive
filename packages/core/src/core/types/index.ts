@@ -331,3 +331,7 @@ export type {
   SourcePublish as SourcePublishFn,
   SourceUnsubscribe as SourceUnsubscribeFn,
 } from "./sources.js";
+
+// RFC 0008 — `SourceReportError` callback type (passed as the second arg
+// to `attach`). Re-exported here so consumers can type their own helpers.
+export type { SourceReportError } from "./sources.js";

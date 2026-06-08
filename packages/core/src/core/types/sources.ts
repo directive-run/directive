@@ -215,7 +215,7 @@ export interface SourceDef {
    *   sources that never error mid-flight don't need it.
    * @returns a cleanup function that runs at `system.stop()`.
    */
-  attach: (publish: SourcePublish, reportError: SourceReportError) => SourceUnsubscribe;
+  attach: (publish: SourcePublish, reportError?: SourceReportError) => SourceUnsubscribe;
   /** Optional metadata for debugging and devtools (never read on hot path). */
   meta?: DefinitionMeta;
   /**
@@ -242,6 +242,13 @@ export interface SourceDef {
    * Coalescing applies per-event-name: two different event names from
    * the same source coalesce independently, so a `"priceTick"` storm
    * doesn't drop a one-shot `"connected"` event.
+   *
+   * **Limitation:** the coalesce STRATEGY is uniform across all event
+   * names on a source — you can't mix (e.g. `lastWriteWins` for
+   * `priceTick` and `none` for `connected` from the same source).
+   * Workaround: split into two source declarations on the module if
+   * the strategies must differ. A future RFC may add per-event-name
+   * strategy overrides.
    */
   coalesce?: "none" | "lastWriteWins" | "all";
   /**

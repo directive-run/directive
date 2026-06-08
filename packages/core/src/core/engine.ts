@@ -1756,6 +1756,25 @@ export function createEngine<S extends Schema>(
       // is supplied, the entire eviction is raced against the deadline
       // — a partial teardown is better than a hang while the runtime
       // is impatient to evict.
+      //
+      // Bug-fix per R11: deadline<=0 used to construct the IIFE,
+      // return synchronously, and let the IIFE run detached with no
+      // error path. Now we either await it or attach a swallow-catch
+      // so the unhandled-rejection surface is bounded.
+      if (deadline !== undefined && deadline - Date.now() <= 0) {
+        // Synchronous deadline: kick off the eviction with a
+        // swallow-catch (every per-source error already routes through
+        // the manager's `phase: "runtime"` sink, so silencing the
+        // composite promise here doesn't lose signal) and return
+        // immediately. The runtime evicts the isolate before the work
+        // would have completed anyway.
+        const detached = (async () => {
+          await sourcesManager.evictAll();
+          await this.destroyAsync();
+        })();
+        detached.catch(() => {});
+        return;
+      }
       const evictWork = (async () => {
         await sourcesManager.evictAll();
         await this.destroyAsync();
@@ -1765,7 +1784,10 @@ export function createEngine<S extends Schema>(
         return;
       }
       const remaining = deadline - Date.now();
-      if (remaining <= 0) return;
+      // After the race, evictWork may still be running. Attach a
+      // swallow-catch so a late rejection doesn't surface as
+      // unhandledRejection in the host runtime.
+      evictWork.catch(() => {});
       await Promise.race([
         evictWork,
         new Promise<void>((resolve) => setTimeout(resolve, remaining)),

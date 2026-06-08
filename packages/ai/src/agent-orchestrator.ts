@@ -304,7 +304,7 @@ export type OrchestratorStreamChunk =
  *     system: marketSystem,
  *     keys: ["lastPrice"],
  *     interruptWhen: (facts) => Math.abs(facts.lastPrice - facts.openPrice) > 5,
- *     mode: "restart",
+ *     mode: "inject-system-message",
  *   },
  * });
  * ```
@@ -331,20 +331,20 @@ export interface LiveContextOptions<
    */
   interruptWhen?: (facts: F, changedKeys: readonly string[]) => boolean;
   /**
-   * What to do when `interruptWhen` returns true:
-   * - `"restart"` (default): abort the current LLM run + automatically
-   *   re-invoke with merged context. The consumer's `for await` loop
-   *   sees `interrupted` then the new run's chunks.
-   * - `"inject-system-message"`: abort the current run + leave the
-   *   stream open. The consumer is responsible for restarting via a
-   *   fresh `runStream` call with whatever prompt they want next.
+   * What to do when `interruptWhen` returns true. Today's landing
+   * supports a single mode (`"inject-system-message"`): the LLM run
+   * aborts and an `interrupted` chunk lands on the stream; the
+   * consumer is responsible for restarting via a fresh `runStream`
+   * call against the still-live liveContext subscription (use
+   * `result.interrupt(reason?)` from outside or the automatic
+   * `liveContext.interruptWhen` flow from inside).
    *
-   * NOTE: the `"restart"` mode is reserved for a future minor — the
-   * 0005 RFC implementation ships with `"inject-system-message"`
-   * behavior as the floor (the consumer re-prompts). The chunk
-   * emission contract is identical either way.
+   * RFC 0005 reserves `"restart"` for a follow-up minor that
+   * implements automatic re-invocation with merged context. Today
+   * `"restart"` is accepted by the type for forward-compat but
+   * behaves identically to `"inject-system-message"`.
    */
-  mode?: "restart" | "inject-system-message";
+  mode?: "inject-system-message" | "restart";
   /**
    * `"all-changes"` emits `context_updated` for every watched-key
    * batch (so the consumer can render a sidebar of fact deltas).
@@ -1719,6 +1719,100 @@ export function createAgentOrchestrator<
         waiters.length = 0;
       };
 
+      // RFC 0005: wire liveContext subscriptions BEFORE the resultPromise
+      // IIFE constructs (which starts running synchronously). Even though
+      // the IIFE's sync prefix today does no fact-mutating work before
+      // its first await, hoisting the subscription removes any latent
+      // race where a future IIFE prefix change could synchronously
+      // mutate facts before subscribe wires up. The subscription
+      // callback closes over `closed`, `pushChunk`, `accumulatedOutput`,
+      // and `abortController` — all declared above and live by the
+      // time a fact change can fire (which requires the IIFE to yield).
+      //
+      // RFC 0005 dev-mode guard: warn when liveContext.system === the
+      // orchestrator's own system AND watched keys overlap bridge-state
+      // keys. Without this, the orchestrator's own setAgentState calls
+      // could trigger interruptWhen → abort, self-looping the run.
+      let liveContextUnsub: (() => void) | null = null;
+      const liveCfg = options.liveContext;
+      if (liveCfg) {
+        if (
+          debug &&
+          (liveCfg.system as unknown) === (system as unknown)
+        ) {
+          const bridgeKeys = ["agent", "conversation", "approvalState"];
+          const overlap = liveCfg.keys.filter((k) =>
+            bridgeKeys.some((bk) => k.startsWith(bk)),
+          );
+          if (overlap.length > 0) {
+            console.warn(
+              `[Directive] liveContext watches bridge-state keys (${overlap.join(", ")}) on the orchestrator's own system. ` +
+                "The orchestrator's own setAgentState / setConversation / approvalState writes will trigger interruptWhen, " +
+                "self-looping the run. Use a separate system for liveContext, or scope `keys` to user-fact namespaces.",
+            );
+          }
+        }
+        const notifyOn = liveCfg.notifyOn ?? "interrupt-only";
+        const interruptWhen = liveCfg.interruptWhen ?? (() => true);
+        const watched = new Set(liveCfg.keys);
+        // The system's facts $store exposes a key-scoped subscribe via
+        // the same shape the breakpoint + approval waiters elsewhere
+        // in this file use. We re-use that surface without touching
+        // the bridge primitive itself.
+        const store = (
+          liveCfg.system as unknown as {
+            facts: {
+              $store: {
+                subscribe?: (
+                  keys: readonly string[],
+                  listener: () => void,
+                ) => () => void;
+                toObject?: () => Record<string, unknown>;
+              };
+            };
+          }
+        ).facts.$store;
+        if (typeof store?.subscribe === "function") {
+          let lastSnapshot: Record<string, unknown> = store.toObject?.() ?? {};
+          liveContextUnsub = store.subscribe(liveCfg.keys, () => {
+            if (closed) return;
+            const current = store.toObject?.() ?? {};
+            const changed: string[] = [];
+            for (const k of liveCfg.keys) {
+              if (current[k] !== lastSnapshot[k]) changed.push(k);
+            }
+            lastSnapshot = current;
+            if (changed.length === 0) return;
+            const watchedChanged = changed.filter((k) => watched.has(k));
+            if (watchedChanged.length === 0) return;
+            liveCfg.onContextUpdate?.(watchedChanged);
+            // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
+            const shouldInterrupt = interruptWhen(current as any, watchedChanged);
+            if (shouldInterrupt) {
+              pushChunk({
+                type: "interrupted",
+                reason: "liveContext.interruptWhen",
+                partialOutput: accumulatedOutput,
+                changedKeys: watchedChanged,
+              });
+              abortController.abort();
+            } else if (notifyOn === "all-changes") {
+              pushChunk({
+                type: "context_updated",
+                changedKeys: watchedChanged,
+              });
+            }
+          });
+        }
+      }
+
+      const tearDownLiveContext = (): void => {
+        if (liveContextUnsub) {
+          liveContextUnsub();
+          liveContextUnsub = null;
+        }
+      };
+
       // Run the agent with streaming callbacks
       const resultPromise = (async (): Promise<RunResult<T>> => {
         pushChunk({
@@ -2029,96 +2123,20 @@ export function createAgentOrchestrator<
         },
       };
 
-      // RFC 0005: wire liveContext subscriptions. On every fact-change
-      // batch that touches a watched key, fire `onContextUpdate`, run
-      // `interruptWhen`, and emit `context_updated` / `interrupted`
-      // chunks accordingly. The subscription detaches when the stream
-      // closes (success, error, abort, or interrupt). The `mode:
-      // "restart"` branch is reserved for a follow-up minor — today's
-      // landing ships the chunk-emission contract + abort wiring; the
-      // consumer re-prompts via a fresh `runStream` call (matches the
-      // documented `"inject-system-message"` mode).
-      let liveContextUnsub: (() => void) | null = null;
-      const liveCfg = options.liveContext;
-      if (liveCfg) {
-        const notifyOn = liveCfg.notifyOn ?? "interrupt-only";
-        const interruptWhen = liveCfg.interruptWhen ?? (() => true);
-        const watched = new Set(liveCfg.keys);
-        // The system's facts $store exposes a key-scoped subscribe via
-        // the same shape the breakpoint + approval waiters at
-        // agent-orchestrator.ts:1309, 1474 use. We re-use that surface
-        // here without touching the bridge primitive itself.
-        const store = (
-          liveCfg.system as unknown as {
-            facts: {
-              $store: {
-                subscribe?: (
-                  keys: readonly string[],
-                  listener: () => void,
-                ) => () => void;
-                toObject?: () => Record<string, unknown>;
-              };
-            };
-          }
-        ).facts.$store;
-        if (typeof store?.subscribe === "function") {
-          let lastSnapshot: Record<string, unknown> = store.toObject?.() ?? {};
-          liveContextUnsub = store.subscribe(liveCfg.keys, () => {
-            if (closed) return;
-            const current = store.toObject?.() ?? {};
-            const changed: string[] = [];
-            for (const k of liveCfg.keys) {
-              if (current[k] !== lastSnapshot[k]) changed.push(k);
-            }
-            lastSnapshot = current;
-            if (changed.length === 0) return;
-            // Only act on changes that touch the watched set — defensive
-            // against future $store implementations that broaden the
-            // subscribe contract.
-            const watchedChanged = changed.filter((k) => watched.has(k));
-            if (watchedChanged.length === 0) return;
-            liveCfg.onContextUpdate?.(watchedChanged);
-            // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
-            const shouldInterrupt = interruptWhen(current as any, watchedChanged);
-            if (shouldInterrupt) {
-              pushChunk({
-                type: "interrupted",
-                reason: "liveContext.interruptWhen",
-                partialOutput: accumulatedOutput,
-                changedKeys: watchedChanged,
-              });
-              // Aborting cancels the in-flight LLM run. The stream
-              // stays open so the consumer's `for await` sees the
-              // `interrupted` chunk before the final `done` / `error`
-              // lands. In `mode: "restart"` (reserved for follow-up),
-              // the orchestrator would re-invoke automatically after
-              // this point.
-              abortController.abort();
-            } else if (notifyOn === "all-changes") {
-              pushChunk({
-                type: "context_updated",
-                changedKeys: watchedChanged,
-              });
-            }
-          });
-        }
-      }
+      // Track whether the abort came from interrupt() — if so, the
+      // resultPromise.finally MUST NOT tear down the liveContext
+      // subscription. The whole differentiator of interrupt vs abort
+      // is that interrupt cancels the LLM run but keeps the
+      // subscription alive so the next caller-driven prompt continues
+      // against fresh facts. Without this flag the abort triggers the
+      // resultPromise's catch path → reject → finally → tearDown, and
+      // the subscription dies anyway (R11 found this).
+      let interruptInitiated = false;
 
-      const tearDownLiveContext = (): void => {
-        if (liveContextUnsub) {
-          liveContextUnsub();
-          liveContextUnsub = null;
-        }
-      };
-
-      // Hook tearDownLiveContext into stream close: closeStream is
-      // called from done/error/abort paths, but it's defined as a
-      // local closure above. We wrap the abort + interrupt paths to
-      // ensure the subscription is released even when the stream
-      // ends abnormally. The success path's `closeStream()` call at
-      // the end of the resultPromise's try also unwires below.
       resultPromise.finally(() => {
-        tearDownLiveContext();
+        if (!interruptInitiated) {
+          tearDownLiveContext();
+        }
       });
 
       return {
@@ -2135,6 +2153,13 @@ export function createAgentOrchestrator<
           // the next caller-driven prompt continues against fresh
           // facts. The interrupted chunk lands with the reason if
           // provided.
+          //
+          // Set the interrupt flag BEFORE aborting so the
+          // resultPromise.finally above sees it and skips
+          // tearDownLiveContext. The caller is responsible for
+          // either kicking off a new runStream (against the live
+          // subscription) or calling abort() to fully tear down.
+          interruptInitiated = true;
           pushChunk({
             type: "interrupted",
             reason: reason ?? "caller.interrupt",
@@ -2142,9 +2167,6 @@ export function createAgentOrchestrator<
             changedKeys: [],
           });
           abortController.abort();
-          // Do NOT tearDownLiveContext here — the subscription is
-          // intentionally retained. Do NOT closeStream — the caller
-          // will start a new run or call abort() to fully tear down.
         },
       };
     },

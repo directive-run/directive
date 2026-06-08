@@ -194,6 +194,108 @@ const unsub = system.observe((event) => {
 
 `system.inspect().sources` lists the declared sources + `system.inspect().attachedSourceCount` reports how many are currently bound.
 
+## Error handling — runtime errors via `reportError`
+
+Per RFC 0008, `attach` receives an optional second argument: a
+`reportError` callback. Authors route mid-flight errors from the
+underlying stream (WebSocket disconnect, Supabase channel goes stale,
+polling fetch throws) through this callback instead of inventing
+magic event names like `STREAM_ERROR`. The manager fires
+`onSourceError` with `phase: "runtime"` — distinct from `"attach"`
+(setup failed) and `"cleanup"` (unsubscribe threw) — so the audit
+ledger, logging plugin, and `inspect().sources[i].lastError`
+attribute mid-flight failures correctly.
+
+```typescript
+sources: {
+  socket: {
+    attach: (publish, reportError) => {
+      const sock = new WebSocket(url);
+      sock.addEventListener("message", (e) =>
+        publish("MSG", JSON.parse(e.data)),
+      );
+      sock.addEventListener("error", () =>
+        reportError?.(new Error("WebSocket lost connection")),
+      );
+      return () => sock.close();
+    },
+  },
+}
+```
+
+`reportError` is optional — short-lived transports that don't surface
+mid-flight errors can ignore it. The callback type is exported as
+`SourceReportError` from `@directive-run/core`. Error messages are
+truncated at 256 chars at the manager boundary so authors who embed
+payloads in error messages get a bounded leak surface.
+
+## Backpressure — `coalesce: "lastWriteWins"`
+
+Per RFC 0007, high-frequency sources (cursor moves, sensor telemetry,
+price ticks, Supabase channel storms) declare `coalesce:
+"lastWriteWins"` so the manager debounces same-event-name publishes
+within one microtask. Per-event-name keying means a `priceTick` storm
+coalesces while a one-shot `connected` event in the same tick still
+dispatches.
+
+```typescript
+sources: {
+  ticker: {
+    attach: (publish) => {
+      const id = setInterval(() => publish("TICK", { v: liveValue() }), 4);
+      return () => clearInterval(id);
+    },
+    coalesce: "lastWriteWins",  // 250 publishes/sec → 1 dispatch/microtask
+  },
+}
+```
+
+Coalesce-dropped publishes bump `dropCount` + record
+`lastDropReason: "coalesced"` on `inspect().sources` so operators
+verify the debouncing is firing on the right sources. The strategy
+is per-source (uniform across event names from that source) —
+splitting strategies per event name requires two source declarations.
+
+## Async-aware teardown — `system.stopAsync()` + DO `onEvict`
+
+Per RFC 0009, sources with async unsubscribes (Supabase realtime's
+`channel.unsubscribe()` returns a Promise; Cloudflare DO storage
+flushes return Promises) work with both sync and async teardown:
+
+- `system.stop()` (sync) — fires unsubscribes; awaits each one's
+  return synchronously (Promise returns are fire-and-forget).
+- `system.stopAsync()` (RFC 0009) — awaits each Promise-returning
+  unsubscribe. Use when the caller needs teardown to actually
+  complete (e.g. the external broker must drop the subscription
+  before the next call).
+- `system.evict(deadline?)` — Cloudflare DO eviction: fires each
+  source's optional `onEvict()` in registration order, then
+  `destroyAsync()`. Optional deadline races teardown against a
+  wall-clock cutoff so the runtime can evict the isolate even if
+  some sources hang.
+
+```typescript
+sources: {
+  channel: {
+    attach: (publish) => {
+      const ch = supabase.channel("game").subscribe();
+      ch.on("postgres_changes", { event: "UPDATE" }, (p) =>
+        publish("ROW_UPDATED", p),
+      );
+      return () => ch.unsubscribe();  // returns a Promise
+    },
+    onEvict: async () => {
+      // Cloudflare DO hibernate signal: close the channel actively
+      // so the broker drops the subscription before the isolate dies.
+      await supabase.removeChannel(ch);
+    },
+  },
+}
+```
+
+Inside a DO `alarm()` or `webSocketClose()` handler:
+`await system.evict(/* deadline */ Date.now() + 5000)`.
+
 ## Common Patterns
 
 ### Pattern: Source supplies inbound; resolver supplies outbound

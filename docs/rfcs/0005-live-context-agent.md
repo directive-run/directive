@@ -36,7 +36,7 @@ tests, ~600 LOC docs + example" and named the 300-LOC scope guard.
 Every primitive needed already exists:
 
 - `system.facts.$store.subscribe(keys, listener)` is the bridge
-  (already used at `agent-orchestrator.ts:1309, 1474` for breakpoints
+  (already used internally for the breakpoint-waiter and approval-waiter pathways
   and approvals).
 - `runStream` already exposes `abort()`.
 - The source primitive publishes into facts.
