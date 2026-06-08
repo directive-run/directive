@@ -2133,11 +2133,17 @@ export function createAgentOrchestrator<
       // the subscription dies anyway (R11 found this).
       let interruptInitiated = false;
 
-      resultPromise.finally(() => {
-        if (!interruptInitiated) {
-          tearDownLiveContext();
-        }
-      });
+      // .finally returns a new promise that re-rejects when resultPromise
+      // rejects; swallow with .catch so a rejected resultPromise (e.g. a
+      // guardrail block) doesn't surface as an unhandled rejection when
+      // the caller only consumes the stream side of the contract.
+      resultPromise
+        .finally(() => {
+          if (!interruptInitiated) {
+            tearDownLiveContext();
+          }
+        })
+        .catch(() => {});
 
       return {
         stream,
