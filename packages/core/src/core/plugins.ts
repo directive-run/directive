@@ -277,8 +277,37 @@ export function createPluginManager<
     // Lifecycle hooks (emitInit is async, handled separately)
     // biome-ignore lint/suspicious/noExplicitAny: System type varies
     async emitInit(system: System<any>): Promise<void> {
-      for (const plugin of plugins) {
-        await safeCallAsync(() => plugin.onInit?.(system) as Promise<void>);
+      // R15 — track which plugins have already received `onInit` via a
+      // WeakSet, then loop over the LIVE `plugins` array until quiet.
+      // This handles two distinct concerns:
+      //   1. Index-shift attack: a plugin's `onInit` that calls
+      //      `manager.unregister(otherName)` between awaits used to
+      //      shift indices on the live array and silently skip the
+      //      next un-init'd plugin (typically `createFactPIIGuardrail`
+      //      or the audit-ledger). The WeakSet ensures each plugin
+      //      gets called at most once, regardless of array shifts.
+      //   2. Cascading registration: plugins like `audit-ledger`'s
+      //      `onInit` call `system.observe(...)` which registers a
+      //      NEW observer plugin mid-init. The bridge between engine
+      //      lifecycle events and audit-ledger entries depends on
+      //      that observer's `onInit` firing for the same cycle. The
+      //      loop-until-quiet shape captures cascaded registrations.
+      // biome-ignore lint/suspicious/noExplicitAny: Plugin shape varies
+      const initialized = new WeakSet<Plugin<any>>();
+      // Cap iterations to bound an adversarial register-loop scenario
+      // (a plugin that registers another plugin in its onInit, and so
+      // on). Typical cascade depth is 1-2; 100 is well past any real
+      // pattern.
+      for (let pass = 0; pass < 100; pass++) {
+        const todo = plugins.filter((p) => !initialized.has(p));
+        if (todo.length === 0) break;
+        for (const plugin of todo) {
+          initialized.add(plugin);
+          await safeCallAsync(
+            () =>
+              (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,
+          );
+        }
       }
     },
     emitStart: broadcast("onStart"),
