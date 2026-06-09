@@ -54,7 +54,11 @@ gate execution on `facts.<lifecycle>.healthy` derivations.
 - **MCP server connect/disconnect** → see "MCP Lifecycle" below.
 - **Health checks** → poll inside the source's `attach`; publish
   `health_changed` events as the upstream service responds.
-- **WebSocket open / close** → `sourceFromWebSocket()` (sources/websocket).
+- **WebSocket open / close (Cloudflare DO)** → `sourceFromWebSocketMessage()`
+  (`@directive-run/sources/cloudflare`). For raw Node/browser WebSocket
+  bridges, declare a source whose `attach` wires `addEventListener` and
+  publishes `MESSAGE` / `CLOSE` / `ERROR` events (a generic
+  `sourceFromWebSocket()` helper is queued for a follow-up RFC).
 
 ### "I want my agent's facts to update from a live external feed"
 
@@ -151,10 +155,14 @@ Two new chunk variants land on the stream:
 `runStream({ liveContext })` is the dedicated subject of
 [RFC 0005](../../docs/rfcs/0005-live-context-agent.md). Today's
 implementation is **231 LOC in `agent-orchestrator.ts`** — under the
-RFC's 300-LOC scope guard. The `mode: "restart"` automatic
-re-invocation is reserved for a follow-up minor; today both `mode`
-values produce identical behavior (the chunk-emission contract +
-abort wiring; consumers re-prompt via a fresh `runStream` call).
+RFC's 300-LOC scope guard. Behavior is **abort-and-emit**: when
+`interruptWhen` returns `true`, the orchestrator aborts the in-flight
+LLM run and emits an `interrupted` chunk with the partial output; the
+caller resumes by issuing a fresh `runStream` against the still-live
+subscription (or fully tears down via `result.abort()`). Automatic
+re-invocation (the "restart" semantic the original RFC drafted) is
+reserved for a follow-up RFC + field — the original `mode` field was
+removed before release because the impl never read it.
 
 **Security companion (mandatory when watched facts may carry PII):**
 wire `createFactPIIGuardrail` on the same Directive system. Without
@@ -344,7 +352,8 @@ exports. One install, optional peerDependencies per vendor.
 |---|---|---|
 | `@directive-run/sources/supabase` | `sourceFromSupabaseChannel()` | Supabase realtime channel |
 | `@directive-run/sources/cloudflare` | `sourceFromDOAlarm()` | Cloudflare Durable Object alarm |
-| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw WebSocket |
+| `@directive-run/sources/cloudflare` | `sourceFromWebSocketMessage()` | Cloudflare Durable Object WebSocket message stream |
+| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw browser / Node WebSocket |
 | `@directive-run/sources/sentry` | `sourceFromSentryHook()` | (future RFC) Sentry production-error stream |
 
 Install only the umbrella; the vendor peerDeps are optional and pull in

@@ -409,6 +409,96 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
+  // R14-C1 regression — walker must decrement depth on the array
+  // branch (R13 passed `depth` raw, which let arrays bypass the
+  // documented walkDepth ≤ 5 bound and stack-overflow on deeply
+  // nested shapes). Each array level now burns one depth slot,
+  // matching how the object branch already works.
+  it("array recursion burns depth (R14-C1)", () => {
+    const module = createModule("nested-arr", {
+      schema: {
+        facts: {
+          tree: t.object<{ levels: unknown }>().meta({ tags: ["pii"] }),
+        },
+        events: { wire: { tree: t.object<{ levels: unknown }>() } },
+      },
+      init: (f) => {
+        f.tree = { levels: null };
+      },
+      events: {
+        wire: (f, p) => {
+          f.tree = p.tree;
+        },
+      },
+    });
+
+    // walkDepth: 4 → redacts a 4-level structural shape
+    // (`object → array → array → string`). The same shape at
+    // walkDepth: 2 should NOT redact under the new bound.
+    const systemDeep = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 4 })],
+    });
+    systemDeep.start();
+    systemDeep.events.wire({ tree: { levels: [["alice@x.com"]] } });
+    expect(
+      (systemDeep.facts.tree.levels as string[][])[0]?.[0],
+    ).toBe("[EMAIL]");
+    systemDeep.destroy();
+
+    const systemShallow = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 2 })],
+    });
+    systemShallow.start();
+    systemShallow.events.wire({ tree: { levels: [["alice@x.com"]] } });
+    // walkDepth: 2 was not enough; email reaches the store raw.
+    // This documents the bound; consumers can opt into a higher
+    // walkDepth or pass a `customDetector`.
+    expect(
+      (systemShallow.facts.tree.levels as string[][])[0]?.[0],
+    ).toBe("alice@x.com");
+    systemShallow.destroy();
+  });
+
+  // R14 cycle guard — cyclic array used to recurse forever and
+  // stack-overflow; `safeCall` swallowed the throw so the raw PII
+  // stayed committed in the fact store. The walker now tracks
+  // visited references via WeakSet and bails on revisit.
+  it("cyclic array does not recurse forever (R14-C1 cycle guard)", () => {
+    const module = createModule("cyc", {
+      schema: {
+        facts: { rows: t.object<{ items: unknown }>().meta({ tags: ["pii"] }) },
+        events: { wire: { rows: t.object<{ items: unknown }>() } },
+      },
+      init: (f) => {
+        f.rows = { items: null };
+      },
+      events: {
+        wire: (f, p) => {
+          f.rows = p.rows;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 5 })],
+    });
+    system.start();
+    const cyc: unknown[] = ["alice@x.com"];
+    cyc.push(cyc);
+    // Without the cycle guard this would throw RangeError. The
+    // resulting follow-up redaction write would never fire and the
+    // raw email would stay in `facts.rows.items`. With the guard,
+    // the leaf email IS redacted on the first pass.
+    expect(() => {
+      system.events.wire({ rows: { items: cyc } });
+    }).not.toThrow();
+    const itemsAfter = system.facts.rows.items as unknown[];
+    expect(itemsAfter[0]).toBe("[EMAIL]");
+    system.destroy();
+  });
+
   it("redacts a top-level array of PII strings", () => {
     const module = createModule("emails", {
       schema: {

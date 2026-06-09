@@ -274,20 +274,38 @@ flushes return Promises) work with both sync and async teardown:
   wall-clock cutoff so the runtime can evict the isolate even if
   some sources hang.
 
+Use the **holder + closure** bridge pattern (the same shape the MCP
+recipe in `ai-sources.md` documents) so the `attach` and `onEvict`
+sibling closures share the channel handle:
+
 ```typescript
+// Holder shared between `attach` and `onEvict`. Both closures live
+// inside the same `sources` object; declaring the channel above them
+// keeps the handle reachable from both.
+let channel: RealtimeChannel | null = null;
+
 sources: {
   channel: {
     attach: (publish) => {
-      const ch = supabase.channel("game").subscribe();
-      ch.on("postgres_changes", { event: "UPDATE" }, (p) =>
+      channel = supabase.channel("game");
+      channel.on("postgres_changes", { event: "UPDATE" }, (p) =>
         publish("ROW_UPDATED", p),
       );
-      return () => ch.unsubscribe();  // returns a Promise
+      channel.subscribe();
+      // Per RFC 0009, the unsubscribe MAY return a Promise; awaiting
+      // it on `system.stopAsync()` ensures the broker has dropped the
+      // subscription before the next start cycle re-attaches.
+      return async () => {
+        if (channel) await supabase.removeChannel(channel);
+        channel = null;
+      };
     },
     onEvict: async () => {
       // Cloudflare DO hibernate signal: close the channel actively
       // so the broker drops the subscription before the isolate dies.
-      await supabase.removeChannel(ch);
+      // The unsubscribe will also run, but onEvict fires first and
+      // bounds the pre-hibernation work to a deadline.
+      if (channel) await supabase.removeChannel(channel);
     },
   },
 }

@@ -379,6 +379,7 @@ export function createFactPIIGuardrail(
   function inspect(
     value: unknown,
     depth: number = effectiveWalkDepth,
+    seen: WeakSet<object> = new WeakSet(),
   ):
     | { matched: false }
     | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
@@ -388,21 +389,37 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: redactText(value, detected), detected };
     }
     if (depth <= 0) return { matched: false };
+    // Cycle guard — `payload.new = arr; arr.push(arr)` cycles would
+    // recurse forever, and a stack-overflow throw is swallowed by
+    // `safeCall` at the plugin boundary so the raw PII would stay
+    // committed in the fact store. R13's array-branch fix introduced
+    // this regression; R14 closes it.
+    if (value !== null && typeof value === "object") {
+      if (seen.has(value as object)) return { matched: false };
+      seen.add(value as object);
+    }
     if (Array.isArray(value)) {
-      // Walk array elements at the same depth budget — R13 found that
-      // real Supabase realtime payloads ship as `payload.new = [{ ... }]`
-      // and MCP resource notifications ship as arrays of resources, so
-      // skipping arrays silently no-ops the Tier 0 guard on the
-      // dominant production ingest shape. Each element is inspected
-      // independently; the array is rebuilt only if at least one
-      // element matched. Symbol keys, Maps, and Sets are still out of
-      // scope (caller must wire a `customDetector` for those).
+      // Walk array elements with the same depth budget the object
+      // branch uses — R13 found that real Supabase realtime payloads
+      // ship as `payload.new = [{ ... }]` and MCP resource notifications
+      // ship as arrays of resources, so skipping arrays silently no-ops
+      // the Tier 0 guard on the dominant production ingest shape.
+      //
+      // R14 hardens R13: (a) decrement `depth` on each level (R13 passed
+      // `depth` raw which let deeply-nested arrays bypass the documented
+      // walkDepth ≤ 5 bound and stack-overflow); (b) snapshot the array
+      // exactly once via `[...value]` BEFORE the loop and iterate the
+      // snapshot — re-reading `value[i]` per iteration was a TOCTOU
+      // bypass when `value` is a Proxy whose `get` returns different
+      // values on subsequent reads. Symbol keys, Maps, and Sets remain
+      // out of scope (caller must wire a `customDetector` for those).
+      const snapshot = [...value];
       let mutatedArr: unknown[] | null = null;
       const all: FactPIIMatch[] = [];
-      for (let i = 0; i < value.length; i++) {
-        const nested = inspect(value[i], depth);
+      for (let i = 0; i < snapshot.length; i++) {
+        const nested = inspect(snapshot[i], depth - 1, seen);
         if (!nested.matched) continue;
-        if (mutatedArr === null) mutatedArr = [...value];
+        if (mutatedArr === null) mutatedArr = [...snapshot];
         mutatedArr[i] = nested.redacted;
         for (const d of nested.detected) all.push(d);
       }
@@ -432,7 +449,7 @@ export function createFactPIIGuardrail(
           // handle the structural walk. Burns one depth level whether
           // the child is an array or another plain object so the
           // configured walkDepth bounds total recursion.
-          const nested = inspect(v, depth - 1);
+          const nested = inspect(v, depth - 1, seen);
           if (!nested.matched) continue;
           if (mutated === null) {
             mutated = { ...(value as Record<string, unknown>) };
