@@ -234,7 +234,15 @@ export function createPluginManager<
   // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
   function broadcast<K extends keyof Plugin<any>>(hook: K) {
     return (...args: unknown[]) => {
-      for (const plugin of plugins) {
+      // R14-MAJ — snapshot the plugins array BEFORE iterating so a
+      // plugin's hook callback that calls `manager.unregister(...)`
+      // (or whose `system.observe()` unsubscribe splices the array)
+      // doesn't shift indices mid-broadcast. The previous live-array
+      // iteration meant a malicious or buggy plugin could silently
+      // skip the next plugin — typically the audit-ledger / fact-pii
+      // guardrail — by self-unregistering at exactly the right hook.
+      const snapshot = [...plugins];
+      for (const plugin of snapshot) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
         safeCall(() => (plugin as any)[hook]?.(...args));
       }

@@ -119,6 +119,11 @@ interface PauseBudgetExceededReq extends Requirement {
 // Exported Types
 // ============================================================================
 
+// R14-C5 — one-shot deprecation warning for the v1.18.0 `mode` field
+// on `LiveContextOptions`. Module-scope so the warning fires once per
+// process, not per `runStream` call.
+let deprecatedModeWarned = false;
+
 /** Orchestrator options */
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
@@ -330,14 +335,23 @@ export interface LiveContextOptions<
    * on every watched-key change).
    */
   interruptWhen?: (facts: F, changedKeys: readonly string[]) => boolean;
-  // RFC 0005 originally reserved a `mode: "inject-system-message" |
-  // "restart"` field for choosing how the orchestrator continues after
-  // `interruptWhen` fires. The 1.18 landing ships a single behavior
-  // (abort the LLM run, emit an `interrupted` chunk, hand control back
-  // to the caller — caller re-prompts via a fresh `runStream` or tears
-  // down via `abort()`). The field was removed in R13 because the impl
-  // never read it; ship a follow-up RFC + field together when automatic
-  // re-prompt semantics are settled.
+  /**
+   * @deprecated The `mode` field has no behavior in 1.x — the 1.18
+   * landing ships a single behavior (abort the LLM run, emit an
+   * `interrupted` chunk, hand control back to the caller; the caller
+   * re-prompts via a fresh `runStream` or tears down via `abort()`).
+   * The field was briefly added in 1.18.0 with two declared values
+   * (`"inject-system-message"` and `"restart"`) but the orchestrator
+   * never read it, so neither value did what its name implied.
+   * Setting this field is a no-op at runtime and the orchestrator
+   * emits a one-shot dev-mode warning when it's set to a non-default
+   * value. The follow-up RFC for automatic re-prompt semantics will
+   * re-introduce the field alongside an impl that actually reads it;
+   * until then this slot is kept solely for source-compat with v1.18
+   * call sites — pass nothing or remove the field for current
+   * abort-and-emit behavior.
+   */
+  mode?: "inject-system-message" | "restart";
   /**
    * `"all-changes"` emits `context_updated` for every watched-key
    * batch (so the consumer can render a sidebar of fact deltas).
@@ -1729,6 +1743,24 @@ export function createAgentOrchestrator<
       let liveContextUnsub: (() => void) | null = null;
       const liveCfg = options.liveContext;
       if (liveCfg) {
+        // R14-C5 — `mode` was briefly part of `LiveContextOptions` in
+        // v1.18.0, removed in v1.19.0, and re-added as @deprecated in
+        // v1.19.1+ for source-compat with v1.18 call sites. The field
+        // is intentionally a runtime no-op; emit a one-shot warning
+        // when a consumer actually sets it so they know to drop it.
+        if (
+          // biome-ignore lint/suspicious/noExplicitAny: deprecated field access
+          (liveCfg as any).mode !== undefined &&
+          !deprecatedModeWarned
+        ) {
+          deprecatedModeWarned = true;
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[Directive] liveContext.mode is deprecated and has no runtime behavior — " +
+              "the 1.x landing ships abort-and-emit only. Remove the field; " +
+              "automatic re-prompt semantics will return in a follow-up RFC.",
+          );
+        }
         if (debug && (liveCfg.system as unknown) === (system as unknown)) {
           const bridgeKeys = ["agent", "conversation", "approvalState"];
           const overlap = liveCfg.keys.filter((k) =>
@@ -1775,12 +1807,45 @@ export function createAgentOrchestrator<
             if (changed.length === 0) return;
             const watchedChanged = changed.filter((k) => watched.has(k));
             if (watchedChanged.length === 0) return;
-            liveCfg.onContextUpdate?.(watchedChanged);
-            // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
-            const shouldInterrupt = interruptWhen(
-              current as any,
-              watchedChanged,
-            );
+            // R14-C4: run `interruptWhen` FIRST so `onContextUpdate`
+            // can observe the interruption decision before the chunk
+            // emits — matches the documented contract on
+            // `LiveContextOptions.onContextUpdate` ("fired AFTER the
+            // interruptWhen predicate runs but BEFORE the chunk
+            // emits"). The previous order let consumer-supplied
+            // callbacks fire blindly.
+            //
+            // Both callbacks are wrapped in try/catch: a throw inside
+            // `interruptWhen` or `onContextUpdate` used to propagate
+            // back through `notifyKey` → `flush` → the source's
+            // publish handler, killing the publisher entirely. The
+            // try/catch confines the failure to a console.error and
+            // continues the notify cycle so downstream listeners
+            // (audit-ledger, logging) still fire.
+            let shouldInterrupt = false;
+            try {
+              shouldInterrupt = interruptWhen(
+                // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
+                current as any,
+                watchedChanged,
+              );
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error(
+                "[Directive] liveContext.interruptWhen threw — treating as non-interrupt",
+                err,
+              );
+              shouldInterrupt = false;
+            }
+            try {
+              liveCfg.onContextUpdate?.(watchedChanged);
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error(
+                "[Directive] liveContext.onContextUpdate threw",
+                err,
+              );
+            }
             if (shouldInterrupt) {
               pushChunk({
                 type: "interrupted",

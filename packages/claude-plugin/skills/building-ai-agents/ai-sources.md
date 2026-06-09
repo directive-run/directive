@@ -54,7 +54,11 @@ gate execution on `facts.<lifecycle>.healthy` derivations.
 - **MCP server connect/disconnect** → see "MCP Lifecycle" below.
 - **Health checks** → poll inside the source's `attach`; publish
   `health_changed` events as the upstream service responds.
-- **WebSocket open / close** → `sourceFromWebSocket()` (sources/websocket).
+- **WebSocket open / close (Cloudflare DO)** → `sourceFromWebSocketMessage()`
+  (`@directive-run/sources/cloudflare`). For raw Node/browser WebSocket
+  bridges, declare a source whose `attach` wires `addEventListener` and
+  publishes `MESSAGE` / `CLOSE` / `ERROR` events (a generic
+  `sourceFromWebSocket()` helper is queued for a follow-up RFC).
 
 ### "I want my agent's facts to update from a live external feed"
 
@@ -151,10 +155,14 @@ Two new chunk variants land on the stream:
 `runStream({ liveContext })` is the dedicated subject of
 [RFC 0005](../../docs/rfcs/0005-live-context-agent.md). Today's
 implementation is **231 LOC in `agent-orchestrator.ts`** — under the
-RFC's 300-LOC scope guard. The `mode: "restart"` automatic
-re-invocation is reserved for a follow-up minor; today both `mode`
-values produce identical behavior (the chunk-emission contract +
-abort wiring; consumers re-prompt via a fresh `runStream` call).
+RFC's 300-LOC scope guard. Behavior is **abort-and-emit**: when
+`interruptWhen` returns `true`, the orchestrator aborts the in-flight
+LLM run and emits an `interrupted` chunk with the partial output; the
+caller resumes by issuing a fresh `runStream` against the still-live
+subscription (or fully tears down via `result.abort()`). Automatic
+re-invocation (the "restart" semantic the original RFC drafted) is
+reserved for a follow-up RFC + field — the original `mode` field was
+removed before release because the impl never read it.
 
 **Security companion (mandatory when watched facts may carry PII):**
 wire `createFactPIIGuardrail` on the same Directive system. Without
@@ -177,77 +185,95 @@ holder. The holder pattern lets you construct the adapter and the
 source in either order — the source's mount/unmount drives which
 publish closure (if any) receives lifecycle events.
 
+> **Multi-tenant safety.** If you import the module that owns the
+> holder from two places (e.g., a Worker that mounts one Directive
+> system per tenant DO), a module-level `let publishRef` would be
+> SHARED — the second tenant's `attach` would silently overwrite the
+> first tenant's pipe. **Always declare the holder + adapter inside a
+> factory function** so each call yields an isolated closure pair.
+> The recipe below uses `makeOrchestrator(adapter)` for exactly this
+> reason; if you create the adapter outside the factory, pass it in
+> per call too.
+
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";
 import type { SourcePublish } from "@directive-run/core";
 import { createMCPAdapter } from "@directive-run/ai/mcp";
 
-// Holder that the source's `attach` populates. The adapter's events
-// forward through this — when the source is detached (`attach`'s
-// unsubscribe runs), the holder goes null and the adapter callbacks
-// no-op. This guarantees post-stop lifecycle events from the MCP
-// transport can't write into a torn-down system.
-let publishRef: SourcePublish | null = null;
+// Factory closure — each call yields a fresh `(adapter, module)`
+// pair with its own `publishRef`. Multi-tenant safe; SSR / Vitest
+// hot-reload safe; one tenant's MCP traffic can never leak into
+// another tenant's facts.
+function makeOrchestrator() {
+  let publishRef: SourcePublish | null = null;
 
-const adapter = createMCPAdapter({
-  servers: [/* ... */],
-  events: {
-    onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
-    onDisconnect: (name) => publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
-  },
-});
+  const adapter = createMCPAdapter({
+    servers: [/* ... */],
+    events: {
+      onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
+      onDisconnect: (name) =>
+        publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
+    },
+  });
 
-const orchestrator = createModule("orchestrator", {
-  schema: {
-    facts: {
-      mcp: t.object<{
-        servers: Record<string, "connected" | "disconnected">;
-      }>(),
+  const orchestrator = createModule("orchestrator", {
+    schema: {
+      facts: {
+        mcp: t.object<{
+          servers: Record<string, "connected" | "disconnected">;
+        }>(),
+      },
+      events: {
+        MCP_SERVER_CONNECTED: { name: t.string() },
+        MCP_SERVER_DISCONNECTED: { name: t.string() },
+      },
+      derivations: {
+        allServersHealthy: t.boolean(),
+      },
+    },
+    init: (f) => {
+      f.mcp = { servers: {} };
     },
     events: {
-      MCP_SERVER_CONNECTED: { name: t.string() },
-      MCP_SERVER_DISCONNECTED: { name: t.string() },
-    },
-    derivations: {
-      allServersHealthy: t.boolean(),
-    },
-  },
-  init: (f) => {
-    f.mcp = { servers: {} };
-  },
-  events: {
-    MCP_SERVER_CONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "connected" },
-      };
-    },
-    MCP_SERVER_DISCONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "disconnected" },
-      };
-    },
-  },
-  derive: {
-    allServersHealthy: (facts) =>
-      Object.values(facts.mcp.servers).every((s) => s === "connected"),
-  },
-  sources: {
-    mcpLifecycle: {
-      attach: (publish) => {
-        publishRef = publish;
-        // Kick the adapter's connection lifecycle once the source is
-        // attached so the first `onConnect` flows into our publish.
-        void adapter.connect();
-        return async () => {
-          publishRef = null;
-          await adapter.disconnect();
+      MCP_SERVER_CONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "connected" },
+        };
+      },
+      MCP_SERVER_DISCONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "disconnected" },
         };
       },
     },
-  },
-});
+    derive: {
+      allServersHealthy: (facts) =>
+        Object.values(facts.mcp.servers).every((s) => s === "connected"),
+    },
+    sources: {
+      mcpLifecycle: {
+        attach: (publish) => {
+          publishRef = publish;
+          // Kick the adapter's connection lifecycle once the source is
+          // attached so the first `onConnect` flows into our publish.
+          void adapter.connect();
+          return async () => {
+            publishRef = null;
+            await adapter.disconnect();
+          };
+        },
+      },
+    },
+  });
+
+  return { orchestrator, adapter };
+}
+
+// Per-tenant / per-request usage:
+const { orchestrator, adapter } = makeOrchestrator();
+const system = createSystem({ module: orchestrator });
 ```
 
 Constraints can now gate agent execution on
@@ -344,7 +370,8 @@ exports. One install, optional peerDependencies per vendor.
 |---|---|---|
 | `@directive-run/sources/supabase` | `sourceFromSupabaseChannel()` | Supabase realtime channel |
 | `@directive-run/sources/cloudflare` | `sourceFromDOAlarm()` | Cloudflare Durable Object alarm |
-| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw WebSocket |
+| `@directive-run/sources/cloudflare` | `sourceFromWebSocketMessage()` | Cloudflare Durable Object WebSocket message stream |
+| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw browser / Node WebSocket |
 | `@directive-run/sources/sentry` | `sourceFromSentryHook()` | (future RFC) Sentry production-error stream |
 
 Install only the umbrella; the vendor peerDeps are optional and pull in

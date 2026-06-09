@@ -93,10 +93,13 @@ with up-to-date facts.
 it, `liveContext` expands the source → fact → prompt PII bypass surface
 into the mid-stream context updates the agent reads while generating.
 
-`liveContext.guardrails` is the per-`runStream` extension point: the
-orchestrator runs the supplied guardrails BEFORE emitting `context_updated`
-chunks, so a fact update that contains PII is either redacted (by the
-plugin) or blocked (by the guardrail) before it reaches the LLM call.
+**R13 update:** the original RFC drafted a `liveContext.guardrails`
+inline array as the per-`runStream` extension point. The shipped
+design moves PII screening to `createFactPIIGuardrail` wired at
+`createSystem` time — the plugin runs on every fact write (including
+the source publishes liveContext watches), so by the time the
+orchestrator emits a `context_updated` chunk the fact has already
+been redacted in-store. No `runStream`-time guardrail array ships.
 
 ## Scope guard
 
@@ -123,11 +126,14 @@ the launch artifact.
 
 ## Open questions
 
-1. **Re-prompt merge strategy.** When `mode: "restart"` fires, does the
-   orchestrator (a) re-render the entire system message from scratch, or
-   (b) append a "context updated:" delta? Recommendation: (a) for v1
-   simplicity, opt into (b) via a `mergeStrategy: "rerender" | "delta"`
-   later if needed.
+1. **Automatic re-prompt semantics (deferred to follow-up RFC).** The
+   1.x landing ships abort-and-emit only; the caller drives re-prompt
+   via a fresh `runStream` call. A future RFC will add automatic
+   re-invocation with a merge strategy — open sub-questions: (a)
+   re-render the entire system message from scratch, or (b) append a
+   "context updated:" delta. The original `mode` field was removed
+   from `LiveContextOptions` before release because the impl never
+   read it; the new field ships alongside the impl in the follow-up.
 2. **Buffer policy during interrupt.** Partial output emitted before
    interrupt — does the caller's `for await (chunk of stream)` loop get
    it as a `token` chunk first then `interrupted`, or only `interrupted`
