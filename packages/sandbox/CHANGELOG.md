@@ -1,5 +1,12 @@
 # @directive-run/sandbox
 
+## 0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f)]:
+  - @directive-run/core@1.19.2
+
 ## 0.3.4
 
 ### Patch Changes
