@@ -280,10 +280,11 @@ export type OrchestratorStreamChunk =
    * RFC 0005: `liveContext.interruptWhen` returned `true` for at
    * least one changed key. The orchestrator aborted the in-flight
    * LLM run and emits this chunk with the partial output captured
-   * up to the abort point. In `mode: "restart"` the orchestrator
-   * also re-invokes the runner with merged context after the chunk
-   * fires; in `mode: "inject-system-message"` the consumer is
-   * responsible for restarting via a fresh `runStream` call.
+   * up to the abort point. The consumer is responsible for
+   * re-prompting via a fresh `runStream` call against the still-live
+   * liveContext subscription (or for fully tearing the run down via
+   * `result.abort()`). A follow-up RFC will add automatic re-invocation
+   * once the design is settled.
    */
   | {
       type: "interrupted";
@@ -304,7 +305,6 @@ export type OrchestratorStreamChunk =
  *     system: marketSystem,
  *     keys: ["lastPrice"],
  *     interruptWhen: (facts) => Math.abs(facts.lastPrice - facts.openPrice) > 5,
- *     mode: "inject-system-message",
  *   },
  * });
  * ```
@@ -330,21 +330,14 @@ export interface LiveContextOptions<
    * on every watched-key change).
    */
   interruptWhen?: (facts: F, changedKeys: readonly string[]) => boolean;
-  /**
-   * What to do when `interruptWhen` returns true. Today's landing
-   * supports a single mode (`"inject-system-message"`): the LLM run
-   * aborts and an `interrupted` chunk lands on the stream; the
-   * consumer is responsible for restarting via a fresh `runStream`
-   * call against the still-live liveContext subscription (use
-   * `result.interrupt(reason?)` from outside or the automatic
-   * `liveContext.interruptWhen` flow from inside).
-   *
-   * RFC 0005 reserves `"restart"` for a follow-up minor that
-   * implements automatic re-invocation with merged context. Today
-   * `"restart"` is accepted by the type for forward-compat but
-   * behaves identically to `"inject-system-message"`.
-   */
-  mode?: "inject-system-message" | "restart";
+  // RFC 0005 originally reserved a `mode: "inject-system-message" |
+  // "restart"` field for choosing how the orchestrator continues after
+  // `interruptWhen` fires. The 1.18 landing ships a single behavior
+  // (abort the LLM run, emit an `interrupted` chunk, hand control back
+  // to the caller — caller re-prompts via a fresh `runStream` or tears
+  // down via `abort()`). The field was removed in R13 because the impl
+  // never read it; ship a follow-up RFC + field together when automatic
+  // re-prompt semantics are settled.
   /**
    * `"all-changes"` emits `context_updated` for every watched-key
    * batch (so the consumer can render a sidebar of fact deltas).

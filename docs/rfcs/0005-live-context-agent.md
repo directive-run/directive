@@ -52,24 +52,33 @@ const result = orchestrator.runStream(agent, input, {
     system,                            // the Directive system whose facts feed the agent
     keys: ["pr.headSha", "pr.state"],  // facts to watch
     interruptWhen: (facts, changedKeys) => boolean,
-    mode: "restart" | "inject-system-message",  // default: "restart"
     notifyOn: "all-changes" | "interrupt-only", // default: "interrupt-only"
     onContextUpdate?: (changedKeys) => void,
-    guardrails?: Array<GuardrailFn<{
-      key: string;
-      value: unknown;
-      agentName: string;
-    }>>,                                // mandatory companion — see Security
   },
 });
 ```
+
+> **R13 update:** the original RFC drafted a `mode: "restart" |
+> "inject-system-message"` field for choosing how the orchestrator
+> continues after an interrupt. The 1.18 landing ships a single
+> behavior — abort the LLM run, emit an `interrupted` chunk, hand
+> control back to the caller (who re-prompts via a fresh `runStream`
+> or fully tears down via `result.abort()`). The `mode` field was
+> removed before release because the impl never read it; the
+> auto-re-prompt semantics will ship in a follow-up RFC + field
+> together once their design is settled.
+>
+> Likewise, the original draft proposed an inline `guardrails` array
+> on `liveContext` itself; the shipped Tier 0 security companion is
+> `createFactPIIGuardrail`, wired at `createSystem` time (see the
+> "Security — Tier 0 prereq" section below).
 
 Two additive chunk variants land on the `OrchestratorStreamChunk`
 discriminated union:
 
 ```ts
 | { type: "context_updated"; changedKeys: string[] }
-| { type: "interrupted"; reason: string; partialOutput: string }
+| { type: "interrupted"; reason: string; partialOutput: string; changedKeys: string[] }
 ```
 
 A new `interrupt(reason?: string): void` method joins `abort()` on the

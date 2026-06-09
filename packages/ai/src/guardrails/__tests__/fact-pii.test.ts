@@ -361,3 +361,82 @@ describe("createFactPIIGuardrail — object payloads", () => {
     system.destroy();
   });
 });
+
+// R13-C6 regression — the walker MUST recurse into arrays. Without
+// this, the dominant Supabase realtime shape (`payload.new = [{...}]`)
+// and MCP resource-list notifications silently bypass the Tier 0 guard.
+describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
+  it("redacts PII inside an array of objects", () => {
+    interface UserRow {
+      email: string;
+      name: string;
+    }
+    interface Roster {
+      users: UserRow[];
+    }
+    const module = createModule("roster", {
+      schema: {
+        facts: { roster: t.object<Roster>().meta({ tags: ["pii"] }) },
+        events: { batch: { roster: t.object<Roster>() } },
+      },
+      init: (f) => {
+        f.roster = { users: [] };
+      },
+      events: {
+        batch: (f, p) => {
+          f.roster = p.roster;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 3 })],
+    });
+    system.start();
+    system.events.batch({
+      roster: {
+        users: [
+          { email: "alice@example.com", name: "Alice" },
+          { email: "bob@example.com", name: "Bob" },
+        ],
+      },
+    });
+    expect(system.facts.roster.users[0]?.email).toBe("[EMAIL]");
+    expect(system.facts.roster.users[1]?.email).toBe("[EMAIL]");
+    // Non-PII fields preserved.
+    expect(system.facts.roster.users[0]?.name).toBe("Alice");
+    expect(system.facts.roster.users[1]?.name).toBe("Bob");
+    system.destroy();
+  });
+
+  it("redacts a top-level array of PII strings", () => {
+    const module = createModule("emails", {
+      schema: {
+        facts: { addresses: t.array<string>().meta({ tags: ["pii"] }) },
+        events: { wire: { addresses: t.array<string>() } },
+      },
+      init: (f) => {
+        f.addresses = [];
+      },
+      events: {
+        wire: (f, p) => {
+          f.addresses = p.addresses;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 2 })],
+    });
+    system.start();
+    system.events.wire({
+      addresses: ["one@example.com", "two@example.com", "no-pii-here"],
+    });
+    expect(system.facts.addresses).toEqual([
+      "[EMAIL]",
+      "[EMAIL]",
+      "no-pii-here",
+    ]);
+    system.destroy();
+  });
+});

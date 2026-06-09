@@ -269,18 +269,24 @@ export interface FactPIIGuardrailOptions {
    */
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
-   * Maximum nesting depth to walk when scanning an object-shaped fact
-   * value. Default `1` — only the top-level string properties of an
-   * object are scanned. Deeper structures (nested objects, arrays of
-   * objects, Maps, Sets) are NOT walked by the built-in scanner; PII
-   * embedded at depth > `walkDepth` will pass through unredacted.
+   * Maximum nesting depth to walk when scanning a structured fact
+   * value. Default `1` — the scanner inspects top-level strings, then
+   * descends one level into the object/array. Arrays and plain objects
+   * count as one depth level each. Maps and Sets are still NOT walked
+   * by the built-in scanner; PII inside those structures must go
+   * through a `customDetector`.
+   *
+   * Per R13-C6 the walker recurses into arrays (Supabase realtime
+   * payloads ship as `payload.new = [{...}]`, MCP resource lists ship
+   * as arrays — those shapes silently bypassed the Tier 0 guard before).
    *
    * Consumers with deeply-nested PII shapes have two options:
    * 1. Pass `walkDepth: 2` (or higher) — the scanner walks plain
-   *    objects to that depth. Arrays, Maps, and Sets are still skipped.
+   *    objects and arrays to that depth. Maps and Sets are still
+   *    skipped.
    * 2. Pass a `customDetector` that walks the consumer-specific shape
    *    and returns concrete matches — the right answer for
-   *    domain-specific structures.
+   *    domain-specific structures (Maps, Sets, getters, Symbol keys).
    *
    * Maximum is `5` to prevent pathological recursion on cyclic
    * structures. Passing anything higher clamps to `5`.
@@ -382,12 +388,34 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: redactText(value, detected), detected };
     }
     if (depth <= 0) return { matched: false };
-    if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      // Walk array elements at the same depth budget — R13 found that
+      // real Supabase realtime payloads ship as `payload.new = [{ ... }]`
+      // and MCP resource notifications ship as arrays of resources, so
+      // skipping arrays silently no-ops the Tier 0 guard on the
+      // dominant production ingest shape. Each element is inspected
+      // independently; the array is rebuilt only if at least one
+      // element matched. Symbol keys, Maps, and Sets are still out of
+      // scope (caller must wire a `customDetector` for those).
+      let mutatedArr: unknown[] | null = null;
+      const all: FactPIIMatch[] = [];
+      for (let i = 0; i < value.length; i++) {
+        const nested = inspect(value[i], depth);
+        if (!nested.matched) continue;
+        if (mutatedArr === null) mutatedArr = [...value];
+        mutatedArr[i] = nested.redacted;
+        for (const d of nested.detected) all.push(d);
+      }
+      if (mutatedArr === null) return { matched: false };
+      return { matched: true, redacted: mutatedArr, detected: all };
+    }
+    if (value && typeof value === "object") {
       // Walk plain objects up to `walkDepth` levels deep so a source
       // publishing a nested PII shape (e.g. `{ profile: { email } }`) is
-      // screened when the consumer opts into `walkDepth: 2+`. Arrays,
-      // Maps, and Sets are out of scope at any depth — pass a
-      // `customDetector` that walks the shape itself.
+      // screened when the consumer opts into `walkDepth: 2+`. Maps and
+      // Sets are out of scope — pass a `customDetector` for those.
+      // Symbol-keyed properties are NOT walked because `Object.entries`
+      // skips them (documented in the JSDoc at the top of this file).
       let mutated: Record<string, unknown> | null = null;
       const all: FactPIIMatch[] = [];
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
@@ -399,12 +427,11 @@ export function createFactPIIGuardrail(
           }
           mutated[k] = redactText(v, detected);
           for (const d of detected) all.push(d);
-        } else if (
-          depth > 1 &&
-          v &&
-          typeof v === "object" &&
-          !Array.isArray(v)
-        ) {
+        } else if (depth > 1 && v && typeof v === "object") {
+          // Includes arrays — recurse and let the array branch above
+          // handle the structural walk. Burns one depth level whether
+          // the child is an array or another plain object so the
+          // configured walkDepth bounds total recursion.
           const nested = inspect(v, depth - 1);
           if (!nested.matched) continue;
           if (mutated === null) {
