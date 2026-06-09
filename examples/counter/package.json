@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-counter",
-  "version": "0.0.32",
+  "version": "0.0.33",
   "private": true,
   "type": "module",
   "scripts": {
