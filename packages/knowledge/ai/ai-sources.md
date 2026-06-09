@@ -185,77 +185,95 @@ holder. The holder pattern lets you construct the adapter and the
 source in either order — the source's mount/unmount drives which
 publish closure (if any) receives lifecycle events.
 
+> **Multi-tenant safety.** If you import the module that owns the
+> holder from two places (e.g., a Worker that mounts one Directive
+> system per tenant DO), a module-level `let publishRef` would be
+> SHARED — the second tenant's `attach` would silently overwrite the
+> first tenant's pipe. **Always declare the holder + adapter inside a
+> factory function** so each call yields an isolated closure pair.
+> The recipe below uses `makeOrchestrator(adapter)` for exactly this
+> reason; if you create the adapter outside the factory, pass it in
+> per call too.
+
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";
 import type { SourcePublish } from "@directive-run/core";
 import { createMCPAdapter } from "@directive-run/ai/mcp";
 
-// Holder that the source's `attach` populates. The adapter's events
-// forward through this — when the source is detached (`attach`'s
-// unsubscribe runs), the holder goes null and the adapter callbacks
-// no-op. This guarantees post-stop lifecycle events from the MCP
-// transport can't write into a torn-down system.
-let publishRef: SourcePublish | null = null;
+// Factory closure — each call yields a fresh `(adapter, module)`
+// pair with its own `publishRef`. Multi-tenant safe; SSR / Vitest
+// hot-reload safe; one tenant's MCP traffic can never leak into
+// another tenant's facts.
+function makeOrchestrator() {
+  let publishRef: SourcePublish | null = null;
 
-const adapter = createMCPAdapter({
-  servers: [/* ... */],
-  events: {
-    onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
-    onDisconnect: (name) => publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
-  },
-});
+  const adapter = createMCPAdapter({
+    servers: [/* ... */],
+    events: {
+      onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
+      onDisconnect: (name) =>
+        publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
+    },
+  });
 
-const orchestrator = createModule("orchestrator", {
-  schema: {
-    facts: {
-      mcp: t.object<{
-        servers: Record<string, "connected" | "disconnected">;
-      }>(),
+  const orchestrator = createModule("orchestrator", {
+    schema: {
+      facts: {
+        mcp: t.object<{
+          servers: Record<string, "connected" | "disconnected">;
+        }>(),
+      },
+      events: {
+        MCP_SERVER_CONNECTED: { name: t.string() },
+        MCP_SERVER_DISCONNECTED: { name: t.string() },
+      },
+      derivations: {
+        allServersHealthy: t.boolean(),
+      },
+    },
+    init: (f) => {
+      f.mcp = { servers: {} };
     },
     events: {
-      MCP_SERVER_CONNECTED: { name: t.string() },
-      MCP_SERVER_DISCONNECTED: { name: t.string() },
-    },
-    derivations: {
-      allServersHealthy: t.boolean(),
-    },
-  },
-  init: (f) => {
-    f.mcp = { servers: {} };
-  },
-  events: {
-    MCP_SERVER_CONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "connected" },
-      };
-    },
-    MCP_SERVER_DISCONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "disconnected" },
-      };
-    },
-  },
-  derive: {
-    allServersHealthy: (facts) =>
-      Object.values(facts.mcp.servers).every((s) => s === "connected"),
-  },
-  sources: {
-    mcpLifecycle: {
-      attach: (publish) => {
-        publishRef = publish;
-        // Kick the adapter's connection lifecycle once the source is
-        // attached so the first `onConnect` flows into our publish.
-        void adapter.connect();
-        return async () => {
-          publishRef = null;
-          await adapter.disconnect();
+      MCP_SERVER_CONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "connected" },
+        };
+      },
+      MCP_SERVER_DISCONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "disconnected" },
         };
       },
     },
-  },
-});
+    derive: {
+      allServersHealthy: (facts) =>
+        Object.values(facts.mcp.servers).every((s) => s === "connected"),
+    },
+    sources: {
+      mcpLifecycle: {
+        attach: (publish) => {
+          publishRef = publish;
+          // Kick the adapter's connection lifecycle once the source is
+          // attached so the first `onConnect` flows into our publish.
+          void adapter.connect();
+          return async () => {
+            publishRef = null;
+            await adapter.disconnect();
+          };
+        },
+      },
+    },
+  });
+
+  return { orchestrator, adapter };
+}
+
+// Per-tenant / per-request usage:
+const { orchestrator, adapter } = makeOrchestrator();
+const system = createSystem({ module: orchestrator });
 ```
 
 Constraints can now gate agent execution on

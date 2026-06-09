@@ -441,9 +441,9 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     });
     systemDeep.start();
     systemDeep.events.wire({ tree: { levels: [["alice@x.com"]] } });
-    expect(
-      (systemDeep.facts.tree.levels as string[][])[0]?.[0],
-    ).toBe("[EMAIL]");
+    expect((systemDeep.facts.tree.levels as string[][])[0]?.[0]).toBe(
+      "[EMAIL]",
+    );
     systemDeep.destroy();
 
     const systemShallow = createSystem({
@@ -455,9 +455,9 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     // walkDepth: 2 was not enough; email reaches the store raw.
     // This documents the bound; consumers can opt into a higher
     // walkDepth or pass a `customDetector`.
-    expect(
-      (systemShallow.facts.tree.levels as string[][])[0]?.[0],
-    ).toBe("alice@x.com");
+    expect((systemShallow.facts.tree.levels as string[][])[0]?.[0]).toBe(
+      "alice@x.com",
+    );
     systemShallow.destroy();
   });
 
