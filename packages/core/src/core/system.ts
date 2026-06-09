@@ -532,9 +532,42 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       engine.stop();
     },
 
+    async stopAsync(): Promise<void> {
+      // RFC 0009: same shutdown sequence as `stop()` but awaits the
+      // engine's async-aware variant so source unsubscribes that return
+      // Promises (Supabase `removeChannel`, DO storage flush) actually
+      // complete before the caller continues.
+      if (tickInterval) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+      }
+      await engine.stopAsync();
+    },
+
     destroy(): void {
       this.stop();
       engine.destroy();
+    },
+
+    async destroyAsync(): Promise<void> {
+      // RFC 0009: async tear-down. Awaits `stopAsync` first so source
+      // teardown completes before facts/derivations/effects are wiped.
+      await this.stopAsync();
+      await engine.destroyAsync();
+    },
+
+    async evict(deadline?: number): Promise<void> {
+      // RFC 0009: signal that the host runtime is about to evict this
+      // system. Fires every source's `onEvict` in registration order,
+      // then races eviction against `deadline` (ms epoch). With no
+      // deadline the entire teardown is awaited. With `deadline <= now`
+      // the eviction is detached so the caller returns immediately
+      // (the runtime is about to kill the isolate anyway).
+      if (tickInterval) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+      }
+      await engine.evict(deadline);
     },
 
     dispatch(event: { type: string; [key: string]: unknown }) {
@@ -1183,9 +1216,38 @@ function createSingleModuleSystem<S extends ModuleSchema>(
       engine.stop();
     },
 
+    async stopAsync(): Promise<void> {
+      // RFC 0009: async-aware stop that waits for source unsubscribes
+      // to settle. Required when sources own external transports
+      // (Supabase realtime, DO storage) whose teardown is async.
+      if (tickInterval) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+      }
+      await engine.stopAsync();
+    },
+
     destroy(): void {
       this.stop();
       engine.destroy();
+    },
+
+    async destroyAsync(): Promise<void> {
+      // RFC 0009: async tear-down. Awaits `stopAsync` first.
+      await this.stopAsync();
+      await engine.destroyAsync();
+    },
+
+    async evict(deadline?: number): Promise<void> {
+      // RFC 0009: signal that the host runtime is about to evict.
+      // Fires every source's `onEvict` in registration order, then
+      // races eviction against `deadline` (ms epoch). The DO eviction
+      // recipe in `core/sources.md` builds on this method.
+      if (tickInterval) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+      }
+      await engine.evict(deadline);
     },
 
     registerModule(moduleDef: ModuleDef<ModuleSchema>): void {

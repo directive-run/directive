@@ -101,9 +101,6 @@ const result = orchestrator.runStream(agent, input, {
     system,                                   // the Directive system whose facts feed the agent
     keys: ["pr.headSha", "pr.state"],         // REQUIRED — fact keys to watch
     interruptWhen: (facts, changedKeys) => boolean,  // optional; default: () => true
-    mode: "inject-system-message",            // shipped today (default behavior).
-                                              // "restart" reserved for follow-up minor;
-                                              // behaves identically to inject-system-message today.
     notifyOn: "interrupt-only",               // default; "all-changes" emits chunk per watched change
     onContextUpdate: (changedKeys) => void,   // optional logging hook
   },
@@ -170,25 +167,49 @@ threat model.
 
 ## MCP Lifecycle as a Source
 
-`@directive-run/ai/mcp` already exposes `MCPAdapterConfig.events`
-(`onConnect`, `onDisconnect`, `onToolCall`, ...) as callback hooks. The
-canonical adapter wraps those callbacks into a source on the
-orchestrator's module:
+`@directive-run/ai/mcp` exposes `MCPAdapterConfig.events`
+(`onConnect`, `onDisconnect`, `onToolCall`, `onError`, ...) as a single
+bag of callbacks set at adapter-construction time. To bridge the
+adapter's lifecycle into a Directive source the recipe is: declare a
+holder that the source's `attach` populates with the live `publish`,
+then point the adapter's `events.onConnect` / `onDisconnect` at the
+holder. The holder pattern lets you construct the adapter and the
+source in either order — the source's mount/unmount drives which
+publish closure (if any) receives lifecycle events.
 
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";
+import type { SourcePublish } from "@directive-run/core";
 import { createMCPAdapter } from "@directive-run/ai/mcp";
 
-const adapter = createMCPAdapter({ /* ... */ });
+// Holder that the source's `attach` populates. The adapter's events
+// forward through this — when the source is detached (`attach`'s
+// unsubscribe runs), the holder goes null and the adapter callbacks
+// no-op. This guarantees post-stop lifecycle events from the MCP
+// transport can't write into a torn-down system.
+let publishRef: SourcePublish | null = null;
+
+const adapter = createMCPAdapter({
+  servers: [/* ... */],
+  events: {
+    onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
+    onDisconnect: (name) => publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
+  },
+});
 
 const orchestrator = createModule("orchestrator", {
   schema: {
     facts: {
-      mcp: t.object<{ servers: Record<string, "connected" | "disconnected"> }>(),
+      mcp: t.object<{
+        servers: Record<string, "connected" | "disconnected">;
+      }>(),
     },
     events: {
       MCP_SERVER_CONNECTED: { name: t.string() },
       MCP_SERVER_DISCONNECTED: { name: t.string() },
+    },
+    derivations: {
+      allServersHealthy: t.boolean(),
     },
   },
   init: (f) => {
@@ -209,21 +230,19 @@ const orchestrator = createModule("orchestrator", {
     },
   },
   derive: {
-    allServersHealthy: (f) =>
-      Object.values(f.mcp.servers).every((s) => s === "connected"),
+    allServersHealthy: (facts) =>
+      Object.values(facts.mcp.servers).every((s) => s === "connected"),
   },
   sources: {
     mcpLifecycle: {
       attach: (publish) => {
-        const off1 = adapter.onConnect((name) =>
-          publish("MCP_SERVER_CONNECTED", { name }),
-        );
-        const off2 = adapter.onDisconnect((name) =>
-          publish("MCP_SERVER_DISCONNECTED", { name }),
-        );
-        return () => {
-          off1();
-          off2();
+        publishRef = publish;
+        // Kick the adapter's connection lifecycle once the source is
+        // attached so the first `onConnect` flows into our publish.
+        void adapter.connect();
+        return async () => {
+          publishRef = null;
+          await adapter.disconnect();
         };
       },
     },
@@ -233,6 +252,14 @@ const orchestrator = createModule("orchestrator", {
 
 Constraints can now gate agent execution on
 `facts.allServersHealthy` — no separate health-check loop needed.
+
+> The holder + closure pattern is the canonical bridge from any
+> single-callback-bag third-party SDK (MCP, telemetry SDKs that take an
+> `onEvent` config at construction) into a Directive source. The
+> alternative — passing `publish` from inside `attach` into the
+> adapter's events — requires the adapter to be constructed AFTER the
+> source is created, which is awkward when the adapter is used outside
+> Directive too.
 
 ---
 

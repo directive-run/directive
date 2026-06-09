@@ -94,6 +94,15 @@ export interface DOAlarmSourceOptions {
    * Returned from `sourceFromDOAlarm.exposeTick(source)` (see below).
    */
   onTickRegistered?: (tick: () => void) => void;
+  /**
+   * RFC 0009 eviction hook. Called by `system.evict(deadline?)` when the
+   * DO runtime signals an upcoming hibernation. Clear the alarm here so
+   * the DO doesn't wake just to fire a publish into a torn-down system.
+   * The default `onEvict` (used when this option is omitted) deletes the
+   * alarm via `storage.deleteAlarm()`; supply your own to add custom
+   * pre-hibernation work (flush an audit log, signal the broker, etc.).
+   */
+  onEvict?: () => void | Promise<void>;
 }
 
 /**
@@ -117,6 +126,7 @@ export function sourceFromDOAlarm(
     eventName,
     payload = () => ({}),
     onTickRegistered,
+    onEvict,
   } = options;
 
   if (intervalMs < 1) {
@@ -136,6 +146,15 @@ export function sourceFromDOAlarm(
     void storage.setAlarm(Date.now() + intervalMs);
   }
 
+  // Default onEvict: drop the pending alarm so the DO doesn't wake
+  // post-hibernation just to fire into a torn-down system. RFC 0009
+  // motivates the hook; this adapter is the literal target runtime.
+  const evictHandler =
+    onEvict ??
+    (async () => {
+      await storage.deleteAlarm();
+    });
+
   const def: SourceDef & { tick(): void } = {
     attach: (publish: SourcePublish) => {
       activePublish = publish;
@@ -150,6 +169,7 @@ export function sourceFromDOAlarm(
         void storage.deleteAlarm();
       };
     },
+    onEvict: evictHandler,
     tick,
     meta: {
       label: `DO alarm: ${eventName} every ${intervalMs}ms`,
@@ -205,6 +225,16 @@ export interface WebSocketMessageSourceOptions {
    * Set `null` to skip publishing on error.
    */
   errorEvent?: string | null;
+  /**
+   * RFC 0009 eviction hook. Called by `system.evict(deadline?)` when the
+   * DO runtime signals an upcoming hibernation. The default `onEvict`
+   * closes the socket with code 1001 (`"going-away"`) so the broker sees
+   * a clean disconnect and a re-attach after hibernation negotiates a
+   * fresh session. Supply your own to skip the close (e.g., when the
+   * runtime is hibernating WebSockets natively and the broker holds the
+   * connection for resumption) or to add custom pre-hibernation work.
+   */
+  onEvict?: () => void | Promise<void>;
 }
 
 /**
@@ -223,7 +253,22 @@ export function sourceFromWebSocketMessage(
     decode,
     closeEvent = "WEBSOCKET_CLOSED",
     errorEvent = "WEBSOCKET_ERROR",
+    onEvict,
   } = options;
+
+  // Default onEvict: close the socket so the broker sees a clean
+  // disconnect ahead of the DO hibernating. Consumers who let the
+  // runtime hibernate the WebSocket natively can opt out by supplying
+  // their own no-op `onEvict`.
+  const evictHandler =
+    onEvict ??
+    (() => {
+      try {
+        socket.close(1001, "going-away");
+      } catch {
+        // Already closed; ignore.
+      }
+    });
 
   return {
     attach: (publish: SourcePublish) => {
@@ -254,6 +299,7 @@ export function sourceFromWebSocketMessage(
         socket.removeEventListener("error", onError);
       };
     },
+    onEvict: evictHandler,
     meta: {
       label: "Cloudflare WebSocket message stream",
       tags: ["source", "cloudflare", "websocket"],
