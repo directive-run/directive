@@ -1,5 +1,93 @@
 # @directive-run/ai
 
+## 1.19.1
+
+### Patch Changes
+
+- [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
+
+  Three small follow-on fixes for issues surfaced during R14 that R14 Tier 1 didn't cover:
+
+  **MCP holder pattern — multi-tenant safe factory** (R14-C2). The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
+
+  **`broadcast` snapshots `plugins` before iteration**. A plugin hook callback that called `manager.unregister(...)` (or whose `system.observe()` unsubscribe spliced the array) used to shift indices mid-iteration, silently skipping the NEXT plugin — typically the audit-ledger or `createFactPIIGuardrail`. The broadcaster now iterates a snapshot taken at call time, so reentrant `unregister` no longer corrupts the broadcast.
+
+  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel** (R14-MAJ from AI Integration lens). The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
+
+- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 audit Tier 1 — walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
+
+  The R14 multi-lens audit against the v1.19.0 source-primitive surface
+  returned ~30 Critical findings. This patch closes the four highest-
+  impact Critical clusters; the remaining items are tracked for a
+  follow-up minor.
+
+  ### Critical fixes
+
+  **Walker DoS + PII bypass** (R14-C1, closes 5+ reviewer findings —
+  Security, Architecture, Red Team x3, Privacy, Distrib Systems, Domain
+  Expert). R13-C6's array recursion fix passed `depth` raw on the array
+  branch and did NOT snapshot the array before iterating. Three exploit
+  chains landed simultaneously: (a) a deeply-nested
+  `[[[[...]]]]` payload bypassed the documented `walkDepth ≤ 5` bound
+  and overflowed the call stack, with the `safeCall` plugin wrapper
+  swallowing the throw — leaving the raw PII committed in the fact
+  store. (b) Cyclic arrays (`const a = []; a.push(a)`) recursed forever
+  into the same overflow. (c) A `Proxy` whose `.get(0)` returned PII on
+  the live read but benign content on the `[...value]` spread leaked
+  PII into the redacted output at the un-walked indices (TOCTOU).
+  Real-world attack surface: any source where the attacker controls
+  payload shape — Supabase RPC, MCP resource list, webhook bodies.
+
+  The fix in `packages/ai/src/guardrails/fact-pii.ts`: (1) decrement
+  `depth` on the array branch (matches the object branch), (2) snapshot
+  the array via `[...value]` BEFORE the loop and iterate the snapshot,
+  (3) track visited references via `WeakSet` and bail on revisit.
+  Closes the stack-overflow + cycle + Proxy chains with one ~10-line
+  fix. Two new regression tests cover the new bound and the cycle
+  guard; the existing R13-C6 array tests still pass.
+
+  **`liveContext.onContextUpdate` call order matched to JSDoc**
+  (R14-C4). The JSDoc declared `onContextUpdate` "fires AFTER the
+  `interruptWhen` predicate runs but BEFORE the chunk emits" — the
+  impl called `onContextUpdate` FIRST. The instrumentation hook
+  couldn't observe interruption decisions, defeating the documented
+  use case. Swap the order, AND wrap both callbacks in try/catch so a
+  throw inside `interruptWhen` or `onContextUpdate` no longer
+  propagates back through `notifyKey` → `flush` → the source's
+  publish handler (which used to kill the publisher entirely and
+  skip every downstream listener in the notify cycle).
+
+  **`LiveContextOptions.mode` restored as `@deprecated` for source-compat**
+  (R14-C5). v1.18.0 shipped to npm with `mode: "inject-system-message"
+| "restart"` on the public `LiveContextOptions` interface. v1.19.0
+  removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
+  shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0
+  published 2026-06-08 05:42 UTC, 1.19.0 published 2026-06-09 14:21
+  UTC — 32hr live with the field). Removing an exported field of an
+  exported type is a breaking change requiring a major bump; shipping
+  it as minor was a semver violation. This patch restores the field
+  as `@deprecated` with a one-shot runtime warning when consumers set
+  it (no behavior change — abort-and-emit is still the only path).
+  Field will be removed properly in v2.0 with a deprecation cycle.
+
+  ### Documentation fixes
+
+  **Source primitive doc cluster** (R14-C3). The `onEvict` recipe in
+  `packages/knowledge/core/sources.md` referenced a `ch` variable
+  defined in a sibling closure — a copy-paste consumer would hit
+  `ReferenceError`. Rewrote using the holder + closure bridge pattern
+  (`let channel = null` shared between `attach` and `onEvict`).
+  `packages/knowledge/ai/ai-sources.md` still documented the removed
+  `mode: "restart"` field — replaced with the actual shipped behavior
+  description. The adapter table referenced a non-existent
+  `sourceFromWebSocket()` adapter as the canonical WebSocket bridge —
+  clarified that the Cloudflare DO adapter `sourceFromWebSocketMessage()`
+  is the shipped path; the generic helper is queued for a follow-up
+  RFC. RFC 0005 self-contradicted on `liveContext.guardrails` (drafted
+  field vs. shipped `createFactPIIGuardrail`) and listed an "Open
+  question" about a removed `mode: "restart"` semantic — both
+  rewritten to match the shipped state.
+
 ## 1.19.0
 
 ### Minor Changes
