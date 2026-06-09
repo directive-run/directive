@@ -189,11 +189,13 @@ publish closure (if any) receives lifecycle events.
 > holder from two places (e.g., a Worker that mounts one Directive
 > system per tenant DO), a module-level `let publishRef` would be
 > SHARED — the second tenant's `attach` would silently overwrite the
-> first tenant's pipe. **Always declare the holder + adapter inside a
-> factory function** so each call yields an isolated closure pair.
-> The recipe below uses `makeOrchestrator(adapter)` for exactly this
-> reason; if you create the adapter outside the factory, pass it in
-> per call too.
+> first tenant's pipe. **Always construct BOTH the adapter AND the
+> module inside the same factory function** so the adapter's
+> `events` callbacks close over the same factory-local `publishRef`
+> as the source's `attach`. Sharing an adapter across factory calls
+> re-introduces the cross-contamination because the adapter's
+> `events.onConnect` was bound at construction time to whichever
+> factory's `publishRef` was in scope first.
 
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";

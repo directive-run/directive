@@ -270,26 +270,38 @@ export interface FactPIIGuardrailOptions {
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
    * Maximum nesting depth to walk when scanning a structured fact
-   * value. Default `1` — the scanner inspects top-level strings, then
-   * descends one level into the object/array. Arrays and plain objects
-   * count as one depth level each. Maps and Sets are still NOT walked
-   * by the built-in scanner; PII inside those structures must go
-   * through a `customDetector`.
+   * value. Default `1` — the scanner inspects top-level strings AND
+   * recurses one level into nested objects / arrays. Each array level
+   * burns one depth slot (so `[[email]]` at `walkDepth: 1` walks the
+   * outer array but its inner array is NOT scanned). Maps and Sets
+   * are still NOT walked by the built-in scanner; PII inside those
+   * structures must go through a `customDetector`.
    *
-   * Per R13-C6 the walker recurses into arrays (Supabase realtime
-   * payloads ship as `payload.new = [{...}]`, MCP resource lists ship
-   * as arrays — those shapes silently bypassed the Tier 0 guard before).
+   * Real-world common shapes and the `walkDepth` they need:
+   * - **Flat object** (`{ email, ssn }`) — works at default `1`.
+   * - **Nested object** (`{ profile: { email } }`) — needs `walkDepth: 2`.
+   * - **Supabase realtime row payload** (`payload.new = [{ email }]`,
+   *   passed as the fact value) — the fact's value is the object
+   *   `{ new: [...] }`, so the chain is object → array → object →
+   *   string and needs `walkDepth: 4`.
+   * - **MCP resource notification list** (`{ resources: [{...}] }`) —
+   *   same shape, needs `walkDepth: 4`.
    *
-   * Consumers with deeply-nested PII shapes have two options:
-   * 1. Pass `walkDepth: 2` (or higher) — the scanner walks plain
-   *    objects and arrays to that depth. Maps and Sets are still
-   *    skipped.
-   * 2. Pass a `customDetector` that walks the consumer-specific shape
-   *    and returns concrete matches — the right answer for
-   *    domain-specific structures (Maps, Sets, getters, Symbol keys).
+   * For deeper or non-object structures (Maps, Sets, class instances
+   * with getters, Symbol-keyed properties), pass a `customDetector`
+   * that walks the consumer-specific shape and returns concrete
+   * matches.
    *
-   * Maximum is `5` to prevent pathological recursion on cyclic
-   * structures. Passing anything higher clamps to `5`.
+   * **Hard caps for safety:**
+   * - `walkDepth` clamps to `[1, 5]` to prevent pathological recursion
+   *   on cyclic structures. Non-finite values (`NaN`, `Infinity`,
+   *   non-number casts) clamp to `1`.
+   * - The walker caps any single array's element count at 10,000
+   *   (warns + truncates). Pass a `customDetector` for larger
+   *   payloads.
+   * - Cycles via shared object references are detected and the
+   *   walker treats re-encountered ancestors as "no match" rather
+   *   than recursing.
    *
    * Property iteration uses `Object.entries`, which skips
    * Symbol-keyed properties and non-enumerable string keys. If you
@@ -342,7 +354,24 @@ export function createFactPIIGuardrail(
   // Clamp walkDepth to [1, 5]. Lower bound prevents accidental no-op
   // scans (`walkDepth: 0` would skip even top-level string members);
   // upper bound caps pathological recursion on cyclic structures.
-  const effectiveWalkDepth = Math.max(1, Math.min(5, Math.floor(walkDepth)));
+  // `Number.isFinite` guards against NaN / Infinity / non-numeric
+  // casts (R15) — `Math.floor(NaN) === NaN`, `Math.min/max(5, NaN) ===
+  // NaN`, so the chain collapsed to NaN without the finite guard;
+  // recursion then used `depth - 1 === NaN` and the bound never
+  // triggered.
+  const effectiveWalkDepth = Number.isFinite(walkDepth)
+    ? Math.max(1, Math.min(5, Math.floor(walkDepth as number)))
+    : 1;
+
+  // Hard cap on per-array element count. A `Proxy` whose
+  // `Symbol.iterator` yields a billion items would block the event
+  // loop / OOM the worker during `[...value]` spread — and the throw
+  // from V8's allocation failure is swallowed by `safeCall` at the
+  // plugin boundary so the raw PII would commit to the store
+  // unredacted (R15-CRIT-1). Anything past the cap is left as-is on
+  // the redacted output AND reported via `console.warn` so consumers
+  // see the truncation rather than a silent miss.
+  const MAX_ARRAY_SCAN = 10_000;
   let initialized = false;
   let systemRef: System | null = null;
 
@@ -376,10 +405,17 @@ export function createFactPIIGuardrail(
     return all;
   }
 
+  // R15 cycle guard — switched from a permanent WeakSet (which
+  // false-skipped a non-cyclic payload that re-used the same object
+  // reference at multiple slots; R15-CRIT-3) to a per-walk
+  // "in-progress" set: add on entry, REMOVE on exit. This catches
+  // true cycles (a re-encountered ancestor still on the walk path) but
+  // permits a shared leaf (`{ primary: user, secondary: user }`) to
+  // redact at every occurrence.
   function inspect(
     value: unknown,
     depth: number = effectiveWalkDepth,
-    seen: WeakSet<object> = new WeakSet(),
+    inProgress: WeakSet<object> = new WeakSet(),
   ):
     | { matched: false }
     | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
@@ -389,35 +425,78 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: redactText(value, detected), detected };
     }
     if (depth <= 0) return { matched: false };
-    // Cycle guard — `payload.new = arr; arr.push(arr)` cycles would
-    // recurse forever, and a stack-overflow throw is swallowed by
-    // `safeCall` at the plugin boundary so the raw PII would stay
-    // committed in the fact store. R13's array-branch fix introduced
-    // this regression; R14 closes it.
     if (value !== null && typeof value === "object") {
-      if (seen.has(value as object)) return { matched: false };
-      seen.add(value as object);
+      if (inProgress.has(value as object)) return { matched: false };
+      inProgress.add(value as object);
     }
+    try {
+      return inspectStructural(value, depth, inProgress);
+    } catch (err) {
+      // R15-CRIT-2 — a `Proxy` whose `Symbol.iterator` returns `undefined`
+      // (or whose `ownKeys` trap throws) used to crash the walker; the
+      // throw was swallowed by `safeCall` at the plugin boundary so the
+      // raw PII committed to the store unredacted. Wrap the structural
+      // walk in try/catch so a hostile shape becomes "no match" rather
+      // than a silent commit + audit-trail leak.
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[Directive] fact-pii walker threw on shape — leaving value as-is and skipping inspection",
+        err instanceof Error ? err.message : String(err),
+      );
+      return { matched: false };
+    } finally {
+      if (value !== null && typeof value === "object") {
+        inProgress.delete(value as object);
+      }
+    }
+  }
+
+  function inspectStructural(
+    value: unknown,
+    depth: number,
+    inProgress: WeakSet<object>,
+  ):
+    | { matched: false }
+    | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
     if (Array.isArray(value)) {
       // Walk array elements with the same depth budget the object
-      // branch uses — R13 found that real Supabase realtime payloads
-      // ship as `payload.new = [{ ... }]` and MCP resource notifications
-      // ship as arrays of resources, so skipping arrays silently no-ops
-      // the Tier 0 guard on the dominant production ingest shape.
-      //
-      // R14 hardens R13: (a) decrement `depth` on each level (R13 passed
-      // `depth` raw which let deeply-nested arrays bypass the documented
-      // walkDepth ≤ 5 bound and stack-overflow); (b) snapshot the array
-      // exactly once via `[...value]` BEFORE the loop and iterate the
-      // snapshot — re-reading `value[i]` per iteration was a TOCTOU
-      // bypass when `value` is a Proxy whose `get` returns different
-      // values on subsequent reads. Symbol keys, Maps, and Sets remain
-      // out of scope (caller must wire a `customDetector` for those).
-      const snapshot = [...value];
+      // branch uses. R13 added the array branch (Supabase realtime
+      // payloads ship as `payload.new = [{ ... }]`). R14 decremented
+      // depth and snapshotted before iterating to close the per-index
+      // TOCTOU. R15 caps the snapshot length to MAX_ARRAY_SCAN —
+      // beyond that, the spread itself is the DoS vector (a Proxy
+      // whose `Symbol.iterator` yields a billion items would block
+      // the event loop). Element 0..MAX-1 are scanned; element
+      // MAX..N is left in the redacted output as-is and a warning
+      // is logged so consumers see the truncation. Symbol keys,
+      // Maps, and Sets remain out of scope (use a `customDetector`).
+      let snapshot: unknown[];
+      let truncated = false;
+      try {
+        if (value.length > MAX_ARRAY_SCAN) {
+          snapshot = Array.prototype.slice.call(
+            value as unknown as ArrayLike<unknown>,
+            0,
+            MAX_ARRAY_SCAN,
+          );
+          truncated = true;
+        } else {
+          snapshot = [...value];
+        }
+      } catch {
+        // Proxy whose Symbol.iterator throws — treat as no match.
+        return { matched: false };
+      }
+      if (truncated) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[Directive] fact-pii walker truncated array at ${MAX_ARRAY_SCAN} elements — pass a customDetector for larger payloads`,
+        );
+      }
       let mutatedArr: unknown[] | null = null;
       const all: FactPIIMatch[] = [];
       for (let i = 0; i < snapshot.length; i++) {
-        const nested = inspect(snapshot[i], depth - 1, seen);
+        const nested = inspect(snapshot[i], depth - 1, inProgress);
         if (!nested.matched) continue;
         if (mutatedArr === null) mutatedArr = [...snapshot];
         mutatedArr[i] = nested.redacted;
@@ -435,7 +514,19 @@ export function createFactPIIGuardrail(
       // skips them (documented in the JSDoc at the top of this file).
       let mutated: Record<string, unknown> | null = null;
       const all: FactPIIMatch[] = [];
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      // R15 — `Object.entries` snapshots own enumerable [key, value]
+      // pairs once, so the iteration itself is TOCTOU-safe (the array
+      // returned by Object.entries doesn't re-read from the source on
+      // subsequent index reads). The `entries` call itself can throw
+      // when `value` is a `Proxy` whose `ownKeys` trap throws — the
+      // outer `inspect()` try/catch catches it.
+      let entries: Array<[string, unknown]>;
+      try {
+        entries = Object.entries(value as Record<string, unknown>);
+      } catch {
+        return { matched: false };
+      }
+      for (const [k, v] of entries) {
         if (typeof v === "string") {
           const detected = runScan(v);
           if (detected.length === 0) continue;
@@ -449,7 +540,7 @@ export function createFactPIIGuardrail(
           // handle the structural walk. Burns one depth level whether
           // the child is an array or another plain object so the
           // configured walkDepth bounds total recursion.
-          const nested = inspect(v, depth - 1, seen);
+          const nested = inspect(v, depth - 1, inProgress);
           if (!nested.matched) continue;
           if (mutated === null) {
             mutated = { ...(value as Record<string, unknown>) };
