@@ -82,6 +82,30 @@ above), not a source. Wire it inside the orchestrator's constructor.
 
 ---
 
+## What other agent frameworks have (and don't)
+
+The closest comparable surfaces today, and what they cover:
+
+| Capability | Directive `runStream({ liveContext })` | LangChain / LangGraph | Vercel AI SDK | LlamaIndex |
+|---|---|---|---|---|
+| **Mid-generation fact updates from an external stream** | ✅ source primitive bridges the transport; `liveContext` watches fact keys; predicate decides interrupt vs. notify | partial — `Tool` callbacks can be invoked but no "fact store the LLM sees through" surface | partial — `streamText` exposes `onChunk` for the consumer but no mid-stream re-prompt | partial — `QueryEngine` re-runs are caller-driven |
+| **Declarative source / inbound subscription** | ✅ `source` primitive — engine owns mount/unmount; lifecycle observable | hand-rolled per integration (LangChain runnables don't own subscriptions) | n/a — Vercel AI is a streaming SDK, not a state engine | n/a — LlamaIndex is a retrieval framework |
+| **Interrupt + resume against the same subscription** | ✅ `result.interrupt(reason?)` keeps the fact subscription alive; caller re-prompts | callback orchestration on the consumer | abort signal only — no "resume against the same context" affordance | re-query each time |
+| **Tier 0 PII guard at the publish→fact boundary** | ✅ `createFactPIIGuardrail` — wired at `createSystem`; runs on every fact write | callback pattern; consumer wires per chain | input/output guardrails on the call; nothing at the fact-store / state-update boundary | Pydantic schema validation at the retrieval boundary |
+| **Source × OTel out of the box** | ✅ `attachSourcesToOtel` — one long-lived span per `(sourceId, moduleId)` | manual `with_config(callbacks=...)` plumbing | consumer wires `onChunk` into their tracer | manual |
+| **Multi-system reactive composition** | ✅ `liveContext.system` accepts ANY Directive system, even one not owned by the orchestrator | n/a — single-graph model | n/a | n/a |
+
+Directive's pitch is not "we're a better LangChain" — it's **"your
+state engine and your agent runtime share one fact store, so the agent
+sees the world change without you wiring callbacks."** The shipped
+1.x surface delivers that for inbound sources + abort-and-emit
+interruption; the queued follow-up RFC adds automatic re-prompt with
+merge strategies. See
+[RFC 0005's "Demo" section](../../docs/rfcs/0005-live-context-agent.md#demo-the-launch-video)
+for the 6-second launch GIF concept.
+
+---
+
 ## `runStream({ liveContext })` — Reactive Agents
 
 > The killer demo: the agent is mid-generation, a source publishes a fact
