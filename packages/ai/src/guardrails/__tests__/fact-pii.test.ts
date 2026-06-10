@@ -643,6 +643,94 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
+  // R16 — non-cloneable inputs (functions, DOM nodes, WeakMaps, class
+  // instances with method refs) throw DataCloneError when the walker
+  // attempts structuredClone. Walker catches the throw, logs a
+  // warning, and treats the value as no-match — same posture as the
+  // R15 per-Proxy-trap try/catches, just collapsed to one site.
+  it("non-cloneable input does not leak PII; walker warns and skips (R16)", () => {
+    const module = createModule("non-cloneable", {
+      schema: {
+        facts: {
+          payload: t
+            .object<{ email: string; handler: unknown }>()
+            .meta({ tags: ["pii"] }),
+        },
+        events: {
+          wire: { payload: t.object<{ email: string; handler: unknown }>() },
+        },
+      },
+      init: (f) => {
+        f.payload = { email: "", handler: null };
+      },
+      events: {
+        wire: (f, p) => {
+          f.payload = p.payload;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 2 })],
+    });
+    system.start();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Payload contains a function — structuredClone throws.
+    system.events.wire({
+      payload: { email: "leak@example.com", handler: () => 42 },
+    });
+    // Warning fired; raw payload stayed in the store (no in-place
+    // redaction possible without a clone — consumer is expected to
+    // wire a customDetector for function-containing shapes).
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("not structured-cloneable"),
+      expect.any(String),
+    );
+    expect(system.facts.payload.email).toBe("leak@example.com");
+    warnSpy.mockRestore();
+    system.destroy();
+  });
+
+  // R16 — Map / Set survive structuredClone but the walker doesn't
+  // descend into them (consumer expected to wire a customDetector
+  // for Map/Set values). Verify a Map inside a redact-target object
+  // doesn't crash AND the surrounding strings still redact.
+  it("Map inside a payload does not block redaction (R16)", () => {
+    interface Mailbox {
+      from: string;
+      // biome-ignore lint/suspicious/noExplicitAny: testing exotic value
+      metadata: any;
+    }
+    const module = createModule("mail", {
+      schema: {
+        facts: { evt: t.object<Mailbox>().meta({ tags: ["pii"] }) },
+        events: { wire: { evt: t.object<Mailbox>() } },
+      },
+      init: (f) => {
+        f.evt = { from: "", metadata: new Map() };
+      },
+      events: {
+        wire: (f, p) => {
+          f.evt = p.evt;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 2 })],
+    });
+    system.start();
+    const meta = new Map<string, string>([["region", "us-west"]]);
+    system.events.wire({
+      evt: { from: "alice@example.com", metadata: meta },
+    });
+    // Surrounding string still redacts.
+    expect(system.facts.evt.from).toBe("[EMAIL]");
+    // The Map is intentionally NOT walked — consumer expected to
+    // wire a customDetector if Map values may contain PII.
+    system.destroy();
+  });
+
   // R15-MAJ-4 — walkDepth: NaN used to bypass the depth bound because
   // `NaN <= 0` is false and arithmetic on NaN stays NaN. Clamp now
   // guards with Number.isFinite and falls back to default 1.
