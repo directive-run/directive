@@ -1,5 +1,12 @@
 # @directive-run/cli
 
+## 1.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`869e8fc`](https://github.com/directive-run/directive/commit/869e8fc3f12f6f4677e7c7c27e2a9ea795cfc4d1)]:
+  - @directive-run/knowledge@1.19.3
+
 ## 1.19.2
 
 ### Patch Changes
