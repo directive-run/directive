@@ -1,12 +1,12 @@
 # Choosing the right primitive
 
-Directive ships six core primitives. Picking the wrong one — modeling
+Directive ships seven core primitives. Picking the wrong one — modeling
 business state as a derivation, or running a side effect inside a
 resolver — is the most common source of "Directive feels heavy"
 complaints. The framework rewards getting this right; this page is the
 decision matrix.
 
-## The six primitives
+## The seven primitives
 
 | Primitive | Purpose | Reads | Writes | Triggers when |
 |---|---|---|---|---|
@@ -131,7 +131,7 @@ calls a moderation API on each message, and displays the result.
 
 Every external touch is a `source` or a `resolver`. Every state field
 is a `fact` or a `derivation`. Every "must-happen rule" is a
-`constraint`. Every "do this when X" is an `effect`. Six primitives,
+`constraint`. Every "do this when X" is an `effect`. Seven primitives,
 seven pieces of work, zero `useEffect` hooks.
 
 ## When you find yourself wanting to break the model

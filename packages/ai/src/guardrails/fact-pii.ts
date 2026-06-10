@@ -455,13 +455,30 @@ export function createFactPIIGuardrail(
       return { matched: false };
     }
 
+    // Pre-clone cap: a 1M-element array shipped as one realtime row
+    // would otherwise burn CPU inside `structuredClone` BEFORE the
+    // walker ever sees it. Cap at the top-level array length so the
+    // clone cost is bounded; the walker's own per-array cap then
+    // applies to inner arrays the clone produced. (R17 regression
+    // of R15-CRIT-1 — pre-rewrite, the cap was applied during walk
+    // on the live value; post-rewrite, applying it only after clone
+    // re-opened the OOM surface.)
+    let cloneInput: unknown = value;
+    if (Array.isArray(value) && value.length > MAX_ARRAY_SCAN) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[Directive] fact-pii walker truncated top-level array at ${MAX_ARRAY_SCAN} elements before clone — pass a customDetector for larger payloads`,
+      );
+      cloneInput = value.slice(0, MAX_ARRAY_SCAN);
+    }
+
     // Sanitization step — strip Proxies, exotic getters, etc. before
     // walking. structuredClone has been native since Node 17 /
     // workerd / Bun / Deno / browsers ≥ 2022 — the entire runtime
     // matrix Directive supports.
     let safe: unknown;
     try {
-      safe = structuredClone(value);
+      safe = structuredClone(cloneInput);
     } catch (err) {
       // Cyclic input, non-cloneable members (functions, DOM nodes,
       // class instances with method properties, WeakMap, etc.). The
@@ -520,10 +537,39 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: mutatedArr, detected: all };
     }
     if (value && typeof value === "object") {
-      // Maps and Sets DO survive structuredClone — we ignore them
-      // (their string elements would need a different traversal
-      // shape). Pass a `customDetector` for those structures.
-      if (value instanceof Map || value instanceof Set) {
+      // structuredClone preserves a handful of "structured" types
+      // (Map, Set, Date, RegExp, Blob, File, ArrayBuffer + views,
+      // Error) as their native class. Walking them with
+      // `Object.entries` would either yield nothing (the interesting
+      // data is on the prototype / in internal slots) or
+      // false-trigger PII matches inside Error.stack frames. We
+      // exit early; consumers pass a `customDetector` to inspect
+      // these structures.
+      if (
+        value instanceof Map ||
+        value instanceof Set ||
+        value instanceof Date ||
+        value instanceof RegExp ||
+        value instanceof Error ||
+        ArrayBuffer.isView(value) ||
+        value instanceof ArrayBuffer ||
+        (typeof Blob !== "undefined" && value instanceof Blob)
+      ) {
+        // Error class: detection-only path. `Error.message` is a
+        // user-controlled string a transport often surfaces, so
+        // we scan it without redacting (Errors are read-only;
+        // we can't rewrite `message` on a frozen Error). The match
+        // surfaces via `onBlocked`; consumers wire log scrubbing.
+        if (value instanceof Error && typeof value.message === "string") {
+          const detected = runScan(value.message);
+          if (detected.length > 0) {
+            return {
+              matched: true,
+              redacted: value,
+              detected,
+            };
+          }
+        }
         return { matched: false };
       }
       let mutated: Record<string, unknown> | null = null;
@@ -563,6 +609,13 @@ export function createFactPIIGuardrail(
     onFactSet(key, value, _prev) {
       if (!initialized) return;
       if (!screenedKeys.has(key)) return;
+      // Idempotent skip: the redact follow-up write re-enters this
+      // hook with `value === _prev` after the same-microtask
+      // overwrite, which would otherwise re-clone + re-scan the
+      // redacted payload (a real CPU hit at 10k publishes/sec). The
+      // redacted token strings don't match any PII pattern, so the
+      // re-scan is a no-op anyway.
+      if (value === _prev) return;
       const result = inspect(value);
       if (!result.matched) return;
       onBlocked?.(key, result.detected, mode);

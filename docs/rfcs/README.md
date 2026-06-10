@@ -31,17 +31,23 @@ landed in. Open questions are tracked inline.
 5. On ship: status updates to include the landing version in the line
    "Status: Accepted — shipped YYYY-MM-DD in <branch>".
 
+## Shipped post-1.18.0
+
+- **Walker security rewrite** — three rounds of patches on the
+  `createFactPIIGuardrail` walker each opened a slightly different
+  Proxy bypass surface (R13 → R14 → R15). R16 landed
+  `structuredClone`-based sanitization-then-walk so the walker only
+  operates on a Proxy-free clone of the fact value. Shipped
+  2026-06-09 in `@directive-run/ai` v1.19.3. R17 hardened the
+  pre-clone array cap + Error/Date/RegExp/Blob/TypedArray
+  short-circuits in v1.19.6.
+
 ## Open follow-up RFCs (tracked but not yet drafted)
 
 - **Live-context automatic re-prompt semantics** — the original RFC 0005
   drafted a `mode: "restart"` field; the impl was abort-and-emit only.
   Future RFC will spec the auto-re-prompt merge strategy (rerender vs.
   delta) and re-introduce the field alongside an impl that reads it.
-- **Walker security rewrite** — three rounds of patches on the
-  `createFactPIIGuardrail` walker have each opened a slightly different
-  Proxy bypass surface. Future RFC will propose `structuredClone`-based
-  sanitization-then-walk so the walker only operates on a Proxy-free
-  clone of the fact value.
 - **Pre-emit transform hook** — `createFactPIIGuardrail` is a post-emit
   redactor; observability plugins (audit-ledger, debug-timeline,
   devtools, custom log shippers) see raw PII on the first `onFactSet`
@@ -61,3 +67,8 @@ landed in. Open questions are tracked inline.
   sources (one-shot OAuth callback, SSE stream end, paginated cursor
   exhaustion) have no canonical way to signal end-of-stream. Future RFC
   will add `publish.complete?()` per the Observer-protocol shape.
+- **`coalesce: "all"` typing** — the public `SourceCoalesce` type
+  surfaces `"all"` as a valid value, but the engine treats anything
+  other than `"latest"` / `"first"` as "no coalesce". Future patch
+  will either implement true buffered-batch semantics or remove the
+  `"all"` literal from the type union.
