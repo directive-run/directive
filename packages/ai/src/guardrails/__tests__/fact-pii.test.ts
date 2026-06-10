@@ -943,7 +943,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.start();
     system.events.wire({ email: "leak@evil.com" });
     expect(inspectCount).toBe(1);
-    system.events.poke({});
+    system.events.poke();
     // No new inspect — value === prev short-circuits.
     expect(inspectCount).toBe(1);
     system.destroy();
