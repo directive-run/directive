@@ -1,5 +1,12 @@
 # @directive-run/sandbox
 
+## 0.3.10
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+
 ## 0.3.9
 
 ### Patch Changes

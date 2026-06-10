@@ -1,5 +1,13 @@
 # @directive-run/example-counter-vue
 
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+  - @directive-run/vue@1.19.7
+
 ## 0.0.39
 
 ### Patch Changes
