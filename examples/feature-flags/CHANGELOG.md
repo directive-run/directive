@@ -1,5 +1,14 @@
 # @directive-run/example-feature-flags
 
+## 0.0.51
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+  - @directive-run/react@1.19.7
+  - @directive-run/el@1.1.0
+
 ## 0.0.50
 
 ### Patch Changes

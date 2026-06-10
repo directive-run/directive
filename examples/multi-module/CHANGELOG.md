@@ -1,5 +1,13 @@
 # @directive-run/example-multi-module
 
+## 0.0.51
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+  - @directive-run/el@1.1.0
+
 ## 0.0.50
 
 ### Patch Changes
