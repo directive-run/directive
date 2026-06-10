@@ -59,6 +59,35 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
     await system.evict(Date.now() - 1);
   });
 
+  // R18 follow-up: concurrent / repeat evict() calls must not double-fire
+  // onEvict. Cloudflare DO hibernation can call evict twice; non-idempotent
+  // onEvict handlers (e.g. one that posts a "going away" broker message)
+  // would double-fire without the engine's `state.isEvicting` gate.
+  it("system.evict() is reentry-safe — onEvict fires once across concurrent calls", async () => {
+    let onEvictCalls = 0;
+    const moduleWithEvict = createModule("evictGate", {
+      schema: { facts: { ok: t.boolean() } },
+      init: (f) => {
+        f.ok = true;
+      },
+      sources: {
+        broker: {
+          attach: () => () => {},
+          onEvict: () => {
+            onEvictCalls += 1;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module: moduleWithEvict });
+    system.start();
+    // Fire two evict() calls concurrently AND a third afterward. All
+    // must observe the gate and become no-ops past the first.
+    await Promise.all([system.evict(), system.evict()]);
+    await system.evict();
+    expect(onEvictCalls).toBe(1);
+  });
+
   it("system.stopAsync() awaits an async source unsubscribe", async () => {
     let unsubscribed = false;
     const moduleWithSource = createModule("withSource", {
