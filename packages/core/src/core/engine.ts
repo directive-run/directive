@@ -141,6 +141,16 @@ interface EngineState<_S extends Schema> {
   isInitialized: boolean;
   isReady: boolean;
   isDestroyed: boolean;
+  /**
+   * RFC 0009 + R18 follow-up — evict-reentry gate. Cloudflare DO
+   * hibernation paths can call `system.evict()` twice (once on the
+   * first eviction signal, once on the failover path). Without this
+   * gate, the second call would re-run every source's `onEvict` —
+   * sources that aren't idempotent (e.g. one that posts a "going
+   * away" message to a broker) would double-fire. Set on first
+   * entry; never cleared (eviction is terminal).
+   */
+  isEvicting: boolean;
   changedKeys: Set<string>;
   previousRequirements: RequirementSet;
   readyPromise: Promise<void> | null;
@@ -874,6 +884,7 @@ export function createEngine<S extends Schema>(
     isInitialized: false,
     isReady: false,
     isDestroyed: false,
+    isEvicting: false,
     changedKeys: new Set(),
     previousRequirements: new RequirementSet(),
     readyPromise: null,
@@ -1761,6 +1772,15 @@ export function createEngine<S extends Schema>(
       // return synchronously, and let the IIFE run detached with no
       // error path. Now we either await it or attach a swallow-catch
       // so the unhandled-rejection surface is bounded.
+      //
+      // R18 follow-up: reentry gate. Cloudflare DO hibernation can
+      // fire eviction twice; without the gate, the second call
+      // re-runs every source's `onEvict` — sources that aren't
+      // idempotent would double-fire. Set BEFORE awaiting any async
+      // work so concurrent calls observe the in-flight state and
+      // become no-ops.
+      if (state.isEvicting || state.isDestroyed) return;
+      state.isEvicting = true;
       if (deadline !== undefined && deadline - Date.now() <= 0) {
         // Synchronous deadline: kick off the eviction with a
         // swallow-catch (every per-source error already routes through

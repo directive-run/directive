@@ -67,8 +67,3 @@ landed in. Open questions are tracked inline.
   sources (one-shot OAuth callback, SSE stream end, paginated cursor
   exhaustion) have no canonical way to signal end-of-stream. Future RFC
   will add `publish.complete?()` per the Observer-protocol shape.
-- **`coalesce: "all"` typing** — the public `SourceCoalesce` type
-  surfaces `"all"` as a valid value, but the engine treats anything
-  other than `"latest"` / `"first"` as "no coalesce". Future patch
-  will either implement true buffered-batch semantics or remove the
-  `"all"` literal from the type union.
