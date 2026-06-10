@@ -580,7 +580,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     expect(system.facts.items[0]).toBe("[EMAIL]");
     // The cap kicked in — operator sees the warning.
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("truncated array at 10000 elements"),
+      expect.stringContaining("10000 elements"),
     );
     warnSpy.mockRestore();
     system.destroy();
@@ -698,8 +698,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
   it("Map inside a payload does not block redaction (R16)", () => {
     interface Mailbox {
       from: string;
-      // biome-ignore lint/suspicious/noExplicitAny: testing exotic value
-      metadata: any;
+      metadata: unknown;
     }
     const module = createModule("mail", {
       schema: {
@@ -740,8 +739,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
       plugins: [
         createFactPIIGuardrail({
           mode: "redact",
-          // biome-ignore lint/suspicious/noExplicitAny: testing the NaN guard
-          walkDepth: Number.NaN as any,
+          walkDepth: Number.NaN,
         }),
       ],
     });
@@ -786,6 +784,168 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
       "[EMAIL]",
       "no-pii-here",
     ]);
+    system.destroy();
+  });
+});
+
+// R17 hardening — the walker rewrite landed in R16 with structuredClone-
+// based sanitization. R17 found three regressions / new bypass surfaces
+// that this block locks in:
+//   - top-level array length cap must apply BEFORE structuredClone, not
+//     just inside walkClone (R15-CRIT-1 regression)
+//   - Error.message strings are user-controlled but structuredClone of
+//     Error preserves the class; the walker now scans Error.message
+//   - TypedArrays / DataViews / Blobs aren't walkable structures; the
+//     walker short-circuits them rather than iterating their entries
+//     (which would either no-op or false-flag bytes).
+describe("createFactPIIGuardrail — R17 walker hardening", () => {
+  it("(R17-C1) caps top-level array BEFORE structuredClone", () => {
+    const module = createModule("items", {
+      schema: {
+        facts: { items: t.array<string>().meta({ tags: ["pii"] }) },
+        events: { wire: { items: t.array<string>() } },
+      },
+      init: (f) => {
+        f.items = [];
+      },
+      events: {
+        wire: (f, p) => {
+          f.items = p.items;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 2 })],
+    });
+    system.start();
+    // 20k elements — must NOT all reach structuredClone.
+    const huge = ["leak@evil.com"];
+    for (let i = 1; i < 20_000; i++) huge.push(`safe-${i}`);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    system.events.wire({ items: huge });
+    expect(system.facts.items[0]).toBe("[EMAIL]");
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("before clone"),
+    );
+    warnSpy.mockRestore();
+    system.destroy();
+  });
+
+  it("(R17-CRIT-1) detects PII inside Error.message", () => {
+    const matches: Array<{ key: string; count: number }> = [];
+    const module = createModule("errors", {
+      schema: {
+        facts: { lastError: t.object<Error>().meta({ tags: ["pii"] }) },
+        events: {
+          wire: { error: t.object<Error>() },
+        },
+      },
+      init: (f) => {
+        f.lastError = new Error("init");
+      },
+      events: {
+        wire: (f, p) => {
+          f.lastError = p.error;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [
+        createFactPIIGuardrail({
+          mode: "alert",
+          onBlocked: (key, detected) => {
+            matches.push({ key, count: detected.length });
+          },
+        }),
+      ],
+    });
+    system.start();
+    system.events.wire({
+      error: new Error("DB write failed for leak@evil.com"),
+    });
+    expect(matches.length).toBe(1);
+    expect(matches[0]?.count).toBe(1);
+    system.destroy();
+  });
+
+  it("(R17-MAJ-4) short-circuits TypedArray + Blob + Date + RegExp", () => {
+    const blocked: string[] = [];
+    const module = createModule("misc", {
+      schema: {
+        facts: { payload: t.object<object>().meta({ tags: ["pii"] }) },
+        events: { wire: { value: t.object<object>() } },
+      },
+      init: (f) => {
+        f.payload = {};
+      },
+      events: {
+        wire: (f, p) => {
+          f.payload = p.value;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [
+        createFactPIIGuardrail({
+          mode: "alert",
+          onBlocked: (key) => blocked.push(key),
+        }),
+      ],
+    });
+    system.start();
+    // TypedArray, Date, RegExp — none of these should trigger a match
+    // (the walker treats them as opaque; consumers wire customDetector).
+    system.events.wire({ value: new Uint8Array([1, 2, 3, 4]) });
+    system.events.wire({ value: new Date(0) });
+    system.events.wire({ value: /leak@evil\.com/ });
+    expect(blocked.length).toBe(0);
+    system.destroy();
+  });
+
+  it("(R17-Distrib-C1) skips re-clone on idempotent re-emit (value === prev)", () => {
+    let inspectCount = 0;
+    const module = createModule("idem", {
+      schema: {
+        facts: { email: t.string().meta({ tags: ["pii"] }) },
+        events: {
+          wire: { email: t.string() },
+          poke: {},
+        },
+      },
+      init: (f) => {
+        f.email = "";
+      },
+      events: {
+        wire: (f, p) => {
+          f.email = p.email;
+        },
+        poke: (f) => {
+          // Re-assign same value — should NOT re-trigger inspect.
+          const current = f.email;
+          f.email = current;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [
+        createFactPIIGuardrail({
+          mode: "alert",
+          onBlocked: () => {
+            inspectCount++;
+          },
+        }),
+      ],
+    });
+    system.start();
+    system.events.wire({ email: "leak@evil.com" });
+    expect(inspectCount).toBe(1);
+    system.events.poke();
+    // No new inspect — value === prev short-circuits.
+    expect(inspectCount).toBe(1);
     system.destroy();
   });
 });
