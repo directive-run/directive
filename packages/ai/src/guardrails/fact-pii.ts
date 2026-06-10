@@ -293,15 +293,18 @@ export interface FactPIIGuardrailOptions {
    * matches.
    *
    * **Hard caps for safety:**
-   * - `walkDepth` clamps to `[1, 5]` to prevent pathological recursion
-   *   on cyclic structures. Non-finite values (`NaN`, `Infinity`,
-   *   non-number casts) clamp to `1`.
+   * - `walkDepth` clamps to `[1, 5]`. Non-finite values (`NaN`,
+   *   `Infinity`, non-number casts) clamp to `1`.
    * - The walker caps any single array's element count at 10,000
    *   (warns + truncates). Pass a `customDetector` for larger
    *   payloads.
-   * - Cycles via shared object references are detected and the
-   *   walker treats re-encountered ancestors as "no match" rather
-   *   than recursing.
+   * - Before walking, the value is passed through `structuredClone`
+   *   to strip any Proxies, exotic getters, Symbol-iterator
+   *   overrides, and functions the consumer might have attached.
+   *   Cyclic inputs throw `DataCloneError` from `structuredClone`
+   *   and the walker treats them as "no match" with a warning.
+   *   Non-cloneable values (functions, DOM nodes, WeakMaps, etc.)
+   *   throw the same way — wire a `customDetector` for those shapes.
    *
    * Property iteration uses `Object.entries`, which skips
    * Symbol-keyed properties and non-enumerable string keys. If you
@@ -363,14 +366,13 @@ export function createFactPIIGuardrail(
     ? Math.max(1, Math.min(5, Math.floor(walkDepth as number)))
     : 1;
 
-  // Hard cap on per-array element count. A `Proxy` whose
-  // `Symbol.iterator` yields a billion items would block the event
-  // loop / OOM the worker during `[...value]` spread — and the throw
-  // from V8's allocation failure is swallowed by `safeCall` at the
-  // plugin boundary so the raw PII would commit to the store
-  // unredacted (R15-CRIT-1). Anything past the cap is left as-is on
-  // the redacted output AND reported via `console.warn` so consumers
-  // see the truncation rather than a silent miss.
+  // Hard cap on per-array element count. After the structuredClone
+  // pass the walker only ever sees plain arrays (any Proxy is
+  // stripped), so the cap exists purely to bound CPU on legitimate
+  // huge payloads (a 1M-element array shipped as one realtime row).
+  // Anything past the cap is left as-is on the redacted output AND
+  // reported via `console.warn` so consumers see the truncation
+  // rather than a silent miss.
   const MAX_ARRAY_SCAN = 10_000;
   let initialized = false;
   let systemRef: System | null = null;
@@ -405,17 +407,41 @@ export function createFactPIIGuardrail(
     return all;
   }
 
-  // R15 cycle guard — switched from a permanent WeakSet (which
-  // false-skipped a non-cyclic payload that re-used the same object
-  // reference at multiple slots; R15-CRIT-3) to a per-walk
-  // "in-progress" set: add on entry, REMOVE on exit. This catches
-  // true cycles (a re-encountered ancestor still on the walk path) but
-  // permits a shared leaf (`{ primary: user, secondary: user }`) to
-  // redact at every occurrence.
+  // Walker — sanitization-first design.
+  //
+  // R13 → R14 → R15 patched a manual structural walker that operated
+  // on the consumer-supplied value directly. Each round closed one
+  // class of Proxy-based bypass and opened another:
+  //
+  //   - R13: array-shaped payloads silently bypass (added array branch).
+  //   - R14: deeply nested arrays bypass the depth bound; Proxy whose
+  //     `get` returns different values per read leaks PII via TOCTOU
+  //     (added depth decrement + array snapshot).
+  //   - R15: Proxy whose `Symbol.iterator` yields a billion items
+  //     OOMs the worker; Proxy whose iterator returns undefined
+  //     crashes the walker; cycle guard via permanent WeakSet
+  //     false-skips shared-leaf references (added size cap +
+  //     try/catch islands + in-progress cycle tracking).
+  //
+  // The pattern of "patch round → new bypass surface" is the signal
+  // that the walker needs to operate on a value that the consumer
+  // CANNOT inject hostile behavior into. `structuredClone` is the
+  // canonical primitive: the cloned value has no Proxies (they're
+  // unwrapped to their underlying target shape), no exotic getters,
+  // no functions (they throw at clone time), no Symbol-iterator
+  // overrides, no cycles (clone throws on cyclic input). The walker
+  // operates on the safe clone with a simple recursive descent — no
+  // try/catch islands, no cycle tracking, no per-trap defense.
+  //
+  // Non-cloneable inputs (DOM nodes, class instances with method
+  // refs, WeakMaps, Promises, etc.) throw `DataCloneError` at the
+  // clone call; we catch, warn, and treat as "no match" — same
+  // posture as the previous per-trap try/catches. The hard cap on
+  // top-level array element count caps the clone cost, since
+  // `structuredClone` of a 100k-element array is still O(N).
   function inspect(
     value: unknown,
     depth: number = effectiveWalkDepth,
-    inProgress: WeakSet<object> = new WeakSet(),
   ):
     | { matched: false }
     | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
@@ -425,80 +451,68 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: redactText(value, detected), detected };
     }
     if (depth <= 0) return { matched: false };
-    if (value !== null && typeof value === "object") {
-      if (inProgress.has(value as object)) return { matched: false };
-      inProgress.add(value as object);
+    if (value === null || typeof value !== "object") {
+      return { matched: false };
     }
+
+    // Sanitization step — strip Proxies, exotic getters, etc. before
+    // walking. structuredClone has been native since Node 17 /
+    // workerd / Bun / Deno / browsers ≥ 2022 — the entire runtime
+    // matrix Directive supports.
+    let safe: unknown;
     try {
-      return inspectStructural(value, depth, inProgress);
+      safe = structuredClone(value);
     } catch (err) {
-      // R15-CRIT-2 — a `Proxy` whose `Symbol.iterator` returns `undefined`
-      // (or whose `ownKeys` trap throws) used to crash the walker; the
-      // throw was swallowed by `safeCall` at the plugin boundary so the
-      // raw PII committed to the store unredacted. Wrap the structural
-      // walk in try/catch so a hostile shape becomes "no match" rather
-      // than a silent commit + audit-trail leak.
+      // Cyclic input, non-cloneable members (functions, DOM nodes,
+      // class instances with method properties, WeakMap, etc.). The
+      // consumer can wire a `customDetector` for these shapes; we
+      // bail rather than commit raw PII silently.
       // eslint-disable-next-line no-console
       console.warn(
-        "[Directive] fact-pii walker threw on shape — leaving value as-is and skipping inspection",
+        "[Directive] fact-pii walker: value is not structured-cloneable — leaving it as-is and skipping inspection. Wire a customDetector for shapes containing functions, DOM nodes, cycles, or WeakMaps.",
         err instanceof Error ? err.message : String(err),
       );
       return { matched: false };
-    } finally {
-      if (value !== null && typeof value === "object") {
-        inProgress.delete(value as object);
-      }
     }
+    return walkClone(safe, depth);
   }
 
-  function inspectStructural(
+  // Walks a structured clone — guaranteed Proxy-free, cycle-free,
+  // function-free. Simple recursive descent; no try/catch (the
+  // input cannot throw on `Object.entries` / `[...arr]` because
+  // structuredClone produces only plain objects + arrays + JSON
+  // primitives + structured types like Date, Map, Set).
+  function walkClone(
     value: unknown,
     depth: number,
-    inProgress: WeakSet<object>,
   ):
     | { matched: false }
     | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
+    if (typeof value === "string") {
+      const detected = runScan(value);
+      if (detected.length === 0) return { matched: false };
+      return { matched: true, redacted: redactText(value, detected), detected };
+    }
+    if (depth <= 0) return { matched: false };
     if (Array.isArray(value)) {
-      // Walk array elements with the same depth budget the object
-      // branch uses. R13 added the array branch (Supabase realtime
-      // payloads ship as `payload.new = [{ ... }]`). R14 decremented
-      // depth and snapshotted before iterating to close the per-index
-      // TOCTOU. R15 caps the snapshot length to MAX_ARRAY_SCAN —
-      // beyond that, the spread itself is the DoS vector (a Proxy
-      // whose `Symbol.iterator` yields a billion items would block
-      // the event loop). Element 0..MAX-1 are scanned; element
-      // MAX..N is left in the redacted output as-is and a warning
-      // is logged so consumers see the truncation. Symbol keys,
-      // Maps, and Sets remain out of scope (use a `customDetector`).
-      let snapshot: unknown[];
-      let truncated = false;
-      try {
-        if (value.length > MAX_ARRAY_SCAN) {
-          snapshot = Array.prototype.slice.call(
-            value as unknown as ArrayLike<unknown>,
-            0,
-            MAX_ARRAY_SCAN,
-          );
-          truncated = true;
-        } else {
-          snapshot = [...value];
-        }
-      } catch {
-        // Proxy whose Symbol.iterator throws — treat as no match.
-        return { matched: false };
-      }
-      if (truncated) {
+      // Cap on element count — even on a structured clone, walking
+      // 100k elements at 6 regex `.exec` per string element is real
+      // CPU. Beyond the cap, elements are left as-is in the redacted
+      // output and a warning is logged. Pass a `customDetector` for
+      // larger payloads.
+      if (value.length > MAX_ARRAY_SCAN) {
         // eslint-disable-next-line no-console
         console.warn(
           `[Directive] fact-pii walker truncated array at ${MAX_ARRAY_SCAN} elements — pass a customDetector for larger payloads`,
         );
       }
+      const limit = Math.min(value.length, MAX_ARRAY_SCAN);
       let mutatedArr: unknown[] | null = null;
       const all: FactPIIMatch[] = [];
-      for (let i = 0; i < snapshot.length; i++) {
-        const nested = inspect(snapshot[i], depth - 1, inProgress);
+      for (let i = 0; i < limit; i++) {
+        const nested = walkClone(value[i], depth - 1);
         if (!nested.matched) continue;
-        if (mutatedArr === null) mutatedArr = [...snapshot];
+        if (mutatedArr === null) mutatedArr = [...value];
         mutatedArr[i] = nested.redacted;
         for (const d of nested.detected) all.push(d);
       }
@@ -506,27 +520,15 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: mutatedArr, detected: all };
     }
     if (value && typeof value === "object") {
-      // Walk plain objects up to `walkDepth` levels deep so a source
-      // publishing a nested PII shape (e.g. `{ profile: { email } }`) is
-      // screened when the consumer opts into `walkDepth: 2+`. Maps and
-      // Sets are out of scope — pass a `customDetector` for those.
-      // Symbol-keyed properties are NOT walked because `Object.entries`
-      // skips them (documented in the JSDoc at the top of this file).
-      let mutated: Record<string, unknown> | null = null;
-      const all: FactPIIMatch[] = [];
-      // R15 — `Object.entries` snapshots own enumerable [key, value]
-      // pairs once, so the iteration itself is TOCTOU-safe (the array
-      // returned by Object.entries doesn't re-read from the source on
-      // subsequent index reads). The `entries` call itself can throw
-      // when `value` is a `Proxy` whose `ownKeys` trap throws — the
-      // outer `inspect()` try/catch catches it.
-      let entries: Array<[string, unknown]>;
-      try {
-        entries = Object.entries(value as Record<string, unknown>);
-      } catch {
+      // Maps and Sets DO survive structuredClone — we ignore them
+      // (their string elements would need a different traversal
+      // shape). Pass a `customDetector` for those structures.
+      if (value instanceof Map || value instanceof Set) {
         return { matched: false };
       }
-      for (const [k, v] of entries) {
+      let mutated: Record<string, unknown> | null = null;
+      const all: FactPIIMatch[] = [];
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
         if (typeof v === "string") {
           const detected = runScan(v);
           if (detected.length === 0) continue;
@@ -536,11 +538,7 @@ export function createFactPIIGuardrail(
           mutated[k] = redactText(v, detected);
           for (const d of detected) all.push(d);
         } else if (depth > 1 && v && typeof v === "object") {
-          // Includes arrays — recurse and let the array branch above
-          // handle the structural walk. Burns one depth level whether
-          // the child is an array or another plain object so the
-          // configured walkDepth bounds total recursion.
-          const nested = inspect(v, depth - 1, inProgress);
+          const nested = walkClone(v, depth - 1);
           if (!nested.matched) continue;
           if (mutated === null) {
             mutated = { ...(value as Record<string, unknown>) };
