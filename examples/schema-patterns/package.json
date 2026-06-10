@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-schema-patterns",
-  "version": "1.0.47",
+  "version": "1.0.48",
   "type": "module",
   "private": true,
   "scripts": {

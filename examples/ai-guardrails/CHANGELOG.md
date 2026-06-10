@@ -1,5 +1,14 @@
 # @directive-run/example-ai-guardrails
 
+## 0.0.48
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.4
+  - @directive-run/ai@1.19.4
+  - @directive-run/el@1.1.0
+
 ## 0.0.47
 
 ### Patch Changes
