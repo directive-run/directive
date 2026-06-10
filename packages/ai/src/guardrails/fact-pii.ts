@@ -457,19 +457,34 @@ export function createFactPIIGuardrail(
 
     // Pre-clone cap: a 1M-element array shipped as one realtime row
     // would otherwise burn CPU inside `structuredClone` BEFORE the
-    // walker ever sees it. Cap at the top-level array length so the
-    // clone cost is bounded; the walker's own per-array cap then
-    // applies to inner arrays the clone produced. (R17 regression
-    // of R15-CRIT-1 — pre-rewrite, the cap was applied during walk
-    // on the live value; post-rewrite, applying it only after clone
-    // re-opened the OOM surface.)
+    // walker ever sees it. (R17 regression of R15-CRIT-1.) R18 follow-up:
+    // the previous `.slice()` path re-read `value.length` on a Proxy,
+    // which can lie (return 5 on the first read, 1e9 on the next) and
+    // bypass the cap. Materialize via `Array.from` so each index is
+    // read EXACTLY once and the resulting array's length is fixed by
+    // the cap value — the Proxy's traps can no longer TOCTOU us.
     let cloneInput: unknown = value;
-    if (Array.isArray(value) && value.length > MAX_ARRAY_SCAN) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[Directive] fact-pii walker truncated top-level array at ${MAX_ARRAY_SCAN} elements before clone — pass a customDetector for larger payloads`,
-      );
-      cloneInput = value.slice(0, MAX_ARRAY_SCAN);
+    if (Array.isArray(value)) {
+      // Read length once; coerce to a finite number; clamp.
+      const rawLen = (value as unknown[]).length;
+      const len =
+        Number.isFinite(rawLen) && rawLen > 0
+          ? Math.min(Math.floor(rawLen as number), MAX_ARRAY_SCAN)
+          : 0;
+      if (rawLen > MAX_ARRAY_SCAN) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[Directive] fact-pii walker truncated top-level array at ${MAX_ARRAY_SCAN} elements before clone — pass a customDetector for larger payloads`,
+        );
+      }
+      // Materialize a plain Array of exactly `len` entries by reading
+      // each index ONCE. structuredClone of this plain Array can't
+      // re-trigger the Proxy's traps. Inner Proxies still get cloned
+      // by structuredClone's own algorithm, but inner-array length
+      // lying is bounded by the recursive walkClone array cap.
+      const snapshot = new Array(len);
+      for (let i = 0; i < len; i++) snapshot[i] = (value as unknown[])[i];
+      cloneInput = snapshot;
     }
 
     // Sanitization step — strip Proxies, exotic getters, etc. before
@@ -557,11 +572,39 @@ export function createFactPIIGuardrail(
       ) {
         // Error class: detection-only path. `Error.message` is a
         // user-controlled string a transport often surfaces, so
-        // we scan it without redacting (Errors are read-only;
-        // we can't rewrite `message` on a frozen Error). The match
-        // surfaces via `onBlocked`; consumers wire log scrubbing.
-        if (value instanceof Error && typeof value.message === "string") {
-          const detected = runScan(value.message);
+        // we scan it (R17) along with `.cause` and (for AggregateError)
+        // `.errors` (R18-C2 — PII can hide inside wrapped causes).
+        // Errors are returned as-is in `redacted` (the instance ref is
+        // the input); the caller MUST treat Error matches as alert-mode,
+        // not redact-mode, because the same-ref return would otherwise
+        // cause the redact follow-up write to be a no-op while the
+        // `onBlocked` callback claimed redaction (R18-C5).
+        if (value instanceof Error) {
+          const detected: FactPIIMatch[] = [];
+          if (typeof value.message === "string") {
+            for (const d of runScan(value.message)) detected.push(d);
+          }
+          if (typeof value.cause === "string") {
+            for (const d of runScan(value.cause)) detected.push(d);
+          } else if (value.cause instanceof Error && depth > 1) {
+            const sub = walkClone(value.cause, depth - 1);
+            if (sub.matched) for (const d of sub.detected) detected.push(d);
+          }
+          if (
+            typeof AggregateError !== "undefined" &&
+            value instanceof AggregateError &&
+            Array.isArray(value.errors) &&
+            depth > 1
+          ) {
+            for (const inner of value.errors) {
+              if (typeof inner === "string") {
+                for (const d of runScan(inner)) detected.push(d);
+              } else if (inner instanceof Error) {
+                const sub = walkClone(inner, depth - 1);
+                if (sub.matched) for (const d of sub.detected) detected.push(d);
+              }
+            }
+          }
           if (detected.length > 0) {
             return {
               matched: true,
@@ -609,22 +652,28 @@ export function createFactPIIGuardrail(
     onFactSet(key, value, _prev) {
       if (!initialized) return;
       if (!screenedKeys.has(key)) return;
-      // Idempotent skip: the redact follow-up write re-enters this
-      // hook with `value === _prev` after the same-microtask
-      // overwrite, which would otherwise re-clone + re-scan the
-      // redacted payload (a real CPU hit at 10k publishes/sec). The
-      // redacted token strings don't match any PII pattern, so the
-      // re-scan is a no-op anyway.
-      if (value === _prev) return;
+      // Idempotent skip — primitives only (R18-C3). For object
+      // references, `value === _prev` is true when a source mutates
+      // a held reference in place and re-publishes; skipping there
+      // would let mutated PII slip through. Re-scanning an object
+      // is bounded by the walker's array + depth caps anyway.
+      if (value === _prev && (typeof value !== "object" || value === null)) {
+        return;
+      }
       const result = inspect(value);
       if (!result.matched) return;
       onBlocked?.(key, result.detected, mode);
       if (mode === "alert") return;
-      // Redact mode: schedule a follow-up store write. `onFactSet` fires
-      // post-commit, so the raw value briefly exists in the store; the
-      // follow-up write overwrites it before the next reconcile / agent
-      // read. Subscribers that snapshot the raw value during the same
-      // microtask see it; the LLM call after the next settle does not.
+      // Redact mode: schedule a follow-up store write. Skip when the
+      // walker returned the input reference itself (current Error path —
+      // R18-C5). The follow-up would be a no-op AND would trip the
+      // primitives-only idempotency gate on re-entry.
+      if (result.redacted === value) return;
+      // `onFactSet` fires post-commit, so the raw value briefly exists
+      // in the store; the follow-up write overwrites it before the next
+      // reconcile / agent read. Subscribers that snapshot the raw value
+      // during the same microtask see it; the LLM call after the next
+      // settle does not.
       const facts = (systemRef as unknown as MetaCapableSystem | null)?.facts;
       if (facts?.$store?.set) {
         try {
@@ -641,10 +690,20 @@ export function createFactPIIGuardrail(
       for (const change of changes) {
         if (change.type !== "set") continue;
         if (!screenedKeys.has(change.key)) continue;
+        // Primitives-only idempotency gate (R18-C3); see onFactSet.
+        const prev = (change as { prev?: unknown }).prev;
+        if (
+          change.value === prev &&
+          (typeof change.value !== "object" || change.value === null)
+        ) {
+          continue;
+        }
         const result = inspect(change.value);
         if (!result.matched) continue;
         onBlocked?.(change.key, result.detected, mode);
         if (mode === "alert") continue;
+        // Skip same-ref redacted return — Error path (R18-C5).
+        if (result.redacted === change.value) continue;
         // Best-effort in-place mutation of the change record so post-batch
         // subscribers reading `change.value` see the redacted value
         // immediately. Frozen change records fall through silently.
