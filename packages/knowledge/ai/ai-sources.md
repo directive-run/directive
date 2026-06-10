@@ -366,7 +366,13 @@ that should accompany this plugin in regulated deployments.
 ## Adapter packages
 
 The canonical bridges live in **`@directive-run/sources`** as subpath
-exports. One install, optional peerDependencies per vendor.
+exports. One install, optional peerDependencies per vendor:
+
+```bash
+pnpm add @directive-run/sources                              # umbrella
+pnpm add @directive-run/sources @supabase/supabase-js        # + supabase
+pnpm add @directive-run/sources @cloudflare/workers-types    # + cloudflare (devDep)
+```
 
 | Subpath | Source factory | Wraps |
 |---|---|---|
@@ -377,7 +383,57 @@ exports. One install, optional peerDependencies per vendor.
 | `@directive-run/sources/sentry` | `sourceFromSentryHook()` | (future RFC) Sentry production-error stream |
 
 Install only the umbrella; the vendor peerDeps are optional and pull in
-only when the corresponding subpath is imported.
+only when the corresponding subpath is imported. `package.json` marks
+both `@supabase/supabase-js` and `@cloudflare/workers-types` as
+optional peer dependencies — consumers using only one subpath get no
+install-error nag for the other.
+
+---
+
+## Observability — pipe `source.*` events to OpenTelemetry
+
+`attachSourcesToOtel(system, { tracer, serviceName })` bridges the
+`system.observe()` source lifecycle (`source.attach` / `.publish` /
+`.detach` / `.error`) into OTel spans. Pairs with `createOtelPlugin`
+which exports the agent-side trace surface; the two together cover
+the entire publish-to-prompt pipeline:
+
+```ts
+import { createAgentOrchestrator, createOtelPlugin } from "@directive-run/ai";
+import { attachSourcesToOtel } from "@directive-run/ai";
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("agent-service", "1.0.0");
+
+const orchestrator = createAgentOrchestrator({
+  runner: anthropic(/* ... */),
+  plugins: [createOtelPlugin({ tracer })],
+});
+
+// One long-lived span per (sourceId, moduleId); publishes land as span
+// events on the parent attach span (cardinality-budgeted).
+const unsub = attachSourcesToOtel(system, {
+  tracer,
+  serviceName: "agent-service",
+  // Optional: throttle high-frequency publishes (default 1 = every publish).
+  publishSampleRate: 1,
+});
+
+// On `system.destroy()` / `evict()`, call unsub to close any open spans.
+```
+
+What you see in your trace backend:
+- `directive.source.attached` — long-lived span; closes on `detach` with
+  OK status, or on `unsub()` with `directive.detached: true` attribute.
+- Span events (`publish`) on the parent span with `source.event_name`
+  attribute and a wall-clock timestamp.
+- `directive.source.error` spans with `phase: "attach" | "cleanup" |
+  "runtime"` and the truncated error message.
+
+This complements `createOtelPlugin`'s agent-span coverage so an SRE
+debugging "agent stopped mid-stream" can trace back through
+`runStream` → `liveContext` interrupt → the watched fact → the source
+publish that triggered the change — one trace tree, no manual joins.
 
 ---
 

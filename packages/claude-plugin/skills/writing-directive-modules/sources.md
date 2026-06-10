@@ -194,6 +194,17 @@ const unsub = system.observe((event) => {
 
 `system.inspect().sources` lists the declared sources + `system.inspect().attachedSourceCount` reports how many are currently bound.
 
+### Pipe `source.*` to OpenTelemetry
+
+For production observability, `@directive-run/ai` ships
+`attachSourcesToOtel(system, { tracer, serviceName })` which bridges
+the lifecycle into OTel spans (one long-lived span per
+`(sourceId, moduleId)`; publishes as span events; errors as
+`directive.source.error` spans tagged with `phase`). See
+[`../ai/ai-sources.md` § Observability](../ai/ai-sources.md#observability--pipe-source-events-to-opentelemetry)
+for the full recipe; nothing in core depends on OTel so the bridge
+lives next to the AI orchestrator's own span integration.
+
 ## Error handling — runtime errors via `reportError`
 
 Per RFC 0008, `attach` receives an optional second argument: a
@@ -313,6 +324,74 @@ sources: {
 
 Inside a DO `alarm()` or `webSocketClose()` handler:
 `await system.evict(/* deadline */ Date.now() + 5000)`.
+
+## Runtime compatibility
+
+The `source` primitive itself is runtime-agnostic — `attach`, `publish`,
+`unsubscribe`, `onEvict`, and `coalesce` only depend on `Promise`,
+`queueMicrotask`, and standard timers (all available in every modern
+JS runtime). The matrix below covers the SHIPPED adapters in
+`@directive-run/sources`; consumer-authored sources inherit each
+runtime's standard guarantees.
+
+| Runtime | Source primitive | `sourceFromSupabaseChannel` | `sourceFromDOAlarm` | `sourceFromWebSocketMessage` | Notes |
+|---|---|---|---|---|---|
+| **Cloudflare DO** | ✅ | ✅ (peerDep `@supabase/supabase-js` works in workerd) | ✅ default `onEvict` clears alarm | ✅ default `onEvict` closes socket 1001 | DO eviction recipe at top of this section; call `await system.evict(deadline)` from `alarm()` / `webSocketClose()`. |
+| **Cloudflare Workers** | ✅ | ✅ | ✅ (needs DO `storage` handle) | ✅ (needs DO `WebSocket` handle) | Same recipes as DO; the 30s wall-clock budget applies to `cleanupAllAsync`. |
+| **Bun** | ✅ | ✅ (Bun supports the `ws` transport supabase uses) | n/a (DO API) | n/a (DO API) | Sync `stop()` + async `stopAsync()` both work; Bun supports top-level `await`. |
+| **Deno** | ✅ | ✅ via `npm:` specifier; needs `--allow-net` | n/a (DO API) | n/a (DO API) | Permissions: `--allow-net` for any transport; `--allow-env` for SUPABASE_URL / SUPABASE_KEY. |
+| **Browser** | ✅ | ✅ | n/a (DO API) | partial — DOM `WebSocket` works with a thin adapter; the Cloudflare-typed helper is DO-specific | DOM `addEventListener` / `BroadcastChannel` / `visibilitychange` recipes inline above. |
+| **Node** | ✅ | ✅ | n/a (DO API) | n/a (DO API) | Test target; vitest exercises every source path. |
+
+The `@directive-run/sandbox` validator allowlists `@directive-run/sources`
+and both subpaths, so the playground / `run_in_sandbox` MCP tool / docs
+live runner all accept source-using snippets.
+
+### Polling — when a transport is request/response only
+
+When the upstream system has no push channel (REST endpoint, a polled
+status URL, a `setInterval`-driven heartbeat), declare a polling source.
+The runtime owns mount/unmount, the `onEvict` hook lets you cancel any
+pending fetch before hibernation, and the engine's batching keeps the
+per-tick fact mutations cheap:
+
+```typescript
+sources: {
+  status: {
+    attach: (publish, reportError) => {
+      const controller = new AbortController();
+      const tick = async () => {
+        try {
+          const res = await fetch(statusUrl, { signal: controller.signal });
+          const body = await res.json();
+          publish("STATUS_TICK", body);
+        } catch (err) {
+          // RFC 0008 — runtime errors go through reportError so they
+          // route to source.error with phase: "runtime"; the source
+          // stays attached.
+          if ((err as { name?: string }).name !== "AbortError") {
+            reportError?.(err);
+          }
+        }
+      };
+      const id = setInterval(tick, 5_000);
+      void tick(); // first poll, immediate.
+      return () => {
+        clearInterval(id);
+        controller.abort();
+      };
+    },
+    coalesce: "lastWriteWins", // only the most recent tick survives a flush
+  },
+},
+```
+
+Choose the `coalesce` strategy that matches the consumer:
+- `"lastWriteWins"` — gauge / dashboard updates where stale ticks
+  don't matter.
+- `"none"` — counters / time-series where every tick must land.
+- `"all"` — currently an alias for `"none"`; reserved for future
+  bounded-buffer semantics (do not depend on it).
 
 ## Common Patterns
 
