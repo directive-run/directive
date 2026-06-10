@@ -1,5 +1,12 @@
 # @directive-run/example-data-triggers
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.3
+
 ## 0.0.21
 
 ### Patch Changes
