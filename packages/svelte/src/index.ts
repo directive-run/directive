@@ -778,7 +778,10 @@ export function useDirective<M extends ModuleSchema>(
   }
 
   onDestroy(() => {
-    system.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // unsubscribes complete; fire-and-forget with swallow-catch
+    // (the framework's onDestroy is sync).
+    system.destroyAsync().catch(() => {});
   });
 
   const factKeys = config?.facts;
@@ -981,7 +984,10 @@ export function useQuerySystem<
   }
 
   onDestroy(() => {
-    system.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // unsubscribes complete; fire-and-forget with swallow-catch
+    // (the framework's onDestroy is sync).
+    system.destroyAsync().catch(() => {});
   });
 
   return system;

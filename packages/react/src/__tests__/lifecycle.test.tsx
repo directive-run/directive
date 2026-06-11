@@ -125,16 +125,16 @@ describe("useDirectiveRef", () => {
     expect(system.facts.name).toBe("overridden");
   });
 
-  it("destroys system on unmount", () => {
+  it("destroys system on unmount (via destroyAsync since RFC 0009)", () => {
     const { result, unmount } = renderHook(() =>
       useDirectiveRef(counterModule),
     );
     const system = result.current;
-    const destroySpy = vi.spyOn(system, "destroy");
+    const destroyAsyncSpy = vi.spyOn(system, "destroyAsync");
 
     unmount();
 
-    expect(destroySpy).toHaveBeenCalledTimes(1);
+    expect(destroyAsyncSpy).toHaveBeenCalledTimes(1);
   });
 
   it("returns stable system reference across re-renders", () => {
