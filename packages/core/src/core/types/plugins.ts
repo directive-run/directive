@@ -355,6 +355,40 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   ) => void;
 
   // ============================================================================
+  // Guardrail Hooks (RFC 0010)
+  // ============================================================================
+
+  /**
+   * Called when a guardrail plugin (e.g. `createFactPIIGuardrail`)
+   * detects a violation on an incoming value AND takes an action.
+   * Surfaces as the `"guardrail.blocked"` `ObservationEvent` for
+   * `system.observe()` subscribers + OTel / timeline / audit-ledger
+   * backends. The guardrail's user-callback (`onBlocked`) still
+   * fires independently; this hook is for backend wiring that should
+   * not coordinate with consumer callbacks.
+   *
+   * @param plugin - The guardrail plugin's name (so observers can
+   *   correlate across multiple guardrails in the same system).
+   * @param key - The fact key the violation was found in.
+   * @param kind - The action the guardrail took:
+   *   `"redact"` (rewrote the value via a follow-up store write),
+   *   `"alert"` (observed but did not mutate), or
+   *   `"detect"` (observed but could not mutate — e.g. read-only
+   *   structured types like `Error`).
+   * @param count - Number of pattern matches in this batch.
+   * @param category - Optional coarse classifier the guardrail
+   *   provides so OTel exporters can label spans without parsing
+   *   payloads.
+   */
+  onGuardrailBlocked?: (
+    plugin: string,
+    key: string,
+    kind: "redact" | "alert" | "detect",
+    count: number,
+    category?: string,
+  ) => void;
+
+  // ============================================================================
   // History Hooks
   // ============================================================================
 

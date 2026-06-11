@@ -864,6 +864,42 @@ export type ObservationEvent =
       error: unknown;
     }
   | { type: "derivation.compute"; id: string; value: unknown }
+  /**
+   * A guardrail plugin (e.g. `createFactPIIGuardrail`) detected a
+   * violation on an incoming value AND took an action. Fires per match
+   * batch (one event per `(plugin, key)` write, not per individual
+   * pattern hit). `plugin` is the plugin name so observers can correlate
+   * across multiple guardrails in the same system. `kind` reports the
+   * action the guardrail took:
+   *
+   * - `"redact"` — the guardrail rewrote the value via a follow-up
+   *   store write. Pair with the subsequent `fact.change` event to see
+   *   the redacted result.
+   * - `"alert"` — the guardrail observed but did not mutate. The raw
+   *   value remains in the store.
+   * - `"detect"` — the guardrail observed but could not mutate (e.g.
+   *   read-only structured types like `Error`). Semantically equivalent
+   *   to `alert` from the operator's point of view but distinguishes
+   *   "couldn't redact" from "chose not to redact".
+   *
+   * `count` carries the number of pattern matches in this batch (e.g.
+   * 3 email matches in one nested-object write). `category` is a
+   * coarse classifier the guardrail provides so OTel exporters can
+   * label spans without parsing payloads.
+   *
+   * The guardrail's user-callback (`onBlocked`, etc.) still fires
+   * independently — this event is for backend wiring (`attachSourcesToOtel`,
+   * `@directive-run/timeline`, audit-ledger plugins) that should not
+   * coordinate with consumer callbacks. RFC 0010.
+   */
+  | {
+      type: "guardrail.blocked";
+      plugin: string;
+      key: string;
+      kind: "redact" | "alert" | "detect";
+      count: number;
+      category?: string;
+    }
   | { type: "reconcile.start" }
   | {
       type: "reconcile.end";
@@ -923,6 +959,33 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
    * ```
    */
   observe(observer: (event: ObservationEvent) => void): () => void;
+
+  /**
+   * RFC 0010 — plugin authoring surface for emitting the
+   * `"guardrail.blocked"` ObservationEvent. A guardrail plugin (e.g.
+   * `createFactPIIGuardrail`) calls
+   * `system.notify.guardrailBlocked(...)` whenever it detects a
+   * violation; the call fans out to all registered plugins'
+   * `onGuardrailBlocked` hooks (including the synthetic plugins that
+   * back `system.observe()`). This bridges the guardrail's per-write
+   * detection into the standard observation fabric so
+   * `attachSourcesToOtel`, `@directive-run/timeline`, and audit-ledger
+   * plugins see it without consumer-callback coordination.
+   *
+   * Application code should never call this directly — use
+   * `system.observe()` to subscribe instead. The method is on the
+   * `System` interface only because plugins need a way to publish
+   * into the same channel observers subscribe to.
+   */
+  readonly notify: {
+    guardrailBlocked(
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ): void;
+  };
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 

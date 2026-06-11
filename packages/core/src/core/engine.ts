@@ -1383,6 +1383,19 @@ export function createEngine<S extends Schema>(
       },
     },
 
+    notify: {
+      guardrailBlocked(
+        plugin: string,
+        key: string,
+        kind: "redact" | "alert" | "detect",
+        count: number,
+        category?: string,
+      ): void {
+        if (!hasPlugins()) return;
+        pluginManager.emitGuardrailBlocked(plugin, key, kind, count, category);
+      },
+    },
+
     observe(
       observer: (event: import("./types/system.js").ObservationEvent) => void,
     ): () => void {
@@ -1520,6 +1533,21 @@ export function createEngine<S extends Schema>(
           phase: "attach" | "cleanup" | "runtime",
           error: unknown,
         ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        onGuardrailBlocked: (
+          plugin: string,
+          key: string,
+          kind: "redact" | "alert" | "detect",
+          count: number,
+          category?: string,
+        ) =>
+          observer({
+            type: "guardrail.blocked",
+            plugin,
+            key,
+            kind,
+            count,
+            ...(category !== undefined ? { category } : {}),
+          }),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
         onReconcileStart: () => observer({ type: "reconcile.start" }),

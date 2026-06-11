@@ -929,6 +929,15 @@ function bindEnginePassthroughs(
   system.restore = engine.restore.bind(engine);
   system.observe = engine.observe.bind(engine);
 
+  // RFC 0010 — guardrail plugin notification surface. Plugins call
+  // `system.notify.guardrailBlocked(...)` to emit the
+  // `"guardrail.blocked"` ObservationEvent via the same plugin-broadcast
+  // fabric as source/effect events. Engine exposes the underlying
+  // `notify` object; we attach it once here.
+  if (engine.notify) {
+    system.notify = engine.notify;
+  }
+
   // Direct engine passthroughs — only bind if not already defined
   // (namespaced systems override these with key-translating versions)
   const overridableMethods = [
