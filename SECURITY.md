@@ -55,6 +55,14 @@ Directive takes security seriously:
 - **HMAC-SHA256 snapshot signing** for tamper detection on serialized state
 - **`isPrototypeSafe()` validation** at all deserialization boundaries
 
+## Adversarial reviews
+
+We run periodic adversarial security reviews on the surfaces that execute user-supplied or untrusted code. The latest is published in full:
+
+- **[Sandbox Audit — June 2026](./docs/security/sandbox-audit-2026-06.md)** — 12 critical and 7 major issues found and fixed across `@directive-run/sandbox@0.3.0`–`@0.3.2`. Covers the AST allowlist validator, outbound fetch wrapper, worker lifecycle, and the `/api/sandbox` route on `directive.run`.
+
+If you find a hole a published audit missed, the response timeline above applies.
+
 ## Supported Versions
 
 | Version | Supported |
