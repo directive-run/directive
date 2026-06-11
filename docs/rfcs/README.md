@@ -17,6 +17,7 @@ landed in. Open questions are tracked inline.
 | [0007](./0007-source-backpressure.md) | Source `coalesce` backpressure | Accepted | shipped 2026-06-07 (v1.18.0) |
 | [0008](./0008-source-observer-protocol.md) | Source Observer protocol (`attach(publish, reportError?)`) | Accepted | shipped 2026-06-07 (v1.18.0) |
 | [0009](./0009-async-stop-and-do-eviction.md) | Async stop + Durable Object eviction | Accepted | shipped 2026-06-07 (v1.18.0); wrapper wiring + adapter `onEvict` shipped 2026-06-09 (v1.19.0 / v1.19.1) |
+| [0010](./0010-guardrail-blocked-event.md) | `guardrail.blocked` `ObservationEvent` + `system.notify` | Accepted | shipped 2026-06-10 (`@directive-run/core` v1.20.0 + `@directive-run/ai` v1.19.7) |
 
 ## Drafting flow
 
@@ -54,6 +55,12 @@ landed in. Open questions are tracked inline.
   emission before the redaction follow-up write fires. Future RFC will
   spec a pre-emit transform plugin API so Tier 0 PII guards close the
   surface for every plugin, not just future fact reads.
+
+  *Partially mitigated by RFC 0010 (`guardrail.blocked` event) — every
+  PII detection now surfaces through `system.observe()` so
+  observability sinks can correlate the typed event with the
+  preceding `fact.change`. Hard pre-emit redaction still needs a
+  separate RFC.*
 - **`source.evict` observation event variant** — RFC 0009 added the
   evict lifecycle but the `ObservationEvent` union still has no
   `source.evict` variant, so audit-ledger / OTel exporters cannot

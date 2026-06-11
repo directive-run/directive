@@ -1092,3 +1092,90 @@ describe("createFactPIIGuardrail — R18 walker hardening", () => {
   // performs (where the engine's dedup might not run). No test —
   // exercising it would require synthetic engine-internal access.
 });
+
+// RFC 0010 — the guardrail emits a `guardrail.blocked` ObservationEvent
+// when it acts. Backend wiring (`attachSourcesToOtel`, timeline,
+// audit-ledger) subscribes via `system.observe()` rather than the
+// per-plugin `onBlocked` callback.
+describe("createFactPIIGuardrail — RFC 0010 guardrail.blocked event", () => {
+  it("emits guardrail.blocked via system.observe() on a PII match", () => {
+    type GuardrailEvent = {
+      type: "guardrail.blocked";
+      plugin: string;
+      key: string;
+      kind: "redact" | "alert" | "detect";
+      count: number;
+      category?: string;
+    };
+    const events: GuardrailEvent[] = [];
+    const module = createModule("obs", {
+      schema: {
+        facts: { email: t.string().meta({ tags: ["pii"] }) },
+        events: { wire: { email: t.string() } },
+      },
+      init: (f) => {
+        f.email = "";
+      },
+      events: {
+        wire: (f, p) => {
+          f.email = p.email;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.observe((e) => {
+      if (e.type === "guardrail.blocked") {
+        events.push(e as GuardrailEvent);
+      }
+    });
+    system.start();
+    system.events.wire({ email: "leak@evil.com" });
+    expect(events.length).toBe(1);
+    const ev = events[0] as GuardrailEvent;
+    expect(ev.plugin).toBe("fact-pii-guardrail");
+    expect(ev.key).toBe("email");
+    expect(ev.kind).toBe("redact");
+    expect(ev.count).toBe(1);
+    expect(ev.category).toBe("email");
+    system.destroy();
+  });
+
+  it("emits kind: \"alert\" when configured mode is alert", () => {
+    type GuardrailEvent = {
+      type: "guardrail.blocked";
+      kind: "redact" | "alert" | "detect";
+    };
+    const events: GuardrailEvent[] = [];
+    const module = createModule("alertmode", {
+      schema: {
+        facts: { email: t.string().meta({ tags: ["pii"] }) },
+        events: { wire: { email: t.string() } },
+      },
+      init: (f) => {
+        f.email = "";
+      },
+      events: {
+        wire: (f, p) => {
+          f.email = p.email;
+        },
+      },
+    });
+    const system = createSystem({
+      module,
+      plugins: [createFactPIIGuardrail({ mode: "alert" })],
+    });
+    system.observe((e) => {
+      if (e.type === "guardrail.blocked") {
+        events.push(e as GuardrailEvent);
+      }
+    });
+    system.start();
+    system.events.wire({ email: "leak@evil.com" });
+    expect(events.length).toBe(1);
+    expect(events[0]?.kind).toBe("alert");
+    system.destroy();
+  });
+});

@@ -327,6 +327,15 @@ interface MetaCapableSystem {
       set?: (k: string, v: unknown) => void;
     };
   };
+  notify?: {
+    guardrailBlocked?: (
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ) => void;
+  };
 }
 
 /**
@@ -663,6 +672,24 @@ export function createFactPIIGuardrail(
       const result = inspect(value);
       if (!result.matched) return;
       onBlocked?.(key, result.detected, mode);
+      // RFC 0010 — fan out to system.observe() / OTel / timeline /
+      // audit-ledger subscribers. `kind: "detect"` for the Error
+      // branch (the walker can't deep-clone an Error instance, so
+      // redaction is detection-only regardless of configured mode).
+      const blockedKind: "redact" | "alert" | "detect" =
+        mode === "alert"
+          ? "alert"
+          : result.redacted === value
+            ? "detect"
+            : "redact";
+      const sys = systemRef as unknown as MetaCapableSystem | null;
+      sys?.notify?.guardrailBlocked?.(
+        "fact-pii-guardrail",
+        key,
+        blockedKind,
+        result.detected.length,
+        result.detected[0]?.type,
+      );
       if (mode === "alert") return;
       // Redact mode: schedule a follow-up store write. Skip when the
       // walker returned the input reference itself (current Error path —
@@ -701,6 +728,21 @@ export function createFactPIIGuardrail(
         const result = inspect(change.value);
         if (!result.matched) continue;
         onBlocked?.(change.key, result.detected, mode);
+        // RFC 0010 fan-out (mirrors onFactSet).
+        const blockedKind: "redact" | "alert" | "detect" =
+          mode === "alert"
+            ? "alert"
+            : result.redacted === change.value
+              ? "detect"
+              : "redact";
+        const sysB = systemRef as unknown as MetaCapableSystem | null;
+        sysB?.notify?.guardrailBlocked?.(
+          "fact-pii-guardrail",
+          change.key,
+          blockedKind,
+          result.detected.length,
+          result.detected[0]?.type,
+        );
         if (mode === "alert") continue;
         // Skip same-ref redacted return — Error path (R18-C5).
         if (result.redacted === change.value) continue;

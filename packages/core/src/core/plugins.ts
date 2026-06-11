@@ -159,6 +159,15 @@ export interface PluginManager<_S extends Schema = any> {
     error: unknown,
   ): void;
 
+  // Guardrail hooks (RFC 0010)
+  emitGuardrailBlocked(
+    plugin: string,
+    key: string,
+    kind: "redact" | "alert" | "detect",
+    count: number,
+    category?: string,
+  ): void;
+
   // History hooks
   emitSnapshot(snapshot: Snapshot): void;
   emitHistoryNavigate(from: number, to: number): void;
@@ -353,6 +362,9 @@ export function createPluginManager<
     emitSourcePublish: broadcast("onSourcePublish"),
     emitSourceDetach: broadcast("onSourceDetach"),
     emitSourceError: broadcast("onSourceError"),
+
+    // Guardrail hooks (RFC 0010)
+    emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
 
     // History hooks
     emitSnapshot: broadcast("onSnapshot"),
