@@ -1,5 +1,59 @@
 # @directive-run/core
 
+## 1.20.0
+
+### Minor Changes
+
+- [#73](https://github.com/directive-run/directive/pull/73) [`633e9a2`](https://github.com/directive-run/directive/commit/633e9a2bc19ee4450215b2ddc61d22590fd1d9d8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - RFC 0010 — `guardrail.blocked` ObservationEvent + `system.notify` surface.
+
+  `@directive-run/core` (minor — additive public API):
+
+  - New `ObservationEvent` variant `"guardrail.blocked"` with `plugin`,
+    `key`, `kind` (`"redact" | "alert" | "detect"`), `count`, optional
+    `category`.
+  - New `Plugin.onGuardrailBlocked` hook.
+  - New `PluginManager.emitGuardrailBlocked` broadcast.
+  - New `System.notify.guardrailBlocked(...)` surface — plugin authoring
+    API that fans out to every plugin's `onGuardrailBlocked` hook
+    (including the synthetic plugin that backs `system.observe()`).
+  - Synthetic observe plugin maps the hook to the typed event.
+
+  `@directive-run/ai` (patch — feature add):
+
+  - `createFactPIIGuardrail` calls `system.notify.guardrailBlocked` on
+    every detection, in addition to the existing `onBlocked` callback.
+    The `kind` field reports `"redact"` (rewrote via follow-up write),
+    `"alert"` (configured mode), or `"detect"` (read-only structured
+    type like `Error` — the walker matched but cannot construct a new
+    instance with guaranteed `stack` parity).
+
+  Backend wiring (`attachSourcesToOtel`, `@directive-run/timeline`,
+  audit-ledger) is consumer-driven via `system.observe()` and is
+  deferred to follow-up patches.
+
+  Closes R18-C6.
+
+### Patch Changes
+
+- [#71](https://github.com/directive-run/directive/pull/71) [`f0b8d77`](https://github.com/directive-run/directive/commit/f0b8d77c0bb415c0a6fe49c5f315c3be60bf6dd5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `system.evict()` reentry gate (R18 Tier 2-C / RFC 0009 follow-up):
+
+  The engine now sets `state.isEvicting` BEFORE awaiting any async eviction
+  work. Concurrent or repeat `system.evict()` calls observe the flag and
+  become no-ops past the first. Without the gate, Cloudflare DO hibernation
+  paths that signal eviction twice would re-run every source's `onEvict`
+  handler — sources with non-idempotent eviction (e.g. one that posts a
+  "going away" message to a broker) would double-fire.
+
+  The gate is set-once / never-cleared (eviction is terminal); a subsequent
+  `system.evict()` after the first completes is a no-op, matching the
+  contract of `system.destroyAsync()`.
+
+  `coalesce: "all"` is left as-is — the JSDoc already documents that `"all"`
+  is a no-op equivalent to `"none"` ("names the intent for readers"), so
+  the previous R18 finding of "type-system lie" is closed by the existing
+  docs. The RFC index's open follow-up entry for `coalesce: "all"` is
+  withdrawn.
+
 ## 1.19.7
 
 ## 1.19.6
