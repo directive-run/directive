@@ -1541,7 +1541,10 @@ export function useDirectiveRef(
     }
 
     return () => {
-      systemRef.current?.destroy();
+      // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+      // unsubscribes complete; fire-and-forget with swallow-catch
+      // (React's effect cleanup is sync).
+      systemRef.current?.destroyAsync().catch(() => {});
       systemRef.current = null;
       statusPluginRef.current = null;
     };
@@ -2252,7 +2255,9 @@ export function useQuerySystem<
     }
 
     return () => {
-      systemRef.current?.destroy();
+      // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+      // unsubscribes complete; fire-and-forget with swallow-catch.
+      systemRef.current?.destroyAsync().catch(() => {});
       systemRef.current = null;
     };
   }, []);

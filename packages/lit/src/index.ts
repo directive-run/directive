@@ -623,7 +623,10 @@ export class SystemController<M extends ModuleSchema>
   }
 
   hostDisconnected(): void {
-    this._system?.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // unsubscribes complete; fire-and-forget with swallow-catch
+    // (Lit's hostDisconnected is sync).
+    this._system?.destroyAsync().catch(() => {});
     this._system = null;
   }
 }
@@ -1156,7 +1159,10 @@ export class QuerySystemController<
   }
 
   hostDisconnected(): void {
-    this._system?.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // unsubscribes complete; fire-and-forget with swallow-catch
+    // (Lit's hostDisconnected is sync).
+    this._system?.destroyAsync().catch(() => {});
     this._system = null;
   }
 }
@@ -1193,8 +1199,11 @@ export class HydrationController implements ReactiveController {
   hostConnected(): void {}
 
   hostDisconnected(): void {
+    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync per system so
+    // source unsubscribes complete; fire-and-forget with swallow-catch
+    // (Lit's hostDisconnected is sync).
     for (const system of this.systems) {
-      system.destroy();
+      system.destroyAsync().catch(() => {});
     }
     this.systems = [];
   }

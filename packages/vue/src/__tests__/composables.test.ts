@@ -1522,11 +1522,11 @@ describe("useDirective", () => {
     scope = effectScope();
     const result = scope.run(() => useDirective(mod))!;
 
-    const destroySpy = vi.spyOn(result.system, "destroy");
+    const destroyAsyncSpy = vi.spyOn(result.system, "destroyAsync");
 
     scope.stop();
 
-    expect(destroySpy).toHaveBeenCalledTimes(1);
+    expect(destroyAsyncSpy).toHaveBeenCalledTimes(1);
   });
 
   it("with status: true returns statusPlugin", () => {
