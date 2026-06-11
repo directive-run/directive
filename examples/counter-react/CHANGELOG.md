@@ -1,5 +1,13 @@
 # @directive-run/example-counter-react
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [[`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b)]:
+  - @directive-run/core@1.20.2
+  - @directive-run/react@1.20.2
+
 ## 0.0.42
 
 ### Patch Changes
