@@ -1,8 +1,8 @@
-# Migrating 55 XState Machines to Directive: A Field Report
+# Migrating XState Machines to Directive — a real production walkthrough, with the numbers
 
 *Posted 2026-04-29 · ~12 min read*
 
-We just finished porting 55 XState machines – about 26,000 lines of orchestration code – from one large Next.js app onto Directive, the constraint-driven runtime we ship as Sizls's flagship state library. This is the field report. It's an honest record of what worked, what hurt, and what shipped back to Directive itself as a result.
+We migrated Minglingo (Sizls' realtime multiplayer platform, ~10k MAU) off XState in 6 weeks. 55 machines, 26,000 LOC of orchestration code, onto Directive — the constraint-driven runtime we ship under `@directive-run/*`. Here's what shipped, what we got wrong, and the rollback gates we set so this couldn't tank a production system.
 
 If you're considering Directive, or you're shopping for an XState alternative, or you're just curious whether constraint-driven state management is real or a marketing fiction, this is the longest piece of evidence we'll have for a while.
 
@@ -10,9 +10,9 @@ If you're considering Directive, or you're shopping for an XState alternative, o
 
 XState was working. The 47 visible state machines (plus eight that lived as spawned children) were tested, shipped, and stable. Nothing was on fire.
 
-The migration was a strategic call, not a tactical one. Sizls runs four products – IntentKit, Pluck, Minglingo, Directive AI – and Directive itself. If we want our flagship runtime to be credible, we need to be running it. Not a small example; not a benchmark; the actual production app, with realtime multiplayer, auth flows, dashboards, the whole stack.
+The migration was a strategic call, not a tactical one. If we want our flagship runtime to be credible, we need to be running it. Not a small example; not a benchmark; the actual production app, with realtime multiplayer, auth flows, dashboards, the whole stack.
 
-The decision sounds obvious in retrospect. At the time, an internal AE review pegged it as 3-6× capacity for a solo developer. That review was right about the hours. It was wrong about whether the calendar tax was worth paying.
+The decision sounds obvious in retrospect. At the time, an internal review pegged it as 3-6× capacity for a solo developer. That review was right about the hours. It was wrong about whether the calendar tax was worth paying.
 
 It was. Here's why.
 
@@ -23,7 +23,7 @@ It was. Here's why.
 1. **Pre-flight spec** – written before any code. States, events, guards, actors, parent/child relationships, current LOC, target LOC, parity-test plan, risk grade. Saved to `docs/migrations/<machine-name>.md`.
 2. **User review** – the spec was the contract. No code until approved.
 3. **Execution** – build the Directive module, wire parity tests, run cassettes against both old and new.
-4. **AE review loop** – four-lens parallel reviewers (security, architecture, DX, innovation). Cycle until 0 critical + 0 major findings.
+4. **Adversarial review** – four reviewers in parallel (security, architecture, DX, perf). Cycle until 0 critical + 0 major findings.
 5. **Per-machine give-up gate** – five criteria: ≤2 weeks wall-time, ≥30% LOC reduction (or near-flat for FSMs), ≥10% re-render perf, 100% cassette parity, 0 P1 bugs in 7-day soak.
 6. **Final commit, move on** – XState file renamed `*.legacy.ts`, deleted two weeks later. Feature flag flipped on for 7 days, then deleted.
 
@@ -93,7 +93,7 @@ Every cycle ended with a "what was painful?" note. Across 55 cycles, those notes
 - Two callable shapes for events – `sys.events.X(payload)` versus `sys.dispatch({type, ...})` – and we didn't pick one until late.
 
 **Quality-of-life docs gaps** (P2-P3):
-- `t.string<UnionType>()` was undiscoverable. Once you knew about it, every module used it. New cycles re-learned its existence at the AE-review stage when a reviewer suggested it.
+- `t.string<UnionType>()` was undiscoverable. Once you knew about it, every module used it. New cycles re-learned its existence at the review stage when a reviewer suggested it.
 - `nullable()` semantics on init were ambiguous – `null` versus `undefined` versus default-to-empty.
 - Derivation-of-derivation composition wasn't anywhere in the docs.
 
@@ -127,7 +127,7 @@ Plus three new packages built on those fixes:
 
 And one design RFC, the largest piece of futures work surfaced by the migration:
 
-- **`t.timer({ms})`** – a first-class timer schema type that the engine owns. Items 4 (no `after`), 15 (fake-timer integration), 16 (clock-in-derivation), and 18 (`useTickWhile`) all converge on the same root: time isn't a first-class fact today. Three clock-source models considered, recommendation locked, draft published. Implementation deferred until at least one Minglingo prototype validates the API shape.
+- **`t.timer({ms})`** – a first-class timer schema type that the engine owns. Items 4 (no `after`), 15 (fake-timer integration), 16 (clock-in-derivation), and 18 (`useTickWhile`) all converge on the same root: time isn't a first-class fact today. Three clock-source models considered, recommendation locked, draft published. Implementation deferred until at least one production prototype validates the API shape.
 
 ## What this teaches about framework design
 
@@ -141,7 +141,7 @@ A few things, more or less in order of how surprised I was:
 
 **The verbosity tax on pure FSMs is real and that's fine.** Auth, signup, and password-reset machines came in flat or +5%. Pure transition machines aren't where Directive earns its keep. Anyone selling a state library that promises to win on every shape is selling marketing. The honest answer is "we win on derived/query state, we tie on FSM state, and we earn the trade because most apps are mostly the former."
 
-**The "AE review loop" methodology shipped more value than any individual feature.** Four lenses (security, architecture, DX, innovation) running in parallel after each cycle – it caught things no single reviewer would have. The mutator helper came out of the innovation lens noticing the 12-instance recurrence. The same-constraint diagnostic came out of the DX lens. Run reviews in parallel. Run them every cycle. Don't batch.
+**Running the adversarial review every cycle, not in batches, shipped more value than any individual feature.** Four reviewers (security, architecture, DX, perf) running in parallel after each cycle caught things no single reviewer would have. The mutator helper came out of one reviewer noticing the 12-instance recurrence. The same-constraint diagnostic came out of another. Run reviews in parallel. Run them every cycle. Don't batch.
 
 ## What's next
 
@@ -150,7 +150,7 @@ Two tracks remain. They're operational, not architectural:
 - **Track B – feature-flag rollout in production.** Each migrated module ships behind `MINGLINGO_DIRECTIVE_<MachineName>`, runs in parallel with the legacy XState path for 7 days, logs divergence, then flips. The 55-machine batch is queued; the calendar will play out over weeks.
 - **Track C – broader adoption signal.** Both 0.x packages (`mutator` and `optimistic`) want at least three external consumers before settling on v1.0 API shapes. The migration is consumer #1; we're looking for two more.
 
-The end state is Sizls's stack alignment story complete: every product runs on Directive, Directive runs on production-validated patterns, the docs and helper packages are written by people who actually used them at scale.
+The end state: Directive runs on production-validated patterns, the docs and helper packages are written by people who actually used them at scale.
 
 That story would be marketing if we hadn't done the work. We did the work.
 
