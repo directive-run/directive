@@ -46,18 +46,20 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     range="$remote_sha..$local_sha"
   fi
 
+  # Note: `IP Meta:` and the SN/UUID redactions in its footer are
+  # INTENTIONAL provenance trails proving the work was done on personal
+  # time on personal equipment. Brand cost of the footer in public
+  # commits is small; legal cost of losing the provenance trail (for
+  # work-context separation from any day-job IP) is large. Not banned.
   bad=$(git log --format='%H%n%s%n%b%n--END--' "$range" 2>/dev/null \
     | grep -niE \
       -e 'AE[- ]?R(x|ound)?[0-9]+' \
       -e '\bP[0-3]-[A-Z]' \
       -e '\bPhase [A-Z]\b' \
-      -e 'IP Meta:' \
-      -e '^/Users/[a-z]+/' \
+      -e '/Users/[a-z]+/' \
       -e '\[bisect\]' \
       -e 'SESSION-HANDOFF' \
       -e 'SHIP-RECOVERY' \
-      -e 'SN:\.\.\.' \
-      -e 'UUID:\.\.\.' \
       -e 'audit lens' \
       || true)
 
