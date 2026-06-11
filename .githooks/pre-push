@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+#
+# pre-push — block leaky commit metadata from reaching the public repo
+#
+# Catches internal review-process language and dev-machine paths in
+# commit subjects + bodies BEFORE they hit github.com/directive-run/.
+# Private remotes are exempt — the hook only enforces on the public
+# directive-run organization.
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+#   chmod +x .githooks/pre-push
+#
+# To override in an emergency:
+#   git push --no-verify
+#
+set -euo pipefail
+
+remote="$1"
+url="$2"
+
+# Only enforce on public-facing remotes
+case "$url" in
+  *directive-run/*|*github.com:directive-run/*) ;;
+  *) exit 0 ;;
+esac
+
+# Each line of stdin is: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # Deleted refs have a zero local_sha — nothing to scan
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    # New branch on the remote — only scan commits that aren't already
+    # reachable from origin/main (otherwise the hook scans every
+    # historical commit and fails on any pre-existing leak).
+    if git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null; then
+      range="origin/main..$local_sha"
+    else
+      # Fallback when origin/main is missing: only scan the tip commit
+      range="$local_sha~1..$local_sha"
+    fi
+  else
+    range="$remote_sha..$local_sha"
+  fi
+
+  bad=$(git log --format='%H%n%s%n%b%n--END--' "$range" 2>/dev/null \
+    | grep -niE \
+      -e 'AE[- ]?R(x|ound)?[0-9]+' \
+      -e '\bP[0-3]-[A-Z]' \
+      -e '\bPhase [A-Z]\b' \
+      -e 'IP Meta:' \
+      -e '^/Users/[a-z]+/' \
+      -e '\[bisect\]' \
+      -e 'SESSION-HANDOFF' \
+      -e 'SHIP-RECOVERY' \
+      -e 'SN:\.\.\.' \
+      -e 'UUID:\.\.\.' \
+      -e 'audit lens' \
+      || true)
+
+  if [ -n "$bad" ]; then
+    echo "" >&2
+    echo "pre-push BLOCKED: leaky tokens found in commits being pushed to $url" >&2
+    echo "" >&2
+    echo "$bad" | head -40 >&2
+    echo "" >&2
+    echo "These tokens leak internal review-process or dev-machine state." >&2
+    echo "Rewrite the offending commit message(s) before pushing." >&2
+    echo "" >&2
+    echo "To override in an emergency: git push --no-verify" >&2
+    echo "" >&2
+    exit 1
+  fi
+done
+exit 0
