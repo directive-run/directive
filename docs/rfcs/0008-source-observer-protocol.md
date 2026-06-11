@@ -1,6 +1,6 @@
 # RFC 0008 – Source publish: Observer-protocol posture (next / error / complete)
 
-- **Status:** Draft (2026-06-07)
+- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** R5 protocol reviewer findings (C-PROTO-1: "SourcePublish
   is incomplete vs. Observer protocol"); R5 domain-expert (Reactive

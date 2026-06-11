@@ -1,5 +1,93 @@
 # @directive-run/example-counter-react
 
+## 0.0.43
+
+### Patch Changes
+
+- Updated dependencies [[`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b)]:
+  - @directive-run/core@1.20.2
+  - @directive-run/react@1.20.2
+
+## 0.0.42
+
+### Patch Changes
+
+- Updated dependencies [[`31ae328`](https://github.com/directive-run/directive/commit/31ae3284b66f2ccf1269902d9f6711415532e28e)]:
+  - @directive-run/react@1.20.1
+  - @directive-run/core@1.20.1
+
+## 0.0.41
+
+### Patch Changes
+
+- Updated dependencies [[`633e9a2`](https://github.com/directive-run/directive/commit/633e9a2bc19ee4450215b2ddc61d22590fd1d9d8), [`f0b8d77`](https://github.com/directive-run/directive/commit/f0b8d77c0bb415c0a6fe49c5f315c3be60bf6dd5)]:
+  - @directive-run/core@1.20.0
+  - @directive-run/react@1.20.0
+
+## 0.0.40
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+  - @directive-run/react@1.19.7
+
+## 0.0.39
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.6
+  - @directive-run/react@1.19.6
+
+## 0.0.38
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.5
+  - @directive-run/react@1.19.5
+
+## 0.0.37
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.4
+  - @directive-run/react@1.19.4
+
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.3
+  - @directive-run/react@1.19.3
+
+## 0.0.35
+
+### Patch Changes
+
+- Updated dependencies [[`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f)]:
+  - @directive-run/core@1.19.2
+  - @directive-run/react@1.19.2
+
+## 0.0.34
+
+### Patch Changes
+
+- Updated dependencies [[`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c), [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c)]:
+  - @directive-run/core@1.19.1
+  - @directive-run/react@1.19.1
+
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies [[`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc)]:
+  - @directive-run/core@1.19.0
+  - @directive-run/react@1.19.0
+
 ## 0.0.32
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/sandbox",
-  "version": "0.3.2",
+  "version": "0.3.13",
   "description": "Execute Directive snippets server-side and return a structured transcript (logs + facts + errors). Consumed by @directive-run/mcp's run_in_sandbox tool and directive.run/playground's live DevTools panel. Uses worker_threads + esbuild bundling + an AST allowlist validator so user-supplied TypeScript runs with a bounded surface (allowlisted imports, allowlisted API calls, 5s wall clock, 32 MB heap).",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

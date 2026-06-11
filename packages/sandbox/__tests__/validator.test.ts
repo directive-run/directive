@@ -167,6 +167,7 @@ describe("validateSandboxInput", () => {
       "@directive-run/scaffold",
       "@directive-run/claude-plugin",
       "@directive-run/lint",
+      "@directive-run/sources",
     ];
 
     it.each(ALLOWED)("permits `%s`", (specifier) => {
@@ -190,6 +191,25 @@ describe("validateSandboxInput", () => {
         },
       ]);
       expect(errors).toEqual([]);
+    });
+
+    it("permits `@directive-run/sources` two-segment subpaths", () => {
+      // `@directive-run/sources/supabase` and `/cloudflare` ship as
+      // the two adapter subpaths of the umbrella package. R13-C3
+      // regression: previously rejected because `sources` wasn't on
+      // the allowlist.
+      for (const specifier of [
+        "@directive-run/sources/supabase",
+        "@directive-run/sources/cloudflare",
+      ]) {
+        const errors = validateSandboxInput([
+          {
+            path: "src/main.ts",
+            source: `import { x } from "${specifier}";\n`,
+          },
+        ]);
+        expect(errors, `expected ${specifier} to be allowed`).toEqual([]);
+      }
     });
 
     const DENIED = [

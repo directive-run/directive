@@ -1,5 +1,440 @@
 # @directive-run/ai
 
+## 1.20.2
+
+### Patch Changes
+
+- [#76](https://github.com/directive-run/directive/pull/76) [`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R19 surgical hardening batch — closes audit findings on top of the v1.20.x release.
+
+  `@directive-run/core` (patch):
+
+  - **`system.notify.guardrailBlocked` plugin-name validation.** The R18
+    Tier 2-A RFC 0010 surface accepted any `plugin` string. A third-party
+    plugin holding a `System` reference could forge `"guardrail.blocked"`
+    events claiming `plugin: "fact-pii-guardrail"`, misleading compliance
+    audit consumers. The method now drops + warns when called with a
+    plugin name that doesn't match a currently-registered plugin.
+  - **`system.notify.guardrailBlocked` reentry depth cap.** A plugin's
+    `onGuardrailBlocked` hook that re-emits via `notify.guardrailBlocked`
+    would recurse through the broadcast fabric until stack overflow.
+    Capped at depth 4 (shallow re-emission is fine; pathological
+    recursion is dropped).
+  - **`system.notify.guardrailBlocked` no-op after destroy.** Late hook
+    firings post-`destroyAsync` no longer reach observers.
+  - **`system.evict()` try/finally on `state.isEvicting`.** Without it, a
+    rejected inner work would latch the flag forever and every
+    subsequent `evict()` call would be a silent no-op. Cloudflare DO
+    hibernation re-fire would become unrecoverable. The flag is now
+    cleared in `finally`; the terminal flag (`isDestroyed`) is set by
+    `destroyAsync()` on the happy path.
+  - **`system.start()` refuses to start during eviction or after destroy.**
+    Previously `start()` only checked `isRunning`, so a race between
+    `evict()`'s `sourcesManager.evictAll()` and its `destroyAsync()`
+    could re-attach sources the host runtime told us to tear down.
+  - **`Plugin.onGuardrailBlocked` JSDoc** clarifies that `Error`-typed
+    fact values always surface as `"detect"` regardless of the
+    guardrail's configured mode.
+
+  `@directive-run/ai` (patch):
+
+  - **`createFactPIIGuardrail` default `walkDepth` raised from `1` → `2`.**
+    Zero-config consumers now scan one level of `Error.cause` chain and
+    shallow-nested-object shapes. The `walkDepth` JSDoc enumerates the
+    cause-chain depth math (recurses at `depth - 1`, so `walkDepth >= 2`
+    needed to scan one cause level). Real-world common shapes ship
+    zero-config.
+  - **File-level JSDoc** documents the `system.observe()` →
+    `"guardrail.blocked"` dual surface (RFC 0010) so consumers reading
+    the public docblock learn about the typed-event stream alongside
+    the `onBlocked` callback.
+
+  `@directive-run/lit` (patch):
+
+  - **`ModuleController.hostDisconnected`** switched from sync `destroy()`
+    to `destroyAsync().catch(...)`. The R18 Tier 2-B migration covered
+    `SystemController` + `DirectiveQueryController` but missed the
+    zero-config `ModuleController` — Lit users using the simplified
+    controller were still dropping source-unsubscribe Promises on the
+    floor.
+
+  `@directive-run/react`, `@directive-run/vue`, `@directive-run/svelte`,
+  `@directive-run/solid`, `@directive-run/lit` (patch):
+
+  - **Dev-mode `console.warn` on `destroyAsync` rejection.** The R18
+    Tier 2-B fire-and-forget `.catch(() => {})` silently swallowed every
+    unmount-time unsubscribe error. Operators had zero signal when a
+    Supabase channel `removeChannel()` rejected. The catch now logs in
+    development (`isDevelopment === true`); production behavior is
+    unchanged (the manager's `phase: "runtime"` observability sink
+    still receives the per-source error).
+
+  Closes R19 Critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
+  lens) + 3, 5, 8 (Arch lens). Bigger Tier 2 items deferred to RFCs:
+  Supabase channel-name reuse race, `attachGuardrailsToOtel` helper,
+  timeline `guardrail.blocked` renderer, knowledge-bundle docs sync.
+
+## 1.20.1
+
+## 1.20.0
+
+### Patch Changes
+
+- [#73](https://github.com/directive-run/directive/pull/73) [`633e9a2`](https://github.com/directive-run/directive/commit/633e9a2bc19ee4450215b2ddc61d22590fd1d9d8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - RFC 0010 — `guardrail.blocked` ObservationEvent + `system.notify` surface.
+
+  `@directive-run/core` (minor — additive public API):
+
+  - New `ObservationEvent` variant `"guardrail.blocked"` with `plugin`,
+    `key`, `kind` (`"redact" | "alert" | "detect"`), `count`, optional
+    `category`.
+  - New `Plugin.onGuardrailBlocked` hook.
+  - New `PluginManager.emitGuardrailBlocked` broadcast.
+  - New `System.notify.guardrailBlocked(...)` surface — plugin authoring
+    API that fans out to every plugin's `onGuardrailBlocked` hook
+    (including the synthetic plugin that backs `system.observe()`).
+  - Synthetic observe plugin maps the hook to the typed event.
+
+  `@directive-run/ai` (patch — feature add):
+
+  - `createFactPIIGuardrail` calls `system.notify.guardrailBlocked` on
+    every detection, in addition to the existing `onBlocked` callback.
+    The `kind` field reports `"redact"` (rewrote via follow-up write),
+    `"alert"` (configured mode), or `"detect"` (read-only structured
+    type like `Error` — the walker matched but cannot construct a new
+    instance with guaranteed `stack` parity).
+
+  Backend wiring (`attachSourcesToOtel`, `@directive-run/timeline`,
+  audit-ledger) is consumer-driven via `system.observe()` and is
+  deferred to follow-up patches.
+
+  Closes R18-C6.
+
+## 1.19.7
+
+### Patch Changes
+
+- [#69](https://github.com/directive-run/directive/pull/69) [`9529917`](https://github.com/directive-run/directive/commit/9529917dc23e7a9cd0f363894fca4bdf374f61a0) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R18 walker hardening — `createFactPIIGuardrail`:
+
+  - **R18-C1 (Proxy TOCTOU on pre-clone cap):** the R17 pre-clone array cap read `value.length` twice (once for the comparison, once during `value.slice`). A hostile `Proxy` whose `length` getter lied on the first read (returning a small number) and on the second read (returning 1e9) could bypass the cap and OOM `structuredClone`. The cap now materializes via a fixed-length `new Array(len)` loop that reads each index exactly once, so the Proxy's traps can't TOCTOU. `structuredClone` then operates on a plain Array of bounded length.
+  - **R18-C2 (`Error.cause` + `AggregateError.errors` blind spot):** R17 only scanned `Error.message`. PII inside `error.cause` (string or wrapped Error) or inside an `AggregateError`'s `errors` array was missed. The walker now recurses into both, decrementing `walkDepth` for the recursion so depth bounds still apply.
+  - **R18-C3 (idempotency-gate restriction):** the `value === _prev` skip in `onFactSet` / `onFactsBatch` is now restricted to primitives. Object references that survived the engine's own dedup (or arrived via direct `facts.$store.set` writes) are re-inspected on every emission rather than skipped.
+  - **R18-C5 (Error redact-mode is now alert-only):** the Error path returns the input reference as `redacted` (Error instances are not deep-cloned with new identity). The follow-up `$store.set` is now skipped when `result.redacted === value`, preventing the writes-back-the-same-ref no-op + the gate-skip cascade on the next emit. The redaction action for Error values is therefore detection-only regardless of the configured `mode`; this is the correct semantic for read-only structured types.
+
+  Closes R18 Critical findings 1, 2, 3, 5. R18-C6 (`guardrail.blocked` `ObservationEvent` variant) deferred to a follow-up RFC since it touches the `@directive-run/core` observation API.
+
+## 1.19.6
+
+### Patch Changes
+
+- [#67](https://github.com/directive-run/directive/pull/67) [`d8d298c`](https://github.com/directive-run/directive/commit/d8d298c42d904bbdb2ddf485b6e4b6ce638d839b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R17 walker hardening — `createFactPIIGuardrail`:
+
+  - Top-level array cap (`MAX_ARRAY_SCAN = 10_000`) is now applied BEFORE `structuredClone` rather than after. Previously, a 1M-element array shipped as one realtime row would consume CPU inside `structuredClone` before the walker ever saw it. (Regression of R15-CRIT-1 introduced by the R16 rewrite.)
+  - `Error.message` strings are now scanned for PII. `Error` instances preserve through `structuredClone`, but the walker's `Object.entries` path skipped them. The walker now extracts `Error.message` and runs the synchronous regex scanner; matches surface via `onBlocked` for log scrubbing wiring (the `Error` instance itself is read-only, so it cannot be redacted in place).
+  - `Date`, `RegExp`, `TypedArray` (`Int8Array`, `Uint8Array`, ...), `DataView`, `ArrayBuffer`, and `Blob` are now short-circuited in the object branch. Previously, the walker would iterate their entries (mostly no-op, but TypedArrays expose numeric byte keys that could in theory trigger false matches). Pass a `customDetector` to inspect these structures.
+  - `onFactSet` now skips the inspection step when the incoming `value === _prev`. The redact follow-up store write would otherwise re-enter the hook and trigger a wasted `structuredClone` + scan on the already-redacted token strings (a real CPU hit at 10k publishes/sec).
+
+  Closes R17 Security CRIT-1, Architecture C1, Distrib C1. Documentation tail: `docs/rfcs/README.md` updated to reflect the R16 walker rewrite as shipped (v1.19.3) + R17 hardening as v1.19.6. `packages/knowledge/core/choosing-primitives.md` fixes "six primitives" → "seven primitives" (the `source` primitive count was off-by-one).
+
+## 1.19.5
+
+### Patch Changes
+
+- [#65](https://github.com/directive-run/directive/pull/65) [`e7ccffd`](https://github.com/directive-run/directive/commit/e7ccffdb103aea56c8bce44418177bd2a7c0f19f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - createFactPIIGuardrail walker: sanitization-first via `structuredClone`
+
+  Replaces the manual structural walker with a `structuredClone`-at-entry pattern that strips Proxies, exotic getters, Symbol-iterator overrides, functions, and detects cycles BEFORE the walker runs on the safe clone. Closes the entire class of Proxy-based bypass attacks at once instead of one-by-one.
+
+  ### Why the rewrite
+
+  R13 → R14 → R15 patched the walker three rounds, each closing one Proxy attack and opening a slightly different one:
+
+  - R13: array-shape payloads silently bypass the guard (added array branch).
+  - R14: deeply nested arrays bypass the depth bound; Proxy whose `get` returns different values per read leaks PII via TOCTOU (added depth decrement + array snapshot).
+  - R15: Proxy whose `Symbol.iterator` yields a billion items OOMs the worker; Proxy whose iterator returns `undefined` crashes the walker; cycle guard via permanent WeakSet false-skips shared-leaf references (added size cap + try/catch islands + in-progress cycle tracking).
+
+  The escalating-patch pattern is the signal that the walker needs to operate on a value the consumer cannot inject hostile behavior into. `structuredClone` is the canonical primitive: the cloned value has no Proxies (unwrapped to underlying target), no exotic getters, no functions (clone throws on them), no Symbol-iterator overrides, no cycles (clone throws on cyclic input).
+
+  ### Net effect on the walker
+
+  | Before (R15)                                                | After (R16)                                                                |
+  | ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+  | 2 functions (`inspect` + `inspectStructural`)               | 2 functions (`inspect` + `walkClone`)                                      |
+  | `inProgress: WeakSet` threaded through every recursive call | none — clones can't be cyclic                                              |
+  | `try/catch` around outer `inspect` body                     | one `try/catch` around `structuredClone` at entry                          |
+  | `try/catch` around `[...value]` spread                      | none — clones are plain arrays                                             |
+  | `try/catch` around `Object.entries(value)`                  | none — clones are plain objects                                            |
+  | Per-trap Proxy defense                                      | One sanitization step strips all Proxies                                   |
+  | New Proxy traps open new bypasses                           | New Proxy traps don't open bypasses (Proxy is stripped before walker runs) |
+
+  The walker is shorter, simpler to explain in docs, and future-proof against new Proxy attack vectors.
+
+  ### Behavior changes (consumer-visible)
+
+  - **Non-cloneable inputs** (values containing functions, DOM nodes, WeakMaps, `Promise`, class instances with method refs, cyclic refs) now log a `console.warn` and skip inspection with "no match" — same posture as the previous R15 per-Proxy-trap try/catches, just collapsed to one site. The raw value stays in the store; consumers wire a `customDetector` for these shapes.
+  - **Map / Set** continue to be skipped by design. Both survive `structuredClone` but aren't walked (their string elements would need a different traversal shape). Consumers wire a `customDetector`.
+  - **`Date` and other structured types** survive `structuredClone` and are correctly skipped by the walker (they aren't redact targets; they're left as-is in the redacted output).
+  - **Proxy inputs** are stripped to their target shape — `new Proxy([leak@x.com], { get: ... })` becomes `[leak@x.com]` after clone, and the email correctly redacts. (This is a strict improvement: R15 treated all Proxy inputs as "no match" out of caution; R16 actually redacts them.)
+  - **All R13/R14/R15 regression tests pass unchanged** — the new walker is a strict drop-in.
+
+  ### Compatibility
+
+  `structuredClone` is native in every runtime Directive supports: Node 17+, Bun, Deno, Cloudflare workerd, browsers ≥ 2022.
+
+  ### Tests
+
+  3657 passing across core/ai/sources (+2 new R16 regression tests covering non-cloneable input fallback and Map inside payload). Existing R13/R14/R15 array / Proxy / cycle / NaN regression tests pass unchanged.
+
+## 1.19.4
+
+## 1.19.3
+
+## 1.19.2
+
+### Patch Changes
+
+- [#59](https://github.com/directive-run/directive/pull/59) [`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R15 surgical hardening — walker Proxy / cycle / NaN defenses + emitInit cascading registration + MCP recipe enforcement
+
+  R15 audit against v1.19.1 surfaced three new Proxy-based attack chains in the walker that the R14 array-snapshot fix introduced (each patch round opens a slightly different bypass; this round trades narrower fixes for an architectural rewrite that's queued separately). One asymmetric snapshot bug in `emitInit`, one NaN clamp gap, and a documented-only multi-tenant pattern with a prose/code contradiction.
+
+  ### Walker hardening
+
+  **Proxy iterator DoS — array length cap** (R15-CRIT-1). A `Proxy` whose target is array-shaped (so `Array.isArray` returns `true`) but whose `Symbol.iterator` yields an arbitrary count blocked the event loop / OOM-ed the worker during `[...value]` spread. The throw from V8's allocation failure was swallowed by `safeCall` at the plugin boundary so the raw PII committed to the store unredacted. Walker now caps any single array snapshot at `MAX_ARRAY_SCAN = 10_000` elements (via `Array.prototype.slice.call`), emits a `console.warn` so consumers see the truncation, and leaves elements past the cap as-is in the redacted output.
+
+  **Proxy throw bypass — try/catch wraps structural walk** (R15-CRIT-2). A `Proxy` whose `Symbol.iterator` returned `undefined` (or whose `ownKeys` trap threw) used to crash the walker; the throw was swallowed by `safeCall` and the raw PII committed. The walker now wraps the structural walk in `try/catch` — a hostile shape becomes "no match" rather than a silent commit, with a `console.warn` so the gap is visible.
+
+  **Cycle guard switched from permanent WeakSet to in-progress tracking** (R15-CRIT-3). The R14 cycle guard added every visited object to a permanent WeakSet — a non-cyclic payload that re-used the same object reference at multiple slots (`{ primary: user, secondary: user }`) redacted the first occurrence but skipped every subsequent one. Real-world hits: Supabase `{old: row, new: row}` UPDATE with no changes; MCP resource notifications that include the same contact card under `primary` AND `recipients[]`; webhook batches with deduped IDs. Switched to per-walk in-progress: add on entry, remove on exit (`try / finally`). Catches true ancestor cycles, permits shared leaves.
+
+  **`walkDepth: NaN` clamp** (R15-MAJ-4). `Math.floor(NaN)` returned NaN, `Math.max/min` short-circuited to NaN, `NaN <= 0` was `false` — the bound never triggered, and on a deeply-nested non-cyclic shape the walker exhausted the stack with `safeCall` swallowing the throw. Clamp now guards with `Number.isFinite(walkDepth)` and falls back to default `1`.
+
+  **Object branch `Object.entries` try/catch**. Wrapped the `Object.entries(value)` call in `try/catch` so a `Proxy` whose `ownKeys` trap throws is treated as "no match" rather than crashing the walker.
+
+  ### Plugin manager
+
+  **`emitInit` loop-until-quiet** (R15-C1). The R14 broadcast snapshot fix patched only sync `broadcast`; async `emitInit` still iterated the live array, so a plugin whose `onInit` called `manager.unregister(otherName)` between awaits could silently skip the next un-init'd plugin — typically `createFactPIIGuardrail` or `audit-ledger`. The previous snapshot-only fix attempt broke the audit-ledger's cascading-registration pattern (`onInit` calls `system.observe(...)` which registers an observer plugin mid-init, whose own `onInit` must fire to bridge engine events to the ledger). Final shape: track init'd plugins via a `WeakSet`, loop the live array until no plugin remains uninit'd, cap at 100 passes to bound an adversarial register-loop. Handles both index-shift and cascading-registration without regressing either.
+
+  ### Documentation
+
+  **`walkDepth` JSDoc rewrite** (R15-M3). Default `walkDepth: 1` did NOT scan the documented dominant Supabase realtime shape (`{ new: [{ email }] }`) because the chain is object → array → object → string (4 levels). JSDoc now lists the canonical real-world shapes with the `walkDepth` they need (flat object: 1, nested object: 2, Supabase row: 4, MCP resource list: 4). Plus documents the hard caps (`MAX_ARRAY_SCAN = 10_000`, cycle guard, finite-only `walkDepth`).
+
+  **MCP factory recipe contradiction fixed** (R15-C2). Previous prose said "if you create the adapter outside the factory, pass it in per call too" while the code example wrapped both adapter AND module construction inside the factory. The "pass it in per call" path re-introduced the multi-tenant cross-contamination R14-C2 was supposed to close: the adapter's `events.onConnect` is bound at adapter-construction time to whichever factory's `publishRef` was in scope first. Recipe now says explicitly: BOTH adapter and module MUST be constructed inside the same factory; sharing the adapter across factory calls is unsafe.
+
+## 1.19.1
+
+### Patch Changes
+
+- [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
+
+  Three small follow-on fixes for issues surfaced during R14 that R14 Tier 1 didn't cover:
+
+  **MCP holder pattern — multi-tenant safe factory** (R14-C2). The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
+
+  **`broadcast` snapshots `plugins` before iteration**. A plugin hook callback that called `manager.unregister(...)` (or whose `system.observe()` unsubscribe spliced the array) used to shift indices mid-iteration, silently skipping the NEXT plugin — typically the audit-ledger or `createFactPIIGuardrail`. The broadcaster now iterates a snapshot taken at call time, so reentrant `unregister` no longer corrupts the broadcast.
+
+  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel** (R14-MAJ from AI Integration lens). The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
+
+- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 audit Tier 1 — walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
+
+  The R14 multi-lens audit against the v1.19.0 source-primitive surface
+  returned ~30 Critical findings. This patch closes the four highest-
+  impact Critical clusters; the remaining items are tracked for a
+  follow-up minor.
+
+  ### Critical fixes
+
+  **Walker DoS + PII bypass** (R14-C1, closes 5+ reviewer findings —
+  Security, Architecture, Red Team x3, Privacy, Distrib Systems, Domain
+  Expert). R13-C6's array recursion fix passed `depth` raw on the array
+  branch and did NOT snapshot the array before iterating. Three exploit
+  chains landed simultaneously: (a) a deeply-nested
+  `[[[[...]]]]` payload bypassed the documented `walkDepth ≤ 5` bound
+  and overflowed the call stack, with the `safeCall` plugin wrapper
+  swallowing the throw — leaving the raw PII committed in the fact
+  store. (b) Cyclic arrays (`const a = []; a.push(a)`) recursed forever
+  into the same overflow. (c) A `Proxy` whose `.get(0)` returned PII on
+  the live read but benign content on the `[...value]` spread leaked
+  PII into the redacted output at the un-walked indices (TOCTOU).
+  Real-world attack surface: any source where the attacker controls
+  payload shape — Supabase RPC, MCP resource list, webhook bodies.
+
+  The fix in `packages/ai/src/guardrails/fact-pii.ts`: (1) decrement
+  `depth` on the array branch (matches the object branch), (2) snapshot
+  the array via `[...value]` BEFORE the loop and iterate the snapshot,
+  (3) track visited references via `WeakSet` and bail on revisit.
+  Closes the stack-overflow + cycle + Proxy chains with one ~10-line
+  fix. Two new regression tests cover the new bound and the cycle
+  guard; the existing R13-C6 array tests still pass.
+
+  **`liveContext.onContextUpdate` call order matched to JSDoc**
+  (R14-C4). The JSDoc declared `onContextUpdate` "fires AFTER the
+  `interruptWhen` predicate runs but BEFORE the chunk emits" — the
+  impl called `onContextUpdate` FIRST. The instrumentation hook
+  couldn't observe interruption decisions, defeating the documented
+  use case. Swap the order, AND wrap both callbacks in try/catch so a
+  throw inside `interruptWhen` or `onContextUpdate` no longer
+  propagates back through `notifyKey` → `flush` → the source's
+  publish handler (which used to kill the publisher entirely and
+  skip every downstream listener in the notify cycle).
+
+  **`LiveContextOptions.mode` restored as `@deprecated` for source-compat**
+  (R14-C5). v1.18.0 shipped to npm with `mode: "inject-system-message"
+| "restart"` on the public `LiveContextOptions` interface. v1.19.0
+  removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
+  shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0
+  published 2026-06-08 05:42 UTC, 1.19.0 published 2026-06-09 14:21
+  UTC — 32hr live with the field). Removing an exported field of an
+  exported type is a breaking change requiring a major bump; shipping
+  it as minor was a semver violation. This patch restores the field
+  as `@deprecated` with a one-shot runtime warning when consumers set
+  it (no behavior change — abort-and-emit is still the only path).
+  Field will be removed properly in v2.0 with a deprecation cycle.
+
+  ### Documentation fixes
+
+  **Source primitive doc cluster** (R14-C3). The `onEvict` recipe in
+  `packages/knowledge/core/sources.md` referenced a `ch` variable
+  defined in a sibling closure — a copy-paste consumer would hit
+  `ReferenceError`. Rewrote using the holder + closure bridge pattern
+  (`let channel = null` shared between `attach` and `onEvict`).
+  `packages/knowledge/ai/ai-sources.md` still documented the removed
+  `mode: "restart"` field — replaced with the actual shipped behavior
+  description. The adapter table referenced a non-existent
+  `sourceFromWebSocket()` adapter as the canonical WebSocket bridge —
+  clarified that the Cloudflare DO adapter `sourceFromWebSocketMessage()`
+  is the shipped path; the generic helper is queued for a follow-up
+  RFC. RFC 0005 self-contradicted on `liveContext.guardrails` (drafted
+  field vs. shipped `createFactPIIGuardrail`) and listed an "Open
+  question" about a removed `mode: "restart"` semantic — both
+  rewritten to match the shipped state.
+
+## 1.19.0
+
+### Minor Changes
+
+- [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 remaining Critical fixes to documented surfaces of the source primitive
+
+  This patch closes the 5 R13 CRITs that affect documented but unreachable
+  or misleading public APIs of v1.18.0. With Tier 1 (already merged) +
+  this Tier 2, all 10 R13 ship-blocking CRITs are resolved.
+
+  ### Critical fixes
+
+  **`System.stopAsync` / `destroyAsync` / `evict` wired through
+  `createSystem` wrappers** (R13-C1). Engine implemented these per RFC
+  0009 but neither the single-module wrapper at `system.ts:1178+` nor the
+  namespaced wrapper at `system.ts:527+` assigned them, and the
+  `SingleModuleSystem` / `NamespacedSystem` / system-config types omitted
+  the declarations. Calling `createSystem({...}).stopAsync()` failed at
+  TypeScript (`Property 'stopAsync' does not exist`) AND at runtime
+  (undefined method). The entire RFC 0009 DO-eviction recipe documented
+  in `core/sources.md` was unreachable from the public API. All three
+  methods now delegate to the engine; both wrappers participate in the
+  `tickInterval` cleanup; added a 6-case regression test
+  (`system-async-lifecycle.test.ts`) that exercises the public boundary
+  including an async source unsubscribe await.
+
+  **Cloudflare DO adapters accept `onEvict`** (R13-C5). `sourceFromDOAlarm`
+  and `sourceFromWebSocketMessage` are the literal target runtime for RFC
+  0009, yet neither adapter accepted or forwarded an `onEvict` option.
+  With this change both adapters expose `onEvict?: () => void | Promise<void>`
+  on their options interface. Defaults: `DOAlarm` clears the pending
+  alarm via `storage.deleteAlarm()`; `WebSocketMessage` closes the socket
+  with code 1001 `"going-away"`. Consumers can override to skip the
+  default (e.g. when the runtime hibernates WebSockets natively) or to
+  add pre-hibernation work (flush audit log, signal broker). 4 new
+  regression tests covering default + custom `onEvict` for both adapters.
+
+  **`createFactPIIGuardrail` walker recurses into arrays** (R13-C6). The
+  walker previously short-circuited on `Array.isArray(value)`, so the
+  dominant real-world Supabase realtime shape
+  (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
+  silently bypassed the Tier 0 guard. The walker now inspects array
+  elements at the same depth budget, rebuilding the array if any element
+  matched. Maps and Sets remain out of scope by design (consumers must
+  wire a `customDetector` for those). 2 new regression tests covering
+  both "array of PII objects" and "array of PII strings" shapes.
+
+  **RFC 0005 `mode` field removed** (R13-C7). The field
+  `liveContext.mode: "inject-system-message" | "restart"` shipped on the
+  public API but was never read by the impl. The name
+  `"inject-system-message"` falsely implied mid-stream injection; the
+  actual behavior is abort-and-emit. Since v1.18.0 has not yet shipped,
+  the field is removed cleanly (no deprecation tail to maintain). The
+  auto-re-prompt semantics will ship in a follow-up RFC + field together
+  once their design is settled. RFC 0005 + `ai-sources.md` updated.
+
+  ### Documentation fixes
+
+  **MCP source recipe rewritten against the real adapter API** (R13-C8).
+  The previous recipe in `ai-sources.md` called `adapter.onConnect(cb) →
+unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
+  adapter exposes `MCPAdapterConfig.events` as a single callback bag at
+  construction time. The rewritten recipe documents the canonical
+  "holder + closure" bridge pattern: a `publishRef` variable that the
+  source's `attach` populates, with the adapter's `events.onConnect` /
+  `onDisconnect` forwarding through it. This is the general pattern for
+  bridging any single-callback-bag third-party SDK into a Directive
+  source. Recipe also adds the missing `derivations` schema declaration.
+
+### Patch Changes
+
+- [#55](https://github.com/directive-run/directive/pull/55) [`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 Critical fixes to documented surfaces of the source primitive
+
+  The post-merge R13 audit (full 13-lens panel against the merged
+  `feat/source-primitive` work) found five Critical issues affecting
+  consumer-facing documented APIs of v1.18.0. All five close in this patch.
+
+  ### Critical fixes
+
+  **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
+  subpath** (R13-C2). The Tier 0 Mandatory Companion to `liveContext` was
+  declared in `guardrails/index.ts` but the actual tsup entry for the
+  subpath (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
+  `packages/knowledge/ai/ai-sources.md` (Sources × Security section) failed
+  at import time: `Module '@directive-run/ai/guardrails' has no exported
+member 'createFactPIIGuardrail'`. Now exported (function + the four
+  public types: `FactPIIGuardrailMode`, `FactPIIGuardrailOptions`,
+  `FactPIICategory`, `FactPIIMatch`). The internal JSDoc example in
+  `fact-pii.ts` also referenced the wrong import path (`@directive-run/ai`
+  instead of `@directive-run/ai/guardrails`) — corrected.
+
+  **`@directive-run/sources` rejected by `@directive-run/sandbox`
+  validator** (R13-C3). The sandbox validator's `ALLOWED_DIRECTIVE_PACKAGES`
+  set didn't include `sources`, so every playground snippet, MCP
+  `run_in_sandbox` call, and docs live runner that imported the umbrella
+  package or either subpath (`@directive-run/sources`,
+  `@directive-run/sources/supabase`, `@directive-run/sources/cloudflare`)
+  hard-failed with `is not allowed in the sandbox` despite the umbrella
+  shipping as part of v1.18.0. Added `sources` to the allowlist and added
+  two-segment-subpath coverage to the validator test grid.
+
+  **`sourceFromSupabaseChannel` unsubscribe fires-and-forgets
+  `removeChannel`** (R13-C4). The original R5-CR1 issue RFC 0009 was
+  designed to close: the adapter returned a sync unsubscribe that did
+  `void client.removeChannel(chan)`, so `system.stopAsync()` resolved
+  before the Supabase broker dropped the subscription. A subsequent
+  `start → stopAsync → start` cycle double-subscribed because the broker
+  still held the old channel when the new attach raced in. Per RFC 0009's
+  `SourceUnsubscribe = () => void | Promise<void>` widening, the adapter
+  now returns `async () => { await client.removeChannel(chan); }`. Engines
+  using legacy sync `cleanupAll` still ignore the returned promise — same
+  fire-and-forget behavior as before — but the broker drop is now
+  observable to consumers using `stopAsync`.
+
+  ### Documentation fixes
+
+  **Broken cross-ref anchor** (R13-C9): `packages/knowledge/core/sources.md`
+  linked to `ai-security.md#sources-pii--closing-the-fact-injection-bypass`
+  with a single hyphen between "sources" and "pii". The actual GFM anchor
+  generated from the heading `## Sources × PII — closing the fact-injection
+bypass` has a double hyphen (`×` strips to a kept space). The
+  highest-traffic cross-ref in the source primitive doc was landing on a
+  404 anchor. Corrected to `#sources--pii--closing-the-fact-injection-bypass`.
+
+  **RFCs 0005–0009 status flipped from Draft → Accepted** (R13-C10): all
+  five RFCs still carried `Status: Draft (2026-06-07)` even though
+  `sources.md` and `ai-sources.md` already cite them as shipped. Readers
+  following the link saw Draft headers and concluded the feature was
+  design-only. Status now reads: `Accepted — shipped 2026-06-07 in
+feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
+
 ## 1.18.0
 
 ### Minor Changes

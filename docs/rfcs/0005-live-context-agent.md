@@ -1,6 +1,6 @@
 # RFC 0005 – `runStream({ liveContext })` — Reactive Agents
 
-- **Status:** Draft (2026-06-07)
+- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the `source` primitive in `@directive-run/core`; the
   Tier 0 prereq `createFactPIIGuardrail` (shipped); the live-context
@@ -52,24 +52,33 @@ const result = orchestrator.runStream(agent, input, {
     system,                            // the Directive system whose facts feed the agent
     keys: ["pr.headSha", "pr.state"],  // facts to watch
     interruptWhen: (facts, changedKeys) => boolean,
-    mode: "restart" | "inject-system-message",  // default: "restart"
     notifyOn: "all-changes" | "interrupt-only", // default: "interrupt-only"
     onContextUpdate?: (changedKeys) => void,
-    guardrails?: Array<GuardrailFn<{
-      key: string;
-      value: unknown;
-      agentName: string;
-    }>>,                                // mandatory companion — see Security
   },
 });
 ```
+
+> **R13 update:** the original RFC drafted a `mode: "restart" |
+> "inject-system-message"` field for choosing how the orchestrator
+> continues after an interrupt. The 1.18 landing ships a single
+> behavior — abort the LLM run, emit an `interrupted` chunk, hand
+> control back to the caller (who re-prompts via a fresh `runStream`
+> or fully tears down via `result.abort()`). The `mode` field was
+> removed before release because the impl never read it; the
+> auto-re-prompt semantics will ship in a follow-up RFC + field
+> together once their design is settled.
+>
+> Likewise, the original draft proposed an inline `guardrails` array
+> on `liveContext` itself; the shipped Tier 0 security companion is
+> `createFactPIIGuardrail`, wired at `createSystem` time (see the
+> "Security — Tier 0 prereq" section below).
 
 Two additive chunk variants land on the `OrchestratorStreamChunk`
 discriminated union:
 
 ```ts
 | { type: "context_updated"; changedKeys: string[] }
-| { type: "interrupted"; reason: string; partialOutput: string }
+| { type: "interrupted"; reason: string; partialOutput: string; changedKeys: string[] }
 ```
 
 A new `interrupt(reason?: string): void` method joins `abort()` on the
@@ -84,10 +93,13 @@ with up-to-date facts.
 it, `liveContext` expands the source → fact → prompt PII bypass surface
 into the mid-stream context updates the agent reads while generating.
 
-`liveContext.guardrails` is the per-`runStream` extension point: the
-orchestrator runs the supplied guardrails BEFORE emitting `context_updated`
-chunks, so a fact update that contains PII is either redacted (by the
-plugin) or blocked (by the guardrail) before it reaches the LLM call.
+**R13 update:** the original RFC drafted a `liveContext.guardrails`
+inline array as the per-`runStream` extension point. The shipped
+design moves PII screening to `createFactPIIGuardrail` wired at
+`createSystem` time — the plugin runs on every fact write (including
+the source publishes liveContext watches), so by the time the
+orchestrator emits a `context_updated` chunk the fact has already
+been redacted in-store. No `runStream`-time guardrail array ships.
 
 ## Scope guard
 
@@ -114,11 +126,14 @@ the launch artifact.
 
 ## Open questions
 
-1. **Re-prompt merge strategy.** When `mode: "restart"` fires, does the
-   orchestrator (a) re-render the entire system message from scratch, or
-   (b) append a "context updated:" delta? Recommendation: (a) for v1
-   simplicity, opt into (b) via a `mergeStrategy: "rerender" | "delta"`
-   later if needed.
+1. **Automatic re-prompt semantics (deferred to follow-up RFC).** The
+   1.x landing ships abort-and-emit only; the caller drives re-prompt
+   via a fresh `runStream` call. A future RFC will add automatic
+   re-invocation with a merge strategy — open sub-questions: (a)
+   re-render the entire system message from scratch, or (b) append a
+   "context updated:" delta. The original `mode` field was removed
+   from `LiveContextOptions` before release because the impl never
+   read it; the new field ships alongside the impl in the follow-up.
 2. **Buffer policy during interrupt.** Partial output emitted before
    interrupt — does the caller's `for await (chunk of stream)` loop get
    it as a `token` chunk first then `interrupted`, or only `interrupted`

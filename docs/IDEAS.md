@@ -1749,6 +1749,86 @@ events already render).
 
 ---
 
+## R13 Game-Changer Ideas (Source primitive Tier 0+1 + RFCs 0005-0009 shipped — 2026-06-08)
+
+Surfaced after PR #52 (`feat/source-primitive`) merged into main. v1.18.0
+Version Packages PR #53 open. Each idea compounds on the just-landed
+substrate: liveContext, createFactPIIGuardrail, attachSourcesToOtel, the
+sources umbrella package. Ranked by viral × speed × impact.
+
+### Top 5 ranked
+
+1. **`liveContext.tournament` — N agents share one fact stream; first
+   valid completion wins.** Three Claude/GPT/Gemini agents racing the same
+   prompt against the same live facts; whichever finishes first AND
+   passes output guardrails wins, others get `interrupted` with
+   `tournament_won_by: <model>`. The substrate IS `liveContext` +
+   `multi-agent-orchestrator`. Killer demo: 6s GIF with three terminal
+   panes, new commit lands, two models interrupt mid-token, winner
+   finishes. Compound: turns "router-model" pattern into data-driven
+   model-agnostic fail-over. **3 days. 9 × 7 × 9 = 567.**
+
+2. **Browser-Native Source Pack:** `sourceFromBrowserVisibility()` +
+   `sourceFromIndexedDBChange()` + `sourceFromFileWatcher()`. Three
+   one-liners that ship as `@directive-run/sources/browser` +
+   `@directive-run/sources/node`. Visibility source is the killer: agent
+   knows when user alt-tabs away → emit `interrupted: { reason:
+   "user-away" }` → pause billing. Kills the "$40 OpenAI bill while AFK"
+   pain point single-handedly. IndexedDB unlocks cross-tab multi-agent
+   with zero server. File-watcher = Cursor's killer feature distributed
+   as a recipe. **1 week. 9 × 8 × 8 = 576.**
+
+3. **`createOutputPIIGuardrail` + `createJailbreakGuardrail` with
+   rejection-feedback loop.** Output-side PII redactor maintains a
+   rolling `guardrail.rejections` fact that feeds back into the input
+   guardrail as denylist patterns. First self-improving PII boundary in
+   agent-land. Pairs with createFactPIIGuardrail to form a bidirectional
+   guardrail — first in the space to ship one. The Sherlock moment is
+   the loop, not the regex. Same primitive detects PII AND jailbreaks.
+   **1 week. 8 × 7 × 10 = 560.**
+
+4. **`@directive-run/exporters` — pre-baked OTel exporters for Datadog,
+   Honeycomb, Sentry, Grafana Cloud, Axiom.** Three lines: `import
+   { attachSourcesToDatadog } from "@directive-run/exporters/datadog"
+   ; attachSourcesToDatadog(system, { apiKey })`. Cut to live Datadog APM
+   dashboard streaming source spans. Turns Directive from
+   state-management library into observability source-of-truth — your
+   state machine IS a first-class APM service. SEO play: 5 vendor
+   landing pages. **2 weeks (3 vendors then 2 more). 7 × 7 × 9 = 441.**
+
+5. **`definePipeline` — the inbound/outbound meta-primitive.**
+   `source` = "world tells your system"; `effect` = "your system tells
+   the world"; `Pipeline` = both, with the round-trip auto-traced.
+   `definePipeline({ from: source, to: effect, transform })` collapses
+   30 lines of source + effect + constraint to 8 lines. Becomes the
+   recommended way to build integrations between two external systems
+   where Directive is the bus. Establishes Directive as integration-
+   runtime story, not just state-runtime story. **Draft RFC now, ship
+   after #1-3 land. 8 × 5 × 10 = 400.**
+
+### Build sequence
+
+- **v1.19 (next ~2.5 weeks):** #1 Tournament + #2 Browser-Native Source
+  Pack + #3 Output-PII Guardrail with feedback loop. Combined estimate:
+  ~2.5 weeks focused work. Combined viral×speed×impact: 1,703 / 3,000.
+- **v1.20:** #4 OTel exporters (Sentry first, Datadog second).
+- **v1.21+:** #5 `definePipeline` — draft RFC now while source primitive
+  is fresh; ship after 2 months of real-world feedback.
+
+Each reinforces the others: tournament demos liveContext value, browser
+sources demo umbrella expandability, output guardrails demo the safety
+story, and all three light up under #4's OTel exporters.
+
+### Cut from this round (or already in earlier IDEAS sections)
+
+- `source.replay()` DVR — already R5 Tier 2; possible compound w/ #1.
+- `directive sources scan` CLI — already R5 Tier 2.
+- `sourceFromGitHubWebhook()` — too narrow on its own; folds into #2.
+- `sourceFromWebRTCDataChannel()` — too narrow on its own.
+- Bigger `*Definition` rename QOL sweep — pursue under naming-review skill.
+
+---
+
 ## Deferred (2026-06): directive-docs sidebar IA review
 
 After v1.20.x ship + RFC 0010, the `directive-docs/src/lib/navigation.ts`

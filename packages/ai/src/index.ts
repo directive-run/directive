@@ -188,6 +188,24 @@ export {
   type RateLimitGuardrail,
 } from "./builtin-guardrails.js";
 
+/**
+ * Tier 0 Mandatory Companion to `liveContext`. Closes the source →
+ * fact → agent-prompt PII bypass at the fact-store boundary. Symmetric
+ * with the other built-in guardrails: re-exported here so consumers
+ * who follow the "main-barrel" idiom find it, AND from the
+ * `@directive-run/ai/guardrails` subpath for tree-shakable imports.
+ *
+ * @deprecated Prefer `@directive-run/ai/guardrails` for tree-shaking.
+ * Will be removed from the main barrel in v2.
+ */
+export {
+  createFactPIIGuardrail,
+  type FactPIIGuardrailMode,
+  type FactPIIGuardrailOptions,
+  type FactPIICategory,
+  type FactPIIMatch,
+} from "./guardrails/fact-pii.js";
+
 // ============================================================================
 // Agent Utilities
 // ============================================================================

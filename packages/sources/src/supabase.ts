@@ -189,13 +189,18 @@ export function sourceFromSupabaseChannel(
       // sync; we capture the status callback for the consumer.
       chan.subscribe((status) => onStatus?.(status));
 
-      // Cleanup: unsubscribe via the client so internal channel registry
-      // is cleared. `removeChannel` returns a Promise; the engine's
-      // current `SourceUnsubscribeFn` is sync — we kick off the cleanup
-      // and let it complete in the background. RFC 0009 widens this to
-      // an awaitable signature.
-      return () => {
-        void client.removeChannel(chan);
+      // Cleanup: unsubscribe via the client so the internal channel
+      // registry is cleared. `removeChannel` returns a Promise; per RFC
+      // 0009 we await it so `system.stopAsync()` does not resolve
+      // before the broker has dropped the subscription. Without this
+      // await, a `start → stopAsync → start` cycle double-subscribes
+      // (the broker still holds the old channel when the new attach
+      // races in). Engines pre-RFC-0009 that call the legacy sync
+      // `cleanupAll` ignore the returned promise — that's the same
+      // fire-and-forget behavior as before, just with the broker drop
+      // observable to consumers who DO use `stopAsync`.
+      return async () => {
+        await client.removeChannel(chan);
       };
     },
     meta: {

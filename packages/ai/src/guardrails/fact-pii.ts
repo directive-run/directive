@@ -25,10 +25,39 @@
  * synchronous regex. Consumers who need richer detection pass a
  * synchronous `customDetector`.
  *
+ * ## Observability
+ *
+ * Every detection emits a typed `"guardrail.blocked"` `ObservationEvent`
+ * via `system.observe()` (RFC 0010). Backend wiring (OTel exporters,
+ * `@directive-run/timeline`, audit-ledger plugins) subscribes to the
+ * event stream and gets:
+ *
+ * ```ts
+ * {
+ *   type: "guardrail.blocked",
+ *   plugin: "fact-pii-guardrail",
+ *   key: "<fact-key>",
+ *   kind: "redact" | "alert" | "detect",
+ *   count: <number-of-matches>,
+ *   category: "ssn" | "credit_card" | "email" | <customDetector-type>
+ * }
+ * ```
+ *
+ * The user `onBlocked` callback fires INDEPENDENTLY for backwards
+ * compatibility and ad-hoc paging (Sentry, Honeycomb). Prefer
+ * `system.observe()` for new integrations — observers see every
+ * registered guardrail's activity through the same typed stream.
+ *
+ * `kind: "detect"` distinguishes "couldn't redact" from "chose not
+ * to redact": `Error` instances always surface as `"detect"` because
+ * the walker matches `Error.message` / `Error.cause` but cannot mint
+ * a redacted Error with guaranteed `.stack` parity. A subscriber
+ * counting redactions should sum `kind === "redact" || kind === "detect"`.
+ *
  * @example Defensive (redact PII writes into pii-tagged facts)
  * ```ts
  * import { createSystem, t } from '@directive-run/core';
- * import { createFactPIIGuardrail } from '@directive-run/ai';
+ * import { createFactPIIGuardrail } from '@directive-run/ai/guardrails';
  *
  * const customer = createModule('customer', {
  *   schema: {
@@ -269,21 +298,51 @@ export interface FactPIIGuardrailOptions {
    */
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
-   * Maximum nesting depth to walk when scanning an object-shaped fact
-   * value. Default `1` — only the top-level string properties of an
-   * object are scanned. Deeper structures (nested objects, arrays of
-   * objects, Maps, Sets) are NOT walked by the built-in scanner; PII
-   * embedded at depth > `walkDepth` will pass through unredacted.
+   * Maximum nesting depth to walk when scanning a structured fact
+   * value. Default `2` (raised from `1` in R19 follow-up so the common
+   * `Error.cause` + shallow-nested-object shapes scan zero-config).
+   * At depth 2 the scanner inspects top-level strings, recurses into
+   * nested objects / arrays, AND recurses one more level — enough
+   * for the Error-with-cause and shallow-nested-object shapes most
+   * consumers actually ship. Each array level burns one depth slot.
+   * Maps and Sets are still NOT walked by the built-in scanner; PII
+   * inside those structures must go through a `customDetector`.
    *
-   * Consumers with deeply-nested PII shapes have two options:
-   * 1. Pass `walkDepth: 2` (or higher) — the scanner walks plain
-   *    objects to that depth. Arrays, Maps, and Sets are still skipped.
-   * 2. Pass a `customDetector` that walks the consumer-specific shape
-   *    and returns concrete matches — the right answer for
-   *    domain-specific structures.
+   * Real-world common shapes and the `walkDepth` they need:
+   * - **Flat object** (`{ email, ssn }`) — works at any `walkDepth >= 1`.
+   * - **Nested object** (`{ profile: { email } }`) — needs `walkDepth >= 2`
+   *   (covered by the default).
+   * - **Error with cause** (`new Error(m, { cause: prev })`) — the cause
+   *   chain is recursed at `depth - 1`, so `walkDepth >= 2` is needed
+   *   to scan one cause level (covered by the default). Deeper cause
+   *   chains (`cause.cause.cause`) need `walkDepth >= 3`.
+   * - **AggregateError** with nested error PII — `walkDepth >= 2` for
+   *   the first layer; deeper for nested aggregates.
+   * - **Supabase realtime row payload** (`payload.new = [{ email }]`,
+   *   passed as the fact value) — the fact's value is the object
+   *   `{ new: [...] }`, so the chain is object → array → object →
+   *   string and needs `walkDepth: 4`.
+   * - **MCP resource notification list** (`{ resources: [{...}] }`) —
+   *   same shape, needs `walkDepth: 4`.
    *
-   * Maximum is `5` to prevent pathological recursion on cyclic
-   * structures. Passing anything higher clamps to `5`.
+   * For deeper or non-object structures (Maps, Sets, class instances
+   * with getters, Symbol-keyed properties), pass a `customDetector`
+   * that walks the consumer-specific shape and returns concrete
+   * matches.
+   *
+   * **Hard caps for safety:**
+   * - `walkDepth` clamps to `[1, 5]`. Non-finite values (`NaN`,
+   *   `Infinity`, non-number casts) clamp to `1`.
+   * - The walker caps any single array's element count at 10,000
+   *   (warns + truncates). Pass a `customDetector` for larger
+   *   payloads.
+   * - Before walking, the value is passed through `structuredClone`
+   *   to strip any Proxies, exotic getters, Symbol-iterator
+   *   overrides, and functions the consumer might have attached.
+   *   Cyclic inputs throw `DataCloneError` from `structuredClone`
+   *   and the walker treats them as "no match" with a warning.
+   *   Non-cloneable values (functions, DOM nodes, WeakMaps, etc.)
+   *   throw the same way — wire a `customDetector` for those shapes.
    *
    * Property iteration uses `Object.entries`, which skips
    * Symbol-keyed properties and non-enumerable string keys. If you
@@ -306,6 +365,15 @@ interface MetaCapableSystem {
       set?: (k: string, v: unknown) => void;
     };
   };
+  notify?: {
+    guardrailBlocked?: (
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ) => void;
+  };
 }
 
 /**
@@ -327,7 +395,7 @@ export function createFactPIIGuardrail(
     excludeKeys = [],
     onBlocked,
     customDetector,
-    walkDepth = 1,
+    walkDepth = 2,
   } = options;
 
   const typeSet = new Set<FactPIICategory>(types);
@@ -336,7 +404,23 @@ export function createFactPIIGuardrail(
   // Clamp walkDepth to [1, 5]. Lower bound prevents accidental no-op
   // scans (`walkDepth: 0` would skip even top-level string members);
   // upper bound caps pathological recursion on cyclic structures.
-  const effectiveWalkDepth = Math.max(1, Math.min(5, Math.floor(walkDepth)));
+  // `Number.isFinite` guards against NaN / Infinity / non-numeric
+  // casts (R15) — `Math.floor(NaN) === NaN`, `Math.min/max(5, NaN) ===
+  // NaN`, so the chain collapsed to NaN without the finite guard;
+  // recursion then used `depth - 1 === NaN` and the bound never
+  // triggered.
+  const effectiveWalkDepth = Number.isFinite(walkDepth)
+    ? Math.max(1, Math.min(5, Math.floor(walkDepth as number)))
+    : 1;
+
+  // Hard cap on per-array element count. After the structuredClone
+  // pass the walker only ever sees plain arrays (any Proxy is
+  // stripped), so the cap exists purely to bound CPU on legitimate
+  // huge payloads (a 1M-element array shipped as one realtime row).
+  // Anything past the cap is left as-is on the redacted output AND
+  // reported via `console.warn` so consumers see the truncation
+  // rather than a silent miss.
+  const MAX_ARRAY_SCAN = 10_000;
   let initialized = false;
   let systemRef: System | null = null;
 
@@ -370,6 +454,38 @@ export function createFactPIIGuardrail(
     return all;
   }
 
+  // Walker — sanitization-first design.
+  //
+  // R13 → R14 → R15 patched a manual structural walker that operated
+  // on the consumer-supplied value directly. Each round closed one
+  // class of Proxy-based bypass and opened another:
+  //
+  //   - R13: array-shaped payloads silently bypass (added array branch).
+  //   - R14: deeply nested arrays bypass the depth bound; Proxy whose
+  //     `get` returns different values per read leaks PII via TOCTOU
+  //     (added depth decrement + array snapshot).
+  //   - R15: Proxy whose `Symbol.iterator` yields a billion items
+  //     OOMs the worker; Proxy whose iterator returns undefined
+  //     crashes the walker; cycle guard via permanent WeakSet
+  //     false-skips shared-leaf references (added size cap +
+  //     try/catch islands + in-progress cycle tracking).
+  //
+  // The pattern of "patch round → new bypass surface" is the signal
+  // that the walker needs to operate on a value that the consumer
+  // CANNOT inject hostile behavior into. `structuredClone` is the
+  // canonical primitive: the cloned value has no Proxies (they're
+  // unwrapped to their underlying target shape), no exotic getters,
+  // no functions (they throw at clone time), no Symbol-iterator
+  // overrides, no cycles (clone throws on cyclic input). The walker
+  // operates on the safe clone with a simple recursive descent — no
+  // try/catch islands, no cycle tracking, no per-trap defense.
+  //
+  // Non-cloneable inputs (DOM nodes, class instances with method
+  // refs, WeakMaps, Promises, etc.) throw `DataCloneError` at the
+  // clone call; we catch, warn, and treat as "no match" — same
+  // posture as the previous per-trap try/catches. The hard cap on
+  // top-level array element count caps the clone cost, since
+  // `structuredClone` of a 100k-element array is still O(N).
   function inspect(
     value: unknown,
     depth: number = effectiveWalkDepth,
@@ -382,12 +498,170 @@ export function createFactPIIGuardrail(
       return { matched: true, redacted: redactText(value, detected), detected };
     }
     if (depth <= 0) return { matched: false };
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      // Walk plain objects up to `walkDepth` levels deep so a source
-      // publishing a nested PII shape (e.g. `{ profile: { email } }`) is
-      // screened when the consumer opts into `walkDepth: 2+`. Arrays,
-      // Maps, and Sets are out of scope at any depth — pass a
-      // `customDetector` that walks the shape itself.
+    if (value === null || typeof value !== "object") {
+      return { matched: false };
+    }
+
+    // Pre-clone cap: a 1M-element array shipped as one realtime row
+    // would otherwise burn CPU inside `structuredClone` BEFORE the
+    // walker ever sees it. (R17 regression of R15-CRIT-1.) R18 follow-up:
+    // the previous `.slice()` path re-read `value.length` on a Proxy,
+    // which can lie (return 5 on the first read, 1e9 on the next) and
+    // bypass the cap. Materialize via `Array.from` so each index is
+    // read EXACTLY once and the resulting array's length is fixed by
+    // the cap value — the Proxy's traps can no longer TOCTOU us.
+    let cloneInput: unknown = value;
+    if (Array.isArray(value)) {
+      // Read length once; coerce to a finite number; clamp.
+      const rawLen = (value as unknown[]).length;
+      const len =
+        Number.isFinite(rawLen) && rawLen > 0
+          ? Math.min(Math.floor(rawLen as number), MAX_ARRAY_SCAN)
+          : 0;
+      if (rawLen > MAX_ARRAY_SCAN) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[Directive] fact-pii walker truncated top-level array at ${MAX_ARRAY_SCAN} elements before clone — pass a customDetector for larger payloads`,
+        );
+      }
+      // Materialize a plain Array of exactly `len` entries by reading
+      // each index ONCE. structuredClone of this plain Array can't
+      // re-trigger the Proxy's traps. Inner Proxies still get cloned
+      // by structuredClone's own algorithm, but inner-array length
+      // lying is bounded by the recursive walkClone array cap.
+      const snapshot = new Array(len);
+      for (let i = 0; i < len; i++) snapshot[i] = (value as unknown[])[i];
+      cloneInput = snapshot;
+    }
+
+    // Sanitization step — strip Proxies, exotic getters, etc. before
+    // walking. structuredClone has been native since Node 17 /
+    // workerd / Bun / Deno / browsers ≥ 2022 — the entire runtime
+    // matrix Directive supports.
+    let safe: unknown;
+    try {
+      safe = structuredClone(cloneInput);
+    } catch (err) {
+      // Cyclic input, non-cloneable members (functions, DOM nodes,
+      // class instances with method properties, WeakMap, etc.). The
+      // consumer can wire a `customDetector` for these shapes; we
+      // bail rather than commit raw PII silently.
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[Directive] fact-pii walker: value is not structured-cloneable — leaving it as-is and skipping inspection. Wire a customDetector for shapes containing functions, DOM nodes, cycles, or WeakMaps.",
+        err instanceof Error ? err.message : String(err),
+      );
+      return { matched: false };
+    }
+    return walkClone(safe, depth);
+  }
+
+  // Walks a structured clone — guaranteed Proxy-free, cycle-free,
+  // function-free. Simple recursive descent; no try/catch (the
+  // input cannot throw on `Object.entries` / `[...arr]` because
+  // structuredClone produces only plain objects + arrays + JSON
+  // primitives + structured types like Date, Map, Set).
+  function walkClone(
+    value: unknown,
+    depth: number,
+  ):
+    | { matched: false }
+    | { matched: true; redacted: unknown; detected: FactPIIMatch[] } {
+    if (typeof value === "string") {
+      const detected = runScan(value);
+      if (detected.length === 0) return { matched: false };
+      return { matched: true, redacted: redactText(value, detected), detected };
+    }
+    if (depth <= 0) return { matched: false };
+    if (Array.isArray(value)) {
+      // Cap on element count — even on a structured clone, walking
+      // 100k elements at 6 regex `.exec` per string element is real
+      // CPU. Beyond the cap, elements are left as-is in the redacted
+      // output and a warning is logged. Pass a `customDetector` for
+      // larger payloads.
+      if (value.length > MAX_ARRAY_SCAN) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[Directive] fact-pii walker truncated array at ${MAX_ARRAY_SCAN} elements — pass a customDetector for larger payloads`,
+        );
+      }
+      const limit = Math.min(value.length, MAX_ARRAY_SCAN);
+      let mutatedArr: unknown[] | null = null;
+      const all: FactPIIMatch[] = [];
+      for (let i = 0; i < limit; i++) {
+        const nested = walkClone(value[i], depth - 1);
+        if (!nested.matched) continue;
+        if (mutatedArr === null) mutatedArr = [...value];
+        mutatedArr[i] = nested.redacted;
+        for (const d of nested.detected) all.push(d);
+      }
+      if (mutatedArr === null) return { matched: false };
+      return { matched: true, redacted: mutatedArr, detected: all };
+    }
+    if (value && typeof value === "object") {
+      // structuredClone preserves a handful of "structured" types
+      // (Map, Set, Date, RegExp, Blob, File, ArrayBuffer + views,
+      // Error) as their native class. Walking them with
+      // `Object.entries` would either yield nothing (the interesting
+      // data is on the prototype / in internal slots) or
+      // false-trigger PII matches inside Error.stack frames. We
+      // exit early; consumers pass a `customDetector` to inspect
+      // these structures.
+      if (
+        value instanceof Map ||
+        value instanceof Set ||
+        value instanceof Date ||
+        value instanceof RegExp ||
+        value instanceof Error ||
+        ArrayBuffer.isView(value) ||
+        value instanceof ArrayBuffer ||
+        (typeof Blob !== "undefined" && value instanceof Blob)
+      ) {
+        // Error class: detection-only path. `Error.message` is a
+        // user-controlled string a transport often surfaces, so
+        // we scan it (R17) along with `.cause` and (for AggregateError)
+        // `.errors` (R18-C2 — PII can hide inside wrapped causes).
+        // Errors are returned as-is in `redacted` (the instance ref is
+        // the input); the caller MUST treat Error matches as alert-mode,
+        // not redact-mode, because the same-ref return would otherwise
+        // cause the redact follow-up write to be a no-op while the
+        // `onBlocked` callback claimed redaction (R18-C5).
+        if (value instanceof Error) {
+          const detected: FactPIIMatch[] = [];
+          if (typeof value.message === "string") {
+            for (const d of runScan(value.message)) detected.push(d);
+          }
+          if (typeof value.cause === "string") {
+            for (const d of runScan(value.cause)) detected.push(d);
+          } else if (value.cause instanceof Error && depth > 1) {
+            const sub = walkClone(value.cause, depth - 1);
+            if (sub.matched) for (const d of sub.detected) detected.push(d);
+          }
+          if (
+            typeof AggregateError !== "undefined" &&
+            value instanceof AggregateError &&
+            Array.isArray(value.errors) &&
+            depth > 1
+          ) {
+            for (const inner of value.errors) {
+              if (typeof inner === "string") {
+                for (const d of runScan(inner)) detected.push(d);
+              } else if (inner instanceof Error) {
+                const sub = walkClone(inner, depth - 1);
+                if (sub.matched) for (const d of sub.detected) detected.push(d);
+              }
+            }
+          }
+          if (detected.length > 0) {
+            return {
+              matched: true,
+              redacted: value,
+              detected,
+            };
+          }
+        }
+        return { matched: false };
+      }
       let mutated: Record<string, unknown> | null = null;
       const all: FactPIIMatch[] = [];
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
@@ -399,13 +673,8 @@ export function createFactPIIGuardrail(
           }
           mutated[k] = redactText(v, detected);
           for (const d of detected) all.push(d);
-        } else if (
-          depth > 1 &&
-          v &&
-          typeof v === "object" &&
-          !Array.isArray(v)
-        ) {
-          const nested = inspect(v, depth - 1);
+        } else if (depth > 1 && v && typeof v === "object") {
+          const nested = walkClone(v, depth - 1);
           if (!nested.matched) continue;
           if (mutated === null) {
             mutated = { ...(value as Record<string, unknown>) };
@@ -430,15 +699,46 @@ export function createFactPIIGuardrail(
     onFactSet(key, value, _prev) {
       if (!initialized) return;
       if (!screenedKeys.has(key)) return;
+      // Idempotent skip — primitives only (R18-C3). For object
+      // references, `value === _prev` is true when a source mutates
+      // a held reference in place and re-publishes; skipping there
+      // would let mutated PII slip through. Re-scanning an object
+      // is bounded by the walker's array + depth caps anyway.
+      if (value === _prev && (typeof value !== "object" || value === null)) {
+        return;
+      }
       const result = inspect(value);
       if (!result.matched) return;
       onBlocked?.(key, result.detected, mode);
+      // RFC 0010 — fan out to system.observe() / OTel / timeline /
+      // audit-ledger subscribers. `kind: "detect"` for the Error
+      // branch (the walker can't deep-clone an Error instance, so
+      // redaction is detection-only regardless of configured mode).
+      const blockedKind: "redact" | "alert" | "detect" =
+        mode === "alert"
+          ? "alert"
+          : result.redacted === value
+            ? "detect"
+            : "redact";
+      const sys = systemRef as unknown as MetaCapableSystem | null;
+      sys?.notify?.guardrailBlocked?.(
+        "fact-pii-guardrail",
+        key,
+        blockedKind,
+        result.detected.length,
+        result.detected[0]?.type,
+      );
       if (mode === "alert") return;
-      // Redact mode: schedule a follow-up store write. `onFactSet` fires
-      // post-commit, so the raw value briefly exists in the store; the
-      // follow-up write overwrites it before the next reconcile / agent
-      // read. Subscribers that snapshot the raw value during the same
-      // microtask see it; the LLM call after the next settle does not.
+      // Redact mode: schedule a follow-up store write. Skip when the
+      // walker returned the input reference itself (current Error path —
+      // R18-C5). The follow-up would be a no-op AND would trip the
+      // primitives-only idempotency gate on re-entry.
+      if (result.redacted === value) return;
+      // `onFactSet` fires post-commit, so the raw value briefly exists
+      // in the store; the follow-up write overwrites it before the next
+      // reconcile / agent read. Subscribers that snapshot the raw value
+      // during the same microtask see it; the LLM call after the next
+      // settle does not.
       const facts = (systemRef as unknown as MetaCapableSystem | null)?.facts;
       if (facts?.$store?.set) {
         try {
@@ -455,10 +755,35 @@ export function createFactPIIGuardrail(
       for (const change of changes) {
         if (change.type !== "set") continue;
         if (!screenedKeys.has(change.key)) continue;
+        // Primitives-only idempotency gate (R18-C3); see onFactSet.
+        const prev = (change as { prev?: unknown }).prev;
+        if (
+          change.value === prev &&
+          (typeof change.value !== "object" || change.value === null)
+        ) {
+          continue;
+        }
         const result = inspect(change.value);
         if (!result.matched) continue;
         onBlocked?.(change.key, result.detected, mode);
+        // RFC 0010 fan-out (mirrors onFactSet).
+        const blockedKind: "redact" | "alert" | "detect" =
+          mode === "alert"
+            ? "alert"
+            : result.redacted === change.value
+              ? "detect"
+              : "redact";
+        const sysB = systemRef as unknown as MetaCapableSystem | null;
+        sysB?.notify?.guardrailBlocked?.(
+          "fact-pii-guardrail",
+          change.key,
+          blockedKind,
+          result.detected.length,
+          result.detected[0]?.type,
+        );
         if (mode === "alert") continue;
+        // Skip same-ref redacted return — Error path (R18-C5).
+        if (result.redacted === change.value) continue;
         // Best-effort in-place mutation of the change record so post-batch
         // subscribers reading `change.value` see the redacted value
         // immediately. Frozen change records fall through silently.

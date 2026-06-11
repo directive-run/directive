@@ -141,6 +141,16 @@ interface EngineState<_S extends Schema> {
   isInitialized: boolean;
   isReady: boolean;
   isDestroyed: boolean;
+  /**
+   * RFC 0009 + R18 follow-up — evict-reentry gate. Cloudflare DO
+   * hibernation paths can call `system.evict()` twice (once on the
+   * first eviction signal, once on the failover path). Without this
+   * gate, the second call would re-run every source's `onEvict` —
+   * sources that aren't idempotent (e.g. one that posts a "going
+   * away" message to a broker) would double-fire. Set on first
+   * entry; never cleared (eviction is terminal).
+   */
+  isEvicting: boolean;
   changedKeys: Set<string>;
   previousRequirements: RequirementSet;
   readyPromise: Promise<void> | null;
@@ -370,6 +380,11 @@ export function createEngine<S extends Schema>(
   }
   // Cached plugin check — updated on register/unregister for O(1) hot-path access
   let _hasPlugins = pluginManager.getPlugins().length > 0;
+  // R19 hardening — reentry depth counter for `system.notify.guardrailBlocked`
+  // so a hostile plugin can't synchronously re-emit through the broadcast
+  // fabric and overflow the stack. Capped at depth 4 (one legitimate
+  // plugin-reacting-to-plugin chain is fine; deeper is a smell).
+  let guardrailNotifyDepth = 0;
   const _origRegister = pluginManager.register.bind(pluginManager);
   const _origUnregister = pluginManager.unregister.bind(pluginManager);
   pluginManager.register = (plugin) => {
@@ -874,6 +889,7 @@ export function createEngine<S extends Schema>(
     isInitialized: false,
     isReady: false,
     isDestroyed: false,
+    isEvicting: false,
     changedKeys: new Set(),
     previousRequirements: new RequirementSet(),
     readyPromise: null,
@@ -1372,6 +1388,65 @@ export function createEngine<S extends Schema>(
       },
     },
 
+    notify: {
+      guardrailBlocked(
+        plugin: string,
+        key: string,
+        kind: "redact" | "alert" | "detect",
+        count: number,
+        category?: string,
+      ): void {
+        // R19 hardening — the public surface accepts a caller-supplied
+        // `plugin` string. A malicious or buggy third-party plugin
+        // holding a `System` ref could otherwise forge audit events
+        // claiming `plugin: "fact-pii-guardrail"` (or any other
+        // guardrail's name). The validation: the `plugin` MUST match
+        // a currently-registered plugin's `name`. This prevents
+        // unknown-plugin forgery; it does NOT prevent one registered
+        // plugin from impersonating another (a deeper RFC tracking
+        // per-plugin notify handles will close that). Today's bar:
+        // observability + audit consumers can trust the `plugin`
+        // field corresponds to SOME plugin actually mounted, not an
+        // arbitrary string from a hostile module.
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        // Reentry depth cap — prevents a plugin's `onGuardrailBlocked`
+        // hook from synchronously calling back into
+        // `notify.guardrailBlocked` and recursing through the
+        // broadcast fabric until stack overflow. Allow shallow
+        // re-emission (one plugin reacting to another's emission)
+        // but bail on pathological recursion.
+        if (guardrailNotifyDepth >= 4) return;
+        // Plugin-name validation. `getPlugins()` is O(N) in the
+        // plugin count; in practice N is small (single-digit) so the
+        // cost is acceptable on the hot path.
+        const pluginExists = pluginManager
+          .getPlugins()
+          .some((p) => p.name === plugin);
+        if (!pluginExists) {
+          if (isDevelopment) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[Directive] system.notify.guardrailBlocked called with unknown plugin "${plugin}". Event dropped.`,
+            );
+          }
+          return;
+        }
+        guardrailNotifyDepth += 1;
+        try {
+          pluginManager.emitGuardrailBlocked(
+            plugin,
+            key,
+            kind,
+            count,
+            category,
+          );
+        } finally {
+          guardrailNotifyDepth -= 1;
+        }
+      },
+    },
+
     observe(
       observer: (event: import("./types/system.js").ObservationEvent) => void,
     ): () => void {
@@ -1509,6 +1584,21 @@ export function createEngine<S extends Schema>(
           phase: "attach" | "cleanup" | "runtime",
           error: unknown,
         ) => observer({ type: "source.error", id, moduleId, phase, error }),
+        onGuardrailBlocked: (
+          plugin: string,
+          key: string,
+          kind: "redact" | "alert" | "detect",
+          count: number,
+          category?: string,
+        ) =>
+          observer({
+            type: "guardrail.blocked",
+            plugin,
+            key,
+            kind,
+            count,
+            ...(category !== undefined ? { category } : {}),
+          }),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
         onReconcileStart: () => observer({ type: "reconcile.start" }),
@@ -1568,6 +1658,32 @@ export function createEngine<S extends Schema>(
 
     start(): void {
       if (state.isRunning) return;
+      // R19 follow-up — refuse to start while an eviction is in flight
+      // or after the system has been destroyed. Both are terminal-ish:
+      // `isEvicting` is cleared in the evict() try/finally only on the
+      // happy path through `destroyAsync()` (which also sets
+      // `isDestroyed`). A `start()` call between `evict()`'s
+      // `sourcesManager.evictAll()` and its `destroyAsync()` would
+      // otherwise re-attach sources that the host runtime told us to
+      // tear down.
+      if (state.isEvicting) {
+        if (isDevelopment) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[Directive] system.start() called during evict() — ignored. Re-create the system after destroyAsync() resolves.",
+          );
+        }
+        return;
+      }
+      if (state.isDestroyed) {
+        if (isDevelopment) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[Directive] system.start() called after destroy — ignored. Systems are not reusable; create a new one.",
+          );
+        }
+        return;
+      }
 
       // Ensure facts are initialized (no-op if already called)
       if (!state.isInitialized) {
@@ -1761,6 +1877,32 @@ export function createEngine<S extends Schema>(
       // return synchronously, and let the IIFE run detached with no
       // error path. Now we either await it or attach a swallow-catch
       // so the unhandled-rejection surface is bounded.
+      //
+      // R18 follow-up: reentry gate. Cloudflare DO hibernation can
+      // fire eviction twice; without the gate, the second call
+      // re-runs every source's `onEvict` — sources that aren't
+      // idempotent would double-fire. Set BEFORE awaiting any async
+      // work so concurrent calls observe the in-flight state and
+      // become no-ops.
+      if (state.isEvicting || state.isDestroyed) return;
+      state.isEvicting = true;
+      // R19 follow-up — the inner work can reject (a plugin's
+      // `onDestroy` throws, a source's `onEvict` rejects, the host
+      // runtime cancels mid-await). Without try/finally, `isEvicting`
+      // would latch forever — and the engine's terminal-state
+      // contract is "isDestroyed === true OR future calls are
+      // no-ops with diagnostics". A rejected eviction leaves the
+      // engine alive but blacklisted from future evict() calls.
+      // Always clear `isEvicting` in finally; the terminal flag
+      // (`isDestroyed`) is set by `destroyAsync()` on the happy path
+      // and stays unset (system is still alive) on rejection.
+      const buildEvictWork = () =>
+        (async () => {
+          await sourcesManager.evictAll();
+          await this.destroyAsync();
+        })().finally(() => {
+          state.isEvicting = false;
+        });
       if (deadline !== undefined && deadline - Date.now() <= 0) {
         // Synchronous deadline: kick off the eviction with a
         // swallow-catch (every per-source error already routes through
@@ -1768,17 +1910,11 @@ export function createEngine<S extends Schema>(
         // composite promise here doesn't lose signal) and return
         // immediately. The runtime evicts the isolate before the work
         // would have completed anyway.
-        const detached = (async () => {
-          await sourcesManager.evictAll();
-          await this.destroyAsync();
-        })();
+        const detached = buildEvictWork();
         detached.catch(() => {});
         return;
       }
-      const evictWork = (async () => {
-        await sourcesManager.evictAll();
-        await this.destroyAsync();
-      })();
+      const evictWork = buildEvictWork();
       if (deadline === undefined) {
         await evictWork;
         return;

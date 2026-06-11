@@ -120,6 +120,34 @@ describe("sourceFromDOAlarm", () => {
       }),
     ).toThrow(/intervalMs must be >= 1/);
   });
+
+  it("default onEvict deletes the pending alarm (RFC 0009)", async () => {
+    const storage = makeFakeStorage();
+    const def = sourceFromDOAlarm({
+      storage,
+      intervalMs: 1000,
+      eventName: "TICK",
+    });
+    // Default onEvict must be present so `system.evict()` actually runs
+    // pre-hibernation cleanup on the DO target runtime.
+    expect(typeof def.onEvict).toBe("function");
+    await def.onEvict?.();
+    expect(storage.deleteAlarm).toHaveBeenCalled();
+  });
+
+  it("custom onEvict overrides the default", async () => {
+    const storage = makeFakeStorage();
+    const custom = vi.fn().mockResolvedValue(undefined);
+    const def = sourceFromDOAlarm({
+      storage,
+      intervalMs: 1000,
+      eventName: "TICK",
+      onEvict: custom,
+    });
+    await def.onEvict?.();
+    expect(custom).toHaveBeenCalledTimes(1);
+    expect(storage.deleteAlarm).not.toHaveBeenCalled();
+  });
 });
 
 describe("sourceFromWebSocketMessage", () => {
@@ -236,5 +264,33 @@ describe("sourceFromWebSocketMessage", () => {
     system.stop();
     expect(socket.listenerCount).toBe(0);
     system.destroy();
+  });
+
+  it("default onEvict closes the socket with going-away (RFC 0009)", async () => {
+    const socket = makeFakeSocket();
+    const def = sourceFromWebSocketMessage({
+      socket: socket as unknown as Parameters<
+        typeof sourceFromWebSocketMessage
+      >[0]["socket"],
+      decode: () => null,
+    });
+    expect(typeof def.onEvict).toBe("function");
+    await def.onEvict?.();
+    expect(socket.close).toHaveBeenCalledWith(1001, "going-away");
+  });
+
+  it("custom onEvict overrides the default socket close", async () => {
+    const socket = makeFakeSocket();
+    const custom = vi.fn();
+    const def = sourceFromWebSocketMessage({
+      socket: socket as unknown as Parameters<
+        typeof sourceFromWebSocketMessage
+      >[0]["socket"],
+      decode: () => null,
+      onEvict: custom,
+    });
+    await def.onEvict?.();
+    expect(custom).toHaveBeenCalledTimes(1);
+    expect(socket.close).not.toHaveBeenCalled();
   });
 });

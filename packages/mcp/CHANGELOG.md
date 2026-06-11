@@ -1,5 +1,104 @@
 # @directive-run/mcp
 
+## 0.5.15
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.2
+  - @directive-run/sandbox@0.3.13
+  - @directive-run/claude-plugin@1.20.2
+
+## 0.5.14
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.1
+  - @directive-run/claude-plugin@1.20.1
+  - @directive-run/sandbox@0.3.12
+
+## 0.5.13
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.0
+  - @directive-run/sandbox@0.3.11
+  - @directive-run/claude-plugin@1.20.0
+
+## 0.5.12
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.7
+  - @directive-run/claude-plugin@1.19.7
+  - @directive-run/sandbox@0.3.10
+
+## 0.5.11
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.6
+  - @directive-run/claude-plugin@1.19.6
+  - @directive-run/sandbox@0.3.9
+
+## 0.5.10
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.5
+  - @directive-run/claude-plugin@1.19.5
+  - @directive-run/sandbox@0.3.8
+
+## 0.5.9
+
+### Patch Changes
+
+- Updated dependencies [[`134b7b9`](https://github.com/directive-run/directive/commit/134b7b917156f07e1b1ecdb1f5ba75068274bce3)]:
+  - @directive-run/knowledge@1.19.4
+  - @directive-run/claude-plugin@1.19.4
+  - @directive-run/sandbox@0.3.7
+
+## 0.5.8
+
+### Patch Changes
+
+- Updated dependencies [[`869e8fc`](https://github.com/directive-run/directive/commit/869e8fc3f12f6f4677e7c7c27e2a9ea795cfc4d1)]:
+  - @directive-run/knowledge@1.19.3
+  - @directive-run/claude-plugin@1.19.3
+  - @directive-run/sandbox@0.3.6
+
+## 0.5.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.2
+  - @directive-run/sandbox@0.3.5
+  - @directive-run/claude-plugin@1.19.2
+
+## 0.5.6
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.1
+  - @directive-run/sandbox@0.3.4
+  - @directive-run/claude-plugin@1.19.1
+
+## 0.5.5
+
+### Patch Changes
+
+- Updated dependencies [[`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8)]:
+  - @directive-run/sandbox@0.3.3
+  - @directive-run/knowledge@1.19.0
+  - @directive-run/claude-plugin@1.19.0
+
 ## 0.5.4
 
 ### Patch Changes

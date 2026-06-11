@@ -159,6 +159,15 @@ export interface PluginManager<_S extends Schema = any> {
     error: unknown,
   ): void;
 
+  // Guardrail hooks (RFC 0010)
+  emitGuardrailBlocked(
+    plugin: string,
+    key: string,
+    kind: "redact" | "alert" | "detect",
+    count: number,
+    category?: string,
+  ): void;
+
   // History hooks
   emitSnapshot(snapshot: Snapshot): void;
   emitHistoryNavigate(from: number, to: number): void;
@@ -234,7 +243,15 @@ export function createPluginManager<
   // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
   function broadcast<K extends keyof Plugin<any>>(hook: K) {
     return (...args: unknown[]) => {
-      for (const plugin of plugins) {
+      // R14-MAJ — snapshot the plugins array BEFORE iterating so a
+      // plugin's hook callback that calls `manager.unregister(...)`
+      // (or whose `system.observe()` unsubscribe splices the array)
+      // doesn't shift indices mid-broadcast. The previous live-array
+      // iteration meant a malicious or buggy plugin could silently
+      // skip the next plugin — typically the audit-ledger / fact-pii
+      // guardrail — by self-unregistering at exactly the right hook.
+      const snapshot = [...plugins];
+      for (const plugin of snapshot) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
         safeCall(() => (plugin as any)[hook]?.(...args));
       }
@@ -269,8 +286,37 @@ export function createPluginManager<
     // Lifecycle hooks (emitInit is async, handled separately)
     // biome-ignore lint/suspicious/noExplicitAny: System type varies
     async emitInit(system: System<any>): Promise<void> {
-      for (const plugin of plugins) {
-        await safeCallAsync(() => plugin.onInit?.(system) as Promise<void>);
+      // R15 — track which plugins have already received `onInit` via a
+      // WeakSet, then loop over the LIVE `plugins` array until quiet.
+      // This handles two distinct concerns:
+      //   1. Index-shift attack: a plugin's `onInit` that calls
+      //      `manager.unregister(otherName)` between awaits used to
+      //      shift indices on the live array and silently skip the
+      //      next un-init'd plugin (typically `createFactPIIGuardrail`
+      //      or the audit-ledger). The WeakSet ensures each plugin
+      //      gets called at most once, regardless of array shifts.
+      //   2. Cascading registration: plugins like `audit-ledger`'s
+      //      `onInit` call `system.observe(...)` which registers a
+      //      NEW observer plugin mid-init. The bridge between engine
+      //      lifecycle events and audit-ledger entries depends on
+      //      that observer's `onInit` firing for the same cycle. The
+      //      loop-until-quiet shape captures cascaded registrations.
+      // biome-ignore lint/suspicious/noExplicitAny: Plugin shape varies
+      const initialized = new WeakSet<Plugin<any>>();
+      // Cap iterations to bound an adversarial register-loop scenario
+      // (a plugin that registers another plugin in its onInit, and so
+      // on). Typical cascade depth is 1-2; 100 is well past any real
+      // pattern.
+      for (let pass = 0; pass < 100; pass++) {
+        const todo = plugins.filter((p) => !initialized.has(p));
+        if (todo.length === 0) break;
+        for (const plugin of todo) {
+          initialized.add(plugin);
+          await safeCallAsync(
+            () =>
+              (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,
+          );
+        }
       }
     },
     emitStart: broadcast("onStart"),
@@ -316,6 +362,9 @@ export function createPluginManager<
     emitSourcePublish: broadcast("onSourcePublish"),
     emitSourceDetach: broadcast("onSourceDetach"),
     emitSourceError: broadcast("onSourceError"),
+
+    // Guardrail hooks (RFC 0010)
+    emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
 
     // History hooks
     emitSnapshot: broadcast("onSnapshot"),

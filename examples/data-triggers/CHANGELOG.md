@@ -1,5 +1,82 @@
 # @directive-run/example-data-triggers
 
+## 0.0.29
+
+### Patch Changes
+
+- Updated dependencies [[`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b)]:
+  - @directive-run/core@1.20.2
+
+## 0.0.28
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.20.1
+
+## 0.0.27
+
+### Patch Changes
+
+- Updated dependencies [[`633e9a2`](https://github.com/directive-run/directive/commit/633e9a2bc19ee4450215b2ddc61d22590fd1d9d8), [`f0b8d77`](https://github.com/directive-run/directive/commit/f0b8d77c0bb415c0a6fe49c5f315c3be60bf6dd5)]:
+  - @directive-run/core@1.20.0
+
+## 0.0.26
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.7
+
+## 0.0.25
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.6
+
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.5
+
+## 0.0.23
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.4
+
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.19.3
+
+## 0.0.21
+
+### Patch Changes
+
+- Updated dependencies [[`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f)]:
+  - @directive-run/core@1.19.2
+
+## 0.0.20
+
+### Patch Changes
+
+- Updated dependencies [[`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c), [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c)]:
+  - @directive-run/core@1.19.1
+
+## 0.0.19
+
+### Patch Changes
+
+- Updated dependencies [[`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc)]:
+  - @directive-run/core@1.19.0
+
 ## 0.0.18
 
 ### Patch Changes

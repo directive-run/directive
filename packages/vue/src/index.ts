@@ -934,7 +934,17 @@ export function useDirective<M extends ModuleSchema>(
   }
 
   onScopeDispose(() => {
-    system.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): use destroyAsync so source
+    // unsubscribes actually complete (e.g. Supabase `channel.unsubscribe()`
+    // returns a Promise the sync `destroy()` would have dropped on
+    // the floor). The framework's onScopeDispose is sync, so we
+    // fire-and-forget with a swallow-catch — broker drops finish in
+    // the background; any unsubscribe rejection is already routed
+    // through the manager's runtime-phase observability sink.
+    system.destroyAsync().catch((err: unknown) => {
+      if (isDevelopment)
+        console.warn("[Directive] destroyAsync rejected during unmount:", err);
+    });
   });
 
   const factKeys = config?.facts;
@@ -1121,7 +1131,17 @@ export function useQuerySystem<
   }
 
   onScopeDispose(() => {
-    system.destroy();
+    // RFC 0009 follow-up (R18 Tier 2-B): use destroyAsync so source
+    // unsubscribes actually complete (e.g. Supabase `channel.unsubscribe()`
+    // returns a Promise the sync `destroy()` would have dropped on
+    // the floor). The framework's onScopeDispose is sync, so we
+    // fire-and-forget with a swallow-catch — broker drops finish in
+    // the background; any unsubscribe rejection is already routed
+    // through the manager's runtime-phase observability sink.
+    system.destroyAsync().catch((err: unknown) => {
+      if (isDevelopment)
+        console.warn("[Directive] destroyAsync rejected during unmount:", err);
+    });
   });
 
   return system;

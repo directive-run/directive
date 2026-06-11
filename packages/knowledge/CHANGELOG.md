@@ -1,5 +1,51 @@
 # @directive-run/knowledge
 
+## 1.20.2
+
+## 1.20.1
+
+## 1.20.0
+
+## 1.19.7
+
+## 1.19.6
+
+## 1.19.5
+
+## 1.19.4
+
+### Patch Changes
+
+- [#63](https://github.com/directive-run/directive/pull/63) [`134b7b9`](https://github.com/directive-run/directive/commit/134b7b917156f07e1b1ecdb1f5ba75068274bce3) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Knowledge docs tail — choosing-primitives matrix + LangChain/Vercel/LlamaIndex comparison
+
+  Closes the last two small docs items from R14 deferred list (the third — runnable `examples/ai-live-context/` Vite scaffold — is queued separately as a bigger work item).
+
+  - New `packages/knowledge/core/choosing-primitives.md` decision matrix for the six core primitives (`facts` / `derivations` / `events` / `constraints` / `resolvers` / `effects` / `sources`). Side-by-side comparisons for the common confusion pairs (`effect` vs `source`, `derivation` vs `resolver` vs `effect`, `event` vs `resolver`, `constraint` vs `derivation`). Worked example: a chat app that mirrors a Supabase realtime channel + calls a moderation API maps every layer to a single primitive — every external touch is a source or resolver, every state field is a fact or derivation, zero `useEffect` hooks.
+
+  - New "## What other agent frameworks have (and don't)" section in `ai-sources.md` comparing `runStream({ liveContext })` against LangChain / LangGraph / Vercel AI SDK / LlamaIndex across six capabilities (mid-generation fact updates, declarative source, interrupt + resume, Tier 0 PII guard at the publish→fact boundary, source × OTel out of the box, multi-system composition). Sets the pitch explicitly: Directive's differentiator is "your state engine and your agent runtime share one fact store" — not "we're a better LangChain."
+
+  - Added `choosing-primitives` to `getting-started-with-directive` skill so the matrix ships in the bundled claude-plugin and an LLM consuming the skill finds the decision tree on first use.
+
+## 1.19.3
+
+### Patch Changes
+
+- [#61](https://github.com/directive-run/directive/pull/61) [`869e8fc`](https://github.com/directive-run/directive/commit/869e8fc3f12f6f4677e7c7c27e2a9ea795cfc4d1) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Knowledge docs deferred batch — RFC index + sources install line + Runtime Compat + polling recipe + attachSourcesToOtel recipe
+
+  Closes five docs-deferred items from R14 + R15 audit rounds, all explicit acceptance criteria from RFCs 0005 / 0009:
+
+  - `docs/rfcs/README.md` index listing every RFC's title / status / landing version, plus the open follow-up RFCs queue (live-context auto-reprompt, walker security rewrite via structuredClone, pre-emit transform hook, `source.evict` observation event, reconnect contract, `publish.complete()` channel).
+  - `@directive-run/sources` install lines in `ai-sources.md` covering the umbrella + the two vendor peerDeps (`@supabase/supabase-js`, `@cloudflare/workers-types`). Documents that both peerDeps are optional and pull in only when the corresponding subpath is imported.
+  - `## Runtime compatibility` section in `core/sources.md` per RFC 0009 acceptance criterion — matrix across Cloudflare DO / Workers / Bun / Deno / Browser / Node for the shipped adapters (`sourceFromSupabaseChannel`, `sourceFromDOAlarm`, `sourceFromWebSocketMessage`).
+  - `### Polling — when a transport is request/response only` recipe in `core/sources.md` with the full `setInterval` + `AbortController` + `reportError` + `coalesce: "lastWriteWins"` pattern (the pattern was previously inline-mentioned but had no recipe section).
+  - `## Observability — pipe source.* events to OpenTelemetry` recipe in `ai-sources.md` covering `attachSourcesToOtel(system, { tracer, serviceName })`, with a cross-ref from `core/sources.md` Observation section. Closes the gap between RFC 0005 / RFC 0009's mention of source-side observability and the actual `@directive-run/ai`-side helper.
+
+## 1.19.2
+
+## 1.19.1
+
+## 1.19.0
+
 ## 1.18.0
 
 ## 1.17.2

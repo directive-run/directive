@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/example-compliance-audit",
-  "version": "0.0.10",
+  "version": "0.0.21",
   "private": true,
   "type": "module",
   "scripts": {

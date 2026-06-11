@@ -288,6 +288,20 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly meta: MetaAccessor;
   /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
   observe(observer: (event: ObservationEvent) => void): () => void;
+  /**
+   * RFC 0010 — plugin authoring surface for emitting the
+   * `"guardrail.blocked"` ObservationEvent. See `System.notify` for the
+   * full contract.
+   */
+  readonly notify: {
+    guardrailBlocked(
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ): void;
+  };
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
@@ -297,8 +311,30 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   start(): void;
   /** Stop the system (cancel resolvers, stop reconciliation) */
   stop(): void;
+  /**
+   * Async-aware stop (RFC 0009). Awaits source unsubscribes so external
+   * transports (Supabase channel.unsubscribe, DO storage flush) settle
+   * before the caller continues. Use this instead of `stop()` when any
+   * declared source returns a Promise from its unsubscribe.
+   */
+  stopAsync(): Promise<void>;
   /** Destroy the system (stop and cleanup) */
   destroy(): void;
+  /**
+   * Async-aware destroy (RFC 0009). Awaits `stopAsync()` first so source
+   * teardown finishes before facts/derivations/effects are wiped.
+   */
+  destroyAsync(): Promise<void>;
+  /**
+   * Signal that the host runtime is about to evict this system (RFC 0009).
+   * Fires every source's `onEvict` in registration order, then races
+   * teardown against `deadline` (ms epoch). With no deadline the full
+   * teardown is awaited. With `deadline <= now` the eviction is
+   * detached so the caller returns immediately. Use for Cloudflare DO
+   * hibernation, Worker eviction, and any runtime that imposes a hard
+   * shutdown wall clock.
+   */
+  evict(deadline?: number): Promise<void>;
 
   /** Whether the system is currently running */
   readonly isRunning: boolean;
@@ -662,6 +698,20 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly meta: MetaAccessor;
   /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
   observe(observer: (event: ObservationEvent) => void): () => void;
+  /**
+   * RFC 0010 — plugin authoring surface for emitting the
+   * `"guardrail.blocked"` ObservationEvent. See `System.notify` for the
+   * full contract.
+   */
+  readonly notify: {
+    guardrailBlocked(
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ): void;
+  };
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
@@ -671,8 +721,30 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   start(): void;
   /** Stop the system (cancel resolvers, stop reconciliation) */
   stop(): void;
+  /**
+   * Async-aware stop (RFC 0009). Awaits source unsubscribes so external
+   * transports (Supabase channel.unsubscribe, DO storage flush) settle
+   * before the caller continues. Use this instead of `stop()` when any
+   * declared source returns a Promise from its unsubscribe.
+   */
+  stopAsync(): Promise<void>;
   /** Destroy the system (stop and cleanup) */
   destroy(): void;
+  /**
+   * Async-aware destroy (RFC 0009). Awaits `stopAsync()` first so source
+   * teardown finishes before facts/derivations/effects are wiped.
+   */
+  destroyAsync(): Promise<void>;
+  /**
+   * Signal that the host runtime is about to evict this system (RFC 0009).
+   * Fires every source's `onEvict` in registration order, then races
+   * teardown against `deadline` (ms epoch). With no deadline the full
+   * teardown is awaited. With `deadline <= now` the eviction is
+   * detached so the caller returns immediately. Use for Cloudflare DO
+   * hibernation, Worker eviction, and any runtime that imposes a hard
+   * shutdown wall clock.
+   */
+  evict(deadline?: number): Promise<void>;
 
   /** Whether the system is currently running */
   readonly isRunning: boolean;
@@ -850,7 +922,13 @@ export interface AnySystem {
   initialize(): void;
   start(): void;
   stop(): void;
+  /** RFC 0009: async-aware stop — awaits source unsubscribes. */
+  stopAsync(): Promise<void>;
   destroy(): void;
+  /** RFC 0009: async-aware destroy. */
+  destroyAsync(): Promise<void>;
+  /** RFC 0009: runtime-eviction signal with optional deadline. */
+  evict(deadline?: number): Promise<void>;
 }
 
 /**

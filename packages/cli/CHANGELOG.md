@@ -1,5 +1,82 @@
 # @directive-run/cli
 
+## 1.20.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.2
+
+## 1.20.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.1
+
+## 1.20.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.20.0
+
+## 1.19.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.7
+
+## 1.19.6
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.6
+
+## 1.19.5
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.5
+
+## 1.19.4
+
+### Patch Changes
+
+- Updated dependencies [[`134b7b9`](https://github.com/directive-run/directive/commit/134b7b917156f07e1b1ecdb1f5ba75068274bce3)]:
+  - @directive-run/knowledge@1.19.4
+
+## 1.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`869e8fc`](https://github.com/directive-run/directive/commit/869e8fc3f12f6f4677e7c7c27e2a9ea795cfc4d1)]:
+  - @directive-run/knowledge@1.19.3
+
+## 1.19.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.2
+
+## 1.19.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.1
+
+## 1.19.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/knowledge@1.19.0
+
 ## 1.18.0
 
 ### Patch Changes

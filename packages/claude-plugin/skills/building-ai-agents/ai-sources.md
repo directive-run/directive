@@ -54,7 +54,11 @@ gate execution on `facts.<lifecycle>.healthy` derivations.
 - **MCP server connect/disconnect** → see "MCP Lifecycle" below.
 - **Health checks** → poll inside the source's `attach`; publish
   `health_changed` events as the upstream service responds.
-- **WebSocket open / close** → `sourceFromWebSocket()` (sources/websocket).
+- **WebSocket open / close (Cloudflare DO)** → `sourceFromWebSocketMessage()`
+  (`@directive-run/sources/cloudflare`). For raw Node/browser WebSocket
+  bridges, declare a source whose `attach` wires `addEventListener` and
+  publishes `MESSAGE` / `CLOSE` / `ERROR` events (a generic
+  `sourceFromWebSocket()` helper is queued for a follow-up RFC).
 
 ### "I want my agent's facts to update from a live external feed"
 
@@ -75,6 +79,30 @@ no AI-specific machinery required.
 Use `createMessageBus` from `@directive-run/ai/communication` for
 per-agent messaging. The bus is a conversation-tier subscription (tier 2
 above), not a source. Wire it inside the orchestrator's constructor.
+
+---
+
+## What other agent frameworks have (and don't)
+
+The closest comparable surfaces today, and what they cover:
+
+| Capability | Directive `runStream({ liveContext })` | LangChain / LangGraph | Vercel AI SDK | LlamaIndex |
+|---|---|---|---|---|
+| **Mid-generation fact updates from an external stream** | ✅ source primitive bridges the transport; `liveContext` watches fact keys; predicate decides interrupt vs. notify | partial — `Tool` callbacks can be invoked but no "fact store the LLM sees through" surface | partial — `streamText` exposes `onChunk` for the consumer but no mid-stream re-prompt | partial — `QueryEngine` re-runs are caller-driven |
+| **Declarative source / inbound subscription** | ✅ `source` primitive — engine owns mount/unmount; lifecycle observable | hand-rolled per integration (LangChain runnables don't own subscriptions) | n/a — Vercel AI is a streaming SDK, not a state engine | n/a — LlamaIndex is a retrieval framework |
+| **Interrupt + resume against the same subscription** | ✅ `result.interrupt(reason?)` keeps the fact subscription alive; caller re-prompts | callback orchestration on the consumer | abort signal only — no "resume against the same context" affordance | re-query each time |
+| **Tier 0 PII guard at the publish→fact boundary** | ✅ `createFactPIIGuardrail` — wired at `createSystem`; runs on every fact write | callback pattern; consumer wires per chain | input/output guardrails on the call; nothing at the fact-store / state-update boundary | Pydantic schema validation at the retrieval boundary |
+| **Source × OTel out of the box** | ✅ `attachSourcesToOtel` — one long-lived span per `(sourceId, moduleId)` | manual `with_config(callbacks=...)` plumbing | consumer wires `onChunk` into their tracer | manual |
+| **Multi-system reactive composition** | ✅ `liveContext.system` accepts ANY Directive system, even one not owned by the orchestrator | n/a — single-graph model | n/a | n/a |
+
+Directive's pitch is not "we're a better LangChain" — it's **"your
+state engine and your agent runtime share one fact store, so the agent
+sees the world change without you wiring callbacks."** The shipped
+1.x surface delivers that for inbound sources + abort-and-emit
+interruption; the queued follow-up RFC adds automatic re-prompt with
+merge strategies. See
+[RFC 0005's "Demo" section](../../docs/rfcs/0005-live-context-agent.md#demo-the-launch-video)
+for the 6-second launch GIF concept.
 
 ---
 
@@ -101,9 +129,6 @@ const result = orchestrator.runStream(agent, input, {
     system,                                   // the Directive system whose facts feed the agent
     keys: ["pr.headSha", "pr.state"],         // REQUIRED — fact keys to watch
     interruptWhen: (facts, changedKeys) => boolean,  // optional; default: () => true
-    mode: "inject-system-message",            // shipped today (default behavior).
-                                              // "restart" reserved for follow-up minor;
-                                              // behaves identically to inject-system-message today.
     notifyOn: "interrupt-only",               // default; "all-changes" emits chunk per watched change
     onContextUpdate: (changedKeys) => void,   // optional logging hook
   },
@@ -154,10 +179,14 @@ Two new chunk variants land on the stream:
 `runStream({ liveContext })` is the dedicated subject of
 [RFC 0005](../../docs/rfcs/0005-live-context-agent.md). Today's
 implementation is **231 LOC in `agent-orchestrator.ts`** — under the
-RFC's 300-LOC scope guard. The `mode: "restart"` automatic
-re-invocation is reserved for a follow-up minor; today both `mode`
-values produce identical behavior (the chunk-emission contract +
-abort wiring; consumers re-prompt via a fresh `runStream` call).
+RFC's 300-LOC scope guard. Behavior is **abort-and-emit**: when
+`interruptWhen` returns `true`, the orchestrator aborts the in-flight
+LLM run and emits an `interrupted` chunk with the partial output; the
+caller resumes by issuing a fresh `runStream` against the still-live
+subscription (or fully tears down via `result.abort()`). Automatic
+re-invocation (the "restart" semantic the original RFC drafted) is
+reserved for a follow-up RFC + field — the original `mode` field was
+removed before release because the impl never read it.
 
 **Security companion (mandatory when watched facts may carry PII):**
 wire `createFactPIIGuardrail` on the same Directive system. Without
@@ -170,69 +199,119 @@ threat model.
 
 ## MCP Lifecycle as a Source
 
-`@directive-run/ai/mcp` already exposes `MCPAdapterConfig.events`
-(`onConnect`, `onDisconnect`, `onToolCall`, ...) as callback hooks. The
-canonical adapter wraps those callbacks into a source on the
-orchestrator's module:
+`@directive-run/ai/mcp` exposes `MCPAdapterConfig.events`
+(`onConnect`, `onDisconnect`, `onToolCall`, `onError`, ...) as a single
+bag of callbacks set at adapter-construction time. To bridge the
+adapter's lifecycle into a Directive source the recipe is: declare a
+holder that the source's `attach` populates with the live `publish`,
+then point the adapter's `events.onConnect` / `onDisconnect` at the
+holder. The holder pattern lets you construct the adapter and the
+source in either order — the source's mount/unmount drives which
+publish closure (if any) receives lifecycle events.
+
+> **Multi-tenant safety.** If you import the module that owns the
+> holder from two places (e.g., a Worker that mounts one Directive
+> system per tenant DO), a module-level `let publishRef` would be
+> SHARED — the second tenant's `attach` would silently overwrite the
+> first tenant's pipe. **Always construct BOTH the adapter AND the
+> module inside the same factory function** so the adapter's
+> `events` callbacks close over the same factory-local `publishRef`
+> as the source's `attach`. Sharing an adapter across factory calls
+> re-introduces the cross-contamination because the adapter's
+> `events.onConnect` was bound at construction time to whichever
+> factory's `publishRef` was in scope first.
 
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";
+import type { SourcePublish } from "@directive-run/core";
 import { createMCPAdapter } from "@directive-run/ai/mcp";
 
-const adapter = createMCPAdapter({ /* ... */ });
+// Factory closure — each call yields a fresh `(adapter, module)`
+// pair with its own `publishRef`. Multi-tenant safe; SSR / Vitest
+// hot-reload safe; one tenant's MCP traffic can never leak into
+// another tenant's facts.
+function makeOrchestrator() {
+  let publishRef: SourcePublish | null = null;
 
-const orchestrator = createModule("orchestrator", {
-  schema: {
-    facts: {
-      mcp: t.object<{ servers: Record<string, "connected" | "disconnected"> }>(),
+  const adapter = createMCPAdapter({
+    servers: [/* ... */],
+    events: {
+      onConnect: (name) => publishRef?.("MCP_SERVER_CONNECTED", { name }),
+      onDisconnect: (name) =>
+        publishRef?.("MCP_SERVER_DISCONNECTED", { name }),
+    },
+  });
+
+  const orchestrator = createModule("orchestrator", {
+    schema: {
+      facts: {
+        mcp: t.object<{
+          servers: Record<string, "connected" | "disconnected">;
+        }>(),
+      },
+      events: {
+        MCP_SERVER_CONNECTED: { name: t.string() },
+        MCP_SERVER_DISCONNECTED: { name: t.string() },
+      },
+      derivations: {
+        allServersHealthy: t.boolean(),
+      },
+    },
+    init: (f) => {
+      f.mcp = { servers: {} };
     },
     events: {
-      MCP_SERVER_CONNECTED: { name: t.string() },
-      MCP_SERVER_DISCONNECTED: { name: t.string() },
-    },
-  },
-  init: (f) => {
-    f.mcp = { servers: {} };
-  },
-  events: {
-    MCP_SERVER_CONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "connected" },
-      };
-    },
-    MCP_SERVER_DISCONNECTED: (f, p) => {
-      f.mcp = {
-        ...f.mcp,
-        servers: { ...f.mcp.servers, [p.name]: "disconnected" },
-      };
-    },
-  },
-  derive: {
-    allServersHealthy: (f) =>
-      Object.values(f.mcp.servers).every((s) => s === "connected"),
-  },
-  sources: {
-    mcpLifecycle: {
-      attach: (publish) => {
-        const off1 = adapter.onConnect((name) =>
-          publish("MCP_SERVER_CONNECTED", { name }),
-        );
-        const off2 = adapter.onDisconnect((name) =>
-          publish("MCP_SERVER_DISCONNECTED", { name }),
-        );
-        return () => {
-          off1();
-          off2();
+      MCP_SERVER_CONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "connected" },
+        };
+      },
+      MCP_SERVER_DISCONNECTED: (f, p) => {
+        f.mcp = {
+          ...f.mcp,
+          servers: { ...f.mcp.servers, [p.name]: "disconnected" },
         };
       },
     },
-  },
-});
+    derive: {
+      allServersHealthy: (facts) =>
+        Object.values(facts.mcp.servers).every((s) => s === "connected"),
+    },
+    sources: {
+      mcpLifecycle: {
+        attach: (publish) => {
+          publishRef = publish;
+          // Kick the adapter's connection lifecycle once the source is
+          // attached so the first `onConnect` flows into our publish.
+          void adapter.connect();
+          return async () => {
+            publishRef = null;
+            await adapter.disconnect();
+          };
+        },
+      },
+    },
+  });
+
+  return { orchestrator, adapter };
+}
+
+// Per-tenant / per-request usage:
+const { orchestrator, adapter } = makeOrchestrator();
+const system = createSystem({ module: orchestrator });
 ```
 
 Constraints can now gate agent execution on
 `facts.allServersHealthy` — no separate health-check loop needed.
+
+> The holder + closure pattern is the canonical bridge from any
+> single-callback-bag third-party SDK (MCP, telemetry SDKs that take an
+> `onEvent` config at construction) into a Directive source. The
+> alternative — passing `publish` from inside `attach` into the
+> adapter's events — requires the adapter to be constructed AFTER the
+> source is created, which is awkward when the adapter is used outside
+> Directive too.
 
 ---
 
@@ -311,17 +390,74 @@ that should accompany this plugin in regulated deployments.
 ## Adapter packages
 
 The canonical bridges live in **`@directive-run/sources`** as subpath
-exports. One install, optional peerDependencies per vendor.
+exports. One install, optional peerDependencies per vendor:
+
+```bash
+pnpm add @directive-run/sources                              # umbrella
+pnpm add @directive-run/sources @supabase/supabase-js        # + supabase
+pnpm add @directive-run/sources @cloudflare/workers-types    # + cloudflare (devDep)
+```
 
 | Subpath | Source factory | Wraps |
 |---|---|---|
 | `@directive-run/sources/supabase` | `sourceFromSupabaseChannel()` | Supabase realtime channel |
 | `@directive-run/sources/cloudflare` | `sourceFromDOAlarm()` | Cloudflare Durable Object alarm |
-| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw WebSocket |
+| `@directive-run/sources/cloudflare` | `sourceFromWebSocketMessage()` | Cloudflare Durable Object WebSocket message stream |
+| `@directive-run/sources/websocket` | `sourceFromWebSocket()` | (future RFC) raw browser / Node WebSocket |
 | `@directive-run/sources/sentry` | `sourceFromSentryHook()` | (future RFC) Sentry production-error stream |
 
 Install only the umbrella; the vendor peerDeps are optional and pull in
-only when the corresponding subpath is imported.
+only when the corresponding subpath is imported. `package.json` marks
+both `@supabase/supabase-js` and `@cloudflare/workers-types` as
+optional peer dependencies — consumers using only one subpath get no
+install-error nag for the other.
+
+---
+
+## Observability — pipe `source.*` events to OpenTelemetry
+
+`attachSourcesToOtel(system, { tracer, serviceName })` bridges the
+`system.observe()` source lifecycle (`source.attach` / `.publish` /
+`.detach` / `.error`) into OTel spans. Pairs with `createOtelPlugin`
+which exports the agent-side trace surface; the two together cover
+the entire publish-to-prompt pipeline:
+
+```ts
+import { createAgentOrchestrator, createOtelPlugin } from "@directive-run/ai";
+import { attachSourcesToOtel } from "@directive-run/ai";
+import { trace } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("agent-service", "1.0.0");
+
+const orchestrator = createAgentOrchestrator({
+  runner: anthropic(/* ... */),
+  plugins: [createOtelPlugin({ tracer })],
+});
+
+// One long-lived span per (sourceId, moduleId); publishes land as span
+// events on the parent attach span (cardinality-budgeted).
+const unsub = attachSourcesToOtel(system, {
+  tracer,
+  serviceName: "agent-service",
+  // Optional: throttle high-frequency publishes (default 1 = every publish).
+  publishSampleRate: 1,
+});
+
+// On `system.destroy()` / `evict()`, call unsub to close any open spans.
+```
+
+What you see in your trace backend:
+- `directive.source.attached` — long-lived span; closes on `detach` with
+  OK status, or on `unsub()` with `directive.detached: true` attribute.
+- Span events (`publish`) on the parent span with `source.event_name`
+  attribute and a wall-clock timestamp.
+- `directive.source.error` spans with `phase: "attach" | "cleanup" |
+  "runtime"` and the truncated error message.
+
+This complements `createOtelPlugin`'s agent-span coverage so an SRE
+debugging "agent stopped mid-stream" can trace back through
+`runStream` → `liveContext` interrupt → the watched fact → the source
+publish that triggered the change — one trace tree, no manual joins.
 
 ---
 
