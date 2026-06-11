@@ -302,7 +302,7 @@ describe("createFactPIIGuardrail — object payloads", () => {
     system.destroy();
   });
 
-  it("does NOT walk past walkDepth (default 1) — deeper PII passes through", () => {
+  it("does NOT walk past walkDepth: 1 — deeper PII passes through (R19 raised default to 2)", () => {
     interface Nested {
       meta: { email: string };
     }
@@ -322,11 +322,13 @@ describe("createFactPIIGuardrail — object payloads", () => {
     });
     const system = createSystem({
       module,
-      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+      // R19: default raised from 1 → 2; opt back to 1 explicitly to
+      // exercise the bound.
+      plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 1 })],
     });
     system.start();
     system.events.wire({ account: { meta: { email: "deep@example.com" } } });
-    // At default walkDepth: 1, the nested `meta.email` is NOT walked.
+    // At walkDepth: 1, the nested `meta.email` is NOT walked.
     expect(system.facts.account.meta.email).toBe("deep@example.com");
     system.destroy();
   });
