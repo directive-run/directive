@@ -1746,3 +1746,44 @@ Until then: SREs get full source visibility via OTel + `system.inspect()`
 behavior through the constraint/resolver effects that follow each
 publish (since the existing `fact.change` / `resolver.start` / etc.
 events already render).
+
+---
+
+## Deferred (2026-06): directive-docs sidebar IA review
+
+After v1.20.x ship + RFC 0010, the `directive-docs/src/lib/navigation.ts`
+sidebar now carries:
+
+- `docsNavigation`: 13 sections, ~71 links (Sources added 2026-06)
+- `aiNavigation`: 8 sections, ~52 links (Sources × Agents + Guardrail
+  Events added 2026-06)
+
+**Heaviest sections worth review when next IA work happens:**
+
+- **Framework Adapters** (13 links — 7 frameworks × 2 doc+API). The
+  doc/API pairing doubles the line count. Reasonable shape only if
+  the docs site supports collapsed-by-default sections; otherwise
+  consider folding "<Framework> API" into the framework page as a
+  tab/subsection.
+- **Examples** (12 links) — could split into "Core examples" vs
+  "Real-world examples" if more are added.
+- **Guides** (11 links) and **AI Guides** (10 links) — flat lists;
+  no problem today but a "Beginner / Intermediate / Advanced"
+  three-bucket split would scale better past ~15.
+- **AI Observability** (5 links + 3 commented-out lab pages) is
+  currently small but RFC 0010 + `attachGuardrailsToOtel` will grow
+  it. Acceptable as-is; flag for review when the next AI observability
+  addition lands.
+
+**Recommendation:** no IA changes today. Track until either (a) the
+docs site adds a per-section collapse component, or (b) one of the
+heavy sections crosses 15 links — at which point the IA review
+becomes the priority.
+
+**Adjacent gaps:**
+
+- `/docs/sources/page.md`, `/ai/sources/page.md`, `/ai/guardrail-events/page.md`
+  were hand-authored on 2026-06-10 from the corresponding
+  `packages/knowledge/{core,ai}/*.md` files in the `directive` repo.
+  A future sync gate could auto-port knowledge-package docs into the
+  website routes so the two surfaces don't drift.
