@@ -1,5 +1,14 @@
 # @directive-run/example-checkers
 
+## 0.0.54
+
+### Patch Changes
+
+- Updated dependencies [[`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b)]:
+  - @directive-run/core@1.20.2
+  - @directive-run/ai@1.20.2
+  - @directive-run/el@1.1.0
+
 ## 0.0.53
 
 ### Patch Changes
