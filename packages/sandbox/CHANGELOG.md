@@ -74,29 +74,25 @@
 
 ### Patch Changes
 
-- [#55](https://github.com/directive-run/directive/pull/55) [`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 Critical fixes to documented surfaces of the source primitive
-
-  The post-merge R13 audit (full 13-lens panel against the merged
-  `feat/source-primitive` work) found five Critical issues affecting
-  consumer-facing documented APIs of v1.18.0. All five close in this patch.
+- [#55](https://github.com/directive-run/directive/pull/55) [`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Five fixes to documented consumer-facing surfaces shipped in v1.18.0's `feat/source-primitive` work.
 
   ### Critical fixes
 
   **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
-  subpath** (R13-C2). The Tier 0 Mandatory Companion to `liveContext` was
-  declared in `guardrails/index.ts` but the actual tsup entry for the
-  subpath (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
-  `packages/knowledge/ai/ai-sources.md` (Sources × Security section) failed
-  at import time: `Module '@directive-run/ai/guardrails' has no exported
-member 'createFactPIIGuardrail'`. Now exported (function + the four
-  public types: `FactPIIGuardrailMode`, `FactPIIGuardrailOptions`,
+  subpath.** The Tier 0 Mandatory Companion to `liveContext` was declared
+  in `guardrails/index.ts` but the actual tsup entry for the subpath
+  (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
+  `packages/knowledge/ai/ai-sources.md` (Sources × Security section)
+  failed at import time: `Module '@directive-run/ai/guardrails' has no
+exported member 'createFactPIIGuardrail'`. Now exported (function + the
+  four public types: `FactPIIGuardrailMode`, `FactPIIGuardrailOptions`,
   `FactPIICategory`, `FactPIIMatch`). The internal JSDoc example in
   `fact-pii.ts` also referenced the wrong import path (`@directive-run/ai`
   instead of `@directive-run/ai/guardrails`) — corrected.
 
   **`@directive-run/sources` rejected by `@directive-run/sandbox`
-  validator** (R13-C3). The sandbox validator's `ALLOWED_DIRECTIVE_PACKAGES`
-  set didn't include `sources`, so every playground snippet, MCP
+  validator.** The sandbox validator's `ALLOWED_DIRECTIVE_PACKAGES` set
+  didn't include `sources`, so every playground snippet, MCP
   `run_in_sandbox` call, and docs live runner that imported the umbrella
   package or either subpath (`@directive-run/sources`,
   `@directive-run/sources/supabase`, `@directive-run/sources/cloudflare`)
@@ -105,8 +101,7 @@ member 'createFactPIIGuardrail'`. Now exported (function + the four
   two-segment-subpath coverage to the validator test grid.
 
   **`sourceFromSupabaseChannel` unsubscribe fires-and-forgets
-  `removeChannel`** (R13-C4). The original R5-CR1 issue RFC 0009 was
-  designed to close: the adapter returned a sync unsubscribe that did
+  `removeChannel`.** The adapter returned a sync unsubscribe that did
   `void client.removeChannel(chan)`, so `system.stopAsync()` resolved
   before the Supabase broker dropped the subscription. A subsequent
   `start → stopAsync → start` cycle double-subscribed because the broker
@@ -119,7 +114,7 @@ member 'createFactPIIGuardrail'`. Now exported (function + the four
 
   ### Documentation fixes
 
-  **Broken cross-ref anchor** (R13-C9): `packages/knowledge/core/sources.md`
+  **Broken cross-ref anchor.** `packages/knowledge/core/sources.md`
   linked to `ai-security.md#sources-pii--closing-the-fact-injection-bypass`
   with a single hyphen between "sources" and "pii". The actual GFM anchor
   generated from the heading `## Sources × PII — closing the fact-injection
@@ -127,12 +122,12 @@ bypass` has a double hyphen (`×` strips to a kept space). The
   highest-traffic cross-ref in the source primitive doc was landing on a
   404 anchor. Corrected to `#sources--pii--closing-the-fact-injection-bypass`.
 
-  **RFCs 0005–0009 status flipped from Draft → Accepted** (R13-C10): all
-  five RFCs still carried `Status: Draft (2026-06-07)` even though
-  `sources.md` and `ai-sources.md` already cite them as shipped. Readers
-  following the link saw Draft headers and concluded the feature was
-  design-only. Status now reads: `Accepted — shipped 2026-06-07 in
-feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
+  **RFCs 0005–0009 status flipped from Draft → Accepted.** All five RFCs
+  still carried `Status: Draft (2026-06-07)` even though `sources.md` and
+  `ai-sources.md` already cite them as shipped. Readers following the link
+  saw Draft headers and concluded the feature was design-only. Status now
+  reads: `Accepted — shipped 2026-06-07 in feat/source-primitive (PR #52,
+merge ab97b028); pending v1.18.0 release`.
 
 - Updated dependencies [[`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc)]:
   - @directive-run/core@1.19.0
@@ -156,16 +151,16 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
 
 ### Minor Changes
 
-- [`4237df7`](https://github.com/directive-run/directive/commit/4237df771965e29f7f4eec3005d35811cc6d0fbc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Close the remaining 4 P0s from the Phase A AE audit (`docs/AE-AUDIT-SANDBOX.md`). With the v0.3.0 property-access bypass already closed, this release lands the SSRF defense, Vercel-compatible temp-file location, facts-proxy console serialization, and derivations in the snapshot.
+- [`4237df7`](https://github.com/directive-run/directive/commit/4237df771965e29f7f4eec3005d35811cc6d0fbc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Closes the four critical issues remaining after v0.3.0's property-access bypass fix. This release lands the SSRF defense, Vercel-compatible temp-file location, facts-proxy console serialization, and derivations in the snapshot. Full audit at [docs/security/sandbox-audit-2026-06.md](https://github.com/directive-run/directive/blob/main/docs/security/sandbox-audit-2026-06.md).
 
-  - **P0-A1 — Temp-file location works on Vercel read-only FS.** Bundle now writes to `os.tmpdir()` (with a fallback to the package dir if `/tmp` is somehow unwritable). Bundler rewrites `@directive-run/*` imports to absolute `file://` URLs via `createRequire(...).resolve()` so the worker doesn't need a `node_modules` chain above the temp file. Unblocks `directive.run/api/run-sandbox` and any other deploy target with a read-only filesystem outside `/tmp`.
-  - **P0-S2 — SSRF wrapper.** New `installFetchWrapper()` patches `globalThis.fetch` in the worker BEFORE the user's bundle imports anything. Rejects loopback (127.0.0.0/8, `::1`, `localhost`), link-local (169.254.0.0/16 — includes AWS/GCP/Azure IMDS at `.169.254`), RFC-1918 private (10/8, 172.16-31/12, 192.168/16), multicast / reserved, IPv4-mapped IPv6 in literal or hex form (`::ffff:a9fe:a9fe`), and non-HTTP(S) protocols. Catches `@directive-run/query`'s internal fetch calls — the validator never saw them because they live in external module bodies.
-  - **P0-DM1 — `console.log(system.facts)` no longer renders `{}`.** Worker's `captureConsole` now detects Directive's facts proxy via the `$store.toObject()` and `$snapshot()` escape hatches, serializes via the snapshot, falls back to `JSON.stringify` for non-Directive values. Pre-fix, `console.log("[start] facts:", system.facts)` rendered as `[start] facts: {}` because `JSON.stringify` on the FactsStore proxy returned `"{}"` while `result.facts` correctly held the snapshot — two contradictory views in the same response.
-  - **P0-DM2 — Derivations in `SandboxResult.derived`.** Host pre-extracts derivation key names from source files via a brace/paren-balanced scanner that handles both multi-line and compact `derive: { isPositive: ... }` forms. Worker iterates `system.derive[key]` after settle for each key. Modules whose primary product is a derivation (`status`, `isReady`, `total`, etc.) now surface the computed value alongside facts.
+  - **Temp-file location works on Vercel read-only FS.** Bundle now writes to `os.tmpdir()` (with a fallback to the package dir if `/tmp` is somehow unwritable). Bundler rewrites `@directive-run/*` imports to absolute `file://` URLs via `createRequire(...).resolve()` so the worker doesn't need a `node_modules` chain above the temp file. Unblocks `directive.run/api/run-sandbox` and any other deploy target with a read-only filesystem outside `/tmp`.
+  - **SSRF wrapper.** New `installFetchWrapper()` patches `globalThis.fetch` in the worker BEFORE the user's bundle imports anything. Rejects loopback (127.0.0.0/8, `::1`, `localhost`), link-local (169.254.0.0/16 — includes AWS/GCP/Azure IMDS at `.169.254`), RFC-1918 private (10/8, 172.16-31/12, 192.168/16), multicast / reserved, IPv4-mapped IPv6 in literal or hex form (`::ffff:a9fe:a9fe`), and non-HTTP(S) protocols. Catches `@directive-run/query`'s internal fetch calls — the validator never saw them because they live in external module bodies.
+  - **`console.log(system.facts)` no longer renders `{}`.** Worker's `captureConsole` now detects Directive's facts proxy via the `$store.toObject()` and `$snapshot()` escape hatches, serializes via the snapshot, falls back to `JSON.stringify` for non-Directive values. Pre-fix, `console.log("[start] facts:", system.facts)` rendered as `[start] facts: {}` because `JSON.stringify` on the FactsStore proxy returned `"{}"` while `result.facts` correctly held the snapshot — two contradictory views in the same response.
+  - **Derivations in `SandboxResult.derived`.** Host pre-extracts derivation key names from source files via a brace/paren-balanced scanner that handles both multi-line and compact `derive: { isPositive: ... }` forms. Worker iterates `system.derive[key]` after settle for each key. Modules whose primary product is a derivation (`status`, `isReady`, `total`, etc.) now surface the computed value alongside facts.
 
   New unit suites at `__tests__/fetch-wrapper.test.ts` (18 cases — protocols, IPv4 ranges, IPv6 ranges, localhost variants) and `__tests__/key-extractor.test.ts` (8 cases — multi-line, single-line, multi-file dedupe, quoted-key tolerance). Extended `__tests__/run-in-sandbox.test.ts` with end-to-end derivation + facts-proxy verification.
 
-  **Remaining P0:** P0-S3 (Origin allowlist + per-IP rate limit on `/api/run-sandbox`) lives in the `directive-docs` repo; that commit ships alongside this release.
+  **Remaining critical work shipped in lockstep:** Origin allowlist + per-IP rate limit on `/api/run-sandbox` lives in the `directive-docs` repo; that commit ships alongside this release.
 
 ## 0.2.0
 
@@ -183,7 +178,7 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
 
 - [`9801112`](https://github.com/directive-run/directive/commit/980111207191e013eb127f4e01349bd0aecc2115) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Security hotfix.** Closes critical AST property-access bypass in `@directive-run/sandbox@0.1.0` and `@0.2.0` where `globalThis.process.exit()`, `Reflect.get(globalThis, "process")`, and `({}).constructor.constructor("return process")()` all bypassed the validator. The original "skip identifiers in property-access position" rule (added to avoid `{module: x}` false-positives) was a total bypass — `process` was a property name and got skipped. v0.3.0 closes this with a dedicated `checkPropertyAccessEscapes` pass.
 
-  Full Phase A AE audit at `docs/AE-AUDIT-SANDBOX.md` (5 lenses: security, architecture, agent-UX, DX, domain-correctness). This release ships the P0-S1 (property-access bypass) + P0-D1 (tool description misdocumented allowlist) fixes; P0-S2/S3 (SSRF, rate-limiting on `/api/run-sandbox`) and the remaining P1/P2 items are tracked for follow-on minors.
+  Full security audit at [docs/security/sandbox-audit-2026-06.md](https://github.com/directive-run/directive/blob/main/docs/security/sandbox-audit-2026-06.md) covering security, architecture, agent UX, developer experience, and domain correctness. This release ships the property-access bypass and tool-description allowlist fixes; SSRF + rate-limiting on `/api/run-sandbox` and remaining stability + documentation items ship in 0.3.0.
 
   **v0.3.0 validator additions:**
 
@@ -202,7 +197,7 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
   - Note about react/vue/svelte/solid/lit imports working but their runtime hooks throwing in Node — directs the LLM to `playground_link` for UI demos.
   - README Playground section updated with the same allowlist.
 
-  **Audit lens grades (Phase A):** Security D → A (after this patch), Architecture B+, Agent-UX B-, DX B-, Domain-Correctness C+. Remaining grades will be addressed in Phase A-2 and Phase B per the audit doc's incident-response priorities.
+  Stability and developer-experience gaps surfaced in the audit are tracked for follow-up releases per the audit doc's incident-response priorities.
 
 ## 0.1.0
 

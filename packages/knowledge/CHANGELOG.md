@@ -32,7 +32,7 @@
 
 - [#61](https://github.com/directive-run/directive/pull/61) [`869e8fc`](https://github.com/directive-run/directive/commit/869e8fc3f12f6f4677e7c7c27e2a9ea795cfc4d1) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Knowledge docs deferred batch — RFC index + sources install line + Runtime Compat + polling recipe + attachSourcesToOtel recipe
 
-  Closes five docs-deferred items from R14 + R15 audit rounds, all explicit acceptance criteria from RFCs 0005 / 0009:
+  Closes five docs-deferred items, all explicit acceptance criteria from RFCs 0005 / 0009:
 
   - `docs/rfcs/README.md` index listing every RFC's title / status / landing version, plus the open follow-up RFCs queue (live-context auto-reprompt, walker security rewrite via structuredClone, pre-emit transform hook, `source.evict` observation event, reconnect contract, `publish.complete()` channel).
   - `@directive-run/sources` install lines in `ai-sources.md` covering the umbrella + the two vendor peerDeps (`@supabase/supabase-js`, `@cloudflare/workers-types`). Documents that both peerDeps are optional and pull in only when the corresponding subpath is imported.
@@ -54,11 +54,11 @@
 
 ### Patch Changes
 
-- [`e4e3d08`](https://github.com/directive-run/directive/commit/e4e3d0809fc44892cbd1a28c76ebe61e8b7317ad) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Post-0.2.2 production-readiness audit findings — 12 P0 fixes shipped together. Full audit synthesis at `docs/AE-AUDIT-0.2.2.md`.
+- [`e4e3d08`](https://github.com/directive-run/directive/commit/e4e3d0809fc44892cbd1a28c76ebe61e8b7317ad) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Post-0.2.2 production-readiness review — 12 critical fixes shipped together.
 
   **`@directive-run/mcp@0.2.3`**
 
-  - Worker_threads is now ON by default for `review_source` and `fix_code`. Falls back to in-process only inside vitest (`VITEST=true`) or when `DIRECTIVE_MCP_USE_LINT_WORKER=0` is set explicitly. Hostile or pathological sources can no longer pin the event loop past the 5-second budget — the AE v0.2.0 P0 requirement is finally the default.
+  - Worker_threads is now ON by default for `review_source` and `fix_code`. Falls back to in-process only inside vitest (`VITEST=true`) or when `DIRECTIVE_MCP_USE_LINT_WORKER=0` is set explicitly. Hostile or pathological sources can no longer pin the event loop past the 5-second budget — the original v0.2.0 hard requirement is finally the default.
   - `get_composable_packages` returns `isError: true` with a structured `NOT_FOUND` / `NO_COMPOSITIONS` prefix when the package name isn't known to the graph, instead of a misleading success-with-prose response. LLM clients can now distinguish "you typed it wrong" from "data absent."
   - SSE session-cap hardened against future SDK changes that might add async-leaky behavior to the transport constructor — a synchronous `pendingConnects` counter is incremented before any yield, so the cap can't be over-shot by N concurrent connects observing the same `sessions.size`.
   - `prepublishOnly` script chains `clean && build` so the published tarball can't ship a stale baked package registry.
@@ -360,7 +360,7 @@ resetTimeout, halfOpenMaxAttempts })` (real: `recoveryTimeMs` and
 
   No code changes; no API changes; this is a content + tooling fix.
 
-- [`5f5dd4d`](https://github.com/directive-run/directive/commit/5f5dd4d36b80bce0a13152cfa4db3895fc53616e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix the five core-CRIT knowledge issues flagged by the v1.14 AE audit.
+- [`5f5dd4d`](https://github.com/directive-run/directive/commit/5f5dd4d36b80bce0a13152cfa4db3895fc53616e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Fix the five critical knowledge issues flagged by the v1.14 audit.
 
   **core/testing.md** rewritten against the actual `createTestSystem`
   overload — options-object only (`{ module: ... }` or `{ modules: ... }`),
