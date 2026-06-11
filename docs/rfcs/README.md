@@ -41,7 +41,40 @@ landed in. Open questions are tracked inline.
   operates on a Proxy-free clone of the fact value. Shipped
   2026-06-09 in `@directive-run/ai` v1.19.3. R17 hardened the
   pre-clone array cap + Error/Date/RegExp/Blob/TypedArray
-  short-circuits in v1.19.6.
+  short-circuits in v1.19.6. R18 closed a Proxy `length`-getter
+  TOCTOU bypass (via `new Array(len)` materialization), added
+  `Error.cause` + `AggregateError.errors` recursion, restricted
+  the idempotency gate to primitives, and fixed the Error
+  redact-mode contract (shipped in v1.19.7).
+
+- **`system.evict()` reentry gate** — Cloudflare DO hibernation can
+  signal eviction twice; without a gate, the second call re-runs
+  every source's `onEvict` and non-idempotent eviction handlers
+  double-fire. `state.isEvicting` is now set BEFORE awaiting any
+  async eviction work AND cleared in a `finally` so a rejected
+  inner work doesn't latch the gate forever. `system.start()`
+  refuses to start while eviction is in flight or after destroy.
+  R18 Tier 2-C, shipped 2026-06-10 in `@directive-run/core` v1.20.0
+  (R19 follow-up added the try/finally + start guard).
+
+- **RFC 0010 / `guardrail.blocked` ObservationEvent** — new
+  `ObservationEvent` variant + `Plugin.onGuardrailBlocked` hook +
+  `System.notify.guardrailBlocked` external plugin surface.
+  `createFactPIIGuardrail` calls `notify.guardrailBlocked` on
+  every detection with `kind: "redact" | "alert" | "detect"`.
+  Backend wiring (`attachSourcesToOtel`, timeline, audit-ledger)
+  is consumer-driven via `system.observe()`. R18 Tier 2-A,
+  shipped 2026-06-10 in `@directive-run/core` v1.20.0 +
+  `@directive-run/ai` v1.20.0. R19 follow-up validated the
+  `plugin` field against registered plugin names + added a
+  reentry depth cap.
+
+- **Framework adapter async-destroy migration** — all 5 adapters
+  (react / vue / svelte / solid / lit) switched from sync
+  `system.destroy()` to `system.destroyAsync().catch(...)` so
+  source unsubscribes complete before host hibernation. Dev-mode
+  `console.warn` surfaces any unsubscribe rejection. R18 Tier 2-B,
+  shipped 2026-06-10 in framework adapter v1.20.x.
 
 ## Open follow-up RFCs (tracked but not yet drafted)
 

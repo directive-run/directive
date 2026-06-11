@@ -941,7 +941,7 @@ export function useDirective<M extends ModuleSchema>(
     // fire-and-forget with a swallow-catch — broker drops finish in
     // the background; any unsubscribe rejection is already routed
     // through the manager's runtime-phase observability sink.
-    system.destroyAsync().catch(() => {});
+    system.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
   });
 
   const factKeys = config?.facts;
@@ -1135,7 +1135,7 @@ export function useQuerySystem<
     // fire-and-forget with a swallow-catch — broker drops finish in
     // the background; any unsubscribe rejection is already routed
     // through the manager's runtime-phase observability sink.
-    system.destroyAsync().catch(() => {});
+    system.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
   });
 
   return system;

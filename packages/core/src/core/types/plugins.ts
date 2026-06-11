@@ -375,6 +375,14 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    *   `"alert"` (observed but did not mutate), or
    *   `"detect"` (observed but could not mutate — e.g. read-only
    *   structured types like `Error`).
+   *
+   *   **Note:** `Error`-typed fact values always surface as `"detect"`
+   *   regardless of the guardrail's configured mode — the walker
+   *   matches `Error.message`/`.cause` but cannot mint a redacted
+   *   Error with guaranteed `.stack` parity. A subscriber counting
+   *   PII redactions should treat `kind === "redact"` and
+   *   `kind === "detect"` equivalently for compliance-incident
+   *   counts.
    * @param count - Number of pattern matches in this batch.
    * @param category - Optional coarse classifier the guardrail
    *   provides so OTel exporters can label spans without parsing

@@ -626,7 +626,7 @@ export class SystemController<M extends ModuleSchema>
     // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
-    this._system?.destroyAsync().catch(() => {});
+    this._system?.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
     this._system = null;
   }
 }
@@ -747,7 +747,14 @@ export class ModuleController<M extends ModuleSchema>
   hostDisconnected(): void {
     this.unsubFacts?.();
     this.unsubDerived?.();
-    this._system?.destroy();
+    // R19 follow-up — R18 Tier 2-B switched `SystemController` and
+    // `DirectiveQueryController` to `destroyAsync` but missed the
+    // zero-config `ModuleController` (this class). Same rationale:
+    // source unsubscribes are async (Supabase, MCP); sync destroy
+    // would drop those Promises on the floor and leave brokers
+    // holding ghost subscriptions until heartbeat. Fire-and-forget
+    // with a swallow-catch — Lit's hostDisconnected is sync.
+    this._system?.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
     this._system = null;
   }
 
@@ -1162,7 +1169,7 @@ export class QuerySystemController<
     // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
-    this._system?.destroyAsync().catch(() => {});
+    this._system?.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
     this._system = null;
   }
 }
@@ -1203,7 +1210,7 @@ export class HydrationController implements ReactiveController {
     // source unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
     for (const system of this.systems) {
-      system.destroyAsync().catch(() => {});
+      system.destroyAsync().catch((err: unknown) => { if (isDevelopment) console.warn("[Directive] destroyAsync rejected during unmount:", err); });
     }
     this.systems = [];
   }

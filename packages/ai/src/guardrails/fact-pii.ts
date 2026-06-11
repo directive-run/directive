@@ -25,6 +25,35 @@
  * synchronous regex. Consumers who need richer detection pass a
  * synchronous `customDetector`.
  *
+ * ## Observability
+ *
+ * Every detection emits a typed `"guardrail.blocked"` `ObservationEvent`
+ * via `system.observe()` (RFC 0010). Backend wiring (OTel exporters,
+ * `@directive-run/timeline`, audit-ledger plugins) subscribes to the
+ * event stream and gets:
+ *
+ * ```ts
+ * {
+ *   type: "guardrail.blocked",
+ *   plugin: "fact-pii-guardrail",
+ *   key: "<fact-key>",
+ *   kind: "redact" | "alert" | "detect",
+ *   count: <number-of-matches>,
+ *   category: "ssn" | "credit_card" | "email" | <customDetector-type>
+ * }
+ * ```
+ *
+ * The user `onBlocked` callback fires INDEPENDENTLY for backwards
+ * compatibility and ad-hoc paging (Sentry, Honeycomb). Prefer
+ * `system.observe()` for new integrations — observers see every
+ * registered guardrail's activity through the same typed stream.
+ *
+ * `kind: "detect"` distinguishes "couldn't redact" from "chose not
+ * to redact": `Error` instances always surface as `"detect"` because
+ * the walker matches `Error.message` / `Error.cause` but cannot mint
+ * a redacted Error with guaranteed `.stack` parity. A subscriber
+ * counting redactions should sum `kind === "redact" || kind === "detect"`.
+ *
  * @example Defensive (redact PII writes into pii-tagged facts)
  * ```ts
  * import { createSystem, t } from '@directive-run/core';
@@ -270,16 +299,25 @@ export interface FactPIIGuardrailOptions {
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
    * Maximum nesting depth to walk when scanning a structured fact
-   * value. Default `1` — the scanner inspects top-level strings AND
-   * recurses one level into nested objects / arrays. Each array level
-   * burns one depth slot (so `[[email]]` at `walkDepth: 1` walks the
-   * outer array but its inner array is NOT scanned). Maps and Sets
-   * are still NOT walked by the built-in scanner; PII inside those
-   * structures must go through a `customDetector`.
+   * value. Default `2` (raised from `1` in R19 follow-up so the common
+   * `Error.cause` + shallow-nested-object shapes scan zero-config).
+   * At depth 2 the scanner inspects top-level strings, recurses into
+   * nested objects / arrays, AND recurses one more level — enough
+   * for the Error-with-cause and shallow-nested-object shapes most
+   * consumers actually ship. Each array level burns one depth slot.
+   * Maps and Sets are still NOT walked by the built-in scanner; PII
+   * inside those structures must go through a `customDetector`.
    *
    * Real-world common shapes and the `walkDepth` they need:
-   * - **Flat object** (`{ email, ssn }`) — works at default `1`.
-   * - **Nested object** (`{ profile: { email } }`) — needs `walkDepth: 2`.
+   * - **Flat object** (`{ email, ssn }`) — works at any `walkDepth >= 1`.
+   * - **Nested object** (`{ profile: { email } }`) — needs `walkDepth >= 2`
+   *   (covered by the default).
+   * - **Error with cause** (`new Error(m, { cause: prev })`) — the cause
+   *   chain is recursed at `depth - 1`, so `walkDepth >= 2` is needed
+   *   to scan one cause level (covered by the default). Deeper cause
+   *   chains (`cause.cause.cause`) need `walkDepth >= 3`.
+   * - **AggregateError** with nested error PII — `walkDepth >= 2` for
+   *   the first layer; deeper for nested aggregates.
    * - **Supabase realtime row payload** (`payload.new = [{ email }]`,
    *   passed as the fact value) — the fact's value is the object
    *   `{ new: [...] }`, so the chain is object → array → object →
@@ -357,7 +395,7 @@ export function createFactPIIGuardrail(
     excludeKeys = [],
     onBlocked,
     customDetector,
-    walkDepth = 1,
+    walkDepth = 2,
   } = options;
 
   const typeSet = new Set<FactPIICategory>(types);
