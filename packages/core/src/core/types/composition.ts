@@ -288,6 +288,20 @@ export interface NamespacedSystem<Modules extends ModulesMap> {
   readonly meta: MetaAccessor;
   /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
   observe(observer: (event: ObservationEvent) => void): () => void;
+  /**
+   * RFC 0010 — plugin authoring surface for emitting the
+   * `"guardrail.blocked"` ObservationEvent. See `System.notify` for the
+   * full contract.
+   */
+  readonly notify: {
+    guardrailBlocked(
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ): void;
+  };
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
@@ -684,6 +698,20 @@ export interface SingleModuleSystem<S extends ModuleSchema> {
   readonly meta: MetaAccessor;
   /** Observe all lifecycle events as a typed stream. Returns an unsubscribe function. */
   observe(observer: (event: ObservationEvent) => void): () => void;
+  /**
+   * RFC 0010 — plugin authoring surface for emitting the
+   * `"guardrail.blocked"` ObservationEvent. See `System.notify` for the
+   * full contract.
+   */
+  readonly notify: {
+    guardrailBlocked(
+      plugin: string,
+      key: string,
+      kind: "redact" | "alert" | "detect",
+      count: number,
+      category?: string,
+    ): void;
+  };
   /** Per-run trace entries (null if trace is not enabled) */
   readonly trace: TraceEntry[] | null;
 
