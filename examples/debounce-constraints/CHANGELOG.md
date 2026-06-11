@@ -1,5 +1,13 @@
 # @directive-run/example-debounce-constraints
 
+## 0.0.52
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.20.1
+  - @directive-run/el@1.1.0
+
 ## 0.0.51
 
 ### Patch Changes
