@@ -1143,7 +1143,7 @@ describe("createFactPIIGuardrail — RFC 0010 guardrail.blocked event", () => {
     system.destroy();
   });
 
-  it("emits kind: \"alert\" when configured mode is alert", () => {
+  it('emits kind: "alert" when configured mode is alert', () => {
     type GuardrailEvent = {
       type: "guardrail.blocked";
       kind: "redact" | "alert" | "detect";
