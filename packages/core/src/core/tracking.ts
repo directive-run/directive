@@ -175,6 +175,14 @@ export function detectNonJsonValueType(value: unknown): string | null {
  *
  * @internal
  */
+/**
+ * Bound the dev-mode warning cache so a long-running process with many
+ * distinct fact paths (per-tenant, per-request-correlation, etc.) doesn't
+ * grow the Set indefinitely. FIFO eviction means warnings re-fire after
+ * eviction — that's actually more useful than silent suppression, since
+ * the consumer hasn't actually fixed the underlying non-JSON assignment.
+ */
+const NON_JSON_WARNING_CACHE_MAX = 1000;
 const nonJsonWarningCache = new Set<string>();
 
 const nonJsonHints: Record<string, string> = {
@@ -205,6 +213,12 @@ export function warnNonJsonFactAssignment(
   const cacheKey = `${factPath}|${valueType}`;
   if (nonJsonWarningCache.has(cacheKey)) {
     return;
+  }
+  if (nonJsonWarningCache.size >= NON_JSON_WARNING_CACHE_MAX) {
+    const oldest = nonJsonWarningCache.values().next().value;
+    if (oldest !== undefined) {
+      nonJsonWarningCache.delete(oldest);
+    }
   }
   nonJsonWarningCache.add(cacheKey);
 

@@ -65,7 +65,7 @@ export interface ModuleHooks<M extends ModuleSchema> {
    *
    * @param error - The error the resolver threw (already normalized to `Error`).
    * @param requirement - The requirement object that the failing resolver was handling.
-   * @param ctx - Hook context, including a typed snapshot of this module's facts.
+   * @param context - Hook context, including a typed snapshot of this module's facts.
    */
   onResolverError?: (
     error: Error,

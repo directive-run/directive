@@ -52,7 +52,8 @@ Directive takes security seriously:
 - **`Object.create(null)`** for all merged definition maps (prevents prototype chain traversal)
 - **Key validation** runs unconditionally (not gated behind development mode)
 - **FIFO eviction caps** on all internal caches to prevent memory exhaustion
-- **HMAC-SHA256 snapshot signing** for tamper detection on serialized state
+- **HMAC-SHA256 snapshot signing** for tamper detection on serialized state via `signSnapshot` / `verifySnapshotSignature`
+- **Audit ledger v1** uses an advisory (non-cryptographic, djb2) chain hash; SHA-256 mode is planned for ledger v2. The cryptographic snapshot signing above is independent
 - **`isPrototypeSafe()` validation** at all deserialization boundaries
 
 ## Adversarial reviews

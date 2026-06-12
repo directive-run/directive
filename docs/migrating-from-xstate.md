@@ -16,8 +16,8 @@ gotchas the first port through each shape will hit.
 | `sendTo(child, event)` | Direct `event.dispatch` on same module, or cross-module event bus (see [Cross-Module Events](./composition/cross-module-events.md)) |
 | `spawnChild(machine, {input})` | `createSystem({ modules })` + `crossModuleDeps` – see [Porting from XState's spawnChild](#porting-from-xstates-spawnchild) below |
 | Parallel states | Multiple independent facts on the same module |
-| `useMachine(...)` (React) | `useFact` / `useDerivation` from `@directive-run/react`. Granular subscriptions = fewer re-renders |
-| `useSelector(state, selector)` | First-class `useDerivation` |
+| `useMachine(...)` (React) | `useFact` / `useDerived` from `@directive-run/react`. Granular subscriptions = fewer re-renders |
+| `useSelector(state, selector)` | First-class `useDerived` |
 | `@statelyai/inspect` | `devtoolsPlugin` from `@directive-run/core/plugins`. Loses the visual statechart – gap accepted |
 | `after: { 5000: 'TIMEOUT' }` | No declarative `after`. Becomes imperative `setTimeout` in an effect, OR the `useTickWhile` React hook for predicate-gated dispatch (see [fake timers](./testing/fake-timers.md)) |
 | Realtime subscription inside actor | `createSubscription` from `@directive-run/query` feeding facts. Causal cache handles dedup |
@@ -83,7 +83,7 @@ class instances – none of these survive Directive's proxy reactivity layer. A
 Date assigned to a fact silently becomes a frozen object that compares unequal
 to itself.
 
-As of `@directive-run/core@1.2.0`, assigning one of these in dev mode emits a
+As of `@directive-run/core@1.20.2`, assigning one of these in dev mode emits a
 runtime warning. In production builds the warning is tree-shaken – your app
 will silently misbehave. **Convert at the boundary**:
 
@@ -189,7 +189,7 @@ From the 55-cycle migration:
 
 | Machine kind | Typical LOC delta | Why |
 |---|---|---|
-| Query/derived (browse, leaderboard) | **-40 to -50%** | Causal cache + `useDerivation` collapse render-pipeline boilerplate |
+| Query/derived (browse, leaderboard) | **-40 to -50%** | Causal cache + `useDerived` collapse render-pipeline boilerplate |
 | Page state / dashboards | **-30 to -45%** | Granular subscriptions replace `useSelector` pyramids |
 | Wizards / sequential flows | **-20 to -30%** | Discriminated `status` + `pendingAction` |
 | Pure FSM (auth, signup) | **near-flat to +5%** | Verbosity tax: every transition becomes a constraint, no causal cache wins |

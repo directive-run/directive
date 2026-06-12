@@ -133,7 +133,7 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
    * @example
    * ```typescript
    * import { t } from '@directive-run/core';
-   * const orchestrator = createOrchestrator({
+   * const orchestrator = createAgentOrchestrator({
    *   factsSchema: { confidence: t.number(), category: t.string() },
    *   // ...
    * });

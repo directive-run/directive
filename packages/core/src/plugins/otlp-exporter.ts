@@ -72,6 +72,21 @@ function buildResource(config: OTLPExporterConfig): OTLPResource {
       key: "service.name",
       value: { stringValue: config.serviceName ?? "directive-agents" },
     },
+    // OpenTelemetry Resource Semantic Conventions — required SDK identification.
+    // Some backends (Tempo, Honeycomb strict mode) quarantine resources missing
+    // these attributes.
+    {
+      key: "telemetry.sdk.name",
+      value: { stringValue: "@directive-run/core" },
+    },
+    {
+      key: "telemetry.sdk.language",
+      value: { stringValue: "typescript" },
+    },
+    {
+      key: "telemetry.sdk.version",
+      value: { stringValue: "1.20.2" },
+    },
   ];
 
   if (config.serviceVersion) {

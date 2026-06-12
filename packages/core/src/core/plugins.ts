@@ -212,14 +212,22 @@ export function createPluginManager<
   const plugins: Plugin<any>[] = [];
 
   /** Safe call - wraps plugin hook calls to prevent errors from breaking the system */
-  function safeCall<T>(fn: (() => T) | undefined): T | undefined {
+  function safeCall<T>(
+    fn: (() => T) | undefined,
+    pluginName?: string,
+    hook?: string,
+  ): T | undefined {
     if (!fn) {
       return undefined;
     }
     try {
       return fn();
     } catch (error) {
-      console.error("[Directive] Plugin error:", error);
+      console.error("[Directive] Plugin error:", {
+        plugin: pluginName,
+        hook,
+        error,
+      });
       return undefined;
     }
   }
@@ -227,6 +235,8 @@ export function createPluginManager<
   /** Safe async call */
   async function safeCallAsync<T>(
     fn: (() => Promise<T>) | undefined,
+    pluginName?: string,
+    hook?: string,
   ): Promise<T | undefined> {
     if (!fn) {
       return undefined;
@@ -234,7 +244,11 @@ export function createPluginManager<
     try {
       return await fn();
     } catch (error) {
-      console.error("[Directive] Plugin error:", error);
+      console.error("[Directive] Plugin error:", {
+        plugin: pluginName,
+        hook,
+        error,
+      });
       return undefined;
     }
   }
@@ -253,7 +267,11 @@ export function createPluginManager<
       const snapshot = [...plugins];
       for (const plugin of snapshot) {
         // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
-        safeCall(() => (plugin as any)[hook]?.(...args));
+        safeCall(
+          () => (plugin as any)[hook]?.(...args),
+          plugin.name,
+          hook as string,
+        );
       }
     };
   }
@@ -315,6 +333,8 @@ export function createPluginManager<
           await safeCallAsync(
             () =>
               (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,
+            plugin.name,
+            "onInit",
           );
         }
       }
