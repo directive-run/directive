@@ -195,7 +195,7 @@ describe("validateSandboxInput", () => {
 
     it("permits `@directive-run/sources` two-segment subpaths", () => {
       // `@directive-run/sources/supabase` and `/cloudflare` ship as
-      // the two adapter subpaths of the umbrella package. R13-C3
+      // the two adapter subpaths of the umbrella package.
       // regression: previously rejected because `sources` wasn't on
       // the allowlist.
       for (const specifier of [
@@ -247,7 +247,7 @@ describe("validateSandboxInput", () => {
    * Adding a new escape vector? Add a test here FIRST, prove it fails,
    * THEN write the fix.
    */
-  describe("AE security audit — property-access bypass closure", () => {
+  describe("June 2026 security audit — property-access bypass closure", () => {
     it("rejects `globalThis.process` direct property access", () => {
       const errors = validateSandboxInput([
         {

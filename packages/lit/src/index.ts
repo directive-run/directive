@@ -750,7 +750,7 @@ export class ModuleController<M extends ModuleSchema>
   hostDisconnected(): void {
     this.unsubFacts?.();
     this.unsubDerived?.();
-    // R19 follow-up — R18 Tier 2-B switched `SystemController` and
+    // follow-up — R18 Tier 2-B switched `SystemController` and
     // `DirectiveQueryController` to `destroyAsync` but missed the
     // zero-config `ModuleController` (this class). Same rationale:
     // source unsubscribes are async (Supabase, MCP); sync destroy

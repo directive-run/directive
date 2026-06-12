@@ -299,7 +299,7 @@ export interface FactPIIGuardrailOptions {
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
    * Maximum nesting depth to walk when scanning a structured fact
-   * value. Default `2` (raised from `1` in R19 follow-up so the common
+   * value. Default `2` (raised from `1` in a follow-up so the common
    * `Error.cause` + shallow-nested-object shapes scan zero-config).
    * At depth 2 the scanner inspects top-level strings, recurses into
    * nested objects / arrays, AND recurses one more level — enough
@@ -504,7 +504,7 @@ export function createFactPIIGuardrail(
 
     // Pre-clone cap: a 1M-element array shipped as one realtime row
     // would otherwise burn CPU inside `structuredClone` BEFORE the
-    // walker ever sees it. (R17 regression of R15-CRIT-1.) R18 follow-up:
+    // walker ever sees it. (regression of the prior-round array cap.) Follow-up:
     // the previous `.slice()` path re-read `value.length` on a Proxy,
     // which can lie (return 5 on the first read, 1e9 on the next) and
     // bypass the cap. Materialize via `Array.from` so each index is
@@ -620,12 +620,12 @@ export function createFactPIIGuardrail(
         // Error class: detection-only path. `Error.message` is a
         // user-controlled string a transport often surfaces, so
         // we scan it (R17) along with `.cause` and (for AggregateError)
-        // `.errors` (R18-C2 — PII can hide inside wrapped causes).
+        // `.errors`. PII can hide inside wrapped causes).
         // Errors are returned as-is in `redacted` (the instance ref is
         // the input); the caller MUST treat Error matches as alert-mode,
         // not redact-mode, because the same-ref return would otherwise
         // cause the redact follow-up write to be a no-op while the
-        // `onBlocked` callback claimed redaction (R18-C5).
+        // `onBlocked` callback claimed redaction.
         if (value instanceof Error) {
           const detected: FactPIIMatch[] = [];
           if (typeof value.message === "string") {
@@ -699,7 +699,7 @@ export function createFactPIIGuardrail(
     onFactSet(key, value, _prev) {
       if (!initialized) return;
       if (!screenedKeys.has(key)) return;
-      // Idempotent skip — primitives only (R18-C3). For object
+      // Idempotent skip — primitives only. For object
       // references, `value === _prev` is true when a source mutates
       // a held reference in place and re-publishes; skipping there
       // would let mutated PII slip through. Re-scanning an object
@@ -731,7 +731,7 @@ export function createFactPIIGuardrail(
       if (mode === "alert") return;
       // Redact mode: schedule a follow-up store write. Skip when the
       // walker returned the input reference itself (current Error path —
-      // R18-C5). The follow-up would be a no-op AND would trip the
+      //). The follow-up would be a no-op AND would trip the
       // primitives-only idempotency gate on re-entry.
       if (result.redacted === value) return;
       // `onFactSet` fires post-commit, so the raw value briefly exists
@@ -755,7 +755,7 @@ export function createFactPIIGuardrail(
       for (const change of changes) {
         if (change.type !== "set") continue;
         if (!screenedKeys.has(change.key)) continue;
-        // Primitives-only idempotency gate (R18-C3); see onFactSet.
+        // Primitives-only idempotency gate ; see onFactSet.
         const prev = (change as { prev?: unknown }).prev;
         if (
           change.value === prev &&
@@ -782,7 +782,7 @@ export function createFactPIIGuardrail(
           result.detected[0]?.type,
         );
         if (mode === "alert") continue;
-        // Skip same-ref redacted return — Error path (R18-C5).
+        // Skip same-ref redacted return — Error path.
         if (result.redacted === change.value) continue;
         // Best-effort in-place mutation of the change record so post-batch
         // subscribers reading `change.value` see the redacted value

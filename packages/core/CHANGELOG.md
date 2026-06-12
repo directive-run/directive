@@ -68,7 +68,7 @@
     unchanged (the manager's `phase: "runtime"` observability sink
     still receives the per-source error).
 
-  Closes R19 Critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
+  Closes the critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
   lens) + 3, 5, 8 (Arch lens). Bigger Tier 2 items deferred to RFCs:
   Supabase channel-name reuse race, `attachGuardrailsToOtel` helper,
   timeline `guardrail.blocked` renderer, knowledge-bundle docs sync.
@@ -106,7 +106,7 @@
   audit-ledger) is consumer-driven via `system.observe()` and is
   deferred to follow-up patches.
 
-  Closes R18-C6.
+  Closes the work.
 
 ### Patch Changes
 
@@ -149,39 +149,39 @@
 
   ### Walker hardening
 
-  **Proxy iterator DoS — array length cap** (R15-CRIT-1). A `Proxy` whose target is array-shaped (so `Array.isArray` returns `true`) but whose `Symbol.iterator` yields an arbitrary count blocked the event loop / OOM-ed the worker during `[...value]` spread. The throw from V8's allocation failure was swallowed by `safeCall` at the plugin boundary so the raw PII committed to the store unredacted. Walker now caps any single array snapshot at `MAX_ARRAY_SCAN = 10_000` elements (via `Array.prototype.slice.call`), emits a `console.warn` so consumers see the truncation, and leaves elements past the cap as-is in the redacted output.
+  **Proxy iterator DoS — array length cap**. A `Proxy` whose target is array-shaped (so `Array.isArray` returns `true`) but whose `Symbol.iterator` yields an arbitrary count blocked the event loop / OOM-ed the worker during `[...value]` spread. The throw from V8's allocation failure was swallowed by `safeCall` at the plugin boundary so the raw PII committed to the store unredacted. Walker now caps any single array snapshot at `MAX_ARRAY_SCAN = 10_000` elements (via `Array.prototype.slice.call`), emits a `console.warn` so consumers see the truncation, and leaves elements past the cap as-is in the redacted output.
 
-  **Proxy throw bypass — try/catch wraps structural walk** (R15-CRIT-2). A `Proxy` whose `Symbol.iterator` returned `undefined` (or whose `ownKeys` trap threw) used to crash the walker; the throw was swallowed by `safeCall` and the raw PII committed. The walker now wraps the structural walk in `try/catch` — a hostile shape becomes "no match" rather than a silent commit, with a `console.warn` so the gap is visible.
+  **Proxy throw bypass — try/catch wraps structural walk**. A `Proxy` whose `Symbol.iterator` returned `undefined` (or whose `ownKeys` trap threw) used to crash the walker; the throw was swallowed by `safeCall` and the raw PII committed. The walker now wraps the structural walk in `try/catch` — a hostile shape becomes "no match" rather than a silent commit, with a `console.warn` so the gap is visible.
 
-  **Cycle guard switched from permanent WeakSet to in-progress tracking** (R15-CRIT-3). The R14 cycle guard added every visited object to a permanent WeakSet — a non-cyclic payload that re-used the same object reference at multiple slots (`{ primary: user, secondary: user }`) redacted the first occurrence but skipped every subsequent one. Real-world hits: Supabase `{old: row, new: row}` UPDATE with no changes; MCP resource notifications that include the same contact card under `primary` AND `recipients[]`; webhook batches with deduped IDs. Switched to per-walk in-progress: add on entry, remove on exit (`try / finally`). Catches true ancestor cycles, permits shared leaves.
+  **Cycle guard switched from permanent WeakSet to in-progress tracking**. The R14 cycle guard added every visited object to a permanent WeakSet — a non-cyclic payload that re-used the same object reference at multiple slots (`{ primary: user, secondary: user }`) redacted the first occurrence but skipped every subsequent one. Real-world hits: Supabase `{old: row, new: row}` UPDATE with no changes; MCP resource notifications that include the same contact card under `primary` AND `recipients[]`; webhook batches with deduped IDs. Switched to per-walk in-progress: add on entry, remove on exit (`try / finally`). Catches true ancestor cycles, permits shared leaves.
 
-  **`walkDepth: NaN` clamp** (R15-MAJ-4). `Math.floor(NaN)` returned NaN, `Math.max/min` short-circuited to NaN, `NaN <= 0` was `false` — the bound never triggered, and on a deeply-nested non-cyclic shape the walker exhausted the stack with `safeCall` swallowing the throw. Clamp now guards with `Number.isFinite(walkDepth)` and falls back to default `1`.
+  **`walkDepth: NaN` clamp**. `Math.floor(NaN)` returned NaN, `Math.max/min` short-circuited to NaN, `NaN <= 0` was `false` — the bound never triggered, and on a deeply-nested non-cyclic shape the walker exhausted the stack with `safeCall` swallowing the throw. Clamp now guards with `Number.isFinite(walkDepth)` and falls back to default `1`.
 
   **Object branch `Object.entries` try/catch**. Wrapped the `Object.entries(value)` call in `try/catch` so a `Proxy` whose `ownKeys` trap throws is treated as "no match" rather than crashing the walker.
 
   ### Plugin manager
 
-  **`emitInit` loop-until-quiet** (R15-C1). The R14 broadcast snapshot fix patched only sync `broadcast`; async `emitInit` still iterated the live array, so a plugin whose `onInit` called `manager.unregister(otherName)` between awaits could silently skip the next un-init'd plugin — typically `createFactPIIGuardrail` or `audit-ledger`. The previous snapshot-only fix attempt broke the audit-ledger's cascading-registration pattern (`onInit` calls `system.observe(...)` which registers an observer plugin mid-init, whose own `onInit` must fire to bridge engine events to the ledger). Final shape: track init'd plugins via a `WeakSet`, loop the live array until no plugin remains uninit'd, cap at 100 passes to bound an adversarial register-loop. Handles both index-shift and cascading-registration without regressing either.
+  **`emitInit` loop-until-quiet**. The R14 broadcast snapshot fix patched only sync `broadcast`; async `emitInit` still iterated the live array, so a plugin whose `onInit` called `manager.unregister(otherName)` between awaits could silently skip the next un-init'd plugin — typically `createFactPIIGuardrail` or `audit-ledger`. The previous snapshot-only fix attempt broke the audit-ledger's cascading-registration pattern (`onInit` calls `system.observe(...)` which registers an observer plugin mid-init, whose own `onInit` must fire to bridge engine events to the ledger). Final shape: track init'd plugins via a `WeakSet`, loop the live array until no plugin remains uninit'd, cap at 100 passes to bound an adversarial register-loop. Handles both index-shift and cascading-registration without regressing either.
 
   ### Documentation
 
-  **`walkDepth` JSDoc rewrite** (R15-M3). Default `walkDepth: 1` did NOT scan the documented dominant Supabase realtime shape (`{ new: [{ email }] }`) because the chain is object → array → object → string (4 levels). JSDoc now lists the canonical real-world shapes with the `walkDepth` they need (flat object: 1, nested object: 2, Supabase row: 4, MCP resource list: 4). Plus documents the hard caps (`MAX_ARRAY_SCAN = 10_000`, cycle guard, finite-only `walkDepth`).
+  **`walkDepth` JSDoc rewrite**. Default `walkDepth: 1` did NOT scan the documented dominant Supabase realtime shape (`{ new: [{ email }] }`) because the chain is object → array → object → string (4 levels). JSDoc now lists the canonical real-world shapes with the `walkDepth` they need (flat object: 1, nested object: 2, Supabase row: 4, MCP resource list: 4). Plus documents the hard caps (`MAX_ARRAY_SCAN = 10_000`, cycle guard, finite-only `walkDepth`).
 
-  **MCP factory recipe contradiction fixed** (R15-C2). Previous prose said "if you create the adapter outside the factory, pass it in per call too" while the code example wrapped both adapter AND module construction inside the factory. The "pass it in per call" path re-introduced the multi-tenant cross-contamination R14-C2 was supposed to close: the adapter's `events.onConnect` is bound at adapter-construction time to whichever factory's `publishRef` was in scope first. Recipe now says explicitly: BOTH adapter and module MUST be constructed inside the same factory; sharing the adapter across factory calls is unsafe.
+  **MCP factory recipe contradiction fixed**. Previous prose said "if you create the adapter outside the factory, pass it in per call too" while the code example wrapped both adapter AND module construction inside the factory. The "pass it in per call" path re-introduced the multi-tenant cross-contamination the prior round was supposed to close: the adapter's `events.onConnect` is bound at adapter-construction time to whichever factory's `publishRef` was in scope first. Recipe now says explicitly: BOTH adapter and module MUST be constructed inside the same factory; sharing the adapter across factory calls is unsafe.
 
 ## 1.19.1
 
 ### Patch Changes
 
-- [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
+- [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
 
   Three small follow-on fixes for issues surfaced during R14 that R14 Tier 1 didn't cover:
 
-  **MCP holder pattern — multi-tenant safe factory** (R14-C2). The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
+  **MCP holder pattern — multi-tenant safe factory**. The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
 
   **`broadcast` snapshots `plugins` before iteration**. A plugin hook callback that called `manager.unregister(...)` (or whose `system.observe()` unsubscribe spliced the array) used to shift indices mid-iteration, silently skipping the NEXT plugin — typically the audit-ledger or `createFactPIIGuardrail`. The broadcaster now iterates a snapshot taken at call time, so reentrant `unregister` no longer corrupts the broadcast.
 
-  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel** (R14-MAJ from AI Integration lens). The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
+  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel**. The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
 
 - [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 audit Tier 1 — walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
 
@@ -192,9 +192,7 @@
 
   ### Critical fixes
 
-  **Walker DoS + PII bypass** (R14-C1, closes 5+ reviewer findings —
-  Security, Architecture, Red Team x3, Privacy, Distrib Systems, Domain
-  Expert). R13-C6's array recursion fix passed `depth` raw on the array
+  **Walker DoS + PII bypass.** The previous array recursion fix passed `depth` raw on the array
   branch and did NOT snapshot the array before iterating. Three exploit
   chains landed simultaneously: (a) a deeply-nested
   `[[[[...]]]]` payload bypassed the documented `walkDepth ≤ 5` bound
@@ -213,10 +211,10 @@
   (3) track visited references via `WeakSet` and bail on revisit.
   Closes the stack-overflow + cycle + Proxy chains with one ~10-line
   fix. Two new regression tests cover the new bound and the cycle
-  guard; the existing R13-C6 array tests still pass.
+  guard; the existing array tests still pass.
 
   **`liveContext.onContextUpdate` call order matched to JSDoc**
-  (R14-C4). The JSDoc declared `onContextUpdate` "fires AFTER the
+ . The JSDoc declared `onContextUpdate` "fires AFTER the
   `interruptWhen` predicate runs but BEFORE the chunk emits" — the
   impl called `onContextUpdate` FIRST. The instrumentation hook
   couldn't observe interruption decisions, defeating the documented
@@ -227,7 +225,7 @@
   skip every downstream listener in the notify cycle).
 
   **`LiveContextOptions.mode` restored as `@deprecated` for source-compat**
-  (R14-C5). v1.18.0 shipped to npm with `mode: "inject-system-message"
+ . v1.18.0 shipped to npm with `mode: "inject-system-message"
 | "restart"` on the public `LiveContextOptions` interface. v1.19.0
   removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
   shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0
@@ -241,7 +239,7 @@
 
   ### Documentation fixes
 
-  **Source primitive doc cluster** (R14-C3). The `onEvict` recipe in
+  **Source primitive doc cluster**. The `onEvict` recipe in
   `packages/knowledge/core/sources.md` referenced a `ch` variable
   defined in a sibling closure — a copy-paste consumer would hit
   `ReferenceError`. Rewrote using the holder + closure bridge pattern
@@ -270,7 +268,7 @@
   ### Critical fixes
 
   **`System.stopAsync` / `destroyAsync` / `evict` wired through
-  `createSystem` wrappers** (R13-C1). Engine implemented these per RFC
+  `createSystem` wrappers**. Engine implemented these per RFC
   0009 but neither the single-module wrapper at `system.ts:1178+` nor the
   namespaced wrapper at `system.ts:527+` assigned them, and the
   `SingleModuleSystem` / `NamespacedSystem` / system-config types omitted
@@ -283,7 +281,7 @@
   (`system-async-lifecycle.test.ts`) that exercises the public boundary
   including an async source unsubscribe await.
 
-  **Cloudflare DO adapters accept `onEvict`** (R13-C5). `sourceFromDOAlarm`
+  **Cloudflare DO adapters accept `onEvict`**. `sourceFromDOAlarm`
   and `sourceFromWebSocketMessage` are the literal target runtime for RFC
   0009, yet neither adapter accepted or forwarded an `onEvict` option.
   With this change both adapters expose `onEvict?: () => void | Promise<void>`
@@ -294,7 +292,7 @@
   add pre-hibernation work (flush audit log, signal broker). 4 new
   regression tests covering default + custom `onEvict` for both adapters.
 
-  **`createFactPIIGuardrail` walker recurses into arrays** (R13-C6). The
+  **`createFactPIIGuardrail` walker recurses into arrays**. The
   walker previously short-circuited on `Array.isArray(value)`, so the
   dominant real-world Supabase realtime shape
   (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
@@ -304,7 +302,7 @@
   wire a `customDetector` for those). 2 new regression tests covering
   both "array of PII objects" and "array of PII strings" shapes.
 
-  **RFC 0005 `mode` field removed** (R13-C7). The field
+  **RFC 0005 `mode` field removed**. The field
   `liveContext.mode: "inject-system-message" | "restart"` shipped on the
   public API but was never read by the impl. The name
   `"inject-system-message"` falsely implied mid-stream injection; the
@@ -315,7 +313,7 @@
 
   ### Documentation fixes
 
-  **MCP source recipe rewritten against the real adapter API** (R13-C8).
+  **MCP source recipe rewritten against the real adapter API**.
   The previous recipe in `ai-sources.md` called `adapter.onConnect(cb) →
 unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
   adapter exposes `MCPAdapterConfig.events` as a single callback bag at
@@ -680,7 +678,7 @@ plugin that captures the raw`Error` object.
   - Source attach + unsubscribe failures are isolated per source (logged via `console.error` AND forwarded to the new `onSourceError` plugin hook) — one bad source never blocks others.
   - The publish callback **guards against post-destroy dispatch** — a source author who retains the callback past `destroy()` cannot dispatch into the torn-down store.
 
-  This formalises the "hook-as-bridge" pattern used in 7+ call sites across downstream consumers (Minglingo's `useActiveRoundSystem`, `useBattleRoyaleSystem`, `eventClaims.realtime.ts`, etc.) where a `useEffect` owned the realtime channel and manually dispatched events on each message. With `sources` declared on the module, the lifecycle is engine-owned and the React hook collapses to `useFact` reads.
+  This formalises the "hook-as-bridge" pattern used in 7+ call sites across downstream consumers (a production app's per-realtime-stream `useEffect` hooks, an event-claims realtime adapter, etc.) where a `useEffect` owned the realtime channel and manually dispatched events on each message. With `sources` declared on the module, the lifecycle is engine-owned and the React hook collapses to `useFact` reads.
 
   Usage:
 
@@ -1932,7 +1930,7 @@ tenant_id: req.user.id }` throws instead of silently dropping the
 
   Downstream consumers running `tsc --noEmit` against `@directive-run/core@1.2.0` saw type errors. Hoist `unionImpl` to a typed top-level const (`unionImpl: UnionFn`) and reference it as `union: unionImpl` in the `t` object – runtime semantics unchanged, declaration emit walks cleanly.
 
-  Caught when Minglingo's `apps/web` tried to consume `@directive-run/core/testing.flushAsync` – the JS dist built fine but the DTS build failed for the union exports, masking the entire testing surface from typed downstream usage.
+  Caught when a downstream consumer's `apps/web` tried to consume `@directive-run/core/testing.flushAsync` – the JS dist built fine but the DTS build failed for the union exports, masking the entire testing surface from typed downstream usage.
 
 ## 1.1.2
 

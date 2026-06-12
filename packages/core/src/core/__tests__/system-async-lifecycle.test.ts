@@ -1,5 +1,5 @@
 /**
- * R13-C1 regression test: the RFC 0009 async-lifecycle methods
+ * regression test: the RFC 0009 async-lifecycle methods
  * (`stopAsync`, `destroyAsync`, `evict`) must be reachable from the
  * public `createSystem` boundary. Without this test, the engine can
  * implement the methods but the wrappers can silently fail to delegate,
@@ -59,7 +59,7 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
     await system.evict(Date.now() - 1);
   });
 
-  // R18 follow-up: concurrent / repeat evict() calls must not double-fire
+  // follow-up: concurrent / repeat evict() calls must not double-fire
   // onEvict. Cloudflare DO hibernation can call evict twice; non-idempotent
   // onEvict handlers (e.g. one that posts a "going away" broker message)
   // would double-fire without the engine's `state.isEvicting` gate.
@@ -88,7 +88,7 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
     expect(onEvictCalls).toBe(1);
   });
 
-  // R19 follow-up: if the inner evict work rejects, `state.isEvicting`
+  // follow-up: if the inner evict work rejects, `state.isEvicting`
   // must be cleared in `finally` so the host can call `evict()` again
   // after recovery. Without try/finally, a one-time rejection would
   // permanently latch the gate.
@@ -126,7 +126,7 @@ describe("RFC 0009 async lifecycle — single-module createSystem", () => {
     expect(onEvictCalls).toBe(1);
   });
 
-  // R19 follow-up: `system.start()` refuses to start during an evict()
+  // follow-up: `system.start()` refuses to start during an evict()
   // in flight, and after destroy. Cloudflare DO failover scenario.
   it("system.start() is a no-op when isEvicting or isDestroyed (R19)", async () => {
     const system = createSystem({ module: counterModule });

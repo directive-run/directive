@@ -254,14 +254,14 @@ describe("evaluatePredicate — edge cases", () => {
 });
 
 // ============================================================================
-// AE R2 fix: deepEqual + $contains for Set / Map
+// fix: deepEqual + $contains for Set / Map
 // ============================================================================
 
 // Before R2, `Object.keys(new Set(...)).length` was always `0`, so the
 // final `keys.length === 0` short-circuit treated *any* two Sets (or any
 // two Maps) as equal regardless of contents. This corrupted $eq/$ne/$in/$nin
 // against Set/Map facts.
-describe("AE-R2: deepEqual handles Set and Map (S-R2-Set)", () => {
+describe("deepEqual handles Set and Map (S-R2-Set)", () => {
   it("two empty Sets compare equal", () => {
     expect(evaluatePredicate({ s: { $eq: new Set() } }, { s: new Set() })).toBe(
       true,
@@ -833,7 +833,7 @@ describe("AE-fix: evaluateTemplate null vs undefined warns (DM-C2)", () => {
 // Round-2 AE fixes — regression tests
 // ============================================================================
 
-describe("AE-R2: $startsWith / $endsWith operators", () => {
+describe("$startsWith / $endsWith operators", () => {
   it("$startsWith returns true when the actual string starts with operand", () => {
     expect(
       evaluatePredicate(
@@ -915,7 +915,7 @@ describe("$matches: string operand rejected at evaluation", () => {
   });
 });
 
-describe("AE-R2: one-operator-per-object runtime dev-warn (DX-M4)", () => {
+describe("one-operator-per-object runtime dev-warn (DX-M4)", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -961,7 +961,7 @@ describe("AE-R2: one-operator-per-object runtime dev-warn (DX-M4)", () => {
   });
 });
 
-describe("AE-R2: evaluateTemplate distinct warns for unknown-key / null / undefined", () => {
+describe("evaluateTemplate distinct warns for unknown-key / null / undefined", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -1020,7 +1020,7 @@ describe("AE-R2: evaluateTemplate distinct warns for unknown-key / null / undefi
 });
 
 // ============================================================================
-// AE R1 fix: deep freeze (FactPredicate specs frozen recursively)
+// fix: deep freeze (FactPredicate specs frozen recursively)
 // ============================================================================
 
 describe("predicate registration deep-freezes nested operand objects", () => {
@@ -1051,7 +1051,7 @@ describe("predicate registration deep-freezes nested operand objects", () => {
 });
 
 // ============================================================================
-// AE R1 fix: evaluateKeySelector typed-value handling (no collisions)
+// fix: evaluateKeySelector typed-value handling (no collisions)
 // ============================================================================
 
 describe("evaluateKeySelector typed-value handling", () => {
@@ -1115,7 +1115,7 @@ describe("evaluateKeySelector typed-value handling", () => {
 });
 
 // ============================================================================
-// AE R1 fix: evaluateTemplate uses Object.hasOwn (no prototype walk)
+// fix: evaluateTemplate uses Object.hasOwn (no prototype walk)
 // ============================================================================
 
 describe("evaluateTemplate prototype walk hardening", () => {

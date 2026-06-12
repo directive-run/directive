@@ -55,7 +55,7 @@ landed in. Open questions are tracked inline.
   inner work doesn't latch the gate forever. `system.start()`
   refuses to start while eviction is in flight or after destroy.
   R18 Tier 2-C, shipped 2026-06-10 in `@directive-run/core` v1.20.0
-  (R19 follow-up added the try/finally + start guard).
+  (follow-up added the try/finally + start guard).
 
 - **RFC 0010 / `guardrail.blocked` ObservationEvent** — new
   `ObservationEvent` variant + `Plugin.onGuardrailBlocked` hook +
@@ -65,7 +65,7 @@ landed in. Open questions are tracked inline.
   Backend wiring (`attachSourcesToOtel`, timeline, audit-ledger)
   is consumer-driven via `system.observe()`. R18 Tier 2-A,
   shipped 2026-06-10 in `@directive-run/core` v1.20.0 +
-  `@directive-run/ai` v1.20.0. R19 follow-up validated the
+  `@directive-run/ai` v1.20.0. follow-up validated the
   `plugin` field against registered plugin names + added a
   reentry depth cap.
 

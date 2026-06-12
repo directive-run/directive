@@ -478,7 +478,7 @@ describe("constraint `when` — $changed rejected unconditionally", () => {
 });
 
 // ============================================================================
-// AE-R2 regression: event { handler + patch } conflict dev-warn
+// regression: event { handler + patch } conflict dev-warn
 // ============================================================================
 
 describe("event handler + patch conflict (DX-R2)", () => {

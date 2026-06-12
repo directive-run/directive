@@ -309,7 +309,7 @@ describe("createModuleFactory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AE R1 fix: namespace-pivot fact-name conflict
+// fix: namespace-pivot fact-name conflict
 // ---------------------------------------------------------------------------
 
 describe("createModule — pivot-name conflict", () => {

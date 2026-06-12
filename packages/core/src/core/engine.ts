@@ -142,7 +142,7 @@ interface EngineState<_S extends Schema> {
   isReady: boolean;
   isDestroyed: boolean;
   /**
-   * RFC 0009 + R18 follow-up — evict-reentry gate. Cloudflare DO
+   * RFC 0009 follow-up — evict-reentry gate. Cloudflare DO
    * hibernation paths can call `system.evict()` twice (once on the
    * first eviction signal, once on the failover path). Without this
    * gate, the second call would re-run every source's `onEvict` —
@@ -1658,7 +1658,7 @@ export function createEngine<S extends Schema>(
 
     start(): void {
       if (state.isRunning) return;
-      // R19 follow-up — refuse to start while an eviction is in flight
+      // follow-up — refuse to start while an eviction is in flight
       // or after the system has been destroyed. Both are terminal-ish:
       // `isEvicting` is cleared in the evict() try/finally only on the
       // happy path through `destroyAsync()` (which also sets
@@ -1878,7 +1878,7 @@ export function createEngine<S extends Schema>(
       // error path. Now we either await it or attach a swallow-catch
       // so the unhandled-rejection surface is bounded.
       //
-      // R18 follow-up: reentry gate. Cloudflare DO hibernation can
+      // follow-up: reentry gate. Cloudflare DO hibernation can
       // fire eviction twice; without the gate, the second call
       // re-runs every source's `onEvict` — sources that aren't
       // idempotent would double-fire. Set BEFORE awaiting any async
@@ -1886,7 +1886,7 @@ export function createEngine<S extends Schema>(
       // become no-ops.
       if (state.isEvicting || state.isDestroyed) return;
       state.isEvicting = true;
-      // R19 follow-up — the inner work can reject (a plugin's
+      // follow-up — the inner work can reject (a plugin's
       // `onDestroy` throws, a source's `onEvict` rejects, the host
       // runtime cancels mid-await). Without try/finally, `isEvicting`
       // would latch forever — and the engine's terminal-state

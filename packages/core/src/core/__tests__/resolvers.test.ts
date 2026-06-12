@@ -1792,7 +1792,7 @@ describe("constraint-binding (RFC-1)", () => {
 });
 
 // ============================================================================
-// AE R1 fix: bound resolver post-await ownership escape
+// fix: bound resolver post-await ownership escape
 // ============================================================================
 
 describe("bound resolver — listener-triggered ownership escape", () => {
@@ -1854,7 +1854,7 @@ describe("bound resolver — listener-triggered ownership escape", () => {
 });
 
 // ============================================================================
-// AE R1 fix: sibling bound-resolver clobber gap (pre-dispatch baseline)
+// fix: sibling bound-resolver clobber gap (pre-dispatch baseline)
 // ============================================================================
 
 describe("bound resolver — sibling clobber gap (factsBaseline)", () => {

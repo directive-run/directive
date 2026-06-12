@@ -13,7 +13,7 @@
   ### Critical fixes
 
   **`System.stopAsync` / `destroyAsync` / `evict` wired through
-  `createSystem` wrappers** (R13-C1). Engine implemented these per RFC
+  `createSystem` wrappers**. Engine implemented these per RFC
   0009 but neither the single-module wrapper at `system.ts:1178+` nor the
   namespaced wrapper at `system.ts:527+` assigned them, and the
   `SingleModuleSystem` / `NamespacedSystem` / system-config types omitted
@@ -26,7 +26,7 @@
   (`system-async-lifecycle.test.ts`) that exercises the public boundary
   including an async source unsubscribe await.
 
-  **Cloudflare DO adapters accept `onEvict`** (R13-C5). `sourceFromDOAlarm`
+  **Cloudflare DO adapters accept `onEvict`**. `sourceFromDOAlarm`
   and `sourceFromWebSocketMessage` are the literal target runtime for RFC
   0009, yet neither adapter accepted or forwarded an `onEvict` option.
   With this change both adapters expose `onEvict?: () => void | Promise<void>`
@@ -37,7 +37,7 @@
   add pre-hibernation work (flush audit log, signal broker). 4 new
   regression tests covering default + custom `onEvict` for both adapters.
 
-  **`createFactPIIGuardrail` walker recurses into arrays** (R13-C6). The
+  **`createFactPIIGuardrail` walker recurses into arrays**. The
   walker previously short-circuited on `Array.isArray(value)`, so the
   dominant real-world Supabase realtime shape
   (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
@@ -47,7 +47,7 @@
   wire a `customDetector` for those). 2 new regression tests covering
   both "array of PII objects" and "array of PII strings" shapes.
 
-  **RFC 0005 `mode` field removed** (R13-C7). The field
+  **RFC 0005 `mode` field removed**. The field
   `liveContext.mode: "inject-system-message" | "restart"` shipped on the
   public API but was never read by the impl. The name
   `"inject-system-message"` falsely implied mid-stream injection; the
@@ -58,7 +58,7 @@
 
   ### Documentation fixes
 
-  **MCP source recipe rewritten against the real adapter API** (R13-C8).
+  **MCP source recipe rewritten against the real adapter API**.
   The previous recipe in `ai-sources.md` called `adapter.onConnect(cb) →
 unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
   adapter exposes `MCPAdapterConfig.events` as a single callback bag at
@@ -80,7 +80,7 @@ unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
   ### Critical fixes
 
   **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
-  subpath** (R13-C2). The Tier 0 Mandatory Companion to `liveContext` was
+  subpath**. The Tier 0 Mandatory Companion to `liveContext` was
   declared in `guardrails/index.ts` but the actual tsup entry for the
   subpath (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
   `packages/knowledge/ai/ai-sources.md` (Sources × Security section) failed
@@ -92,7 +92,7 @@ member 'createFactPIIGuardrail'`. Now exported (function + the four
   instead of `@directive-run/ai/guardrails`) — corrected.
 
   **`@directive-run/sources` rejected by `@directive-run/sandbox`
-  validator** (R13-C3). The sandbox validator's `ALLOWED_DIRECTIVE_PACKAGES`
+  validator**. The sandbox validator's `ALLOWED_DIRECTIVE_PACKAGES`
   set didn't include `sources`, so every playground snippet, MCP
   `run_in_sandbox` call, and docs live runner that imported the umbrella
   package or either subpath (`@directive-run/sources`,
@@ -102,7 +102,7 @@ member 'createFactPIIGuardrail'`. Now exported (function + the four
   two-segment-subpath coverage to the validator test grid.
 
   **`sourceFromSupabaseChannel` unsubscribe fires-and-forgets
-  `removeChannel`** (R13-C4). The original R5-CR1 issue RFC 0009 was
+  `removeChannel`**. The original R5-CR1 issue RFC 0009 was
   designed to close: the adapter returned a sync unsubscribe that did
   `void client.removeChannel(chan)`, so `system.stopAsync()` resolved
   before the Supabase broker dropped the subscription. A subsequent
@@ -116,7 +116,7 @@ member 'createFactPIIGuardrail'`. Now exported (function + the four
 
   ### Documentation fixes
 
-  **Broken cross-ref anchor** (R13-C9): `packages/knowledge/core/sources.md`
+  **Broken cross-ref anchor**: `packages/knowledge/core/sources.md`
   linked to `ai-security.md#sources-pii--closing-the-fact-injection-bypass`
   with a single hyphen between "sources" and "pii". The actual GFM anchor
   generated from the heading `## Sources × PII — closing the fact-injection
@@ -124,7 +124,7 @@ bypass` has a double hyphen (`×` strips to a kept space). The
   highest-traffic cross-ref in the source primitive doc was landing on a
   404 anchor. Corrected to `#sources--pii--closing-the-fact-injection-bypass`.
 
-  **RFCs 0005–0009 status flipped from Draft → Accepted** (R13-C10): all
+  **RFCs 0005–0009 status flipped from Draft → Accepted**: all
   five RFCs still carried `Status: Draft (2026-06-07)` even though
   `sources.md` and `ai-sources.md` already cite them as shipped. Readers
   following the link saw Draft headers and concluded the feature was

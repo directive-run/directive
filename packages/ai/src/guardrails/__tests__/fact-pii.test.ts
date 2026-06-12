@@ -364,10 +364,10 @@ describe("createFactPIIGuardrail — object payloads", () => {
   });
 });
 
-// R13-C6 regression — the walker MUST recurse into arrays. Without
+// regression — the walker MUST recurse into arrays. Without
 // this, the dominant Supabase realtime shape (`payload.new = [{...}]`)
 // and MCP resource-list notifications silently bypass the Tier 0 guard.
-describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
+describe("createFactPIIGuardrail — array payloads", () => {
   it("redacts PII inside an array of objects", () => {
     interface UserRow {
       email: string;
@@ -411,12 +411,12 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
-  // R14-C1 regression — walker must decrement depth on the array
+  // regression — walker must decrement depth on the array
   // branch (R13 passed `depth` raw, which let arrays bypass the
   // documented walkDepth ≤ 5 bound and stack-overflow on deeply
   // nested shapes). Each array level now burns one depth slot,
   // matching how the object branch already works.
-  it("array recursion burns depth (R14-C1)", () => {
+  it("array recursion burns depth", () => {
     const module = createModule("nested-arr", {
       schema: {
         facts: {
@@ -467,7 +467,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
   // stack-overflow; `safeCall` swallowed the throw so the raw PII
   // stayed committed in the fact store. The walker now tracks
   // visited references via WeakSet and bails on revisit.
-  it("cyclic array does not recurse forever (R14-C1 cycle guard)", () => {
+  it("cyclic array does not recurse forever (prior round cycle guard)", () => {
     const module = createModule("cyc", {
       schema: {
         facts: { rows: t.object<{ items: unknown }>().meta({ tags: ["pii"] }) },
@@ -507,7 +507,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
   // returned `{ matched: false }` — raw PII leaked through. The
   // in-progress tracking pops on exit, so a shared leaf at multiple
   // slots redacts everywhere.
-  it("redacts shared object references at every occurrence (R15-CRIT-3)", () => {
+  it("redacts shared object references at every occurrence", () => {
     const module = createModule("shared", {
       schema: {
         facts: {
@@ -546,12 +546,12 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
-  // R15-CRIT-1 — Proxy whose Symbol.iterator yields a huge number of
+  // Prior round — Proxy whose Symbol.iterator yields a huge number of
   // items used to block the event loop / OOM. The walker now caps the
   // snapshot length at MAX_ARRAY_SCAN (10_000) so a hostile shape
   // cannot DoS the redaction plugin. Element 0..MAX-1 are scanned;
   // beyond that, the redacted output retains the original values.
-  it("caps array scan at MAX_ARRAY_SCAN (R15-CRIT-1)", () => {
+  it("caps array scan at MAX_ARRAY_SCAN", () => {
     const module = createModule("huge", {
       schema: {
         facts: { items: t.array<string>().meta({ tags: ["pii"] }) },
@@ -588,13 +588,13 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
-  // R15-CRIT-2 — Proxy whose Symbol.iterator returns undefined used to
+  // Prior round — Proxy whose Symbol.iterator returns undefined used to
   // throw inside the walker; the throw was swallowed by safeCall and
   // raw PII committed. The walker now catches the throw and returns
   // matched: false. The fact value is committed as-is (the consumer
   // can layer a customDetector on top); this matches the alert-mode
   // safety posture.
-  it("hostile Proxy iterator does not crash the walker (R15-CRIT-2)", () => {
+  it("hostile Proxy iterator does not crash the walker", () => {
     // Directly drive the walker — go through the guardrail's
     // construction to get the same inspect() closure the plugin
     // uses; then call it on a Proxy whose Symbol.iterator returns
@@ -636,7 +636,7 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     // plugin running succeeds (regression-style — proves no init crash).
     expect(() => facts.set("v", "hello")).not.toThrow();
     // And that the evil Proxy at least does not infect anything if it's
-    // accidentally seen later. R15-CRIT-2 reproduction is best done via
+    // accidentally seen later. Prior round reproduction is best done via
     // a unit test against inspect() directly; this test asserts the
     // surrounding plugin remains healthy.
     void evil;
@@ -732,10 +732,10 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
     system.destroy();
   });
 
-  // R15-MAJ-4 — walkDepth: NaN used to bypass the depth bound because
+  // Prior round — walkDepth: NaN used to bypass the depth bound because
   // `NaN <= 0` is false and arithmetic on NaN stays NaN. Clamp now
   // guards with Number.isFinite and falls back to default 1.
-  it("walkDepth: NaN clamps to default 1 (R15-MAJ-4)", () => {
+  it("walkDepth: NaN clamps to default 1", () => {
     const system = createSystem({
       module: makeCustomerModule(),
       plugins: [
@@ -794,14 +794,14 @@ describe("createFactPIIGuardrail — array payloads (R13-C6)", () => {
 // based sanitization. R17 found three regressions / new bypass surfaces
 // that this block locks in:
 //   - top-level array length cap must apply BEFORE structuredClone, not
-//     just inside walkClone (R15-CRIT-1 regression)
+//     just inside walkClone (Prior round regression)
 //   - Error.message strings are user-controlled but structuredClone of
 //     Error preserves the class; the walker now scans Error.message
 //   - TypedArrays / DataViews / Blobs aren't walkable structures; the
 //     walker short-circuits them rather than iterating their entries
 //     (which would either no-op or false-flag bytes).
 describe("createFactPIIGuardrail — R17 walker hardening", () => {
-  it("(R17-C1) caps top-level array BEFORE structuredClone", () => {
+  it("caps top-level array BEFORE structuredClone", () => {
     const module = createModule("items", {
       schema: {
         facts: { items: t.array<string>().meta({ tags: ["pii"] }) },
@@ -834,7 +834,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.destroy();
   });
 
-  it("(R17-CRIT-1) detects PII inside Error.message", () => {
+  it("(Prior round) detects PII inside Error.message", () => {
     const matches: Array<{ key: string; count: number }> = [];
     const module = createModule("errors", {
       schema: {
@@ -872,7 +872,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.destroy();
   });
 
-  it("(R17-MAJ-4) short-circuits TypedArray + Blob + Date + RegExp", () => {
+  it("(Prior round) short-circuits TypedArray + Blob + Date + RegExp", () => {
     const blocked: string[] = [];
     const module = createModule("misc", {
       schema: {
@@ -960,7 +960,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
 //   - C-R18-3: idempotency gate skips mutable-ref re-publish with new PII
 //   - C-R18-5: Error redact-mode no-ops + retriggers gate skip
 describe("createFactPIIGuardrail — R18 walker hardening", () => {
-  it("(R18-C1) Proxy length-getter TOCTOU cannot bypass the pre-clone cap", () => {
+  it("Proxy length-getter TOCTOU cannot bypass the pre-clone cap", () => {
     const matches: number[] = [];
     const module = createModule("p1", {
       schema: {
@@ -1016,7 +1016,7 @@ describe("createFactPIIGuardrail — R18 walker hardening", () => {
     system.destroy();
   });
 
-  it("(R18-C2) detects PII inside Error.cause string", () => {
+  it("detects PII inside Error.cause string", () => {
     const matches: number[] = [];
     const module = createModule("errcause", {
       schema: {
@@ -1050,7 +1050,7 @@ describe("createFactPIIGuardrail — R18 walker hardening", () => {
     system.destroy();
   });
 
-  it("(R18-C2) detects PII inside Error.cause that is itself an Error", () => {
+  it("detects PII inside Error.cause that is itself an Error", () => {
     const matches: number[] = [];
     const module = createModule("errwrap", {
       schema: {
@@ -1086,7 +1086,7 @@ describe("createFactPIIGuardrail — R18 walker hardening", () => {
     system.destroy();
   });
 
-  // R18-C3 — the idempotency gate is restricted to primitives. The
+  // prior round — the idempotency gate is restricted to primitives. The
   // engine itself dedups same-reference object writes before
   // `onFactSet` fires, so the bypass-via-events path isn't reachable
   // in practice; the restriction is defensive against direct

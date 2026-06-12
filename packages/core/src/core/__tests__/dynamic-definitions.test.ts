@@ -1169,10 +1169,10 @@ describe("Resolver assign triggers reconciliation", () => {
 });
 
 // ============================================================================
-// 14. AE-R2 regression: assign() chain fn → data → fn keeps whenSpec coherent
+// 14. regression: assign() chain fn → data → fn keeps whenSpec coherent
 // ============================================================================
 
-describe("AE-R2 regression: constraints.assign chain swaps whenSpec correctly", () => {
+describe("regression: constraints.assign chain swaps whenSpec correctly", () => {
   it("function-form → data-form → function-form correctly adds/removes whenSpec", async () => {
     const system = createStartedSystem();
     await flushMicrotasks();

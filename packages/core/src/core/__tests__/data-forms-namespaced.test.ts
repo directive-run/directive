@@ -507,7 +507,7 @@ describe("dynamic constraint register — data-form when", () => {
 });
 
 // ============================================================================
-// AE-R2 regression: effect `$changed` under a namespaced system
+// regression: effect `$changed` under a namespaced system
 // ============================================================================
 
 describe("namespaced effect `$changed` operator", () => {
@@ -590,7 +590,7 @@ describe("namespaced effect `$changed` operator", () => {
 });
 
 // ============================================================================
-// AE R2 fix: namespace-pivot nested form in data-form `when`
+// fix: namespace-pivot nested form in data-form `when`
 // ============================================================================
 
 // Before R2, the cross-module RFC nested form (`when: { self: {...}, auth:
@@ -767,7 +767,7 @@ describe("namespace-pivot `self` and dep-namespace forms", () => {
 });
 
 // ============================================================================
-// AE R2 fix: namespaced events both `handler` AND `patch` dev-warn
+// fix: namespaced events both `handler` AND `patch` dev-warn
 // ============================================================================
 
 // Before R2 the engine's single-module path warned when both `handler` and

@@ -243,7 +243,7 @@ export function createPluginManager<
   // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
   function broadcast<K extends keyof Plugin<any>>(hook: K) {
     return (...args: unknown[]) => {
-      // R14-MAJ — snapshot the plugins array BEFORE iterating so a
+      // — snapshot the plugins array BEFORE iterating so a
       // plugin's hook callback that calls `manager.unregister(...)`
       // (or whose `system.observe()` unsubscribe splices the array)
       // doesn't shift indices mid-broadcast. The previous live-array

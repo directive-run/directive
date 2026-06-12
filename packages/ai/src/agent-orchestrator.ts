@@ -119,7 +119,7 @@ interface PauseBudgetExceededReq extends Requirement {
 // Exported Types
 // ============================================================================
 
-// R14-C5 — one-shot deprecation warning for the v1.18.0 `mode` field
+// — one-shot deprecation warning for the v1.18.0 `mode` field
 // on `LiveContextOptions`. Module-scope so the warning fires once per
 // process, not per `runStream` call.
 let deprecatedModeWarned = false;
@@ -1743,7 +1743,7 @@ export function createAgentOrchestrator<
       let liveContextUnsub: (() => void) | null = null;
       const liveCfg = options.liveContext;
       if (liveCfg) {
-        // R14-C5 — `mode` was briefly part of `LiveContextOptions` in
+        // — `mode` was briefly part of `LiveContextOptions` in
         // v1.18.0, removed in v1.19.0, and re-added as @deprecated in
         // v1.19.1+ for source-compat with v1.18 call sites. The field
         // is intentionally a runtime no-op; emit a one-shot warning
@@ -1807,7 +1807,7 @@ export function createAgentOrchestrator<
             if (changed.length === 0) return;
             const watchedChanged = changed.filter((k) => watched.has(k));
             if (watchedChanged.length === 0) return;
-            // R14-C4: run `interruptWhen` FIRST so `onContextUpdate`
+            // — run `interruptWhen` FIRST so `onContextUpdate`
             // can observe the interruption decision before the chunk
             // emits — matches the documented contract on
             // `LiveContextOptions.onContextUpdate` ("fired AFTER the
