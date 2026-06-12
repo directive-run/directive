@@ -44,7 +44,7 @@ export interface SandboxResult {
    * Final `system.derive` snapshot — every derivation declared in the
    * module config, evaluated by reading `system.derive[key]`. Empty
    * when the module has no `derive:` block or when validation rejected
-   * before bundle. The Phase A AE audit (P0-DM2) flagged the original
+   * before bundle. The June 2026 security audit flagged the original
    * sandbox for snapshotting only facts; modules whose primary product
    * is a derivation (`status`, `isReady`, etc.) returned an empty-
    * looking transcript.

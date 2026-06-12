@@ -130,9 +130,9 @@ export async function runInSandbox(
     };
   }
 
-  // Phase A audit P0-DM2: pre-extract derivation key names from the
-  // source files so the worker can iterate them after settle. The
-  // `system.derive` proxy has no `ownKeys` trap.
+  // Pre-extract derivation key names from the source files so the
+  // worker can iterate them after settle. The `system.derive` proxy
+  // has no `ownKeys` trap.
   const derivationKeys = extractDerivationKeys(files);
 
   let bundled: { source: string; bytes: number };

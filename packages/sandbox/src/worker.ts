@@ -33,18 +33,17 @@ if (!parentPort) {
   );
 }
 
-// Phase A audit P0-S2: install the SSRF fetch wrapper BEFORE the
-// bundle is imported so @directive-run/query's / @directive-run/ai's
-// internal fetch calls (which the validator can't see because they
-// live in external module bodies) hit the loopback / private-IP /
-// IMDS blocklist.
+// Install the SSRF fetch wrapper BEFORE the bundle is imported so
+// @directive-run/query's / @directive-run/ai's internal fetch calls
+// (which the validator can't see because they live in external module
+// bodies) hit the loopback / private-IP / IMDS blocklist.
 installFetchWrapper();
 
 const port = parentPort;
 
 /**
  * Format a single console.log argument. Directive's `system.facts` is
- * a Proxy over a `FactsStore`; the audit (P0-DM1) found that
+ * a Proxy over a `FactsStore`; the audit found that
  * `JSON.stringify(system.facts)` produces `"{}"` (or store internals)
  * because the proxy has no `toJSON`. So `console.log("[start] facts:",
  * system.facts)` rendered as `[start] facts: {}` in the transcript
@@ -207,11 +206,11 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
         `facts snapshot failed: ${(err as Error).message}\n${(err as Error).stack ?? ""}`,
       );
     }
-    // Phase A audit P0-DM2: snapshot derivations. The host pre-extracts
-    // the key names from the source files (system.derive's proxy has no
-    // ownKeys trap) and passes them via message.derivationKeys; we read
-    // each via `system.derive[key]`, swallowing per-key errors so one
-    // bad derivation doesn't kill the whole snapshot.
+    // Snapshot derivations. The host pre-extracts the key names from
+    // the source files (system.derive's proxy has no ownKeys trap) and
+    // passes them via message.derivationKeys; we read each via
+    // `system.derive[key]`, swallowing per-key errors so one bad
+    // derivation doesn't kill the whole snapshot.
     if (message.derivationKeys.length > 0 && system.derive) {
       for (const key of message.derivationKeys) {
         try {

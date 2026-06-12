@@ -98,12 +98,12 @@ async function getTempBundleDir(): Promise<string> {
  * Write the bundled snippet to a temp file Node's ESM loader can
  * import via a file:// URL.
  *
- * Phase A audit P0-A1: previous versions wrote inside the sandbox
- * package's own directory so Node's resolver could walk up to find
- * `@directive-run/core` in node_modules — but Vercel / AWS Lambda /
- * Cloud Run all ship read-only FS outside `/tmp`. The bundler now
- * rewrites `@directive-run/*` imports to ABSOLUTE `file://` URLs of
- * the host's resolved paths (see `bundleSandboxFiles`), so the temp
+ * Previous versions wrote inside the sandbox package's own directory
+ * so Node's resolver could walk up to find `@directive-run/core` in
+ * node_modules — but Vercel / AWS Lambda / Cloud Run all ship
+ * read-only FS outside `/tmp`. The bundler now rewrites
+ * `@directive-run/*` imports to ABSOLUTE `file://` URLs of the
+ * host's resolved paths (see `bundleSandboxFiles`), so the temp
  * file can live in `/tmp` without needing a node_modules anchor.
  *
  * Caller MUST clean the directory up in a finally block.

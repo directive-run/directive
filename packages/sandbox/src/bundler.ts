@@ -22,8 +22,8 @@ import type { PlaygroundFile } from "./types.js";
 /**
  * Resolve a `@directive-run/*` bare specifier to an absolute file://
  * URL using the host process's node_modules. Required because the
- * worker imports the bundle from `/tmp` (Phase A P0-A1) where Node's
- * ESM resolver can't walk up to find `@directive-run/*`. By rewriting
+ * worker imports the bundle from `/tmp` where Node's ESM resolver
+ * can't walk up to find `@directive-run/*`. By rewriting
  * to absolute file URLs at bundle time, the worker doesn't need a
  * node_modules anchor.
  *
@@ -138,12 +138,12 @@ export async function bundleSandboxFiles(
                 return null;
               }
               if (args.path.startsWith("@directive-run/")) {
-                // Phase A audit P0-A1: rewrite to absolute file:// URL
-                // so the worker's `/tmp/.../bundle.mjs` can import the
-                // package without needing node_modules above /tmp.
-                // Falls back to the bare specifier when resolution
-                // fails — the legacy "write next to node_modules"
-                // pattern still works as a backup.
+                // Rewrite to absolute file:// URL so the worker's
+                // `/tmp/.../bundle.mjs` can import the package without
+                // needing node_modules above /tmp. Falls back to the
+                // bare specifier when resolution fails — the legacy
+                // "write next to node_modules" pattern still works
+                // as a backup.
                 const resolved = resolveDirectivePackageToFileUrl(args.path);
                 if (resolved) {
                   return { external: true, path: resolved };

@@ -3,16 +3,15 @@
  * across a payload of source files. Mirrors the lightweight pattern the
  * docs site's DevTools panel uses for static-structure parsing.
  *
- * Phase A AE audit (P0-DM2): `system.derive` is a Proxy with no
- * `ownKeys` trap, so the worker can't enumerate derivations from inside
- * the sandbox. Instead, the host pre-scans source files for the
- * declared keys and forwards them to the worker, which then reads
- * `system.derive[key]` for each.
+ * `system.derive` is a Proxy with no `ownKeys` trap, so the worker
+ * can't enumerate derivations from inside the sandbox. Instead, the
+ * host pre-scans source files for the declared keys and forwards them
+ * to the worker, which then reads `system.derive[key]` for each.
  *
  * Best-effort: a module that builds derivation keys dynamically (e.g.
  * `derive: Object.fromEntries(keys.map(k => [k, fn]))`) won't be
- * extracted. That's acceptable for the audit's stated goal of
- * "transcript reflects what the module declared."
+ * extracted. That's acceptable for the stated goal of "transcript
+ * reflects what the module declared."
  */
 
 import type { PlaygroundFile } from "./types.js";

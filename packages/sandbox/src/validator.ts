@@ -247,9 +247,9 @@ function checkDynamicImportsAndCalls(
 }
 
 /**
- * The Phase A AE security audit (docs/AE-AUDIT-SANDBOX.md) found that
- * the original "skip identifiers in property-access position" rule
- * (added to avoid `{module: x}` false-positives) was a TOTAL bypass:
+ * The June 2026 security audit (docs/security/sandbox-audit-2026-06.md)
+ * found that the original "skip identifiers in property-access position"
+ * rule (added to avoid `{module: x}` false-positives) was a TOTAL bypass:
  * `globalThis.process.exit()` worked because `process` was a property
  * name and got skipped. This pass closes that hole.
  *

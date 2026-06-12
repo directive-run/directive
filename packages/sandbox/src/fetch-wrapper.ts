@@ -7,10 +7,10 @@
  * calls global `fetch` internally — the validator never sees those
  * calls because they live in external module bodies.
  *
- * Phase A audit P0-S2: a snippet that builds a `createBaseQuery({
+ * Threat closed: a snippet that builds a `createBaseQuery({
  * baseUrl: "http://169.254.169.254" })` triggers an outbound HTTP
- * request from the worker to AWS IMDS. On the directive.run/api/run-
- * sandbox Vercel surface, that's SSRF from a privileged egress.
+ * request from the worker to AWS IMDS. On the directive.run/api/sandbox
+ * Vercel surface, that's SSRF from a privileged egress.
  *
  * This wrapper rejects:
  *
