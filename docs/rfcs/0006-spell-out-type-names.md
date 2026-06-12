@@ -97,9 +97,9 @@ those via `pnpm --filter @directive-run/knowledge generate-sitemap`).
   covers the 5 TS-inference edge cases where alias identity matters:
   generic constraint, mapped-key, conditional distribution,
   tagged-union literal, barrel re-export.
-- External-consumer smoke: `pnpm -C ../minglingo build` — verifies
-  Minglingo (consumes `ModuleDef`) compiles against the renamed types
-  via the back-compat aliases.
+- External-consumer smoke: a production-consumer typecheck verifies
+  the renamed types compose through the back-compat aliases (the
+  external app consumes `ModuleDef` directly).
 
 ## Why an RFC and not a single fix commit
 

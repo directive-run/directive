@@ -121,7 +121,7 @@ expect(sys.modules.b.derive.derivedFromA).toBe('...');
 
 ## Anti-pattern: rolling your own `flushAsync`
 
-Several code-bases (Minglingo had 49 instances) wrote local helpers like:
+Several codebases (one production migration had 49 instances) wrote local helpers like:
 
 ```ts
 async function flushAsync() {

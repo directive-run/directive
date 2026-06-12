@@ -1,7 +1,7 @@
 # Migrating from XState
 
-Distilled from porting 55 XState machines (~26,000 LOC) to Directive across the
-Minglingo codebase. This guide is the cheat-sheet you wish existed before
+Distilled from porting 55 XState machines (~26,000 LOC) to Directive across a
+production codebase. This guide is the cheat-sheet you wish existed before
 starting. It covers concept mapping, recurring patterns, and a few non-obvious
 gotchas the first port through each shape will hit.
 
@@ -214,9 +214,10 @@ those, until feature work pauses.
 
 ## Per-module rollout pattern
 
-Ship each port behind a feature flag (`MINGLINGO_DIRECTIVE_<MachineName>` in
-the Minglingo case). Run both implementations in parallel for 7 days, log
-divergence, then flip. Delete the XState file two weeks after the soak.
+Ship each port behind a per-machine feature flag (e.g.
+`<PRODUCT>_DIRECTIVE_<MachineName>`). Run both implementations in parallel
+for 7 days, log divergence, then flip. Delete the XState file two weeks
+after the soak.
 
 This pattern is independent of Directive – it's the rollback-discipline part
 that makes solo-dev migration tractable.

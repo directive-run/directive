@@ -16,7 +16,7 @@ Both surface the same underlying primitive: dynamic mutation of a system's modul
 
 ## Motivation
 
-The Minglingo migration converged on these gaps in the `spawn` analogue analysis (Item 22 originally, refined in Item 26):
+A production XState→Directive migration converged on these gaps in the `spawn` analogue analysis (Item 22 originally, refined in Item 26):
 
 - **Per-turn `turnMachine`** in the realtime cluster wants one Directive system per active turn, with the parent `turnBasedGameMachine` opening + closing them as turns begin and end. Today, every turn requires `createSystem` + manual lifecycle. Cleanup on early termination has no engine support.
 - **Per-player `playerScoreMachine`** in the team-wars cluster wants one module instance per joined player. Today, the player set is encoded as a single `Map`-shaped fact, losing the per-player module isolation that XState `spawnChild` provided.
@@ -27,7 +27,7 @@ Without engine support, every consumer hand-rolls:
 2. Per-instance `createSystem` + `start` + `destroy` plumbing.
 3. Custom dispose-on-error semantics that don't compose with the parent system's `destroy()`.
 
-Three Minglingo cycles paid this tax (turnMachine, teamWarsMachine, tournamentMachine). A first-class API would close the gap.
+Three production migration cycles paid this tax (turnMachine, teamWarsMachine, tournamentMachine). A first-class API would close the gap.
 
 ## Proposed API
 
@@ -230,8 +230,8 @@ contract locked.
 
 This RFC is **draft**. Open for review. Defer implementation until:
 
-1. AE-review-loop on this doc (security/correctness, architecture, DX, domain expert).
-2. At least one concrete Minglingo use case prototyped on top of the proposed API (likely the realtime cluster's `turnMachine`-per-turn pattern, since the migration cycle for `turnBasedGameMachine` documents the exact pain this would close).
+1. Adversarial multi-lens review on this doc (security/correctness, architecture, DX, domain expert).
+2. At least one concrete production use case prototyped on top of the proposed API (likely the realtime cluster's `turnMachine`-per-turn pattern, since the migration cycle for `turnBasedGameMachine` documents the exact pain this would close).
 3. Determinism + replay path validated against `@directive-run/timeline`'s recorded streams.
 
 ## See also

@@ -3,7 +3,7 @@
 - **Status:** Draft (2026-05-18)
 - **Author:** Jason Comes
 - **Supersedes:** the `bind: 'auto'` constraint-binding shipped (and reverted) with the v1.4.0 release attempts.
-- **Related:** the Minglingo XState→Directive migration (Phase A – executor-tail-clobber).
+- **Related:** the production XState→Directive migration (executor-tail-clobber finding).
 
 ## Summary
 
@@ -48,7 +48,7 @@ re-evaluating the constraint's `when()` predicate. Two fatal flaws:
 1. **All-or-nothing.** Once `when()` flipped false, *every* subsequent write
    was dropped – including writes to *data* facts that the resolver
    legitimately produced (e.g. "this player won", "this number was called").
-   A resolver that writes `data` then `status` lost the data. In Minglingo
+   A resolver that writes `data` then `status` lost the data. In production
    this silently dropped a player's win if the round ended a moment after
    they claimed it.
 

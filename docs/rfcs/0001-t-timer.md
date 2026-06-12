@@ -14,9 +14,9 @@ with replay, dehydrate/hydrate, fake timers, and SSR.
 
 ## Motivation
 
-Across the 55-cycle Minglingo migration, four distinct items all converged
-on the same root problem: **time is not currently a first-class fact in
-Directive.**
+Across a 55-cycle production XState→Directive migration, four distinct items
+all converged on the same root problem: **time is not currently a first-class
+fact in Directive.**
 
 1. **Item #4 – No declarative `after`.** XState's `after: { 5000: 'TIMEOUT' }`
    becomes an imperative `setTimeout` in an effect. The effect can't be
@@ -300,10 +300,10 @@ Estimated effort: 1.5 weeks for a solo dev with the surface area locked.
 
 This RFC is **draft**. Open for review. Defer implementation until:
 
-1. AE-review-loop on this doc (security/correctness, architecture, DX,
-   domain expert). Settle the clock-source choice on paper.
-2. One concrete use-case prototype (in Minglingo: pick the simplest
-   timer-using machine – likely `gameLobbyMachine`'s start-countdown – and
+1. Adversarial multi-lens review on this doc (security/correctness,
+   architecture, DX, domain expert). Settle the clock-source choice on paper.
+2. One concrete use-case prototype (pick the simplest production
+   timer-using machine — likely a lobby's start-countdown — and
    sketch how it would read with `t.timer` before / after).
 3. Budget confirmation. 1.5 weeks is a real fraction of the program; if
    Phase 5 (Time-travel REPL) is the bigger viral lever, this RFC may be

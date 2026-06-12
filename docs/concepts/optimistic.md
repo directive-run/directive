@@ -1,7 +1,7 @@
 # `@directive-run/optimistic` – resolver-scope snapshot + rollback
 
 > The "snapshot before, restore on catch, rethrow" pattern – the one
-> that recurred ~3 times across the Minglingo migration – as a one-line
+> that recurred ~3 times across a production migration – as a one-line
 > macro. Single resolver invocation. Loud-fail on non-cloneable values.
 
 ## What it solves

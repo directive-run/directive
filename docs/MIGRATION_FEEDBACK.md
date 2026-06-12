@@ -1,9 +1,9 @@
 # Directive – improvements + gaps surfaced from 22 XState→Directive cycles
 
-Captured live during Workstream-B migrations of Minglingo's
-state-machine layer. Each item is a real friction point, with the
-cycle number where it bit, and a concrete proposal where one has
-crystallized.
+Captured live during a production XState→Directive migration of a
+state-machine layer with 55 machines and ~26k LOC. Each item is a real
+friction point, with the cycle number where it bit, and a concrete
+proposal where one has crystallized.
 
 ---
 
@@ -761,13 +761,13 @@ material rather than incremental fixes:
 
 ---
 
-## What Minglingo Updates AFTER Each Directive Ship
+## What the Consumer Updates AFTER Each Directive Ship
 
 **Are existing 682 tests at risk?** No. They use workarounds for current
 gaps (local `flushAsync`, `dateMs` instead of Date, callback-deps instead
 of `sendParent`). Future ships would simplify them, not break them.
 
-| Directive ships | Minglingo cleanup | LOC saved |
+| Directive ships | Consumer cleanup | LOC saved |
 |---|---|---|
 | #1 (flushAsync) | Replace 55 local impls with one import | ~275 |
 | #20 (JSON warn) | No rework – workarounds stay correct | 0 |
@@ -787,8 +787,8 @@ of `sendParent`). Future ships would simplify them, not break them.
 - Phase 4: `t.timer()` RFC → implementation
 - Phase 5: Time-travel REPL (the Sherlock)
 
-**Track B** – Minglingo rollout (parallel, 2-4 weeks):
-- Wire `MINGLINGO_DIRECTIVE_<X>` feature flags
+**Track B** – Consumer rollout (parallel, 2-4 weeks):
+- Wire per-machine feature flags
 - Migrate React surfaces (`useMachine` → `@directive-run/react`)
 - Per-module 7-day soaks
 - Monitor production divergence

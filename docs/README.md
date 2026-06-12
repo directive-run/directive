@@ -2,8 +2,9 @@
 
 Source-of-truth docs for [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core)
 and the surrounding package family. Most of these docs were written or
-expanded during the 55-machine Minglingo migration (April 2026); the
-field-report lives in [`posts/migrating-55-machines.md`](./posts/migrating-55-machines.md).
+expanded during a 55-machine production XState→Directive migration in
+April 2026; the field-report lives in
+[`posts/migrating-55-machines.md`](./posts/migrating-55-machines.md).
 
 ## Start here
 

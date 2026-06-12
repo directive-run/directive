@@ -2,11 +2,11 @@
 
 > Collapse the `pendingAction` ceremony – fact + event + constraint +
 > resolver – into a typed handler map. Closes the 12-instance shape
-> that surfaced across the Minglingo migration into one declaration.
+> that surfaced across a production migration into one declaration.
 
 ## The shape
 
-Across the 55-cycle Minglingo XState → Directive migration, **12 modules**
+Across a 55-cycle production XState → Directive migration, **12 modules**
 ended up with the same four-piece pattern:
 
 - a nullable `pendingAction` fact holding a discriminated union
