@@ -16,7 +16,7 @@ npm install @directive-run/mutator
 
 ## What it solves
 
-Across the 55-cycle Minglingo XState→Directive migration, **12 modules**
+Across a 55-cycle production XState→Directive migration, **12 modules**
 ended up with the same shape:
 
 - a nullable `pendingAction` fact holding a discriminated union

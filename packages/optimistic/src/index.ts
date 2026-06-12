@@ -9,7 +9,7 @@
  * single resolver/handler invocation. It is NOT a system-wide
  * transaction primitive, NOT a replay-undo, and does NOT cross module
  * boundaries. Treat it as the "try / restore on catch" pattern that
- * recurred ~3 times in the Minglingo migration, refactored into a
+ * recurred ~3 times in a production migration, refactored into a
  * one-line helper.
  *
  * @see ../README.md for the full API and a worked example.

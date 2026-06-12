@@ -19,8 +19,8 @@
  *
  * The "hook-as-bridge" pattern — a `useEffect` that owns an external
  * subscription, maps incoming payloads, and dispatches `sys.events.X()` —
- * shows up in 7+ call sites across the Sizls workspace (Minglingo's
- * `useActiveRoundSystem`, `useBattleRoyaleSystem`, `eventClaims.realtime.ts`,
+ * shows up in 7+ call sites in the production app we dogfood Directive
+ * on (multiple realtime hooks plus a per-event-stream realtime adapter,
  * etc.). Each site re-derives the lifecycle plumbing.
  *
  * A `source` declares that plumbing as a first-class module field. The

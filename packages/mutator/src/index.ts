@@ -5,7 +5,7 @@
  * ceremony — fact + event + constraint + resolver — into a typed handler
  * map.
  *
- * Background: across the 55-cycle Minglingo migration, 12 modules ended
+ * Background: across a 55-cycle production migration, 12 modules ended
  * up with the same shape:
  *   - a nullable `pendingAction` fact holding a discriminated union
  *   - an event that sets it

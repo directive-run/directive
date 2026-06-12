@@ -9,7 +9,7 @@ npm install @directive-run/optimistic
 ## What it solves
 
 The "snapshot before, restore on catch, rethrow" pattern that recurred
-~3 times during the Minglingo migration. Manual version:
+~3 times during a production migration. Manual version:
 
 ```ts
 submit: async ({ payload, facts }) => {

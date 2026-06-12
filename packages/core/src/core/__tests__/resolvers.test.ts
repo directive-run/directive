@@ -1355,8 +1355,9 @@ describe("edge cases", () => {
 
 /**
  * Setup helper for RFC-0003 tests: a richer schema (matches the canonical
- * Minglingo Phase A fact shape) with a `getConstraintBinding` lookup.
- * Each binding entry names the facts the triggering resolver owns.
+ * production fact shape from the migration that motivated the RFC) with
+ * a `getConstraintBinding` lookup. Each binding entry names the facts
+ * the triggering resolver owns.
  */
 function setupBinding(
   bindings: Record<string, { fields: readonly string[] }>,
