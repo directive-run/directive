@@ -8,7 +8,14 @@ import { createDisabledHistory, createHistoryManager } from "../history.js";
 
 function setup(
   opts: {
-    historyOption?: boolean | { maxSnapshots?: number };
+    historyOption?:
+      | boolean
+      | {
+          maxSnapshots?: number;
+          redactSnapshot?: (
+            facts: Record<string, unknown>,
+          ) => Record<string, unknown>;
+        };
     onSnapshot?: (s: unknown) => void;
     onHistoryChange?: (from: number, to: number) => void;
   } = {},

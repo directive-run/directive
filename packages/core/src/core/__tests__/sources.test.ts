@@ -1593,4 +1593,115 @@ describe("source primitive — end-to-end with createSystem", () => {
     manager.attachAll(() => ({ accepted: true }));
     await expect(manager.evictAll()).resolves.toBeUndefined();
   });
+
+  // R1 Distrib M4 — `cleanupAllAsync` per-source timeout.
+  //
+  // Prior behavior: a single source's `unsubscribe()` returning a Promise
+  // that never resolved would block the entire teardown sequence until
+  // the host runtime hard-killed the process. The per-source timeout
+  // caps each unsubscribe at 5s (default), surfaces the hang via
+  // `reportError`, and continues with the remaining sources so the
+  // overall manager.stopAsync() / system.stopAsync() chain can
+  // complete.
+  it("R1 Distrib M4: cleanupAllAsync isolates a hung unsubscribe via timeout", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    let lastCleaned = false;
+    const manager = createSourcesManager(
+      {
+        hung: {
+          // Returns a Promise that never resolves — simulates a Supabase
+          // channel.unsubscribe() stuck on a broker that never acks.
+          attach: () => () => new Promise<void>(() => undefined),
+        },
+        clean: {
+          attach: () => () => {
+            lastCleaned = true;
+          },
+        },
+      },
+      { hung: "mod-a", clean: "mod-b" },
+      { onError },
+    );
+
+    manager.attachAll(() => ({ accepted: true }));
+
+    // Use fake timers so we don't burn 5 real seconds in the test.
+    vi.useFakeTimers();
+    const cleanupPromise = manager.cleanupAllAsync();
+    // Tick past the 5s per-source timeout.
+    await vi.advanceTimersByTimeAsync(6_000);
+    await cleanupPromise;
+    vi.useRealTimers();
+
+    // The hang surfaced as a cleanup-phase error...
+    const cleanupErrors = onError.mock.calls.filter(
+      ([, , phase]) => phase === "cleanup",
+    );
+    expect(cleanupErrors.length).toBe(1);
+    expect(cleanupErrors[0]?.[0]).toBe("hung");
+    expect(
+      (cleanupErrors[0]?.[3] as Error)?.message ?? "",
+    ).toContain("timeout");
+    // ...and the clean source's unsubscribe still ran (reverse-LIFO
+    // order — `clean` ran first since it was registered last).
+    expect(lastCleaned).toBe(true);
+    consoleErrorSpy.mockRestore();
+  });
+
+  // R1 Distrib M5 — `evictAll` per-source timeout.
+  //
+  // Prior behavior: a slow `onEvict` (e.g., audit-log flush hanging on
+  // a saturated sink) consumed the engine's evict deadline at the
+  // expense of downstream sources — late sources in the registration
+  // order never got their `onEvict` call. The per-source timeout caps
+  // each onEvict at the default and continues so registration-order
+  // sources are not starved.
+  it("R1 Distrib M5: evictAll isolates a hung onEvict via timeout", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    let lastEvicted = false;
+    const manager = createSourcesManager(
+      {
+        hung: {
+          attach: () => () => undefined,
+          // onEvict that never resolves.
+          onEvict: () => new Promise<void>(() => undefined),
+        },
+        last: {
+          attach: () => () => undefined,
+          onEvict: () => {
+            lastEvicted = true;
+          },
+        },
+      },
+      { hung: "mod-a", last: "mod-b" },
+      { onError },
+    );
+
+    manager.attachAll(() => ({ accepted: true }));
+
+    vi.useFakeTimers();
+    const evictPromise = manager.evictAll();
+    await vi.advanceTimersByTimeAsync(6_000);
+    await evictPromise;
+    vi.useRealTimers();
+
+    const runtimeErrors = onError.mock.calls.filter(
+      ([, , phase]) => phase === "runtime",
+    );
+    expect(runtimeErrors.length).toBe(1);
+    expect(runtimeErrors[0]?.[0]).toBe("hung");
+    expect(
+      (runtimeErrors[0]?.[3] as Error)?.message ?? "",
+    ).toContain("timeout");
+    // The downstream `last` source still got its onEvict — the hang
+    // didn't consume its slice of the deadline.
+    expect(lastEvicted).toBe(true);
+    consoleErrorSpy.mockRestore();
+  });
 });

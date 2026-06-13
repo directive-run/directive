@@ -102,6 +102,55 @@ interface SourceCounters {
   detachedAt: number | null;
 }
 
+/**
+ * Default per-source lifecycle timeout. Caps any single `unsubscribe()`
+ * or `onEvict()` so a hung transport (Supabase channel that never acks,
+ * Cloudflare DO storage flush wedged on a saturated D1, audit-log sink
+ * paused) cannot stall the rest of teardown / eviction. Five seconds is
+ * comfortable for healthy transports and short enough for ops to
+ * recognize a hang.
+ */
+const DEFAULT_PER_SOURCE_TIMEOUT_MS = 5_000;
+const perSourceTimeoutMs = DEFAULT_PER_SOURCE_TIMEOUT_MS;
+
+/**
+ * Race a Promise against a wall-clock timeout. On timeout, fires
+ * `onTimeout` with a structured error and resolves; the source's
+ * underlying work continues in the background but the caller is
+ * unblocked. The Promise's eventual rejection (after the timeout
+ * fired) is swallowed so it doesn't surface as `unhandledRejection`
+ * in the host.
+ */
+async function raceWithTimeout<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+  onTimeout: () => void,
+): Promise<T | undefined> {
+  let timeoutFired = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      timeoutFired = true;
+      onTimeout();
+      resolve(undefined);
+    }, timeoutMs);
+  });
+  // Catch the work's rejection AFTER the timeout fired so we don't
+  // emit unhandledRejection. The first resolution wins via Promise.race.
+  const safeWork = work.catch((err) => {
+    if (timeoutFired) {
+      // The timeout already fired; swallow the late rejection.
+      return undefined as T;
+    }
+    throw err;
+  });
+  try {
+    return await Promise.race([safeWork, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function emptyCounters(): SourceCounters {
   return {
     publishCount: 0,
@@ -668,9 +717,13 @@ export function createSourcesManager(
       if (phase !== "attached") return;
       phase = "stopped";
       // Reverse-order teardown so resources release in LIFO order.
-      // Await each unsubscribe so external transports (Supabase
-      // channel.unsubscribe(), Cloudflare DO storage flushes) complete
-      // before the manager reports cleanup done.
+      // Each unsubscribe is wrapped in a per-source timeout
+      // (`perSourceTimeoutMs`, default 5_000ms) so one hanging
+      // transport — Supabase channel.unsubscribe() stuck on a
+      // broker that never acks, Cloudflare DO storage flush that
+      // wedges — cannot block the rest of teardown indefinitely.
+      // The hang surfaces as a `reportError` and teardown continues.
+      const timeoutMs = perSourceTimeoutMs;
       for (let i = attached.length - 1; i >= 0; i--) {
         const record = attached[i];
         if (!record || record.detached) continue;
@@ -680,7 +733,17 @@ export function createSourcesManager(
         c.detachedAt = Date.now();
         counters.set(record.id, c);
         try {
-          await record.unsubscribe();
+          await raceWithTimeout(
+            Promise.resolve(record.unsubscribe()),
+            timeoutMs,
+            () => {
+              const err = new Error(
+                `[Directive] Module "${record.moduleId}" → Source "${record.id}" unsubscribe exceeded ${timeoutMs}ms timeout; abandoning to unblock teardown.`,
+              );
+              console.error(err.message);
+              reportError(record.id, record.moduleId, "cleanup", err);
+            },
+          );
         } catch (rawError) {
           const error =
             rawError instanceof Error ? rawError : new Error(String(rawError));
@@ -701,14 +764,27 @@ export function createSourcesManager(
       // Eviction runs in registration order so sources with downstream
       // dependencies close in the right order (the dual of unsubscribe's
       // reverse-registration order — same rationale as start vs. stop).
-      // Each onEvict runs in a try/catch so a single failing eviction
-      // cannot block the rest.
+      // Each onEvict is wrapped in a per-source timeout so a slow
+      // `onEvict` (e.g., audit-log flush hanging on a saturated sink)
+      // doesn't consume the engine's evict deadline at the expense of
+      // downstream sources. Failures isolate via try/catch + timeout.
+      const timeoutMs = perSourceTimeoutMs;
       for (const record of attached) {
         if (record.detached) continue;
         const def = definitions.get(record.id)?.def;
         if (!def?.onEvict) continue;
         try {
-          await def.onEvict();
+          await raceWithTimeout(
+            Promise.resolve(def.onEvict()),
+            timeoutMs,
+            () => {
+              const err = new Error(
+                `[Directive] Module "${record.moduleId}" → Source "${record.id}" onEvict exceeded ${timeoutMs}ms timeout; abandoning so downstream sources still get evicted.`,
+              );
+              console.error(err.message);
+              reportError(record.id, record.moduleId, "runtime", err);
+            },
+          );
         } catch (rawError) {
           const error =
             rawError instanceof Error ? rawError : new Error(String(rawError));
