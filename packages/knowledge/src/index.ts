@@ -71,6 +71,20 @@ function loadAllExamples(): Map<string, string> {
   return map;
 }
 
+/**
+ * Look up a bundled knowledge file by name. Returns the raw markdown
+ * string. Returns `""` when the name isn't known — callers driving an
+ * LLM should pair this with {@link hasKnowledge} so a typo turns
+ * into an actionable error instead of a silently empty prompt.
+ *
+ * @example
+ * ```ts
+ * import { getKnowledge, hasKnowledge } from "@directive-run/knowledge";
+ *
+ * if (!hasKnowledge("guardrails")) throw new Error("typo");
+ * const md = getKnowledge("guardrails");
+ * ```
+ */
 export function getKnowledge(name: string): string {
   if (!knowledgeCache) {
     knowledgeCache = loadAllKnowledge();
@@ -79,6 +93,11 @@ export function getKnowledge(name: string): string {
   return knowledgeCache.get(name) ?? "";
 }
 
+/**
+ * Return every loaded knowledge file as `name → markdown`. Consumers
+ * iterating the corpus (full-text search, embedding builder, RAG
+ * index) read this once and key off the returned map.
+ */
 export function getAllKnowledge(): ReadonlyMap<string, string> {
   if (!knowledgeCache) {
     knowledgeCache = loadAllKnowledge();
@@ -87,12 +106,50 @@ export function getAllKnowledge(): ReadonlyMap<string, string> {
   return knowledgeCache;
 }
 
+/**
+ * `true` when a knowledge file with this exact name is bundled.
+ * Use this BEFORE {@link getKnowledge} when the name is user / agent
+ * input — `getKnowledge` returns `""` on miss, which is
+ * indistinguishable from an intentionally empty file.
+ *
+ * @example
+ * ```ts
+ * if (!hasKnowledge(userTyped)) {
+ *   console.error(`unknown knowledge file: ${userTyped}`);
+ *   console.error(`available: ${[...getAllKnowledge().keys()].join(", ")}`);
+ *   return;
+ * }
+ * ```
+ */
+export function hasKnowledge(name: string): boolean {
+  if (!knowledgeCache) {
+    knowledgeCache = loadAllKnowledge();
+  }
+  return knowledgeCache.has(name);
+}
+
+/**
+ * Look up a bundled example file by name. Returns the raw source.
+ * Returns `""` when the name isn't known — pair with {@link hasExample}
+ * when the input is user-controlled.
+ */
 export function getExample(name: string): string {
   if (!exampleCache) {
     exampleCache = loadAllExamples();
   }
 
   return exampleCache.get(name) ?? "";
+}
+
+/**
+ * `true` when an example file with this exact name is bundled.
+ * The miss-vs-empty disambiguator for {@link getExample}.
+ */
+export function hasExample(name: string): boolean {
+  if (!exampleCache) {
+    exampleCache = loadAllExamples();
+  }
+  return exampleCache.has(name);
 }
 
 export function getAllExamples(): ReadonlyMap<string, string> {

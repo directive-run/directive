@@ -10,27 +10,47 @@ You probably don't depend on this package directly — it's the engine behind th
 import {
   generateModule,
   generateOrchestrator,
+  generateRunner,
   validateModuleName,
   suggestFileNames,
   requiredPackages,
   toCamelCase,
   MODULE_SECTIONS,
   SCAFFOLD_KINDS,
+  type GeneratedScaffold,
   type ModuleSection,
   type ScaffoldKind,
 } from "@directive-run/scaffold";
 
-// Generate a full Directive module with every section
-const source = generateModule("traffic-light");
+// Generate a full Directive module with every section. Returns a
+// `GeneratedScaffold` object — a paired (moduleSource, runnerSource)
+// bundle so the consumer can drop the library AND a driver that
+// boots it in one go.
+const result = generateModule("traffic-light");
+// result.moduleSource    — the `createModule(...)` library text
+// result.runnerSource    — the `createSystem` + `start` + log driver
+// result.suggestedFilenames — { module: "traffic-light.ts", runner: "main.ts" }
+// result.runnable        — true when moduleSource already calls .start()
 
 // Generate a minimal module (schema + init only)
 const minimal = generateModule("traffic-light", []);
 
 // Pick which sections to include
-const customized = generateModule("traffic-light", ["derive", "constraints", "resolvers"]);
+const customized = generateModule("traffic-light", [
+  "derive",
+  "constraints",
+  "resolvers",
+]);
 
-// Generate an AI orchestrator module
+// Generate an AI orchestrator module (also returns GeneratedScaffold)
 const orch = generateOrchestrator("chat-agent");
+
+// Build a runner for an existing module source (useful when the
+// consumer already has a module and just wants the driver scaffolded).
+const runner = generateRunner({
+  moduleSource: result.moduleSource,
+  kebabName: "traffic-light",
+});
 
 // Validate a name before generating
 const ok = validateModuleName("traffic-light"); // true | string
@@ -42,6 +62,21 @@ suggestFileNames("traffic-light", "module");
 // What the consumer needs to install
 requiredPackages("orchestrator");
 // → ["@directive-run/core", "@directive-run/ai"]
+```
+
+## Writing to disk
+
+`generateModule` returns paired sources, not a single string. Drop both
+files onto the consumer's filesystem so the runner can import from the
+module:
+
+```typescript
+import { writeFileSync } from "node:fs";
+
+const { moduleSource, runnerSource, suggestedFilenames } =
+  generateModule("traffic-light");
+writeFileSync(suggestedFilenames.module, moduleSource);
+if (runnerSource) writeFileSync(suggestedFilenames.runner, runnerSource);
 ```
 
 ## Naming rule

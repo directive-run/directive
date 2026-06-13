@@ -207,7 +207,7 @@ lands.
 // good: withOptimistic only sees the handler that actually does the work.
 // If cancellable aborts, the abort never reaches the optimistic snapshot.
 const handler = cancellable(
-  withOptimistic<Facts, "draft">(["draft"])(async (req, ctx, signal) => {
+  withOptimistic<Facts>(["draft"])(async (req, ctx, signal) => {
     ctx.facts.draft = req.text;
     await saveDraft(req.text, { signal });
   }),
@@ -215,7 +215,7 @@ const handler = cancellable(
 
 // bad: a supersede abort throws past withOptimistic, which then rolls back
 // `draft` even though the new dispatch was about to set it.
-const handler = withOptimistic<Facts, "draft">(["draft"])(
+const handler = withOptimistic<Facts>(["draft"])(
   cancellable(async (req, ctx, signal) => {
     ctx.facts.draft = req.text;
     await saveDraft(req.text, { signal });

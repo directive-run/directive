@@ -71,7 +71,10 @@ it('completes the load chain', async () => {
 
   sys.start();
   sys.events.LOAD();
-  await flushAsync();
+  // `system.settle()` drains the reconciliation queue and waits for
+  // every in-flight resolver to either resolve, reject, or cancel —
+  // i.e. it's the wait-until-quiet primitive for assertions.
+  await sys.settle();
 
   expect(sys.facts.status).toBe('ready'); // ← if this fails, timeline prints
   sys.destroy();
@@ -116,7 +119,7 @@ const sys = createSystem({ ... });
 recordTimeline(sys, { id: 'load' });
 sys.start();
 sys.events.LOAD();
-await flushAsync();
+await sys.settle();
 
 const out = formatTimeline(getTimeline('load'), { color: false, maxFrames: 30 });
 console.log(out);
@@ -131,7 +134,7 @@ import { withTimeline } from '@directive-run/timeline';
 await withTimeline('my-test', sys, async () => {
   sys.start();
   sys.events.START();
-  await flushAsync();
+  await sys.settle();
   expect(sys.facts.status).toBe('done');
 });
 ```
@@ -214,7 +217,7 @@ it('completes in under 50ms with no cascade', async () => {
   const t = recordTimeline(sys, { id: 'fast' });
   sys.start();
   sys.events.LOAD();
-  await flushAsync();
+  await sys.settle();
 
   expect(t).toReachInMs('status', 'ready', 50);     // fact reached value
   expect(t).toFireConstraint('load');                // fired ≥1 time
