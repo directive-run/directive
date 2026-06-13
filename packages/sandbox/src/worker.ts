@@ -21,6 +21,7 @@
 import { performance } from "node:perf_hooks";
 import { parentPort } from "node:worker_threads";
 import { installFetchWrapper } from "./fetch-wrapper.js";
+import { sanitizeStack } from "./sanitize-stack.js";
 import type {
   SandboxResult,
   WorkerInputMessage,
@@ -150,32 +151,6 @@ interface SandboxSystem {
 declare global {
   // eslint-disable-next-line no-var
   var __directiveSandbox_system__: SandboxSystem | null;
-}
-
-/**
- * Strip absolute paths from a stack trace before it crosses the
- * worker→host→client boundary. Stack traces leak the sandbox host's
- * filesystem layout — `/Users/<name>/`, `/home/<user>/`, the mkdtemp
- * bundle directory, and on serverless surfaces `/var/task/...`. These
- * become a fingerprint of the host environment any sandbox client can
- * read. Sanitize once at the boundary so every error path benefits.
- */
-function sanitizeStack(s: string | undefined): string {
-  if (!s) return "";
-  return (
-    s
-      // file:// URLs
-      .replace(/file:\/\/\/[^\s)]+/g, "<sandbox>")
-      // dev-machine home directories — macOS + Linux
-      .replace(/\/Users\/[^/\s)]+/g, "/<home>")
-      .replace(/\/home\/[^/\s)]+/g, "/<home>")
-      // macOS private-var prefix
-      .replace(/\/private\/var\/[^\s)]+/g, "<tmp>")
-      // serverless lambda / vercel function task root
-      .replace(/\/var\/task\/[^\s)]+/g, "<task>")
-      // generic tmp + lambda-runtime task paths
-      .replace(/\/tmp\/[^\s)]+/g, "<tmp>")
-  );
 }
 
 async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {

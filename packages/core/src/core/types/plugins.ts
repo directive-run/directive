@@ -350,12 +350,7 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
     id: string,
     moduleId: string,
     eventName: string,
-    reason:
-      | "post-destroy"
-      | "post-stop"
-      | "blocked-event-name"
-      | "invalid-event-name"
-      | "coalesced",
+    reason: import("./sources.js").SourceDropReason,
   ) => void;
 
   /**

@@ -654,6 +654,70 @@ describe("source primitive — observability via system.observe()", () => {
     ]);
   });
 
+  it("emits source.drop on system.observe() when the engine rejects a publish (R7 follow-on)", () => {
+    type DropFrame = {
+      type: "source.drop";
+      id: string;
+      moduleId: string;
+      eventName: string;
+      reason: string;
+    };
+    const drops: DropFrame[] = [];
+    const capturedRef: { current: SourcePublish | null } = { current: null };
+    const module = createModule("observed-drops", {
+      schema: {
+        facts: { count: t.number() },
+        events: { TICK: { delta: t.number() } },
+      },
+      init: (f) => {
+        f.count = 0;
+      },
+      events: {
+        TICK: (f, payload) => {
+          f.count = f.count + payload.delta;
+        },
+      },
+      sources: {
+        ticker: {
+          attach: (publish) => {
+            capturedRef.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+    });
+    const system = createSystem({ module });
+    system.observe((event) => {
+      if (event.type === "source.drop") {
+        drops.push({
+          type: event.type,
+          id: event.id,
+          moduleId: event.moduleId,
+          eventName: event.eventName,
+          reason: event.reason,
+        });
+      }
+    });
+
+    system.start();
+    // Empty-string event name trips the engine guard
+    // `reason: "invalid-event-name"`. Without the new source.drop
+    // ObservationEvent wiring, the drop would be invisible to
+    // `system.observe()` consumers — they'd only see it by polling
+    // `inspect().sources[i].dropCount`.
+    capturedRef.current?.("", {});
+    system.stop();
+
+    expect(drops).toHaveLength(1);
+    expect(drops[0]).toMatchObject({
+      type: "source.drop",
+      id: "ticker",
+      moduleId: "observed-drops",
+      eventName: "",
+      reason: "invalid-event-name",
+    });
+  });
+
   it("emits source.error for sources that throw on attach (without firing source.attach)", () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")

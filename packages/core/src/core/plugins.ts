@@ -161,12 +161,7 @@ export interface PluginManager<_S extends Schema = any> {
     id: string,
     moduleId: string,
     eventName: string,
-    reason:
-      | "post-destroy"
-      | "post-stop"
-      | "blocked-event-name"
-      | "invalid-event-name"
-      | "coalesced",
+    reason: import("./types/sources.js").SourceDropReason,
   ): void;
   emitSourceDetach(id: string, moduleId: string): void;
   emitSourceError(

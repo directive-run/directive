@@ -1580,6 +1580,13 @@ export function createEngine<S extends Schema>(
           observer({ type: "source.attach", id, moduleId }),
         onSourcePublish: (id: string, moduleId: string, eventName: string) =>
           observer({ type: "source.publish", id, moduleId, eventName }),
+        onSourceDrop: (
+          id: string,
+          moduleId: string,
+          eventName: string,
+          reason: import("./types/sources.js").SourceDropReason,
+        ) =>
+          observer({ type: "source.drop", id, moduleId, eventName, reason }),
         onSourceDetach: (id: string, moduleId: string) =>
           observer({ type: "source.detach", id, moduleId }),
         onSourceError: (

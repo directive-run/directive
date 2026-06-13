@@ -26,6 +26,16 @@ export interface RunInSandboxInput {
   files?: PlaygroundFile[];
   /** Wall-clock timeout in milliseconds. Defaults to 5000. Clamped to [100, 10000]. */
   timeoutMs?: number;
+  /**
+   * Optional cancellation signal. Wire this to your HTTP request's
+   * AbortSignal (Next.js / Express both expose one) so a client that
+   * disconnects mid-flight releases its worker slot immediately
+   * instead of leaking it. Without a signal, an abandoned `runInSandbox`
+   * call still queues into the per-process worker cap and only frees
+   * when the worker times out — under load this drives the cap to
+   * permanent deadlock.
+   */
+  signal?: AbortSignal;
 }
 
 export interface SandboxResult {

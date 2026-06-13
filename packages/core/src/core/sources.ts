@@ -24,6 +24,7 @@
 
 import type {
   SourceDef,
+  SourceDropReason,
   SourcePublish,
   SourceUnsubscribe,
 } from "./types/sources.js";
@@ -84,13 +85,7 @@ interface SourceCounters {
   publishCount: number;
   lastPublishAt: number | null;
   dropCount: number;
-  lastDropReason:
-    | "post-destroy"
-    | "post-stop"
-    | "blocked-event-name"
-    | "invalid-event-name"
-    | "coalesced"
-    | null;
+  lastDropReason: SourceDropReason | null;
   lastDropAt: number | null;
   errorCount: number;
   lastError: {
@@ -251,12 +246,7 @@ export interface SourcesManagerCallbacks {
     id: string,
     moduleId: string,
     eventName: string,
-    reason:
-      | "post-destroy"
-      | "post-stop"
-      | "blocked-event-name"
-      | "invalid-event-name"
-      | "coalesced",
+    reason: SourceDropReason,
   ) => void;
   readonly onDetach?: (id: string, moduleId: string) => void;
   readonly onError?: (
@@ -359,13 +349,7 @@ export interface SourceInspectionRow {
    *   ahead of the microtask flush (only when `SourceDef.coalesce`
    *   is `"lastWriteWins"`)
    */
-  lastDropReason:
-    | "post-destroy"
-    | "post-stop"
-    | "blocked-event-name"
-    | "invalid-event-name"
-    | "coalesced"
-    | null;
+  lastDropReason: SourceDropReason | null;
   /** Wall-clock ms of the most recent rejected publish, or `null`. */
   lastDropAt: number | null;
   errorCount: number;

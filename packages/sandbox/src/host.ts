@@ -41,11 +41,48 @@ const DEFAULT_MAX_WORKERS = Math.max(
 
 let maxConcurrentWorkers = DEFAULT_MAX_WORKERS;
 let activeWorkers = 0;
-const waiters: Array<() => void> = [];
+
+/**
+ * A waiter holds the promise resolver for one caller blocked in
+ * `acquireSlot()`. `aborted` lets a caller deregister BEFORE its
+ * resolver fires — without this, an abandoned caller (HTTP client
+ * disconnect, parent `Promise.race` rejection, AbortSignal trigger)
+ * leaves a phantom resolver that bumps `activeWorkers` for a caller
+ * that no longer exists, pinning a slot permanently. After enough
+ * cancellations the pool deadlocks.
+ */
+interface Waiter {
+  resolve: () => void;
+  reject: (reason: unknown) => void;
+  aborted: boolean;
+}
+const waiters: Waiter[] = [];
+
+/**
+ * Wake the first non-aborted waiter, skipping any that aborted while
+ * still queued. The `activeWorkers` increment happens HERE (not in
+ * the waiter's resolve path) so a higher new cap or a freed slot
+ * cannot accidentally allow more than `maxConcurrentWorkers` to run.
+ */
+function wakeNextWaiter(): void {
+  while (waiters.length > 0 && activeWorkers < maxConcurrentWorkers) {
+    const next = waiters.shift();
+    if (!next || next.aborted) continue;
+    activeWorkers++;
+    next.resolve();
+    return;
+  }
+}
 
 /**
  * Override the per-process worker cap. Pass `Infinity` to disable.
  * Returns the previous value.
+ *
+ * Lowering the cap below `activeWorkers` does NOT terminate running
+ * workers — the new ceiling applies as those workers drain. New
+ * `acquireSlot()` callers queue until `activeWorkers` falls below
+ * the new cap. Raising the cap immediately drains any waiters the
+ * new ceiling can absorb.
  */
 export function setMaxConcurrentWorkers(value: number): number {
   const prev = maxConcurrentWorkers;
@@ -53,31 +90,66 @@ export function setMaxConcurrentWorkers(value: number): number {
     return prev;
   }
   maxConcurrentWorkers = Math.max(1, Math.floor(value));
-  // Drain any waiters the new (higher) cap can absorb.
+  // Drain waiters the new (higher) cap can absorb. wakeNextWaiter()
+  // checks the cap before each increment so a LOWER cap does nothing
+  // here — drains happen organically as releaseSlot() fires.
   while (waiters.length > 0 && activeWorkers < maxConcurrentWorkers) {
-    const next = waiters.shift();
-    if (next) next();
+    wakeNextWaiter();
   }
   return prev;
 }
 
-function acquireSlot(): Promise<void> {
+function acquireSlot(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(
+      signal.reason instanceof Error
+        ? signal.reason
+        : new Error("sandbox: acquireSlot aborted"),
+    );
+  }
   if (activeWorkers < maxConcurrentWorkers) {
     activeWorkers++;
     return Promise.resolve();
   }
-  return new Promise<void>((resolve) => {
-    waiters.push(() => {
-      activeWorkers++;
-      resolve();
-    });
+  return new Promise<void>((resolve, reject) => {
+    const waiter: Waiter = { resolve, reject, aborted: false };
+    waiters.push(waiter);
+    if (signal) {
+      const onAbort = () => {
+        waiter.aborted = true;
+        reject(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new Error("sandbox: acquireSlot aborted"),
+        );
+        // Don't splice — `wakeNextWaiter()` will skip aborted waiters
+        // naturally. Splicing here would race with concurrent shifts.
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      // Decorate resolve/reject to clean up the listener once the
+      // waiter is finally settled (acquired OR aborted).
+      const originalResolve = waiter.resolve;
+      const originalReject = waiter.reject;
+      waiter.resolve = () => {
+        signal.removeEventListener("abort", onAbort);
+        originalResolve();
+      };
+      waiter.reject = (reason) => {
+        signal.removeEventListener("abort", onAbort);
+        originalReject(reason);
+      };
+    }
   });
 }
 
 function releaseSlot(): void {
   activeWorkers = Math.max(0, activeWorkers - 1);
-  const next = waiters.shift();
-  if (next) next();
+  // Only hand the slot off when the cap allows — protects against
+  // `setMaxConcurrentWorkers(lower)` followed by releases that would
+  // otherwise immediately re-saturate above the new ceiling.
+  if (activeWorkers < maxConcurrentWorkers) {
+    wakeNextWaiter();
+  }
 }
 
 async function resolveWorkerPath(): Promise<string> {
@@ -110,6 +182,15 @@ export interface HostRunInput {
   /** Derivation key names extracted from the payload's source files. */
   derivationKeys: string[];
   timeoutMs?: number;
+  /**
+   * Optional AbortSignal. When the signal aborts BEFORE a worker slot
+   * is acquired, the queued waiter is removed cleanly — no phantom
+   * slot increment. When the signal aborts AFTER worker spawn, the
+   * worker is terminated and the slot released. Callers wiring this
+   * to an HTTP request signal close the connection-cancel → leaked-
+   * slot DoS vector exposed in the AE review of v0.3.x.
+   */
+  signal?: AbortSignal;
 }
 
 export class WorkerExecError extends Error {
@@ -189,7 +270,9 @@ export async function execInWorker(
   const timeoutMs = clampTimeout(input.timeoutMs);
   // Block here until a slot frees. A burst that exceeds the cap is
   // queued rather than amplified into worker-spawn pressure on the host.
-  await acquireSlot();
+  // The optional signal lets a cancelled caller deregister from the
+  // wait queue without leaking a phantom slot.
+  await acquireSlot(input.signal);
   let workerPath: string;
   let bundlePath: string;
   let cleanupTempDir: () => void;

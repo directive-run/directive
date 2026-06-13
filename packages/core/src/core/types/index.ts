@@ -75,6 +75,7 @@ export type {
   SourcesDef,
   SourcePublish,
   SourceUnsubscribe,
+  SourceDropReason,
 } from "./sources.js";
 
 // Event types

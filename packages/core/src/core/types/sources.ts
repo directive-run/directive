@@ -116,6 +116,24 @@ import type { DefinitionMeta } from "./meta.js";
 export type SourceUnsubscribe = () => void | Promise<void>;
 
 /**
+ * Why a source publish was rejected. Mirrored across the three
+ * surfaces that report drops:
+ *
+ * - `SourceInspectionRow.lastDropReason` (operator-facing, on inspect())
+ * - `Plugin.onSourceDrop` (plugin hook)
+ * - `ObservationEvent` `source.drop` variant (system.observe())
+ *
+ * Centralizing the union here keeps the three from drifting when a
+ * new drop path is added to the engine.
+ */
+export type SourceDropReason =
+  | "post-destroy"
+  | "post-stop"
+  | "blocked-event-name"
+  | "invalid-event-name"
+  | "coalesced";
+
+/**
  * Typed event dispatcher passed to a source's `attach`. Calls into the same
  * dispatch queue used by `system.events.X(payload)`.
  *

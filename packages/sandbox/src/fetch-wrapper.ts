@@ -24,12 +24,16 @@
  * Allows:
  *
  * - Any public IPv4 / IPv6 address
- * - Any hostname that resolves to public (resolution happens at request
- *   time; we don't pre-resolve because Node's fetch doesn't expose the
- *   resolved IP before sending. The host header is parsed for the
- *   surface-level check; DNS rebinding is theoretical here because
- *   external attackers can't control internal DNS, but documented as
- *   a known gap.)
+ * - Any hostname that resolves to public addresses only. `checkResolvedAddresses`
+ *   pre-resolves via `dns.lookup({ all: true })` and rejects when ANY
+ *   returned address is in a private range — this NARROWS the DNS-
+ *   rebinding window from the bare hostname check, but does NOT close
+ *   it. Node's fetch performs an INDEPENDENT DNS resolution at socket
+ *   connect time; an attacker controlling DNS with a 0-TTL record can
+ *   still rotate the address between our pre-check and the socket
+ *   connect. Fully closing the TOCTOU requires an `undici.Agent` with
+ *   a custom `connect.lookup` that pins the IP we vetted — tracked as
+ *   a follow-on (lz-bomb + DNS-pin land together).
  */
 
 const ALLOWED_PROTOCOLS = new Set(["http:", "https:"]);

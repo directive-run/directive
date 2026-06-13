@@ -59,4 +59,40 @@ describe("sandbox host worker cap", () => {
     const reset = setMaxConcurrentWorkers(before);
     expect(reset).toBe(4);
   });
+
+  it("aborted callers do not leak a worker slot", async () => {
+    setMaxConcurrentWorkers(1);
+    // First call holds the only slot.
+    const first = runInSandbox({ files: TRIVIAL, timeoutMs: 4000 });
+    // Second + third callers queue. Abort the second before the first
+    // returns — without the AbortSignal plumbing, an aborted caller
+    // would leave a phantom waiter that consumes a slot when the first
+    // call releases, permanently saturating the pool.
+    const aborter = new AbortController();
+    const second = runInSandbox({
+      files: TRIVIAL,
+      timeoutMs: 4000,
+      signal: aborter.signal,
+    });
+    aborter.abort();
+    await expect(second).rejects.toThrow();
+    // First completes; third should then proceed without being blocked
+    // by the abandoned second.
+    const firstResult = await first;
+    expect(firstResult.errors).toEqual([]);
+    const third = await runInSandbox({ files: TRIVIAL, timeoutMs: 4000 });
+    expect(third.errors).toEqual([]);
+  });
+
+  it("acquireSlot rejects synchronously when given an already-aborted signal", async () => {
+    setMaxConcurrentWorkers(1);
+    // Hold the slot with a long-running call so the next one MUST queue.
+    const blocker = runInSandbox({ files: TRIVIAL, timeoutMs: 4000 });
+    const pre = new AbortController();
+    pre.abort();
+    await expect(
+      runInSandbox({ files: TRIVIAL, timeoutMs: 4000, signal: pre.signal }),
+    ).rejects.toThrow();
+    await blocker;
+  });
 });

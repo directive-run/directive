@@ -9,3 +9,4 @@
 
 export { createDirectiveServer } from "./server.js";
 export { startSseServer, type SseServerOptions } from "./sse.js";
+export { setMaxConcurrentLintWorkers } from "./lint-runner.js";

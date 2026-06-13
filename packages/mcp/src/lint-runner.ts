@@ -35,9 +35,38 @@ const DEFAULT_MAX_WORKERS = Math.max(
 );
 let maxConcurrentLintWorkers = DEFAULT_MAX_WORKERS;
 let activeLintWorkers = 0;
-const lintWaiters: Array<() => void> = [];
+interface LintWaiter {
+  resolve: () => void;
+  reject: (reason: unknown) => void;
+  aborted: boolean;
+}
+const lintWaiters: LintWaiter[] = [];
 
-/** Override the cap. Returns the previous value. */
+/**
+ * Wake the first non-aborted waiter. The `activeLintWorkers` increment
+ * happens HERE (not in the waiter's resolve path) so a higher new cap
+ * or a freed slot cannot accidentally allow more than
+ * `maxConcurrentLintWorkers` to run.
+ */
+function wakeNextLintWaiter(): void {
+  while (
+    lintWaiters.length > 0 &&
+    activeLintWorkers < maxConcurrentLintWorkers
+  ) {
+    const next = lintWaiters.shift();
+    if (!next || next.aborted) continue;
+    activeLintWorkers++;
+    next.resolve();
+    return;
+  }
+}
+
+/**
+ * Override the cap. Returns the previous value.
+ *
+ * Lowering the cap below `activeLintWorkers` does NOT terminate
+ * running workers — the new ceiling applies as they drain.
+ */
 export function setMaxConcurrentLintWorkers(value: number): number {
   const prev = maxConcurrentLintWorkers;
   if (!Number.isFinite(value) && value !== Number.POSITIVE_INFINITY) {
@@ -48,29 +77,56 @@ export function setMaxConcurrentLintWorkers(value: number): number {
     lintWaiters.length > 0 &&
     activeLintWorkers < maxConcurrentLintWorkers
   ) {
-    const next = lintWaiters.shift();
-    if (next) next();
+    wakeNextLintWaiter();
   }
   return prev;
 }
 
-function acquireLintSlot(): Promise<void> {
+function acquireLintSlot(signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(
+      signal.reason instanceof Error
+        ? signal.reason
+        : new Error("lint-runner: acquireLintSlot aborted"),
+    );
+  }
   if (activeLintWorkers < maxConcurrentLintWorkers) {
     activeLintWorkers++;
     return Promise.resolve();
   }
-  return new Promise<void>((resolve) => {
-    lintWaiters.push(() => {
-      activeLintWorkers++;
-      resolve();
-    });
+  return new Promise<void>((resolve, reject) => {
+    const waiter: LintWaiter = { resolve, reject, aborted: false };
+    lintWaiters.push(waiter);
+    if (signal) {
+      const onAbort = () => {
+        waiter.aborted = true;
+        reject(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new Error("lint-runner: acquireLintSlot aborted"),
+        );
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      const originalResolve = waiter.resolve;
+      const originalReject = waiter.reject;
+      waiter.resolve = () => {
+        signal.removeEventListener("abort", onAbort);
+        originalResolve();
+      };
+      waiter.reject = (reason) => {
+        signal.removeEventListener("abort", onAbort);
+        originalReject(reason);
+      };
+    }
   });
 }
 
 function releaseLintSlot(): void {
   activeLintWorkers = Math.max(0, activeLintWorkers - 1);
-  const next = lintWaiters.shift();
-  if (next) next();
+  // Only hand the slot off when the cap allows.
+  if (activeLintWorkers < maxConcurrentLintWorkers) {
+    wakeNextLintWaiter();
+  }
 }
 
 export interface LintRunInput {

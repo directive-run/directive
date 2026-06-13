@@ -877,6 +877,22 @@ export type ObservationEvent =
       moduleId: string;
       eventName: string;
     }
+  /**
+   * Engine- or manager-rejected publish. Pairs with `source.publish`
+   * so observers see both halves of the publish path without polling
+   * `inspect().sources[i].dropCount`. `reason` mirrors what the inspect
+   * row records:
+   * - `"post-destroy"` / `"post-stop"` — leaked transport firing after teardown
+   * - `"blocked-event-name"` / `"invalid-event-name"` — engine guard probe
+   * - `"coalesced"` — manager debounced a same-event publish within one microtask
+   */
+  | {
+      type: "source.drop";
+      id: string;
+      moduleId: string;
+      eventName: string;
+      reason: import("./sources.js").SourceDropReason;
+    }
   /** Source detached at `system.stop()` (reverse-registration order). */
   | { type: "source.detach"; id: string; moduleId: string }
   /**

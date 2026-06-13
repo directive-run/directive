@@ -88,6 +88,7 @@ export type {
   SourcePublish,
   SourceUnsubscribe,
   SourceReportError,
+  SourceDropReason,
   // Definition Meta
   DefinitionMeta,
   DerivationDefWithMeta,

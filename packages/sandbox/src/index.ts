@@ -158,6 +158,7 @@ export async function runInSandbox(
       bundledSource: bundled.source,
       derivationKeys,
       timeoutMs: input.timeoutMs,
+      signal: input.signal,
     });
     return result;
   } catch (err) {
