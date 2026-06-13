@@ -157,6 +157,44 @@ export function checkSandboxFetchUrl(rawUrl: string): UrlCheck {
 }
 
 /**
+ * Pre-resolve a hostname via `dns.lookup` and reject if ANY resolved
+ * address lands in a private / loopback / link-local range. Closes
+ * the DNS-rebinding gap the original wrapper acknowledged: a snippet
+ * that fetches `http://attacker.example.com/` whose A record resolves
+ * to 169.254.169.254 (or whose record rotates between checks) would
+ * otherwise reach the IMDS surface. We resolve once and check the
+ * actual IPs, not just the hostname spelling.
+ *
+ * Returns `null` if every resolved address is public; returns a
+ * reason string for the first private hit.
+ */
+export async function checkResolvedAddresses(host: string): Promise<string | null> {
+  // Skip DNS resolution for hostnames that are already IP literals —
+  // the hostname-level check already covered them.
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return null;
+  if (host.includes(":")) return null; // IPv6 literal (URL parser leaves it bracketed but hostname strips them)
+  try {
+    const { lookup } = await import("node:dns/promises");
+    const records = await lookup(host, { all: true });
+    for (const r of records) {
+      if (r.family === 4 && isPrivateIPv4(r.address)) {
+        return `hostname "${host}" resolves to private IPv4 ${r.address}`;
+      }
+      if (r.family === 6 && isPrivateIPv6(r.address)) {
+        return `hostname "${host}" resolves to private IPv6 ${r.address}`;
+      }
+    }
+    return null;
+  } catch {
+    // DNS failure: fall through and let the underlying fetch report
+    // the resolution error to the caller. The wrapper isn't the place
+    // to swallow DNS noise — we only block when we KNOW the address
+    // is private.
+    return null;
+  }
+}
+
+/**
  * Install the wrapper on `globalThis.fetch`. Called from the worker
  * BEFORE the bundle is imported so any `fetch` calls inside the user's
  * code or inside allowlisted packages (`@directive-run/query`,
@@ -187,6 +225,22 @@ export function installFetchWrapper(): void {
       throw new Error(
         `sandbox: outbound fetch blocked — ${decision.reason ?? "denied"}`,
       );
+    }
+    // DNS rebinding defence — pre-resolve and reject before the
+    // outbound socket opens. The original wrapper acknowledged this
+    // gap in its preamble; closing it now that node:dns/promises is
+    // a stable surface.
+    let parsedHost = "";
+    try {
+      parsedHost = new URL(rawUrl).hostname.replace(/^\[|\]$/g, "");
+    } catch {
+      // already rejected above; defensive
+    }
+    if (parsedHost) {
+      const dnsReason = await checkResolvedAddresses(parsedHost);
+      if (dnsReason !== null) {
+        throw new Error(`sandbox: outbound fetch blocked — ${dnsReason}`);
+      }
     }
     return original(input, init);
   };

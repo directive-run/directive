@@ -105,3 +105,35 @@ describe("checkSandboxFetchUrl", () => {
     expect(result.allow).toBe(false);
   });
 });
+
+describe("checkResolvedAddresses — DNS rebinding defence", () => {
+  it("returns null for IPv4 literals (already covered by hostname rule)", async () => {
+    const { checkResolvedAddresses } = await import("../src/fetch-wrapper.js");
+    const result = await checkResolvedAddresses("8.8.8.8");
+    expect(result).toBeNull();
+  });
+
+  it("returns null for IPv6 literals", async () => {
+    const { checkResolvedAddresses } = await import("../src/fetch-wrapper.js");
+    const result = await checkResolvedAddresses("2001:db8::1");
+    expect(result).toBeNull();
+  });
+
+  it("returns a reason when hostname resolves to a loopback address (localhost → 127.0.0.1 / ::1)", async () => {
+    const { checkResolvedAddresses } = await import("../src/fetch-wrapper.js");
+    // localhost resolves to a loopback on every host. The function is
+    // a pure DNS-resolution check — the hostname rule wouldn't fire
+    // here because we call the helper directly.
+    const result = await checkResolvedAddresses("localhost");
+    expect(result).toMatch(/resolves to private/);
+  });
+
+  it("returns null when a hostname resolves to a public address", async () => {
+    const { checkResolvedAddresses } = await import("../src/fetch-wrapper.js");
+    // dns.google is owned by Google and resolves to 8.8.8.8 / 8.8.4.4 —
+    // public. If CI runs without DNS (unusual) the function returns
+    // null on lookup failure, which is also "not blocked" semantically.
+    const result = await checkResolvedAddresses("dns.google");
+    expect(result).toBeNull();
+  });
+});
