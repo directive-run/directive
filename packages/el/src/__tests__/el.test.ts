@@ -384,7 +384,7 @@ describe("el()", () => {
       // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", { __proto__: polluted } as any);
       // The polluted-bag did not become the prototype of the element.
-      expect(div.polluted).toBeUndefined();
+      expect((div as unknown as { polluted?: boolean }).polluted).toBeUndefined();
       expect(Object.getPrototypeOf(div)).not.toBe(polluted);
     });
 
