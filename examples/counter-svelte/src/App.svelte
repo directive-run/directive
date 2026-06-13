@@ -4,9 +4,9 @@ import { system } from "./module";
 
 system.start();
 
-const _count = useFact(system, "count");
-const _doubled = useDerived(system, "doubled");
-const _events = useEvents(system);
+const count = useFact(system, "count");
+const doubled = useDerived(system, "doubled");
+const events = useEvents(system);
 </script>
 
 <div style="font-family: system-ui; max-width: 400px; margin: 40px auto; text-align: center">

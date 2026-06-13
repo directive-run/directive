@@ -46,8 +46,22 @@ export function jsx(
   }
 
   const { children, ...rest } = props;
-  for (const key of BLOCKED_PROPS) {
-    delete rest[key];
+  // Mirror `sanitizeProps` in el.ts: drop XSS sinks (innerHTML family),
+  // prototype-pollution keys (__proto__ / constructor / prototype),
+  // and string-valued `on<Event>` handlers (function-valued is the
+  // legitimate JSX path; string-valued is the attack vector).
+  for (const key of Object.keys(rest)) {
+    if (BLOCKED_PROPS.has(key)) {
+      delete rest[key];
+      continue;
+    }
+    if (
+      key.length > 2 &&
+      key.startsWith("on") &&
+      typeof rest[key] !== "function"
+    ) {
+      delete rest[key];
+    }
   }
 
   const element = Object.assign(document.createElement(type), rest);

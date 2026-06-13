@@ -378,6 +378,46 @@ describe("el()", () => {
       expect(div.className).toBe("safe");
       expect(div.innerHTML).toBe("");
     });
+
+    it("strips __proto__ (prototype pollution prevention)", () => {
+      const polluted = { polluted: true };
+      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
+      const div = el("div", { __proto__: polluted } as any);
+      // The polluted-bag did not become the prototype of the element.
+      expect(div.polluted).toBeUndefined();
+      expect(Object.getPrototypeOf(div)).not.toBe(polluted);
+    });
+
+    it("strips constructor + prototype keys (prototype pollution)", () => {
+      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
+      const div = el("div", {
+        constructor: { name: "evil" },
+        prototype: { evil: true },
+        className: "ok",
+      } as any);
+      expect(div.className).toBe("ok");
+      expect((div as unknown as { evil?: boolean }).evil).toBeUndefined();
+    });
+
+    it("rejects string-valued on<Event> handlers (inline JS injection)", () => {
+      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
+      const img = el("img", {
+        // String would otherwise register as inline event handler.
+        onerror: "alert(1)",
+        onclick: "alert(2)",
+        alt: "ok",
+      } as any);
+      expect(img.alt).toBe("ok");
+      expect(img.onerror).toBeNull();
+      expect(img.onclick).toBeNull();
+    });
+
+    it("preserves function-valued event handlers", () => {
+      const handler = (): void => undefined;
+      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
+      const btn = el("button", { onclick: handler } as any);
+      expect(btn.onclick).toBe(handler);
+    });
   });
 
   // ============================================================================
