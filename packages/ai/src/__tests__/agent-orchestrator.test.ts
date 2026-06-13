@@ -611,3 +611,213 @@ describe("destroy", () => {
     expect(() => orchestrator.destroy()).not.toThrow();
   });
 });
+
+// ============================================================================
+// R1 C-batch 2 — Budget pre-flight (C7)
+// ============================================================================
+//
+// Prior behavior: budget was a constraint that fired post-call. N
+// concurrent runs each saw `tokenUsage = 0 < cap`, all proceeded, total
+// spend was N * maxTokenBudget. The fix adds a pre-flight check that
+// rejects when projected usage (current + in-flight reservations + this
+// call's estimate) would exceed the cap.
+describe("budget pre-flight (R1 C7)", () => {
+  it("default (no budgetEstimateTokens) — rejects when already over cap", async () => {
+    // Heavy result to push usage past cap on first call.
+    const heavy: RunResult = {
+      output: "ok",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 80,
+      tokenUsage: { inputTokens: 40, outputTokens: 40 },
+    };
+    const runner = createMockRunner([heavy]);
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      maxTokenBudget: 50, // tighter than the heavy call
+    });
+    // First call succeeds (pre-flight sees usage=0 < 50) but overshoots
+    // (post-call tokenUsage=80 > 50).
+    await orchestrator.run(mockAgent(), "first");
+    // Second call's pre-flight sees usage=80 >= 50 and rejects.
+    await expect(orchestrator.run(mockAgent(), "second")).rejects.toThrow(
+      /budget would be exceeded/i,
+    );
+    orchestrator.destroy();
+  });
+
+  it("budgetEstimateTokens (number) — reserves per-call and blocks concurrent overshoot", async () => {
+    // Per-call estimate of 30 tokens; cap 50.
+    // First call reserves 30 (in-flight=30, projected=0+30+30=60 > 50?
+    // No — current=0, in-flight=0, estimate=30 → 30 ≤ 50 OK).
+    // Second concurrent call sees current=0, in-flight=30, estimate=30
+    // → 60 > 50 → reject.
+    let release: (() => void) | null = null;
+    const blocker = new Promise<void>((r) => {
+      release = r;
+    });
+    const runner: AgentRunner = vi.fn(async () => {
+      await blocker;
+      return successResult("ok");
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      maxTokenBudget: 50,
+      budgetEstimateTokens: 30,
+    });
+
+    const first = orchestrator.run(mockAgent(), "a");
+    // Concurrent: second one should reject pre-flight.
+    await expect(orchestrator.run(mockAgent(), "b")).rejects.toThrow(
+      /budget would be exceeded/i,
+    );
+    (release as (() => void) | null)?.();
+    await first;
+    orchestrator.destroy();
+  });
+
+  it("budgetEstimateTokens (callback) — per-call estimate from input length", async () => {
+    const runner = createMockRunner();
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      maxTokenBudget: 100,
+      // 1 token per 4 chars rough estimate
+      budgetEstimateTokens: (input) => Math.ceil(input.length / 4),
+    });
+    // Short input (8 chars → 2 tokens estimate) succeeds.
+    await orchestrator.run(mockAgent(), "Hi there");
+    // Huge input (500 chars → 125 tokens > 100 cap) fails pre-flight.
+    await expect(
+      orchestrator.run(mockAgent(), "x".repeat(500)),
+    ).rejects.toThrow(/budget would be exceeded/i);
+    orchestrator.destroy();
+  });
+
+  it("reservation is released after the call completes", async () => {
+    const runner = createMockRunner([successResult()]);
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      maxTokenBudget: 100,
+      budgetEstimateTokens: 60,
+    });
+    // First call reserves 60 (in-flight=60). After return, reservation
+    // released, so a second call (estimate 60) projects 10 (post-call
+    // tokenUsage) + 0 (in-flight) + 60 = 70 ≤ 100 → should succeed.
+    await orchestrator.run(mockAgent(), "a");
+    await orchestrator.run(mockAgent(), "b");
+    orchestrator.destroy();
+  });
+
+  it("no maxTokenBudget — pre-flight is a no-op", async () => {
+    const runner = createMockRunner();
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      // intentionally no maxTokenBudget
+    });
+    // Any input length is fine.
+    await orchestrator.run(mockAgent(), "x".repeat(10_000));
+    orchestrator.destroy();
+  });
+});
+
+// ============================================================================
+// R1 C-batch 2 — Retry-outside-circuit-breaker (Distrib C2)
+// ============================================================================
+//
+// Prior: `circuitBreaker.execute(() => runWithRetry(...))` hid retries
+// from the breaker; `attempts: 3, failureThreshold: 5` required 15 real
+// failures before the breaker opened.
+// New default: each retry attempt is wrapped in CB.execute individually.
+// Each failure counts toward `failureThreshold`. Opt-in to legacy via
+// `retryInsideCircuit: true`.
+describe("retry-outside-circuit-breaker (R1 Distrib C2)", () => {
+  it("default — each retry attempt counts as a circuit-breaker failure", async () => {
+    let cbAttempts = 0;
+    const fakeCB = {
+      // Counts every execute() call — that's what the new strategy
+      // expects: each retry attempt goes through the breaker.
+      execute: async <T>(fn: () => Promise<T>) => {
+        cbAttempts++;
+        return fn();
+      },
+    };
+    // Runner always throws; retry config = 3 attempts.
+    const runner = createMockRunner([
+      new Error("fail 1"),
+      new Error("fail 2"),
+      new Error("fail 3"),
+    ]);
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      circuitBreaker: fakeCB as unknown as Parameters<
+        typeof createAgentOrchestrator
+      >[0]["circuitBreaker"],
+      agentRetry: { attempts: 3, backoff: "fixed" },
+      // default: retryInsideCircuit: false
+    });
+    await expect(orchestrator.run(mockAgent(), "hi")).rejects.toThrow();
+    expect(cbAttempts).toBe(3); // one per retry attempt — the fix
+    orchestrator.destroy();
+  });
+
+  it("retryInsideCircuit: true — legacy behavior, one CB call wraps the entire retry loop", async () => {
+    let cbAttempts = 0;
+    const fakeCB = {
+      execute: async <T>(fn: () => Promise<T>) => {
+        cbAttempts++;
+        return fn();
+      },
+    };
+    const runner = createMockRunner([
+      new Error("fail 1"),
+      new Error("fail 2"),
+      new Error("fail 3"),
+    ]);
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      circuitBreaker: fakeCB as unknown as Parameters<
+        typeof createAgentOrchestrator
+      >[0]["circuitBreaker"],
+      agentRetry: { attempts: 3, backoff: "fixed" },
+      retryInsideCircuit: true,
+    });
+    await expect(orchestrator.run(mockAgent(), "hi")).rejects.toThrow();
+    expect(cbAttempts).toBe(1); // legacy: retries hidden from CB
+    orchestrator.destroy();
+  });
+
+  it("default — short-circuits remaining retries once the breaker opens", async () => {
+    let cbAttempts = 0;
+    let opened = false;
+    const fakeCB = {
+      execute: async <T>(fn: () => Promise<T>) => {
+        if (opened) {
+          throw new Error("Circuit breaker open");
+        }
+        cbAttempts++;
+        // Open the breaker after the second failure.
+        if (cbAttempts >= 2) opened = true;
+        return fn();
+      },
+    };
+    const runner = createMockRunner([
+      new Error("fail 1"),
+      new Error("fail 2"),
+      new Error("fail 3"),
+      new Error("fail 4"),
+    ]);
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      circuitBreaker: fakeCB as unknown as Parameters<
+        typeof createAgentOrchestrator
+      >[0]["circuitBreaker"],
+      agentRetry: { attempts: 4, backoff: "fixed" },
+    });
+    await expect(orchestrator.run(mockAgent(), "hi")).rejects.toThrow();
+    // CB allowed 2 attempts before opening; the third+fourth retries
+    // see the open breaker and short-circuit.
+    expect(cbAttempts).toBe(2);
+    orchestrator.destroy();
+  });
+});

@@ -509,6 +509,25 @@ export function createResolversManager<S extends Schema>(
   // Batch states by resolver ID
   const batches = new Map<string, BatchState>();
 
+  /**
+   * Track in-flight batch executions so `cancel(reqId)` and `cancelAll()`
+   * can abort a batch that has already left the pre-flush queue but is
+   * still mid-execution. Each batch invocation gets an opaque instance
+   * id; the controller is the same one passed into `runBatchRetryLoop`.
+   *
+   * `reqToBatch` is a reverse index from requirement id → batch instance
+   * id so `cancel(reqId)` can find the owning batch in O(1) without
+   * walking every state.
+   */
+  interface BatchInflightState {
+    resolverId: string;
+    controller: AbortController;
+    requirementIds: Set<string>;
+  }
+  const batchInflight = new Map<string, BatchInflightState>();
+  const reqToBatch = new Map<string, string>();
+  let nextBatchInstanceId = 0;
+
   // Resolver index by requirement type for O(1) lookup (populated lazily)
   // Capped to prevent unbounded growth with dynamic requirement types (e.g., FETCH_USER_${id})
   const resolversByType = new Map<string, Set<string>>();
@@ -1319,8 +1338,13 @@ export function createResolversManager<S extends Schema>(
     retryPolicy: RetryPolicy & { attempts: number; backoff: string },
     timeout: number | undefined,
     baseline?: Readonly<Record<string, unknown>>,
+    externalController?: AbortController,
   ): Promise<Error | null> {
-    const controller = new AbortController();
+    // Use the externally-provided controller when present so the caller
+    // (`executeBatch`) can also register it for cancellation lookup. The
+    // legacy fallback creates a local controller for callers that don't
+    // pass one in (none today, but keeps the function self-contained).
+    const controller = externalController ?? new AbortController();
     const startedAt = Date.now();
     let lastError: Error | null = null;
 
@@ -1384,14 +1408,39 @@ export function createResolversManager<S extends Schema>(
     const batchConfig = { ...DEFAULT_BATCH, ...def.batch };
     const timeout = batchConfig.timeoutMs ?? def.timeout;
 
-    const lastError = await runBatchRetryLoop(
-      def,
+    // Register the in-flight batch so `cancel(reqId)` / `cancelAll()`
+    // can reach the controller mid-execution. Without this, the
+    // controller created in `runBatchRetryLoop` is unreachable from
+    // outside and the batch runs to completion regardless of cancel.
+    const batchInstanceId = `batch-${nextBatchInstanceId++}`;
+    const controller = new AbortController();
+    const state: BatchInflightState = {
       resolverId,
-      requirements,
-      retryPolicy,
-      timeout,
-      baseline,
-    );
+      controller,
+      requirementIds: new Set(requirements.map((r) => r.id)),
+    };
+    batchInflight.set(batchInstanceId, state);
+    for (const r of requirements) {
+      reqToBatch.set(r.id, batchInstanceId);
+    }
+
+    let lastError: Error | null = null;
+    try {
+      lastError = await runBatchRetryLoop(
+        def,
+        resolverId,
+        requirements,
+        retryPolicy,
+        timeout,
+        baseline,
+        controller,
+      );
+    } finally {
+      batchInflight.delete(batchInstanceId);
+      for (const r of requirements) {
+        reqToBatch.delete(r.id);
+      }
+    }
 
     if (lastError) {
       recordBatchErrors(
@@ -1586,7 +1635,7 @@ export function createResolversManager<S extends Schema>(
         return;
       }
 
-      // Check pending batch queues
+      // Check pending batch queues (pre-flush, still buffered)
       for (const batch of batches.values()) {
         const idx = batch.requirements.findIndex((r) => r.id === requirementId);
         if (idx !== -1) {
@@ -1607,6 +1656,37 @@ export function createResolversManager<S extends Schema>(
           return;
         }
       }
+
+      // Check in-flight batches (already left the queue, mid-execution).
+      // Cancelling ANY requirement in an in-flight batch aborts the
+      // whole batch (the controller is shared across all members) and
+      // marks every requirement as canceled. This matches the
+      // all-or-nothing semantic of `resolveBatch` — you can't cancel
+      // one row of a SQL UPDATE without aborting the transaction.
+      const batchInstanceId = reqToBatch.get(requirementId);
+      if (batchInstanceId) {
+        const batchState = batchInflight.get(batchInstanceId);
+        if (batchState) {
+          batchState.controller.abort();
+          for (const id of batchState.requirementIds) {
+            statuses.set(id, {
+              state: "canceled",
+              requirementId: id,
+              canceledAt: Date.now(),
+            });
+            reqToBatch.delete(id);
+          }
+          batchInflight.delete(batchInstanceId);
+          cleanupStatuses();
+          // Fire onCancel for every affected requirement. The original
+          // requirement objects are not retained on the batch state (we
+          // only kept their ids); callers needing full requirement data
+          // can read it from their constraint that emitted it.
+          for (const id of batchState.requirementIds) {
+            onCancel?.(batchState.resolverId, { id } as RequirementWithId);
+          }
+        }
+      }
     },
 
     detach(requirementId: string): void {
@@ -1622,7 +1702,7 @@ export function createResolversManager<S extends Schema>(
         this.cancel(id);
       }
 
-      // Cancel queued batch requirements
+      // Cancel queued batch requirements (still pre-flush)
       for (const batch of batches.values()) {
         if (batch.timer) {
           clearTimeout(batch.timer);
@@ -1637,6 +1717,24 @@ export function createResolversManager<S extends Schema>(
         }
       }
       batches.clear();
+
+      // Cancel in-flight batches (already left the queue, mid-execution).
+      // Aborts each batch's shared controller, marks every requirement
+      // canceled, and clears the lookup index.
+      for (const [, state] of batchInflight) {
+        state.controller.abort();
+        for (const id of state.requirementIds) {
+          statuses.set(id, {
+            state: "canceled",
+            requirementId: id,
+            canceledAt: Date.now(),
+          });
+          onCancel?.(state.resolverId, { id } as RequirementWithId);
+        }
+      }
+      batchInflight.clear();
+      reqToBatch.clear();
+
       cleanupStatuses();
     },
 

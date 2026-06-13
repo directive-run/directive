@@ -185,6 +185,54 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
     maxBudget: number;
     percentage: number;
   }) => void;
+  /**
+   * Optional reservation hint for the budget pre-flight check. When set
+   * (number or per-call callback), the orchestrator reserves that many
+   * tokens for each in-flight call so concurrent runs cannot collectively
+   * overshoot `maxTokenBudget`. Without this, the pre-flight only catches
+   * the "already over" case — N concurrent runs can each individually
+   * read `tokenUsage = 0` and overshoot together (TOCTOU).
+   *
+   * - `undefined` (default): pre-flight only checks the already-over
+   *   condition. Concurrent runs may still collectively overshoot.
+   * - `number`: reserve this many tokens per call (typical small-agent
+   *   ceiling is 2000–8000).
+   * - `(input, agent) => number`: per-call estimate.
+   *
+   * @example
+   * ```ts
+   * createAgentOrchestrator({
+   *   maxTokenBudget: 100_000,
+   *   budgetEstimateTokens: 5_000, // conservative reservation per call
+   * });
+   * ```
+   */
+  budgetEstimateTokens?:
+    | number
+    | ((input: string, agent: AgentLike) => number);
+  /**
+   * Controls how `circuitBreaker` composes with `agentRetry`.
+   *
+   * Prior to v1.21, the orchestrator wrapped the entire retry loop in
+   * one `circuitBreaker.execute(...)` call — `attempts: 3` +
+   * `failureThreshold: 5` required 15 real upstream failures before the
+   * breaker opened. That's the retry-storm anti-pattern: a transient
+   * provider outage cost roughly `attempts × failureThreshold` calls
+   * before any protection kicked in.
+   *
+   * The new default (`false`) routes each retry attempt through the
+   * breaker individually. Each failed attempt counts toward
+   * `failureThreshold`; if the breaker opens partway through retries,
+   * the remaining attempts short-circuit and the orchestrator surfaces
+   * the breaker's open-circuit error to the caller. This is the
+   * correct semantic under sustained upstream failure.
+   *
+   * Set to `true` for the legacy behavior (one breaker call per
+   * top-level run, retries hidden from the breaker).
+   *
+   * @default false
+   */
+  retryInsideCircuit?: boolean;
   /** Plugins */
   plugins?: Plugin[];
   /**
@@ -539,6 +587,8 @@ export function createAgentOrchestrator<
     maxTokenBudget,
     budgetWarningThreshold = 0.8,
     onBudgetWarning,
+    budgetEstimateTokens,
+    retryInsideCircuit = false,
     plugins = [],
     debug: rawDebug = false,
     approvalTimeoutMs = 300000,
@@ -766,6 +816,38 @@ export function createAgentOrchestrator<
 
   system.start();
 
+  // ---- R1 C7 — Budget pre-flight + TOCTOU reservation ----
+  //
+  // The legacy budget constraint fires AFTER `tokenUsage` is updated,
+  // so a single run can overshoot by the full call cost AND N
+  // concurrent runs can each individually pass the post-call check
+  // collectively overshooting by N * maxTokenBudget.
+  //
+  // `inFlightReservation` tracks tokens reserved for currently-running
+  // calls. The pre-flight check at the top of `runAgentWithGuardrails`
+  // rejects when current usage PLUS reservations PLUS this call's
+  // estimate would exceed the cap. When `budgetEstimateTokens` is
+  // undefined (default), the reservation stays 0 and the pre-flight
+  // only catches the "already over" case — a strict back-compat
+  // behavior for consumers that didn't ship the new option.
+  const inFlightReservation = { count: 0 };
+
+  function resolveBudgetReservation(
+    agent: AgentLike,
+    input: string,
+  ): number {
+    if (budgetEstimateTokens === undefined) return 0;
+    if (typeof budgetEstimateTokens === "number") {
+      return Math.max(0, Math.floor(budgetEstimateTokens));
+    }
+    try {
+      const n = budgetEstimateTokens(input, agent);
+      return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+    } catch {
+      return 0;
+    }
+  }
+
   // Helper to run agent with guardrails
   async function runAgentWithGuardrails<T>(
     agent: AgentLike,
@@ -774,8 +856,165 @@ export function createAgentOrchestrator<
     opts?: RunOptions,
     callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
-    // Wrap in circuit breaker if configured
-    if (circuitBreaker) {
+    // ---- Budget pre-flight (R1 C7) ----
+    //
+    // Reject BEFORE the LLM call when current usage + in-flight
+    // reservations + this call's estimated cost would exceed the cap.
+    // This closes the post-call constraint's TOCTOU window: with the
+    // old behavior N concurrent runs each saw `tokenUsage = 0 < cap`,
+    // all proceeded, and total spend was N * maxTokenBudget.
+    //
+    // When `budgetEstimateTokens` is undefined (default), `reserved`
+    // is 0 — the check then only rejects when usage is already at or
+    // past the cap (back-compat for consumers that haven't adopted
+    // the reservation hint).
+    let reserved = 0;
+    if (maxTokenBudget) {
+      const currentUsage = getAgentState(system.facts).tokenUsage;
+      reserved = resolveBudgetReservation(agent, input);
+      const projected =
+        currentUsage + inFlightReservation.count + reserved;
+      if (projected > maxTokenBudget) {
+        throw new Error(
+          `[Directive] Agent budget would be exceeded by this call: ` +
+            `current=${currentUsage} + in-flight=${inFlightReservation.count} + ` +
+            `estimate=${reserved} > maxTokenBudget=${maxTokenBudget}. ` +
+            `Raise \`maxTokenBudget\`, lower \`budgetEstimateTokens\`, ` +
+            `or reset \`tokenUsage\`.`,
+        );
+      }
+      inFlightReservation.count += reserved;
+    }
+
+    try {
+      return await runAgentWithGuardrailsBody<T>(
+        agent,
+        input,
+        _currentFacts,
+        opts,
+        callOptions,
+      );
+    } finally {
+      if (maxTokenBudget && reserved > 0) {
+        inFlightReservation.count = Math.max(
+          0,
+          inFlightReservation.count - reserved,
+        );
+      }
+    }
+  }
+
+  /**
+   * Self-healing fallback chain shared by both CB composition strategies.
+   * Tries `fallbackRunners` (in order), then `fallbackAgent`, then the
+   * `fallback-response` degradation policy. Re-throws the original
+   * error when no fallback succeeds (or `selfHealing` is not configured).
+   */
+  async function applySelfHealingFallback<T>(
+    error: unknown,
+    agent: AgentLike,
+    input: string,
+    opts?: RunOptions,
+  ): Promise<RunResult<T>> {
+    if (!selfHealing) throw error;
+
+    if (selfHealing.fallbackRunners) {
+      for (const fallbackRunner of selfHealing.fallbackRunners) {
+        try {
+          const rerouteEvent: RerouteEvent = {
+            originalAgent: agent.name,
+            reroutedTo: "fallback-runner",
+            reason: error instanceof Error ? error.message : String(error),
+            timestamp: Date.now(),
+          };
+          try {
+            selfHealing.onReroute?.(rerouteEvent);
+          } catch {
+            /* non-fatal */
+          }
+          if (timeline) {
+            timeline.record({
+              type: "reroute",
+              timestamp: Date.now(),
+              agentId: agent.name,
+              snapshotId: null,
+              from: agent.name,
+              to: "fallback-runner",
+              reason: error instanceof Error ? error.message : String(error),
+            });
+          }
+          return await fallbackRunner<T>(agent, input, opts);
+        } catch {
+          // Try next fallback
+        }
+      }
+    }
+
+    if (selfHealing.fallbackAgent) {
+      try {
+        const rerouteEvent: RerouteEvent = {
+          originalAgent: agent.name,
+          reroutedTo: selfHealing.fallbackAgent.name,
+          reason: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now(),
+        };
+        try {
+          selfHealing.onReroute?.(rerouteEvent);
+        } catch {
+          /* non-fatal */
+        }
+        if (timeline) {
+          timeline.record({
+            type: "reroute",
+            timestamp: Date.now(),
+            agentId: agent.name,
+            snapshotId: null,
+            from: agent.name,
+            to: selfHealing.fallbackAgent.name,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return await runner<T>(selfHealing.fallbackAgent, input, opts);
+      } catch {
+        // Fallback agent also failed
+      }
+    }
+
+    if (
+      selfHealing.degradation === "fallback-response" &&
+      selfHealing.fallbackResponse !== undefined
+    ) {
+      return {
+        output: selfHealing.fallbackResponse as T,
+        messages: [],
+        toolCalls: [],
+        totalTokens: 0,
+      };
+    }
+
+    throw error;
+  }
+
+  async function runAgentWithGuardrailsBody<T>(
+    agent: AgentLike,
+    input: string,
+    _currentFacts: F & OrchestratorState,
+    opts?: RunOptions,
+    callOptions?: RunCallOptions,
+  ): Promise<RunResult<T>> {
+    // ---- Circuit-breaker composition (R1 Distrib C2) ----
+    //
+    // Two strategies, controlled by `retryInsideCircuit`:
+    //
+    // - `false` (default, the bug fix): the breaker wraps each retry
+    //   attempt INSIDE `executeAgentWithRetry` (see Inner). The outer
+    //   path here runs Inner directly. Self-healing fallback still
+    //   fires when the breaker open-circuits or every attempt fails.
+    // - `true` (legacy): the breaker wraps the whole Inner call so
+    //   retries are hidden from the breaker.
+    if (circuitBreaker && retryInsideCircuit) {
+      // Legacy strategy: CB wraps the whole Inner (including its retry
+      // loop). Hidden retries don't count toward `failureThreshold`.
       try {
         return await circuitBreaker.execute(() =>
           runAgentWithGuardrailsInner<T>(
@@ -787,101 +1026,28 @@ export function createAgentOrchestrator<
           ),
         );
       } catch (error) {
-        // Self-healing fallback
-        if (selfHealing) {
-          // Try fallback runners in order
-          if (selfHealing.fallbackRunners) {
-            for (const fallbackRunner of selfHealing.fallbackRunners) {
-              try {
-                const rerouteEvent: RerouteEvent = {
-                  originalAgent: agent.name,
-                  reroutedTo: "fallback-runner",
-                  reason:
-                    error instanceof Error ? error.message : String(error),
-                  timestamp: Date.now(),
-                };
-                try {
-                  selfHealing.onReroute?.(rerouteEvent);
-                } catch {
-                  /* non-fatal */
-                }
-                if (timeline) {
-                  timeline.record({
-                    type: "reroute",
-                    timestamp: Date.now(),
-                    agentId: agent.name,
-                    snapshotId: null,
-                    from: agent.name,
-                    to: "fallback-runner",
-                    reason:
-                      error instanceof Error ? error.message : String(error),
-                  });
-                }
-
-                return await fallbackRunner<T>(agent, input, opts);
-              } catch {
-                // Try next fallback
-              }
-            }
-          }
-
-          // Try fallback agent
-          if (selfHealing.fallbackAgent) {
-            try {
-              const rerouteEvent: RerouteEvent = {
-                originalAgent: agent.name,
-                reroutedTo: selfHealing.fallbackAgent.name,
-                reason: error instanceof Error ? error.message : String(error),
-                timestamp: Date.now(),
-              };
-              try {
-                selfHealing.onReroute?.(rerouteEvent);
-              } catch {
-                /* non-fatal */
-              }
-              if (timeline) {
-                timeline.record({
-                  type: "reroute",
-                  timestamp: Date.now(),
-                  agentId: agent.name,
-                  snapshotId: null,
-                  from: agent.name,
-                  to: selfHealing.fallbackAgent.name,
-                  reason:
-                    error instanceof Error ? error.message : String(error),
-                });
-              }
-
-              return await runner<T>(selfHealing.fallbackAgent, input, opts);
-            } catch {
-              // Fallback agent also failed
-            }
-          }
-
-          // Apply degradation policy
-          if (
-            selfHealing.degradation === "fallback-response" &&
-            selfHealing.fallbackResponse !== undefined
-          ) {
-            return {
-              output: selfHealing.fallbackResponse as T,
-              messages: [],
-              toolCalls: [],
-              totalTokens: 0,
-            };
-          }
-        }
-        throw error;
+        return applySelfHealingFallback<T>(error, agent, input, opts);
       }
     }
 
-    return runAgentWithGuardrailsInner<T>(
-      agent,
-      input,
-      _currentFacts,
-      opts,
-      callOptions,
-    );
+    // New-default + no-CB strategy: Inner runs once. When CB is
+    // configured, Inner wraps each retry attempt with CB internally
+    // (see `effectiveRunner` setup in Inner). Self-healing still kicks
+    // in if Inner ultimately throws.
+    try {
+      return await runAgentWithGuardrailsInner<T>(
+        agent,
+        input,
+        _currentFacts,
+        opts,
+        callOptions,
+      );
+    } catch (error) {
+      if (circuitBreaker || selfHealing) {
+        return applySelfHealingFallback<T>(error, agent, input, opts);
+      }
+      throw error;
+    }
   }
 
   async function runAgentWithGuardrailsInner<T>(
@@ -1071,6 +1237,20 @@ export function createAgentOrchestrator<
         schema: effectiveSchema,
         maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
       });
+    }
+
+    // Circuit-breaker per attempt (R1 Distrib C2). When `circuitBreaker`
+    // is configured and `retryInsideCircuit` is false (the new default),
+    // wrap the runner so every retry attempt inside
+    // `executeAgentWithRetry` is gated by the breaker. Each failure
+    // counts toward `failureThreshold`; an open breaker short-circuits
+    // remaining retries.
+    if (circuitBreaker && !retryInsideCircuit) {
+      const inner = effectiveRunner;
+      effectiveRunner = (<U>(a: AgentLike, i: string, o?: RunOptions) =>
+        circuitBreaker!.execute(() =>
+          inner<U>(a, i, o),
+        )) as typeof effectiveRunner;
     }
 
     // Run the agent with retry support

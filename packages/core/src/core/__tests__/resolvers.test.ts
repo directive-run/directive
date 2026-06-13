@@ -2398,3 +2398,173 @@ describe("R2 — batch baseline freshness", () => {
     sys.destroy();
   });
 });
+
+// ============================================================================
+// R1 C-batch 2 — Batch resolver in-flight cancellation (C8)
+// ============================================================================
+//
+// Before this fix, `cancel(reqId)` and `cancelAll()` could only see
+// requirements that were either still pre-flush in a batch queue OR
+// non-batched (in `inflight`). Once a batch left the queue and entered
+// `executeBatch`, the AbortController was unreachable from outside; the
+// batch ran to completion regardless of cancel.
+//
+// The fix tracks in-flight batches in `batchInflight` keyed by an opaque
+// instance id, with a `reqToBatch` reverse index so `cancel(reqId)` can
+// abort the owning batch in O(1).
+describe("batch resolver in-flight cancellation (R1 C8)", () => {
+  it("cancel(reqId) aborts an in-flight batch via the shared controller", async () => {
+    // Set up a batch resolver whose `resolveBatch` blocks on a deferred
+    // promise so we can issue cancel before it completes.
+    const cancelEvents: string[] = [];
+    let releaseBatch: (() => void) | null = null;
+    const batchSignals: Array<AbortSignal | undefined> = [];
+    const blocker = new Promise<void>((r) => {
+      releaseBatch = r;
+    });
+
+    const { manager } = setup(
+      {
+        bulkFetch: {
+          requirement: "BULK_FETCH",
+          batch: { enabled: true, windowMs: 1, maxSize: 100 },
+          resolveBatch: async (_reqs, ctx) => {
+            batchSignals.push(ctx.signal);
+            await blocker;
+          },
+        },
+      },
+      { onCancel: (_resolverId, req) => cancelEvents.push(req.id) },
+    );
+
+    const r1 = makeReq("BULK_FETCH", { id: "a" });
+    const r2 = makeReq("BULK_FETCH", { id: "b" });
+    const r3 = makeReq("BULK_FETCH", { id: "c" });
+    manager.resolve(r1);
+    manager.resolve(r2);
+    manager.resolve(r3);
+
+    // Wait for the batch to flush + enter executeBatch (windowMs = 1ms).
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Sanity: the batch is now in-flight (signal captured, not yet aborted).
+    expect(batchSignals.length).toBe(1);
+    expect(batchSignals[0]?.aborted).toBe(false);
+
+    // Cancel via one of the requirements in the batch. The whole batch's
+    // controller fires (all-or-nothing semantic).
+    manager.cancel(r2.id);
+
+    expect(batchSignals[0]?.aborted).toBe(true);
+    // onCancel fires for every requirement in the batch, not just r2.
+    expect(cancelEvents.sort()).toEqual([r1.id, r2.id, r3.id].sort());
+
+    // All three statuses are now "canceled".
+    expect(manager.getStatus(r1.id).state).toBe("canceled");
+    expect(manager.getStatus(r2.id).state).toBe("canceled");
+    expect(manager.getStatus(r3.id).state).toBe("canceled");
+
+    // Release the underlying batch work so the test doesn't leak.
+    releaseBatch?.();
+    await flush();
+  });
+
+  it("cancelAll() aborts every in-flight batch", async () => {
+    const cancelEvents: string[] = [];
+    const aborts: AbortSignal[] = [];
+    let releaseA: (() => void) | null = null;
+    let releaseB: (() => void) | null = null;
+    const blockerA = new Promise<void>((r) => {
+      releaseA = r;
+    });
+    const blockerB = new Promise<void>((r) => {
+      releaseB = r;
+    });
+    let callIndex = 0;
+
+    const { manager } = setup(
+      {
+        groupA: {
+          requirement: "GROUP_A",
+          batch: { enabled: true, windowMs: 1, maxSize: 100 },
+          resolveBatch: async (_reqs, ctx) => {
+            aborts.push(ctx.signal);
+            const which = callIndex++;
+            if (which === 0) await blockerA;
+            else await blockerB;
+          },
+        },
+        groupB: {
+          requirement: "GROUP_B",
+          batch: { enabled: true, windowMs: 1, maxSize: 100 },
+          resolveBatch: async (_reqs, ctx) => {
+            aborts.push(ctx.signal);
+            const which = callIndex++;
+            if (which === 0) await blockerA;
+            else await blockerB;
+          },
+        },
+      },
+      { onCancel: (_resolverId, req) => cancelEvents.push(req.id) },
+    );
+
+    const a1 = makeReq("GROUP_A");
+    const a2 = makeReq("GROUP_A", { tag: "v2" });
+    const b1 = makeReq("GROUP_B");
+    manager.resolve(a1);
+    manager.resolve(a2);
+    manager.resolve(b1);
+
+    await new Promise((r) => setTimeout(r, 10));
+    expect(aborts.length).toBe(2);
+    expect(aborts.every((s) => !s.aborted)).toBe(true);
+
+    manager.cancelAll();
+
+    // Both in-flight batches now aborted.
+    expect(aborts.every((s) => s.aborted)).toBe(true);
+    // onCancel fired for every requirement across both batches.
+    expect(cancelEvents.sort()).toEqual([a1.id, a2.id, b1.id].sort());
+
+    releaseA?.();
+    releaseB?.();
+    await flush();
+  });
+
+  it("in-flight cancel cleans up the reverse index so the same reqId can be re-resolved later", async () => {
+    let releaseFirst: (() => void) | null = null;
+    const blocker = new Promise<void>((r) => {
+      releaseFirst = r;
+    });
+    let runs = 0;
+
+    const { manager } = setup({
+      job: {
+        requirement: "JOB",
+        batch: { enabled: true, windowMs: 1, maxSize: 100 },
+        resolveBatch: async () => {
+          runs++;
+          if (runs === 1) await blocker;
+        },
+      },
+    });
+
+    const req = makeReq("JOB", { id: "same-id" });
+    manager.resolve(req);
+    await new Promise((r) => setTimeout(r, 10));
+    manager.cancel(req.id);
+    releaseFirst?.();
+    await flush();
+
+    // Re-resolve the SAME requirement id — should be accepted (the
+    // reverse-index entry was cleaned up by the cancel path) and the
+    // resolveBatch should run a SECOND time, which is what `runs === 2`
+    // verifies. The intervening status race ("canceled" vs "success"
+    // after the underlying work resolves post-abort) is not the
+    // invariant under test here.
+    manager.resolve(req);
+    await new Promise((r) => setTimeout(r, 10));
+    await flush();
+    expect(runs).toBe(2);
+  });
+});
