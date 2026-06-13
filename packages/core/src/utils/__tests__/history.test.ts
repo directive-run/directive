@@ -510,3 +510,77 @@ describe("createDisabledHistory", () => {
     manager.import("{}");
   });
 });
+
+// ---------------------------------------------------------------------------
+// R1 C-batch 3 — history.redactSnapshot hook (Privacy A2)
+// ---------------------------------------------------------------------------
+//
+// Prior behavior: history ring buffer stored `structuredClone(toObject())`
+// verbatim. Any PII a source had written to a fact since the last
+// snapshot persisted in the buffer and shipped through `export()` to
+// disk — no GDPR Art.17 erasure path through history.
+//
+// The fix adds an optional `redactSnapshot` transform on
+// `HistoryConfig`. Default `undefined` keeps current behavior; consumers
+// opt in by passing a redactor.
+describe("history redactSnapshot (R1 Privacy A2)", () => {
+  it("applies the redactor to every snapshot", () => {
+    const { manager } = setup({
+      historyOption: {
+        maxSnapshots: 10,
+        redactSnapshot: (facts) => ({
+          ...facts,
+          name: typeof facts.name === "string" ? "[REDACTED]" : facts.name,
+        }),
+      },
+    });
+
+    const snap = manager.takeSnapshot("test");
+    expect(snap.facts).toEqual({ count: 0, name: "[REDACTED]" });
+  });
+
+  it("default (no redactor) stores facts verbatim — back-compat", () => {
+    const { manager } = setup({ historyOption: { maxSnapshots: 10 } });
+    const snap = manager.takeSnapshot("test");
+    expect(snap.facts).toEqual({ count: 0, name: "init" });
+  });
+
+  it("falls back to raw facts when the redactor throws", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { manager } = setup({
+      historyOption: {
+        maxSnapshots: 10,
+        redactSnapshot: () => {
+          throw new Error("redactor blew up");
+        },
+      },
+    });
+
+    const snap = manager.takeSnapshot("test");
+    expect(snap.facts).toEqual({ count: 0, name: "init" });
+    expect(warn).toHaveBeenCalledWith(
+      "[Directive] history.redactSnapshot threw, snapshot stored raw",
+      expect.objectContaining({ error: expect.any(Error) }),
+    );
+
+    warn.mockRestore();
+  });
+
+  it("export() emits the redacted form, not the raw facts", () => {
+    const { facts, manager } = setup({
+      historyOption: {
+        maxSnapshots: 10,
+        redactSnapshot: (f) => ({ ...f, name: "[REDACTED]" }),
+      },
+    });
+
+    facts.name = "alice@evil.com";
+    manager.takeSnapshot("test");
+
+    const json = JSON.parse(manager.export());
+    // Verify the snapshot in the exported JSON has the redacted name,
+    // not the raw email.
+    expect(JSON.stringify(json)).not.toContain("alice@evil.com");
+    expect(JSON.stringify(json)).toContain("[REDACTED]");
+  });
+});

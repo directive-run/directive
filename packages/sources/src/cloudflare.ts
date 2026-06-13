@@ -136,14 +136,36 @@ export function sourceFromDOAlarm(
   }
 
   let activePublish: SourcePublish | null = null;
+  // Generation counter — bumped on every attach + cleanup. A `tick()`
+  // started against generation N that races against a stop / restart
+  // cycle will see `generation !== N` by the time it resolves the
+  // setAlarm call, and skip the re-arm. Without this, a post-stop
+  // hibernation wake fires `tick()` into a torn-down system.
+  let generation = 0;
+
+  // Safe re-arm helper. Cloudflare DO contract: only one alarm can be
+  // in flight; calling `setAlarm` while one exists overwrites it. We
+  // check `getAlarm()` first so a `start → stop → start` race can't
+  // double-arm, and bail when our generation has been invalidated.
+  function scheduleNextAlarm(myGeneration: number): void {
+    void (async () => {
+      try {
+        const existing = await storage.getAlarm();
+        if (myGeneration !== generation || !activePublish) return;
+        if (existing !== null) return;
+        await storage.setAlarm(Date.now() + intervalMs);
+      } catch {
+        // Storage failures land via the source primitive's observation
+        // events; swallowing keeps the publish path going.
+      }
+    })();
+  }
 
   function tick(): void {
+    const myGeneration = generation;
     if (!activePublish) return;
     activePublish(eventName, payload());
-    // Schedule the next alarm. Fire-and-forget — the host runtime
-    // handles delivery; failures land via the source primitive's
-    // observation events.
-    void storage.setAlarm(Date.now() + intervalMs);
+    scheduleNextAlarm(myGeneration);
   }
 
   // Default onEvict: drop the pending alarm so the DO doesn't wake
@@ -157,12 +179,15 @@ export function sourceFromDOAlarm(
 
   const def: SourceDef & { tick(): void } = {
     attach: (publish: SourcePublish) => {
+      generation++;
       activePublish = publish;
-      // Schedule the first alarm. The DO's `alarm()` method must call
-      // `tick()` to drive subsequent publishes.
-      void storage.setAlarm(Date.now() + intervalMs);
+      // Schedule the first alarm. Same getAlarm() check as `tick()`:
+      // if a previous-instance alarm is still pending, don't overwrite.
+      scheduleNextAlarm(generation);
       onTickRegistered?.(tick);
       return () => {
+        // Invalidate any in-flight tick re-arm before clearing state.
+        generation++;
         activePublish = null;
         // Clear any pending alarm so the DO doesn't wake the dead
         // system after stop.
@@ -280,7 +305,14 @@ export function sourceFromWebSocketMessage(
       const onClose = (event: { code?: number; reason?: string }) => {
         if (closeEvent === null) return;
         publish(closeEvent, {
-          code: event.code ?? 1000,
+          // RFC 6455 §7.4.1: `1000 = Normal Closure`,
+          // `1006 = Abnormal Closure (no close frame received)`.
+          // When `event.code` is undefined the connection died without
+          // a close frame (server crash, network drop, browser-yielded
+          // event); 1006 is the canonical signal for that condition.
+          // Defaulting to 1000 would silently classify abnormal drops
+          // as clean — exactly the failure mode consumers need to catch.
+          code: event.code ?? 1006,
           reason: event.reason ?? "",
         });
       };

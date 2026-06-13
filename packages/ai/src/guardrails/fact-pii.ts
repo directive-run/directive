@@ -330,14 +330,14 @@ export interface FactPIIGuardrailOptions {
   customDetector?: (text: string) => readonly FactPIIMatch[];
   /**
    * Maximum nesting depth to walk when scanning a structured fact
-   * value. Default `2` (raised from `1` in a follow-up so the common
-   * `Error.cause` + shallow-nested-object shapes scan zero-config).
-   * At depth 2 the scanner inspects top-level strings, recurses into
-   * nested objects / arrays, AND recurses one more level — enough
-   * for the Error-with-cause and shallow-nested-object shapes most
-   * consumers actually ship. Each array level burns one depth slot.
-   * Maps and Sets are still NOT walked by the built-in scanner; PII
-   * inside those structures must go through a `customDetector`.
+   * value. Default `4` (raised from `2` to cover Supabase realtime row
+   * shapes and MCP resource notification lists zero-config — those
+   * payloads are `payload.new = [{ email }]` which is four levels:
+   * object → array → object → string). At depth 4 the scanner
+   * inspects top-level strings, recurses into nested objects / arrays,
+   * and recurses three more levels. Each array level burns one depth
+   * slot. Maps and Sets are still NOT walked by the built-in scanner;
+   * PII inside those structures must go through a `customDetector`.
    *
    * Real-world common shapes and the `walkDepth` they need:
    * - **Flat object** (`{ email, ssn }`) — works at any `walkDepth >= 1`.
@@ -426,7 +426,7 @@ export function createFactPIIGuardrail(
     excludeKeys = [],
     onBlocked,
     customDetector,
-    walkDepth = 2,
+    walkDepth = 4,
     // Default errorMode follows top-level `mode`: when the operator
     // configures `mode: "redact"`, Errors actually get redacted; when
     // `mode: "alert"`, Errors emit kind "alert" via the same path the

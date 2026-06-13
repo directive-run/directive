@@ -95,6 +95,9 @@ export interface CreateHistoryOptions<S extends Schema> {
 function resolveHistoryOption(option: HistoryOption): {
   enabled: boolean;
   maxSnapshots: number;
+  redactSnapshot?: (
+    facts: Record<string, unknown>,
+  ) => Record<string, unknown>;
 } {
   if (typeof option === "boolean") {
     return { enabled: option, maxSnapshots: 100 };
@@ -104,6 +107,7 @@ function resolveHistoryOption(option: HistoryOption): {
   return {
     enabled: true,
     maxSnapshots: option.maxSnapshots ?? 100,
+    redactSnapshot: option.redactSnapshot,
   };
 }
 
@@ -130,7 +134,7 @@ export function createHistoryManager<S extends Schema>(
 ): HistoryManager<S> {
   const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
 
-  const { enabled: isEnabled, maxSnapshots } =
+  const { enabled: isEnabled, maxSnapshots, redactSnapshot } =
     resolveHistoryOption(historyOption);
 
   // Ring buffer of snapshots
@@ -152,7 +156,22 @@ export function createHistoryManager<S extends Schema>(
 
   /** Serialize facts to a snapshot-friendly format */
   function serializeFacts(): Record<string, unknown> {
-    const factsObj = getCurrentFacts();
+    let factsObj = getCurrentFacts();
+
+    // Optional PII / sensitive-data redaction before the clone lands
+    // in the ring buffer. Errors fall back to raw facts with a
+    // structured warning so consumers can flag a broken redactor in
+    // logs rather than silently shipping unredacted snapshots.
+    if (redactSnapshot) {
+      try {
+        factsObj = redactSnapshot(factsObj);
+      } catch (error) {
+        console.warn(
+          "[Directive] history.redactSnapshot threw, snapshot stored raw",
+          { error },
+        );
+      }
+    }
 
     // Deep clone to prevent mutation
     try {

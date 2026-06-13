@@ -84,6 +84,37 @@ export interface HistoryConfig {
   maxSnapshots?: number;
   /** Only snapshot events from these modules. Omit to snapshot all modules. Multi-module only. */
   snapshotModules?: string[];
+  /**
+   * Optional transform applied to the facts snapshot BEFORE it's
+   * cloned into the ring buffer. The default (`undefined`) stores
+   * facts verbatim — including any PII a source published into a
+   * fact since the last snapshot.
+   *
+   * Wire a redactor to strip PII from the ring buffer (and from
+   * `export()` payloads) for GDPR Art.17 erasure / SOC2 audit hygiene.
+   * Pair with `createFactPIIGuardrail` on the input boundary for
+   * end-to-end coverage — the guardrail redacts on writes,
+   * `redactSnapshot` redacts whatever still escapes into history.
+   *
+   * Throws inside the redactor are caught and the snapshot falls
+   * back to the raw facts with a structured `console.warn`; the
+   * redactor must be defensive (return a safe fallback rather than
+   * throwing) if redaction is load-bearing for compliance.
+   *
+   * @example
+   * ```ts
+   * createSystem({
+   *   module,
+   *   history: {
+   *     maxSnapshots: 100,
+   *     redactSnapshot: (facts) => ({ ...facts, email: "[REDACTED]" }),
+   *   },
+   * });
+   * ```
+   */
+  redactSnapshot?: (
+    facts: Record<string, unknown>,
+  ) => Record<string, unknown>;
 }
 
 /** History option: boolean shorthand or full config (presence implies enabled) */
