@@ -21,6 +21,58 @@ const MAX_SOURCE_BYTES = 200_000;
 const PARSE_BUDGET_MS = 5_000;
 const FILENAME_RE = /^[\w./-]{1,128}$/;
 
+/**
+ * Cap simultaneously-running lint workers within the MCP host process.
+ * Each worker spawns a ts-morph project + a thread; a multi-client MCP
+ * burst (Cursor + Claude + IDE all calling `review_source` in parallel)
+ * could amplify into a thread-spawn storm. Cap to one-per-CPU by default;
+ * queued calls run as slots free.
+ */
+const DEFAULT_MAX_WORKERS = Math.max(
+  1,
+  (globalThis as { navigator?: { hardwareConcurrency?: number } }).navigator
+    ?.hardwareConcurrency ?? 4,
+);
+let maxConcurrentLintWorkers = DEFAULT_MAX_WORKERS;
+let activeLintWorkers = 0;
+const lintWaiters: Array<() => void> = [];
+
+/** Override the cap. Returns the previous value. */
+export function setMaxConcurrentLintWorkers(value: number): number {
+  const prev = maxConcurrentLintWorkers;
+  if (!Number.isFinite(value) && value !== Number.POSITIVE_INFINITY) {
+    return prev;
+  }
+  maxConcurrentLintWorkers = Math.max(1, Math.floor(value));
+  while (
+    lintWaiters.length > 0 &&
+    activeLintWorkers < maxConcurrentLintWorkers
+  ) {
+    const next = lintWaiters.shift();
+    if (next) next();
+  }
+  return prev;
+}
+
+function acquireLintSlot(): Promise<void> {
+  if (activeLintWorkers < maxConcurrentLintWorkers) {
+    activeLintWorkers++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    lintWaiters.push(() => {
+      activeLintWorkers++;
+      resolve();
+    });
+  });
+}
+
+function releaseLintSlot(): void {
+  activeLintWorkers = Math.max(0, activeLintWorkers - 1);
+  const next = lintWaiters.shift();
+  if (next) next();
+}
+
 export interface LintRunInput {
   source: string;
   fileName?: string;
@@ -67,7 +119,14 @@ async function resolveWorkerPath(): Promise<string> {
 }
 
 async function runInWorker<TIn, TOut>(payload: TIn): Promise<TOut> {
-  const workerPath = await resolveWorkerPath();
+  await acquireLintSlot();
+  let workerPath: string;
+  try {
+    workerPath = await resolveWorkerPath();
+  } catch (err) {
+    releaseLintSlot();
+    throw err;
+  }
   const worker = new Worker(workerPath, { stderr: false });
   let timer: NodeJS.Timeout | null = null;
   try {
@@ -119,6 +178,7 @@ async function runInWorker<TIn, TOut>(payload: TIn): Promise<TOut> {
       clearTimeout(timer);
     }
     await worker.terminate().catch(() => undefined);
+    releaseLintSlot();
   }
 }
 

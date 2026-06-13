@@ -33,6 +33,7 @@ export {
   type SandboxResult,
 } from "./types.js";
 export type { ValidationError } from "./validator.js";
+export { setMaxConcurrentWorkers } from "./host.js";
 
 const MAX_PAYLOAD_BYTES = 200_000;
 const MAX_FILES = 10;

@@ -25,6 +25,61 @@ const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_MS = 5_000;
 
+/**
+ * Concurrency cap on simultaneously-running workers within one host
+ * process. Each worker reserves ~32 MB of heap + a thread; a malicious
+ * burst (multi-tab playground, MCP client storm) can spawn enough
+ * workers to OOM the surface. Cap to one-per-CPU by default; consumers
+ * can override via `setMaxConcurrentWorkers()`. Excess calls queue
+ * FIFO and run as slots free.
+ */
+const DEFAULT_MAX_WORKERS = Math.max(
+  1,
+  (globalThis as { navigator?: { hardwareConcurrency?: number } }).navigator
+    ?.hardwareConcurrency ?? 4,
+);
+
+let maxConcurrentWorkers = DEFAULT_MAX_WORKERS;
+let activeWorkers = 0;
+const waiters: Array<() => void> = [];
+
+/**
+ * Override the per-process worker cap. Pass `Infinity` to disable.
+ * Returns the previous value.
+ */
+export function setMaxConcurrentWorkers(value: number): number {
+  const prev = maxConcurrentWorkers;
+  if (!Number.isFinite(value) && value !== Number.POSITIVE_INFINITY) {
+    return prev;
+  }
+  maxConcurrentWorkers = Math.max(1, Math.floor(value));
+  // Drain any waiters the new (higher) cap can absorb.
+  while (waiters.length > 0 && activeWorkers < maxConcurrentWorkers) {
+    const next = waiters.shift();
+    if (next) next();
+  }
+  return prev;
+}
+
+function acquireSlot(): Promise<void> {
+  if (activeWorkers < maxConcurrentWorkers) {
+    activeWorkers++;
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    waiters.push(() => {
+      activeWorkers++;
+      resolve();
+    });
+  });
+}
+
+function releaseSlot(): void {
+  activeWorkers = Math.max(0, activeWorkers - 1);
+  const next = waiters.shift();
+  if (next) next();
+}
+
 async function resolveWorkerPath(): Promise<string> {
   // PRIMARY: static URL relative to this module's own file. Bundlers
   // (Next.js outputFileTracing, esbuild, webpack, etc.) follow this
@@ -132,10 +187,22 @@ export async function execInWorker(
   input: HostRunInput,
 ): Promise<SandboxResult> {
   const timeoutMs = clampTimeout(input.timeoutMs);
-  const workerPath = await resolveWorkerPath();
-  const { bundlePath, cleanup: cleanupTempDir } = await writeBundleToTemp(
-    input.bundledSource,
-  );
+  // Block here until a slot frees. A burst that exceeds the cap is
+  // queued rather than amplified into worker-spawn pressure on the host.
+  await acquireSlot();
+  let workerPath: string;
+  let bundlePath: string;
+  let cleanupTempDir: () => void;
+  try {
+    workerPath = await resolveWorkerPath();
+    ({ bundlePath, cleanup: cleanupTempDir } = await writeBundleToTemp(
+      input.bundledSource,
+    ));
+  } catch (err) {
+    // Release the slot if we never made it to the worker construction.
+    releaseSlot();
+    throw err;
+  }
   const worker = new Worker(workerPath, {
     // 32 MB heap ceiling — bounded enough to prevent runaway allocations
     // without crowding the typical demo footprint (~2-5 MB).
@@ -222,6 +289,7 @@ export async function execInWorker(
     }
     await worker.terminate().catch(() => undefined);
     cleanupTempDir();
+    releaseSlot();
     void timedOut;
   }
 }
