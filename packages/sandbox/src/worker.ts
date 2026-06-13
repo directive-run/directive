@@ -152,6 +152,32 @@ declare global {
   var __directiveSandbox_system__: SandboxSystem | null;
 }
 
+/**
+ * Strip absolute paths from a stack trace before it crosses the
+ * worker→host→client boundary. Stack traces leak the sandbox host's
+ * filesystem layout — `/Users/<name>/`, `/home/<user>/`, the mkdtemp
+ * bundle directory, and on serverless surfaces `/var/task/...`. These
+ * become a fingerprint of the host environment any sandbox client can
+ * read. Sanitize once at the boundary so every error path benefits.
+ */
+function sanitizeStack(s: string | undefined): string {
+  if (!s) return "";
+  return (
+    s
+      // file:// URLs
+      .replace(/file:\/\/\/[^\s)]+/g, "<sandbox>")
+      // dev-machine home directories — macOS + Linux
+      .replace(/\/Users\/[^/\s)]+/g, "/<home>")
+      .replace(/\/home\/[^/\s)]+/g, "/<home>")
+      // macOS private-var prefix
+      .replace(/\/private\/var\/[^\s)]+/g, "<tmp>")
+      // serverless lambda / vercel function task root
+      .replace(/\/var\/task\/[^\s)]+/g, "<task>")
+      // generic tmp + lambda-runtime task paths
+      .replace(/\/tmp\/[^\s)]+/g, "<tmp>")
+  );
+}
+
 async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
   const logs: string[] = [];
   const errors: string[] = [];
@@ -177,13 +203,13 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
       parts.push(`[code: ${e.code}]`);
     }
     if (e.stack) {
-      parts.push(e.stack);
+      parts.push(sanitizeStack(e.stack));
     }
     if (e.cause) {
       const cause = e.cause as Error;
       parts.push(`Cause: ${cause.message ?? String(cause)}`);
       if (cause.stack) {
-        parts.push(cause.stack);
+        parts.push(sanitizeStack(cause.stack));
       }
     }
     errors.push(parts.join("\n"));
@@ -203,7 +229,7 @@ async function runOne(message: WorkerInputMessage): Promise<SandboxResult> {
       facts = system.facts.$store.toObject();
     } catch (err) {
       errors.push(
-        `facts snapshot failed: ${(err as Error).message}\n${(err as Error).stack ?? ""}`,
+        `facts snapshot failed: ${(err as Error).message}\n${sanitizeStack((err as Error).stack)}`,
       );
     }
     // Snapshot derivations. The host pre-extracts the key names from
@@ -251,7 +277,10 @@ port.once("message", async (msg: WorkerInputMessage) => {
   } catch (err) {
     const out: WorkerOutputMessage = {
       ok: false,
-      error: (err as Error).stack ?? (err as Error).message ?? String(err),
+      error:
+        sanitizeStack((err as Error).stack) ||
+        (err as Error).message ||
+        String(err),
     };
     port.postMessage(out);
   }

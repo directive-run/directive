@@ -76,4 +76,4 @@
 // but a direct subpath import lands only the bytes that subpath
 // actually uses.
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.3.0";

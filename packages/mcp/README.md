@@ -40,7 +40,7 @@ directive-mcp --help
 ```text
 2. Verify the server is loaded.
    Claude Desktop:  click the tools/hammer icon — you should see `directive`
-                    with 20 tools. Or ask Claude:
+                    with 22 tools. Or ask Claude:
                     "Use the directive MCP server's get_server_info tool."
    Cursor:          open Settings → MCP → look for `directive` (status: connected).
    MCP Inspector:   npx @modelcontextprotocol/inspector npx -y @directive-run/mcp
@@ -79,9 +79,9 @@ Every Directive MCP request follows the same shape: an AI client (Claude Desktop
 │  src/cli.ts:                                                                   │
 │    parseArgs() → { sse: false (default) }                                      │
 │    setServerInfo({ transport: "stdio", authEnabled: false })                   │
-│    createDirectiveServer() → McpServer with 20 tools registered                │
+│    createDirectiveServer() → McpServer with 22 tools registered                │
 │                                                                                │
-│  Tool surface (20):                                                            │
+│  Tool surface (22):                                                            │
 │    Knowledge:   list_knowledge, get_knowledge, search_knowledge,               │
 │                 list_examples, get_example, search_examples                    │
 │    Packages:    list_packages, get_package_info, get_composable_packages       │
