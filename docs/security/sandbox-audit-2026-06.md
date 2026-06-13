@@ -86,7 +86,7 @@ The anonymous POST endpoint had no rate limit and no Origin check. Combined with
 **Status:** Fixed in `@directive-run/mcp@0.5.1`.
 **Source:** `packages/mcp/src/server.ts` (`run_in_sandbox` description) + `packages/mcp/README.md`.
 
-The MCP tool description and the README claimed the allowlist was `@directive-run/{core,ai,query}`. The actual allowlist (post-0.2.0) is 16 packages: `core`, `ai`, `query`, `react`, `vue`, `svelte`, `solid`, `lit`, `el`, `optimistic`, `timeline`, `mutator`, `knowledge`, `scaffold`, `claude-plugin`, `lint`. An LLM reading the description was pre-emptively rejecting valid React / Vue / AI orchestrator snippets.
+The MCP tool description and the README claimed the allowlist was `@directive-run/{core,ai,query}`. The actual allowlist (post-0.2.0, current as of this audit) is 17 packages: `core`, `ai`, `query`, `react`, `vue`, `svelte`, `solid`, `lit`, `el`, `optimistic`, `timeline`, `mutator`, `knowledge`, `scaffold`, `claude-plugin`, `lint`, `sources`. An LLM reading the description was pre-emptively rejecting valid React / Vue / AI orchestrator snippets. The canonical, drift-proof source is `ALLOWED_DIRECTIVE_PACKAGES` in `packages/sandbox/src/validator.ts`.
 
 **Fix:** Tool description and README rewritten with the full allowlist. Added the foot-gun note: "react/vue/svelte/solid/lit imports work but their runtime hooks throw in Node — use `playground_link` for UI demos."
 
