@@ -173,4 +173,59 @@ describe("buildPlaygroundLink", () => {
       expect(result.url.startsWith("https://directive.run/run#")).toBe(true);
     });
   });
+
+  // The docs site's PlaygroundClient + RunRedirect cap decoded payloads
+  // at 1 MB to defuse LZ-bomb links. Verify the encoder side stays well
+  // under that ceiling for any legitimate MAX-sized input — there's no
+  // path where lz-string can expand an 8 KB input into a >1 MB string,
+  // so the cap can NEVER reject a tool-generated link.
+  describe("decoder compatibility (1 MB cap defended in PlaygroundClient + RunRedirect)", () => {
+    const DECODER_CAP_BYTES = 1_000_000;
+
+    it("max-size single-source roundtrips well under the decoder cap", () => {
+      const big = "// padding\n".repeat(Math.floor(MAX_PLAYGROUND_SOURCE_BYTES / 11));
+      const result = buildPlaygroundLink({ source: big });
+      const hash = parseHash(result.url);
+      const encoded = hash.get("src");
+      expect(encoded).not.toBeNull();
+      const decoded = decompressFromEncodedURIComponent(encoded ?? "") ?? "";
+      // The decoded source is the original (lz-string round-trips
+      // exactly). The original was capped at MAX_PLAYGROUND_SOURCE_BYTES
+      // by the encoder's assertByteBudget. Decoded length ≤ encoder cap,
+      // encoder cap ≪ decoder cap → cap can never reject this link.
+      expect(decoded.length).toBeLessThanOrEqual(MAX_PLAYGROUND_SOURCE_BYTES);
+      expect(decoded.length).toBeLessThan(DECODER_CAP_BYTES);
+    });
+
+    it("max-size multi-file roundtrips well under the decoder cap", () => {
+      // Build files until the JSON-wrapped payload is just under the
+      // 8 KB cap — that's the worst-case shape a generator emits.
+      const files: { path: string; source: string }[] = [];
+      for (let i = 0; i < 5; i++) {
+        files.push({
+          path: `src/file${i}.ts`,
+          source: "// padding\n".repeat(120),
+        });
+      }
+      // Trim until we're below the cap.
+      while (
+        Buffer.byteLength(JSON.stringify(files), "utf8") >
+        MAX_PLAYGROUND_SOURCE_BYTES
+      ) {
+        const last = files[files.length - 1];
+        if (!last) break;
+        last.source = last.source.slice(0, -100);
+      }
+      const result = buildPlaygroundLink({ files });
+      const hash = parseHash(result.url);
+      const encoded = hash.get("files");
+      expect(encoded).not.toBeNull();
+      const decoded = decompressFromEncodedURIComponent(encoded ?? "") ?? "";
+      expect(decoded.length).toBeLessThan(DECODER_CAP_BYTES);
+      // Also verify the JSON shape the decoder expects.
+      const parsed = JSON.parse(decoded);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed[0]).toMatchObject({ path: expect.any(String), source: expect.any(String) });
+    });
+  });
 });
