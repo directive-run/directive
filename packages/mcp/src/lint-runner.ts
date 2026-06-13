@@ -62,10 +62,24 @@ function wakeNextLintWaiter(): void {
 }
 
 /**
- * Override the cap. Returns the previous value.
+ * Override the per-process lint-worker cap. Pass `Infinity` to disable.
+ * Returns the previous value.
+ *
+ * Each ts-morph worker spawns a TypeScript project + a thread; a
+ * multi-client MCP burst (Cursor + Claude + IDE all calling
+ * `review_source` in parallel) could amplify into a thread-spawn
+ * storm. The cap queues excess requests FIFO; abandoned callers
+ * (signal-aborted or dropped promises) deregister cleanly so they
+ * don't leak phantom waiters.
  *
  * Lowering the cap below `activeLintWorkers` does NOT terminate
  * running workers — the new ceiling applies as they drain.
+ *
+ * @example Cap the lint pool at boot
+ * ```ts
+ * import { setMaxConcurrentLintWorkers } from "@directive-run/mcp";
+ * setMaxConcurrentLintWorkers(4);
+ * ```
  */
 export function setMaxConcurrentLintWorkers(value: number): number {
   const prev = maxConcurrentLintWorkers;

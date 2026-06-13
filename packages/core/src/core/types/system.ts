@@ -367,13 +367,7 @@ export interface SystemInspection {
      * - `"coalesced"` — manager debounced a same-event-name publish
      *   when `SourceDef.coalesce === "lastWriteWins"`
      */
-    lastDropReason:
-      | "post-destroy"
-      | "post-stop"
-      | "blocked-event-name"
-      | "invalid-event-name"
-      | "coalesced"
-      | null;
+    lastDropReason: import("./sources.js").SourceDropReason | null;
     /** Wall-clock ms of the most recent rejected publish, or `null`. */
     lastDropAt: number | null;
     /** Total attach + cleanup errors since the last attachAll. */

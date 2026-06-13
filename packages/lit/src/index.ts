@@ -905,9 +905,17 @@ export function createModuleController<M extends ModuleSchema>(
  * `createModuleController`.
  *
  * @deprecated Renamed to `createModuleController` — same shape, no
- * import collision with `@directive-run/core`.
+ * import collision with `@directive-run/core`. The function-wrapper
+ * shape (vs `export const x = y`) ensures the `@deprecated` JSDoc
+ * tag renders the strikethrough in every TS-aware editor.
  */
-export const createModule = createModuleController;
+export function createModule<M extends ModuleSchema>(
+  host: ReactiveControllerHost,
+  moduleDef: ModuleDef<M>,
+  config?: Parameters<typeof createModuleController<M>>[2],
+): ModuleController<M> {
+  return createModuleController<M>(host, moduleDef, config);
+}
 
 // ============================================================================
 // Functional Helpers
@@ -999,9 +1007,16 @@ export function getHistory(
 /**
  * @deprecated Renamed to `getHistory`. The Lit functional helper is
  * snapshot-only; React/Vue/Svelte/Solid `useHistory` is reactive.
- * Use `HistoryController` for the reactive Lit equivalent.
+ * Use `HistoryController` for the reactive Lit equivalent. The
+ * function-wrapper shape (vs `export const x = y`) ensures the
+ * `@deprecated` JSDoc tag renders in every TS-aware editor.
  */
-export const useHistory = getHistory;
+// biome-ignore lint/suspicious/noExplicitAny: System type varies
+export function useHistory(
+  system: SingleModuleSystem<any>,
+): HistoryState | null {
+  return getHistory(system);
+}
 
 export function getDerived<T>(
   // biome-ignore lint/suspicious/noExplicitAny: System type varies

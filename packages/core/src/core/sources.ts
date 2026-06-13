@@ -198,15 +198,7 @@ export type SourceDispatch = (
  */
 export type SourceDispatchResult =
   | { accepted: true }
-  | {
-      accepted: false;
-      reason:
-        | "post-destroy"
-        | "post-stop"
-        | "blocked-event-name"
-        | "invalid-event-name"
-        | "coalesced";
-    };
+  | { accepted: false; reason: SourceDropReason };
 
 /**
  * Per-source lifecycle callbacks the engine wires into the plugin manager.

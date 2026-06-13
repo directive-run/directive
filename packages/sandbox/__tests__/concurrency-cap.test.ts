@@ -95,4 +95,50 @@ describe("sandbox host worker cap", () => {
     ).rejects.toThrow();
     await blocker;
   });
+
+  it("post-acquisition signal abort terminates the running worker + frees the slot", async () => {
+    setMaxConcurrentWorkers(1);
+    // Long-running snippet — busy-loop close to the timeout so the
+    // worker doesn't naturally finish before the abort fires.
+    const LONG_RUNNING = [
+      {
+        path: "src/main.ts",
+        source: [
+          'import { createModule, createSystem, t } from "@directive-run/core";',
+          'const m = createModule("noop", {',
+          "  schema: { facts: { v: t.number() }, events: {} },",
+          "  init: (f) => { f.v = 0; },",
+          "});",
+          "const system = createSystem({ module: m });",
+          "system.start();",
+          "// Busy loop until budget close — keeps the worker active.",
+          "const end = Date.now() + 3500;",
+          "while (Date.now() < end) { for (let i=0; i<1000; i++) {} }",
+          "system.destroy();",
+        ].join("\n"),
+      },
+    ];
+    const aborter = new AbortController();
+    const t0 = Date.now();
+    const resultPromise = runInSandbox({
+      files: LONG_RUNNING,
+      timeoutMs: 4000,
+      signal: aborter.signal,
+    });
+    // Abort after the worker has spawned + acquired the slot. Without
+    // post-acquisition signal wiring this would hang for ~3.5s; with
+    // it the worker is terminated immediately and the next acquire
+    // sees the slot free.
+    setTimeout(() => aborter.abort(), 100);
+    // `runInSandbox` converts WorkerExecError into a SandboxResult
+    // with the message in `errors[]` rather than rejecting outright.
+    const result = await resultPromise;
+    const aborted_at = Date.now();
+    // Should have aborted well before the 3.5s busy-loop.
+    expect(aborted_at - t0).toBeLessThan(2000);
+    expect(result.errors.some((e) => /aborted/i.test(e))).toBe(true);
+    // Slot freed: a fresh call should run immediately.
+    const fresh = await runInSandbox({ files: TRIVIAL, timeoutMs: 4000 });
+    expect(fresh.errors).toEqual([]);
+  });
 });

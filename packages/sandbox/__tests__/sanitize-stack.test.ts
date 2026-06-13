@@ -70,6 +70,44 @@ describe("sanitizeStack", () => {
     expect(out).toMatch(/<usr-local>/);
   });
 
+  it("strips /app/ — Heroku / Render / Docker app root", () => {
+    const out = sanitizeStack(
+      "    at fn (/app/node_modules/@directive-run/sandbox/dist/worker.js:1:1)",
+    );
+    expect(out).not.toMatch(/\/app\/node_modules/);
+    expect(out).toMatch(/<app>/);
+  });
+
+  it("strips /srv/ — Linux service deploy root", () => {
+    const out = sanitizeStack("    at fn (/srv/api/dist/server.js:1:1)");
+    expect(out).not.toMatch(/\/srv\/api/);
+    expect(out).toMatch(/<srv>/);
+  });
+
+  it("strips /workspace/ — Codespaces / GitHub Actions root", () => {
+    const out = sanitizeStack("    at fn (/workspace/src/file.ts:1:1)");
+    expect(out).not.toMatch(/\/workspace\/src/);
+    expect(out).toMatch(/<workspace>/);
+  });
+
+  it("strips /data/ — common volume mount root", () => {
+    const out = sanitizeStack("    at fn (/data/storage/config.json:1:1)");
+    expect(out).not.toMatch(/\/data\/storage/);
+    expect(out).toMatch(/<data>/);
+  });
+
+  it("strips /etc/ — Linux config root", () => {
+    const out = sanitizeStack("    at fn (/etc/ssl/certs/ca.pem:1:1)");
+    expect(out).not.toMatch(/\/etc\/ssl/);
+    expect(out).toMatch(/<etc>/);
+  });
+
+  it("strips /root/ — Linux root home", () => {
+    const out = sanitizeStack("    at fn (/root/.ssh/id_rsa:1:1)");
+    expect(out).not.toMatch(/\/root\/\.ssh/);
+    expect(out).toMatch(/<root>/);
+  });
+
   it("strips Windows C:\\Users\\<name>\\ paths", () => {
     const out = sanitizeStack(
       "    at fn (C:\\Users\\jason\\AppData\\Local\\Temp\\bundle.mjs:1:1)",

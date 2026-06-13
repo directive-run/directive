@@ -83,6 +83,13 @@ function wakeNextWaiter(): void {
  * `acquireSlot()` callers queue until `activeWorkers` falls below
  * the new cap. Raising the cap immediately drains any waiters the
  * new ceiling can absorb.
+ *
+ * @example Cap the worker pool at boot for a Next.js API route
+ * ```ts
+ * // app/api/sandbox/route.ts — runs once per cold start
+ * import { setMaxConcurrentWorkers } from "@directive-run/sandbox";
+ * setMaxConcurrentWorkers(8);
+ * ```
  */
 export function setMaxConcurrentWorkers(value: number): number {
   const prev = maxConcurrentWorkers;
@@ -301,6 +308,8 @@ export async function execInWorker(
 
   let timer: NodeJS.Timeout | null = null;
   let timedOut = false;
+  let aborted = false;
+  let abortListener: (() => void) | null = null;
   const startMs = Date.now();
 
   try {
@@ -343,6 +352,36 @@ export async function execInWorker(
         );
       }, timeoutMs);
 
+      // Post-acquisition signal wiring: when the caller's AbortSignal
+      // fires (HTTP client disconnect, parent cancellation), terminate
+      // the running worker so the slot frees IMMEDIATELY instead of
+      // hanging until `timeoutMs` (up to 10s) elapses. Without this,
+      // an abandoned caller still ties up the slot for the full
+      // worker timeout — driving the per-process pool to deadlock
+      // under sustained disconnect load.
+      if (input.signal) {
+        abortListener = () => {
+          if (settled) return;
+          settled = true;
+          aborted = true;
+          worker.terminate();
+          reject(
+            new WorkerExecError(
+              "sandbox: aborted by caller signal",
+              "worker-error",
+            ),
+          );
+        };
+        if (input.signal.aborted) {
+          // Pre-acquired-then-aborted — fire synchronously.
+          abortListener();
+        } else {
+          input.signal.addEventListener("abort", abortListener, {
+            once: true,
+          });
+        }
+      }
+
       const message: WorkerInputMessage = {
         bundlePath: pathToFileURL(bundlePath).href,
         timeoutMs,
@@ -370,9 +409,13 @@ export async function execInWorker(
     if (timer) {
       clearTimeout(timer);
     }
+    if (abortListener && input.signal) {
+      input.signal.removeEventListener("abort", abortListener);
+    }
     await worker.terminate().catch(() => undefined);
     cleanupTempDir();
     releaseSlot();
     void timedOut;
+    void aborted;
   }
 }

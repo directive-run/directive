@@ -52,5 +52,18 @@ export function sanitizeStack(s: string | undefined): string {
       // package layout (e.g. `/opt/render/project/src/...`).
       .replace(new RegExp(`\\/opt\\/${TAIL}`, "g"), "<opt>")
       .replace(new RegExp(`\\/usr\\/local\\/${TAIL}`, "g"), "<usr-local>")
+      // Common deploy roots — Heroku/Render/Docker/Codespaces/GitHub
+      // Actions all root applications under one of these. Without
+      // these, a worker error from a containerized host leaks the
+      // deploy layout + package versions inside `/app/node_modules/`.
+      .replace(new RegExp(`\\/app\\/${TAIL}`, "g"), "<app>")
+      .replace(new RegExp(`\\/srv\\/${TAIL}`, "g"), "<srv>")
+      .replace(new RegExp(`\\/workspace\\/${TAIL}`, "g"), "<workspace>")
+      .replace(new RegExp(`\\/data\\/${TAIL}`, "g"), "<data>")
+      // /etc and /root — high-sensitivity Linux paths (config files,
+      // root home). A snippet that throws referencing one of these
+      // should not echo the absolute path back to the caller.
+      .replace(new RegExp(`\\/etc\\/${TAIL}`, "g"), "<etc>")
+      .replace(new RegExp(`\\/root\\/${TAIL}`, "g"), "<root>")
   );
 }
