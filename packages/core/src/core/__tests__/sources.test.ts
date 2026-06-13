@@ -1276,6 +1276,73 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(onPublish).toHaveBeenCalledWith("s", "mod", "OK");
   });
 
+  // R2 fix: onDrop pairs with onPublish so observers see both halves
+  // without polling inspect().sources[i].dropCount.
+  it("onDrop fires with the engine's drop reason on rejected publishes", () => {
+    const onPublish = vi.fn();
+    const onDrop = vi.fn();
+    const dispatch = vi
+      .fn()
+      .mockImplementation((_id, _moduleId, eventName) => ({
+        accepted: eventName === "OK",
+        ...(eventName === "OK"
+          ? {}
+          : { reason: "blocked-event-name" as const }),
+      }));
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        s: {
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+      { s: "mod" },
+      { onPublish, onDrop },
+    );
+    manager.attachAll(dispatch);
+    captured.current?.("OK", {});
+    captured.current?.("BAD", {});
+    expect(onPublish).toHaveBeenCalledTimes(1);
+    expect(onDrop).toHaveBeenCalledTimes(1);
+    expect(onDrop).toHaveBeenCalledWith("s", "mod", "BAD", "blocked-event-name");
+  });
+
+  // R2 fix: onDrop fires with reason "coalesced" when the manager
+  // debounces a same-event publish within a single microtask tick.
+  it("onDrop fires with reason \"coalesced\" on the lastWriteWins manager drop", async () => {
+    const onDrop = vi.fn();
+    const dispatch = vi
+      .fn()
+      .mockReturnValue({ accepted: true });
+    const captured: { current: SourcePublish | null } = { current: null };
+    const manager = createSourcesManager(
+      {
+        s: {
+          coalesce: "lastWriteWins",
+          attach: (publish) => {
+            captured.current = publish;
+            return () => undefined;
+          },
+        },
+      },
+      { s: "mod" },
+      { onDrop },
+    );
+    manager.attachAll(dispatch);
+    captured.current?.("tick", { v: 1 });
+    captured.current?.("tick", { v: 2 });
+    captured.current?.("tick", { v: 3 });
+    // The first publish stays; the second + third both bump dropCount
+    // with reason "coalesced".
+    expect(onDrop).toHaveBeenCalledTimes(2);
+    expect(onDrop).toHaveBeenCalledWith("s", "mod", "tick", "coalesced");
+    // Drain the microtask flush so dispatch fires once.
+    await Promise.resolve();
+  });
+
   // R6 fix: error.message truncation prevents unbounded payload leakage.
   it("lastError.message is truncated at SOURCE_ERROR_MESSAGE_MAX (256) chars", () => {
     const consoleErrorSpy = vi

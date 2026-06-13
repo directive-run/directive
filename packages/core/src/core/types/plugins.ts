@@ -332,6 +332,33 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   onSourcePublish?: (id: string, moduleId: string, eventName: string) => void;
 
   /**
+   * Called when the engine OR the manager rejects a source publish.
+   * Pairs with `onSourcePublish` so observers see both halves of the
+   * publish path without polling `inspect().sources[i].dropCount`.
+   *
+   * `reason` mirrors `SourceInspectionRow.lastDropReason`:
+   * - `"post-destroy"` / `"post-stop"` — leaked transport firing after teardown
+   * - `"blocked-event-name"` / `"invalid-event-name"` — engine guard probe
+   * - `"coalesced"` — manager debounced an in-tick same-event publish
+   *
+   * @param id - The source ID.
+   * @param moduleId - The owning module's id.
+   * @param eventName - The dispatched event name (the first arg to `publish`).
+   * @param reason - Why the publish was rejected.
+   */
+  onSourceDrop?: (
+    id: string,
+    moduleId: string,
+    eventName: string,
+    reason:
+      | "post-destroy"
+      | "post-stop"
+      | "blocked-event-name"
+      | "invalid-event-name"
+      | "coalesced",
+  ) => void;
+
+  /**
    * Called when a source detaches at `system.stop()` (reverse-registration
    * order across all modules).
    * @param id - The source ID.

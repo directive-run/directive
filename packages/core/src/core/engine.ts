@@ -573,6 +573,10 @@ export function createEngine<S extends Schema>(
         if (hasPlugins())
           pluginManager.emitSourcePublish(id, moduleId, eventName);
       },
+      onDrop: (id, moduleId, eventName, reason) => {
+        if (hasPlugins())
+          pluginManager.emitSourceDrop(id, moduleId, eventName, reason);
+      },
       onDetach: (id, moduleId) => {
         if (hasPlugins()) pluginManager.emitSourceDetach(id, moduleId);
       },

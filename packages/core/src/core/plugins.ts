@@ -151,6 +151,23 @@ export interface PluginManager<_S extends Schema = any> {
   // can route source events through the same dispatch fabric.
   emitSourceAttach(id: string, moduleId: string): void;
   emitSourcePublish(id: string, moduleId: string, eventName: string): void;
+  /**
+   * Engine- or manager-rejected publish. Mirrors `emitSourcePublish`
+   * so observers can pair every accepted publish with the drop side
+   * without polling `inspect().sources[i].dropCount`. `reason` matches
+   * the value the inspect row records.
+   */
+  emitSourceDrop(
+    id: string,
+    moduleId: string,
+    eventName: string,
+    reason:
+      | "post-destroy"
+      | "post-stop"
+      | "blocked-event-name"
+      | "invalid-event-name"
+      | "coalesced",
+  ): void;
   emitSourceDetach(id: string, moduleId: string): void;
   emitSourceError(
     id: string,
@@ -400,6 +417,7 @@ export function createPluginManager<
     // Source hooks
     emitSourceAttach: broadcast("onSourceAttach"),
     emitSourcePublish: broadcast("onSourcePublish"),
+    emitSourceDrop: broadcast("onSourceDrop"),
     emitSourceDetach: broadcast("onSourceDetach"),
     emitSourceError: broadcast("onSourceError"),
 

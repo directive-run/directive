@@ -237,6 +237,27 @@ export interface SourcesManagerCallbacks {
     moduleId: string,
     eventName: string,
   ) => void;
+  /**
+   * Fires when the engine OR the manager rejects a publish. Mirrors
+   * `onPublish` so plugin observers can pair every accepted publish
+   * with the drop side without polling `inspect().sources[i].dropCount`.
+   *
+   * `reason` matches the value the manager writes to `lastDropReason`
+   * on the inspect row. Use this hook to drive alerting (a source whose
+   * `lastDropReason: "blocked-event-name"` is a misconfiguration; a
+   * source whose `lastDropReason: "coalesced"` is publishing too fast).
+   */
+  readonly onDrop?: (
+    id: string,
+    moduleId: string,
+    eventName: string,
+    reason:
+      | "post-destroy"
+      | "post-stop"
+      | "blocked-event-name"
+      | "invalid-event-name"
+      | "coalesced",
+  ) => void;
   readonly onDetach?: (id: string, moduleId: string) => void;
   readonly onError?: (
     id: string,
@@ -481,6 +502,7 @@ export function createSourcesManager(
         c.dropCount += 1;
         c.lastDropReason = result.reason;
         c.lastDropAt = now;
+        callbacks.onDrop?.(id, record.moduleId, eventName, result.reason);
       }
     };
 
@@ -510,6 +532,7 @@ export function createSourcesManager(
             c.lastDropReason = "coalesced";
             c.lastDropAt = Date.now();
           }
+          callbacks.onDrop?.(id, record.moduleId, eventName, "coalesced");
         }
         pending.set(eventName, payload);
         if (!flushScheduled) {
