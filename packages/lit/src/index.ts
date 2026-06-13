@@ -871,7 +871,17 @@ export function createOptimisticUpdate(
   );
 }
 
-export function createModule<M extends ModuleSchema>(
+/**
+ * Build a `ModuleController` from a Directive module definition.
+ *
+ * The function is exported as both `createModuleController` (preferred)
+ * and `createModule` (legacy alias). The original `createModule` name
+ * collides with `@directive-run/core`'s `createModule` — importing
+ * both into the same scope shadows whichever lands last in editor
+ * auto-import order. New code should use `createModuleController`;
+ * the `createModule` alias remains so existing imports still resolve.
+ */
+export function createModuleController<M extends ModuleSchema>(
   host: ReactiveControllerHost,
   moduleDef: ModuleDef<M>,
   config?: {
@@ -888,6 +898,16 @@ export function createModule<M extends ModuleSchema>(
 ): ModuleController<M> {
   return new ModuleController<M>(host, moduleDef, config);
 }
+
+/**
+ * Legacy alias for `createModuleController`. Collides by name with
+ * `@directive-run/core`'s `createModule`. New code should prefer
+ * `createModuleController`.
+ *
+ * @deprecated Renamed to `createModuleController` — same shape, no
+ * import collision with `@directive-run/core`.
+ */
+export const createModule = createModuleController;
 
 // ============================================================================
 // Functional Helpers
@@ -954,16 +974,34 @@ export class HistoryController implements ReactiveController {
 }
 
 /**
- * Functional helper for history state (non-reactive, snapshot).
- * For reactive updates, use HistoryController.
+ * Snapshot-only history helper. Returns the current `HistoryState`
+ * once and does not re-fire when history mutates.
+ *
+ * **Named `getHistory` to match the snapshot semantics.** The Lit
+ * adapter intentionally provides a non-reactive variant alongside
+ * the reactive `HistoryController` so callers reading history once
+ * (e.g. logging the last snapshot before a destroy) don't have to
+ * spin up a controller. The previous name `useHistory` collided
+ * with the reactive `useHistory` semantics in
+ * `@directive-run/{react,vue,svelte,solid}` where the hook IS
+ * reactive — same name, opposite contract.
+ *
+ * For reactive history, use `HistoryController`.
  */
 // biome-ignore lint/suspicious/noExplicitAny: System type varies
-export function useHistory(
+export function getHistory(
   system: SingleModuleSystem<any>,
 ): HistoryState | null {
-  assertSystem("useHistory", system);
+  assertSystem("getHistory", system);
   return buildHistoryState(system);
 }
+
+/**
+ * @deprecated Renamed to `getHistory`. The Lit functional helper is
+ * snapshot-only; React/Vue/Svelte/Solid `useHistory` is reactive.
+ * Use `HistoryController` for the reactive Lit equivalent.
+ */
+export const useHistory = getHistory;
 
 export function getDerived<T>(
   // biome-ignore lint/suspicious/noExplicitAny: System type varies
