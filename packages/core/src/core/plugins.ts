@@ -330,12 +330,32 @@ export function createPluginManager<
         if (todo.length === 0) break;
         for (const plugin of todo) {
           initialized.add(plugin);
+          // Time each onInit so a slow plugin is attributable in production
+          // logs. We use `performance.now()` (cross-runtime in Node 18+ /
+          // browsers / Bun / Deno / Workers) and only log when the cost is
+          // non-trivial to keep dev console noise low.
+          const startedAt =
+            typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now();
           await safeCallAsync(
             () =>
               (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,
             plugin.name,
             "onInit",
           );
+          const elapsedMs =
+            (typeof performance !== "undefined"
+              ? performance.now()
+              : Date.now()) - startedAt;
+          if (elapsedMs > 100) {
+            console.warn("[Directive] slow plugin onInit", {
+              plugin: plugin.name,
+              hook: "onInit",
+              pass,
+              durationMs: Math.round(elapsedMs),
+            });
+          }
         }
       }
     },

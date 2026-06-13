@@ -743,9 +743,18 @@ export function createFactPIIGuardrail(
       if (facts?.$store?.set) {
         try {
           facts.$store.set(key, result.redacted);
-        } catch {
-          // Store rejected (e.g. unknown key, mid-destroy). onBlocked
-          // already fired so the consumer has the signal.
+        } catch (error) {
+          // Store rejected (e.g. unknown key, mid-destroy). `onBlocked`
+          // already fired so the consumer knows redaction WAS detected,
+          // but the follow-up write didn't land — the raw value remains
+          // in store. Log structured so log scrapers can flag a guardrail
+          // that thinks it succeeded but didn't.
+          console.warn("[Directive] guardrail redact write failed", {
+            plugin: "fact-pii-guardrail",
+            key,
+            phase: "onFactSet",
+            error,
+          });
         }
       }
     },
@@ -799,8 +808,17 @@ export function createFactPIIGuardrail(
         if (facts?.$store?.set) {
           try {
             facts.$store.set(change.key, result.redacted);
-          } catch {
-            /* store may reject mid-destroy; onBlocked already fired */
+          } catch (error) {
+            // Same posture as `onFactSet` redact-write failure: detected
+            // and onBlocked fired, follow-up write didn't land. Log so a
+            // misbehaving store (mid-destroy, unknown key) is visible to
+            // log scrapers rather than silently leaving raw PII in place.
+            console.warn("[Directive] guardrail redact write failed", {
+              plugin: "fact-pii-guardrail",
+              key: change.key,
+              phase: "onFactsBatch",
+              error,
+            });
           }
         }
       }

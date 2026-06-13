@@ -324,6 +324,22 @@ function validateModuleConfig<M extends ModuleSchema>(
   if (!config.schema) {
     console.warn("[Directive] Module schema is required");
   } else if (!config.schema.facts) {
+    // Detect the canonical footgun: user passed bare facts as `schema`.
+    // Every `t.X()` output carries a `_typeName` property — if we see one
+    // directly under `schema`, that's almost certainly an intended fact
+    // declaration in the wrong position.
+    const looksLikeFlatSchema = Object.values(
+      config.schema as Record<string, unknown>,
+    ).some(
+      (v) =>
+        v != null && typeof v === "object" && "_typeName" in (v as object),
+    );
+    if (looksLikeFlatSchema) {
+      console.warn(
+        `[Directive] Module "${id}" schema appears to contain fact declarations directly. ` +
+          "Did you mean `schema: { facts: { ... } }` instead of `schema: { ... }`?",
+      );
+    }
     console.warn("[Directive] Module schema.facts is required");
   }
 

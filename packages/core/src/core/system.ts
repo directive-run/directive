@@ -171,6 +171,20 @@ export function createSystem<
 >(
   options: CreateSystemOptionsSingle<S> | CreateSystemOptionsNamed<Modules>,
 ): SingleModuleSystem<S> | NamespacedSystem<Modules> {
+  // Detect the empty / mistyped options case BEFORE the routing branches
+  // so the caller gets a clear `[Directive]` diagnostic instead of a
+  // downstream `Cannot convert undefined or null to object` thrown from
+  // `Object.keys(undefined)` deep inside the engine init.
+  if (
+    !options ||
+    (!("module" in options) && !("modules" in options))
+  ) {
+    throw new Error(
+      "[Directive] createSystem requires either `{ module }` (single-module form) " +
+        "or `{ modules: { name: module } }` (namespaced form). Got an options " +
+        "object with neither.",
+    );
+  }
   // Single module mode (module prop)
   if ("module" in options) {
     if (!options.module) {

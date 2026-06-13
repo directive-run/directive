@@ -2903,8 +2903,18 @@ export function createEngine<S extends Schema>(
   (system as unknown as Record<string, unknown>).registerModule =
     registerModule;
 
-  // Initialize plugins
-  pluginManager.emitInit(system);
+  // Initialize plugins.
+  //
+  // `emitInit` returns a Promise (the loop-until-quiet awaits each plugin's
+  // `onInit` in pass-order). We intentionally do NOT await it here so
+  // `createSystem` stays synchronous — but a rejection used to silently
+  // become an unhandled promise rejection in the host. Route any rejection
+  // through console.error with structured context so log scrapers can see
+  // it; per-plugin failures are also caught by `safeCallAsync` inside the
+  // manager and won't reach this catch in normal operation.
+  void pluginManager.emitInit(system).catch((error: unknown) => {
+    console.error("[Directive] Plugin emitInit failure", { error });
+  });
 
   // Call module init hooks
   for (const module of config.modules) {

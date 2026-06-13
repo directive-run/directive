@@ -60,6 +60,23 @@ interface SupabasePayload {
 
 type SupabaseHandler = (payload: SupabasePayload) => void;
 
+interface SupabasePresencePayload {
+  event: "sync" | "join" | "leave";
+  // Presence state shape is user-defined per channel; surface as an opaque
+  // record so the consumer's `map` can cast to its own shape.
+  newPresences?: Record<string, unknown>[];
+  leftPresences?: Record<string, unknown>[];
+  // `sync` events carry the full presence snapshot.
+  state?: Record<string, Record<string, unknown>[]>;
+}
+
+interface SupabaseBroadcastPayload {
+  type: "broadcast";
+  event: string;
+  // Broadcast payload is opaque user data per channel.
+  payload: Record<string, unknown>;
+}
+
 interface SupabaseRealtimeChannel {
   on(
     type: "postgres_changes",
@@ -70,6 +87,16 @@ interface SupabaseRealtimeChannel {
       filter?: string;
     },
     handler: SupabaseHandler,
+  ): SupabaseRealtimeChannel;
+  on(
+    type: "presence",
+    filter: { event: "sync" | "join" | "leave" },
+    handler: (payload: SupabasePresencePayload) => void,
+  ): SupabaseRealtimeChannel;
+  on(
+    type: "broadcast",
+    filter: { event: string },
+    handler: (payload: SupabaseBroadcastPayload) => void,
   ): SupabaseRealtimeChannel;
   subscribe(callback?: (status: string) => void): SupabaseRealtimeChannel;
   unsubscribe(): Promise<"ok" | "timed out" | "error">;
@@ -110,13 +137,61 @@ export interface SupabaseEventBinding {
   ) => { name: string; payload: Record<string, unknown> } | null;
 }
 
+/**
+ * Declarative mapping from a Supabase presence event (`sync`, `join`,
+ * `leave`) to a typed Directive event publish. Optional — channels that
+ * don't use presence can omit the `presence` array on options.
+ */
+export interface SupabasePresenceBinding {
+  /** Presence event to subscribe to. */
+  event: "sync" | "join" | "leave";
+  /**
+   * Map the presence payload to a typed Directive event. Return `null`
+   * to skip publishing.
+   */
+  map: (
+    payload: SupabasePresencePayload,
+  ) => { name: string; payload: Record<string, unknown> } | null;
+}
+
+/**
+ * Declarative mapping from a Supabase broadcast event to a typed
+ * Directive event publish. Optional — channels that don't use broadcast
+ * can omit the `broadcast` array on options.
+ */
+export interface SupabaseBroadcastBinding {
+  /** Broadcast event name. Use `'*'` to listen to all broadcast events. */
+  event: string;
+  /**
+   * Map the broadcast payload to a typed Directive event. Return `null`
+   * to skip publishing.
+   */
+  map: (
+    payload: SupabaseBroadcastPayload,
+  ) => { name: string; payload: Record<string, unknown> } | null;
+}
+
 export interface SupabaseChannelOptions {
   /** The Supabase client (`createClient(url, key)`). */
   client: SupabaseRealtimeClient;
   /** Channel name. Must be unique per system instance. */
   channel: string;
-  /** One or more event bindings on this channel. */
+  /** One or more `postgres_changes` event bindings on this channel. */
   events: readonly SupabaseEventBinding[];
+  /**
+   * Optional presence bindings. The Supabase Realtime presence channel
+   * publishes `sync`/`join`/`leave` events independently from
+   * `postgres_changes`; consumers wiring a presence-based feature
+   * (lobby roster, typing indicators, etc.) declare bindings here.
+   */
+  presence?: readonly SupabasePresenceBinding[];
+  /**
+   * Optional broadcast bindings. The Supabase Realtime broadcast surface
+   * lets clients fan out arbitrary JSON payloads on a channel
+   * (chat-style messaging, custom RPC). Consumers wiring those features
+   * declare bindings here.
+   */
+  broadcast?: readonly SupabaseBroadcastBinding[];
   /**
    * Optional status hook. Fires with Supabase's connection status
    * (`'SUBSCRIBED'`, `'CHANNEL_ERROR'`, `'TIMED_OUT'`, `'CLOSED'`).
@@ -147,6 +222,8 @@ export function sourceFromSupabaseChannel(
     client,
     channel: channelName,
     events,
+    presence,
+    broadcast,
     onStatus,
     redactRow = (row) => row,
   } = options;
@@ -181,6 +258,41 @@ export function sourceFromSupabaseChannel(
             publish(result.name, result.payload);
           },
         );
+      }
+
+      // Presence bindings (optional). Registered separately from
+      // `postgres_changes` so consumers wiring lobby/roster/typing
+      // features get the sync/join/leave events Supabase publishes on
+      // the same channel. Each binding's `map` runs on every matching
+      // event; the source publishes the returned Directive event.
+      if (presence) {
+        for (const binding of presence) {
+          chan = chan.on(
+            "presence",
+            { event: binding.event },
+            (payload) => {
+              const result = binding.map(payload);
+              if (result === null) return;
+              publish(result.name, result.payload);
+            },
+          );
+        }
+      }
+
+      // Broadcast bindings (optional). Same pattern — fan out custom JSON
+      // payloads the channel emits via the broadcast surface.
+      if (broadcast) {
+        for (const binding of broadcast) {
+          chan = chan.on(
+            "broadcast",
+            { event: binding.event },
+            (payload) => {
+              const result = binding.map(payload);
+              if (result === null) return;
+              publish(result.name, result.payload);
+            },
+          );
+        }
       }
 
       // Open the subscription. `subscribe()` is async on the wire but
