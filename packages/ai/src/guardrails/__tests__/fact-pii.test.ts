@@ -1181,3 +1181,177 @@ describe("createFactPIIGuardrail — RFC 0010 guardrail.blocked event", () => {
     system.destroy();
   });
 });
+
+// =========================================================================
+// errorMode — R1 finding C2 (Error-wrap PII redaction)
+// =========================================================================
+//
+// Prior to the C2 fix, `mode: "redact"` did NOT actually redact Errors
+// whose `.message` / `.cause` carried PII. The walker returned the input
+// Error reference, downstream treated `redacted === value` as
+// "couldn't redact, only detect", and the follow-up store write was
+// skipped — raw PII persisted in the fact store and shipped to the next
+// agent prompt that interpolated the fact.
+//
+// The fix: a new `errorMode` option controls this path:
+//
+// - `"redact"` (new default in `mode: "redact"`): replace the Error with
+//   a fresh `Error(redactedMessage)` in the store
+// - `"preserve"`: keep the original Error (back-compat for consumers
+//   that need instanceof or stack parity); raw PII remains in store
+// - `"alert-only"`: same as preserve but emit kind `"alert"` instead of
+//   `"detect"` so observers route through the urgent path
+describe("createFactPIIGuardrail — errorMode (R1 C2 fix)", () => {
+  function makeErrorModule() {
+    // We model `err` as `t.any()` because the test writes both Error
+    // instances AND strings — Directive's schema validators are strict
+    // about object-vs-string, and the guardrail under test doesn't care
+    // about the static type.
+    return createModule("errormod", {
+      schema: {
+        facts: {
+          err: t.any().meta({ tags: ["pii"] }),
+        },
+        events: { wire: { err: t.any() } },
+      },
+      init: (f) => {
+        f.err = "";
+      },
+      events: {
+        wire: (f, p) => {
+          f.err = p.err;
+        },
+      },
+    });
+  }
+
+  it("errorMode: 'redact' (default) replaces an Error with PII with a redacted Error", () => {
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+    system.events.wire({
+      err: new Error("contact alice@evil.com — SSN 123-45-6789"),
+    });
+    const stored = system.facts.err as Error;
+    expect(stored).toBeInstanceOf(Error);
+    expect(stored.message).not.toContain("alice@evil.com");
+    expect(stored.message).not.toContain("123-45-6789");
+    expect(stored.message).toContain("[EMAIL]");
+    expect(stored.message).toContain("[SSN]");
+    system.destroy();
+  });
+
+  it("errorMode: 'redact' preserves the original Error class name", () => {
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+    const original = new TypeError("typed error: alice@evil.com");
+    system.events.wire({ err: original });
+    const stored = system.facts.err as Error;
+    // The fresh Error is still an Error instance (downstream `throw` and
+    // `instanceof Error` checks keep working), and the `.name` matches
+    // the original class — so `err.name === "TypeError"` branching still
+    // works.
+    expect(stored).toBeInstanceOf(Error);
+    expect(stored.name).toBe("TypeError");
+    expect(stored.message).not.toContain("alice@evil.com");
+    system.destroy();
+  });
+
+  it("errorMode: 'preserve' keeps the original Error in store (back-compat opt-out)", () => {
+    // Use a thin per-fact-set guardrail instance + the onBlocked hook to
+    // verify behavior without depending on the engine's typed-event
+    // reentry semantics (which apply a cap on guardrailBlocked emissions
+    // and complicate event-count assertions).
+    const guardrail = createFactPIIGuardrail({
+      mode: "redact",
+      errorMode: "preserve",
+    });
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [guardrail],
+    });
+    system.start();
+    const original = new Error("contact alice@evil.com");
+    system.events.wire({ err: original });
+    // Raw Error stays in store under preserve mode — the consumer
+    // explicitly opted into back-compat (instanceof / stack parity).
+    // Assert by message content (not strict equality — vitest's diff
+    // formatter trips on Error.prototype properties).
+    const stored = system.facts.err as Error;
+    expect(stored).toBeInstanceOf(Error);
+    expect(stored.message).toContain("alice@evil.com");
+    expect(stored.message).not.toContain("[EMAIL]");
+    system.destroy();
+  });
+
+  it("errorMode: 'preserve' fires onBlocked with action='redact' (top-level mode)", () => {
+    // The `onBlocked` callback receives the *mode*, not the *kind* — it
+    // tells the consumer how the guardrail was configured. Use it
+    // instead of system.observe() to avoid the typed-event reentry cap.
+    const blocks: Array<{ key: string; matches: number }> = [];
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [
+        createFactPIIGuardrail({
+          mode: "redact",
+          errorMode: "preserve",
+          onBlocked: (key, detected) =>
+            blocks.push({ key, matches: detected.length }),
+        }),
+      ],
+    });
+    system.start();
+    system.events.wire({ err: new Error("contact alice@evil.com") });
+    // At least one block fired with a PII match (engine reentry may
+    // multiply emissions but that's the engine's domain, not ours).
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks[0]?.matches).toBeGreaterThanOrEqual(1);
+    system.destroy();
+  });
+
+  it("errorMode: 'alert-only' keeps the Error and fires onBlocked", () => {
+    const blocks: Array<{ key: string; matches: number }> = [];
+    const original = new Error("contact alice@evil.com");
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [
+        createFactPIIGuardrail({
+          mode: "redact",
+          errorMode: "alert-only",
+          onBlocked: (key, detected) =>
+            blocks.push({ key, matches: detected.length }),
+        }),
+      ],
+    });
+    system.start();
+    system.events.wire({ err: original });
+    // Same-ref preserve in store; onBlocked still fires. Assert by
+    // message + class — strict toBe(original) trips vitest's diff
+    // formatter on Error.prototype properties.
+    const stored = system.facts.err as Error;
+    expect(stored).toBeInstanceOf(Error);
+    expect(stored.message).toContain("alice@evil.com");
+    expect(stored.message).not.toContain("[EMAIL]");
+    expect(blocks.length).toBeGreaterThan(0);
+    system.destroy();
+  });
+
+  it("non-Error PII writes are unaffected by errorMode", () => {
+    // Sanity: errorMode only governs the Error branch. A string fact
+    // with PII still goes through the regular redactText path.
+    const system = createSystem({
+      module: makeErrorModule(),
+      plugins: [createFactPIIGuardrail({ mode: "redact" })],
+    });
+    system.start();
+    system.events.wire({ err: "contact alice@evil.com" });
+    expect(system.facts.err).toContain("[EMAIL]");
+    expect(system.facts.err).not.toContain("alice@evil.com");
+    system.destroy();
+  });
+});

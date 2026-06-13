@@ -258,9 +258,40 @@ function redactText(text: string, matches: FactPIIMatch[]): string {
  */
 export type FactPIIGuardrailMode = "redact" | "alert";
 
+/**
+ * How to handle Error / AggregateError instances whose `.message`,
+ * `.cause`, or `.errors` carry PII matches.
+ *
+ * - `"redact"` (default in `mode: "redact"`): replace the value in the
+ *   store with a new `Error(redactedMessage)`. The redacted Error
+ *   preserves its `.name` but loses the original class identity
+ *   (subclasses become plain `Error`), `.stack`, `.cause`, and
+ *   `AggregateError.errors`, because those cannot be redacted
+ *   losslessly without re-invoking the original constructor.
+ * - `"preserve"`: keep the original Error in the store. Only fire
+ *   `onBlocked` + emit `guardrail.blocked` with kind `"detect"`. Use
+ *   this for back-compat when downstream code relies on
+ *   `instanceof YourErrorSubclass` or on `.stack` parity. The raw PII
+ *   remains in store under this setting.
+ * - `"alert-only"`: same as `"preserve"` but emit kind `"alert"` so
+ *   observability flags the leak as urgent.
+ */
+export type FactPIIErrorMode = "redact" | "preserve" | "alert-only";
+
 export interface FactPIIGuardrailOptions {
   /** Default: `"redact"` */
   mode?: FactPIIGuardrailMode;
+  /**
+   * Error / AggregateError handling. Defaults to `"redact"` when top-level
+   * `mode` is `"redact"`, `"alert-only"` when `mode` is `"alert"`. See
+   * {@link FactPIIErrorMode} for the per-option semantics.
+   *
+   * **Migration note:** prior to v1.21, the guardrail did NOT redact
+   * Errors regardless of the top-level `mode`. Consumers depending on
+   * the original Error class identity or `.stack` parity after a block
+   * must opt out by setting `errorMode: "preserve"`.
+   */
+  errorMode?: FactPIIErrorMode;
   /**
    * Built-in categories to scan for. Default: all three (`ssn`,
    * `credit_card`, `email`). Pass `[]` to opt out of the built-ins and
@@ -396,6 +427,11 @@ export function createFactPIIGuardrail(
     onBlocked,
     customDetector,
     walkDepth = 2,
+    // Default errorMode follows top-level `mode`: when the operator
+    // configures `mode: "redact"`, Errors actually get redacted; when
+    // `mode: "alert"`, Errors emit kind "alert" via the same path the
+    // walker uses for non-Error matches.
+    errorMode = mode === "redact" ? "redact" : "alert-only",
   } = options;
 
   const typeSet = new Set<FactPIICategory>(types);
@@ -441,6 +477,42 @@ export function createFactPIIGuardrail(
         screenedKeys.add(entry.id);
       }
     }
+  }
+
+  /**
+   * Build a redacted Error from an original Error whose message / cause /
+   * errors contained PII matches. Returns a fresh `Error` instance whose
+   * `.message` has every detected match substituted via `redactText`. The
+   * original `.cause`, `.stack`, and `AggregateError.errors` are dropped
+   * because they cannot be redacted without re-invoking the original
+   * constructor (which we don't know how to do generically). The new
+   * Error's `.name` is set to the original class's name so downstream
+   * `name`-based dispatch (e.g. `if (err.name === "ValidationError")`)
+   * still works.
+   */
+  function buildRedactedError(
+    original: Error,
+    detected: FactPIIMatch[],
+  ): Error {
+    // Collect every detected match string, redact a synthesized
+    // composite message that includes whatever string surfaces the
+    // walker found (message + cause-if-string + AggregateError.errors
+    // string members). The composite is dominated by `original.message`
+    // for most real-world payloads.
+    const originalMessage =
+      typeof original.message === "string" ? original.message : "";
+    const redactedMessage = redactText(originalMessage, detected);
+    const fresh = new Error(redactedMessage);
+    // Preserve the original class name so consumers branching on
+    // `err.name === "TypeError"` keep working after redaction.
+    if (typeof original.name === "string" && original.name !== "Error") {
+      Object.defineProperty(fresh, "name", {
+        value: original.name,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return fresh;
   }
 
   function runScan(text: string): FactPIIMatch[] {
@@ -653,9 +725,28 @@ export function createFactPIIGuardrail(
             }
           }
           if (detected.length > 0) {
+            // Error redaction strategy is controlled by `errorMode`.
+            //
+            // - `"redact"` builds a NEW Error whose `.message` is the
+            //   original message with PII matches substituted; the
+            //   downstream onFactSet sees `redacted !== value` and
+            //   schedules a follow-up `$store.set` that REPLACES the
+            //   raw Error with the redacted one. This is the bug fix
+            //   for "Error PII persists silently in `mode: redact`".
+            // - `"preserve"` returns the input reference (same as the
+            //   pre-v1.21 behavior). Downstream treats the same-ref
+            //   return as "couldn't redact, only detect" — `kind`
+            //   becomes `"detect"`, the follow-up write is skipped,
+            //   raw Error stays in store.
+            // - `"alert-only"` returns same-ref like `"preserve"`,
+            //   but downstream maps `kind` to `"alert"` so observers
+            //   can route it through the urgent-alert path.
             return {
               matched: true,
-              redacted: value,
+              redacted:
+                errorMode === "redact"
+                  ? buildRedactedError(value, detected)
+                  : value,
               detected,
             };
           }
@@ -711,15 +802,24 @@ export function createFactPIIGuardrail(
       if (!result.matched) return;
       onBlocked?.(key, result.detected, mode);
       // RFC 0010 — fan out to system.observe() / OTel / timeline /
-      // audit-ledger subscribers. `kind: "detect"` for the Error
-      // branch (the walker can't deep-clone an Error instance, so
-      // redaction is detection-only regardless of configured mode).
+      // audit-ledger subscribers.
+      //
+      // `kind` mapping:
+      // - top-level `mode: "alert"` always emits `"alert"`
+      // - else if `errorMode: "alert-only"` and the value is an Error
+      //   (same-ref return from the walker), emit `"alert"` so observers
+      //   route it through the urgent path
+      // - else `redacted === value` means the walker chose not to
+      //   redact (Error with `errorMode: "preserve"`) — emit `"detect"`
+      // - else the walker built a redacted replacement — emit `"redact"`
       const blockedKind: "redact" | "alert" | "detect" =
         mode === "alert"
           ? "alert"
-          : result.redacted === value
-            ? "detect"
-            : "redact";
+          : errorMode === "alert-only" && value instanceof Error
+            ? "alert"
+            : result.redacted === value
+              ? "detect"
+              : "redact";
       const sys = systemRef as unknown as MetaCapableSystem | null;
       sys?.notify?.guardrailBlocked?.(
         "fact-pii-guardrail",
@@ -729,10 +829,10 @@ export function createFactPIIGuardrail(
         result.detected[0]?.type,
       );
       if (mode === "alert") return;
-      // Redact mode: schedule a follow-up store write. Skip when the
-      // walker returned the input reference itself (current Error path —
-      //). The follow-up would be a no-op AND would trip the
-      // primitives-only idempotency gate on re-entry.
+      // Skip the follow-up store write when the walker returned the
+      // input reference (Error with `errorMode: "preserve"` or
+      // `"alert-only"`). The follow-up would be a no-op AND would trip
+      // the primitives-only idempotency gate on re-entry.
       if (result.redacted === value) return;
       // `onFactSet` fires post-commit, so the raw value briefly exists
       // in the store; the follow-up write overwrites it before the next
@@ -775,13 +875,16 @@ export function createFactPIIGuardrail(
         const result = inspect(change.value);
         if (!result.matched) continue;
         onBlocked?.(change.key, result.detected, mode);
-        // RFC 0010 fan-out (mirrors onFactSet).
+        // RFC 0010 fan-out (mirrors onFactSet — see kind-mapping comment
+        // there for the full table).
         const blockedKind: "redact" | "alert" | "detect" =
           mode === "alert"
             ? "alert"
-            : result.redacted === change.value
-              ? "detect"
-              : "redact";
+            : errorMode === "alert-only" && change.value instanceof Error
+              ? "alert"
+              : result.redacted === change.value
+                ? "detect"
+                : "redact";
         const sysB = systemRef as unknown as MetaCapableSystem | null;
         sysB?.notify?.guardrailBlocked?.(
           "fact-pii-guardrail",

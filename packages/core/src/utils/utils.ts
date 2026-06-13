@@ -740,30 +740,41 @@ export async function signSnapshot<T>(
  * **Important:** Always verify signatures before trusting snapshot data,
  * especially if the snapshot was received from an untrusted source (client, cache).
  *
+ * The default verification enforces `expiresAt` — a captured-and-replayed
+ * snapshot stops verifying once its `expiresAt` is in the past. Callers
+ * that legitimately need signature-only validation (testing infrastructure,
+ * archival validation) can pass `{ ignoreExpiry: true }`.
+ *
  * @example
  * ```typescript
  * // Receive signed snapshot from client or cache
  * const snapshot = JSON.parse(cachedData);
  *
- * // Verify before using
+ * // Verify before using. `verifySnapshotSignature` returns false for an
+ * // expired snapshot even when the HMAC is valid; treat it as the
+ * // single attestation gate.
  * const isValid = await verifySnapshotSignature(snapshot, process.env.SNAPSHOT_SECRET);
  * if (!isValid) {
- *   throw new Error('Invalid snapshot signature - possible tampering');
+ *   throw new Error('Invalid or expired snapshot');
  * }
  *
  * // Now safe to use snapshot.data
- * if (snapshot.data.canUseFeature.api) {
- *   // Grant access
- * }
+ * processSnapshotData(snapshot.data);
  * ```
  *
  * @param signedSnapshot - The signed snapshot to verify
  * @param secret - The HMAC secret (must match the signing secret)
- * @returns True if signature is valid, false otherwise
+ * @param options - Optional flags:
+ *   - `ignoreExpiry`: skip the `expiresAt` check (signature-only mode)
+ *   - `now`: override the current time used for expiry comparison
+ *     (test helper)
+ * @returns True if signature is valid AND (unless `ignoreExpiry`) not
+ *   expired; false otherwise
  */
 export async function verifySnapshotSignature<T>(
   signedSnapshot: SignedSnapshot<T>,
   secret: string | Uint8Array,
+  options?: { ignoreExpiry?: boolean; now?: number },
 ): Promise<boolean> {
   if (!signedSnapshot.signature || signedSnapshot.algorithm !== "hmac-sha256") {
     return false;
@@ -781,7 +792,22 @@ export async function verifySnapshotSignature<T>(
   const expectedSignature = await hmacSha256(payload, secret);
 
   // Use timing-safe comparison
-  return timingSafeEqual(signedSnapshot.signature, expectedSignature);
+  if (!timingSafeEqual(signedSnapshot.signature, expectedSignature)) {
+    return false;
+  }
+
+  // Enforce expiresAt unless the caller explicitly opted out. Without
+  // this check, a captured-and-replayed valid signature is accepted
+  // forever — the canonical replay-attack chain. Treating the signature
+  // as a full attestation gate requires checking the attestation window.
+  if (
+    !options?.ignoreExpiry &&
+    isSnapshotExpired(signedSnapshot, options?.now)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
