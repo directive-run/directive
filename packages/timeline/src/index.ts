@@ -722,6 +722,24 @@ export async function replayTimeline(
       skipped++;
     }
   }
+  // Replay against a non-mutator timeline is the most-asked first-use
+  // question — `dispatched: 0, skipped: N > 0` means the function found
+  // events to re-dispatch but none of them matched the dispatch-driven
+  // shape `isDispatchable()` recognises today. Without a dev signal,
+  // callers think the function silently no-op'd. Emit once per call so
+  // production replays don't spam.
+  if (
+    dispatched === 0 &&
+    skipped > 0 &&
+    typeof process !== "undefined" &&
+    process.env?.NODE_ENV !== "production"
+  ) {
+    console.warn(
+      `[Directive:timeline] replayTimeline dispatched 0 of ${skipped} candidate frames. ` +
+        `Today \`isDispatchable()\` recognises mutator-shape \`pendingMutation\` writes only — non-mutator systems will not re-dispatch via replay yet. ` +
+        `See packages/timeline/src/index.ts \`isDispatchable\` for the current set.`,
+    );
+  }
   return { dispatched, skipped, truncated: 0 };
 }
 
