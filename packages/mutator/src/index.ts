@@ -21,7 +21,7 @@
  * @see ../README.md for the full API and a worked example.
  */
 
-import { t } from "@directive-run/core";
+import { t, type SchemaType } from "@directive-run/core";
 
 /**
  * A keyed map of variant payloads. Each key becomes a discriminator value
@@ -170,9 +170,15 @@ export type MutationHandlers<M extends MutationMap, F> = {
  * spread.
  */
 export interface MutatorFragments<M extends MutationMap, F> {
-  /** Spread into `schema.facts`. Adds `pendingMutation`. */
+  /**
+   * Spread into `schema.facts`. Adds `pendingMutation` typed against
+   * the mutation map's union so spreading `...mut.facts` into a module
+   * schema preserves the `PendingMutation<M>` narrowing — readers of
+   * `facts.pendingMutation` get the typed `{kind, payload, status,
+   * error}` shape narrowed by `kind` rather than `unknown`.
+   */
   facts: {
-    pendingMutation: ReturnType<typeof t.object>;
+    pendingMutation: SchemaType<PendingMutation<M> | null>;
   };
   /** Spread into `schema.events`. Adds the `MUTATE` event. */
   events: {
@@ -282,10 +288,14 @@ export function defineMutator<
   type Pending = PendingMutation<M>;
 
   const facts = {
-    pendingMutation: t.object<Pending>().nullable() as ReturnType<
-      typeof t.object
+    // Cast through `unknown` to bridge the chainable builder shape to
+    // the public `SchemaType<Pending | null>` surface. The runtime
+    // value IS `t.object<Pending>().nullable()`; the cast is purely
+    // a type-layer adapter so the public type stays generic-preserving.
+    pendingMutation: t.object<Pending>().nullable() as unknown as SchemaType<
+      Pending | null
     >,
-  } as MutatorFragments<M, F>["facts"];
+  } satisfies MutatorFragments<M, F>["facts"];
 
   // Schema event marker — the runtime uses this for typing and devtools.
   // Payload validation happens at dispatch time via t-schema check.

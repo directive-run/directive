@@ -365,4 +365,34 @@ describe("@directive-run/mutator", () => {
     expect(_submit.status).toBe("pending");
     expect(_submit.error).toBe(null);
   });
+
+  // `MutatorFragments.facts.pendingMutation` previously typed as
+  // `ReturnType<typeof t.object>` (no generic) — spreading
+  // `...mut.facts` into a schema collapsed the `PendingMutation<M>`
+  // shape to `unknown`, killing autocomplete on the very fact the
+  // package exists to type. Now generic-preserving.
+  it("MutatorFragments.facts.pendingMutation preserves PendingMutation<M> narrowing", () => {
+    type Mutations = {
+      submit: { values: string[] };
+      cancel: Record<string, never>;
+    };
+    const mut = defineMutator<Mutations, { values: string[] }>({
+      submit: async ({ payload, facts }) => {
+        facts.values = payload.values;
+      },
+      cancel: ({ facts }) => {
+        facts.values = [];
+      },
+    });
+    // Compile-time check: the inferred schema-type's storage matches
+    // `PendingMutation<Mutations> | null` rather than `unknown`. If the
+    // generic regresses, this assignment fails at typecheck.
+    const _typed: typeof mut.facts.pendingMutation extends
+      | import("@directive-run/core").SchemaType<
+          import("../index.js").PendingMutation<Mutations> | null
+        >
+      ? true
+      : false = true;
+    expect(_typed).toBe(true);
+  });
 });
