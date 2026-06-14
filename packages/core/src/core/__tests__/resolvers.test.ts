@@ -2417,7 +2417,10 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     // Set up a batch resolver whose `resolveBatch` blocks on a deferred
     // promise so we can issue cancel before it completes.
     const cancelEvents: string[] = [];
-    let releaseBatch: (() => void) | null = null;
+    // `!` (definite assignment) because TS narrows `releaseBatch` to
+    // `null` immediately after the initializer — the assignment from
+    // inside the Promise executor doesn't update the outer narrowing.
+    let releaseBatch!: () => void;
     const batchSignals: Array<AbortSignal | undefined> = [];
     const blocker = new Promise<void>((r) => {
       releaseBatch = r;
@@ -2465,15 +2468,17 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     expect(manager.getStatus(r3.id).state).toBe("canceled");
 
     // Release the underlying batch work so the test doesn't leak.
-    releaseBatch?.();
+    releaseBatch();
     await flush();
   });
 
   it("cancelAll() aborts every in-flight batch", async () => {
     const cancelEvents: string[] = [];
     const aborts: AbortSignal[] = [];
-    let releaseA: (() => void) | null = null;
-    let releaseB: (() => void) | null = null;
+    // `!` (definite assignment) — see comment on the earlier deferred
+    // pattern in this file for the rationale.
+    let releaseA!: () => void;
+    let releaseB!: () => void;
     const blockerA = new Promise<void>((r) => {
       releaseA = r;
     });
@@ -2526,13 +2531,15 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     // onCancel fired for every requirement across both batches.
     expect(cancelEvents.sort()).toEqual([a1.id, a2.id, b1.id].sort());
 
-    releaseA?.();
-    releaseB?.();
+    releaseA();
+    releaseB();
     await flush();
   });
 
   it("in-flight cancel cleans up the reverse index so the same reqId can be re-resolved later", async () => {
-    let releaseFirst: (() => void) | null = null;
+    // `!` (definite assignment) — Promise executor assignment doesn't
+    // update outer narrowing under TS 5.5+.
+    let releaseFirst!: () => void;
     const blocker = new Promise<void>((r) => {
       releaseFirst = r;
     });
@@ -2553,7 +2560,7 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     manager.resolve(req);
     await new Promise((r) => setTimeout(r, 10));
     manager.cancel(req.id);
-    releaseFirst?.();
+    releaseFirst();
     await flush();
 
     // Re-resolve the SAME requirement id — should be accepted (the
