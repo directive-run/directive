@@ -1,8 +1,8 @@
-# IP provenance ledger — June 2026 brand-leveling cleanup batch
+# IP provenance ledger – June 2026 brand-leveling cleanup batch
 
-This document attests that the commits listed below — across the
+This document attests that the commits listed below – across the
 `directive-run/directive` and `directive-run/directive-docs` public
-repositories — were authored by Jason Comes on personal time, on
+repositories – were authored by Jason Comes on personal time, on
 personal equipment, as part of independent project work on Directive
 (an open-source project under the Sizls workspace).
 
@@ -56,4 +56,4 @@ context attestation that would have appeared in a per-commit
 values recorded by git at commit time and can be independently
 verified against the public repository history.
 
-— Jason Comes
+– Jason Comes

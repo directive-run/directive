@@ -72,7 +72,7 @@ it('completes the load chain', async () => {
   sys.start();
   sys.events.LOAD();
   // `system.settle()` drains the reconciliation queue and waits for
-  // every in-flight resolver to either resolve, reject, or cancel —
+  // every in-flight resolver to either resolve, reject, or cancel –
   // i.e. it's the wait-until-quiet primitive for assertions.
   await sys.settle();
 
@@ -368,15 +368,15 @@ the frontends compose.
 
 ## Composes with
 
-- [`@directive-run/mutator`](../mutator) — every mutation cycle records into the timeline; replay a failed test's exact mutation sequence
-- [`@directive-run/optimistic`](../optimistic) — captures optimistic writes AND rollbacks, so flaky tests reproduce byte-for-byte
-- [`@directive-run/query`](../query) — recorded refetches and tag invalidations turn data-fetching tests into deterministic replays
-- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) — the substrate
-- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) — runtime inspector (orthogonal: that's for live apps; this is for test failures)
+- [`@directive-run/mutator`](../mutator) – every mutation cycle records into the timeline; replay a failed test's exact mutation sequence
+- [`@directive-run/optimistic`](../optimistic) – captures optimistic writes AND rollbacks, so flaky tests reproduce byte-for-byte
+- [`@directive-run/query`](../query) – recorded refetches and tag invalidations turn data-fetching tests into deterministic replays
+- [`@directive-run/core` `system.observe()`](https://docs.directive.run/api/system#observe) – the substrate
+- [`@directive-run/devtools-plugin`](https://docs.directive.run/plugins/devtools) – runtime inspector (orthogonal: that's for live apps; this is for test failures)
 
 ## Use this package with your AI assistant
 
-Recorded timelines make AI debugging reproducible byte-for-byte — when an AI assistant proposes a fix to a flaky test, the timeline tells you whether the fix actually changes the failing event sequence. Pair with [Directive's IDE Integration](https://directive.run/docs/ide-integration).
+Recorded timelines make AI debugging reproducible byte-for-byte – when an AI assistant proposes a fix to a flaky test, the timeline tells you whether the fix actually changes the failing event sequence. Pair with [Directive's IDE Integration](https://directive.run/docs/ide-integration).
 
 ```
 # Claude Code

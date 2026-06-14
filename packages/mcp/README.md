@@ -1,8 +1,8 @@
 # `@directive-run/mcp`
 
-Run a Model Context Protocol (MCP) server that lets AI assistants — Claude Desktop, Cursor, Windsurf, or any MCP client — query Directive's knowledge base, code examples, lint rules, and scaffolding tools live. No pre-bundling, no stale snapshots: the assistant asks, the server answers from the current package contents.
+Run a Model Context Protocol (MCP) server that lets AI assistants – Claude Desktop, Cursor, Windsurf, or any MCP client – query Directive's knowledge base, code examples, lint rules, and scaffolding tools live. No pre-bundling, no stale snapshots: the assistant asks, the server answers from the current package contents.
 
-Most readers want this package. Install it if you use Claude Desktop, Cursor, or another MCP-speaking client — or if you're hosting Directive's knowledge as a service for your team's agents.
+Most readers want this package. Install it if you use Claude Desktop, Cursor, or another MCP-speaking client – or if you're hosting Directive's knowledge as a service for your team's agents.
 
 > **Which side are you on?** This package is the **server**: it exposes Directive's knowledge so AI clients can read it. If instead you're building a Directive AI agent that needs to *call* external MCP servers (filesystem, GitHub, Slack), use [`@directive-run/ai/mcp`](../ai) and its `createMCPAdapter`.
 
@@ -39,7 +39,7 @@ directive-mcp --help
 
 ```text
 2. Verify the server is loaded.
-   Claude Desktop:  click the tools/hammer icon — you should see `directive`
+   Claude Desktop:  click the tools/hammer icon – you should see `directive`
                     with 22 tools. Or ask Claude:
                     "Use the directive MCP server's get_server_info tool."
    Cursor:          open Settings → MCP → look for `directive` (status: connected).
@@ -61,7 +61,7 @@ directive-mcp --help
 
 ## How it works
 
-Every Directive MCP request follows the same shape: an AI client (Claude Desktop, Cursor, your own agent) speaks JSON-RPC to one of two transports — `stdio` for local subprocess clients, `SSE` for the hosted gateway. The server dispatches to a tool handler, which reads from one of three in-process data sources: the bundled `@directive-run/knowledge` package (markdown + extracted examples), the lazy-loaded `@directive-run/lint` registry (ts-morph rules, loaded on first call so the ~25 MB ts-morph cost only hits when `review_source` or `fix_code` actually runs), or the pure-string `@directive-run/scaffold` generators. Nothing touches disk; nothing calls out over the network — except `get_package_info`, which fetches `latest` from npm with a 1-hour cache.
+Every Directive MCP request follows the same shape: an AI client (Claude Desktop, Cursor, your own agent) speaks JSON-RPC to one of two transports – `stdio` for local subprocess clients, `SSE` for the hosted gateway. The server dispatches to a tool handler, which reads from one of three in-process data sources: the bundled `@directive-run/knowledge` package (markdown + extracted examples), the lazy-loaded `@directive-run/lint` registry (ts-morph rules, loaded on first call so the ~25 MB ts-morph cost only hits when `review_source` or `fix_code` actually runs), or the pure-string `@directive-run/scaffold` generators. Nothing touches disk; nothing calls out over the network – except `get_package_info`, which fetches `latest` from npm with a 1-hour cache.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
@@ -149,10 +149,10 @@ npx @modelcontextprotocol/inspector npx -y @directive-run/mcp
 ## SSE transport (hosted)
 
 ```bash
-# Loopback (local dev) — no token required
+# Loopback (local dev) – no token required
 directive-mcp --sse --port 3000
 
-# Public host — token is mandatory
+# Public host – token is mandatory
 directive-mcp --sse --port 3000 --host 0.0.0.0 \
   --token "$DIRECTIVE_MCP_TOKEN" \
   --allow-origin https://app.example.com
@@ -162,9 +162,9 @@ directive-mcp --sse --port 3000 --host 0.0.0.0 \
 
 Endpoints:
 
-- `GET /sse` — establish the SSE stream.
-- `POST /messages?sessionId=…` — client→server JSON-RPC messages.
-- `GET /healthz` — liveness probe.
+- `GET /sse` – establish the SSE stream.
+- `POST /messages?sessionId=…` – client→server JSON-RPC messages.
+- `GET /healthz` – liveness probe.
 
 ## Tools (22)
 
@@ -192,7 +192,7 @@ Endpoints:
 | Tool | Purpose |
 |---|---|
 | `generate_module` | Generate NEW Directive module or AI orchestrator source. Returns the source string + suggested filenames + required-packages list; the caller writes to disk via its own file tool. |
-| `list_module_sections` | Enumerate the valid `sections` values for `generate_module` (autodiscovery — no hallucinated enum values). |
+| `list_module_sections` | Enumerate the valid `sections` values for `generate_module` (autodiscovery – no hallucinated enum values). |
 
 ### Review
 
@@ -227,10 +227,10 @@ Endpoints:
 
 | Tool | Purpose |
 |---|---|
-| `playground_link` | Turn TypeScript source into a clickable URL that boots a real Directive project in StackBlitz. Two shapes: pass `source` (single string) for already-runnable snippets from `get_example` / `fix_code`, OR pass `files: [{path, source}, …]` for the paired library + runner output from `generate_module`. Optional `mode: "preview" \| "instant"` — `"preview"` (default) lands on `directive.run/playground` with code + Open-in-StackBlitz button; `"instant"` lands on `directive.run/run` which auto-submits the StackBlitz form (no preview UI). 8 KB cap on raw input. Payload travels in the URL hash so it never reaches server logs. |
-| `run_in_sandbox` | Execute a Directive snippet inside a bounded worker_threads sandbox and return its observed behavior — captured `console.log/warn/error` lines, the post-`settle()` facts snapshot, structured errors, plus a `playgroundUrl` for click-through editing in StackBlitz. Pair with `generate_module` to show the user what the generated module ACTUALLY DID when it ran. **v0.3.0 boundary:** AST allowlist permits `@directive-run/{core, ai, query, react, vue, svelte, solid, lit, el, optimistic, timeline, mutator, knowledge, scaffold, claude-plugin, lint}` + relative `./*.js`; rejects FS/network/eval identifier references AND their property-access bypass chains (`globalThis.process`, `Reflect.get(globalThis, …)`, `.constructor`, `Function(...)`). 5-second wall-clock budget (clamped to [100ms, 10s]), 32 MB heap. Note: `react/vue/svelte/solid/lit` import OK but their runtime hooks throw in Node — use `playground_link` for UI demos. |
+| `playground_link` | Turn TypeScript source into a clickable URL that boots a real Directive project in StackBlitz. Two shapes: pass `source` (single string) for already-runnable snippets from `get_example` / `fix_code`, OR pass `files: [{path, source}, …]` for the paired library + runner output from `generate_module`. Optional `mode: "preview" \| "instant"` – `"preview"` (default) lands on `directive.run/playground` with code + Open-in-StackBlitz button; `"instant"` lands on `directive.run/run` which auto-submits the StackBlitz form (no preview UI). 8 KB cap on raw input. Payload travels in the URL hash so it never reaches server logs. |
+| `run_in_sandbox` | Execute a Directive snippet inside a bounded worker_threads sandbox and return its observed behavior – captured `console.log/warn/error` lines, the post-`settle()` facts snapshot, structured errors, plus a `playgroundUrl` for click-through editing in StackBlitz. Pair with `generate_module` to show the user what the generated module ACTUALLY DID when it ran. **v0.3.0 boundary:** AST allowlist permits `@directive-run/{core, ai, query, react, vue, svelte, solid, lit, el, optimistic, timeline, mutator, knowledge, scaffold, claude-plugin, lint}` + relative `./*.js`; rejects FS/network/eval identifier references AND their property-access bypass chains (`globalThis.process`, `Reflect.get(globalThis, …)`, `.constructor`, `Function(...)`). 5-second wall-clock budget (clamped to [100ms, 10s]), 32 MB heap. Note: `react/vue/svelte/solid/lit` import OK but their runtime hooks throw in Node – use `playground_link` for UI demos. |
 
-**Composition for a "try it now" link:** `generate_module` returns paired `{moduleSource, runnerSource, suggestedFilenames}` — pass both to `playground_link` as a `files` array (the runner is the entry point at `src/main.ts`) and the user clicks ONE URL that boots a project where `tsx src/main.ts` actually logs Directive facts to the StackBlitz terminal. For `get_example` / `fix_code` output (already runnable), pass the single `source` string instead.
+**Composition for a "try it now" link:** `generate_module` returns paired `{moduleSource, runnerSource, suggestedFilenames}` – pass both to `playground_link` as a `files` array (the runner is the entry point at `src/main.ts`) and the user clicks ONE URL that boots a project where `tsx src/main.ts` actually logs Directive facts to the StackBlitz terminal. For `get_example` / `fix_code` output (already runnable), pass the single `source` string instead.
 
 ## Troubleshooting
 
@@ -239,7 +239,7 @@ The four most common first-time failures:
 | Symptom | What's happening | Fix |
 |---|---|---|
 | Claude Desktop shows no `directive` server in the hammer/tools menu. | Config file wasn't read, or `npx` failed to install. | Fully quit Claude Desktop (Cmd-Q, not just close the window) and relaunch. Then check the log: `~/Library/Logs/Claude/mcp-server-directive.log` (macOS), `%APPDATA%\Claude\logs\mcp-server-directive.log` (Windows). |
-| `review_source` returns `review_source failed — worker-error: ts-morph is not installed`. | npm install ran with `--no-optional`, or your package manager skipped `optionalDependencies`. | `npm install -g ts-morph` once. ts-morph (~25 MB) is loaded only when `review_source` / `fix_code` fires. |
+| `review_source` returns `review_source failed – worker-error: ts-morph is not installed`. | npm install ran with `--no-optional`, or your package manager skipped `optionalDependencies`. | `npm install -g ts-morph` once. ts-morph (~25 MB) is loaded only when `review_source` / `fix_code` fires. |
 | `--sse --host 0.0.0.0` exits with `--token is required`. | Public bind needs auth. | Pass `--token <secret>` or set `DIRECTIVE_MCP_TOKEN` in the environment. Loopback binds (the default `127.0.0.1`) don't need a token. |
 | `npx -y @directive-run/mcp` is slow on first launch. | `npx` is downloading + installing the package + ts-morph (~25 MB). | First launch is ~10-20 s on a cold npm cache. Subsequent launches use the cached tarball. To pre-warm: `npm install -g @directive-run/mcp` and use `"command": "directive-mcp"` in the config. |
 
@@ -261,26 +261,26 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 const server = createDirectiveServer();
 await server.connect(new StdioServerTransport());
 
-// SSE — returns the underlying http.Server
+// SSE – returns the underlying http.Server
 const httpServer = await startSseServer({ port: 3000, host: "0.0.0.0" });
 ```
 
 ### Tuning the lint worker pool
 
-`review_source` and `fix_code` each spawn a ts-morph worker thread to parse the input. A multi-client burst — Cursor + Claude + IDE all calling these tools in parallel — could amplify into a thread-spawn storm. `setMaxConcurrentLintWorkers(n)` caps the simultaneously-running lint workers. Calls beyond the cap queue FIFO; abandoned callers (signal-aborted or dropped promises) deregister cleanly. Defaults to `navigator.hardwareConcurrency` (falls back to 4); pass `Infinity` to disable.
+`review_source` and `fix_code` each spawn a ts-morph worker thread to parse the input. A multi-client burst – Cursor + Claude + IDE all calling these tools in parallel – could amplify into a thread-spawn storm. `setMaxConcurrentLintWorkers(n)` caps the simultaneously-running lint workers. Calls beyond the cap queue FIFO; abandoned callers (signal-aborted or dropped promises) deregister cleanly. Defaults to `navigator.hardwareConcurrency` (falls back to 4); pass `Infinity` to disable.
 
 ```ts
 import { setMaxConcurrentLintWorkers } from "@directive-run/mcp";
-// At server boot — runs once per process.
+// At server boot – runs once per process.
 setMaxConcurrentLintWorkers(4);
 ```
 
 ## See also
 
-- [`@directive-run/ai/mcp`](../ai) — adapts external MCP servers as Directive resolvers (the *client* side; opposite arrow from this package).
-- [`@directive-run/knowledge`](../knowledge) — markdown + JSON sources this server fronts.
-- [`@directive-run/lint`](../lint) — the ts-morph rule registry behind `review_source` and `fix_code`.
-- [`@directive-run/scaffold`](../scaffold) — the pure-function generators behind `generate_module`.
-- [`@directive-run/claude-plugin`](../claude-plugin) — the Claude Code skill bundles also exposed via `get_skill`.
-- [`@directive-run/cli`](../cli) — generates static `.cursorrules` / `CLAUDE.md` / `.windsurfrules` files for assistants that don't speak MCP.
-- [directive.run/docs/ide-integration](https://directive.run/docs/ide-integration) — the cross-editor decision tree.
+- [`@directive-run/ai/mcp`](../ai) – adapts external MCP servers as Directive resolvers (the *client* side; opposite arrow from this package).
+- [`@directive-run/knowledge`](../knowledge) – markdown + JSON sources this server fronts.
+- [`@directive-run/lint`](../lint) – the ts-morph rule registry behind `review_source` and `fix_code`.
+- [`@directive-run/scaffold`](../scaffold) – the pure-function generators behind `generate_module`.
+- [`@directive-run/claude-plugin`](../claude-plugin) – the Claude Code skill bundles also exposed via `get_skill`.
+- [`@directive-run/cli`](../cli) – generates static `.cursorrules` / `CLAUDE.md` / `.windsurfrules` files for assistants that don't speak MCP.
+- [directive.run/docs/ide-integration](https://directive.run/docs/ide-integration) – the cross-editor decision tree.

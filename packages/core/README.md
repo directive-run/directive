@@ -186,7 +186,7 @@ system.events.addItem({ name: "Widget", price: 9.99 });
 
 ## Observability
 
-Every system exposes a typed `system.observe(observer)` stream — one listener receives every observation event with full TypeScript narrowing on `event.type`. Source-publish, source-drop, fact-change, constraint evaluation, requirement lifecycle, resolver lifecycle, and effect runs all flow through the same channel.
+Every system exposes a typed `system.observe(observer)` stream – one listener receives every observation event with full TypeScript narrowing on `event.type`. Source-publish, source-drop, fact-change, constraint evaluation, requirement lifecycle, resolver lifecycle, and effect runs all flow through the same channel.
 
 ```ts
 const unsubscribe = system.observe((event) => {
@@ -215,7 +215,7 @@ const alerter: Plugin = {
 };
 ```
 
-The `SourceDropReason` union is the single source of truth for drop reasons — `SystemInspection.sources[i].lastDropReason`, the `Plugin.onSourceDrop` hook signature, and the `source.drop` observation-event variant all reference the same type. Adding a new reason in one place flows to all three at compile time.
+The `SourceDropReason` union is the single source of truth for drop reasons – `SystemInspection.sources[i].lastDropReason`, the `Plugin.onSourceDrop` hook signature, and the `source.drop` observation-event variant all reference the same type. Adding a new reason in one place flows to all three at compile time.
 
 ## Why Directive?
 

@@ -70,9 +70,9 @@ Request bodies are capped at **10 MB** (`MAX_BODY_BYTES`). Larger uploads are re
 
 ## Composes with
 
-- [`@directive-run/query`](../query) — declarative data fetching that this proxy unblocks during dev (CORS preflight + key handling)
-- [`@directive-run/mutator`](../mutator) — mutation handlers calling AI providers route through this proxy in dev
-- [`@directive-run/ai`](../ai) — when you call an LLM adapter from the browser in dev, this plugin is what lets the request leave
+- [`@directive-run/query`](../query) – declarative data fetching that this proxy unblocks during dev (CORS preflight + key handling)
+- [`@directive-run/mutator`](../mutator) – mutation handlers calling AI providers route through this proxy in dev
+- [`@directive-run/ai`](../ai) – when you call an LLM adapter from the browser in dev, this plugin is what lets the request leave
 
 ## License
 

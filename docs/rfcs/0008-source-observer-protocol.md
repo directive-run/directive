@@ -1,6 +1,6 @@
 # RFC 0008 – Source publish: Observer-protocol posture (next / error / complete)
 
-- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** R5 protocol reviewer findings (C-PROTO-1: "SourcePublish
   is incomplete vs. Observer protocol"); R5 domain-expert (Reactive
@@ -12,7 +12,7 @@ Today's `SourcePublishFn` exposes only the `next` arm of the RxJS
 Observer protocol (`next/error/complete`). A source whose underlying
 stream errors (WebSocket disconnect, Supabase channel goes stale,
 polling fetch throws) has no canonical way to report it. Authors fall
-back to publishing magic event names (`STREAM_ERROR`, `STREAM_ENDED`) —
+back to publishing magic event names (`STREAM_ERROR`, `STREAM_ENDED`) –
 fragmented per consumer, untyped.
 
 This RFC takes an explicit posture: **adopt the EventEmitter shape, not
@@ -21,7 +21,7 @@ additive minor can extend without breaking.**
 
 ## The two postures
 
-### Option A — EventEmitter (recommended)
+### Option A – EventEmitter (recommended)
 
 `SourcePublishFn` stays a bare function. Sources that need to surface a
 runtime error route it through a dedicated `reportError` callback supplied
@@ -44,7 +44,7 @@ interface SourceDefinition {
   `source.detach` with `reason: "completed"`. A one-shot OAuth callback
   source can self-detach without waiting for `system.stop()`.
 
-### Option B — RxJS Observer
+### Option B – RxJS Observer
 
 `SourcePublishFn` becomes an object with `next` / `error` / `complete`
 methods. Maximally compatible with RxJS code; breaks every existing
@@ -61,7 +61,7 @@ source author's `publish('EVENT', payload)` call.
 
 ## Type-wrap to reserve the namespace
 
-In the meantime — without picking either posture yet — wrap
+In the meantime – without picking either posture yet – wrap
 `SourcePublishFn` as an interface so future minors can add the
 namespace:
 
@@ -71,7 +71,7 @@ export interface SourcePublishFn {
   (event: string, payload?: unknown): void;
 }
 
-// future minor (additive — interface gains optional methods)
+// future minor (additive – interface gains optional methods)
 export interface SourcePublishFn {
   (event: string, payload?: unknown): void;
   error?: (err: Error) => void;
@@ -88,7 +88,7 @@ extension path is still available without a major bump.
 - `SourcePublishFn` becomes an interface (was a bare callable type).
   Today's call shape is unchanged.
 - A new variant `ObservationEvent.source.error.phase: "runtime"` is
-  reserved in the discriminated union (additive — no consumer change).
+  reserved in the discriminated union (additive – no consumer change).
 - `SourcesManagerCallbacks.onError` gains a `"runtime"` phase value
   alongside `"attach"` and `"cleanup"`.
 - Once Option A's runtime lands (separate PR), `attach` gains
@@ -96,7 +96,7 @@ extension path is still available without a major bump.
 - `packages/knowledge/core/sources.md` adds an "Error handling" section
   describing the Option A reportError pattern (today: publish a custom
   error event name; future: use `reportError`).
-- The `EffectCleanup` vs `SourceUnsubscribe` asymmetry — flagged by the
-  R5 DX reviewer — is addressed in the RFC 0006 naming sweep
+- The `EffectCleanup` vs `SourceUnsubscribe` asymmetry – flagged by the
+  R5 DX reviewer – is addressed in the RFC 0006 naming sweep
   (`SourceUnsubscribe` → `SourceUnsubscribeFn`); this RFC does not
   duplicate that work.

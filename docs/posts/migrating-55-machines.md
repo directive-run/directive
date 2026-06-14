@@ -1,8 +1,8 @@
-# Migrating XState Machines to Directive — a real production walkthrough, with the numbers
+# Migrating XState Machines to Directive – a real production walkthrough, with the numbers
 
 *Posted 2026-04-29 · ~12 min read*
 
-We migrated Minglingo (Sizls' realtime multiplayer platform, ~10k MAU) off XState in 6 weeks. 55 machines, 26,000 LOC of orchestration code, onto Directive — the constraint-driven runtime we ship under `@directive-run/*`. Here's what shipped, what we got wrong, and the rollback gates we set so this couldn't tank a production system.
+We migrated Minglingo (Sizls' realtime multiplayer platform, ~10k MAU) off XState in 6 weeks. 55 machines, 26,000 LOC of orchestration code, onto Directive – the constraint-driven runtime we ship under `@directive-run/*`. Here's what shipped, what we got wrong, and the rollback gates we set so this couldn't tank a production system.
 
 If you're considering Directive, or you're shopping for an XState alternative, or you're just curious whether constraint-driven state management is real or a marketing fiction, this is the longest piece of evidence we'll have for a while.
 

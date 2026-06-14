@@ -1,8 +1,8 @@
-# RFC 0010 — `guardrail.blocked` ObservationEvent
+# RFC 0010 – `guardrail.blocked` ObservationEvent
 
 | Field | Value |
 |---|---|
-| Status | Accepted — shipped 2026-06-10 |
+| Status | Accepted – shipped 2026-06-10 |
 | Landing | `@directive-run/core` 1.20.0 + `@directive-run/ai` 1.19.7 |
 | Author | R18 Tier 2-A follow-up |
 
@@ -34,7 +34,7 @@ The Error-message detection path (R17) compounds this: the
 `Error` instance is never redacted (`Error.message` is treated as
 detection-only since the walker can't construct a new Error with
 guaranteed `stack` parity). So even the follow-up `fact.change` doesn't
-fire — the only signal is `onBlocked`. Without an observation event,
+fire – the only signal is `onBlocked`. Without an observation event,
 the path is observability-dead.
 
 ## Proposed API
@@ -52,22 +52,22 @@ the path is observability-dead.
   }
 ```
 
-- `plugin` — the guardrail plugin's name (`"fact-pii-guardrail"` for
+- `plugin` – the guardrail plugin's name (`"fact-pii-guardrail"` for
   the built-in). Enables filtering when multiple guardrails are wired.
-- `key` — the fact key the violation was found in.
-- `kind` — the action the guardrail took:
-  - `"redact"` — the guardrail rewrote the value via a follow-up store
+- `key` – the fact key the violation was found in.
+- `kind` – the action the guardrail took:
+  - `"redact"` – the guardrail rewrote the value via a follow-up store
     write. Pair with the subsequent `fact.change` event to see the
     redacted result.
-  - `"alert"` — the guardrail observed but did not mutate (configured
+  - `"alert"` – the guardrail observed but did not mutate (configured
     `mode: "alert"`). Raw value remains in the store.
-  - `"detect"` — the guardrail observed but could not mutate
+  - `"detect"` – the guardrail observed but could not mutate
     (read-only structured types like `Error`). Semantically equivalent
     to `alert` from the operator's point of view but distinguishes
     "couldn't redact" from "chose not to redact".
-- `count` — number of pattern matches in this batch (e.g. 3 email
+- `count` – number of pattern matches in this batch (e.g. 3 email
   matches in one nested-object write).
-- `category` — optional coarse classifier the guardrail provides so
+- `category` – optional coarse classifier the guardrail provides so
   OTel exporters can label spans without parsing payloads. The
   built-in PII guardrail emits the first detected category
   (`"email"` | `"ssn"` | `"credit_card"`).
@@ -108,7 +108,7 @@ detects a violation, it calls `system.notify.guardrailBlocked(...)`.
 The call fans out to every plugin's `onGuardrailBlocked` hook through
 the same broadcast fabric as source/effect events.
 
-Application code should not call this directly — use
+Application code should not call this directly – use
 `system.observe()` to subscribe. The method is on `System` because
 plugins are the publishers and need a way to emit into the same
 channel observers consume.
@@ -123,7 +123,7 @@ can subscribe via `system.observe()` immediately.
 
 ## Security considerations
 
-- The `count` and `category` fields are deliberately coarse — no
+- The `count` and `category` fields are deliberately coarse – no
   payload content, no sample of the matched text. This avoids
   exfiltrating PII into observability backends that may have weaker
   retention controls than the primary fact store.
@@ -135,7 +135,7 @@ can subscribe via `system.observe()` immediately.
 ## Open questions
 
 - Should we add a corresponding `"guardrail.passed"` event so
-  operators can see the per-write base rate? Decision: NO for now —
+  operators can see the per-write base rate? Decision: NO for now –
   high-volume systems would saturate observability backends with
   pass events. Backends that need this can synthesize it from
   `fact.change` minus `guardrail.blocked` of the same key.

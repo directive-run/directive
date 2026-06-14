@@ -2,7 +2,7 @@
 
 Pure source-string generators for [Directive](https://directive.run) modules and orchestrators. Zero runtime dependencies. Shared substrate consumed by `@directive-run/cli` (its `directive new <name>` command writes the result to disk) and `@directive-run/mcp` (its `generate_module` MCP tool returns the result to the calling AI client without ever touching disk).
 
-You probably don't depend on this package directly — it's the engine behind the user-facing scaffolding flows. Install it explicitly if you're building tooling that needs to programmatically generate Directive module skeletons.
+You probably don't depend on this package directly – it's the engine behind the user-facing scaffolding flows. Install it explicitly if you're building tooling that needs to programmatically generate Directive module skeletons.
 
 ## API
 
@@ -23,14 +23,14 @@ import {
 } from "@directive-run/scaffold";
 
 // Generate a full Directive module with every section. Returns a
-// `GeneratedScaffold` object — a paired (moduleSource, runnerSource)
+// `GeneratedScaffold` object – a paired (moduleSource, runnerSource)
 // bundle so the consumer can drop the library AND a driver that
 // boots it in one go.
 const result = generateModule("traffic-light");
-// result.moduleSource    — the `createModule(...)` library text
-// result.runnerSource    — the `createSystem` + `start` + log driver
-// result.suggestedFilenames — { module: "traffic-light.ts", runner: "main.ts" }
-// result.runnable        — true when moduleSource already calls .start()
+// result.moduleSource    – the `createModule(...)` library text
+// result.runnerSource    – the `createSystem` + `start` + log driver
+// result.suggestedFilenames – { module: "traffic-light.ts", runner: "main.ts" }
+// result.runnable        – true when moduleSource already calls .start()
 
 // Generate a minimal module (schema + init only)
 const minimal = generateModule("traffic-light", []);
@@ -81,10 +81,10 @@ if (runnerSource) writeFileSync(suggestedFilenames.runner, runnerSource);
 
 ## Naming rule
 
-Module names must match `/^[a-z][a-z0-9-]{0,63}$/` — start with a lowercase letter, contain only lowercase letters, digits, and hyphens, and be 64 characters or fewer. `validateModuleName(name)` returns `true` on success or a human-readable error string. All generator functions assert the same rule and throw `Error` on invalid input — important because the generated source embeds the name as a JavaScript identifier and a string literal.
+Module names must match `/^[a-z][a-z0-9-]{0,63}$/` – start with a lowercase letter, contain only lowercase letters, digits, and hyphens, and be 64 characters or fewer. `validateModuleName(name)` returns `true` on success or a human-readable error string. All generator functions assert the same rule and throw `Error` on invalid input – important because the generated source embeds the name as a JavaScript identifier and a string literal.
 
 ## See also
 
-- [`@directive-run/cli`](../cli) — `directive new <name>` writes the generated source to disk.
-- [`@directive-run/mcp`](../mcp) — `generate_module` MCP tool returns the generated source to AI clients.
-- [`@directive-run/core`](../core) — the runtime the generated modules import from.
+- [`@directive-run/cli`](../cli) – `directive new <name>` writes the generated source to disk.
+- [`@directive-run/mcp`](../mcp) – `generate_module` MCP tool returns the generated source to AI clients.
+- [`@directive-run/core`](../core) – the runtime the generated modules import from.

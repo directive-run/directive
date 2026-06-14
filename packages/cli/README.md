@@ -4,7 +4,7 @@ CLI for [Directive](https://directive.run) – project scaffolding, system intro
 
 ## Quick: install AI rules for your assistant
 
-If you found this package looking for "how do I get Directive knowledge into my AI assistant?" — one command:
+If you found this package looking for "how do I get Directive knowledge into my AI assistant?" – one command:
 
 ```bash
 npx directive ai-rules init
@@ -260,8 +260,8 @@ const tools = detectTools("./my-project");
 
 ## Composes with
 
-- [`@directive-run/knowledge`](../knowledge) — the source-of-truth knowledge package the CLI reads from. Every rules-file generator pulls from here, so a knowledge update reaches every assistant on the next `ai-rules update`.
-- [`@directive-run/claude-plugin`](../claude-plugin) — the Claude Code plugin built from the same knowledge. Use the plugin for Claude Code; use `directive ai-rules init` for everything else.
+- [`@directive-run/knowledge`](../knowledge) – the source-of-truth knowledge package the CLI reads from. Every rules-file generator pulls from here, so a knowledge update reaches every assistant on the next `ai-rules update`.
+- [`@directive-run/claude-plugin`](../claude-plugin) – the Claude Code plugin built from the same knowledge. Use the plugin for Claude Code; use `directive ai-rules init` for everything else.
 
 ## Contributing
 

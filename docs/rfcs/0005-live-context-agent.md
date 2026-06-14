@@ -1,6 +1,6 @@
-# RFC 0005 – `runStream({ liveContext })` — Reactive Agents
+# RFC 0005 – `runStream({ liveContext })` – Reactive Agents
 
-- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the `source` primitive in `@directive-run/core`; the
   Tier 0 prereq `createFactPIIGuardrail` (shipped); the live-context
@@ -29,7 +29,7 @@ PR mid-commit-landing; the agent resets and finishes with the new diff.
 ## Motivation
 
 The R5 audit's Innovation reviewer ranked this `viral × speed × impact`
-**10 × 8 × 10 = 800** — the highest score in the entire backlog. The R5
+**10 × 8 × 10 = 800** – the highest score in the entire backlog. The R5
 AI-Integration reviewer scoped it at "~500-550 LOC implementation +
 tests, ~600 LOC docs + example" and named the 300-LOC scope guard.
 
@@ -61,7 +61,7 @@ const result = orchestrator.runStream(agent, input, {
 > **R13 update:** the original RFC drafted a `mode: "restart" |
 > "inject-system-message"` field for choosing how the orchestrator
 > continues after an interrupt. The 1.18 landing ships a single
-> behavior — abort the LLM run, emit an `interrupted` chunk, hand
+> behavior – abort the LLM run, emit an `interrupted` chunk, hand
 > control back to the caller (who re-prompts via a fresh `runStream`
 > or fully tears down via `result.abort()`). The `mode` field was
 > removed before release because the impl never read it; the
@@ -71,7 +71,7 @@ const result = orchestrator.runStream(agent, input, {
 > Likewise, the original draft proposed an inline `guardrails` array
 > on `liveContext` itself; the shipped Tier 0 security companion is
 > `createFactPIIGuardrail`, wired at `createSystem` time (see the
-> "Security — Tier 0 prereq" section below).
+> "Security – Tier 0 prereq" section below).
 
 Two additive chunk variants land on the `OrchestratorStreamChunk`
 discriminated union:
@@ -87,7 +87,7 @@ detaches liveContext. `interrupt` cancels the in-flight generation but
 keeps liveContext attached so the next caller-driven prompt continues
 with up-to-date facts.
 
-## Security — Tier 0 prereq
+## Security – Tier 0 prereq
 
 `createFactPIIGuardrail` (shipped) is the **mandatory** companion. Without
 it, `liveContext` expands the source → fact → prompt PII bypass surface
@@ -96,7 +96,7 @@ into the mid-stream context updates the agent reads while generating.
 **R13 update:** the original RFC drafted a `liveContext.guardrails`
 inline array as the per-`runStream` extension point. The shipped
 design moves PII screening to `createFactPIIGuardrail` wired at
-`createSystem` time — the plugin runs on every fact write (including
+`createSystem` time – the plugin runs on every fact write (including
 the source publishes liveContext watches), so by the time the
 orchestrator emits a `context_updated` chunk the fact has already
 been redacted in-store. No `runStream`-time guardrail array ships.
@@ -129,15 +129,15 @@ the launch artifact.
 1. **Automatic re-prompt semantics (deferred to follow-up RFC).** The
    1.x landing ships abort-and-emit only; the caller drives re-prompt
    via a fresh `runStream` call. A future RFC will add automatic
-   re-invocation with a merge strategy — open sub-questions: (a)
+   re-invocation with a merge strategy – open sub-questions: (a)
    re-render the entire system message from scratch, or (b) append a
    "context updated:" delta. The original `mode` field was removed
    from `LiveContextOptions` before release because the impl never
    read it; the new field ships alongside the impl in the follow-up.
 2. **Buffer policy during interrupt.** Partial output emitted before
-   interrupt — does the caller's `for await (chunk of stream)` loop get
+   interrupt – does the caller's `for await (chunk of stream)` loop get
    it as a `token` chunk first then `interrupted`, or only `interrupted`
-   with `partialOutput`? Recommendation: both — emit tokens up to the
+   with `partialOutput`? Recommendation: both – emit tokens up to the
    abort point, then `interrupted`.
 3. **interruptWhen frequency.** Called on every fact-change observer
    batch or only on watched-key matches? Recommendation: only on

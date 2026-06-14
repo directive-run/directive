@@ -328,13 +328,13 @@ submit: async ({ payload, facts, deps }) => {
 
 ## Composes with
 
-- [`@directive-run/query`](../query) — declarative data fetching; pair mutators with query's invalidation tags so a successful mutation refetches the right resources
-- [`@directive-run/optimistic`](../optimistic) — `withOptimistic` / `withOptimisticHandlers` wrap a mutator handler with snapshot + rollback
-- [`@directive-run/timeline`](../timeline) — records every mutation cycle into a timeline for replayable testing
+- [`@directive-run/query`](../query) – declarative data fetching; pair mutators with query's invalidation tags so a successful mutation refetches the right resources
+- [`@directive-run/optimistic`](../optimistic) – `withOptimistic` / `withOptimisticHandlers` wrap a mutator handler with snapshot + rollback
+- [`@directive-run/timeline`](../timeline) – records every mutation cycle into a timeline for replayable testing
 
 ## Use this package with your AI assistant
 
-Discriminated-union mutators are what AI assistants need to write correct optimistic updates first try — pair `defineMutator` with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant knows when to reach for `cancellable()` / `recordReplayable()` vs. plain handlers.
+Discriminated-union mutators are what AI assistants need to write correct optimistic updates first try – pair `defineMutator` with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant knows when to reach for `cancellable()` / `recordReplayable()` vs. plain handlers.
 
 ```
 # Claude Code

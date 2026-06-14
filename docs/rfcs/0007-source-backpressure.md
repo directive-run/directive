@@ -1,6 +1,6 @@
 # RFC 0007 – Source backpressure + coalesce strategy
 
-- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** R5 distributed-systems reviewer findings (R5-CR3
   "10k events/sec into Tier 2 path"); R6 architecture reviewer's
@@ -12,7 +12,7 @@ The R5 distributed-systems reviewer ran throughput analysis and found
 **no back-pressure primitive** in the source path. At 10k publishes/sec
 into Tier 2 (publish → fact → constraint → async resolver), the resolver
 pool grows unbounded, the reconcile-depth guard trips at depth 50, and
-`previousRequirements` is silently reset — **data loss disguised as
+`previousRequirements` is silently reset – **data loss disguised as
 "recovery."**
 
 This RFC adds an optional `coalesce` field on `SourceDef` so high-frequency
@@ -28,7 +28,7 @@ interface SourceDefinition {
   meta?: DefinitionMeta;
   /**
    * How to absorb publishes that would overwhelm the reconcile loop.
-   * Default: "none" — every publish dispatches.
+   * Default: "none" – every publish dispatches.
    *
    * - "none" (default): no debounce. Every publish flows into the engine.
    *   Correct for low-frequency lifecycle events (MCP connect, DO alarm).
@@ -49,7 +49,7 @@ interface SourceDefinition {
 |---|---|---|
 | Bare publish → event dispatch (no constraint cares) | ~50k-200k/sec | **20k/sec sustained, 100k burst** |
 | publish → fact update (constraint re-evaluates) | ~5k-10k/sec before microtask drain visible | **5k/sec sustained, 10k burst** |
-| publish → fact → derivation → async resolver fires | 500/sec before pool unbounded | **500/sec sustained, 2k burst — only with bounded resolver pool** |
+| publish → fact → derivation → async resolver fires | 500/sec before pool unbounded | **500/sec sustained, 2k burst – only with bounded resolver pool** |
 | 10k/sec into Tier 2 (worst case) | **MELT**: reconcile depth 50, previousRequirements reset, data loss | **CAP at 5k/sec via coalesce** |
 
 ## Coalescing strategy
@@ -80,7 +80,7 @@ type SourceDropReason =
   | "coalesced";  // NEW
 ```
 
-The new variant is additive — existing callers do not need updates.
+The new variant is additive – existing callers do not need updates.
 
 ## Observability requirements
 
@@ -90,7 +90,7 @@ The new variant is additive — existing callers do not need updates.
 - Logging plugin's `onSourcePublish` fires once per FLUSHED publish, not
   once per raw publish. (Otherwise the coalesce primitive doesn't reduce
   log cardinality, defeating the purpose.)
-- Audit-ledger does not capture publishes — drops here are visible only
+- Audit-ledger does not capture publishes – drops here are visible only
   via inspect + observation events (no new ledger entries needed).
 
 ## Acceptance criteria

@@ -1,6 +1,6 @@
 # RFC 0006 – Spell out `*Def` type names across `@directive-run/core`
 
-- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the R5 DX-review finding (Major M1); anti-patterns
   entry #5 (`context` → `ctx` is wrong); the `docs/IDEAS.md` R5 Tier 1
@@ -17,7 +17,7 @@ DX reviewer flagged this as Major because:
   `context` to `ctx` as wrong. The same logic applies to type names.
 - These types appear in autocomplete + hover documentation for every
   module / system / plugin author. They read as internal jargon.
-- Minifiers handle the bytes regardless — source-code readability
+- Minifiers handle the bytes regardless – source-code readability
   outweighs the keystroke savings.
 
 This RFC renames every `*Def` to `*Definition` across the public surface,
@@ -76,24 +76,24 @@ Touches every package that imports a renamed type:
 - `@directive-run/react`, `query`, `timeline`, `mutator`, `optimistic`
 - `@directive-run/vue`, `svelte`, `solid`, `lit`, `el`
 - `@directive-run/scaffold`, `cli`, `lint`, `mcp`, `sandbox`, `claude-plugin`
-- `@directive-run/sources` (post-rename — new in Phase C)
+- `@directive-run/sources` (post-rename – new in Phase C)
 - `@directive-run/vite-plugin-api-proxy`
 
 Plus every `.md` in `packages/knowledge/` mentioning the old names
-(excluding `api-skeleton.md` + `sitemap.md` — auto-generated; regen
+(excluding `api-skeleton.md` + `sitemap.md` – auto-generated; regen
 those via `pnpm --filter @directive-run/knowledge generate-sitemap`).
 
 ## Verification (CI gates)
 
-- `pnpm -r tsc --noEmit` — workspace-wide typecheck clean.
-- `pnpm -r build` — every package builds; subpath exports + tree-shaking
+- `pnpm -r tsc --noEmit` – workspace-wide typecheck clean.
+- `pnpm -r build` – every package builds; subpath exports + tree-shaking
   intact.
-- `pnpm -r test` — per-package test counts: zero drops, zero skips.
-- `pnpm --filter @directive-run/claude-plugin build && test` — bundled
+- `pnpm -r test` – per-package test counts: zero drops, zero skips.
+- `pnpm --filter @directive-run/claude-plugin build && test` – bundled
   AI rules reflect renamed types.
-- `pnpm tsx scripts/size-check.ts` against `size-budgets.json` — no
+- `pnpm tsx scripts/size-check.ts` against `size-budgets.json` – no
   regressions.
-- New `packages/core/src/core/__tests__/rename-aliases.test-d.ts` —
+- New `packages/core/src/core/__tests__/rename-aliases.test-d.ts` –
   covers the 5 TS-inference edge cases where alias identity matters:
   generic constraint, mapped-key, conditional distribution,
   tagged-union literal, barrel re-export.

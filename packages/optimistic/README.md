@@ -239,14 +239,14 @@ runs.
 
 ## Composes with
 
-- [`@directive-run/mutator`](../mutator) — `defineMutator` handlers wrapped with `withOptimisticHandlers` get rollback for free
-- [`@directive-run/query`](../query) — when an optimistic mutation invalidates a query tag, the rollback also reverts the invalidation
-- [`@directive-run/timeline`](../timeline) — records optimistic writes and rollbacks so test failures are reproducible byte-for-byte
-- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) — the underlying runtime
+- [`@directive-run/mutator`](../mutator) – `defineMutator` handlers wrapped with `withOptimisticHandlers` get rollback for free
+- [`@directive-run/query`](../query) – when an optimistic mutation invalidates a query tag, the rollback also reverts the invalidation
+- [`@directive-run/timeline`](../timeline) – records optimistic writes and rollbacks so test failures are reproducible byte-for-byte
+- [`@directive-run/core`](https://www.npmjs.com/package/@directive-run/core) – the underlying runtime
 
 ## Use this package with your AI assistant
 
-`withOptimisticHandlers` solves the optimistic-rollback pattern AI assistants get wrong by default — pair it with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant knows how to wire snapshot + rollback alongside `defineMutator`.
+`withOptimisticHandlers` solves the optimistic-rollback pattern AI assistants get wrong by default – pair it with [Directive's IDE Integration](https://directive.run/docs/ide-integration) so your assistant knows how to wire snapshot + rollback alongside `defineMutator`.
 
 ```
 # Claude Code

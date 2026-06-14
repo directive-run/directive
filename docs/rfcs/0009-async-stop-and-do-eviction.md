@@ -1,6 +1,6 @@
 # RFC 0009 – Async-aware `system.stop()` + Durable Object eviction hook
 
-- **Status:** Accepted — shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
+- **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** R5 distributed-systems reviewer findings (R5-CR1:
   `system.stop()` doesn't await async unsubscribes; R5-CR4: DO eviction
@@ -59,7 +59,7 @@ await is the existing pattern that silently breaks. The migration is:
 // before (1.x)
 system.stop();
 
-// after (2.0 — semver major bump required)
+// after (2.0 – semver major bump required)
 await system.stop();
 ```
 
@@ -110,7 +110,7 @@ The DO consumer wires it in their `alarm()` or
 ## Acceptance criteria
 
 - `SourceUnsubscribeFn` widens to `() => void | Promise<void>` (purely
-  additive — existing sync unsubscribes continue to satisfy the type).
+  additive – existing sync unsubscribes continue to satisfy the type).
 - `SourcesManager.cleanupAll` becomes async.
 - New `System.stopAsync()` + `System.destroyAsync()` methods land
   additively in 1.x. The sync `stop` / `destroy` are deprecated but

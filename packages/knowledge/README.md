@@ -1,8 +1,8 @@
 # @directive-run/knowledge
 
-The **source of truth** for all Directive coding knowledge — used by Claude Code skills, Cursor / Copilot / Windsurf / Cline / Codex rules files, the website's `/llms.txt` route, and the programmatic API for downstream tooling.
+The **source of truth** for all Directive coding knowledge – used by Claude Code skills, Cursor / Copilot / Windsurf / Cline / Codex rules files, the website's `/llms.txt` route, and the programmatic API for downstream tooling.
 
-If you want your AI assistant to write idiomatic Directive code, you do not install this package directly — you install one of its consumers below.
+If you want your AI assistant to write idiomatic Directive code, you do not install this package directly – you install one of its consumers below.
 
 ## Using the knowledge
 
@@ -15,7 +15,7 @@ Two commands in a Claude Code session:
 /plugin install directive@directive-plugins
 ```
 
-Ships 12 skills bundled from this package. Skills are model-invoked — Claude reads each skill's description and auto-loads the relevant one when your task matches.
+Ships 12 skills bundled from this package. Skills are model-invoked – Claude reads each skill's description and auto-loads the relevant one when your task matches.
 
 ### Cursor, Copilot, Windsurf, Cline, OpenAI Codex
 
@@ -63,7 +63,7 @@ const examples = getAllExamples();
 clearCache();
 ```
 
-If you're just trying to write code with AI help, you don't need this — install the Claude plugin or run `directive ai-rules` above.
+If you're just trying to write code with AI help, you don't need this – install the Claude plugin or run `directive ai-rules` above.
 
 ## What's in the package
 

@@ -303,7 +303,7 @@ This RFC is **draft**. Open for review. Defer implementation until:
 1. Adversarial multi-lens review on this doc (security/correctness,
    architecture, DX, domain expert). Settle the clock-source choice on paper.
 2. One concrete use-case prototype (pick the simplest production
-   timer-using machine — likely a lobby's start-countdown — and
+   timer-using machine – likely a lobby's start-countdown – and
    sketch how it would read with `t.timer` before / after).
 3. Budget confirmation. 1.5 weeks is a real fraction of the program; if
    Phase 5 (Time-travel REPL) is the bigger viral lever, this RFC may be

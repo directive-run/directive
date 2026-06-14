@@ -1,11 +1,11 @@
 # @directive-run/sources
 
-Source adapters for [Directive](https://directive.run) — wrap external
+Source adapters for [Directive](https://directive.run) – wrap external
 event streams (Supabase realtime, Cloudflare DO alarms, WebSocket,
 Sentry, etc.) as typed `source` primitives.
 
 **One package, one install, subpath exports per vendor.** Vendor
-peerDependencies are optional — only the vendors you import need their
+peerDependencies are optional – only the vendors you import need their
 peer-dependency installed.
 
 ## Install
@@ -133,9 +133,9 @@ This matches how `@directive-run/core` already uses subpath exports for
 
 ## Related
 
-- [`@directive-run/core` source primitive](https://github.com/directive-run/directive/blob/main/packages/knowledge/core/sources.md) — the underlying primitive these adapters wrap.
-- [`@directive-run/ai` AI × Sources recipes](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-sources.md) — `runStream({ liveContext })`, MCP lifecycle as a source.
-- [Tier 0 PII guardrail](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-security.md#sources-pii--closing-the-fact-injection-bypass) — `createFactPIIGuardrail` (wire whenever sources feed facts the agent reads).
+- [`@directive-run/core` source primitive](https://github.com/directive-run/directive/blob/main/packages/knowledge/core/sources.md) – the underlying primitive these adapters wrap.
+- [`@directive-run/ai` AI × Sources recipes](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-sources.md) – `runStream({ liveContext })`, MCP lifecycle as a source.
+- [Tier 0 PII guardrail](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-security.md#sources-pii--closing-the-fact-injection-bypass) – `createFactPIIGuardrail` (wire whenever sources feed facts the agent reads).
 
 ## License
 

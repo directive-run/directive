@@ -6,14 +6,14 @@ The package has two install paths: **Claude Code's plugin marketplace** for end 
 
 ## Install for Claude Code (canonical)
 
-Two steps in a Claude Code session — first register the marketplace, then install the plugin:
+Two steps in a Claude Code session – first register the marketplace, then install the plugin:
 
 ```
 /plugin marketplace add directive-run/directive
 /plugin install directive@directive-plugins
 ```
 
-After install, verify the plugin is active with `/plugins` — you should see `directive` in the list.
+After install, verify the plugin is active with `/plugins` – you should see `directive` in the list.
 
 ## Install for tool authors (npm)
 
@@ -36,7 +36,7 @@ import {
 const names = listSkills();
 // → ["building-ai-agents", "building-ai-orchestrators", ...]
 
-// One skill — manifest + supporting files
+// One skill – manifest + supporting files
 const skill = getSkill("building-ai-orchestrators");
 skill?.manifest;            // SKILL.md (with YAML frontmatter)
 skill?.files.get("examples"); // examples.md contents
@@ -48,7 +48,7 @@ const all = getAllSkills(); // Map<string, Skill>
 const ex = getSkillFile("building-ai-orchestrators", "examples");
 ```
 
-The npm install path is not a replacement for the Claude Code plugin install — it does not register the skills with Claude Code itself. It only exposes the same `skills/` directory as a typed module so other tools can read it.
+The npm install path is not a replacement for the Claude Code plugin install – it does not register the skills with Claude Code itself. It only exposes the same `skills/` directory as a typed module so other tools can read it.
 
 ## What happens after install
 

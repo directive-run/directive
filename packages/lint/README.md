@@ -2,7 +2,7 @@
 
 ts-morph-based static analysis for [Directive](https://directive.run) code. Rule registry + executable checks + autofixes. Consumed by `@directive-run/mcp` (its `review_source` and `fix_code` MCP tools) and by the future `directive doctor lint` CLI subcommand.
 
-You probably don't depend on this package directly — it's the engine behind the agent-facing review tools. Install it explicitly if you're building static-analysis tooling for Directive codebases.
+You probably don't depend on this package directly – it's the engine behind the agent-facing review tools. Install it explicitly if you're building static-analysis tooling for Directive codebases.
 
 ## API
 
@@ -26,7 +26,7 @@ const rules = getRules();
 const rule = getRuleById("no-single-line-if-return");
 
 // Actually run the executable rules against a source string.
-// ts-morph is loaded lazily — throws a structured error if not installed.
+// ts-morph is loaded lazily – throws a structured error if not installed.
 const result = await runRules(`
 import { createModule } from "@directive-run/core";
 export const x = createModule("x", { schema, init: () => {} });
@@ -60,7 +60,7 @@ const worker = new Worker(require.resolve("@directive-run/lint/worker"));
 worker.postMessage({ kind: "run", source });
 worker.on("message", ({ ok, result, error }) => { /* … */ });
 
-// terminate() after a budget — synchronous ts-morph cannot be aborted
+// terminate() after a budget – synchronous ts-morph cannot be aborted
 // any other way
 setTimeout(() => worker.terminate(), 5000);
 ```
@@ -69,6 +69,6 @@ The MCP server uses this pattern to bound `review_source` parse cost.
 
 ## See also
 
-- [`@directive-run/mcp`](../mcp) — exposes `review_source`, `fix_code`, `list_review_rules`, `get_review_rule` MCP tools that wrap this package.
-- [`@directive-run/knowledge`](../knowledge) — anti-pattern markdown sources (`packages/knowledge/core/anti-patterns.md`); rule IDs in this package match knowledge's parsed anti-pattern IDs.
-- [`@directive-run/core`](../core) — `doctor` namespace for runtime constraint checks (different scope: runtime, not source).
+- [`@directive-run/mcp`](../mcp) – exposes `review_source`, `fix_code`, `list_review_rules`, `get_review_rule` MCP tools that wrap this package.
+- [`@directive-run/knowledge`](../knowledge) – anti-pattern markdown sources (`packages/knowledge/core/anti-patterns.md`); rule IDs in this package match knowledge's parsed anti-pattern IDs.
+- [`@directive-run/core`](../core) – `doctor` namespace for runtime constraint checks (different scope: runtime, not source).
