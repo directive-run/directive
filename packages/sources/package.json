@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/sources",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Source adapters for Directive — wrap Supabase realtime, Cloudflare DO alarms, WebSocket, Sentry, etc. as typed `source` primitives. One package, one install, subpath exports per vendor.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

@@ -1,5 +1,48 @@
 # @directive-run/ai
 
+## 1.21.0
+
+### Patch Changes
+
+- [`3b4d36b`](https://github.com/directive-run/directive/commit/3b4d36b032289eccd426d65a9e2f0439521fcab8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Two follow-on defensive fixes.
+
+  ## core: batch-resolver cancellation handles requirements that span multiple in-flight batches
+
+  The reverse index from requirement id → owning batch was a `Map<string, string>` — when two batch resolver definitions ended up processing the same requirement instance concurrently (rare, but legal in the type system), the second registration silently overwrote the first. Cancelling the requirement aborted the most recently registered batch only; the other ran to completion despite the explicit cancel.
+
+  The index is now `Map<string, Set<string>>`. A requirement that participates in N batches at once tracks all N owners; cancelling iterates the snapshot and aborts every batch. The unwind path mirrors the change so the `Set` collapses cleanly per batch and the requirement is removed from the index only when the last owner releases it. All-or-nothing batch semantics are preserved within each batch.
+
+  ## ai: self-healing fallback respects the orchestrator's token budget
+
+  `applySelfHealingFallback` calls the user-supplied `runner` (and any `fallbackRunners`) directly. With `budgetEstimateTokens` configured, the primary path reserved tokens against `maxTokenBudget` via `runAgentWithGuardrails`'s pre-flight check — but every fallback call entered the runner without that reservation. A primary failure CAUSED by budget pressure would then drive the fallback into the same overshoot the pre-flight existed to prevent.
+
+  The new `withFallbackBudgetReservation` wrapper reserves tokens against the running `inFlightReservation`, runs the fallback work, and releases the reservation in `finally`. When `budgetEstimateTokens` is undefined (default) the reservation is 0 and the wrapper is a no-op — strict back-compat for consumers that haven't adopted the new option.
+
+- [`dab3537`](https://github.com/directive-run/directive/commit/dab35376019c715066d5127b4ffce7d10729b9f4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Two follow-on hardenings.
+
+  ## core: per-source teardown timeout is now configurable per source
+
+  `SourcesManager.cleanupAllAsync` and `evictAll` previously applied a single 5-second cap to every source. Long-tail transports that legitimately need more time to drain (a Supabase channel flushing a backlog before close, an OpenTelemetry batch span exporter draining its queue, a Cloudflare DO storage flush awaiting a D1 commit) hit the cap and reported a hang even when the underlying work was healthy.
+
+  `SourceDef` now accepts an optional `evictTimeoutMs?: number` override. Sources keep the 5s default unless they declare a different ceiling — adjacent sources are unaffected. Pass `Infinity` to disable the cap for that source only (the manager skips the timer wiring entirely so Node doesn't emit a `TimeoutOverflowWarning`).
+
+  ```ts
+  sources: {
+    supabase: sourceFromSupabaseChannel({
+      // Default 5s would clip the backlog drain. Give the channel
+      // up to 15s to acknowledge the unsubscribe.
+      evictTimeoutMs: 15_000,
+      // ...rest of the source config
+    }),
+  }
+  ```
+
+  The package-wide default is exported as `DEFAULT_PER_SOURCE_TIMEOUT_MS` for consumers who want to derive their own ceiling.
+
+  ## ai: `FactPIIErrorMode` joins its sibling in the barrel
+
+  The `errorMode` option on `createFactPIIGuardrail` accepts a `FactPIIErrorMode` union. The type was internal-only — the sister type `FactPIIGuardrailMode` was already exported. Consumers writing the option's type annotation had to deep-import from `@directive-run/ai/guardrails/fact-pii.js`. `FactPIIErrorMode` is now re-exported from both `@directive-run/ai` and `@directive-run/ai/guardrails`.
+
 ## 1.20.2
 
 ### Patch Changes
@@ -154,7 +197,7 @@
 
   ### Net effect on the walker
 
-  | Before                                                      | After                                                                       |
+  | Before                                                      | After                                                                      |
   | ----------------------------------------------------------- | -------------------------------------------------------------------------- |
   | 2 functions (`inspect` + `inspectStructural`)               | 2 functions (`inspect` + `walkClone`)                                      |
   | `inProgress: WeakSet` threaded through every recursive call | none — clones can't be cyclic                                              |

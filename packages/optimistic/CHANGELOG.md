@@ -1,5 +1,15 @@
 # @directive-run/optimistic changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Repair two README examples that didn't compile.
+
+  `withOptimistic<F>` is a single-generic curried helper, but two worked examples in the cancel-supersession layering section called `withOptimistic<Facts, "draft">(["draft"])(...)`. The second generic was a leftover from an older two-arg shape — copy-paste produced an "Expected 1 type argument, got 2" compile error. Dropped to `withOptimistic<Facts>` so the example matches the function's actual signature.
+
+  No code changes.
+
 ## 0.2.0
 
 ### Minor Changes

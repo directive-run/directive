@@ -1,5 +1,7 @@
 # @directive-run/solid
 
+## 1.21.0
+
 ## 1.20.2
 
 ### Patch Changes

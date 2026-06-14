@@ -1,5 +1,7 @@
 # @directive-run/claude-plugin
 
+## 1.21.0
+
 ## 1.20.2
 
 ## 1.20.1

@@ -1,5 +1,13 @@
 # @directive-run/example-batch-resolver
 
+## 0.0.55
+
+### Patch Changes
+
+- Updated dependencies [[`3b4d36b`](https://github.com/directive-run/directive/commit/3b4d36b032289eccd426d65a9e2f0439521fcab8), [`dab3537`](https://github.com/directive-run/directive/commit/dab35376019c715066d5127b4ffce7d10729b9f4), [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4), [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4), [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c)]:
+  - @directive-run/core@1.21.0
+  - @directive-run/el@1.1.1
+
 ## 0.0.54
 
 ### Patch Changes

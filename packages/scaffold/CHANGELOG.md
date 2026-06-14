@@ -1,5 +1,15 @@
 # @directive-run/scaffold
 
+## 0.2.1
+
+### Patch Changes
+
+- [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Repair the README quickstart, which treated `generateModule("name")` as returning a string. It returns a `GeneratedScaffold` object `{ moduleSource, runnerSource, suggestedFilenames, runnable }` — anyone pasting from the README into `writeFileSync(file, source)` got files containing `[object Object]`.
+
+  The quickstart now destructures the paired (moduleSource, runnerSource) bundle, walks through the `runnable` flag's meaning, documents the previously-unlisted `generateRunner` export, and adds a "Writing to disk" section showing the two-file drop with the `suggestedFilenames` hint.
+
+  No code changes.
+
 ## 0.2.0
 
 ### Minor Changes

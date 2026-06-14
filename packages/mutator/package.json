@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/mutator",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Discriminated mutation helper for Directive — collapse the pendingAction ceremony to a typed handler map.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
