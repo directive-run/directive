@@ -184,6 +184,39 @@ system.events.addItem({ name: "Widget", price: 9.99 });
 | `@directive-run/core/worker` | Web Worker support |
 | `@directive-run/core/adapter-utils` | Shared utilities for building framework adapters |
 
+## Observability
+
+Every system exposes a typed `system.observe(observer)` stream — one listener receives every observation event with full TypeScript narrowing on `event.type`. Source-publish, source-drop, fact-change, constraint evaluation, requirement lifecycle, resolver lifecycle, and effect runs all flow through the same channel.
+
+```ts
+const unsubscribe = system.observe((event) => {
+  if (event.type === "source.publish") {
+    log("source published:", event.id, event.eventName);
+  } else if (event.type === "source.drop") {
+    // Pairs with `source.publish` so observers see both halves of the
+    // publish path without polling `inspect().sources[i].dropCount`.
+    // `reason` is the shared `SourceDropReason` union.
+    log("source dropped:", event.id, event.eventName, event.reason);
+  }
+});
+```
+
+For plugin authors, the same hooks are available on `Plugin`:
+
+```ts
+import type { Plugin, SourceDropReason } from "@directive-run/core";
+
+const alerter: Plugin = {
+  name: "drop-alerter",
+  onSourceDrop(id, moduleId, eventName, reason: SourceDropReason) {
+    if (reason === "coalesced") metrics.incr("source.coalesce", { id });
+    if (reason === "blocked-event-name") logger.error({ id, eventName });
+  },
+};
+```
+
+The `SourceDropReason` union is the single source of truth for drop reasons — `SystemInspection.sources[i].lastDropReason`, the `Plugin.onSourceDrop` hook signature, and the `source.drop` observation-event variant all reference the same type. Adding a new reason in one place flows to all three at compile time.
+
 ## Why Directive?
 
 - **Declarative over imperative** &ndash; describe what your system needs, not how to wire it up. Constraints and resolvers replace manual data-fetching orchestration.

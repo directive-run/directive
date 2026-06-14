@@ -250,7 +250,11 @@ If a tool errors mid-conversation, the fastest recovery is: *"Ask the directive 
 For tool authors who want to mount the server inside their own host process:
 
 ```typescript
-import { createDirectiveServer, startSseServer } from "@directive-run/mcp";
+import {
+  createDirectiveServer,
+  startSseServer,
+  setMaxConcurrentLintWorkers,
+} from "@directive-run/mcp";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 // stdio
@@ -259,6 +263,16 @@ await server.connect(new StdioServerTransport());
 
 // SSE — returns the underlying http.Server
 const httpServer = await startSseServer({ port: 3000, host: "0.0.0.0" });
+```
+
+### Tuning the lint worker pool
+
+`review_source` and `fix_code` each spawn a ts-morph worker thread to parse the input. A multi-client burst — Cursor + Claude + IDE all calling these tools in parallel — could amplify into a thread-spawn storm. `setMaxConcurrentLintWorkers(n)` caps the simultaneously-running lint workers. Calls beyond the cap queue FIFO; abandoned callers (signal-aborted or dropped promises) deregister cleanly. Defaults to `navigator.hardwareConcurrency` (falls back to 4); pass `Infinity` to disable.
+
+```ts
+import { setMaxConcurrentLintWorkers } from "@directive-run/mcp";
+// At server boot — runs once per process.
+setMaxConcurrentLintWorkers(4);
 ```
 
 ## See also
