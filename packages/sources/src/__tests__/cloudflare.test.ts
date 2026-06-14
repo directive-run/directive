@@ -26,7 +26,7 @@ function makeFakeStorage() {
 }
 
 describe("sourceFromDOAlarm", () => {
-  it("schedules an alarm on attach + publishes on tick", () => {
+  it("schedules an alarm on attach + publishes on tick", async () => {
     const storage = makeFakeStorage();
     const handler = vi.fn();
     let registeredTick: undefined | (() => void);
@@ -59,14 +59,25 @@ describe("sourceFromDOAlarm", () => {
     });
     const system = createSystem({ module });
     system.start();
-    // setAlarm called once at attach.
+    // setAlarm is scheduled inside an async block that awaits
+    // `storage.getAlarm()` first (so a `start → stop → start` race
+    // can't double-arm the DO). Drain the microtask + the resolved
+    // getAlarm Promise before asserting.
+    await Promise.resolve();
+    await Promise.resolve();
     expect(storage.setAlarm).toHaveBeenCalledTimes(1);
-    // Simulate the DO runtime calling the registered tick.
+    // Simulate the DO runtime delivering the alarm: the DO clears the
+    // pending alarm before invoking alarm(), so a fresh tick sees
+    // getAlarm() === null and can re-arm cleanly.
+    await storage.deleteAlarm();
+    storage.deleteAlarm.mockClear();
     expect(registeredTick).not.toBeNull();
     registeredTick?.();
     expect(handler).toHaveBeenCalledTimes(1);
     expect(system.facts.count).toBe(1);
-    // Tick schedules the NEXT alarm.
+    // Tick schedules the NEXT alarm — same async flush dance.
+    await Promise.resolve();
+    await Promise.resolve();
     expect(storage.setAlarm).toHaveBeenCalledTimes(2);
     system.destroy();
   });
