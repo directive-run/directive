@@ -515,9 +515,13 @@ export function createResolversManager<S extends Schema>(
    * still mid-execution. Each batch invocation gets an opaque instance
    * id; the controller is the same one passed into `runBatchRetryLoop`.
    *
-   * `reqToBatch` is a reverse index from requirement id → batch instance
-   * id so `cancel(reqId)` can find the owning batch in O(1) without
-   * walking every state.
+   * `reqToBatch` is a reverse index from requirement id → SET of batch
+   * instance ids so `cancel(reqId)` can find every owning batch in O(1)
+   * without walking every state. The value is a Set rather than a single
+   * id because two batch resolvers can legally process the same
+   * requirement instance concurrently (different resolver definitions,
+   * same requirement type); cancelling the requirement must abort ALL
+   * owning batches, not just the most recently registered one.
    */
   interface BatchInflightState {
     resolverId: string;
@@ -525,7 +529,7 @@ export function createResolversManager<S extends Schema>(
     requirementIds: Set<string>;
   }
   const batchInflight = new Map<string, BatchInflightState>();
-  const reqToBatch = new Map<string, string>();
+  const reqToBatch = new Map<string, Set<string>>();
   let nextBatchInstanceId = 0;
 
   // Resolver index by requirement type for O(1) lookup (populated lazily)
@@ -1421,7 +1425,16 @@ export function createResolversManager<S extends Schema>(
     };
     batchInflight.set(batchInstanceId, state);
     for (const r of requirements) {
-      reqToBatch.set(r.id, batchInstanceId);
+      // A requirement can participate in multiple in-flight batches
+      // when two batch resolver definitions handle the same requirement
+      // type concurrently. Add this batch to the requirement's set
+      // rather than overwriting the prior entry.
+      let owners = reqToBatch.get(r.id);
+      if (!owners) {
+        owners = new Set();
+        reqToBatch.set(r.id, owners);
+      }
+      owners.add(batchInstanceId);
     }
 
     let lastError: Error | null = null;
@@ -1438,7 +1451,10 @@ export function createResolversManager<S extends Schema>(
     } finally {
       batchInflight.delete(batchInstanceId);
       for (const r of requirements) {
-        reqToBatch.delete(r.id);
+        const owners = reqToBatch.get(r.id);
+        if (!owners) continue;
+        owners.delete(batchInstanceId);
+        if (owners.size === 0) reqToBatch.delete(r.id);
       }
     }
 
@@ -1663,10 +1679,25 @@ export function createResolversManager<S extends Schema>(
       // marks every requirement as canceled. This matches the
       // all-or-nothing semantic of `resolveBatch` — you can't cancel
       // one row of a SQL UPDATE without aborting the transaction.
-      const batchInstanceId = reqToBatch.get(requirementId);
-      if (batchInstanceId) {
-        const batchState = batchInflight.get(batchInstanceId);
-        if (batchState) {
+      //
+      // When the requirement participates in MULTIPLE batches
+      // concurrently (two batch resolvers, same requirement type, both
+      // in flight), abort EVERY owning batch — not just one. Snapshot
+      // the set before iterating because the abort path mutates
+      // `reqToBatch` for the requirements it touches.
+      const owningBatches = reqToBatch.get(requirementId);
+      if (owningBatches && owningBatches.size > 0) {
+        // Snapshot the set before iterating — the abort path mutates
+        // `reqToBatch` for the requirements it touches and would
+        // otherwise invalidate the iterator.
+        const batchIdsToCancel = Array.from(owningBatches);
+        // Collect (resolverId, requirementId) pairs we need to surface
+        // via `onCancel` after the maps settle, so a hostile listener
+        // can't re-enter and double-cancel.
+        const onCancelPairs: Array<{ resolverId: string; reqId: string }> = [];
+        for (const batchInstanceId of batchIdsToCancel) {
+          const batchState = batchInflight.get(batchInstanceId);
+          if (!batchState) continue;
           batchState.controller.abort();
           for (const id of batchState.requirementIds) {
             statuses.set(id, {
@@ -1674,17 +1705,22 @@ export function createResolversManager<S extends Schema>(
               requirementId: id,
               canceledAt: Date.now(),
             });
-            reqToBatch.delete(id);
+            const reqOwners = reqToBatch.get(id);
+            if (reqOwners) {
+              reqOwners.delete(batchInstanceId);
+              if (reqOwners.size === 0) reqToBatch.delete(id);
+            }
+            onCancelPairs.push({ resolverId: batchState.resolverId, reqId: id });
           }
           batchInflight.delete(batchInstanceId);
-          cleanupStatuses();
-          // Fire onCancel for every affected requirement. The original
-          // requirement objects are not retained on the batch state (we
-          // only kept their ids); callers needing full requirement data
-          // can read it from their constraint that emitted it.
-          for (const id of batchState.requirementIds) {
-            onCancel?.(batchState.resolverId, { id } as RequirementWithId);
-          }
+        }
+        cleanupStatuses();
+        // Fire onCancel for every affected requirement. The original
+        // requirement objects are not retained on the batch state (we
+        // only kept their ids); callers needing full requirement data
+        // can read it from their constraint that emitted it.
+        for (const pair of onCancelPairs) {
+          onCancel?.(pair.resolverId, { id: pair.reqId } as RequirementWithId);
         }
       }
     },

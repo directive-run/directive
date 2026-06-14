@@ -910,6 +910,38 @@ export function createAgentOrchestrator<
    * `fallback-response` degradation policy. Re-throws the original
    * error when no fallback succeeds (or `selfHealing` is not configured).
    */
+  /**
+   * Reserve tokens for a fallback call against the running budget,
+   * invoke the work, and release the reservation in `finally`. Without
+   * this, fallback runners and the fallback agent bypass the
+   * pre-flight reservation that the primary path runs in
+   * `runAgentWithGuardrails` — a primary failure caused by budget
+   * pressure would then drive the fallback into the SAME overshoot
+   * the pre-flight existed to prevent.
+   *
+   * When `budgetEstimateTokens` is undefined (default), `reserve()`
+   * returns 0 and this is a no-op — the back-compat path.
+   */
+  async function withFallbackBudgetReservation<T>(
+    agent: AgentLike,
+    input: string,
+    work: () => Promise<RunResult<T>>,
+  ): Promise<RunResult<T>> {
+    const reserved = resolveBudgetReservation(agent, input);
+    if (reserved <= 0) {
+      return await work();
+    }
+    inFlightReservation.count += reserved;
+    try {
+      return await work();
+    } finally {
+      inFlightReservation.count = Math.max(
+        0,
+        inFlightReservation.count - reserved,
+      );
+    }
+  }
+
   async function applySelfHealingFallback<T>(
     error: unknown,
     agent: AgentLike,
@@ -943,7 +975,9 @@ export function createAgentOrchestrator<
               reason: error instanceof Error ? error.message : String(error),
             });
           }
-          return await fallbackRunner<T>(agent, input, opts);
+          return await withFallbackBudgetReservation<T>(agent, input, () =>
+            fallbackRunner<T>(agent, input, opts),
+          );
         } catch {
           // Try next fallback
         }
@@ -974,7 +1008,10 @@ export function createAgentOrchestrator<
             reason: error instanceof Error ? error.message : String(error),
           });
         }
-        return await runner<T>(selfHealing.fallbackAgent, input, opts);
+        const fallbackAgent = selfHealing.fallbackAgent;
+        return await withFallbackBudgetReservation<T>(fallbackAgent, input, () =>
+          runner<T>(fallbackAgent, input, opts),
+        );
       } catch {
         // Fallback agent also failed
       }
