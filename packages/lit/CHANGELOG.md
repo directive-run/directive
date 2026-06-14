@@ -1,5 +1,53 @@
 # @directive-run/lit
 
+## 1.21.0
+
+### Minor Changes
+
+- [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Disambiguate two long-standing Lit naming collisions via deprecation aliases. Existing imports keep working.
+
+  **`createModule` → `createModuleController`.** `@directive-run/lit`'s `createModule(host, moduleDef, config)` factory previously collided with `@directive-run/core`'s `createModule(id, def)` — importing both into the same scope shadowed whichever landed last in editor auto-import order, and the trap fired silently on the first paired import. The factory is now `createModuleController`. `createModule` remains as a deprecated alias so existing imports still resolve.
+
+  **`useHistory` → `getHistory`.** `@directive-run/lit`'s `useHistory(system)` returns a one-shot snapshot. The hooks of the same name in `@directive-run/{react,vue,svelte,solid}` are REACTIVE — they re-fire on every history navigation. Same name, opposite contract. The functional helper is now `getHistory(system)`; reactive history under Lit stays in `HistoryController`. `useHistory` remains as a deprecated alias.
+
+  VS Code shows the `@deprecated` strikethrough on both legacy names.
+
+### Patch Changes
+
+- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence round following the AE review of last cycle's fix batch. Closes the two HIGH issues + the four MAJOR items the review surfaced.
+
+  ## sandbox — post-acquisition signal wiring + sanitizeStack export + expanded coverage
+
+  **Post-acquisition AbortSignal wiring.** The previous release plumbed `signal` only through the `acquireSlot` queue wait. After the slot acquired, the signal was dropped — a client that disconnected mid-execution still tied up the slot for the full `timeoutMs` (up to 10 s). Now the signal also fires `worker.terminate()` on the running worker so the slot frees immediately. The docstring's "released immediately on disconnect" contract is now accurate end-to-end.
+
+  **`sanitizeStack` is now a public export.** Consumers building custom error-routing (Sentry integrations, audit-log middleware) previously couldn't strip host filesystem paths from `SandboxResult.errors[]` before logging. The function is now exported from `@directive-run/sandbox` directly:
+
+  ```ts
+  import { sanitizeStack } from "@directive-run/sandbox";
+  logger.error(sanitizeStack(result.errors.join("\n")));
+  ```
+
+  **Extended path coverage.** The sanitizer now strips `/app/` (Heroku/Render/Docker), `/srv/` (Linux deploy), `/workspace/` (Codespaces/GitHub Actions), `/data/` (volume mounts), `/etc/` (configs), and `/root/` (root home) on top of the POSIX + Windows + UNC patterns. 7 new regression tests.
+
+  **`@example` block** added to `setMaxConcurrentWorkers`.
+
+  ## core — `SourceDropReason` adoption completion
+
+  Two inline copies of the drop-reason union survived the previous round:
+
+  - `SystemInspection.sources[i].lastDropReason` (`types/system.ts`)
+  - `SourceDispatchResult.reason` (`core/sources.ts`)
+
+  Both now reference `SourceDropReason`. The four surfaces that report drops (inspect row, plugin hook, plugin manager emit, observation event) are finally unified — a new reason added to the shared type now propagates everywhere at compile time.
+
+  ## lit — deprecated aliases as function wrappers
+
+  `export const createModule = createModuleController` and `export const useHistory = getHistory` swallowed the `@deprecated` JSDoc strikethrough in older VS Code, Vim+coc, and JetBrains < 2024.1. Both aliases are now thin function wrappers so the deprecation marker renders in every TS-aware editor.
+
+  ## mcp — full JSDoc on `setMaxConcurrentLintWorkers`
+
+  The MCP cap setter's JSDoc was a 3-line summary; the sandbox sister had the full WHY (per-worker heap cost, multi-client burst scenario, `Infinity` to disable). Brought them to parity with an `@example` block.
+
 ## 1.20.2
 
 ### Patch Changes

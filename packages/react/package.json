@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/react",
-  "version": "1.20.2",
+  "version": "1.21.0",
   "imports": {
     "#is-development": {
       "production": "./src/dev-false.ts",

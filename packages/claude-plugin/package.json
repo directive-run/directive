@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/claude-plugin",
-  "version": "1.20.2",
+  "version": "1.21.0",
   "description": "Claude Code plugin for Directive — 12 skills covering modules, constraints, resolvers, derivations, AI orchestration, and adapters. Installable via Claude Code's plugin marketplace or consumable programmatically as an npm package.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",

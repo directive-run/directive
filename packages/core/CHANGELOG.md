@@ -1,5 +1,96 @@
 # @directive-run/core
 
+## 1.21.0
+
+### Minor Changes
+
+- [`dab3537`](https://github.com/directive-run/directive/commit/dab35376019c715066d5127b4ffce7d10729b9f4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Two follow-on hardenings.
+
+  ## core: per-source teardown timeout is now configurable per source
+
+  `SourcesManager.cleanupAllAsync` and `evictAll` previously applied a single 5-second cap to every source. Long-tail transports that legitimately need more time to drain (a Supabase channel flushing a backlog before close, an OpenTelemetry batch span exporter draining its queue, a Cloudflare DO storage flush awaiting a D1 commit) hit the cap and reported a hang even when the underlying work was healthy.
+
+  `SourceDef` now accepts an optional `evictTimeoutMs?: number` override. Sources keep the 5s default unless they declare a different ceiling — adjacent sources are unaffected. Pass `Infinity` to disable the cap for that source only (the manager skips the timer wiring entirely so Node doesn't emit a `TimeoutOverflowWarning`).
+
+  ```ts
+  sources: {
+    supabase: sourceFromSupabaseChannel({
+      // Default 5s would clip the backlog drain. Give the channel
+      // up to 15s to acknowledge the unsubscribe.
+      evictTimeoutMs: 15_000,
+      // ...rest of the source config
+    }),
+  }
+  ```
+
+  The package-wide default is exported as `DEFAULT_PER_SOURCE_TIMEOUT_MS` for consumers who want to derive their own ceiling.
+
+  ## ai: `FactPIIErrorMode` joins its sibling in the barrel
+
+  The `errorMode` option on `createFactPIIGuardrail` accepts a `FactPIIErrorMode` union. The type was internal-only — the sister type `FactPIIGuardrailMode` was already exported. Consumers writing the option's type annotation had to deep-import from `@directive-run/ai/guardrails/fact-pii.js`. `FactPIIErrorMode` is now re-exported from both `@directive-run/ai` and `@directive-run/ai/guardrails`.
+
+- [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Pair every `source.publish` with a new `source.drop` observation event so plugin observers see both halves of the publish path without polling `inspect().sources[i].dropCount`.
+
+  - New `Plugin.onSourceDrop(id, moduleId, eventName, reason)` hook fires whenever the engine OR the manager rejects a publish.
+  - New `system.observe()` `source.drop` ObservationEvent variant carries the same payload.
+  - New `SourceDropReason` type (exported from the public surface) is the shared union the inspect row, the plugin hook, and the observation event all reference, so the three surfaces cannot drift.
+  - `reason` mirrors `SourceInspectionRow.lastDropReason`:
+    - `"post-destroy"` / `"post-stop"` — leaked transport firing after teardown
+    - `"blocked-event-name"` / `"invalid-event-name"` — engine guard probe
+    - `"coalesced"` — manager debounced a same-event publish within one microtask
+
+  The existing `onSourcePublish` semantics are unchanged — accepted publishes still fire there, drops fire only on `onSourceDrop`.
+
+### Patch Changes
+
+- [`3b4d36b`](https://github.com/directive-run/directive/commit/3b4d36b032289eccd426d65a9e2f0439521fcab8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Two follow-on defensive fixes.
+
+  ## core: batch-resolver cancellation handles requirements that span multiple in-flight batches
+
+  The reverse index from requirement id → owning batch was a `Map<string, string>` — when two batch resolver definitions ended up processing the same requirement instance concurrently (rare, but legal in the type system), the second registration silently overwrote the first. Cancelling the requirement aborted the most recently registered batch only; the other ran to completion despite the explicit cancel.
+
+  The index is now `Map<string, Set<string>>`. A requirement that participates in N batches at once tracks all N owners; cancelling iterates the snapshot and aborts every batch. The unwind path mirrors the change so the `Set` collapses cleanly per batch and the requirement is removed from the index only when the last owner releases it. All-or-nothing batch semantics are preserved within each batch.
+
+  ## ai: self-healing fallback respects the orchestrator's token budget
+
+  `applySelfHealingFallback` calls the user-supplied `runner` (and any `fallbackRunners`) directly. With `budgetEstimateTokens` configured, the primary path reserved tokens against `maxTokenBudget` via `runAgentWithGuardrails`'s pre-flight check — but every fallback call entered the runner without that reservation. A primary failure CAUSED by budget pressure would then drive the fallback into the same overshoot the pre-flight existed to prevent.
+
+  The new `withFallbackBudgetReservation` wrapper reserves tokens against the running `inFlightReservation`, runs the fallback work, and releases the reservation in `finally`. When `budgetEstimateTokens` is undefined (default) the reservation is 0 and the wrapper is a no-op — strict back-compat for consumers that haven't adopted the new option.
+
+- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence round following the AE review of last cycle's fix batch. Closes the two HIGH issues + the four MAJOR items the review surfaced.
+
+  ## sandbox — post-acquisition signal wiring + sanitizeStack export + expanded coverage
+
+  **Post-acquisition AbortSignal wiring.** The previous release plumbed `signal` only through the `acquireSlot` queue wait. After the slot acquired, the signal was dropped — a client that disconnected mid-execution still tied up the slot for the full `timeoutMs` (up to 10 s). Now the signal also fires `worker.terminate()` on the running worker so the slot frees immediately. The docstring's "released immediately on disconnect" contract is now accurate end-to-end.
+
+  **`sanitizeStack` is now a public export.** Consumers building custom error-routing (Sentry integrations, audit-log middleware) previously couldn't strip host filesystem paths from `SandboxResult.errors[]` before logging. The function is now exported from `@directive-run/sandbox` directly:
+
+  ```ts
+  import { sanitizeStack } from "@directive-run/sandbox";
+  logger.error(sanitizeStack(result.errors.join("\n")));
+  ```
+
+  **Extended path coverage.** The sanitizer now strips `/app/` (Heroku/Render/Docker), `/srv/` (Linux deploy), `/workspace/` (Codespaces/GitHub Actions), `/data/` (volume mounts), `/etc/` (configs), and `/root/` (root home) on top of the POSIX + Windows + UNC patterns. 7 new regression tests.
+
+  **`@example` block** added to `setMaxConcurrentWorkers`.
+
+  ## core — `SourceDropReason` adoption completion
+
+  Two inline copies of the drop-reason union survived the previous round:
+
+  - `SystemInspection.sources[i].lastDropReason` (`types/system.ts`)
+  - `SourceDispatchResult.reason` (`core/sources.ts`)
+
+  Both now reference `SourceDropReason`. The four surfaces that report drops (inspect row, plugin hook, plugin manager emit, observation event) are finally unified — a new reason added to the shared type now propagates everywhere at compile time.
+
+  ## lit — deprecated aliases as function wrappers
+
+  `export const createModule = createModuleController` and `export const useHistory = getHistory` swallowed the `@deprecated` JSDoc strikethrough in older VS Code, Vim+coc, and JetBrains < 2024.1. Both aliases are now thin function wrappers so the deprecation marker renders in every TS-aware editor.
+
+  ## mcp — full JSDoc on `setMaxConcurrentLintWorkers`
+
+  The MCP cap setter's JSDoc was a 3-line summary; the sandbox sister had the full WHY (per-worker heap cost, multi-client burst scenario, `Infinity` to disable). Brought them to parity with an `@example` block.
+
 ## 1.20.2
 
 ### Patch Changes
@@ -214,7 +305,7 @@
   guard; the existing array tests still pass.
 
   **`liveContext.onContextUpdate` call order matched to JSDoc**
- . The JSDoc declared `onContextUpdate` "fires AFTER the
+  . The JSDoc declared `onContextUpdate` "fires AFTER the
   `interruptWhen` predicate runs but BEFORE the chunk emits" — the
   impl called `onContextUpdate` FIRST. The instrumentation hook
   couldn't observe interruption decisions, defeating the documented
@@ -225,7 +316,7 @@
   skip every downstream listener in the notify cycle).
 
   **`LiveContextOptions.mode` restored as `@deprecated` for source-compat**
- . v1.18.0 shipped to npm with `mode: "inject-system-message"
+  . v1.18.0 shipped to npm with `mode: "inject-system-message"
 | "restart"` on the public `LiveContextOptions` interface. v1.19.0
   removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
   shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0

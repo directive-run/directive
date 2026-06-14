@@ -1,5 +1,60 @@
 # @directive-run/sandbox
 
+## 0.4.0
+
+### Minor Changes
+
+- [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Per-process worker cap, AbortSignal plumbing, DNS-rebinding narrowing, and host-path leak coverage.
+
+  **New: `setMaxConcurrentWorkers(n)`.** Caps the per-process worker pool. Each worker reserves ~32 MB of heap + a thread; without a cap, a burst from many distinct IPs (each within any per-IP rate limit) can each spawn their own worker and OOM the host. Calls beyond the cap queue FIFO. Defaults to `navigator.hardwareConcurrency` (falls back to 4). Pass `Infinity` to disable.
+
+  **New: `signal` on `RunInSandboxInput`.** Pipe your HTTP request's `AbortSignal` (Next.js, Express, etc. all expose one) through to `runInSandbox`. A client that disconnects mid-flight releases its worker slot immediately. Without this, abandoned callers leak phantom waiters into the queue and the pool eventually deadlocks at saturation.
+
+  **DNS-rebinding narrowing.** `checkResolvedAddresses` now pre-resolves the hostname via `dns.lookup({ all: true })` and rejects when any returned address lands in a private range. The bare hostname check missed this entirely. The TOCTOU is narrowed (Node's fetch resolves a second time at socket-connect; an attacker with a 0-TTL record can still rotate between checks) — full closure requires an `undici.Agent` with a custom `connect.lookup` and is tracked as a follow-on.
+
+  **Host-filesystem-path sanitization.** Worker error reports now strip POSIX (`/Users/<name>/`, `/home/<name>/`, `/private/var/`, `/var/task/`, `/tmp/`, `/opt/`, `/usr/local/`) AND Windows + UNC (`C:\Users\<name>\`, `D:\a\_work\…`, `\\server\share\…`) paths before crossing the worker→host→client boundary. Without this, every sandboxed exception leaks the host environment's filesystem layout — fingerprintable by any sandbox client.
+
+  **`/api/sandbox` consumers**: add `signal: request.signal` to your `runInSandbox(...)` call and `setMaxConcurrentWorkers(N)` at module-init to pick up the slot-leak defence end-to-end.
+
+- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence round following the AE review of last cycle's fix batch. Closes the two HIGH issues + the four MAJOR items the review surfaced.
+
+  ## sandbox — post-acquisition signal wiring + sanitizeStack export + expanded coverage
+
+  **Post-acquisition AbortSignal wiring.** The previous release plumbed `signal` only through the `acquireSlot` queue wait. After the slot acquired, the signal was dropped — a client that disconnected mid-execution still tied up the slot for the full `timeoutMs` (up to 10 s). Now the signal also fires `worker.terminate()` on the running worker so the slot frees immediately. The docstring's "released immediately on disconnect" contract is now accurate end-to-end.
+
+  **`sanitizeStack` is now a public export.** Consumers building custom error-routing (Sentry integrations, audit-log middleware) previously couldn't strip host filesystem paths from `SandboxResult.errors[]` before logging. The function is now exported from `@directive-run/sandbox` directly:
+
+  ```ts
+  import { sanitizeStack } from "@directive-run/sandbox";
+  logger.error(sanitizeStack(result.errors.join("\n")));
+  ```
+
+  **Extended path coverage.** The sanitizer now strips `/app/` (Heroku/Render/Docker), `/srv/` (Linux deploy), `/workspace/` (Codespaces/GitHub Actions), `/data/` (volume mounts), `/etc/` (configs), and `/root/` (root home) on top of the POSIX + Windows + UNC patterns. 7 new regression tests.
+
+  **`@example` block** added to `setMaxConcurrentWorkers`.
+
+  ## core — `SourceDropReason` adoption completion
+
+  Two inline copies of the drop-reason union survived the previous round:
+
+  - `SystemInspection.sources[i].lastDropReason` (`types/system.ts`)
+  - `SourceDispatchResult.reason` (`core/sources.ts`)
+
+  Both now reference `SourceDropReason`. The four surfaces that report drops (inspect row, plugin hook, plugin manager emit, observation event) are finally unified — a new reason added to the shared type now propagates everywhere at compile time.
+
+  ## lit — deprecated aliases as function wrappers
+
+  `export const createModule = createModuleController` and `export const useHistory = getHistory` swallowed the `@deprecated` JSDoc strikethrough in older VS Code, Vim+coc, and JetBrains < 2024.1. Both aliases are now thin function wrappers so the deprecation marker renders in every TS-aware editor.
+
+  ## mcp — full JSDoc on `setMaxConcurrentLintWorkers`
+
+  The MCP cap setter's JSDoc was a 3-line summary; the sandbox sister had the full WHY (per-worker heap cost, multi-client burst scenario, `Infinity` to disable). Brought them to parity with an `@example` block.
+
+### Patch Changes
+
+- Updated dependencies [[`3b4d36b`](https://github.com/directive-run/directive/commit/3b4d36b032289eccd426d65a9e2f0439521fcab8), [`dab3537`](https://github.com/directive-run/directive/commit/dab35376019c715066d5127b4ffce7d10729b9f4), [`0c2d306`](https://github.com/directive-run/directive/commit/0c2d30637d854098286980309a00f2152c9997d4), [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c)]:
+  - @directive-run/core@1.21.0
+
 ## 0.3.13
 
 ### Patch Changes
