@@ -291,6 +291,25 @@ export interface SourceDef {
    * 0009 documents the full DO-eviction recipe.
    */
   onEvict?: () => void | Promise<void>;
+
+  /**
+   * Per-source lifecycle timeout in milliseconds. Caps how long the
+   * manager waits for THIS source's `unsubscribe()` or `onEvict()`
+   * during teardown / eviction before declaring it hung and moving on.
+   *
+   * Defaults to 5000ms — comfortable for healthy transports, short
+   * enough for ops to recognize a hang. Override per source for
+   * legitimate long-tail teardowns:
+   *
+   * - Supabase channel that flushes a backlog before closing → 15000
+   * - OpenTelemetry batch span exporter draining a queue → 10000
+   * - Cloudflare DO storage flush awaiting D1 commit → 8000
+   *
+   * Sources that timeout still have their underlying work continue in
+   * the background — the manager just unblocks the rest of teardown.
+   * Setting this to `Infinity` disables the cap for this source only.
+   */
+  evictTimeoutMs?: number;
 }
 
 /**

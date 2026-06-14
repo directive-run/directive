@@ -105,8 +105,21 @@ interface SourceCounters {
  * comfortable for healthy transports and short enough for ops to
  * recognize a hang.
  */
-const DEFAULT_PER_SOURCE_TIMEOUT_MS = 5_000;
-const perSourceTimeoutMs = DEFAULT_PER_SOURCE_TIMEOUT_MS;
+export const DEFAULT_PER_SOURCE_TIMEOUT_MS = 5_000;
+
+/**
+ * Resolve the per-source teardown timeout for a single source. Accepts
+ * the source's `evictTimeoutMs` override (which can be `Infinity` to
+ * disable) and falls back to the package-wide default.
+ */
+function resolveSourceTimeout(override: number | undefined): number {
+  if (override === undefined) return DEFAULT_PER_SOURCE_TIMEOUT_MS;
+  if (override === Number.POSITIVE_INFINITY) return override;
+  if (!Number.isFinite(override) || override <= 0) {
+    return DEFAULT_PER_SOURCE_TIMEOUT_MS;
+  }
+  return Math.floor(override);
+}
 
 /**
  * Race a Promise against a wall-clock timeout. On timeout, fires
@@ -121,6 +134,12 @@ async function raceWithTimeout<T>(
   timeoutMs: number,
   onTimeout: () => void,
 ): Promise<T | undefined> {
+  // `Infinity` disables the cap — skip the timer wiring entirely so
+  // Node's setTimeout doesn't emit a TimeoutOverflowWarning (its
+  // delay argument is a 32-bit int that can't represent Infinity).
+  if (timeoutMs === Number.POSITIVE_INFINITY) {
+    return await work;
+  }
   let timeoutFired = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const timeoutPromise = new Promise<undefined>((resolve) => {
@@ -717,12 +736,12 @@ export function createSourcesManager(
       phase = "stopped";
       // Reverse-order teardown so resources release in LIFO order.
       // Each unsubscribe is wrapped in a per-source timeout
-      // (`perSourceTimeoutMs`, default 5_000ms) so one hanging
+      // (`SourceDef.evictTimeoutMs` if supplied, else
+      // `DEFAULT_PER_SOURCE_TIMEOUT_MS` = 5_000ms) so one hanging
       // transport — Supabase channel.unsubscribe() stuck on a
       // broker that never acks, Cloudflare DO storage flush that
       // wedges — cannot block the rest of teardown indefinitely.
       // The hang surfaces as a `reportError` and teardown continues.
-      const timeoutMs = perSourceTimeoutMs;
       for (let i = attached.length - 1; i >= 0; i--) {
         const record = attached[i];
         if (!record || record.detached) continue;
@@ -731,6 +750,8 @@ export function createSourcesManager(
         const c = counters.get(record.id) ?? emptyCounters();
         c.detachedAt = Date.now();
         counters.set(record.id, c);
+        const def = definitions.get(record.id)?.def;
+        const timeoutMs = resolveSourceTimeout(def?.evictTimeoutMs);
         try {
           await raceWithTimeout(
             Promise.resolve(record.unsubscribe()),
@@ -763,15 +784,16 @@ export function createSourcesManager(
       // Eviction runs in registration order so sources with downstream
       // dependencies close in the right order (the dual of unsubscribe's
       // reverse-registration order — same rationale as start vs. stop).
-      // Each onEvict is wrapped in a per-source timeout so a slow
-      // `onEvict` (e.g., audit-log flush hanging on a saturated sink)
-      // doesn't consume the engine's evict deadline at the expense of
+      // Each onEvict is wrapped in a per-source timeout
+      // (`SourceDef.evictTimeoutMs` if supplied) so a slow `onEvict`
+      // (e.g., audit-log flush hanging on a saturated sink) doesn't
+      // consume the engine's evict deadline at the expense of
       // downstream sources. Failures isolate via try/catch + timeout.
-      const timeoutMs = perSourceTimeoutMs;
       for (const record of attached) {
         if (record.detached) continue;
         const def = definitions.get(record.id)?.def;
         if (!def?.onEvict) continue;
+        const timeoutMs = resolveSourceTimeout(def.evictTimeoutMs);
         try {
           await raceWithTimeout(
             Promise.resolve(def.onEvict()),

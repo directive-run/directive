@@ -117,6 +117,7 @@ export {
 export {
   createFactPIIGuardrail,
   type FactPIIGuardrailMode,
+  type FactPIIErrorMode,
   type FactPIIGuardrailOptions,
   type FactPIICategory,
   type FactPIIMatch,

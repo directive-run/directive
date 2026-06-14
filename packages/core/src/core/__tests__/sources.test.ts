@@ -1835,4 +1835,101 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(lastEvicted).toBe(true);
     consoleErrorSpy.mockRestore();
   });
+
+  // `SourceDef.evictTimeoutMs` — per-source override of the default
+  // 5_000ms teardown cap. Lets long-tail transports (Supabase channel
+  // draining a backlog before close, OpenTelemetry batch exporter
+  // flushing a queue, CF DO storage flush awaiting D1 commit) raise
+  // their own ceiling without nudging unrelated sources.
+  it("evictTimeoutMs override wins over the package default for cleanupAllAsync", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    const manager = createSourcesManager(
+      {
+        slow: {
+          // Custom timeout of 12s. Without the override, the default
+          // 5s cap would fire first; with the override, the test
+          // advances time to 7s and the hang has NOT yet timed out.
+          evictTimeoutMs: 12_000,
+          attach: () => () => new Promise<void>(() => undefined),
+        },
+      },
+      { slow: "mod" },
+      { onError },
+    );
+
+    manager.attachAll(() => ({ accepted: true }));
+
+    vi.useFakeTimers();
+    const cleanupPromise = manager.cleanupAllAsync();
+    // Tick PAST the default 5s but BEFORE the per-source 12s override.
+    await vi.advanceTimersByTimeAsync(7_000);
+    // No timeout error yet — override is in effect.
+    expect(onError).not.toHaveBeenCalled();
+    // Tick past the override.
+    await vi.advanceTimersByTimeAsync(6_000);
+    await cleanupPromise;
+    vi.useRealTimers();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const errCall = onError.mock.calls[0];
+    expect(errCall?.[0]).toBe("slow");
+    expect((errCall?.[3] as Error)?.message ?? "").toContain("12000ms");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("evictTimeoutMs override wins over the package default for evictAll", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const onError = vi.fn();
+    const manager = createSourcesManager(
+      {
+        slow: {
+          evictTimeoutMs: 12_000,
+          attach: () => () => undefined,
+          onEvict: () => new Promise<void>(() => undefined),
+        },
+      },
+      { slow: "mod" },
+      { onError },
+    );
+
+    manager.attachAll(() => ({ accepted: true }));
+
+    vi.useFakeTimers();
+    const evictPromise = manager.evictAll();
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(onError).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(6_000);
+    await evictPromise;
+    vi.useRealTimers();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0]?.[3] as Error)?.message ?? "").toContain(
+      "12000ms",
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("evictTimeoutMs: Infinity disables the cap for that source only", async () => {
+    const onError = vi.fn();
+    const manager = createSourcesManager(
+      {
+        unbounded: {
+          evictTimeoutMs: Number.POSITIVE_INFINITY,
+          attach: () => () => undefined,
+          onEvict: () => Promise.resolve(),
+        },
+      },
+      { unbounded: "mod" },
+      { onError },
+    );
+    manager.attachAll(() => ({ accepted: true }));
+    // Completes normally — no timeout fires; the resolved onEvict wins.
+    await manager.evictAll();
+    expect(onError).not.toHaveBeenCalled();
+  });
 });
