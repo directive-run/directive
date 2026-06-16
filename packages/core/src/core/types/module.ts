@@ -206,12 +206,13 @@ export interface TypedConstraintDef<M extends ModuleSchema> {
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
-   * these facts land only if they still hold the snapshot value taken at
-   * resolver dispatch; otherwise the write is dropped and the resolver
-   * aborted. Omit for no binding (default). Ignored on async constraints.
+   * Fact keys this resolver aborts on when they change mid-flight. The
+   * engine snapshots their values at resolver dispatch; if any of them
+   * changes before the resolver writes, the resolver's writes are
+   * dropped and the resolver aborted. Omit for no binding (default).
+   * Ignored on async constraints.
    */
-  owns?: readonly string[];
+  abortOn?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.
@@ -275,12 +276,13 @@ export interface CrossModuleConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
-   * these facts land only if they still hold the snapshot value taken at
-   * resolver dispatch; otherwise the write is dropped and the resolver
-   * aborted. Omit for no binding (default). Ignored on async constraints.
+   * Fact keys this resolver aborts on when they change mid-flight. The
+   * engine snapshots their values at resolver dispatch; if any of them
+   * changes before the resolver writes, the resolver's writes are
+   * dropped and the resolver aborted. Omit for no binding (default).
+   * Ignored on async constraints.
    */
-  owns?: readonly string[];
+  abortOn?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.

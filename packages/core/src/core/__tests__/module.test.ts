@@ -424,13 +424,13 @@ describe("createModule — pivot-name conflict", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createModule — reserved `owns` keys (R4 FIX 6)
+// createModule — reserved `abortOn` keys (R4 FIX 6)
 // ---------------------------------------------------------------------------
 
-describe("createModule — reserved owns keys", () => {
-  it("throws when a constraint owns '__proto__'", () => {
+describe("createModule — reserved abortOn keys", () => {
+  it("throws when a constraint aborts on '__proto__'", () => {
     expect(() =>
-      createModule("owns-proto", {
+      createModule("abortOn-proto", {
         schema: {
           facts: { count: { _type: 0 } },
           derivations: {},
@@ -438,20 +438,20 @@ describe("createModule — reserved owns keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
-            owns: ["__proto__"],
+            abortOn: ["__proto__"],
           } as any,
         },
       }),
-    ).toThrow(/owns key '__proto__' is reserved/);
+    ).toThrow(/abortOn key '__proto__' is reserved/);
   });
 
-  it("throws when a constraint owns 'constructor'", () => {
+  it("throws when a constraint aborts on 'constructor'", () => {
     expect(() =>
-      createModule("owns-ctor", {
+      createModule("abortOn-ctor", {
         schema: {
           facts: { count: { _type: 0 } },
           derivations: {},
@@ -459,20 +459,20 @@ describe("createModule — reserved owns keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
-            owns: ["constructor"],
+            abortOn: ["constructor"],
           } as any,
         },
       }),
-    ).toThrow(/owns key 'constructor' is reserved/);
+    ).toThrow(/abortOn key 'constructor' is reserved/);
   });
 
-  it("throws when a constraint owns a $-prefixed key", () => {
+  it("throws when a constraint aborts on a $-prefixed key", () => {
     expect(() =>
-      createModule("owns-dollar", {
+      createModule("abortOn-dollar", {
         schema: {
           facts: { count: { _type: 0 } },
           derivations: {},
@@ -480,15 +480,15 @@ describe("createModule — reserved owns keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
-            owns: ["$store"],
+            abortOn: ["$store"],
           } as any,
         },
       }),
-    ).toThrow(/owns key '\$store' is reserved/);
+    ).toThrow(/abortOn key '\$store' is reserved/);
   });
 
   it("names the offending module and constraint in the error", () => {
@@ -501,20 +501,20 @@ describe("createModule — reserved owns keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved owns key
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           chargeCard: {
             when: () => true,
             require: { type: "X" },
-            owns: ["prototype"],
+            abortOn: ["prototype"],
           } as any,
         },
       }),
     ).toThrow(/module 'billing' constraint 'chargeCard'/);
   });
 
-  it("does NOT throw for an ordinary fact key in owns", () => {
+  it("does NOT throw for an ordinary fact key in abortOn", () => {
     expect(() =>
-      createModule("owns-ok", {
+      createModule("abortOn-ok", {
         schema: {
           facts: { count: { _type: 0 } },
           derivations: {},
@@ -522,11 +522,11 @@ describe("createModule — reserved owns keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing owns key
+          // biome-ignore lint/suspicious/noExplicitAny: testing abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
-            owns: ["count"],
+            abortOn: ["count"],
           } as any,
         },
       }),

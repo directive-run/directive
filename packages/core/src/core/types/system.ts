@@ -295,16 +295,17 @@ export interface SystemInspection {
      */
     whenSpec?: FactPredicate<Record<string, unknown>>;
     /**
-     * Owned-fact list for RFC-0003 binding. Populated from the
-     * constraint definition's `owns:` field. Exposed for `doctor.checkOwns()`
-     * so it can flag candidates that would race or shadow these writes.
-     * Absent when the constraint declares no `owns`.
+     * Abort-binding fact list for RFC-0003 constraint binding. Populated
+     * from the constraint definition's `abortOn:` field. Exposed for
+     * `doctor.checkAbortOn()` so it can flag candidates that would race
+     * or shadow these writes. Absent when the constraint declares no
+     * `abortOn`.
      */
-    readonly owns?: readonly string[];
+    readonly abortOn?: readonly string[];
     /**
      * Fact paths the constraint `bind:`s to. v2 promise — the runtime
      * does not yet emit a `bind` field on inspect snapshots, but the
-     * type slot is reserved so `doctor.checkOwns()` is stable across
+     * type slot is reserved so `doctor.checkAbortOn()` is stable across
      * the rollout. (F1)
      */
     readonly bind?: readonly string[];

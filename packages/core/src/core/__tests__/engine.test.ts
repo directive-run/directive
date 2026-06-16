@@ -1630,7 +1630,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "EXECUTE_ACTION" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -1671,7 +1671,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     system.destroy();
   });
 
-  it("no `owns` (default) preserves the clobber behavior", async () => {
+  it("no `abortOn` (default) preserves the clobber behavior", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -1703,7 +1703,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "EXECUTE_ACTION" },
-          // no `owns` — binding off by default
+          // no `abortOn` — binding off by default
         },
       },
       resolvers: {
@@ -1769,7 +1769,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "CLAIM_WIN" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -1839,7 +1839,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         work: {
           when: (f) => f.status === "working",
           require: { type: "WORK" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -1907,7 +1907,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         work: {
           when: (f) => f.status === "working",
           require: { type: "WORK" },
-          // no `owns` — default cancellation behavior
+          // no `abortOn` — default cancellation behavior
         },
       },
       resolvers: {
@@ -1965,7 +1965,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
         work: {
           when: (f) => f.status === "working",
           require: { type: "WORK" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -2001,7 +2001,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     system.destroy();
   });
 
-  it("`owns` on an async constraint is ignored — the clobber lands", async () => {
+  it("`abortOn` on an async constraint is ignored — the clobber lands", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -2031,7 +2031,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
           deps: ["status"],
           when: async (f) => f.status === "mutating",
           require: { type: "EXECUTE_ACTION" },
-          owns: ["status"], // ignored — async constraint
+          abortOn: ["status"], // ignored on async constraint
         },
       },
       resolvers: {
@@ -2057,8 +2057,8 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     await flush();
     await flush();
 
-    // `owns` is ignored on async constraints — the resolver's tail write is
-    // not clobber-checked, so it lands (same as `owns` absent).
+    // `abortOn` is ignored on async constraints — the resolver's tail write
+    // is not clobber-checked, so it lands (same as `abortOn` absent).
     expect(system.facts.status).toBe("playing");
 
     system.destroy();

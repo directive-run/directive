@@ -838,11 +838,11 @@ describe("namespaced event handler + patch — dev warn", () => {
 });
 
 // ============================================================================
-// RFC-0003 clobber detection — namespaced `owns`
+// RFC-0003 clobber detection — namespaced `abortOn`
 // ============================================================================
 
-describe("namespaced constraint owns — clobber detection", () => {
-  it("prefixes owns keys so clobber detection fires in a multi-module system", async () => {
+describe("namespaced constraint abortOn — clobber detection", () => {
+  it("prefixes abortOn keys so clobber detection fires in a multi-module system", async () => {
     let releaseA!: () => void;
     const blockerA = new Promise<void>((r) => {
       releaseA = r;
@@ -870,7 +870,7 @@ describe("namespaced constraint owns — clobber detection", () => {
         tick: {
           when: (f) => f.status === "ticking",
           require: { type: "TICK" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -878,8 +878,8 @@ describe("namespaced constraint owns — clobber detection", () => {
           requirement: "TICK",
           resolve: async (_req, ctx) => {
             await blockerA;
-            // Owned write — should be dropped because `clobberIt` mutated
-            // `counter::status` while the resolver was awaiting.
+            // Abort-bound write — should be dropped because `clobberIt`
+            // mutated `counter::status` while the resolver was awaiting.
             ctx.facts.status = "resolved";
           },
         },
@@ -907,7 +907,7 @@ describe("namespaced constraint owns — clobber detection", () => {
 
     system.events.counter.go();
     await flush();
-    // External mutation of the owned fact while the resolver is blocked.
+    // External mutation of the abort-bound fact while the resolver is blocked.
     system.events.counter.clobberIt();
     await flush();
     releaseA();
@@ -928,14 +928,14 @@ describe("namespaced constraint owns — clobber detection", () => {
     // The clobbered fact name is namespace-prefixed.
     expect(clob.fact).toBe("counter::status");
     expect(clob.actual).toBe("external");
-    // The dropped owned write never landed.
+    // The dropped abort-bound write never landed.
     expect(system.facts.counter.status).toBe("external");
 
     unsub();
     system.destroy();
   });
 
-  it("each module's owns is scoped to its own namespace", async () => {
+  it("each module's abortOn is scoped to its own namespace", async () => {
     let releaseOne!: () => void;
     const blockerOne = new Promise<void>((r) => {
       releaseOne = r;
@@ -966,7 +966,7 @@ describe("namespaced constraint owns — clobber detection", () => {
           act: {
             when: (f) => f.value === "working",
             require: { type: reqType },
-            owns: ["value"],
+            abortOn: ["value"],
           },
         },
         resolvers: {

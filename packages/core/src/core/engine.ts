@@ -657,16 +657,16 @@ export function createEngine<S extends Schema>(
 
   /**
    * RFC-0003 resolver constraint-binding lookup. Returns the constraint's
-   * owned-fact list, or `undefined` when the constraint has no `owns` field,
-   * an empty list, or is async — async constraints `await` between
-   * predicate evaluation and resolver dispatch, which would race the
-   * binding's owned-fact snapshot, so they cannot be bound.
+   * abort-binding fact list, or `undefined` when the constraint has no
+   * `abortOn` field, an empty list, or is async — async constraints
+   * `await` between predicate evaluation and resolver dispatch, which
+   * would race the binding's snapshot, so they cannot be bound.
    */
   function getConstraintBinding(
     constraintId: string,
   ): { fields: readonly string[] } | undefined {
     const def = mergedConstraints[constraintId];
-    if (!def?.owns || def.owns.length === 0) return undefined;
+    if (!def?.abortOn || def.abortOn.length === 0) return undefined;
     const state = constraintsManager.getState(constraintId);
     if (state?.isAsync || def.async) {
       if (isDevelopment) {
@@ -674,20 +674,20 @@ export function createEngine<S extends Schema>(
         // when() returned a Promise) the user almost certainly didn't realize.
         // Call that out explicitly — the workaround is a data-form when (always
         // sync) or an explicit `async: true` opt-in that accepts the loss of
-        // owns.
+        // abortOn.
         if (state?.isAsync && !def.async) {
           console.warn(
-            `[Directive] constraint '${constraintId}': owns binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
+            `[Directive] constraint '${constraintId}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
           );
         } else {
           console.warn(
-            `[Directive] Constraint "${constraintId}" has \`owns\` but is async. Binding is disabled — async constraints cannot be bound.`,
+            `[Directive] Constraint "${constraintId}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound.`,
           );
         }
       }
       return undefined;
     }
-    return { fields: def.owns };
+    return { fields: def.abortOn };
   }
 
   /**
@@ -2095,11 +2095,12 @@ export function createEngine<S extends Schema>(
         })),
         constraints: constraintsManager.getAllStates().map((s) => {
           const whenSpec = constraintsManager.getWhenSpec(s.id);
-          // (F1) Surface `owns:` from the merged constraint def so
-          // `doctor.checkOwns()` can flag candidates that would race
+          // (F1) Surface `abortOn:` from the merged constraint def so
+          // `doctor.checkAbortOn()` can flag candidates that would race
           // or shadow these writes. `bind` slot reserved for v2.
           const def = mergedConstraints[s.id];
-          const owns = def?.owns && def.owns.length > 0 ? def.owns : undefined;
+          const abortOn =
+            def?.abortOn && def.abortOn.length > 0 ? def.abortOn : undefined;
 
           return {
             id: s.id,
@@ -2110,7 +2111,7 @@ export function createEngine<S extends Schema>(
             lastActiveAt: s.lastActiveAt,
             meta: def?.meta,
             ...(whenSpec ? { whenSpec } : {}),
-            ...(owns ? { owns } : {}),
+            ...(abortOn ? { abortOn } : {}),
           };
         }),
         resolvers: Object.fromEntries(

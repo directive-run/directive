@@ -212,17 +212,17 @@ interface BatchState {
  * Per-constraint binding info, used by RFC-1 (resolver constraint-binding).
  *
  * The engine wires this lookup into the resolvers manager so that a resolver
- * dispatched from a constraint with an `owns` field knows which facts it
- * *owns* — writes to those are clobber-checked (see {@link createBoundFacts}).
+ * dispatched from a constraint with an `abortOn` field knows which facts it
+ * compare-and-swaps on dispatch (see {@link createBoundFacts}).
  *
  * Returns `undefined`/`null` when the source constraint is unknown or has no
- * `owns` field — in which case binding is a no-op and the resolver behaves
- * exactly as before.
+ * `abortOn` field — in which case binding is a no-op and the resolver
+ * behaves exactly as before.
  *
  * @internal
  */
 export interface ConstraintBindingInfo {
-  /** Fact keys the triggering resolver owns; writes to these are clobber-checked. */
+  /** Fact keys this resolver aborts on when changed mid-flight; writes to these are clobber-checked. */
   readonly fields: readonly string[];
 }
 
@@ -242,8 +242,8 @@ export interface CreateResolversOptions<S extends Schema> {
    * Look up binding info for a source constraint id (RFC-1).
    *
    * Wired by the engine — given the `fromConstraint` of a `RequirementWithId`,
-   * returns the constraint's owned fact keys. Return `undefined` if the
-   * constraint is unknown or has no `owns` field.
+   * returns the constraint's abort-binding fact keys. Return `undefined` if
+   * the constraint is unknown or has no `abortOn` field.
    */
   getConstraintBinding?: (
     constraintId: string,
@@ -661,7 +661,7 @@ export function createResolversManager<S extends Schema>(
    * Returns `null` when binding does not apply:
    * - No `getConstraintBinding` wired (e.g. tests calling the manager directly).
    * - The requirement has no `fromConstraint` (out-of-band dispatch / callOne).
-   * - The constraint has no `owns` field (default) or an empty list.
+   * - The constraint has no `abortOn` field (default) or an empty list.
    *
    * @internal
    */

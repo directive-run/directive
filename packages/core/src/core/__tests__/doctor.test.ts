@@ -136,18 +136,18 @@ describe("doctor.checkAgainst — reason quality", () => {
 });
 
 // ============================================================================
-// M4 — doctor.checkOwns (owns:/bind: awareness)
+// M4 — doctor.checkAbortOn (abortOn:/bind: awareness)
 // ============================================================================
 
-describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
-  it("flags a candidate path that matches a constraint's owns: (M5: in warnings)", () => {
-    const result = doctor.checkOwns(
+describe("doctor.checkAbortOn (M4) — abortOn/bind awareness", () => {
+  it("flags a candidate path that matches a constraint's abortOn: (M5: in warnings)", () => {
+    const result = doctor.checkAbortOn(
       { cartTotal: { $gte: 100 }, region: { $eq: "US" } },
       [
         {
           id: "applyDiscount",
           whenSpec: { cartTotal: { $gte: 50 } },
-          owns: ["cartTotal"],
+          abortOn: ["cartTotal"],
         },
       ],
     );
@@ -155,14 +155,14 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
     const f = result.warnings[0]!;
     expect(f.constraintId).toBe("applyDiscount");
     expect(f.candidatePath).toBe("cartTotal");
-    expect(f.source).toBe("owns");
+    expect(f.source).toBe("abortOn");
     expect(f.severity).toBe("warning");
     expect(f.reason).toContain("applyDiscount");
     expect(f.reason).toContain("cartTotal");
   });
 
   it("flags a candidate path that matches a constraint's bind: (M5: in warnings)", () => {
-    const result = doctor.checkOwns({ phase: { $eq: "red" } }, [
+    const result = doctor.checkAbortOn({ phase: { $eq: "red" } }, [
       { id: "lock", bind: ["phase"] },
     ]);
     expect(result.warnings).toHaveLength(1);
@@ -170,23 +170,23 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
     expect(result.warnings[0]?.severity).toBe("warning");
   });
 
-  it("no findings when constraints expose no owns:/bind: metadata", () => {
-    const result = doctor.checkOwns({ cartTotal: { $gte: 100 } }, [
+  it("no findings when constraints expose no abortOn:/bind: metadata", () => {
+    const result = doctor.checkAbortOn({ cartTotal: { $gte: 100 } }, [
       { id: "noMeta", whenSpec: { cartTotal: { $lt: 50 } } },
     ]);
     expect(result.warnings).toEqual([]);
   });
 
-  it("no findings when candidate paths are disjoint from owners", () => {
-    const result = doctor.checkOwns({ region: { $eq: "US" } }, [
-      { id: "x", owns: ["cartTotal"] },
+  it("no findings when candidate paths are disjoint from abort-bindings", () => {
+    const result = doctor.checkAbortOn({ region: { $eq: "US" } }, [
+      { id: "x", abortOn: ["cartTotal"] },
     ]);
     expect(result.warnings).toEqual([]);
   });
 
-  it("F-3: CheckOwnsResult shape is { warnings } only — no contradictions field", () => {
-    const result = doctor.checkOwns({ cartTotal: { $gte: 100 } }, [
-      { id: "owner", owns: ["cartTotal"] },
+  it("F-3: CheckAbortOnResult shape is { warnings } only — no contradictions field", () => {
+    const result = doctor.checkAbortOn({ cartTotal: { $gte: 100 } }, [
+      { id: "owner", abortOn: ["cartTotal"] },
     ]);
     expect(Object.keys(result).sort()).toEqual(["warnings"]);
     expect(
@@ -195,19 +195,19 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
   });
 
   it("accepts the inspect()-style { constraints: [...] } wrapper", () => {
-    const result = doctor.checkOwns(
+    const result = doctor.checkAbortOn(
       { cartTotal: { $gte: 100 } },
-      { constraints: [{ id: "owner", owns: ["cartTotal"] }] },
+      { constraints: [{ id: "owner", abortOn: ["cartTotal"] }] },
     );
     expect(result.warnings).toHaveLength(1);
   });
 
   // ============================================================================
-  // F1 — owns: surfaces through real system.inspect()
+  // F1 — abortOn: surfaces through real system.inspect()
   // ============================================================================
 
-  it("F1: real system.inspect().constraints[].owns is populated and doctor flags it", () => {
-    const mod = createModule("ownsmod", {
+  it("F1: real system.inspect().constraints[].abortOn is populated and doctor flags it", () => {
+    const mod = createModule("abortonmod", {
       schema: {
         facts: {
           foo: t.number(),
@@ -225,7 +225,7 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
         x: {
           when: { bar: { $gte: 5 } },
           require: { type: "SET_FOO" },
-          owns: ["foo"],
+          abortOn: ["foo"],
         },
       },
       resolvers: {
@@ -241,13 +241,13 @@ describe("doctor.checkOwns (M4) — owns/bind awareness", () => {
     system.start();
     try {
       const inspection = system.inspect();
-      expect(inspection.constraints[0]?.owns).toEqual(["foo"]);
+      expect(inspection.constraints[0]?.abortOn).toEqual(["foo"]);
 
-      const result = doctor.checkOwns({ foo: { $gte: 1 } }, inspection);
+      const result = doctor.checkAbortOn({ foo: { $gte: 1 } }, inspection);
       expect(result.warnings).toHaveLength(1);
       expect(result.warnings[0]?.constraintId).toBe("x");
       expect(result.warnings[0]?.candidatePath).toBe("foo");
-      expect(result.warnings[0]?.source).toBe("owns");
+      expect(result.warnings[0]?.source).toBe("abortOn");
     } finally {
       system.destroy();
     }

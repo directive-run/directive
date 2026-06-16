@@ -27,9 +27,10 @@
  * defensible.
  *
  * **v1 scope LIMITATION (M4):** `checkAgainst` operates on predicate
- * logic only. It does NOT consult `bind:` / `owns:` resolver metadata —
- * a candidate that would *write* to a fact owned by another constraint
- * will not be flagged here. Use `doctor.checkOwns()` for that gate.
+ * logic only. It does NOT consult `bind:` / `abortOn:` resolver
+ * metadata — a candidate that would *write* to a fact in another
+ * constraint's abort-binding will not be flagged here. Use
+ * `doctor.checkAbortOn()` for that gate.
  *
  * **INVARIANT (M11):** `checkAgainst` depends on `flattenPredicate`
  * emitting `{ path, op, value }` LeafClause shape — if that shape ever
@@ -82,31 +83,32 @@ export interface ExistingConstraint {
   readonly id: string;
   readonly whenSpec?: unknown;
   /**
-   * Fact paths the constraint's resolver(s) write to, if exposed by the
-   * inspect API. Consulted by {@link doctor.checkOwns} to flag candidates
-   * that would write to fields owned elsewhere. Optional — older inspect
-   * payloads omit it.
+   * Fact paths the constraint's resolver aborts on when changed
+   * mid-flight, if exposed by the inspect API. Consulted by
+   * {@link doctor.checkAbortOn} to flag candidates that would write to
+   * fields under another constraint's abort-binding. Optional — older
+   * inspect payloads omit it.
    */
-  readonly owns?: readonly string[];
-  /** Same as {@link owns} but for the bind: side of binding metadata. */
+  readonly abortOn?: readonly string[];
+  /** Same as {@link abortOn} but for the bind: side of binding metadata. */
   readonly bind?: readonly string[];
 }
 
 /**
- * Returned by {@link doctor.checkOwns}.
+ * Returned by {@link doctor.checkAbortOn}.
  *
  * `severity` matches the {@link Contradiction} discriminator on
  * {@link CheckAgainstResult} so callers can route both shapes
- * uniformly: by default, owns-collisions are `"warning"` (the engine
- * still has a runtime gate), but a caller can promote them to
- * `"error"` for stricter pre-deploy linting. (M5)
+ * uniformly: by default, abort-binding collisions are `"warning"`
+ * (the engine still has a runtime gate), but a caller can promote them
+ * to `"error"` for stricter pre-deploy linting. (M5)
  */
-export interface CheckOwnsFinding {
+export interface CheckAbortOnFinding {
   readonly constraintId: string;
   /** The fact path on the candidate predicate that triggered the finding. */
   readonly candidatePath: string;
-  /** The owner side it would collide with: "owns" or "bind". */
-  readonly source: "owns" | "bind";
+  /** The binding side it would collide with: "abortOn" or "bind". */
+  readonly source: "abortOn" | "bind";
   readonly reason: string;
   /**
    * Severity discriminator — `"warning"` by default (the engine has
@@ -117,20 +119,21 @@ export interface CheckOwnsFinding {
 }
 
 /**
- * Result of {@link doctor.checkOwns}.
+ * Result of {@link doctor.checkAbortOn}.
  *
- * Owns-/bind- collisions are warnings, not contradictions — the engine
- * itself enforces the runtime binding gate, so a pre-deploy doctor pass
- * treats them as advisory. The {@link CheckOwnsFinding.severity}
- * discriminator anticipates v2 promotion of findings to errors. (M5, F-3)
+ * AbortOn-/bind- collisions are warnings, not contradictions — the
+ * engine itself enforces the runtime binding gate, so a pre-deploy
+ * doctor pass treats them as advisory. The
+ * {@link CheckAbortOnFinding.severity} discriminator anticipates v2
+ * promotion of findings to errors. (M5, F-3)
  */
-export interface CheckOwnsResult {
+export interface CheckAbortOnResult {
   /**
-   * Owns-/bind- collisions surfaced by {@link doctor.checkOwns}. Empty
-   * when constraints expose no `owns:` / `bind:` metadata or the
-   * candidate's fact paths don't overlap.
+   * AbortOn-/bind- collisions surfaced by {@link doctor.checkAbortOn}.
+   * Empty when constraints expose no `abortOn:` / `bind:` metadata or
+   * the candidate's fact paths don't overlap.
    */
-  readonly warnings: readonly CheckOwnsFinding[];
+  readonly warnings: readonly CheckAbortOnFinding[];
 }
 
 // ============================================================================
@@ -445,34 +448,35 @@ export const doctor = {
 
   /**
    * Flag a candidate predicate whose referenced fact paths overlap with
-   * fields *owned* (or `bind:`-bound) by an existing constraint's
-   * resolvers. A v1 stub: relies on `inspect()` exposing `owns:` / `bind:`
-   * on each constraint snapshot. When that metadata is absent, this
-   * returns `{ findings: [] }` — no false positives.
+   * fields in another constraint's `abortOn:` list (or `bind:`-bound by
+   * an existing constraint's resolvers). A v1 stub: relies on
+   * `inspect()` exposing `abortOn:` / `bind:` on each constraint
+   * snapshot. When that metadata is absent, this returns
+   * `{ findings: [] }` — no false positives.
    *
    * **TODO (v2):** wire the engine's resolver-ownership graph through
    * `system.inspect()` so this returns real findings without manual
-   * `owns:` annotations on inspect payloads.
+   * `abortOn:` annotations on inspect payloads.
    *
    * @example
    * ```ts
-   * doctor.checkOwns(
+   * doctor.checkAbortOn(
    *   { cartTotal: { $gte: 100 } },
    *   system.inspect(),
    * );
    * // → { findings: [
    * //     { constraintId: "applyDiscount", candidatePath: "cartTotal",
-   * //       source: "owns",
-   * //       reason: "Constraint applyDiscount already owns cartTotal." }
+   * //       source: "abortOn",
+   * //       reason: "Constraint applyDiscount aborts on cartTotal." }
    * //   ] }
    * ```
    */
-  checkOwns<F = Record<string, unknown>>(
+  checkAbortOn<F = Record<string, unknown>>(
     candidate: FactPredicate<F>,
     existing:
       | readonly ExistingConstraint[]
       | { constraints: readonly ExistingConstraint[] },
-  ): CheckOwnsResult {
+  ): CheckAbortOnResult {
     const constraints: readonly ExistingConstraint[] = Array.isArray(existing)
       ? existing
       : "constraints" in existing && Array.isArray(existing.constraints)
@@ -485,18 +489,18 @@ export const doctor = {
     }
     const candidatePaths = new Set(candidateLeaves.map((l) => l.path));
 
-    const warnings: CheckOwnsFinding[] = [];
+    const warnings: CheckAbortOnFinding[] = [];
     for (const c of constraints) {
       if (!isExistingConstraint(c)) continue;
-      const owns = Array.isArray(c.owns) ? c.owns : [];
+      const abortOn = Array.isArray(c.abortOn) ? c.abortOn : [];
       const bind = Array.isArray(c.bind) ? c.bind : [];
-      for (const path of owns) {
+      for (const path of abortOn) {
         if (candidatePaths.has(path)) {
           warnings.push({
             constraintId: c.id,
             candidatePath: path,
-            source: "owns",
-            reason: `Constraint "${c.id}" already owns "${path}" — candidate would race or shadow its writes.`,
+            source: "abortOn",
+            reason: `Constraint "${c.id}" aborts on "${path}" — candidate would race or shadow its writes.`,
             severity: "warning",
           });
         }
@@ -514,7 +518,7 @@ export const doctor = {
       }
     }
 
-    // (M5, F-3) Owns-collisions are warnings by default — the engine
+    // (M5, F-3) AbortOn-collisions are warnings by default — the engine
     // still enforces the runtime binding gate. v1 result shape is
     // `{ warnings }` only; the per-finding `severity` discriminator
     // anticipates v2 promotion of findings to errors without breaking

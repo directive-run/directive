@@ -121,26 +121,29 @@ export interface ConstraintDef<
   /** Timeout for async constraints (ms) */
   timeout?: number;
   /**
-   * Fact keys whose **value the resolver compare-and-swaps**. Writes to
-   * these facts land only if they still hold the snapshot value taken at
-   * resolver dispatch; otherwise the write is dropped and the resolver
-   * aborted.
+   * Fact keys this resolver **aborts on** when they change mid-flight.
+   * The engine snapshots their values at resolver dispatch; if any of
+   * them changes before the resolver writes, the resolver's writes are
+   * dropped and the resolver aborted.
    *
-   * This is value-based per-fact compare-and-swap with one-shot
-   * fact-level poisoning — not a lock, not document versioning. Writes
-   * to facts not listed always land; `when()` is not consulted. Omit for
-   * no binding (default). Ignored on async constraints.
+   * Reads aloud as "abort on changes to these facts." This is the
+   * opposite shape of a lock — the resolver yields to whoever wrote
+   * first; it does NOT prevent other writers. Value-based per-fact
+   * compare-and-swap with one-shot fact-level poisoning, not document
+   * versioning. Writes to facts not listed always land; `when()` is not
+   * consulted. Omit for no binding (default). Ignored on async
+   * constraints.
    *
    * @example
    * ```ts
    * executeAction: {
    *   when: (f) => f.status === 'mutating',
    *   require: { type: 'EXECUTE_ACTION' },
-   *   owns: ['status'], // the resolver owns `status`
+   *   abortOn: ['status'], // abort if `status` changes mid-flight
    * }
    * ```
    */
-  owns?: readonly string[];
+  abortOn?: readonly string[];
   /**
    * Constraint IDs whose resolvers must complete before this constraint is evaluated.
    * If a dependency's `when()` returns false (no requirements), this constraint proceeds.

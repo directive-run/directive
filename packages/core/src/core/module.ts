@@ -283,31 +283,31 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
 }
 
 /**
- * Reject constraint `owns` entries that name a reserved property — a
+ * Reject constraint `abortOn` entries that name a reserved property — a
  * `BLOCKED_PROPS` key (`__proto__`, `constructor`, `prototype`) or a
  * `$`-prefixed key. Such names can never be owned fact slots, so the
  * clobber-detection binding would silently no-op. A structural integrity
  * check — runs unconditionally, not just in dev.
  */
-function validateOwnsKeys<M extends ModuleSchema>(
+function validateAbortOnKeys<M extends ModuleSchema>(
   id: string,
   config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
 ): void {
   const constraints = config.constraints as
-    | Record<string, { owns?: readonly string[] }>
+    | Record<string, { abortOn?: readonly string[] }>
     | undefined;
   if (!constraints) {
     return;
   }
   for (const [cid, constraint] of Object.entries(constraints)) {
-    const owns = constraint?.owns;
-    if (!owns) {
+    const abortOn = constraint?.abortOn;
+    if (!abortOn) {
       continue;
     }
-    for (const key of owns) {
+    for (const key of abortOn) {
       if (BLOCKED_PROPS.has(key) || key.startsWith("$")) {
         throw new Error(
-          `[Directive] module '${id}' constraint '${cid}': owns key '${key}' is reserved (BLOCKED_PROPS or $-prefixed)`,
+          `[Directive] module '${id}' constraint '${cid}': abortOn key '${key}' is reserved (BLOCKED_PROPS or $-prefixed)`,
         );
       }
     }
@@ -503,9 +503,9 @@ export function createModule<const M extends ModuleSchema>(
   // convenience — run unconditionally.
   validatePivotNameConflicts(id, config);
 
-  // Reserved `owns` keys would silently disable clobber-detection — a
+  // Reserved `abortOn` keys would silently disable clobber-detection — a
   // structural integrity check, run unconditionally.
-  validateOwnsKeys(id, config);
+  validateAbortOnKeys(id, config);
 
   if (isDevelopment) {
     validateModuleConfig(id, config);

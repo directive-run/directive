@@ -1356,8 +1356,8 @@ describe("edge cases", () => {
 /**
  * Setup helper for RFC-0003 tests: a richer schema (matches the canonical
  * production fact shape from the migration that motivated the RFC) with
- * a `getConstraintBinding` lookup. Each binding entry names the facts
- * the triggering resolver owns.
+ * a `getConstraintBinding` lookup. Each binding entry names the facts the
+ * triggering resolver aborts on when changed mid-flight.
  */
 function setupBinding(
   bindings: Record<string, { fields: readonly string[] }>,
@@ -1384,7 +1384,7 @@ function setupBinding(
 }
 
 describe("constraint-binding (RFC-1)", () => {
-  it("drops an owned-fact write clobbered by an external event", async () => {
+  it("drops an abort-bound fact write clobbered by an external event", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -1398,7 +1398,7 @@ describe("constraint-binding (RFC-1)", () => {
           resolve: async (_req, ctx) => {
             await blocker;
             // An external event set status='left' during the await. The
-            // resolver's tail write to the owned fact must be dropped.
+            // resolver's tail write to the abort-bound fact must be dropped.
             ctx.facts.status = "playing";
           },
         },
@@ -1416,7 +1416,7 @@ describe("constraint-binding (RFC-1)", () => {
     expect(facts.status).toBe("left");
   });
 
-  it("`owns` absent (default) — the tail clobber lands", async () => {
+  it("`abortOn` absent (default) — the tail clobber lands", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -1796,7 +1796,7 @@ describe("constraint-binding (RFC-1)", () => {
 // ============================================================================
 
 describe("bound resolver — listener-triggered ownership escape", () => {
-  it("the resolver's intended value (not the listener's) owns the slot", async () => {
+  it("the resolver's intended value (not the listener's) holds the slot", async () => {
     const bindingSchema = {
       status: t.string(),
       progress: t.number(),
@@ -1858,7 +1858,7 @@ describe("bound resolver — listener-triggered ownership escape", () => {
 // ============================================================================
 
 describe("bound resolver — sibling clobber gap (factsBaseline)", () => {
-  it("two resolvers in one tick share a baseline; the second's owned write is clobber-detected", async () => {
+  it("two resolvers in one tick share a baseline; the second's abort-bound write is clobber-detected", async () => {
     const bindingSchema = {
       status: t.string(),
       progress: t.number(),
@@ -1885,7 +1885,7 @@ describe("bound resolver — sibling clobber gap (factsBaseline)", () => {
         resolverB: {
           requirement: "WRITE_B",
           resolve: async (_req, ctx) => {
-            // Sibling resolver also owns `status` — without a shared
+            // Sibling resolver also abort-binds `status` — without a shared
             // baseline it would see rawFacts.status == v1 (from resolverA)
             // and silently overwrite. With the shared baseline, expected
             // is "initial" and rawFacts is "v1" → clobber detected.
@@ -2022,7 +2022,7 @@ describe("R2 — factsBaseline lazy perf", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "DO" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -2057,7 +2057,7 @@ describe("R2 — factsBaseline lazy perf", () => {
   });
 
   it("no bound constraints in a tick → resolver still runs (no baseline overhead)", async () => {
-    // When `added` requirements have no `owns` field, the engine should
+    // When `added` requirements have no `abortOn` field, the engine should
     // skip building factsBaseline entirely. Behavior must be unchanged.
     let resolved = false;
     const m = createModule("noown", {
@@ -2074,7 +2074,7 @@ describe("R2 — factsBaseline lazy perf", () => {
         c: {
           when: (f) => f.count === 0,
           require: { type: "NUDGE" },
-          // no `owns` — unbound resolver
+          // no `abortOn` — unbound resolver
         },
       },
       resolvers: {
@@ -2102,7 +2102,7 @@ describe("R2 — factsBaseline lazy perf", () => {
 // ============================================================================
 
 describe("R2 — clobber observability via system.observe", () => {
-  it("emits resolver.write.rejected on a dropped owned-fact write", async () => {
+  it("emits resolver.write.rejected on a dropped abort-bound write", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
       release = r;
@@ -2133,7 +2133,7 @@ describe("R2 — clobber observability via system.observe", () => {
         mutate: {
           when: (f) => f.status === "mutating",
           require: { type: "ACT" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {
@@ -2191,9 +2191,9 @@ describe("R2 — clobber observability via system.observe", () => {
 
 describe("R4 — clobber-event rate-limit", () => {
   it("caps per-instance clobber events at 10 + one suppressed summary", async () => {
-    // A single resolver owns 100 facts. An external write clobbers every
-    // one, then the resolver tries to write all 100 — without a rate-limit
-    // that would broadcast 100 clobber events to every plugin.
+    // A single resolver abort-binds 100 facts. An external write clobbers
+    // every one, then the resolver tries to write all 100 — without a
+    // rate-limit that would broadcast 100 clobber events to every plugin.
     const FACT_COUNT = 100;
     const factKeys = Array.from({ length: FACT_COUNT }, (_, i) => `f${i}`);
 
@@ -2357,7 +2357,7 @@ describe("R2 — batch baseline freshness", () => {
         cReady: {
           when: (f) => f.status === "ready",
           require: { type: "B", tag: "x" },
-          owns: ["status"],
+          abortOn: ["status"],
         },
       },
       resolvers: {

@@ -233,9 +233,9 @@ export type { PredictMissingChange, PredictResult } from "./core/predict.js";
 // doctor — structural contradiction detection between a candidate predicate and existing constraints
 export { doctor } from "./core/doctor.js";
 export type {
+  CheckAbortOnFinding,
+  CheckAbortOnResult,
   CheckAgainstResult,
-  CheckOwnsFinding,
-  CheckOwnsResult,
   Contradiction,
   ContradictionType,
   ExistingConstraint,
