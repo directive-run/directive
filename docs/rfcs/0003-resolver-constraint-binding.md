@@ -1,23 +1,24 @@
-# RFC 0003 – Resolver constraint-binding (`owns`)
+# RFC 0003 – Resolver constraint-binding (`abortOn`)
 
-- **Status:** Draft (2026-05-18)
+- **Status:** Draft (2026-05-18); renamed `owns:` → `abortOn:` 2026-06-16.
 - **Author:** Jason Comes
 - **Supersedes:** the `bind: 'auto'` constraint-binding shipped (and reverted) with the v1.4.0 release attempts.
 - **Related:** the production XState→Directive migration (executor-tail-clobber finding).
 
 ## Summary
 
-`owns` lets a constraint declare the facts its resolver **owns**. A write from
-that resolver to an owned fact is dropped – and the resolver aborted – if the
-fact was changed by anything else (an event, another resolver) since the
-resolver last wrote or observed it. This is per-fact optimistic concurrency.
+`abortOn` lets a constraint declare the facts its resolver **aborts on**
+when changed mid-flight. A write from that resolver to a listed fact is
+dropped – and the resolver aborted – if the fact was changed by anything
+else (an event, another resolver) since the resolver last wrote or observed
+it. This is per-fact optimistic concurrency.
 
 ```ts
 constraints: {
   mutate: {
     when: (f) => f.status === 'mutating',
     require: { type: 'EXECUTE_ACTION' },
-    owns: ['status'],
+    abortOn: ['status'],
   },
 }
 ```
@@ -63,41 +64,54 @@ check, not a predicate re-evaluation.
 
 ## Design
 
-> `owns` is **value-based per-fact compare-and-swap**, with one-shot
+> `abortOn` is **value-based per-fact compare-and-swap**, with one-shot
 > fact-level poisoning. It is *not*: HTTP If-Match (header-driven,
 > request-level), Postgres row locks (pessimistic), Mongoose `__v`
 > (whole-document versioning), or RxJS `share` (multicast). The closest
 > concept is STM's optimistic per-cell retry – but Directive **drops**
 > the write instead of retrying.
 
-`owns` names the facts the resolver owns. The resolver's `ctx.facts`
-is a proxy that, per owned fact, remembers the value the resolver last wrote
-or started with (snapshotted at resolver dispatch). A write to an owned fact:
+`abortOn` names the facts the resolver aborts on when changed mid-flight.
+The resolver's `ctx.facts` is a proxy that, per listed fact, remembers the
+value the resolver last wrote or started with (snapshotted at resolver
+dispatch). A write to a listed fact:
 
 - **lands** if the fact still holds that remembered value (nobody else wrote
   it) – and the remembered value is updated;
 - **is dropped**, and the resolver's `AbortController` aborted, if the fact's
-  live value differs (an external writer intervened). Ownership of that fact
-  is then lost for the rest of the invocation (**one-shot per fact**).
+  live value differs (an external writer intervened). The binding for that
+  fact is then released for the rest of the invocation
+  (**one-shot per fact**).
 
-Writes to any fact **not** in `owns` always land. `when()` is never
+Writes to any fact **not** in `abortOn` always land. `when()` is never
 consulted by the binding – it remains purely the constraint trigger.
+
+The name `abortOn` is verb-first by design (the other constraint config
+keys – `when:`, `require:`, `priority:`, `after:`, `deps:` – are
+noun/preposition-prefixed). The verb is the whole point: declaring this
+list says "this resolver aborts on changes to these facts," which is
+exactly what the runtime enforces.
+
+**`abortOn` does NOT prevent other writers.** It protects this resolver
+from writing stale data over a fresher value. Anything else can still
+write to the listed facts at any time – the binding only intercepts
+writes by *this* resolver.
 
 ### Properties
 
 - **Data-safe.** Only the named facts are clobber-checked; the resolver's
   other writes are untouched. Fixes flaw 1.
 - **Predicate-independent.** The binding never runs `when()`, so the
-  resolver writing any fact (owned or not) cannot deactivate it. Fixes
+  resolver writing any fact (listed or not) cannot deactivate it. Fixes
   flaw 2.
-- **Sync constraints only.** The owned-fact baseline is snapshotted when the
-  resolver is dispatched. Async constraints `await` between predicate
-  evaluation and dispatch – an event in that window would move the owned
-  fact before the snapshot, so the clobber would go undetected. `owns` on an
-  async constraint is therefore ignored (dev-mode warning). A future
+- **Sync constraints only.** The abort-binding baseline is snapshotted when
+  the resolver is dispatched. Async constraints `await` between predicate
+  evaluation and dispatch – an event in that window would move the listed
+  fact before the snapshot, so the clobber would go undetected. `abortOn` on
+  an async constraint is therefore ignored (dev-mode warning). A future
   revision could snapshot at predicate-evaluation time to lift this.
-- **One-shot per fact.** Once an owned write is dropped, later writes to that
-  fact are dropped too – a resolver whose intent was superseded cannot
+- **One-shot per fact.** Once a write is dropped, later writes to that fact
+  are dropped too – a resolver whose intent was superseded cannot
   resurrect it, even if the fact transiently returns to the expected value.
 
 ### Resolver lifecycle – detach instead of cancel
@@ -111,8 +125,8 @@ requirement is removed, the bound resolver is untracked from the engine's
 in-flight set but its signal is *not* aborted – it runs to completion. This
 is essential. Cancelling would make the resolver bail at its first
 post-`await` signal check, and its data writes would never happen – the
-binding (which only acts on the *owned* fact) would never even be reached.
-Detach lets the data writes land; the binding still drops the owned-fact
+binding (which only acts on the *listed* fact) would never even be reached.
+Detach lets the data writes land; the binding still drops the abort-bound
 clobber.
 
 Detach (rather than merely skipping cancellation) also keeps re-dispatch
@@ -124,13 +138,13 @@ clobber-checks each against its own snapshot. In practice a constraint's
 event guards usually prevent re-entry before the first resolver finishes.
 
 A bound resolver's signal is therefore aborted only by the binding itself (a
-dropped owned write), by an explicit `cancel()`, or by a timeout – never by
+dropped write), by an explicit `cancel()`, or by a timeout – never by
 requirement removal.
 
 ### Known limitation – ABA
 
-The check is value-based (`Object.is`). If an external writer changes an
-owned fact and then changes it *back* to the resolver's expected value
+The check is value-based (`Object.is`). If an external writer changes a
+listed fact and then changes it *back* to the resolver's expected value
 before the resolver writes, no clobber is detected. This is intentional and
 correct: the external actor's net effect was a no-op, so the resolver
 completing its transition is legitimate. A clobber that matters – an event
@@ -141,61 +155,75 @@ moving a fact to a terminal value and leaving it there – is always detected.
 ```ts
 interface ConstraintDef {
   // ...
-  /** Fact keys the triggering resolver owns; writes to these are clobber-checked. */
-  owns?: readonly string[];
+  /** Fact keys this resolver aborts on when changed mid-flight; writes to these are clobber-checked. */
+  abortOn?: readonly string[];
 }
 ```
 
-Omit `owns` (the default) for no binding – every write lands, current
+Omit `abortOn` (the default) for no binding – every write lands, current
 behavior. An empty array is treated as no binding.
 
-`owns` is a no-op for out-of-band invocations (`callOne`) and for mixed-source
-batch resolvers, where there is no single triggering constraint.
+`abortOn` is a no-op for out-of-band invocations (`callOne`) and for
+mixed-source batch resolvers, where there is no single triggering constraint.
 
 ## Migration from the reverted v1
 
-`bind: 'auto'` → `owns: [<the phase fact>]`. The fields are the facts the
-resolver re-asserts in its tail and that an event might change out from
+`bind: 'auto'` → `abortOn: [<the phase fact>]`. The fields are the facts
+the resolver re-asserts in its tail and that an event might change out from
 under it – typically a single `status`/`phase`/`mode` fact. The constraint's
 `when()` predicate needs no change; the binding ignores it.
 
 ## Future work (not in this RFC)
 
-- **Module-level default field list.** `owns` is intentionally per-constraint
-  – within a module, mutator constraints are bound but loader constraints
-  must not be (a loader legitimately writes the phase fact forward). A
-  blanket module/system-level `owns` would break loaders. The repetition
-  worth removing is the *field list*: a module could declare `phaseFacts:
-  ['status']` once, and constraints opt in with a lightweight `owns: true`
-  (inherit) – keeping per-constraint opt-in while staying DRY. Deferred until
-  enough bound constraints exist to justify the API surface.
-- **Async constraints.** Bindable if the owned-fact baseline is snapshotted
-  at predicate-evaluation time rather than resolver-dispatch time (see
-  "Sync constraints only" above). Deferred.
-- **Auto-detected fields.** Inferring owned facts from what `when()` reads is
-  *not* viable – it gates discriminant facts the resolver legitimately
+- **Module-level default field list.** `abortOn` is intentionally
+  per-constraint – within a module, mutator constraints are bound but loader
+  constraints must not be (a loader legitimately writes the phase fact
+  forward). A blanket module/system-level `abortOn` would break loaders. The
+  repetition worth removing is the *field list*: a module could declare
+  `phaseFacts: ['status']` once, and constraints opt in with a lightweight
+  `abortOn: true` (inherit) – keeping per-constraint opt-in while staying
+  DRY. Deferred until enough bound constraints exist to justify the API
+  surface.
+- **Async constraints.** Bindable if the abort-binding baseline is
+  snapshotted at predicate-evaluation time rather than resolver-dispatch
+  time (see "Sync constraints only" above). Deferred.
+- **Auto-detected fields.** Inferring listed facts from what `when()` reads
+  is *not* viable – it gates discriminant facts the resolver legitimately
   clears (e.g. `pendingAction`), re-creating the freeze. The author must
   name the phase fact explicitly.
+- **Richer trigger object form.** Widening from `abortOn: string[]` to
+  `abortOn: (string | AbortTrigger)[]` so consumers can express
+  conditional abort (e.g. `{ fact: 'status', when: { $eq: 'cancelled' } }`).
+  Captured as a follow-on; deferred until consumer demand surfaces. See
+  IDEAS.md R8.A.
+- **Per-constraint declarative `on*` callbacks.** A second surface
+  alongside the event stream (`onAbort`, `onClobber`, etc.). Captured as a
+  follow-on; deferred. See IDEAS.md R8.B.
 
 ### Runtime async detection
 
 A function `when` that returns a Promise is promoted to async at runtime –
 *even when `async: true` was not set*. The engine then silently disables
-`owns` for that constraint and logs:
+`abortOn` for that constraint and logs:
 
-> `[Directive] constraint '<id>': owns binding disabled because when() returned a Promise – convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+> `[Directive] constraint '<id>': abortOn binding disabled because when() returned a Promise – convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
 
 The workaround is a **data-form `when`** (always sync – the binding works)
 or a sync function `when` that pushes the async dependency into a derivation.
 
 ## Observing rejected writes
 
-When the binding drops an owned-fact write, Directive emits a
+When the binding drops a listed-fact write, Directive emits a
 `resolver.write.rejected` observation event with `reason: "clobbered"` so
 devtools, the logging plugin, and user-installed observers can surface the
 drop. The `reason` field keeps the observation protocol backend-neutral –
 clobber detection is the in-memory implementation; future write-rejecting
 backends can report other reasons under the same event type.
+
+The `reason: "clobbered"` discriminant stays even though the field was
+renamed from `owns:` to `abortOn:` – it's established vocabulary across the
+plugin hook payload and the clobber-loop detector (IDEAS.md R4.J), and
+renaming it would break consumer log queries with no clarity upside.
 
 The event is a discriminated union on `kind`: branch on it before reading
 the arm-specific fields.
@@ -259,17 +287,32 @@ sibling resolvers in the same reconcile tick and out-of-band event mutations
 within the same process – that's the only race surface a single-process
 Directive runtime has.
 
-`owns` is a per-process Map. In multi-tab same-origin scenarios with a
+`abortOn` is a per-process Map. In multi-tab same-origin scenarios with a
 shared backing store (e.g., IndexedDB via `BroadcastChannel`), each tab
 has its own clobber detection – cross-tab writes are not caught. For
 multi-tab safety, serialize writes through a single coordinator tab or
 wait for v2's distributed `ClobberDetector`.
 
 Multi-process Directive (planned v2) will introduce a `ClobberDetector`
-interface to abstract the per-fact owned-value lookup. Single-process
+interface to abstract the per-fact value lookup. Single-process
 implementations will plug into the same surface today's `createBoundFacts`
 uses internally – no resolver-author-visible change. Distributed
 implementations (Redis, Postgres advisory locks, durable execution
 backends) will satisfy the same interface so the binding semantics
 carry across processes. Architectural design is deferred until the
 v2 cross-process story lands.
+
+## Naming history
+
+The constraint-binding field was originally named `owns:`. The semantic
+was clear once you understood it (per-fact compare-and-swap on snapshot,
+write-drop on mismatch) but the name pointed the wrong way: `owns:` reads
+as "this resolver asserts ownership of these facts," when the runtime
+actually enforces "this resolver yields when these facts change."
+
+Renamed to `abortOn:` on 2026-06-16 (`@directive-run/core` v1.22.x):
+verb-first, accurate to the mechanism, reads aloud as "abort on changes
+to these facts." Same semantics, same audit event payload
+(`resolver.write.rejected { reason: "clobbered" }` is unchanged). Old
+references to `owns:` in shipped issues and blog posts are preserved as
+the historical record.

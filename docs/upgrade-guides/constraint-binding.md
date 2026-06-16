@@ -1,6 +1,7 @@
-# Upgrade Guide: Resolver Constraint-Binding (`owns`)
+# Upgrade Guide: Resolver Constraint-Binding (`abortOn`)
 
-**RFC-0003.** Available in `@directive-run/core` ≥ next minor.
+**RFC-0003.** Available in `@directive-run/core` ≥ v1.22.0. Renamed from
+`owns:` to `abortOn:` on 2026-06-16.
 
 ## TL;DR
 
@@ -8,20 +9,26 @@ A resolver fires from a constraint, does async work, then writes a fact in its
 tail. While it was mid-`await`, an event changed that fact. The resolver's tail
 then silently overwrites what the event wrote.
 
-Declare the facts the resolver **owns** and Directive drops the clobbering
-write for you – while leaving the resolver's other writes alone:
+Declare the facts the resolver **aborts on** when changed mid-flight and
+Directive drops the clobbering write for you – while leaving the resolver's
+other writes alone:
 
 ```ts
 constraints: {
   mutate: {
     when: (f) => f.status === "mutating",
     require: { type: "EXECUTE_ACTION" },
-    owns: ["status"], // <-- the resolver owns `status`
+    abortOn: ["status"], // <-- abort if `status` changes mid-flight
   },
 }
 ```
 
-Omit `owns` (the default) and every write lands – current behavior.
+Omit `abortOn` (the default) and every write lands – current behavior.
+
+`abortOn:` is verb-first by design: reads aloud as "abort on changes to
+these facts." It does **not** prevent other writers from touching the
+listed facts; it only protects *this* resolver from writing stale data
+over a fresher value.
 
 ## The bug this fixes
 
@@ -50,14 +57,14 @@ if (ctx.facts.status === "mutating") {
 }
 ```
 
-`owns` replaces that boilerplate – and, unlike a blanket guard, it is precise:
-it protects *only* the facts you name.
+`abortOn` replaces that boilerplate – and, unlike a blanket guard, it is
+precise: it protects *only* the facts you name.
 
 ## How it works
 
-`owns` lists the facts the resolver owns. For each owned fact the
-binding remembers the value the resolver last wrote or started with. A write
-to an owned fact:
+`abortOn` lists the facts this resolver aborts on when changed mid-flight.
+For each listed fact the binding remembers the value the resolver last wrote
+or started with. A write to a listed fact:
 
 - **lands** if the fact still holds that value – nobody else wrote it;
 - **is dropped** (and `ctx.signal` is aborted) if the fact's live value
@@ -85,28 +92,29 @@ resolve: async (_req, ctx) => {
 }
 ```
 
-**After** – declare the owned fact, write plainly:
+**After** – declare the abort-binding, write plainly:
 
 ```ts
-// constraint: owns: ["status"]
+// constraint: abortOn: ["status"]
 resolve: async (_req, ctx) => {
   try {
     const result = await mutate();
     ctx.facts.lastResult = result;   // data – always lands
-    ctx.facts.status = "playing";    // owned – dropped if `status` was clobbered
+    ctx.facts.status = "playing";    // abort-bound – dropped if `status` was clobbered
   } catch {
-    ctx.facts.status = "rolled-back"; // owned – dropped too
+    ctx.facts.status = "rolled-back"; // abort-bound – dropped too
   }
 }
 ```
 
 `lastResult` lands either way – the async work succeeded, the data is real.
-Only the owned `status` write is clobber-checked. Optionally bail early:
+Only the abort-bound `status` write is clobber-checked. Optionally bail
+early:
 
 ```ts
 const result = await mutate();
 ctx.facts.lastResult = result;
-if (ctx.signal.aborted) return; // an owned write was already dropped
+if (ctx.signal.aborted) return; // an abort-bound write was already dropped
 ctx.facts.status = "playing";
 ```
 
@@ -126,24 +134,24 @@ point of per-fact binding.
 
 Normally the engine cancels an in-flight resolver when its requirement goes
 away (the constraint flipped false). A **bound** resolver is exempt – it runs
-to completion so its data writes land; the binding drops only the owned-fact
-clobber. A bound resolver's `ctx.signal` is aborted only by a dropped owned
-write, an explicit `cancel()`, or a timeout.
+to completion so its data writes land; the binding drops only the
+abort-bound clobber. A bound resolver's `ctx.signal` is aborted only by a
+dropped abort-bound write, an explicit `cancel()`, or a timeout.
 
 ### Async constraints
 
-Not supported. The binding snapshots the owned facts when the resolver is
+Not supported. The binding snapshots the listed facts when the resolver is
 dispatched; an async constraint `await`s between predicate evaluation and
-dispatch, so an event could move an owned fact before the snapshot is taken.
-`owns` on an async constraint is ignored (dev-mode warning).
+dispatch, so an event could move a listed fact before the snapshot is taken.
+`abortOn` on an async constraint is ignored (dev-mode warning).
 
 ### Runtime async detection
 
 A function `when` that **returns a Promise** is promoted to async at runtime
 even if you did not set `async: true`. That promotion silently disables the
-`owns` binding for that constraint – the engine logs:
+`abortOn` binding for that constraint – the engine logs:
 
-> `[Directive] constraint '<id>': owns binding disabled because when() returned a Promise – convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
+> `[Directive] constraint '<id>': abortOn binding disabled because when() returned a Promise – convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`
 
 The fix is one of:
 
@@ -160,22 +168,22 @@ No-op. `callOne` has no source constraint, so there is nothing to bind.
 
 ### Mixed-source batches
 
-No-op. A batch resolver fed by multiple constraints has no single owner;
+No-op. A batch resolver fed by multiple constraints has no single source;
 same-source batches are bound normally.
 
 ### One-shot per fact
 
-Once an owned write is dropped, further writes to *that fact* are dropped for
-the rest of the invocation – even if the fact transiently returns to its
-expected value. Writes to other owned facts are unaffected.
+Once an abort-bound write is dropped, further writes to *that fact* are
+dropped for the rest of the invocation – even if the fact transiently
+returns to its expected value. Writes to other listed facts are unaffected.
 
 ### ABA
 
-The check is value-based. If an external writer changes an owned fact and then
-changes it back to the resolver's expected value before the resolver writes,
-no clobber is detected – correctly: the external change netted to nothing.
-A clobber that matters (an event moving a fact to a terminal value and leaving
-it there) is always caught.
+The check is value-based. If an external writer changes a listed fact and
+then changes it back to the resolver's expected value before the resolver
+writes, no clobber is detected – correctly: the external change netted to
+nothing. A clobber that matters (an event moving a fact to a terminal value
+and leaving it there) is always caught.
 
 ## Migrating from `bind: 'auto'`
 
@@ -184,10 +192,27 @@ The reverted v1 used `bind: 'auto'` and gated every write by re-evaluating
 
 ```diff
 - bind: 'auto',
-+ owns: ['status'],
++ abortOn: ['status'],
 ```
 
 Pick the fact(s) the resolver re-asserts in its tail. No change to `when()`.
+
+## Migrating from `owns:` (v1.5 – v1.21)
+
+The constraint-binding field was originally named `owns:` (introduced in
+v1.5 alongside RFC 0003). Renamed to `abortOn:` in v1.22.0 to reflect the
+actual semantics – the resolver yields when listed facts change; it does
+not assert ownership. Same engine, same audit event, clearer name:
+
+```diff
+- owns: ['status'],
++ abortOn: ['status'],
+```
+
+The audit event payload (`resolver.write.rejected { reason: "clobbered" }`)
+is **unchanged** – production log queries on `"clobbered"` keep working.
+`doctor.checkOwns()` was renamed to `doctor.checkAbortOn()` for
+consistency.
 
 ## Migrating from `$matches: string` (pre-v1.5)
 
@@ -223,9 +248,9 @@ section.
 
 ## Observing rejected writes
 
-When the binding drops an owned-fact write, Directive emits a
-`resolver.write.rejected` observation event with `reason: "clobbered"` so you
-can surface the drop in tests, devtools, or production logging:
+When the binding drops an abort-bound write, Directive emits a
+`resolver.write.rejected` observation event with `reason: "clobbered"` so
+you can surface the drop in tests, devtools, or production logging:
 
 The event is a discriminated union on `kind` – branch on it before reading
 the arm-specific fields:

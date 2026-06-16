@@ -156,7 +156,7 @@ seven pieces of work, zero `useEffect` hooks.
 - [`sources.md`](./sources.md) — the source primitive's full lifecycle
   and recipes.
 - [`constraints.md`](./constraints.md) — `when` predicates, requirement
-  shapes, and the `bind` / `owns` field-scoped CAS contract.
+  shapes, and the `bind` / `abortOn` field-scoped CAS contract.
 - [`resolvers.md`](./resolvers.md) — retry config, batch semantics, and
   the `ctx.set` write contract.
 - [`anti-patterns.md`](./anti-patterns.md) — the things to avoid that

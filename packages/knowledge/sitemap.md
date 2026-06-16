@@ -63,7 +63,7 @@ Website: https://directive.run
 ### Advanced Patterns
 - [Overview](https://directive.run/docs/advanced/overview)
 - [Data-form Definitions](https://directive.run/docs/data-triggers)
-- [Resolver Binding (owns)](https://directive.run/docs/resolver-binding)
+- [Resolver Binding](https://directive.run/docs/resolver-binding)
 - [Multi-Module](https://directive.run/docs/advanced/multi-module)
 - [Runtime Dynamics](https://directive.run/docs/advanced/runtime)
 - [History & Snapshots](https://directive.run/docs/advanced/history)
