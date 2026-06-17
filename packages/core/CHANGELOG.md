@@ -1,5 +1,214 @@
 # @directive-run/core
 
+## 1.22.0
+
+### Minor Changes
+
+- [`d85fa45`](https://github.com/directive-run/directive/commit/d85fa4569e6fcf7a15be0f896dfe2aaf3b226ccc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Rename constraint-binding API from `owns:` to `abortOn:`.
+
+  The constraint-binding field — the per-fact compare-and-swap that drops a
+  resolver's writes when listed facts mutate mid-flight — was named `owns:`.
+  Reading `owns: ['kyc.status']` suggested the resolver asserts ownership of
+  `kyc.status`. The runtime enforces the opposite: the resolver **yields**
+  when `kyc.status` changes during dispatch.
+
+  `abortOn:` reads correctly: "this resolver aborts on changes to these
+  facts." Same semantics, clearer name, same audit-event payload (the
+  `resolver.write.rejected { reason: "clobbered" }` event is unchanged — no
+  Grafana / Splunk query updates needed).
+
+  **Before:**
+
+  ```ts
+  constraints: {
+    finalizeKyc: {
+      when: (f) => f.kyc.status === 'pending',
+      require: { type: 'FINALIZE_KYC' },
+      owns: ['kyc.status'],
+    },
+  },
+  ```
+
+  **After:**
+
+  ```ts
+  constraints: {
+    finalizeKyc: {
+      when: (f) => f.kyc.status === 'pending',
+      require: { type: 'FINALIZE_KYC' },
+      abortOn: ['kyc.status'],
+    },
+  },
+  ```
+
+  **Also renamed for consistency:**
+
+  - `doctor.checkOwns()` → `doctor.checkAbortOn()`
+  - `CheckOwnsResult` / `CheckOwnsFinding` types → `CheckAbortOnResult` /
+    `CheckAbortOnFinding`
+  - `DoctorConstraintOwnsConflict` interface → `DoctorConstraintAbortOnConflict`
+  - The `source: "owns"` discriminant on doctor findings → `source: "abortOn"`
+  - `system.inspect().constraints[].owns` → `system.inspect().constraints[].abortOn`
+
+  **Migration:** mechanical replacement. The semantics, audit event, runtime
+  gate, and snapshot model are all unchanged. Scope the rename to constraint
+  config blocks — `owns` as an English word in unrelated prose is fine.
+
+- [`cb05d88`](https://github.com/directive-run/directive/commit/cb05d88f5c01e30bc4bf7e69903a0f8f3be26664) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Follow-ons to the v1.22.0 `owns:` → `abortOn:` rename: verb-consistent
+  abort lifecycle, defensive `bind:` validator, SIEM event for
+  async-disabled bindings, new `clobberAlertPlugin`.
+
+  **Verb-consistent abort lifecycle.** Three surfaces, one verb:
+
+  - `abortOn:` — declarative on the constraint
+  - `ctx.signal` — `AbortSignal` on the resolver context (Web Platform)
+  - `resolversManager.abort()` / `resolversManager.abortAll()` — renamed
+    from `cancel()` / `cancelAll()` so the imperative method pairs with
+    `AbortController.abort()`
+
+  `ResolversManager` is `@internal`, so the rename is not a public-API
+  break — only adapter authors hitting the internal manager will see the
+  new names.
+
+  **`validateBindKeys` defensive parity for the `bind:` v2 reservation.**
+  A new module-registration validator (mirroring `validateAbortOnKeys`)
+  rejects `__proto__`, `constructor`, `prototype`, and `$`-prefixed entries
+  on the `bind:` field. `bind:` has no runtime semantics yet — the
+  validator ships now so the reserved-key bypass surface stays closed
+  before any v2 runtime wires the field.
+
+  **SIEM-facing observation event for async-disabled bindings.** The
+  engine now emits a new `constraint.binding.disabled` observation event
+  (and `onConstraintBindingDisabled(id, reason)` plugin hook) when it
+  silently disables a constraint's `abortOn:` because the constraint is
+  async:
+
+  - `reason: "async-declared"` — the constraint def has `async: true`
+  - `reason: "async-promoted"` — `when()` returned a Promise at runtime
+    (the author probably didn't realize they opted out of clobber
+    protection)
+
+  The dev-mode `console.warn` is unchanged — this is the machine-facing
+  pair so production plugins can detect a constraint silently losing its
+  clobber protection.
+
+  **New `clobberAlertPlugin`** (under `@directive-run/core/plugins`).
+  Default high-severity alerting for `resolver.write.rejected` events
+  landing on facts that carry irreversible meta tags. Replace the default
+  `console.error` with a PagerDuty / Slack / Sentry call:
+
+  ```ts
+  createSystem({
+    module: m,
+    plugins: [
+      clobberAlertPlugin({
+        irreversibleTags: ["money", "pii", "irreversible"], // default
+        // Or list resolver IDs when irreversibility lives on the resolver
+        // rather than on a fact tag:
+        irreversibleResolvers: ["stripeCharge"],
+        onAlert: (e) =>
+          pagerduty.trigger({
+            severity: "critical",
+            summary: `Clobber on ${e.fact} (${e.tags.join(", ")})`,
+            details: e,
+          }),
+      }),
+    ],
+  });
+  ```
+
+  Reads `system.meta.fact(name)?.tags` to filter; either filter (tag or
+  resolver) firing triggers the alert. Cooldown keys by `(fact, resolver)`
+  pair so two different resolvers racing on the same fact both alert (a
+  real incident) while a single resolver retrying the same fact (noise)
+  is suppressed. A throwing `onAlert` callback is caught and surfaced via
+  `console.error` so it never breaks the resolver dispatch path.
+
+  **Future v2 `AbortDetector` interface naming.** The RFC's
+  "Single-process scope" section previously called the planned
+  multi-process interface `ClobberDetector`. Renamed to `AbortDetector`
+  in the RFC text before v2 ships, so the v2 interface name is
+  verb-consistent with `abortOn:` from day one. No runtime change — the
+  interface doesn't exist yet.
+
+### Patch Changes
+
+- [`b7ce8a9`](https://github.com/directive-run/directive/commit/b7ce8a99f97d73e98348610bfb1685ec1c765026) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Stop `constraint.binding.disabled` from flooding observers on hot
+  async constraints, and preserve `clobberAlertPlugin` telemetry past
+  the per-resolver rate-limit cap with a new `onSummary` callback.
+
+  **`constraint.binding.disabled` is now deduped per (constraint, reason).**
+  The event (and its companion dev-mode `console.warn`) fires at most
+  once per (constraint id, reason) pair across the lifetime of the
+  registered constraint. A hot async-disabled constraint that dispatches
+  thousands of times per second produces exactly one event per reason,
+  so SIEM and log streams cannot be flooded by the binding-disabled
+  signal. The bit clears on `unregister()` so re-registering a
+  constraint resets the once-per-lifetime contract.
+
+  **New `onSummary` callback on `clobberAlertPlugin`.** When the engine's
+  per-resolver clobber rate-limit folds the 11th+ per-write event into a
+  single `kind: "summary"` event, `onSummary` now surfaces it — but only
+  when the resolver is in `irreversibleResolvers` OR has previously
+  fired `onAlert` in this session. That preserves SIEM telemetry on
+  resolvers that have proven they touch irreversible state, without
+  flooding on noise resolvers whose summary events are expected.
+
+  ```ts
+  clobberAlertPlugin({
+    irreversibleResolvers: ["chargeCard"],
+    onAlert: (e) => pagerduty.trigger({ ... }),
+    // NEW: also page when N>10 clobbers fold into one summary.
+    onSummary: (e) => pagerduty.trigger({
+      severity: "critical",
+      summary: `${e.resolver} suppressed ${e.dropped} clobbers past the cap`,
+      details: e,
+    }),
+  });
+  ```
+
+  `ClobberSummaryEvent` carries `resolver`, `requirementId`, `dropped`,
+  `matchedBy: "resolver-listed" | "prior-irreversible-alert"`, and
+  `timestamp`. A throwing `onSummary` callback is caught and surfaced
+  via `console.error` so it never breaks the resolver dispatch path —
+  parity with the existing `onAlert` error isolation.
+
+  Tests: 5360 → 5365 across the monorepo (+5: dedupe across many
+  dispatches, three `onSummary` paths, one `onSummary`-throws path).
+
+- [`d39a9c6`](https://github.com/directive-run/directive/commit/d39a9c61ffcb2e89ee369042e3030cbd4d1096be) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `clobberAlertPlugin` refinements: optional `irreversibleResolvers`
+  filter, `matchedBy` discriminator on the event payload, cooldown keys
+  by (fact, resolver), error-isolated `onAlert`, bounded cooldown map.
+
+  - **`irreversibleResolvers` option** — when irreversibility is modeled on
+    the resolver (e.g. `stripeCharge`) rather than as a fact-meta tag, list
+    the resolver ID in `irreversibleResolvers`. The plugin OR's the two
+    filters. The JSDoc on `irreversibleTags` now explains _why_ tagging the
+    fact is the default modeling choice (the audit event names the fact,
+    not the side effect).
+  - **`matchedBy: "tag" | "resolver" | "both"`** added to `ClobberAlertEvent`
+    so consumers can route alerts based on which filter triggered them.
+    `tags` may now be empty when only the resolver filter matched.
+  - **Cooldown keys by `(fact, resolver)`** — two different resolvers
+    racing on the same fact within the cooldown window now both alert
+    (a real incident) while a single resolver retrying the same fact
+    (noise) is suppressed.
+  - **`onAlert` error isolation** — a throwing `onAlert` callback (PagerDuty
+    503, Slack rate limit, etc.) is caught and surfaced via `console.error`
+    so it never breaks the resolver dispatch path. The cooldown slot is
+    stamped only after the callback succeeds, so a transient outage does
+    not silence the next genuine alert.
+  - **Bounded cooldown map** — entries cap at 1000 with FIFO eviction so a
+    long-running system with high resolver churn cannot grow memory
+    unboundedly.
+
+  Plus a clearer dev-mode warning for declared-async constraints
+  (`async: true`) explaining the workarounds. Symmetric with the existing
+  runtime-promoted-async advice.
+
+  Adds 6 new tests covering the new filter, error isolation, `matchedBy`
+  discriminator, retry-after-throw, and the FIFO cap.
+
 ## 1.21.0
 
 ### Minor Changes
