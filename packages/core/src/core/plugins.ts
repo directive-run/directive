@@ -98,6 +98,21 @@ export interface PluginManager<_S extends Schema = any> {
     whenExplain?: import("./types/predicate.js").ClauseResult[],
   ): void;
   emitConstraintError(id: string, error: unknown): void;
+  /**
+   * Fired once per lookup when the engine silently disables a
+   * constraint's `abortOn:` binding because the constraint is async.
+   * Pairs with the dev-mode `console.warn` for SIEM visibility — without
+   * this signal, a production constraint loses its clobber-protection
+   * with no plugin trail.
+   *
+   * `"async-declared"` means the def has `async: true` (author opted in);
+   * `"async-promoted"` means `when()` returned a Promise at runtime
+   * (author probably did not realize).
+   */
+  emitConstraintBindingDisabled(
+    id: string,
+    reason: "async-declared" | "async-promoted",
+  ): void;
 
   // Requirement hooks
   emitRequirementCreated(req: RequirementWithId): void;
@@ -391,6 +406,7 @@ export function createPluginManager<
     // Constraint hooks
     emitConstraintEvaluate: broadcast("onConstraintEvaluate"),
     emitConstraintError: broadcast("onConstraintError"),
+    emitConstraintBindingDisabled: broadcast("onConstraintBindingDisabled"),
 
     // Requirement hooks
     emitRequirementCreated: broadcast("onRequirementCreated"),

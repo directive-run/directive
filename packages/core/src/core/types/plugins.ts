@@ -162,6 +162,31 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
    */
   onConstraintError?: (id: string, error: unknown) => void;
 
+  /**
+   * Called when the engine silently disables a constraint's `abortOn:`
+   * binding because the constraint is async. Pairs with the dev-mode
+   * `console.warn` for SIEM-side visibility — without this signal, a
+   * production constraint loses its clobber-protection with no
+   * plugin / observer trail.
+   *
+   * - `"async-declared"` — the constraint def has `async: true`. The
+   *   author opted in; treat as advisory.
+   * - `"async-promoted"` — the constraint's `when()` returned a Promise
+   *   at runtime, even though `async: true` was not set. The author
+   *   probably did not realize. This is the dangerous case — escalate.
+   *
+   * Fired at most once per `getConstraintBinding` lookup; deduping
+   * across reconcile ticks is the consumer's responsibility (the
+   * audit-ledger plugin does this with a per-id sticky bit).
+   *
+   * @param id - The constraint ID whose binding was disabled
+   * @param reason - Whether the async state was author-declared or runtime-promoted
+   */
+  onConstraintBindingDisabled?: (
+    id: string,
+    reason: "async-declared" | "async-promoted",
+  ) => void;
+
   // ============================================================================
   // Requirement Hooks
   // ============================================================================

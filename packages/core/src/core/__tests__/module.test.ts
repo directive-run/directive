@@ -533,3 +533,114 @@ describe("createModule — reserved abortOn keys", () => {
     ).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// createModule — reserved `bind` keys (v2 reservation, parity with abortOn)
+// ---------------------------------------------------------------------------
+
+describe("createModule — reserved bind keys", () => {
+  it("throws when a constraint binds '__proto__'", () => {
+    expect(() =>
+      createModule("bind-proto", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            bind: ["__proto__"],
+          } as any,
+        },
+      }),
+    ).toThrow(/bind key '__proto__' is reserved/);
+  });
+
+  it("throws when a constraint binds 'constructor'", () => {
+    expect(() =>
+      createModule("bind-ctor", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            bind: ["constructor"],
+          } as any,
+        },
+      }),
+    ).toThrow(/bind key 'constructor' is reserved/);
+  });
+
+  it("throws when a constraint binds a $-prefixed key", () => {
+    expect(() =>
+      createModule("bind-dollar", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            bind: ["$store"],
+          } as any,
+        },
+      }),
+    ).toThrow(/bind key '\$store' is reserved/);
+  });
+
+  it("names the offending module and constraint in the error", () => {
+    expect(() =>
+      createModule("billing", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
+          chargeCard: {
+            when: () => true,
+            require: { type: "X" },
+            bind: ["prototype"],
+          } as any,
+        },
+      }),
+    ).toThrow(/module 'billing' constraint 'chargeCard'/);
+  });
+
+  it("does NOT throw for an ordinary fact key in bind", () => {
+    expect(() =>
+      createModule("bind-ok", {
+        schema: {
+          facts: { count: { _type: 0 } },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
+        constraints: {
+          // biome-ignore lint/suspicious/noExplicitAny: testing bind key
+          c1: {
+            when: () => true,
+            require: { type: "X" },
+            bind: ["count"],
+          } as any,
+        },
+      }),
+    ).not.toThrow();
+  });
+});

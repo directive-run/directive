@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
+import type { ObservationEvent } from "../types/system.js";
 
 // ============================================================================
 // Helpers
@@ -2061,6 +2062,132 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     // is not clobber-checked, so it lands (same as `abortOn` absent).
     expect(system.facts.status).toBe("playing");
 
+    system.destroy();
+  });
+
+  it("emits `constraint.binding.disabled` (reason: async-declared) when `abortOn` lands on a declared-async constraint", async () => {
+    const m = createModule("asyncDeclared", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { start: {} },
+        requirements: { GO: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+      },
+      constraints: {
+        mutate: {
+          async: true,
+          deps: ["status"],
+          when: async (f) => f.status === "mutating",
+          require: { type: "GO" },
+          abortOn: ["status"],
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "GO",
+          resolve: async (_req, ctx) => {
+            ctx.facts.status = "done";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    const events: ObservationEvent[] = [];
+    const unsub = system.observe((e) => events.push(e));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    system.start();
+    await flushMicrotasks();
+    system.events.start();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    const bindingDisabled = events.filter(
+      (
+        e,
+      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
+        e.type === "constraint.binding.disabled",
+    );
+    expect(bindingDisabled.length).toBeGreaterThanOrEqual(1);
+    expect(bindingDisabled[0]?.id).toBe("mutate");
+    expect(bindingDisabled[0]?.reason).toBe("async-declared");
+
+    unsub();
+    warn.mockRestore();
+    system.destroy();
+  });
+
+  it("emits `constraint.binding.disabled` (reason: async-promoted) when `when()` returns a Promise but async wasn't declared", async () => {
+    const m = createModule("asyncPromoted", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { start: {} },
+        requirements: { GO: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        start: (f) => {
+          f.status = "mutating";
+        },
+      },
+      constraints: {
+        mutate: {
+          // No `async: true` — but the predicate returns a Promise.
+          // The engine promotes it at runtime and disables abortOn binding.
+          deps: ["status"],
+          when: ((f: { status: string }) =>
+            Promise.resolve(f.status === "mutating")) as unknown as (
+            facts: { status: string },
+          ) => boolean,
+          require: { type: "GO" },
+          abortOn: ["status"],
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "GO",
+          resolve: async (_req, ctx) => {
+            ctx.facts.status = "done";
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    const events: ObservationEvent[] = [];
+    const unsub = system.observe((e) => events.push(e));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    system.start();
+    await flushMicrotasks();
+    system.events.start();
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    const bindingDisabled = events.filter(
+      (
+        e,
+      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
+        e.type === "constraint.binding.disabled",
+    );
+    expect(bindingDisabled.length).toBeGreaterThanOrEqual(1);
+    expect(bindingDisabled[0]?.id).toBe("mutate");
+    expect(bindingDisabled[0]?.reason).toBe("async-promoted");
+
+    unsub();
+    warn.mockRestore();
     system.destroy();
   });
 });

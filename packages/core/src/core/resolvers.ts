@@ -73,15 +73,17 @@ export interface ResolversManager<_S extends Schema> {
     options?: { factsBaseline?: Readonly<Record<string, unknown>> },
   ): void;
   /**
-   * Cancel an in-flight or batch-queued resolver by requirement ID.
+   * Abort an in-flight or batch-queued resolver by requirement ID.
    *
    * @remarks
    * Aborts the `AbortController` for in-flight resolvers. For batch-queued
-   * requirements, removes the requirement from the pending batch.
+   * requirements, removes the requirement from the pending batch. Named to
+   * match `AbortController.abort()` and the declarative `abortOn:` key on
+   * constraints — three surfaces, one verb, one signal.
    *
-   * @param requirementId - The unique requirement ID to cancel.
+   * @param requirementId - The unique requirement ID to abort.
    */
-  cancel(requirementId: string): void;
+  abort(requirementId: string): void;
   /**
    * Untrack an in-flight resolver by requirement ID **without** aborting it
    * (RFC-0003 resolver constraint-binding).
@@ -89,17 +91,17 @@ export interface ResolversManager<_S extends Schema> {
    * @remarks
    * Used for bound resolvers whose triggering requirement was removed: the
    * resolver runs to completion (its data writes land; the binding still
-   * guards owned facts) but it no longer occupies the `inflight` slot, so the
-   * same requirement re-dispatches cleanly if it returns. A no-op if the
-   * requirement is not in-flight.
+   * guards abort-bound facts) but it no longer occupies the `inflight`
+   * slot, so the same requirement re-dispatches cleanly if it returns. A
+   * no-op if the requirement is not in-flight.
    *
    * @param requirementId - The unique requirement ID to detach.
    */
   detach(requirementId: string): void;
   /**
-   * Cancel every in-flight resolver and flush all pending batch queues.
+   * Abort every in-flight resolver and flush all pending batch queues.
    */
-  cancelAll(): void;
+  abortAll(): void;
   /**
    * Get the current status of a resolver by requirement ID.
    *
@@ -260,7 +262,7 @@ export interface CreateResolversOptions<S extends Schema> {
   onError?: (resolver: string, req: RequirementWithId, error: unknown) => void;
   /** Called before each retry attempt with the upcoming attempt number. */
   onRetry?: (resolver: string, req: RequirementWithId, attempt: number) => void;
-  /** Called when a resolver is canceled via {@link ResolversManager.cancel | cancel}. */
+  /** Called when a resolver is aborted via {@link ResolversManager.abort | abort}. */
   onCancel?: (resolver: string, req: RequirementWithId) => void;
   /**
    * Called when a bound resolver's owned-fact write is dropped because the
@@ -472,7 +474,7 @@ function validateDefinitions<S extends Schema>(
 
 /**
  * Creates a resolver manager that tracks active resolver instances and
- * coordinates their lifecycle (start / complete / error / cancel) against
+ * coordinates their lifecycle (start / complete / error / abort) against
  * the engine's requirement graph.
  *
  * @param options - resolver definitions, facts reference, and event hooks
@@ -510,13 +512,13 @@ export function createResolversManager<S extends Schema>(
   const batches = new Map<string, BatchState>();
 
   /**
-   * Track in-flight batch executions so `cancel(reqId)` and `cancelAll()`
+   * Track in-flight batch executions so `abort(reqId)` and `abortAll()`
    * can abort a batch that has already left the pre-flush queue but is
    * still mid-execution. Each batch invocation gets an opaque instance
    * id; the controller is the same one passed into `runBatchRetryLoop`.
    *
    * `reqToBatch` is a reverse index from requirement id → SET of batch
-   * instance ids so `cancel(reqId)` can find every owning batch in O(1)
+   * instance ids so `abort(reqId)` can find every owning batch in O(1)
    * without walking every state. The value is a Set rather than a single
    * id because two batch resolvers can legally process the same
    * requirement instance concurrently (different resolver definitions,
@@ -1419,10 +1421,10 @@ export function createResolversManager<S extends Schema>(
     const batchConfig = { ...DEFAULT_BATCH, ...def.batch };
     const timeout = batchConfig.timeoutMs ?? def.timeout;
 
-    // Register the in-flight batch so `cancel(reqId)` / `cancelAll()`
+    // Register the in-flight batch so `abort(reqId)` / `abortAll()`
     // can reach the controller mid-execution. Without this, the
     // controller created in `runBatchRetryLoop` is unreachable from
-    // outside and the batch runs to completion regardless of cancel.
+    // outside and the batch runs to completion regardless of abort.
     const batchInstanceId = `batch-${nextBatchInstanceId++}`;
     const controller = new AbortController();
     const state: BatchInflightState = {
@@ -1630,7 +1632,7 @@ export function createResolversManager<S extends Schema>(
         options?.factsBaseline,
       ).finally(() => {
         // Only fire onResolutionComplete if we're the first to clean up.
-        // If cancel() already removed us from inflight, skip to avoid
+        // If abort() already removed us from inflight, skip to avoid
         // spurious double-notifications.
         const wasInflight = inflight.delete(req.id);
         if (wasInflight) {
@@ -1639,7 +1641,7 @@ export function createResolversManager<S extends Schema>(
       });
     },
 
-    cancel(requirementId: string): void {
+    abort(requirementId: string): void {
       // Check inflight resolvers first
       const state = inflight.get(requirementId);
       if (state) {
@@ -1684,7 +1686,7 @@ export function createResolversManager<S extends Schema>(
       // Cancelling ANY requirement in an in-flight batch aborts the
       // whole batch (the controller is shared across all members) and
       // marks every requirement as canceled. This matches the
-      // all-or-nothing semantic of `resolveBatch` — you can't cancel
+      // all-or-nothing semantic of `resolveBatch` — you can't abort
       // one row of a SQL UPDATE without aborting the transaction.
       //
       // When the requirement participates in MULTIPLE batches
@@ -1739,10 +1741,10 @@ export function createResolversManager<S extends Schema>(
       inflight.delete(requirementId);
     },
 
-    cancelAll(): void {
+    abortAll(): void {
       const ids = [...inflight.keys()];
       for (const id of ids) {
-        this.cancel(id);
+        this.abort(id);
       }
 
       // Cancel queued batch requirements (still pre-flush)
@@ -1924,7 +1926,7 @@ export function createResolversManager<S extends Schema>(
     },
 
     destroy(): void {
-      this.cancelAll();
+      this.abortAll();
       statuses.clear();
       resolversByType.clear();
     },

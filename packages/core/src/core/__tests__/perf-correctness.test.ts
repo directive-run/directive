@@ -540,7 +540,7 @@ describe("P1-3: resolver cache LRU", () => {
     }
 
     // Cleanup
-    manager.cancelAll();
+    manager.abortAll();
   });
 });
 

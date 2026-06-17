@@ -216,8 +216,12 @@ under it – typically a single `status`/`phase`/`mode` fact. The constraint's
   *single-writer-binding* (no other writer may touch the listed facts
   while the resolver runs). The runtime does not emit `bind` on inspect
   snapshots today; doctor's `bind` check returns zero findings until
-  v2 lands. Design deferred until the v2 multi-process story crystallizes –
-  `bind:` semantics ride on the planned `ClobberDetector` interface
+  v2 lands. **Reserved-property validation already in place**:
+  `validateBindKeys` (in `module.ts`) rejects `__proto__`, `constructor`,
+  `prototype`, and `$`-prefixed `bind:` keys at registration time, so the
+  reserved-key bypass surface is closed before v2 wires the field.
+  Design deferred until the v2 multi-process story crystallizes –
+  `bind:` semantics ride on the planned `AbortDetector` interface
   (see "Single-process scope" below).
 
 ### Runtime async detection
@@ -244,6 +248,28 @@ The `reason: "clobbered"` discriminant stays even though the field was
 renamed from `owns:` to `abortOn:` – it's established vocabulary across the
 plugin hook payload and the clobber-loop detector (IDEAS.md R4.J), and
 renaming it would break consumer log queries with no clarity upside.
+
+### Async-disable observation event
+
+When the engine silently disables a constraint's `abortOn:` binding
+because the constraint is async (declared `async: true` OR runtime-promoted
+because its `when()` returned a Promise), it emits
+`constraint.binding.disabled` with `reason: "async-declared"` or
+`reason: "async-promoted"`. The dev-mode `console.warn` is the
+human-facing signal; the event is the SIEM-facing one. Without it, a
+production constraint loses its clobber-protection with no plugin /
+observer trail. The plugin hook is `onConstraintBindingDisabled(id,
+reason)`.
+
+### Default high-severity alerting
+
+The built-in `clobberAlertPlugin` ships a default rule that fires
+`console.error` on every `resolver.write.rejected { reason: "clobbered" }`
+whose fact's schema meta carries any of the tags in `irreversibleTags`
+(default: `["money", "pii", "irreversible"]`). Replace the `onAlert`
+callback to route to PagerDuty / Slack / Sentry / your SIEM of choice.
+The audit ledger already records every clobber; the plugin separates
+"noise" from "page an engineer NOW" without consumer wiring.
 
 The event is a discriminated union on `kind`: branch on it before reading
 the arm-specific fields.
@@ -311,9 +337,9 @@ Directive runtime has.
 shared backing store (e.g., IndexedDB via `BroadcastChannel`), each tab
 has its own clobber detection – cross-tab writes are not caught. For
 multi-tab safety, serialize writes through a single coordinator tab or
-wait for v2's distributed `ClobberDetector`.
+wait for v2's distributed `AbortDetector`.
 
-Multi-process Directive (planned v2) will introduce a `ClobberDetector`
+Multi-process Directive (planned v2) will introduce a `AbortDetector`
 interface to abstract the per-fact value lookup. Single-process
 implementations will plug into the same surface today's `createBoundFacts`
 uses internally – no resolver-author-visible change. Distributed

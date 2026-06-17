@@ -788,6 +788,26 @@ export type ObservationEvent =
       whenExplain?: ClauseResult[];
     }
   | { type: "constraint.error"; id: string; error: unknown }
+  /**
+   * Fired when the engine silently disables a constraint's `abortOn:`
+   * binding because the constraint is async (declared `async: true` OR
+   * runtime-promoted because its `when()` returned a Promise). The
+   * dev-mode `console.warn` is the human-facing signal; this event is
+   * the SIEM-facing one. Without it, a production constraint loses its
+   * clobber-protection with no plugin / observer trail.
+   *
+   * - `reason: "async-declared"` — the constraint def has `async: true`.
+   *   The author opted in; the warning + event are advisory.
+   * - `reason: "async-promoted"` — the constraint's `when()` returned
+   *   a Promise at runtime. The author probably did not realize. This
+   *   is the more dangerous case — the binding silently disables and
+   *   the clobber check no-ops.
+   */
+  | {
+      type: "constraint.binding.disabled";
+      id: string;
+      reason: "async-declared" | "async-promoted";
+    }
   | { type: "requirement.created"; id: string; requirementType: string }
   | { type: "requirement.met"; id: string; byResolver: string }
   | { type: "requirement.canceled"; id: string }

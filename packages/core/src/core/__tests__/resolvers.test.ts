@@ -651,7 +651,7 @@ describe("abort / cancel", () => {
 
     expect(manager.isResolving(req.id)).toBe(true);
 
-    manager.cancel(req.id);
+    manager.abort(req.id);
 
     expect(manager.isResolving(req.id)).toBe(false);
     expect(signalAborted).toBe(true);
@@ -684,7 +684,7 @@ describe("abort / cancel", () => {
     manager.resolve(req);
     await flush();
 
-    manager.cancel(req.id);
+    manager.abort(req.id);
 
     expect(manager.getStatus(req.id).state).toBe("canceled");
     expect(onCancel).toHaveBeenCalledWith("fetchData", req);
@@ -731,7 +731,7 @@ describe("abort / cancel", () => {
 
     expect(manager.getInflight().length).toBe(2);
 
-    manager.cancelAll();
+    manager.abortAll();
 
     expect(manager.getInflight().length).toBe(0);
     expect(manager.getStatus(reqA.id).state).toBe("canceled");
@@ -1299,7 +1299,7 @@ describe("edge cases", () => {
     const { manager } = setup({});
 
     // Should not throw
-    manager.cancel("doesNotExist");
+    manager.abort("doesNotExist");
   });
 
   it("successful status includes completedAt and duration", async () => {
@@ -2456,7 +2456,7 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
 
     // Cancel via one of the requirements in the batch. The whole batch's
     // controller fires (all-or-nothing semantic).
-    manager.cancel(r2.id);
+    manager.abort(r2.id);
 
     expect(batchSignals[0]?.aborted).toBe(true);
     // onCancel fires for every requirement in the batch, not just r2.
@@ -2524,7 +2524,7 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     expect(aborts.length).toBe(2);
     expect(aborts.every((s) => !s.aborted)).toBe(true);
 
-    manager.cancelAll();
+    manager.abortAll();
 
     // Both in-flight batches now aborted.
     expect(aborts.every((s) => s.aborted)).toBe(true);
@@ -2559,7 +2559,7 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     const req = makeReq("JOB", { id: "same-id" });
     manager.resolve(req);
     await new Promise((r) => setTimeout(r, 10));
-    manager.cancel(req.id);
+    manager.abort(req.id);
     releaseFirst();
     await flush();
 

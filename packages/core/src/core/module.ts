@@ -285,7 +285,7 @@ function validatePivotNameConflicts<M extends ModuleSchema>(
 /**
  * Reject constraint `abortOn` entries that name a reserved property — a
  * `BLOCKED_PROPS` key (`__proto__`, `constructor`, `prototype`) or a
- * `$`-prefixed key. Such names can never be owned fact slots, so the
+ * `$`-prefixed key. Such names can never be valid fact slots, so the
  * clobber-detection binding would silently no-op. A structural integrity
  * check — runs unconditionally, not just in dev.
  */
@@ -308,6 +308,45 @@ function validateAbortOnKeys<M extends ModuleSchema>(
       if (BLOCKED_PROPS.has(key) || key.startsWith("$")) {
         throw new Error(
           `[Directive] module '${id}' constraint '${cid}': abortOn key '${key}' is reserved (BLOCKED_PROPS or $-prefixed)`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Reject constraint `bind:` entries that name a reserved property — a
+ * `BLOCKED_PROPS` key (`__proto__`, `constructor`, `prototype`) or a
+ * `$`-prefixed key. Same defensive shape as {@link validateAbortOnKeys}.
+ *
+ * `bind:` is the v2 reservation slot for single-writer binding (RFC-0003
+ * Future Work). The engine does not consume it yet — but the validator
+ * ships now so the symmetry is locked in code review before any v2
+ * runtime wires the field. Without this gate, a future engine could
+ * silently accept `bind: ['__proto__']` and the reserved-key bypass
+ * (the exact class of bug `validateAbortOnKeys` exists to close) would
+ * re-appear on the sibling field. Symmetric structural integrity
+ * check — runs unconditionally, not just in dev.
+ */
+function validateBindKeys<M extends ModuleSchema>(
+  id: string,
+  config: ModuleConfig<M> | ModuleConfigWithDeps<M, CrossModuleDeps>,
+): void {
+  const constraints = config.constraints as
+    | Record<string, { bind?: readonly string[] }>
+    | undefined;
+  if (!constraints) {
+    return;
+  }
+  for (const [cid, constraint] of Object.entries(constraints)) {
+    const bind = constraint?.bind;
+    if (!bind) {
+      continue;
+    }
+    for (const key of bind) {
+      if (BLOCKED_PROPS.has(key) || key.startsWith("$")) {
+        throw new Error(
+          `[Directive] module '${id}' constraint '${cid}': bind key '${key}' is reserved (BLOCKED_PROPS or $-prefixed)`,
         );
       }
     }
@@ -506,6 +545,12 @@ export function createModule<const M extends ModuleSchema>(
   // Reserved `abortOn` keys would silently disable clobber-detection — a
   // structural integrity check, run unconditionally.
   validateAbortOnKeys(id, config);
+
+  // `bind:` is type-reserved for v2 single-writer binding. The validator
+  // ships now (vacuously safe today, since the engine never reads
+  // `def.bind`) so the symmetry with abortOn is locked in code review
+  // before any v2 runtime wires the field.
+  validateBindKeys(id, config);
 
   if (isDevelopment) {
     validateModuleConfig(id, config);

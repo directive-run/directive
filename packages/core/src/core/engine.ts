@@ -669,6 +669,8 @@ export function createEngine<S extends Schema>(
     if (!def?.abortOn || def.abortOn.length === 0) return undefined;
     const state = constraintsManager.getState(constraintId);
     if (state?.isAsync || def.async) {
+      const reason: "async-declared" | "async-promoted" =
+        state?.isAsync && !def.async ? "async-promoted" : "async-declared";
       if (isDevelopment) {
         // If the engine promoted this constraint to async at runtime (its
         // when() returned a Promise) the user almost certainly didn't realize.
@@ -680,7 +682,7 @@ export function createEngine<S extends Schema>(
         // "has `owns` but is async" before v1.22.0 (rename owns: → abortOn:).
         // Searching old issue threads under the previous phrasing will not
         // hit this code path.
-        if (state?.isAsync && !def.async) {
+        if (reason === "async-promoted") {
           console.warn(
             `[Directive] constraint '${constraintId}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
           );
@@ -689,6 +691,13 @@ export function createEngine<S extends Schema>(
             `[Directive] Constraint "${constraintId}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound.`,
           );
         }
+      }
+      // SIEM-facing signal — fires in both dev and prod so production
+      // plugins (audit-ledger, observability) can detect a constraint
+      // silently losing its clobber-protection. Dev-mode console.warn
+      // covers the human side; this covers the machine side.
+      if (hasPlugins()) {
+        pluginManager.emitConstraintBindingDisabled(constraintId, reason);
       }
       return undefined;
     }
@@ -1076,7 +1085,7 @@ export function createEngine<S extends Schema>(
         if (bound) {
           resolversManager.detach(req.id);
         } else {
-          resolversManager.cancel(req.id);
+          resolversManager.abort(req.id);
         }
       }
 
@@ -1498,6 +1507,11 @@ export function createEngine<S extends Schema>(
         },
         onConstraintError: (id: string, error: unknown) =>
           observer({ type: "constraint.error", id, error }),
+        onConstraintBindingDisabled: (
+          id: string,
+          reason: "async-declared" | "async-promoted",
+        ) =>
+          observer({ type: "constraint.binding.disabled", id, reason }),
         onRequirementCreated: (req: {
           id: string;
           requirement: { type: string };
@@ -1796,7 +1810,7 @@ export function createEngine<S extends Schema>(
       errorBoundary.getRetryLaterManager().clearAll();
 
       // Cancel all resolvers
-      resolversManager.cancelAll();
+      resolversManager.abortAll();
 
       // Detach external event sources BEFORE running effect cleanups so any
       // sources that share resources with effects (rare but possible) see
@@ -1854,7 +1868,7 @@ export function createEngine<S extends Schema>(
         retryLaterTimer = null;
       }
       errorBoundary.getRetryLaterManager().clearAll();
-      resolversManager.cancelAll();
+      resolversManager.abortAll();
       await sourcesManager.cleanupAllAsync();
       effectsManager.cleanupAll();
       for (const module of config.modules) {

@@ -1,6 +1,6 @@
 # Resolvers
 
-> Covers `@directive-run/core` — resolver definition: retry policies, batching, cancellation, custom dedup keys, `owns` binding.
+> Covers `@directive-run/core` — resolver definition: retry policies, batching, cancellation, custom dedup keys, `abortOn` binding.
 
 Resolvers fulfill requirements emitted by constraints. They are the supply side of the constraint-resolver pattern. Resolvers handle async work and mutate state through `context.facts`.
 
@@ -204,6 +204,31 @@ resolvers: {
 ```
 
 Failed items from `resolveBatchWithResults` can be individually retried if a retry policy is configured.
+
+## `abortOn` binding (constraint-side)
+
+Declared on the *constraint*, not the resolver. Lists facts whose values
+must remain unchanged between dispatch and the resolver's writes; if any
+of them changes mid-flight, the resolver's writes are dropped and its
+signal is aborted.
+
+```typescript
+constraints: {
+  finalizeKyc: {
+    when: (f) => f.kyc.status === "pending",
+    require: { type: "FINALIZE_KYC" },
+    abortOn: ["kyc.status"], // abort if `kyc.status` changes mid-flight
+  },
+},
+```
+
+`abortOn:` does **not** lock or gate other writers. It only protects this
+resolver from clobbering with stale data when its tail write attempts a
+value the world has since moved past. See
+[`/docs/resolver-binding`](https://directive.run/docs/resolver-binding)
+for the full lifecycle, ABA caveats, and the audit event
+(`resolver.write.rejected { reason: "clobbered" }`) that fires on a
+dropped write.
 
 ## Timeout
 

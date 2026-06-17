@@ -62,3 +62,8 @@ export {
   type CircuitBreakerStats,
   type CircuitBreaker,
 } from "./circuit-breaker.js";
+export {
+  clobberAlertPlugin,
+  type ClobberAlertPluginOptions,
+  type ClobberAlertEvent,
+} from "./clobber-alert.js";
