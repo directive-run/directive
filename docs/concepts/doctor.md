@@ -84,6 +84,6 @@ This is a structural v1. It does **NOT** check:
 
 ## Reference
 
-- API: `doctor.checkAgainst`, `doctor.checkOwns`, `CheckAgainstResult`, `CheckOwnsResult`, `CheckOwnsFinding`, `Contradiction`, `ContradictionType`
+- API: `doctor.checkAgainst`, `doctor.checkAbortOn`, `CheckAgainstResult`, `CheckAbortOnResult`, `CheckAbortOnFinding`, `Contradiction`, `ContradictionType`
 - Underlying: [`diffRules`](./rules-diff.md) (used to flatten predicates for comparison)
 - Pairs with: [`predicateFromIntent`](./predicate-from-intent.md), [`predict`](./predict.md)

@@ -806,7 +806,7 @@ export type ObservationEvent =
     }
   | {
       /**
-       * A real per-write rejection. A bound resolver's owned-fact write was
+       * A real per-write rejection. A bound resolver's abort-bound write was
        * dropped because the fact was changed by something outside the
        * resolver between the resolver's baseline and its next write (RFC-0003
        * optimistic-concurrency check). `reason` keeps the observation protocol

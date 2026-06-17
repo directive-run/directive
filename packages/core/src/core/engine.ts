@@ -675,6 +675,11 @@ export function createEngine<S extends Schema>(
         // Call that out explicitly — the workaround is a data-form when (always
         // sync) or an explicit `async: true` opt-in that accepts the loss of
         // abortOn.
+        //
+        // Bisect breadcrumb: these warnings used "owns binding disabled" /
+        // "has `owns` but is async" before v1.22.0 (rename owns: → abortOn:).
+        // Searching old issue threads under the previous phrasing will not
+        // hit this code path.
         if (state?.isAsync && !def.async) {
           console.warn(
             `[Directive] constraint '${constraintId}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
@@ -1059,7 +1064,7 @@ export function createEngine<S extends Schema>(
       // Handle resolvers for removed requirements. Unbound: cancel (abort the
       // signal). Bound (RFC-0003): detach instead — untrack the resolver but
       // do not abort it. It runs to completion so its data writes land (the
-      // binding still drops owned-fact clobbers); untracking lets the
+      // binding still drops abort-bound clobbers); untracking lets the
       // requirement re-dispatch cleanly if the constraint flips true again.
       // Cancelling a bound resolver would abort the signal and make a
       // signal-checking resolver bail early, losing those data writes (the
@@ -1077,13 +1082,13 @@ export function createEngine<S extends Schema>(
 
       // Start resolvers for new requirements. Snapshot facts ONCE before the
       // dispatch loop so every resolver in this reconcile tick observes the
-      // same pre-dispatch values for its owned facts. Without a shared
-      // baseline, two bound resolvers that overlap on an owned fact would
+      // same pre-dispatch values for its abort-bound facts. Without a
+      // shared baseline, two bound resolvers that overlap on an abort-bound fact would
       // race: the first lands its write, the second's `expected` map (seeded
       // from live `rawFacts`) inherits that write, and the second silently
       // clobbers the first.
       //
-      // Perf: only snapshot the *owned* fact keys across this tick's bound
+      // Perf: only snapshot the *abort-bound* fact keys across this tick's bound
       // requirements. With 10k facts and one binding on field "A", a full
       // `store.toObject()` would copy all 10k slots per reconcile tick. We
       // build the smallest possible baseline; if no `added` requirement has

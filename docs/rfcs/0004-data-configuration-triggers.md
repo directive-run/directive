@@ -2,7 +2,7 @@
 
 - **Status:** Draft (2026-05-19)
 - **Author:** Jason Comes
-- **Related:** [RFC 0003 – Resolver constraint-binding (`owns`)](./0003-resolver-constraint-binding.md)
+- **Related:** [RFC 0003 – Resolver constraint-binding (`abortOn`)](./0003-resolver-constraint-binding.md)
 
 ## Summary
 

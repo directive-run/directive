@@ -63,7 +63,7 @@ export interface ResolversManager<_S extends Schema> {
    * @param req - The requirement (with a stable identity ID) to resolve.
    * @param options.factsBaseline - Optional pre-dispatch facts snapshot
    *   shared by every resolver dispatched in the same reconcile tick. Used
-   *   by RFC-1 constraint-binding to seed each resolver's `expected` map
+   *   by RFC-0003 constraint-binding to seed each resolver's `expected` map
    *   from a value that pre-dates any sibling resolver's writes, preventing
    *   the sibling-clobber gap where resolver 2 silently overwrites
    *   resolver 1's owned write.
@@ -209,7 +209,7 @@ interface BatchState {
 }
 
 /**
- * Per-constraint binding info, used by RFC-1 (resolver constraint-binding).
+ * Per-constraint binding info, used by RFC-0003 (resolver constraint-binding).
  *
  * The engine wires this lookup into the resolvers manager so that a resolver
  * dispatched from a constraint with an `abortOn` field knows which facts it
@@ -239,7 +239,7 @@ export interface CreateResolversOptions<S extends Schema> {
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
   /**
-   * Look up binding info for a source constraint id (RFC-1).
+   * Look up binding info for a source constraint id (RFC-0003).
    *
    * Wired by the engine — given the `fromConstraint` of a `RequirementWithId`,
    * returns the constraint's abort-binding fact keys. Return `undefined` if
@@ -656,7 +656,7 @@ export function createResolversManager<S extends Schema>(
   }
 
   /**
-   * Resolve the effective constraint binding for a requirement (RFC-1).
+   * Resolve the effective constraint binding for a requirement (RFC-0003).
    *
    * Returns `null` when binding does not apply:
    * - No `getConstraintBinding` wired (e.g. tests calling the manager directly).
@@ -675,32 +675,39 @@ export function createResolversManager<S extends Schema>(
   }
 
   /**
-   * Build a binding-aware Proxy around the engine `facts` proxy (RFC-1).
+   * Build a binding-aware Proxy around the engine `facts` proxy (RFC-0003).
    *
-   * **Semantics — per-fact optimistic concurrency:**
+   * **Semantics — per-fact optimistic concurrency (caller-aborting, not
+   * server-gating):**
    * - Reads pass through unchanged.
    * - A write to a fact NOT in `binding.fields` (a "data" write) always lands.
-   * - A write to an *owned* fact (in `binding.fields`) lands only if the fact
-   *   still holds the value this resolver last wrote or started with. If it
-   *   was changed by anything else (an event, another resolver), the write is
-   *   dropped, the resolver's `AbortController` is aborted, and that fact's
-   *   ownership is lost.
-   * - Ownership is **one-shot per fact**: once lost, further writes to that
-   *   fact are dropped even if it later returns to the expected value.
+   * - A write to an *abort-bound* fact (in `binding.fields`) lands only if
+   *   the fact still holds the value this resolver last wrote or started
+   *   with. If it was changed by anything else (an event, another
+   *   resolver), the resolver yields: the write is dropped, the resolver's
+   *   `AbortController` is aborted, and that fact is poisoned (one-shot)
+   *   for the rest of this invocation.
+   * - Poisoning is **one-shot per fact**: once a write is dropped, further
+   *   writes to that fact are dropped even if it later returns to the
+   *   expected value. The resolver does not get to "win the race" once it
+   *   has lost it.
    * - The set trap returns `true` even when dropping a write so resolvers
    *   running in strict mode don't see a `TypeError`. `ctx.signal.aborted`
-   *   is the canonical signal that an owned write was dropped.
+   *   is the canonical signal that an abort-bound write was dropped.
+   * - This proxy does **not** prevent other writers from touching the
+   *   listed facts — anyone can still write to them at any time. The
+   *   binding only intercepts writes by *this* resolver.
    *
    * `when()` is never consulted here — it remains purely the constraint
    * trigger. The binding works with async constraints too.
    *
    * @param baseline - Optional pre-dispatch facts snapshot. When provided,
-   *   `expected` for each owned fact seeds from the baseline rather than the
-   *   live `rawFacts` slot. This prevents the "sibling clobber" race where
-   *   two resolvers run in the same reconcile tick and overlap on owned
-   *   facts — without a shared pre-dispatch baseline, the second resolver
-   *   would observe the first's writes already-landed and silently allow
-   *   the clobber.
+   *   `expected` for each abort-bound fact seeds from the baseline rather
+   *   than the live `rawFacts` slot. This prevents the "sibling clobber"
+   *   race where two resolvers run in the same reconcile tick and overlap
+   *   on abort-bound facts — without a shared pre-dispatch baseline, the
+   *   second resolver would observe the first's writes already-landed and
+   *   silently allow the clobber.
    *
    * @internal
    */
@@ -827,7 +834,7 @@ export function createResolversManager<S extends Schema>(
    *   requirement in the batch — calling `ctx.requeue()` requeues all of them.
    *   For out-of-band invocations (e.g. `callOne`) pass an empty array; the
    *   `requeue()` call will be a safe no-op.
-   * @param binding - Optional RFC-1 constraint binding. When present, writes
+   * @param binding - Optional RFC-0003 constraint binding. When present, writes
    *   through `ctx.facts` to the owned facts are clobber-checked. See
    *   {@link ConstraintBindingInfo} and {@link createBoundFacts}.
    * @param controller - The AbortController owning `signal`. Required when
@@ -1273,7 +1280,7 @@ export function createResolversManager<S extends Schema>(
     attempt: number,
     baseline?: Readonly<Record<string, unknown>>,
   ): Promise<"done" | "retry"> {
-    // Resolve binding for the batch (RFC-1). Binding only applies when
+    // Resolve binding for the batch (RFC-0003). Binding only applies when
     // every requirement in the batch shares the same source constraint —
     // otherwise the predicate would be ambiguous. Mixed batches fall back
     // to no binding (current behavior).

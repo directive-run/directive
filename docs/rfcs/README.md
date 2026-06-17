@@ -10,7 +10,7 @@ landed in. Open questions are tracked inline.
 |---|---|---|---|
 | [0001](./0001-t-timer.md) | `t.timer()` schema primitive | Accepted | 1.x |
 | [0002](./0002-unregister-and-multi-instance.md) | `unregisterModule()` + multi-instance modules | Draft | TBD |
-| [0003](./0003-resolver-constraint-binding.md) | Resolver / constraint binding | Accepted | 1.x |
+| [0003](./0003-resolver-constraint-binding.md) | Resolver / constraint binding (`abortOn:`) | Accepted | 1.x |
 | [0004](./0004-data-configuration-triggers.md) | Data-form predicate triggers | Accepted | 1.x |
 | [0005](./0005-live-context-agent.md) | `runStream({ liveContext })` – Reactive Agents | Accepted | shipped 2026-06-07 (v1.18.0) |
 | [0006](./0006-spell-out-type-names.md) | `*Definition` aliases (1.x forward-compat) | Accepted | shipped 2026-06-07 (v1.18.0) |

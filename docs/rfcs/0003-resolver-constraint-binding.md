@@ -86,11 +86,20 @@ dispatch). A write to a listed fact:
 Writes to any fact **not** in `abortOn` always land. `when()` is never
 consulted by the binding – it remains purely the constraint trigger.
 
-The name `abortOn` is verb-first by design (the other constraint config
-keys – `when:`, `require:`, `priority:`, `after:`, `deps:` – are
-noun/preposition-prefixed). The verb is the whole point: declaring this
-list says "this resolver aborts on changes to these facts," which is
-exactly what the runtime enforces.
+The name `abortOn` describes the runtime action the resolver takes when
+a listed fact changes – it aborts. The other constraint config keys
+(`when:`, `require:`, `priority:`, `after:`, `deps:`) describe the
+*configuration*; `abortOn:` describes the *reaction*. The verb is the
+point: declaring this list says "this resolver aborts on changes to
+these facts," which is exactly what the runtime enforces.
+
+**This is caller-aborting OCC, not server-gating CAS.** Distributed-systems
+readers will recognize the shape from HTTP `If-Match`, CosmosDB
+`optimisticConcurrencyToken`, and EventStore `expectedVersion` – but
+those mechanisms *reject the write at the server boundary*. Directive
+does the opposite: the listed facts are written freely by anyone, and
+the constrained resolver is the one that yields (drops its writes,
+aborts its signal) when it observes the divergence.
 
 **`abortOn` does NOT prevent other writers.** It protects this resolver
 from writing stale data over a fresher value. Anything else can still
@@ -199,6 +208,17 @@ under it – typically a single `status`/`phase`/`mode` fact. The constraint's
 - **Per-constraint declarative `on*` callbacks.** A second surface
   alongside the event stream (`onAbort`, `onClobber`, etc.). Captured as a
   follow-on; deferred. See IDEAS.md R8.B.
+- **`bind:` (v2, distinct surface).** The `bind:` field is type-reserved
+  on `system.inspect().constraints[]` and on `CheckAbortOnFinding.source`
+  as a v2 promise – but it is *not* the v1 `bind: 'auto'` that this RFC
+  supersedes, and it is *not* a synonym for `abortOn:`. The intent: where
+  `abortOn:` is *caller-aborting* (this resolver yields), `bind:` will be
+  *single-writer-binding* (no other writer may touch the listed facts
+  while the resolver runs). The runtime does not emit `bind` on inspect
+  snapshots today; doctor's `bind` check returns zero findings until
+  v2 lands. Design deferred until the v2 multi-process story crystallizes –
+  `bind:` semantics ride on the planned `ClobberDetector` interface
+  (see "Single-process scope" below).
 
 ### Runtime async detection
 

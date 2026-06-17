@@ -242,8 +242,9 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   /**
    * Called when a resolver's write is rejected by the runtime. The only
    * `reason` today is `"clobbered"`: a bound resolver (RFC-0003) dropped a
-   * write to an owned fact because the fact was changed by something outside
-   * the resolver between the resolver's baseline and its next write — the
+   * write to an abort-bound fact (one listed in the constraint's
+   * `abortOn:`) because the fact was changed by something outside the
+   * resolver between the resolver's baseline and its next write — the
    * resolver's `AbortController` is aborted in the same step. See
    * {@link createBoundFacts} for the per-fact optimistic-concurrency model.
    * `reason` keeps the hook backend-neutral.

@@ -1350,7 +1350,7 @@ describe("edge cases", () => {
 });
 
 // ============================================================================
-// Constraint-Binding (RFC-1)
+// Constraint-Binding (RFC-0003)
 // ============================================================================
 
 /**
@@ -1383,7 +1383,7 @@ function setupBinding(
   return { store, facts, manager };
 }
 
-describe("constraint-binding (RFC-1)", () => {
+describe("constraint-binding (RFC-0003)", () => {
   it("drops an abort-bound fact write clobbered by an external event", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {

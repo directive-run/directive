@@ -202,17 +202,82 @@ Pick the fact(s) the resolver re-asserts in its tail. No change to `when()`.
 The constraint-binding field was originally named `owns:` (introduced in
 v1.5 alongside RFC 0003). Renamed to `abortOn:` in v1.22.0 to reflect the
 actual semantics – the resolver yields when listed facts change; it does
-not assert ownership. Same engine, same audit event, clearer name:
+not assert ownership. Same engine, clearer name.
+
+### Vocabulary in one sentence
+
+The `abortOn:` config (declaration) causes the engine to fire a
+`resolver.write.rejected` event with `reason: "clobbered"` (runtime
+discriminator) whenever a listed fact changed mid-flight. **Three nouns,
+one concept** – kept distinct deliberately so production log queries on
+`"clobbered"` keep working while the source-code vocabulary updates to
+`abortOn:`.
+
+### What renamed
 
 ```diff
 - owns: ['status'],
 + abortOn: ['status'],
 ```
 
-The audit event payload (`resolver.write.rejected { reason: "clobbered" }`)
-is **unchanged** – production log queries on `"clobbered"` keep working.
-`doctor.checkOwns()` was renamed to `doctor.checkAbortOn()` for
-consistency.
+Also renamed for consistency (mechanical replacements – no semantic
+change):
+
+- `doctor.checkOwns()` → `doctor.checkAbortOn()`
+- `CheckOwnsResult` / `CheckOwnsFinding` types → `CheckAbortOnResult` /
+  `CheckAbortOnFinding`
+- `DoctorConstraintOwnsConflict` interface → `DoctorConstraintAbortOnConflict`
+- `system.inspect().constraints[].owns` → `.abortOn`
+- The `source` discriminant on doctor findings: `source: "owns"` →
+  `source: "abortOn"`
+
+### What did NOT rename
+
+- Audit event payload `resolver.write.rejected { reason: "clobbered" }` –
+  unchanged. Grafana / Splunk / Datadog queries keyed on `"clobbered"` keep
+  firing.
+- `onResolverWriteRejected` plugin hook signature – unchanged.
+- Internal `ConstraintBindingInfo.fields` runtime shape – unchanged.
+- Reserved-key validator behaviour – `__proto__`, `constructor`,
+  `prototype`, `$-prefixed` keys still throw at registration time, just
+  with the new field name in the error message.
+
+### Helper functions typed over `string[]`
+
+The field type stays `readonly string[]`. Consumer helper functions like
+`function validateBindingFields(fields: readonly string[]): void` keep
+working without changes – only the field NAME on the constraint
+definition moved.
+
+### Internal runbooks searching the source tree
+
+If your IR runbook or SRE playbook says "when you see
+`resolver.write.rejected`, grep the repo for `owns:` matching this fact,"
+update the grep target to `abortOn:`. The event payload is unchanged but
+the source-side vocabulary is not.
+
+### CI grep gates
+
+If your security CI or pre-deploy lint greps for `checkOwns(`,
+`CheckOwnsResult`, `validateOwnsKeys`, or `DoctorConstraintOwnsConflict`,
+update to `checkAbortOn(`, `CheckAbortOnResult`, `validateAbortOnKeys`,
+and `DoctorConstraintAbortOnConflict`. The renamed methods do not export
+under the old names; gates grepping for the old names will silently
+false-pass.
+
+### Stored `system.inspect()` snapshots (SOC2 evidence, audit captures)
+
+If your compliance pipeline persists `system.inspect().constraints[]`
+into a long-term evidence store, captures taken before v1.22.0 hold
+`owns:` and captures taken after hold `abortOn:`. The field type is
+identical (`readonly string[]`). Record the `@directive-run/core`
+version alongside the snapshot so the field shape is unambiguous on
+replay.
+
+No RoPA / Privacy Notice update is required – the rename is an internal
+field-shape change. The "processed data" the audit ledger persists (fact
+paths, `reason` discriminator, `expected` / `actual` values) is
+unchanged.
 
 ## Migrating from `$matches: string` (pre-v1.5)
 

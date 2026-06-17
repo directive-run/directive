@@ -1589,10 +1589,10 @@ describe("Engine — Effects", () => {
 });
 
 // ============================================================================
-// Constraint-Binding (RFC-1) — engine-level integration
+// Constraint-Binding (RFC-0003) — engine-level integration
 // ============================================================================
 
-describe("constraint-binding (RFC-1) — engine integration", () => {
+describe("constraint-binding (RFC-0003) — engine integration", () => {
   it("the binding prevents tail-clobber end-to-end through createSystem", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
@@ -1664,7 +1664,7 @@ describe("constraint-binding (RFC-1) — engine integration", () => {
     release();
     await flush();
 
-    // Without RFC-1 binding, status would be 'playing' here. With binding,
+    // Without RFC-0003 binding, status would be 'playing' here. With binding,
     // the tail write was dropped → status stays 'left'.
     expect(system.facts.status).toBe("left");
 
