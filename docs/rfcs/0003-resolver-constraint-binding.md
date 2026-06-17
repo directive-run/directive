@@ -278,6 +278,14 @@ system.observe((e) => {
 });
 ```
 
+The event (and its companion dev-mode `console.warn`) fires **at most
+once per (constraint id, reason) pair** across the lifetime of the
+registered constraint. A hot async constraint that dispatches thousands
+of times per second still produces exactly one event per reason, so
+the SIEM / log stream cannot be flooded by the binding-disabled
+signal. The bit is cleared if the constraint is `unregister()`-ed and
+re-registered.
+
 ### Default high-severity alerting
 
 The built-in `clobberAlertPlugin` ships a default rule that fires
@@ -291,6 +299,14 @@ effect itself is what makes it irreversible). Replace the `onAlert`
 callback to route to PagerDuty / Slack / Sentry / your SIEM of choice.
 The audit ledger already records every clobber; the plugin separates
 "noise" from "page an engineer NOW" without consumer wiring.
+
+For long-running clobber bursts past the engine's per-resolver
+rate-limit cap (10 per-write events per resolver instance), set
+`onSummary` to receive the aggregated summary event with the dropped
+count. The plugin only surfaces summaries when the resolver is in
+`irreversibleResolvers` or has previously fired `onAlert` in the
+session — so SIEM keeps telemetry on resolvers that have proven they
+touch irreversible state, without flooding on noise resolvers.
 
 The event is a discriminated union on `kind`: branch on it before reading
 the arm-specific fields.

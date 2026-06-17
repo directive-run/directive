@@ -671,17 +671,20 @@ export function createEngine<S extends Schema>(
     if (state?.isAsync || def.async) {
       const reason: "async-declared" | "async-promoted" =
         state?.isAsync && !def.async ? "async-promoted" : "async-declared";
-      if (isDevelopment) {
+
+      // Per-(constraintId, reason) dedupe so a hot async constraint that
+      // dispatches at high throughput doesn't flood the console or the
+      // observation stream with identical events.
+      const notifyKey = `${constraintId}::${reason}`;
+      const alreadyNotified = bindingDisabledNotified.has(notifyKey);
+      if (!alreadyNotified) bindingDisabledNotified.add(notifyKey);
+
+      if (isDevelopment && !alreadyNotified) {
         // If the engine promoted this constraint to async at runtime (its
         // when() returned a Promise) the user almost certainly didn't realize.
         // Call that out explicitly — the workaround is a data-form when (always
         // sync) or an explicit `async: true` opt-in that accepts the loss of
         // abortOn.
-        //
-        // Bisect breadcrumb: these warnings used "owns binding disabled" /
-        // "has `owns` but is async" before v1.22.0 (rename owns: → abortOn:).
-        // Searching old issue threads under the previous phrasing will not
-        // hit this code path.
         if (reason === "async-promoted") {
           console.warn(
             `[Directive] constraint '${constraintId}': abortOn binding disabled because when() returned a Promise — convert to a synchronous when, mark the constraint async: true and accept the binding being off, or use a data-form when (always sync).`,
@@ -696,7 +699,7 @@ export function createEngine<S extends Schema>(
       // plugins (audit-ledger, observability) can detect a constraint
       // silently losing its clobber-protection. Dev-mode console.warn
       // covers the human side; this covers the machine side.
-      if (hasPlugins()) {
+      if (hasPlugins() && !alreadyNotified) {
         pluginManager.emitConstraintBindingDisabled(constraintId, reason);
       }
       return undefined;
@@ -712,6 +715,20 @@ export function createEngine<S extends Schema>(
    * the resolver again. See {@link ResolverContext.requeue}.
    */
   const pendingRequeueIds = new Set<string>();
+
+  /**
+   * Per-(constraintId, reason) sticky bit so `constraint.binding.disabled`
+   * fires at most ONCE per pair across the lifetime of the registered
+   * constraint. Without this, a hot async constraint that dispatches at
+   * 1k/sec would flood SIEM/observers with 1k/sec of identical events.
+   * The dev-mode `console.warn` is gated by the same sticky bit so
+   * `pnpm dev` doesn't flood the terminal either.
+   *
+   * The bit is cleared when the constraint's definition is removed via
+   * `unregister()` so re-registering a constraint resets the
+   * once-per-lifetime contract.
+   */
+  const bindingDisabledNotified = new Set<string>();
 
   // Create resolvers manager
   const resolversManager: ResolversManager<S> = createResolversManager({
@@ -1316,6 +1333,11 @@ export function createEngine<S extends Schema>(
       },
       unregister: (id: string) => {
         definitions.unregister("constraint", id);
+        // Reset the binding-disabled sticky bits so a constraint
+        // re-registered under the same id can fire the warn/event
+        // again the first time its async state is observed.
+        bindingDisabledNotified.delete(`${id}::async-declared`);
+        bindingDisabledNotified.delete(`${id}::async-promoted`);
       },
       call: (id: string, props?: Record<string, unknown>) =>
         definitions.call("constraint", id, props) as Promise<

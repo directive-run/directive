@@ -3,6 +3,7 @@ import { createModule, createSystem, t } from "../../index.js";
 import { flushMicrotasks } from "../../utils/testing.js";
 import {
   type ClobberAlertEvent,
+  type ClobberSummaryEvent,
   clobberAlertPlugin,
 } from "../clobber-alert.js";
 
@@ -730,5 +731,187 @@ describe("clobberAlertPlugin", () => {
     } finally {
       dateNowSpy.mockRestore();
     }
+  });
+
+  it("onSummary fires for resolver-listed irreversible resolvers", async () => {
+    const summaries: ClobberSummaryEvent[] = [];
+    const m = createModule("summary", {
+      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      init: (f) => {
+        f._ = 1;
+      },
+    });
+    const plugin = clobberAlertPlugin({
+      irreversibleResolvers: ["chargeCard"],
+      onAlert: () => {},
+      onSummary: (e) => summaries.push(e),
+    });
+    const system = createSystem({ module: m, plugins: [plugin] });
+    system.start();
+
+    plugin.onResolverWriteRejected?.({
+      kind: "summary",
+      resolver: "chargeCard",
+      req: { id: "req", requirement: { type: "T" } } as Parameters<
+        NonNullable<typeof plugin.onResolverWriteRejected>
+      >[0] extends infer X
+        ? X extends { req: infer R }
+          ? R
+          : never
+        : never,
+      reason: "clobbered",
+      dropped: 47,
+    });
+
+    expect(summaries.length).toBe(1);
+    expect(summaries[0]?.resolver).toBe("chargeCard");
+    expect(summaries[0]?.dropped).toBe(47);
+    expect(summaries[0]?.matchedBy).toBe("resolver-listed");
+
+    system.destroy();
+  });
+
+  it("onSummary fires for resolvers that previously alerted on an irreversible fact", async () => {
+    const alerts: ClobberAlertEvent[] = [];
+    const summaries: ClobberSummaryEvent[] = [];
+    const m = createModule("priorAlert", {
+      schema: {
+        facts: { amount: t.number().meta({ tags: ["money"] }) },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
+      init: (f) => {
+        f.amount = 1;
+      },
+    });
+    const plugin = clobberAlertPlugin({
+      onAlert: (e) => alerts.push(e),
+      onSummary: (e) => summaries.push(e),
+    });
+    const system = createSystem({ module: m, plugins: [plugin] });
+    system.start();
+
+    const synthRejection = () => ({
+      kind: "rejection" as const,
+      resolver: "loopy",
+      req: { id: "req", requirement: { type: "T" } } as Parameters<
+        NonNullable<typeof plugin.onResolverWriteRejected>
+      >[0] extends infer X
+        ? X extends { req: infer R }
+          ? R
+          : never
+        : never,
+      reason: "clobbered" as const,
+      fact: "amount",
+      expected: 1,
+      actual: 2,
+    });
+
+    // First a rejection — fires onAlert, records the resolver.
+    plugin.onResolverWriteRejected?.(synthRejection());
+    expect(alerts.length).toBe(1);
+
+    // Then a summary for the same resolver — fires onSummary because
+    // the resolver is in the "prior-irreversible-alert" set.
+    plugin.onResolverWriteRejected?.({
+      kind: "summary",
+      resolver: "loopy",
+      req: { id: "req", requirement: { type: "T" } } as Parameters<
+        NonNullable<typeof plugin.onResolverWriteRejected>
+      >[0] extends infer X
+        ? X extends { req: infer R }
+          ? R
+          : never
+        : never,
+      reason: "clobbered",
+      dropped: 23,
+    });
+
+    expect(summaries.length).toBe(1);
+    expect(summaries[0]?.matchedBy).toBe("prior-irreversible-alert");
+    expect(summaries[0]?.dropped).toBe(23);
+
+    system.destroy();
+  });
+
+  it("onSummary stays silent when neither filter matches", async () => {
+    const summaries: ClobberSummaryEvent[] = [];
+    const m = createModule("silent", {
+      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      init: (f) => {
+        f._ = 1;
+      },
+    });
+    const plugin = clobberAlertPlugin({
+      irreversibleResolvers: ["chargeCard"],
+      onAlert: () => {},
+      onSummary: (e) => summaries.push(e),
+    });
+    const system = createSystem({ module: m, plugins: [plugin] });
+    system.start();
+
+    // Summary for an unrelated resolver that never fired onAlert.
+    plugin.onResolverWriteRejected?.({
+      kind: "summary",
+      resolver: "noiseResolver",
+      req: { id: "req", requirement: { type: "T" } } as Parameters<
+        NonNullable<typeof plugin.onResolverWriteRejected>
+      >[0] extends infer X
+        ? X extends { req: infer R }
+          ? R
+          : never
+        : never,
+      reason: "clobbered",
+      dropped: 5,
+    });
+
+    expect(summaries.length).toBe(0);
+    system.destroy();
+  });
+
+  it("isolates a throwing onSummary callback from the dispatch path", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const m = createModule("throwingSummary", {
+      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      init: (f) => {
+        f._ = 1;
+      },
+    });
+    const plugin = clobberAlertPlugin({
+      irreversibleResolvers: ["r"],
+      onAlert: () => {},
+      onSummary: () => {
+        throw new Error("PagerDuty 503");
+      },
+    });
+    const system = createSystem({ module: m, plugins: [plugin] });
+    system.start();
+
+    expect(() =>
+      plugin.onResolverWriteRejected?.({
+        kind: "summary",
+        resolver: "r",
+        req: { id: "req", requirement: { type: "T" } } as Parameters<
+          NonNullable<typeof plugin.onResolverWriteRejected>
+        >[0] extends infer X
+          ? X extends { req: infer R }
+            ? R
+            : never
+          : never,
+        reason: "clobbered",
+        dropped: 3,
+      }),
+    ).not.toThrow();
+
+    const errCalls = errorSpy.mock.calls.filter(
+      (call) =>
+        typeof call[0] === "string" &&
+        call[0].includes("onSummary callback threw"),
+    );
+    expect(errCalls.length).toBeGreaterThanOrEqual(1);
+
+    errorSpy.mockRestore();
+    system.destroy();
   });
 });

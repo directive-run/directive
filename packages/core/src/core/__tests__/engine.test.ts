@@ -2117,9 +2117,13 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
       ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
         e.type === "constraint.binding.disabled",
     );
-    expect(bindingDisabled.length).toBeGreaterThanOrEqual(1);
+    // Exactly ONE event per (constraintId, reason) regardless of how
+    // many dispatches the async-disabled constraint triggers.
+    expect(bindingDisabled.length).toBe(1);
     expect(bindingDisabled[0]?.id).toBe("mutate");
     expect(bindingDisabled[0]?.reason).toBe("async-declared");
+    // And exactly ONE dev-mode warn for the same reason.
+    expect(warn).toHaveBeenCalledTimes(1);
 
     unsub();
     warn.mockRestore();
@@ -2182,9 +2186,84 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
       ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
         e.type === "constraint.binding.disabled",
     );
-    expect(bindingDisabled.length).toBeGreaterThanOrEqual(1);
+    expect(bindingDisabled.length).toBe(1);
     expect(bindingDisabled[0]?.id).toBe("mutate");
     expect(bindingDisabled[0]?.reason).toBe("async-promoted");
+    // The runtime-promotion path also surfaces a separate
+    // "constraint promoted to async at runtime" warning from the
+    // constraints manager, in addition to the binding-disabled
+    // warning. Both fire once thanks to engine-side dedupe.
+    const bindingDisabledWarns = warn.mock.calls.filter(
+      (call) =>
+        typeof call[0] === "string" && call[0].includes("abortOn binding disabled"),
+    );
+    expect(bindingDisabledWarns.length).toBe(1);
+
+    unsub();
+    warn.mockRestore();
+    system.destroy();
+  });
+
+  it("dedupes `constraint.binding.disabled` across many dispatches", async () => {
+    const m = createModule("dedupe", {
+      schema: {
+        facts: { status: t.string() },
+        derivations: {},
+        events: { tick: {} },
+        requirements: { GO: {} },
+      },
+      init: (f) => {
+        f.status = "idle";
+      },
+      events: {
+        tick: (f) => {
+          // Toggle back and forth to force many dispatches.
+          f.status = f.status === "idle" ? "mutating" : "idle";
+        },
+      },
+      constraints: {
+        mutate: {
+          async: true,
+          deps: ["status"],
+          when: async (f) => f.status === "mutating",
+          require: { type: "GO" },
+          abortOn: ["status"],
+        },
+      },
+      resolvers: {
+        run: {
+          requirement: "GO",
+          resolve: async () => {},
+        },
+      },
+    });
+
+    const system = createSystem({ module: m });
+    const events: ObservationEvent[] = [];
+    const unsub = system.observe((e) => events.push(e));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    system.start();
+    await flushMicrotasks();
+
+    // Toggle the async-disabled constraint into the firing state many times.
+    for (let i = 0; i < 20; i++) {
+      system.events.tick();
+      await flushMicrotasks();
+      system.events.tick(); // back to idle
+      await flushMicrotasks();
+    }
+
+    const bindingDisabled = events.filter(
+      (
+        e,
+      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
+        e.type === "constraint.binding.disabled",
+    );
+    // Even across many dispatches, only ONE event per (id, reason) pair fires.
+    expect(bindingDisabled.length).toBe(1);
+    // And exactly ONE dev-mode warn.
+    expect(warn).toHaveBeenCalledTimes(1);
 
     unsub();
     warn.mockRestore();

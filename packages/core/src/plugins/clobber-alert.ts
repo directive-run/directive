@@ -54,6 +54,25 @@ export interface ClobberAlertPluginOptions {
    */
   onAlert?: (event: ClobberAlertEvent) => void;
   /**
+   * Callback fired when the engine's per-resolver rate limit aggregates
+   * multiple per-write clobber events into a single
+   * `kind: "summary"` event (default cap: 10 per-resolver-instance).
+   * The summary names the resolver + dropped count but loses per-fact
+   * attribution — the engine has no way to enumerate every dropped
+   * write inside the cap.
+   *
+   * Only fires when EITHER:
+   * - the resolver is listed in `irreversibleResolvers`, OR
+   * - this plugin has previously fired `onAlert` for the resolver
+   *   (i.e. the resolver has touched an irreversible fact in this
+   *   session, so a follow-on burst is operationally relevant)
+   *
+   * Default: undefined (no summary alerts). Set this to preserve
+   * SIEM telemetry past the engine's rate-limit cap on a hot
+   * resolver fighting an irreversible fact.
+   */
+  onSummary?: (event: ClobberSummaryEvent) => void;
+  /**
    * Cooldown window keyed by `(fact, resolver)` pair. A second clobber
    * from the same resolver on the same fact within this window does not
    * re-fire `onAlert`. A clobber from a *different* resolver on the
@@ -88,6 +107,32 @@ export interface ClobberAlertEvent {
   readonly expected: unknown;
   readonly actual: unknown;
   /** `Date.now()` at the moment the alert fired. */
+  readonly timestamp: number;
+}
+
+/**
+ * Payload passed to {@link ClobberAlertPluginOptions.onSummary}.
+ *
+ * Fired when the engine's per-resolver clobber rate-limit aggregates
+ * multiple per-write events into one summary. Per-fact attribution is
+ * lost (the engine cannot enumerate every dropped write inside the
+ * cap), but the resolver + dropped count are preserved so SIEM can
+ * page on "this resolver is still fighting an irreversible fact
+ * past the cap."
+ */
+export interface ClobberSummaryEvent {
+  readonly resolver: string;
+  readonly requirementId: string;
+  /** Number of per-write clobber events the engine suppressed under the cap. */
+  readonly dropped: number;
+  /**
+   * Why the summary surfaced from this plugin's filter:
+   * - `"resolver-listed"` — the resolver was in `irreversibleResolvers`
+   * - `"prior-irreversible-alert"` — the resolver had already fired
+   *   `onAlert` on an irreversible fact in this session
+   */
+  readonly matchedBy: "resolver-listed" | "prior-irreversible-alert";
+  /** `Date.now()` at the moment the summary fired. */
   readonly timestamp: number;
 }
 
@@ -136,9 +181,17 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
         { expected: event.expected, actual: event.actual },
       );
     });
+  const onSummary = options.onSummary;
 
   let systemRef: System<M> | null = null;
   const lastAlerted = new Map<string, number>();
+  /**
+   * Resolver IDs that have fired at least one `onAlert` in this session.
+   * Used to surface summary alerts for resolvers that have proven they
+   * touch irreversible state — even if the summary event itself lacks
+   * the fact-tag information the per-event path uses.
+   */
+  const priorIrreversibleAlertResolvers = new Set<string>();
 
   return {
     name: "clobber-alert",
@@ -148,10 +201,36 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
     onDestroy() {
       systemRef = null;
       lastAlerted.clear();
+      priorIrreversibleAlertResolvers.clear();
     },
     onResolverWriteRejected(event) {
-      if (event.kind !== "rejection") return;
       if (!systemRef) return;
+
+      if (event.kind === "summary") {
+        if (!onSummary) return;
+        const resolverListed = irreversibleResolvers.has(event.resolver);
+        const priorAlert = priorIrreversibleAlertResolvers.has(event.resolver);
+        if (!resolverListed && !priorAlert) return;
+        try {
+          onSummary({
+            resolver: event.resolver,
+            requirementId: event.req.id,
+            dropped: event.dropped,
+            matchedBy: resolverListed
+              ? "resolver-listed"
+              : "prior-irreversible-alert",
+            timestamp: Date.now(),
+          });
+        } catch (err) {
+          console.error(
+            `[Directive] clobberAlertPlugin: onSummary callback threw for resolver '${event.resolver}'`,
+            err,
+          );
+        }
+        return;
+      }
+
+      // event.kind === "rejection"
 
       const factMeta = systemRef.meta.fact(event.fact);
       const tags = factMeta?.tags ?? [];
@@ -201,6 +280,11 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
           }
           lastAlerted.set(cooldownKey, Date.now());
         }
+        // Remember this resolver fired an irreversible alert so a
+        // subsequent summary event (the engine's rate-limit aggregate)
+        // can route to `onSummary` even though per-fact attribution
+        // is lost in the summary payload.
+        priorIrreversibleAlertResolvers.add(event.resolver);
       } catch (err) {
         // The consumer's `onAlert` threw (PagerDuty 503, Slack rate
         // limit, etc.). Surface it without breaking the dispatch path.
