@@ -688,7 +688,7 @@ export function createEngine<S extends Schema>(
           );
         } else {
           console.warn(
-            `[Directive] Constraint "${constraintId}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound.`,
+            `[Directive] Constraint "${constraintId}" has \`abortOn\` but is async. Binding is disabled — async constraints cannot be bound. To enable abortOn, switch to a synchronous function-form when or a data-form when (always sync), and drop \`async: true\`.`,
           );
         }
       }
@@ -1070,8 +1070,8 @@ export function createEngine<S extends Schema>(
         }
       }
 
-      // Handle resolvers for removed requirements. Unbound: cancel (abort the
-      // signal). Bound (RFC-0003): detach instead — untrack the resolver but
+      // Handle resolvers for removed requirements. Unbound: abort the
+      // signal. Bound (RFC-0003): detach instead — untrack the resolver but
       // do not abort it. It runs to completion so its data writes land (the
       // binding still drops abort-bound clobbers); untracking lets the
       // requirement re-dispatch cleanly if the constraint flips true again.

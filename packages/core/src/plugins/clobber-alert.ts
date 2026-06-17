@@ -27,18 +27,42 @@ export interface ClobberAlertPluginOptions {
    * "high-severity alert." A clobber whose fact's schema meta carries
    * ANY of these tags fires `onAlert`.
    *
+   * **Why tag the fact, not the resolver?** A clobber is detected at
+   * fact-write time. The audit event payload (`fact`, `expected`,
+   * `actual`) names the fact, not the side effect — the fact is the
+   * trigger surface for any irreversible work the resolver is about
+   * to do (a charge, a send, a delete). Tagging `payment.amount` with
+   * `"money"` marks the fact whose race-loss should page someone.
+   *
+   * If your model puts the irreversibility on the resolver rather than
+   * the fact, use `irreversibleResolvers` — both filters OR.
+   *
    * Default: `["money", "pii", "irreversible"]`.
    */
   irreversibleTags?: readonly string[];
   /**
+   * Resolver IDs whose clobbered writes should always alert, regardless
+   * of fact tags. Use this when irreversibility is modeled on the
+   * resolver (e.g. `stripeCharge`) rather than on the trigger fact.
+   * Defaults to empty — the fact-tag path covers most cases.
+   */
+  irreversibleResolvers?: readonly string[];
+  /**
    * Callback fired when a clobber lands on a fact whose tags overlap
-   * `irreversibleTags`. Default: `console.error(...)`.
+   * `irreversibleTags`, or whose resolver is in `irreversibleResolvers`.
+   * Default: `console.error(...)`.
    */
   onAlert?: (event: ClobberAlertEvent) => void;
   /**
-   * Per-fact cooldown window. A second clobber on the same fact within
-   * this window does not re-fire `onAlert` (the audit ledger still
-   * records it). Default: `0` (no cooldown — every event alerts).
+   * Cooldown window keyed by `(fact, resolver)` pair. A second clobber
+   * from the same resolver on the same fact within this window does not
+   * re-fire `onAlert`. A clobber from a *different* resolver on the
+   * same fact still fires — fighting writers are a different
+   * operational incident than a single resolver retrying.
+   *
+   * The audit ledger records every clobber regardless of cooldown.
+   *
+   * Default: `0` (no cooldown — every event alerts).
    */
   cooldownMs?: number;
 }
@@ -82,6 +106,7 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
   const irreversibleTags = new Set(
     options.irreversibleTags ?? ["money", "pii", "irreversible"],
   );
+  const irreversibleResolvers = new Set(options.irreversibleResolvers ?? []);
   const cooldownMs = options.cooldownMs ?? 0;
   const onAlert =
     options.onAlert ??
@@ -111,24 +136,40 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
       const factMeta = systemRef.meta.fact(event.fact);
       const tags = factMeta?.tags ?? [];
       const matched = tags.filter((t) => irreversibleTags.has(t));
-      if (matched.length === 0) return;
+      const resolverMatched = irreversibleResolvers.has(event.resolver);
+      if (matched.length === 0 && !resolverMatched) return;
 
       if (cooldownMs > 0) {
-        const last = lastAlerted.get(event.fact) ?? 0;
+        // Key by (fact, resolver) so two different resolvers fighting
+        // on the same fact (a real incident) both alert, while a single
+        // resolver retrying the same fact (noise) is suppressed.
+        const cooldownKey = `${event.fact}::${event.resolver}`;
+        const last = lastAlerted.get(cooldownKey) ?? 0;
         const now = Date.now();
         if (now - last < cooldownMs) return;
-        lastAlerted.set(event.fact, now);
+        lastAlerted.set(cooldownKey, now);
       }
 
-      onAlert({
-        fact: event.fact,
-        tags: matched,
-        resolver: event.resolver,
-        requirementId: event.req.id,
-        expected: event.expected,
-        actual: event.actual,
-        timestamp: Date.now(),
-      });
+      try {
+        onAlert({
+          fact: event.fact,
+          tags: matched,
+          resolver: event.resolver,
+          requirementId: event.req.id,
+          expected: event.expected,
+          actual: event.actual,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        // The consumer's `onAlert` threw (PagerDuty 503, Slack rate
+        // limit, etc.). Surface it without breaking the dispatch path.
+        // The audit ledger already recorded the clobber; this is
+        // purely the alerting side.
+        console.error(
+          `[Directive] clobberAlertPlugin: onAlert callback threw for fact '${event.fact}'`,
+          err,
+        );
+      }
     },
   };
 }
