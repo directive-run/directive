@@ -12,16 +12,13 @@ Website: https://directive.run
 - [Why Directive](https://directive.run/docs/why-directive)
 - [Installation](https://directive.run/docs/installation)
 - [Core Concepts](https://directive.run/docs/core-concepts)
-- [Comparison](https://directive.run/docs/comparison)
 - [Choosing Primitives](https://directive.run/docs/choosing-primitives)
+- [Comparison](https://directive.run/docs/comparison)
 
-### AI Tooling
+### Editor Setup
 - [IDE Integration](https://directive.run/docs/ide-integration)
-- [Claude Code plugin](https://directive.run/docs/ide-integration#claude-code)
-- [CLI ai-rules](https://directive.run/docs/ide-integration#cli-ai-rules)
-- [Knowledge package](https://directive.run/docs/ide-integration#knowledge-package)
 
-### Core API
+### Primitives
 - [Overview](https://directive.run/docs/core-api)
 - [Module & System](https://directive.run/docs/module-system)
 - [Facts](https://directive.run/docs/facts)
@@ -29,8 +26,8 @@ Website: https://directive.run
 - [Constraints](https://directive.run/docs/constraints)
 - [Resolvers](https://directive.run/docs/resolvers)
 - [Effects](https://directive.run/docs/effects)
-- [Sources](https://directive.run/docs/sources)
 - [Events](https://directive.run/docs/events)
+- [Sources](https://directive.run/docs/sources)
 - [Schema & Types](https://directive.run/docs/schema-overview)
 - [API Reference](https://directive.run/docs/api/core)
 - [Type Reference](https://directive.run/docs/api/types)
@@ -63,7 +60,7 @@ Website: https://directive.run
 ### Advanced Patterns
 - [Overview](https://directive.run/docs/advanced/overview)
 - [Data-form Definitions](https://directive.run/docs/data-triggers)
-- [Resolver Binding](https://directive.run/docs/resolver-binding)
+- [Sandbox](https://directive.run/docs/sandbox)
 - [Multi-Module](https://directive.run/docs/advanced/multi-module)
 - [Runtime Dynamics](https://directive.run/docs/advanced/runtime)
 - [History & Snapshots](https://directive.run/docs/advanced/history)
@@ -72,13 +69,13 @@ Website: https://directive.run
 - [Definition Meta](https://directive.run/docs/advanced/meta)
 
 ### Predicate Tools
-- [predicateFromIntent (LLM emit)](https://directive.run/docs/predicate-from-intent)
-- [describePredicate (prose)](https://directive.run/docs/describe-predicate)
-- [Predicate Codegen (SQL/Mongo/PostgREST)](https://directive.run/docs/predicate-codegen)
-- [predict()](https://directive.run/docs/predict)
-- [doctor.checkAgainst()](https://directive.run/docs/doctor)
-- [Predicate Backtest (replay-under)](https://directive.run/docs/replay-under)
-- [Parameter Sweep (tune)](https://directive.run/docs/tune)
+- [Predicate from Intent](https://directive.run/docs/predicate-from-intent)
+- [Describe Predicate](https://directive.run/docs/describe-predicate)
+- [Predicate Codegen](https://directive.run/docs/predicate-codegen)
+- [Predict](https://directive.run/docs/predict)
+- [Doctor Check](https://directive.run/docs/doctor)
+- [Predicate Backtest](https://directive.run/docs/replay-under)
+- [Parameter Sweep](https://directive.run/docs/tune)
 - [Rules Diff](https://directive.run/docs/rules-diff)
 
 ### Plugins
@@ -89,17 +86,16 @@ Website: https://directive.run
 - [Persistence](https://directive.run/docs/plugins/persistence)
 - [Performance](https://directive.run/docs/plugins/performance)
 - [Circuit Breaker](https://directive.run/docs/plugins/circuit-breaker)
-- [Audit Ledger](https://directive.run/docs/audit-ledger)
 - [Observability](https://directive.run/docs/plugins/observability)
 - [Custom Plugins](https://directive.run/docs/plugins/custom)
 
-### Packages
-- [Timeline (test REPL)](https://directive.run/docs/packages/timeline)
-- [Mutator (typed mutations)](https://directive.run/docs/packages/mutator)
-- [Optimistic (auto-rollback)](https://directive.run/docs/packages/optimistic)
-- [Query (data fetching)](https://directive.run/docs/packages/query)
+### Companion Packages
+- [Timeline](https://directive.run/docs/packages/timeline)
+- [Mutator](https://directive.run/docs/packages/mutator)
+- [Optimistic](https://directive.run/docs/packages/optimistic)
+- [Query](https://directive.run/docs/packages/query)
 - [Vite Dev Proxy](https://directive.run/docs/packages/vite-dev-proxy)
-- [Composing all four](https://directive.run/docs/packages/composing-packages)
+- [Composing All Four](https://directive.run/docs/packages/composing-packages)
 
 ### Testing
 - [Overview](https://directive.run/docs/testing/overview)
@@ -107,6 +103,10 @@ Website: https://directive.run
 - [Fake Timers](https://directive.run/docs/testing/fake-timers)
 - [Assertions](https://directive.run/docs/testing/assertions)
 - [Test Async Chains](https://directive.run/docs/guides/test-async-chains)
+
+### Security & Compliance
+- [Resolver Binding](https://directive.run/docs/resolver-binding)
+- [Audit Ledger](https://directive.run/docs/audit-ledger)
 
 ### Examples
 - [Number Match](https://directive.run/docs/examples/counter)
@@ -134,7 +134,7 @@ Website: https://directive.run
 - [Role-Based Permissions](https://directive.run/docs/guides/permissions)
 - [Batch Mutations](https://directive.run/docs/guides/batch-mutations)
 
-### Integration Guides
+### Works With
 - [Overview](https://directive.run/docs/works-with/overview)
 - [Redux](https://directive.run/docs/works-with/redux)
 - [Zustand](https://directive.run/docs/works-with/zustand)
@@ -146,17 +146,17 @@ Website: https://directive.run
 
 ### Foundations
 - [Overview](https://directive.run/ai/overview)
-- [Running Agents](https://directive.run/ai/running-agents)
-- [Resilience & Routing](https://directive.run/ai/resilience-routing)
-- [Comparison](https://directive.run/ai/comparison)
 - [Tutorial](https://directive.run/ai/tutorial)
+- [Running Agents](https://directive.run/ai/running-agents)
+- [Comparison](https://directive.run/ai/comparison)
 - [Troubleshooting](https://directive.run/ai/troubleshooting)
 
-### Agent Orchestrator
+### Single-Agent Orchestrator
 - [Overview](https://directive.run/ai/orchestrator)
 - [Guardrails](https://directive.run/ai/guardrails)
 - [Streaming](https://directive.run/ai/streaming)
 - [Memory](https://directive.run/ai/memory)
+- [Resilience & Routing](https://directive.run/ai/resilience-routing)
 
 ### Multi-Agent Orchestrator
 - [Overview](https://directive.run/ai/multi-agent)
@@ -168,6 +168,7 @@ Website: https://directive.run
 
 ### Infrastructure
 - [MCP Integration](https://directive.run/ai/mcp)
+- [Sources × Agents](https://directive.run/ai/sources)
 - [RAG Enricher](https://directive.run/ai/rag)
 - [SSE Transport](https://directive.run/ai/sse-transport)
 - [Semantic Cache](https://directive.run/ai/semantic-cache)
@@ -176,6 +177,7 @@ Website: https://directive.run
 - [Debug Timeline](https://directive.run/ai/debug-timeline)
 - [Pattern Checkpoints](https://directive.run/ai/checkpoints)
 - [Breakpoints & Checkpoints](https://directive.run/ai/breakpoints)
+- [Guardrail Events](https://directive.run/ai/guardrail-events)
 - [DevTools](https://directive.run/ai/devtools)
 
 ### Security & Compliance
@@ -195,15 +197,11 @@ Website: https://directive.run
 - [Data Pipeline](https://directive.run/ai/examples/data-pipeline)
 - [Code Review](https://directive.run/ai/examples/code-review)
 
-### Human Approval Workflows
+### Stream Agent Responses
+- [Handle Agent Errors](https://directive.run/ai/guides/handle-agent-errors)
 - [Control AI Costs](https://directive.run/ai/guides/control-ai-costs)
 
-### Validate Structured Output
-- [Handle Agent Errors](https://directive.run/ai/guides/handle-agent-errors)
-
-### Stream Agent Responses
+### Pipelines & Apps
 - [Multi-Step Pipeline](https://directive.run/ai/guides/multi-step-pipeline)
-
-### Test Without LLM Calls
 - [DAG Pipeline](https://directive.run/ai/guides/dag-pipeline)
 - [Goal Pipeline](https://directive.run/ai/guides/goal-pipeline)
