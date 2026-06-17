@@ -2,44 +2,48 @@
 "@directive-run/core": minor
 ---
 
-`abortOn:` rename Tier 2: verb-consistency, defensive coverage, async-disable observability, new `clobberAlertPlugin`.
+Follow-ons to the v1.22.0 `owns:` → `abortOn:` rename: verb-consistent
+abort lifecycle, defensive `bind:` validator, SIEM event for
+async-disabled bindings, new `clobberAlertPlugin`.
 
-Follow-on to the v1.22.0 `owns:` → `abortOn:` rename, closing the
-remaining items an adversarial review panel surfaced.
+**Verb-consistent abort lifecycle.** Three surfaces, one verb:
 
-**Verb consistency across the lifecycle surface.** Three verbs collapsed
-to two coherent layers:
+- `abortOn:` — declarative on the constraint
+- `ctx.signal` — `AbortSignal` on the resolver context (Web Platform)
+- `resolversManager.abort()` / `resolversManager.abortAll()` — renamed
+  from `cancel()` / `cancelAll()` so the imperative method pairs with
+  `AbortController.abort()`
 
-- `abortOn:` (declarative on constraint)
-- `ctx.signal` (AbortSignal, Web Platform name)
-- `resolversManager.abort()` / `resolversManager.abortAll()` (was
-  `cancel()` / `cancelAll()` — renamed for symmetry with
-  `AbortController.abort()`)
+`ResolversManager` is `@internal`, so the rename is not a public-API
+break — only adapter authors hitting the internal manager will see the
+new names.
 
-`ResolversManager` is `@internal`, so the rename is not a public API
-break for consumers — only adapter authors hitting the internal manager
-will see the new names.
-
-**Defensive parity for `bind:` v2 reservation.** A new
-`validateBindKeys` (mirroring `validateAbortOnKeys`) rejects reserved
-property names (`__proto__`, `constructor`, `prototype`, `$`-prefixed)
-on the `bind:` field at module-registration time. `bind:` has no runtime
-semantics yet — but the validator ships now so the symmetry with
-`abortOn:` is locked in code review before any v2 runtime wires the
-field. Closes the reserved-key bypass surface preemptively.
+**`validateBindKeys` defensive parity for the `bind:` v2 reservation.**
+A new module-registration validator (mirroring `validateAbortOnKeys`)
+rejects `__proto__`, `constructor`, `prototype`, and `$`-prefixed entries
+on the `bind:` field. `bind:` has no runtime semantics yet — the
+validator ships now so the reserved-key bypass surface stays closed
+before any v2 runtime wires the field.
 
 **SIEM-facing observation event for async-disabled bindings.** The
-engine now emits `constraint.binding.disabled { id, reason }` when it
-silently disables a constraint's `abortOn:` binding because the
-constraint is async (`reason: "async-declared"` for `async: true` opt-in,
-`reason: "async-promoted"` for a runtime-promoted `when()` that returned
-a Promise). The dev-mode `console.warn` is unchanged — this is the
-machine-facing pair, so production plugins can detect a constraint
-silently losing its clobber-protection. Plugin hook:
-`onConstraintBindingDisabled(id, reason)`.
+engine now emits a new `constraint.binding.disabled` observation event
+(and `onConstraintBindingDisabled(id, reason)` plugin hook) when it
+silently disables a constraint's `abortOn:` because the constraint is
+async:
 
-**New `clobberAlertPlugin`** (under `@directive-run/core/plugins`). Default
-high-severity alerting for clobber events landing on irreversible facts:
+- `reason: "async-declared"` — the constraint def has `async: true`
+- `reason: "async-promoted"` — `when()` returned a Promise at runtime
+  (the author probably didn't realize they opted out of clobber
+  protection)
+
+The dev-mode `console.warn` is unchanged — this is the machine-facing
+pair so production plugins can detect a constraint silently losing its
+clobber protection.
+
+**New `clobberAlertPlugin`** (under `@directive-run/core/plugins`).
+Default high-severity alerting for `resolver.write.rejected` events
+landing on facts that carry irreversible meta tags. Replace the default
+`console.error` with a PagerDuty / Slack / Sentry call:
 
 ```ts
 createSystem({
@@ -47,6 +51,9 @@ createSystem({
   plugins: [
     clobberAlertPlugin({
       irreversibleTags: ["money", "pii", "irreversible"], // default
+      // Or list resolver IDs when irreversibility lives on the resolver
+      // rather than on a fact tag:
+      irreversibleResolvers: ["stripeCharge"],
       onAlert: (e) => pagerduty.trigger({
         severity: "critical",
         summary: `Clobber on ${e.fact} (${e.tags.join(", ")})`,
@@ -57,13 +64,16 @@ createSystem({
 });
 ```
 
-Fires `console.error` by default; route to PagerDuty / Slack / Sentry by
-passing `onAlert`. Reads `system.meta.fact(name)?.tags` to filter — any
-fact with at least one tag in `irreversibleTags` triggers the alert.
-Per-fact cooldown supported (`cooldownMs`).
+Reads `system.meta.fact(name)?.tags` to filter; either filter (tag or
+resolver) firing triggers the alert. Cooldown keys by `(fact, resolver)`
+pair so two different resolvers racing on the same fact both alert (a
+real incident) while a single resolver retrying the same fact (noise)
+is suppressed. A throwing `onAlert` callback is caught and surfaced via
+`console.error` so it never breaks the resolver dispatch path.
 
-**Planned v2 `AbortDetector` interface naming.** The RFC's "Single-process
-scope" section previously called the future multi-process interface
-`ClobberDetector`. Renamed to `AbortDetector` in the RFC text before v2
-ships, so the v2 interface name is verb-consistent with `abortOn:` from
-day one. No runtime change (interface doesn't exist yet).
+**Future v2 `AbortDetector` interface naming.** The RFC's
+"Single-process scope" section previously called the planned
+multi-process interface `ClobberDetector`. Renamed to `AbortDetector`
+in the RFC text before v2 ships, so the v2 interface name is
+verb-consistent with `abortOn:` from day one. No runtime change — the
+interface doesn't exist yet.

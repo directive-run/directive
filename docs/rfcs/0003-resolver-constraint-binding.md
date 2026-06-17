@@ -261,12 +261,33 @@ production constraint loses its clobber-protection with no plugin /
 observer trail. The plugin hook is `onConstraintBindingDisabled(id,
 reason)`.
 
+A typical observer:
+
+```ts
+system.observe((e) => {
+  if (e.type === "constraint.binding.disabled") {
+    metrics.increment("directive.binding.disabled", {
+      constraint: e.id,
+      reason: e.reason, // "async-declared" | "async-promoted"
+    });
+    if (e.reason === "async-promoted") {
+      // Author probably didn't realize — escalate
+      logger.warn(`Constraint ${e.id} silently lost clobber protection`);
+    }
+  }
+});
+```
+
 ### Default high-severity alerting
 
 The built-in `clobberAlertPlugin` ships a default rule that fires
 `console.error` on every `resolver.write.rejected { reason: "clobbered" }`
 whose fact's schema meta carries any of the tags in `irreversibleTags`
-(default: `["money", "pii", "irreversible"]`). Replace the `onAlert`
+(default: `["money", "pii", "irreversible"]`) OR whose resolver is
+listed in `irreversibleResolvers`. The two filters OR — use whichever
+matches how irreversibility is modeled in your system (fact tags when
+the trigger surface is the right anchor, resolver IDs when the side
+effect itself is what makes it irreversible). Replace the `onAlert`
 callback to route to PagerDuty / Slack / Sentry / your SIEM of choice.
 The audit ledger already records every clobber; the plugin separates
 "noise" from "page an engineer NOW" without consumer wiring.
@@ -304,7 +325,7 @@ type ResolverWriteRejected =
   | {
       kind: "rejection";
       resolver: string;
-      requirementId: string;
+      req: RequirementWithId;
       reason: "clobbered";
       fact: string;
       expected: unknown;
@@ -313,7 +334,7 @@ type ResolverWriteRejected =
   | {
       kind: "summary";
       resolver: string;
-      requirementId: string;
+      req: RequirementWithId;
       reason: "clobbered";
       dropped: number;
     };
@@ -322,6 +343,14 @@ interface Plugin {
   onResolverWriteRejected?: (event: ResolverWriteRejected) => void;
 }
 ```
+
+The plugin hook payload uses `req: RequirementWithId` (carrying the full
+requirement object, including `req.id`) while the observation event
+payload uses `requirementId: string` (the id alone). The two differ
+deliberately: observation events stream to many observers and ship the
+minimal id; the plugin hook fires on a single trusted backend and
+carries the full requirement so a plugin can read `req.fromConstraint`,
+`req.type`, etc. without a separate lookup.
 
 Devtools and the logging plugin handle this event by default.
 

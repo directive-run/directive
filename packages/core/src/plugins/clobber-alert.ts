@@ -70,7 +70,19 @@ export interface ClobberAlertPluginOptions {
 /** Payload passed to {@link ClobberAlertPluginOptions.onAlert}. */
 export interface ClobberAlertEvent {
   readonly fact: string;
+  /**
+   * Fact-meta tags that matched `irreversibleTags`. Empty when the alert
+   * fired only because the resolver matched `irreversibleResolvers`.
+   * Use {@link matchedBy} to distinguish without checking length.
+   */
   readonly tags: readonly string[];
+  /**
+   * Which filter triggered the alert:
+   * - `"tag"` — fact-meta tags overlapped `irreversibleTags`
+   * - `"resolver"` — resolver ID matched `irreversibleResolvers`
+   * - `"both"` — both filters matched
+   */
+  readonly matchedBy: "tag" | "resolver" | "both";
   readonly resolver: string;
   readonly requirementId: string;
   readonly expected: unknown;
@@ -78,6 +90,14 @@ export interface ClobberAlertEvent {
   /** `Date.now()` at the moment the alert fired. */
   readonly timestamp: number;
 }
+
+/**
+ * Cap the per-(fact, resolver) cooldown map at this size with FIFO
+ * eviction so a long-running system with high resolver churn (e.g.
+ * dynamically-registered resolvers) cannot grow the map unboundedly.
+ * Matches the cap precedent set for `retryAttempts` in the engine.
+ */
+const COOLDOWN_MAP_CAP = 1000;
 
 /**
  * Create a plugin that fires high-severity alerts for clobber events
@@ -136,30 +156,51 @@ export function clobberAlertPlugin<M extends ModuleSchema>(
       const factMeta = systemRef.meta.fact(event.fact);
       const tags = factMeta?.tags ?? [];
       const matched = tags.filter((t) => irreversibleTags.has(t));
+      const tagMatched = matched.length > 0;
       const resolverMatched = irreversibleResolvers.has(event.resolver);
-      if (matched.length === 0 && !resolverMatched) return;
+      if (!tagMatched && !resolverMatched) return;
 
+      const matchedBy: "tag" | "resolver" | "both" =
+        tagMatched && resolverMatched
+          ? "both"
+          : tagMatched
+            ? "tag"
+            : "resolver";
+
+      const cooldownKey = `${event.fact}::${event.resolver}`;
       if (cooldownMs > 0) {
         // Key by (fact, resolver) so two different resolvers fighting
         // on the same fact (a real incident) both alert, while a single
         // resolver retrying the same fact (noise) is suppressed.
-        const cooldownKey = `${event.fact}::${event.resolver}`;
         const last = lastAlerted.get(cooldownKey) ?? 0;
         const now = Date.now();
         if (now - last < cooldownMs) return;
-        lastAlerted.set(cooldownKey, now);
       }
 
       try {
         onAlert({
           fact: event.fact,
           tags: matched,
+          matchedBy,
           resolver: event.resolver,
           requirementId: event.req.id,
           expected: event.expected,
           actual: event.actual,
           timestamp: Date.now(),
         });
+        // Stamp the cooldown only AFTER a successful alert. If the
+        // callback throws (PagerDuty 503, etc.), don't burn the cooldown
+        // slot — the next genuine alert can still fire.
+        if (cooldownMs > 0) {
+          // FIFO eviction at cap so the map can't grow without bound
+          // under high resolver churn (e.g. dynamically registered
+          // resolvers in a long-running system).
+          if (lastAlerted.size >= COOLDOWN_MAP_CAP) {
+            const oldestKey = lastAlerted.keys().next().value;
+            if (oldestKey !== undefined) lastAlerted.delete(oldestKey);
+          }
+          lastAlerted.set(cooldownKey, Date.now());
+        }
       } catch (err) {
         // The consumer's `onAlert` threw (PagerDuty 503, Slack rate
         // limit, etc.). Surface it without breaking the dispatch path.
