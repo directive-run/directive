@@ -353,7 +353,6 @@ describe("el()", () => {
 
   describe("BLOCKED_PROPS", () => {
     it("strips innerHTML from props (XSS prevention)", () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", {
         innerHTML: "<img src=x onerror=alert(1)>",
       } as any);
@@ -362,14 +361,12 @@ describe("el()", () => {
     });
 
     it("strips outerHTML from props (XSS prevention)", () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", { outerHTML: "<script>alert(1)</script>" } as any);
 
       expect(div.tagName).toBe("DIV");
     });
 
     it("still applies safe props alongside blocked ones", () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", {
         className: "safe",
         innerHTML: "<script>bad</script>",
@@ -381,15 +378,15 @@ describe("el()", () => {
 
     it("strips __proto__ (prototype pollution prevention)", () => {
       const polluted = { polluted: true };
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", { __proto__: polluted } as any);
       // The polluted-bag did not become the prototype of the element.
-      expect((div as unknown as { polluted?: boolean }).polluted).toBeUndefined();
+      expect(
+        (div as unknown as { polluted?: boolean }).polluted,
+      ).toBeUndefined();
       expect(Object.getPrototypeOf(div)).not.toBe(polluted);
     });
 
     it("strips constructor + prototype keys (prototype pollution)", () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const div = el("div", {
         constructor: { name: "evil" },
         prototype: { evil: true },
@@ -400,7 +397,6 @@ describe("el()", () => {
     });
 
     it("rejects string-valued on<Event> handlers (inline JS injection)", () => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const img = el("img", {
         // String would otherwise register as inline event handler.
         onerror: "alert(1)",
@@ -414,7 +410,6 @@ describe("el()", () => {
 
     it("preserves function-valued event handlers", () => {
       const handler = (): void => undefined;
-      // biome-ignore lint/suspicious/noExplicitAny: testing security guard
       const btn = el("button", { onclick: handler } as any);
       expect(btn.onclick).toBe(handler);
     });

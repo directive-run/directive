@@ -44,7 +44,6 @@ export function createQueryModule<const M extends ModuleSchema>(
   definitions: AnyQueryDefinition[],
   config: ModuleConfig<M>,
 ): ModuleDef<M> {
-  // biome-ignore lint/suspicious/noExplicitAny: withQueries returns untyped config, cast back to preserve M
   const merged = withQueries(definitions, config as any);
 
   return createModule(id, merged as ModuleConfig<M>);

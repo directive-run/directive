@@ -516,7 +516,6 @@ export function createMultiAgentOrchestrator(
   }
 
   // ---- Coordinator Module ----
-  // biome-ignore lint/suspicious/noExplicitAny: Dynamic schema construction
   const coordFacts: Record<string, any> = {
     __globalTokens: t.number(),
     __status: t.string(),
@@ -543,7 +542,6 @@ export function createMultiAgentOrchestrator(
   } satisfies ModuleSchema;
 
   // Convert orchestrator-level constraints
-  // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
   const coordConstraints: Record<string, any> =
     convertOrchestratorConstraints(userConstraints);
 
@@ -551,7 +549,6 @@ export function createMultiAgentOrchestrator(
   if (maxTokenBudget) {
     coordConstraints.__budgetLimit = {
       priority: 100,
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => {
         const tokens = getBridgeFact<number>(facts, "__globalTokens");
 
@@ -561,7 +558,6 @@ export function createMultiAgentOrchestrator(
     };
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
   const coordResolvers: Record<string, any> = Object.create(null);
 
   // Convert user-provided orchestrator-level resolvers
@@ -569,7 +565,6 @@ export function createMultiAgentOrchestrator(
     coordResolvers[id] = {
       requirement: resolver.requirement,
       key: resolver.key,
-      // biome-ignore lint/suspicious/noExplicitAny: Context type varies
       resolve: async (req: Requirement, context: any) => {
         const state = getOrchestratorState(context.facts);
         const combinedFacts = {
@@ -601,7 +596,6 @@ export function createMultiAgentOrchestrator(
     requirement: requirementGuard<PauseBudgetExceededReq>(
       "__PAUSE_BUDGET_EXCEEDED",
     ),
-    // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async () => {
       globalStatus = "paused";
       if (debug) {
@@ -615,7 +609,6 @@ export function createMultiAgentOrchestrator(
   // Built-in RUN_AGENT resolver
   coordResolvers.__runAgent = {
     requirement: isRunAgentReq,
-    // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async (req: RunAgentRequirement) => {
       await runSingleAgent(req.agent, req.input);
     },
@@ -639,25 +632,21 @@ export function createMultiAgentOrchestrator(
   });
 
   // ---- Per-Agent Modules (as a map for createSystem) ----
-  // biome-ignore lint/suspicious/noExplicitAny: Module types vary
   const modulesMap: Record<string, any> = Object.create(null);
   modulesMap.__coord = coordinatorModule;
 
   for (const [agentId, registration] of Object.entries(agents)) {
-    // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
     const perAgentConstraints: Record<string, any> = registration.constraints
       ? convertOrchestratorConstraints(registration.constraints)
       : {};
 
     // Convert per-agent resolvers
-    // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
     const perAgentResolvers: Record<string, any> = Object.create(null);
     if (registration.resolvers) {
       for (const [id, resolver] of Object.entries(registration.resolvers)) {
         perAgentResolvers[id] = {
           requirement: resolver.requirement,
           key: resolver.key,
-          // biome-ignore lint/suspicious/noExplicitAny: Context type varies
           resolve: async (req: Requirement, context: any) => {
             const state = getOrchestratorState(context.facts);
             const combinedFacts = {
@@ -1339,7 +1328,6 @@ export function createMultiAgentOrchestrator(
   }
 
   // ---- Helper: Get per-agent facts from namespaced System ----
-  // biome-ignore lint/suspicious/noExplicitAny: System facts vary
   function getAgentFacts(agentId: string): any {
     return (system.facts as any)[agentId];
   }
@@ -5604,7 +5592,6 @@ export function createMultiAgentOrchestrator(
     system: system as unknown as System<any>,
 
     get facts() {
-      // biome-ignore lint/suspicious/noExplicitAny: System facts vary
       return system.facts as any;
     },
 
@@ -6182,19 +6169,16 @@ export function createMultiAgentOrchestrator(
       }
 
       // Build per-agent constraints and resolvers (same as initial setup)
-      // biome-ignore lint/suspicious/noExplicitAny: Constraint types complex
       const perAgentConstraints: Record<string, any> = registration.constraints
         ? convertOrchestratorConstraints(registration.constraints)
         : {};
 
-      // biome-ignore lint/suspicious/noExplicitAny: Resolver types complex
       const perAgentResolvers: Record<string, any> = Object.create(null);
       if (registration.resolvers) {
         for (const [id, resolver] of Object.entries(registration.resolvers)) {
           perAgentResolvers[id] = {
             requirement: resolver.requirement,
             key: resolver.key,
-            // biome-ignore lint/suspicious/noExplicitAny: Context type varies
             resolve: async (req: Requirement, context: any) => {
               const state = getOrchestratorState(context.facts);
               const combinedFacts = {
@@ -6249,7 +6233,6 @@ export function createMultiAgentOrchestrator(
             : undefined,
       });
 
-      // biome-ignore lint/suspicious/noExplicitAny: System type narrowing loses namespaced overload
       (system as any).registerModule(agentId, agentModule);
 
       // Add to registry

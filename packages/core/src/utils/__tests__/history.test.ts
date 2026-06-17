@@ -21,9 +21,7 @@ function setup(
   } = {},
 ) {
   const schema = { count: { _type: 0 }, name: { _type: "" } } as const;
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper — schema types are checked at runtime
   const store = createFactsStore({ schema } as any);
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper
   const facts = createFactsProxy(store, schema as any) as any;
 
   // Initialise
@@ -32,7 +30,6 @@ function setup(
 
   const historyOption = opts.historyOption ?? true;
 
-  // biome-ignore lint/suspicious/noExplicitAny: Test helper
   const manager = createHistoryManager<any>({
     historyOption,
     facts,

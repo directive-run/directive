@@ -140,7 +140,6 @@ function shouldPersist(
  * @param options - {@link PersistQueryCacheOptions}
  * @returns A plugin object compatible with `createSystem`'s `plugins` array.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Plugin type varies by system schema
 export function persistQueryCache(options: PersistQueryCacheOptions): any {
   const {
     storage,
@@ -192,7 +191,6 @@ export function persistQueryCache(options: PersistQueryCacheOptions): any {
   }
 
   /** Save current query states to storage */
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   function saveCache(system: any): void {
     if (destroyed) {
       return;
@@ -244,7 +242,6 @@ export function persistQueryCache(options: PersistQueryCacheOptions): any {
   }
 
   /** Schedule a debounced save */
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   function scheduleSave(system: any): void {
     if (destroyed) {
       return;
@@ -258,13 +255,11 @@ export function persistQueryCache(options: PersistQueryCacheOptions): any {
     }, debounceMs);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: System ref stored for save
   let systemRef: any = null;
 
   return {
     name: "query-cache-persistence",
 
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     onInit: (system: any) => {
       systemRef = system;
 

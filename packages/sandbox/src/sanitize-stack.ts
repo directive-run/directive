@@ -24,17 +24,17 @@ export function sanitizeStack(s: string | undefined): string {
   return (
     s
       // file:// URLs
-      .replace(new RegExp(`file:\\/\\/\\/${PATH_TERMINATOR}+`, "g"), "<sandbox>")
+      .replace(
+        new RegExp(`file:\\/\\/\\/${PATH_TERMINATOR}+`, "g"),
+        "<sandbox>",
+      )
       // UNC paths — must run BEFORE the generic `\\` Windows pattern so
       // `\\server\share\file` becomes `<unc>`, not `<unc>\share\file`.
       .replace(new RegExp(`\\\\\\\\${TAIL}`, "g"), "<unc>")
       // Windows drive paths — `C:\Users\<user>\...` and friends.
       // Captures any drive letter + `\Users\<name>` or `\Documents and Settings\<name>`.
       .replace(/[A-Za-z]:\\Users\\[^\\\s)\]>"',]+/g, "<home>")
-      .replace(
-        /[A-Za-z]:\\Documents and Settings\\[^\\\s)\]>"',]+/g,
-        "<home>",
-      )
+      .replace(/[A-Za-z]:\\Documents and Settings\\[^\\\s)\]>"',]+/g, "<home>")
       // Generic Windows absolute paths — `C:\<anything-not-Users>` that
       // didn't match above. Catches CI runners (`D:\a\_work\…`) and
       // tempdirs.

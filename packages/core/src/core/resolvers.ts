@@ -1165,7 +1165,6 @@ export function createResolversManager<S extends Schema>(
   ): Promise<"done" | "retry"> {
     let resolvePromise!: Promise<BatchResolveResults>;
     store.batch(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Requirement type varies
       resolvePromise = def.resolveBatchWithResults!(reqPayloads as any, ctx);
     });
 
@@ -1227,7 +1226,6 @@ export function createResolversManager<S extends Schema>(
     let resolvePromise!: Promise<void>;
     store.batch(() => {
       resolvePromise = def.resolveBatch!(
-        // biome-ignore lint/suspicious/noExplicitAny: Requirement type varies
         reqPayloads as any,
         ctx,
       ) as Promise<void>;
@@ -1719,7 +1717,10 @@ export function createResolversManager<S extends Schema>(
               reqOwners.delete(batchInstanceId);
               if (reqOwners.size === 0) reqToBatch.delete(id);
             }
-            onCancelPairs.push({ resolverId: batchState.resolverId, reqId: id });
+            onCancelPairs.push({
+              resolverId: batchState.resolverId,
+              reqId: id,
+            });
           }
           batchInflight.delete(batchInstanceId);
         }

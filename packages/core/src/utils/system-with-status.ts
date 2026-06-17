@@ -20,7 +20,6 @@ export interface CreateSystemWithStatusOptions<M extends ModuleSchema> {
   /** The module to use for the system */
   module: ModuleDef<M>;
   /** Additional plugins to include alongside the status plugin */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin generic contravariance issues
   plugins?: Plugin<any>[];
   /** Trace: per-run reconciliation changelog */
   trace?: TraceOption;
@@ -31,7 +30,6 @@ export interface CreateSystemWithStatusOptions<M extends ModuleSchema> {
   /** Enable zero-config mode */
   zeroConfig?: boolean;
   /** Initial facts to set on the system */
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies by module
   initialFacts?: Record<string, any>;
 }
 
@@ -91,9 +89,7 @@ export function createSystemWithStatus<M extends ModuleSchema>(
 
   // Create the system with the status plugin included
   // Use type assertion to bypass overload resolution issues
-  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   const allPlugins = [...existingPlugins, statusPlugin.plugin] as Plugin<any>[];
-  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   const system = createSystem({
     module: options.module,
     plugins: allPlugins,
@@ -102,7 +98,6 @@ export function createSystemWithStatus<M extends ModuleSchema>(
     tickMs: options.tickMs,
     zeroConfig: options.zeroConfig,
     initialFacts: options.initialFacts,
-    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   } as any);
 
   return {

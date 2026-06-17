@@ -129,7 +129,7 @@ export async function explainCommand(args: string[]) {
 
         // Show payload
         const payload = { ...u.requirement };
-        delete (payload as Record<string, unknown>).type;
+        (payload as Record<string, unknown>).type = undefined;
         const payloadKeys = Object.keys(payload);
         if (payloadKeys.length > 0) {
           console.log(`  Payload: ${JSON.stringify(payload)}`);

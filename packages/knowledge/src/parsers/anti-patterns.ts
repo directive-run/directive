@@ -50,7 +50,7 @@ export interface AntiPattern {
   goodExample?: string;
 }
 
-let cache: ReadonlyArray<AntiPattern> | null = null;
+let cache: readonly AntiPattern[] | null = null;
 
 function resolveSourcePath(): string {
   const candidates = [
@@ -183,7 +183,7 @@ function extractExamples(body: string): {
   };
 }
 
-function loadAntiPatterns(): ReadonlyArray<AntiPattern> {
+function loadAntiPatterns(): readonly AntiPattern[] {
   if (cache) {
     return cache;
   }
@@ -219,7 +219,7 @@ function loadAntiPatterns(): ReadonlyArray<AntiPattern> {
 }
 
 /** Return every parsed anti-pattern, stable order, frozen. */
-export function getAntiPatterns(): ReadonlyArray<AntiPattern> {
+export function getAntiPatterns(): readonly AntiPattern[] {
   return loadAntiPatterns();
 }
 

@@ -29,7 +29,7 @@ interface CompositionsFile {
   edges: CompositionEdge[];
 }
 
-let cache: ReadonlyArray<CompositionEdge> | null = null;
+let cache: readonly CompositionEdge[] | null = null;
 
 function resolveSourcePath(): string {
   const candidates = [
@@ -44,7 +44,7 @@ function resolveSourcePath(): string {
   return candidates[0] ?? "";
 }
 
-function load(): ReadonlyArray<CompositionEdge> {
+function load(): readonly CompositionEdge[] {
   if (cache) {
     return cache;
   }
@@ -59,7 +59,7 @@ function load(): ReadonlyArray<CompositionEdge> {
 }
 
 /** All composition edges as a flat list. */
-export function getCompositions(): ReadonlyArray<CompositionEdge> {
+export function getCompositions(): readonly CompositionEdge[] {
   return load();
 }
 
@@ -69,7 +69,7 @@ export function getCompositions(): ReadonlyArray<CompositionEdge> {
  */
 export function getCompositionsFor(
   packageName: string,
-): ReadonlyArray<CompositionEdge> {
+): readonly CompositionEdge[] {
   return load().filter((e) => e.from === packageName);
 }
 
@@ -78,7 +78,7 @@ export function getCompositionsFor(
  */
 export function getReverseCompositionsFor(
   packageName: string,
-): ReadonlyArray<CompositionEdge> {
+): readonly CompositionEdge[] {
   return load().filter((e) => e.to === packageName);
 }
 

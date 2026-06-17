@@ -54,7 +54,6 @@ describe("createWorkerClient — pending request hygiene", () => {
 
   it("rejects a stalled request after the default 30s timeout", async () => {
     const worker = makeMockWorker();
-    // biome-ignore lint/suspicious/noExplicitAny: minimal mock
     const client = createWorkerClient({ worker: worker as any });
 
     const promise = client.inspect();
@@ -77,7 +76,6 @@ describe("createWorkerClient — pending request hygiene", () => {
 
   it("does NOT time out when timeoutMs is 0 (opt-out)", async () => {
     const worker = makeMockWorker();
-    // biome-ignore lint/suspicious/noExplicitAny: minimal mock
     const client = createWorkerClient({ worker: worker as any });
 
     let settled = false;
@@ -102,7 +100,6 @@ describe("createWorkerClient — pending request hygiene", () => {
     worker.emit({
       type: "INSPECT_RESULT",
       requestId: lastCall.requestId,
-      // biome-ignore lint/suspicious/noExplicitAny: minimal payload
       inspection: {} as any,
     });
 
@@ -112,7 +109,6 @@ describe("createWorkerClient — pending request hygiene", () => {
 
   it("does NOT time out when timeoutMs is Infinity (opt-out)", async () => {
     const worker = makeMockWorker();
-    // biome-ignore lint/suspicious/noExplicitAny: minimal mock
     const client = createWorkerClient({ worker: worker as any });
 
     let settled = false;
@@ -134,7 +130,6 @@ describe("createWorkerClient — pending request hygiene", () => {
     worker.emit({
       type: "INSPECT_RESULT",
       requestId: lastCall.requestId,
-      // biome-ignore lint/suspicious/noExplicitAny: minimal payload
       inspection: {} as any,
     });
 
@@ -144,7 +139,6 @@ describe("createWorkerClient — pending request hygiene", () => {
 
   it("rejects all pending requests when worker.onerror fires", async () => {
     const worker = makeMockWorker();
-    // biome-ignore lint/suspicious/noExplicitAny: minimal mock
     const client = createWorkerClient({ worker: worker as any });
 
     const a = client.inspect().catch((err) => err);
@@ -164,7 +158,6 @@ describe("createWorkerClient — pending request hygiene", () => {
 
   it("clears the timeout when a response arrives in time (no leak)", async () => {
     const worker = makeMockWorker();
-    // biome-ignore lint/suspicious/noExplicitAny: minimal mock
     const client = createWorkerClient({ worker: worker as any });
 
     const promise = client.inspect();
@@ -176,7 +169,6 @@ describe("createWorkerClient — pending request hygiene", () => {
     worker.emit({
       type: "INSPECT_RESULT",
       requestId: lastCall.requestId,
-      // biome-ignore lint/suspicious/noExplicitAny: minimal payload
       inspection: { fooState: "ok" } as any,
     });
 

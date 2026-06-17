@@ -213,7 +213,6 @@ afterEach(async () => {
 async function makeProxy(extraRoute?: {
   headers?: Record<string, string>;
   headerKey?: string;
-  // biome-ignore lint/suspicious/noExplicitAny: pass-through to the route config
   cors?: any;
 }): Promise<number> {
   const plugin = apiProxy({
@@ -231,7 +230,6 @@ async function makeProxy(extraRoute?: {
   const fake = createFakeServer();
   // The plugin's configureServer takes a Vite-like ServerContext;
   // we only need `middlewares.use`, which our fake provides.
-  // biome-ignore lint/suspicious/noExplicitAny: minimal duck-typed server
   (plugin as any).configureServer(fake);
 
   const { server, port } = await startMiddlewareServer(

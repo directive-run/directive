@@ -203,11 +203,12 @@ function parseSweepArg(arg: string): [string, unknown[]] {
 
 const BLOCKS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 
-function bar(value: number, max: number, width = 32): string {
+function _bar(value: number, max: number, width = 32): string {
   if (max <= 0) return "".padEnd(width);
   const filled = Math.round((value / max) * width);
   return "█".repeat(filled).padEnd(width);
 }
+void _bar;
 
 /**
  * Render the sweep curve as an ASCII table with a bar per row plus a
@@ -330,7 +331,6 @@ export async function tuneCommand(args: string[]): Promise<void> {
   try {
     report = sweepUnder({
       frames,
-      // biome-ignore lint/suspicious/noExplicitAny: spec loaded from JSON
       original: original as any,
       template,
       sweep,

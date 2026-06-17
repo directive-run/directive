@@ -64,7 +64,6 @@ export type ExtractSchema<M> = M extends ModuleDef<infer S> ? S : never;
  * specific schema types during inference. The actual schema types are
  * extracted via `ExtractSchema<M>` where needed.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Required for TypeScript to preserve specific module schema types during inference
 export type ModulesMap = Record<string, ModuleDef<any>>;
 
 // ============================================================================

@@ -42,11 +42,8 @@ import type { System } from "./system.js";
 
 /** Lifecycle hooks for modules */
 export interface ModuleHooks<M extends ModuleSchema> {
-  // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
   onInit?: (system: System<any>) => void;
-  // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
   onStart?: (system: System<any>) => void;
-  // biome-ignore lint/suspicious/noExplicitAny: System type inference is complex
   onStop?: (system: System<any>) => void;
   onError?: (error: DirectiveError, context: unknown) => void;
   /**

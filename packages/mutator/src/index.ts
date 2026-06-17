@@ -21,7 +21,7 @@
  * @see ../README.md for the full API and a worked example.
  */
 
-import { t, type SchemaType } from "@directive-run/core";
+import { type SchemaType, t } from "@directive-run/core";
 
 /**
  * A keyed map of variant payloads. Each key becomes a discriminator value
@@ -292,9 +292,9 @@ export function defineMutator<
     // the public `SchemaType<Pending | null>` surface. The runtime
     // value IS `t.object<Pending>().nullable()`; the cast is purely
     // a type-layer adapter so the public type stays generic-preserving.
-    pendingMutation: t.object<Pending>().nullable() as unknown as SchemaType<
-      Pending | null
-    >,
+    pendingMutation: t
+      .object<Pending>()
+      .nullable() as unknown as SchemaType<Pending | null>,
   } satisfies MutatorFragments<M, F>["facts"];
 
   // Schema event marker — the runtime uses this for typing and devtools.

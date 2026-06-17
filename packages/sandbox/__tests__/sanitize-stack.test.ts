@@ -45,9 +45,7 @@ describe("sanitizeStack", () => {
   });
 
   it("strips /var/task/ — Lambda + Vercel function root", () => {
-    const out = sanitizeStack(
-      "    at handler (/var/task/dist/route.js:42:5)",
-    );
+    const out = sanitizeStack("    at handler (/var/task/dist/route.js:42:5)");
     expect(out).not.toMatch(/\/var\/task\/dist/);
     expect(out).toMatch(/<task>/);
   });
@@ -59,7 +57,9 @@ describe("sanitizeStack", () => {
   });
 
   it("strips /opt/ — common Linux distro / Render / Heroku app prefix", () => {
-    const out = sanitizeStack("    at fn (/opt/render/project/src/file.js:1:1)");
+    const out = sanitizeStack(
+      "    at fn (/opt/render/project/src/file.js:1:1)",
+    );
     expect(out).not.toMatch(/\/opt\/render/);
     expect(out).toMatch(/<opt>/);
   });
@@ -153,9 +153,7 @@ describe("sanitizeStack", () => {
   });
 
   it("terminates paths on comma + quote (JSON-embedded paths)", () => {
-    const out = sanitizeStack(
-      'JSON: {"file":"/Users/dev/a.ts","line":1}',
-    );
+    const out = sanitizeStack('JSON: {"file":"/Users/dev/a.ts","line":1}');
     expect(out).not.toMatch(/\/Users\/dev\/a\.ts/);
     expect(out).toMatch(/\/<home>/);
     // The closing quote + brace should be preserved.

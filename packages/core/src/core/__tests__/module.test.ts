@@ -366,7 +366,6 @@ describe("createModule — pivot-name conflict", () => {
       requirements: {},
     };
     expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: testing cross-module deps shape
       createModule("data", {
         schema: {
           facts: { auth: { _type: 0 } },
@@ -438,7 +437,6 @@ describe("createModule — reserved abortOn keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -459,7 +457,6 @@ describe("createModule — reserved abortOn keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -480,7 +477,6 @@ describe("createModule — reserved abortOn keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -501,7 +497,6 @@ describe("createModule — reserved abortOn keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved abortOn key
           chargeCard: {
             when: () => true,
             require: { type: "X" },
@@ -522,7 +517,6 @@ describe("createModule — reserved abortOn keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing abortOn key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -549,7 +543,6 @@ describe("createModule — reserved bind keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -570,7 +563,6 @@ describe("createModule — reserved bind keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -591,7 +583,6 @@ describe("createModule — reserved bind keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
           c1: {
             when: () => true,
             require: { type: "X" },
@@ -612,7 +603,6 @@ describe("createModule — reserved bind keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing reserved bind key
           chargeCard: {
             when: () => true,
             require: { type: "X" },
@@ -633,7 +623,6 @@ describe("createModule — reserved bind keys", () => {
           requirements: {},
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: testing bind key
           c1: {
             when: () => true,
             require: { type: "X" },

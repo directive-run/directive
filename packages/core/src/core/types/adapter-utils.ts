@@ -263,7 +263,6 @@ export interface AdapterCallbacks {
  * });
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema type
 export function createCallbackPlugin(
   name: string,
   callbacks: AdapterCallbacks,

@@ -221,7 +221,6 @@ const crossModuleFactsProxyCache = new WeakMap<
  * WeakMap to cache module events proxies.
  */
 const moduleEventsProxyCache = new WeakMap<
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type for cache key
   any,
   Map<string, Record<string, (payload?: Record<string, unknown>) => void>>
 >();
@@ -517,7 +516,6 @@ export function createNamespacedDeriveProxy(
  * @internal
  */
 export function createNamespacedEventsProxy(
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
   engine: any,
   modulesMap: ModulesMap,
   getModuleNames: () => string[],

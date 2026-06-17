@@ -183,7 +183,6 @@ describe("bind()", () => {
     const span = el("span");
 
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
       bind(null as any, span, () => {});
     }).toThrow("[Directive]");
   });
@@ -367,7 +366,6 @@ describe("mount()", () => {
     const container = el("div");
 
     expect(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
       mount(null as any, container, () => []);
     }).toThrow("[Directive]");
   });

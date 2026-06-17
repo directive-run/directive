@@ -64,7 +64,6 @@ export type StatusPlugin = ReturnType<typeof createRequirementStatusPlugin>;
  * Create a Svelte store for a derived value.
  */
 export function createDerivedStore<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): Readable<T> {
@@ -90,7 +89,6 @@ export function createDerivedStore<T>(
  * Create a Svelte store for multiple derived values.
  */
 export function createDerivedsStore<T extends Record<string, unknown>>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   derivationIds: string[],
 ): Readable<T> {
@@ -114,7 +112,6 @@ export function createDerivedsStore<T extends Record<string, unknown>>(
  * Create a Svelte store for a single fact value.
  */
 export function createFactStore<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   factKey: string,
 ): Readable<T | undefined> {
@@ -143,7 +140,6 @@ export function createFactStore<T>(
  * NOTE: This updates on every fact change. Use sparingly in production.
  */
 export function createInspectStore(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
 ): Readable<SystemInspection> {
   return readable<SystemInspection>(system.inspect(), (set) => {
@@ -179,7 +175,6 @@ export function useFact<
 ): Readable<Pick<InferFacts<S>, K>>;
 /** Implementation */
 export function useFact(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   keyOrKeys: string | string[],
 ): Readable<unknown> {
@@ -200,7 +195,6 @@ export function useFact(
   return createFactStore(system, keyOrKeys);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactMulti(
   system: SingleModuleSystem<any>,
   factKeys: string[],
@@ -243,7 +237,6 @@ export function useDerived<
 ): Readable<Pick<InferDerivations<S>, K>>;
 /** Implementation */
 export function useDerived(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   idOrIds: string | string[],
 ): Readable<unknown> {
@@ -279,9 +272,7 @@ export function useSelector<S extends ModuleSchema, R>(
   equalityFn?: (a: R, b: R) => boolean,
 ): Readable<R>;
 export function useSelector(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   selector: (state: any) => unknown,
   equalityFn: (a: unknown, b: unknown) => boolean = defaultEquality,
 ): Readable<unknown> {
@@ -400,7 +391,6 @@ export function useWatch<
 ): void;
 /** Implementation */
 export function useWatch(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   key: string,
   callback: (newValue: unknown, prevValue: unknown) => void,
@@ -425,7 +415,6 @@ export interface UseInspectOptions {
  * Returns Readable<InspectState> with optional throttling.
  */
 export function useInspect(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   options?: UseInspectOptions,
 ): Readable<InspectState> {
@@ -516,7 +505,6 @@ export function useRequirementStatus(
  * Reactively returns the explanation string for a requirement.
  */
 export function useExplain(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   requirementId: string,
 ): Readable<string | null> {
@@ -548,7 +536,6 @@ export function useConstraintStatus(
 ): Readable<ConstraintInfo | null>;
 /** Implementation */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): Readable<ConstraintInfo[] | ConstraintInfo | null> {
@@ -569,7 +556,6 @@ export function useConstraintStatus(
 }
 
 function _getConstraintValue(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): ConstraintInfo[] | ConstraintInfo | null {
@@ -597,7 +583,6 @@ export interface OptimisticUpdateResult {
  * a requirement type via statusPlugin, and rolls back on failure.
  */
 export function useOptimisticUpdate(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   statusPlugin?: StatusPlugin,
   requirementType?: string,
@@ -694,7 +679,6 @@ export function useOptimisticUpdate(
  * ```
  */
 export function useHistory(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
 ): Readable<HistoryState | null> {
   assertSystem("useHistory", system);
@@ -709,13 +693,11 @@ export function useHistory(
 
 /** Configuration for useDirective */
 export interface UseDirectiveConfig {
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
   initialFacts?: Record<string, any>;
   status?: boolean;
   /** Fact keys to subscribe to (omit for all) */
@@ -755,11 +737,9 @@ export function useDirective<M extends ModuleSchema>(
   if (config?.status) {
     const sp = createRequirementStatusPlugin();
     statusPlugin = sp;
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
     allPlugins.push(sp.plugin as Plugin<any>);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   const system = createSystem({
     module: moduleDef,
     plugins: allPlugins.length > 0 ? allPlugins : undefined,
@@ -866,7 +846,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       factKey: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Cast for overload compatibility
       useFact(system as SingleModuleSystem<any>, factKey) as Readable<
         InferFacts<M>[K] | undefined
       >,
@@ -874,7 +853,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       derivationId: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Cast for overload compatibility
       useDerived(system as SingleModuleSystem<any>, derivationId) as Readable<
         InferDerivations<M>[K]
       >,
@@ -888,9 +866,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       key: K,
       callback: (newValue: unknown, previousValue: unknown) => void,
-    ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Cast for overload compatibility
-      useWatch(system as SingleModuleSystem<any>, key, callback),
+    ) => useWatch(system as SingleModuleSystem<any>, key, callback),
   };
 }
 
@@ -929,7 +905,6 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
   null;
 
@@ -970,7 +945,6 @@ function getCreateQuerySystem() {
  * </script>
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 export function useQuerySystem<
   T extends {
     start: () => void;

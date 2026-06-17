@@ -1281,9 +1281,7 @@ describe("R2 — isEmptyOrConfigPredicate", () => {
     const sys = createSystem({ module: m });
     sys.start();
 
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic register accepts unknown
     (sys.constraints as any).register("oops", {
-      // biome-ignore lint/suspicious/noExplicitAny: intentionally bad shape
       when: {} as any,
       require: { type: "X" },
     });
@@ -1440,7 +1438,6 @@ describe("predicate spec cycle/depth guards", () => {
           f.phase = "red";
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: cyclic test spec
           c1: { when: cyclic as any, require: { type: "X" } },
         },
       });
@@ -1473,7 +1470,6 @@ describe("predicate spec cycle/depth guards", () => {
           f.phase = "red";
         },
         constraints: {
-          // biome-ignore lint/suspicious/noExplicitAny: deep test spec
           c1: { when: deep as any, require: { type: "X" } },
         },
       });
@@ -1570,7 +1566,6 @@ describe("predicate spec cycle/depth guards", () => {
         f.active = true;
       },
       constraints: {
-        // biome-ignore lint/suspicious/noExplicitAny: cyclic test spec
         c1: { when: cyclic as any, require: { type: "X" } },
       },
     });

@@ -368,7 +368,6 @@ function matchPattern(pattern: PIIPattern, text: string): DetectedPII[] {
   const group = pattern.valueGroup ?? 1;
   let match: RegExpExecArray | null;
 
-  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex.exec loop
   while ((match = regex.exec(text)) !== null) {
     const value = match[group] ?? match[0];
     const start = match.index;

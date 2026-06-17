@@ -57,7 +57,7 @@ function check(): number {
       rawBytes = statSync(abs).size;
       const buf = readFileSync(abs);
       gzBytes = gzipSync(buf).byteLength;
-    } catch (err) {
+    } catch {
       console.error(`[size-check] missing artifact: ${b.path}`);
       console.error("  hint: run `pnpm build` first");
       failed++;

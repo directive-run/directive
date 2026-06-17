@@ -198,7 +198,6 @@ export function createGraphQLQuery<
           >,
         );
 
-  // biome-ignore lint/suspicious/noExplicitAny: Generic constraints require widening at the boundary
   return createQuery<TData, TResult, TError, any>({
     name,
 
@@ -268,7 +267,6 @@ export function createGraphQLQuery<
 
     transform,
 
-    // biome-ignore lint/suspicious/noExplicitAny: Pass-through options need widened types
     ...(queryOptions as any),
   });
 }

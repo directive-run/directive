@@ -274,7 +274,6 @@ export function createDefinitionsRegistry<S extends Schema>(
     constraint: {
       label: "Constraint",
       mergedMap: mergedConstraints as Record<string, unknown>,
-      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
       manager: constraintsManager as any,
       dynamicSet: dynamicIds.constraints,
       originalsMap: originals.constraints,
@@ -283,7 +282,6 @@ export function createDefinitionsRegistry<S extends Schema>(
     resolver: {
       label: "Resolver",
       mergedMap: mergedResolvers as Record<string, unknown>,
-      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
       manager: resolversManager as any,
       dynamicSet: dynamicIds.resolvers,
       originalsMap: originals.resolvers,
@@ -292,7 +290,6 @@ export function createDefinitionsRegistry<S extends Schema>(
     derivation: {
       label: "Derivation",
       mergedMap: mergedDerive as Record<string, unknown>,
-      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
       manager: derivationsManager as any,
       dynamicSet: dynamicIds.derivations,
       originalsMap: originals.derivations,
@@ -302,7 +299,6 @@ export function createDefinitionsRegistry<S extends Schema>(
     effect: {
       label: "Effect",
       mergedMap: mergedEffects as Record<string, unknown>,
-      // biome-ignore lint/suspicious/noExplicitAny: Manager type erasure for dispatch map
       manager: effectsManager as any,
       dynamicSet: dynamicIds.effects,
       originalsMap: originals.effects,

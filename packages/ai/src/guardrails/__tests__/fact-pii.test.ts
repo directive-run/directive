@@ -232,7 +232,6 @@ describe("createFactPIIGuardrail — customDetector", () => {
       }> = [];
       let m: RegExpExecArray | null;
       accountPattern.lastIndex = 0;
-      // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic exec loop
       while ((m = accountPattern.exec(text)) !== null) {
         out.push({
           type: "ssn",
@@ -604,7 +603,6 @@ describe("createFactPIIGuardrail — array payloads", () => {
     const evil = new Proxy(["leak@example.com"], {
       get(target, key) {
         if (key === Symbol.iterator) return undefined;
-        // biome-ignore lint/suspicious/noExplicitAny: test fixture
         return (target as any)[key];
       },
     });
@@ -626,7 +624,6 @@ describe("createFactPIIGuardrail — array payloads", () => {
     // Proxy. The walker treats the Array.isArray-true Proxy as an
     // array, the spread throws "not iterable", and the R15 try/catch
     // converts the throw to no-match. No system crash.
-    // biome-ignore lint/suspicious/noExplicitAny: test pokes the system internals
     const facts = (system as any).facts.$store;
     // Manually walk fact-pii's inspect path by triggering onFactSet
     // through the store with a benign string first, then call inspect

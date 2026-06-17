@@ -112,9 +112,7 @@ export interface HistoryConfig {
    * });
    * ```
    */
-  redactSnapshot?: (
-    facts: Record<string, unknown>,
-  ) => Record<string, unknown>;
+  redactSnapshot?: (facts: Record<string, unknown>) => Record<string, unknown>;
 }
 
 /** History option: boolean shorthand or full config (presence implies enabled) */
@@ -1254,7 +1252,6 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
 /** System configuration */
 export interface SystemConfig<M extends ModuleSchema = ModuleSchema> {
   modules: ModuleDef<M>[];
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
   plugins?: Plugin<any>[];
   history?: HistoryOption;
   trace?: TraceOption;

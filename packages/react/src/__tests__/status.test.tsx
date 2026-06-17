@@ -69,7 +69,6 @@ function createSystemWithStatus(
       },
     },
   });
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
   const system = createSystem({
     module: mod,
     plugins: [statusPlugin.plugin as Plugin<any>],
@@ -130,7 +129,6 @@ function createMultiTypeSystem(
       },
     },
   });
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
   const system = createSystem({
     module: mod,
     plugins: [statusPlugin.plugin as Plugin<any>],
@@ -501,7 +499,6 @@ describe("useSuspenseRequirement", () => {
         },
       },
     });
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
     const system = createSystem({
       module: mod,
       plugins: [statusPlugin.plugin as Plugin<any>],
@@ -645,7 +642,6 @@ describe("useSuspenseRequirement", () => {
         },
       },
     });
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
     const system = createSystem({
       module: mod,
       plugins: [statusPlugin.plugin as Plugin<any>],

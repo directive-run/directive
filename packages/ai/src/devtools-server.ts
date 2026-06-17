@@ -985,7 +985,6 @@ export async function createWsTransport(
       ) => void)
     | null = null;
 
-  // biome-ignore lint/suspicious/noExplicitAny: ws types resolved at runtime via dynamic import
   wss.on("connection", (ws: any) => {
     let messageHandler: ((data: string) => void) | null = null;
     let closeHandler: (() => void) | null = null;

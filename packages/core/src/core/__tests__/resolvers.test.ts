@@ -2574,5 +2574,4 @@ describe("batch resolver in-flight cancellation (R1 C8)", () => {
     await flush();
     expect(runs).toBe(2);
   });
-
 });

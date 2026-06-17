@@ -178,7 +178,6 @@ export function useFact<
 
 /** Implementation */
 export function useFact(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   keyOrKeys: string | string[],
 ): unknown {
@@ -200,7 +199,6 @@ export function useFact(
 }
 
 function _useSingleFact(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
   system: SingleModuleSystem<any>,
   factKey: string,
 ): unknown {
@@ -228,7 +226,6 @@ function _useSingleFact(
 }
 
 function _useFacts(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
   system: SingleModuleSystem<any>,
   factKeys: string[],
 ): Record<string, unknown> {
@@ -329,7 +326,6 @@ export function useFactWithDefault<
 
 /** Implementation */
 export function useFactWithDefault(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   factKey: string,
   factory: () => unknown,
@@ -372,7 +368,6 @@ export function useDerived<
 
 /** Implementation */
 export function useDerived(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   keyOrKeys: string | string[],
 ): unknown {
@@ -394,7 +389,6 @@ export function useDerived(
 }
 
 function _useSingleDerived(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): unknown {
@@ -422,7 +416,6 @@ function _useSingleDerived(
 }
 
 function _useDerivedMulti(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
   system: SingleModuleSystem<any>,
   derivationIds: string[],
 ): Record<string, unknown> {
@@ -552,9 +545,7 @@ export function useSelector<Modules extends ModulesMap, R>(
 
 // Generic fallback: non-null system
 export function useSelector<R>(
-  // biome-ignore lint/suspicious/noExplicitAny: Generic fallback
   system: SingleModuleSystem<any>,
-  // biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
   selector: (state: Record<string, any>) => R,
   defaultValue?: R,
   equalityFn?: (a: R, b: R) => boolean,
@@ -562,26 +553,20 @@ export function useSelector<R>(
 
 // Generic fallback: nullable system
 export function useSelector<R>(
-  // biome-ignore lint/suspicious/noExplicitAny: Generic fallback
   system: SingleModuleSystem<any> | null | undefined,
-  // biome-ignore lint/suspicious/noExplicitAny: Selector receives dynamic state
   selector: (state: Record<string, any>) => R,
   defaultValue: R,
   equalityFn?: (a: R, b: R) => boolean,
 ): R;
 
 export function useSelector(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature accepts both system types
   systemArg: SingleModuleSystem<any> | NamespacedSystem<any> | null | undefined,
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   selector: (state: any) => unknown,
   defaultValueArg?: unknown,
   equalityFnArg?: (a: unknown, b: unknown) => boolean,
 ): unknown {
   // Route to namespaced implementation if system is a NamespacedSystem
-  // biome-ignore lint/suspicious/noExplicitAny: Runtime type check
   if (systemArg && (systemArg as any)._mode === "namespaced") {
-    // biome-ignore lint/suspicious/noExplicitAny: Delegate to namespaced impl
     return _useNamespacedSelectorImpl(
       systemArg as NamespacedSystem<any>,
       selector,
@@ -764,9 +749,7 @@ export function useSelector(
  * Uses equality comparison to prevent unnecessary re-renders.
  */
 function _useNamespacedSelectorImpl(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal impl
   system: NamespacedSystem<any>,
-  // biome-ignore lint/suspicious/noExplicitAny: Internal impl
   selector: (state: any) => unknown,
   defaultValueArg?: unknown,
   equalityFnArg?: (a: unknown, b: unknown) => boolean,
@@ -863,10 +846,8 @@ export function useWatch<
 
 /** Implementation */
 export function useWatch(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   key: string,
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation overload dispatch
   callback: (newValue: any, prevValue: any) => void,
 ): void {
   assertSystem("useWatch", system);
@@ -949,7 +930,6 @@ export function useTickWhile<S extends ModuleSchema>(
     }
 
     const id = setInterval(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic event dispatch
       const evts = system.events as Record<string, (...args: any[]) => void>;
       const fn = evts[eventName as string];
       if (typeof fn === "function") {
@@ -990,7 +970,6 @@ export interface UseInspectOptions {
  * ```
  */
 export function useInspect(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   options?: UseInspectOptions,
 ): InspectState {
@@ -1034,17 +1013,11 @@ export function useInspect(
   return deferredState;
 }
 
-function _buildInspectState(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
-  system: SingleModuleSystem<any>,
-): InspectState {
+function _buildInspectState(system: SingleModuleSystem<any>): InspectState {
   return computeInspectState(system);
 }
 
-function _useInspectSync(
-  // biome-ignore lint/suspicious/noExplicitAny: Internal
-  system: SingleModuleSystem<any>,
-): InspectState {
+function _useInspectSync(system: SingleModuleSystem<any>): InspectState {
   const cachedSnapshot = useRef<InspectState | null>(null);
   const cachedUnmetIds = useRef<string[]>([]);
   const cachedInflightIds = useRef<string[]>([]);
@@ -1111,7 +1084,6 @@ function _useInspectSync(
  * ```
  */
 export function useHistory(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
 ): HistoryState | null {
   assertSystem("useHistory", system);
@@ -1382,14 +1354,12 @@ function _useSuspenseRequirementMulti(
 
 /** Base options for creating a scoped system */
 interface DirectiveRefBaseConfig {
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
   history?: HistoryOption;
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
   initialFacts?: Record<string, any>;
 }
 
@@ -1436,16 +1406,12 @@ export function useDirectiveRef<const Modules extends ModulesMap>(
 
 /** Implementation */
 export function useDirectiveRef(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature handles both modes
   options: any,
   config?: { status?: boolean } & DirectiveRefBaseConfig,
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation return varies by overload
 ): any {
-  // biome-ignore lint/suspicious/noExplicitAny: System ref holds either system type
   const systemRef = useRef<any>(null);
   const statusPluginRef = useRef<StatusPlugin | null>(null);
   // Factory ref for strict mode re-creation (effects unmount then re-mount)
-  // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
   const factoryRef = useRef<(() => any) | null>(null);
   const wantStatus = config?.status === true;
   const isNamespaced = "modules" in options;
@@ -1474,7 +1440,6 @@ export function useDirectiveRef(
           tickMs,
           zeroConfig,
           initialFacts,
-          // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
         } as any);
         // Always initialize facts/derivations (safe for SSR).
         // Only start reconciliation on the client.
@@ -1502,14 +1467,12 @@ export function useDirectiveRef(
 
       if (wantStatus) {
         statusPluginRef.current = createRequirementStatusPlugin();
-        // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
         allPlugins = [
           ...allPlugins,
           statusPluginRef.current.plugin as Plugin<any>,
         ];
       }
 
-      // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
       const sys = createSystem({
         module: mod,
         plugins: allPlugins.length > 0 ? allPlugins : undefined,
@@ -1688,7 +1651,6 @@ export function useDirective<
   const subscribeAll = factKeys.length === 0 && derivedKeys.length === 0;
 
   // Create system via useDirectiveRef (handles lifecycle)
-  // biome-ignore lint/suspicious/noExplicitAny: Conditional overload dispatch
   const refResult: any = status
     ? useDirectiveRef(moduleOrOptions, { status: true as const, ...configRest })
     : useDirectiveRef(moduleOrOptions, configRest);
@@ -1765,7 +1727,6 @@ export function useDirective<
       // Read selected keys only
       factsResult = {};
       for (const key of factKeys) {
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic fact access
         factsResult[key] = (system.facts as any)[key];
       }
       effectiveFactKeys = factKeys;
@@ -1890,7 +1851,6 @@ export function useEvents<S extends ModuleSchema>(
  * ```
  */
 export function useExplain(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   requirementId: string,
 ): string | null {
@@ -1931,7 +1891,6 @@ export function useConstraintStatus(
 ): ConstraintInfo | null;
 /** Implementation */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): ConstraintInfo[] | ConstraintInfo | null {
@@ -1975,7 +1934,6 @@ export interface OptimisticUpdateResult {
  * ```
  */
 export function useOptimisticUpdate(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   statusPlugin?: StatusPlugin,
   requirementType?: string,
@@ -2134,7 +2092,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       factKey: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
       useFact(system as SingleModuleSystem<any>, factKey) as
         | InferFacts<M>[K]
         | undefined,
@@ -2142,7 +2099,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       derivationId: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
       useDerived(
         system as SingleModuleSystem<any>,
         derivationId,
@@ -2153,9 +2109,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       key: K,
       callback: (newValue: unknown, previousValue: unknown) => void,
-    ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
-      useWatch(system as SingleModuleSystem<any>, key, callback),
+    ) => useWatch(system as SingleModuleSystem<any>, key, callback),
   };
 }
 
@@ -2163,7 +2117,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
   null;
 
@@ -2218,7 +2171,6 @@ function getCreateQuerySystem() {
  * }
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: System type varies based on config
 export function useQuerySystem<
   T extends {
     start: () => void;
@@ -2283,7 +2235,6 @@ export function useQuerySystem<
 
 // Cache of pending promises per system+key to ensure stable references across renders
 const suspensePromiseCache = new WeakMap<
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   any,
   Map<string, { promise: Promise<void>; resolve: () => void }>
 >();
@@ -2312,7 +2263,6 @@ const suspensePromiseCache = new WeakMap<
  * ```
  */
 export function useSuspenseQuery<T = unknown>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   queryName: string,
 ): T {
@@ -2327,7 +2277,6 @@ export function useSuspenseQuery<T = unknown>(
     return system.read(queryName);
   }, [system, queryName]);
 
-  // biome-ignore lint/suspicious/noExplicitAny: ResourceState shape checked at runtime
   const state = useSyncExternalStore(
     subscribe,
     getSnapshot,
@@ -2372,7 +2321,6 @@ export function useSuspenseQuery<T = unknown>(
 
     // Subscribe to resolve the promise when state changes
     const unsub = system.subscribe([queryName], () => {
-      // biome-ignore lint/suspicious/noExplicitAny: ResourceState checked at runtime
       const updated = system.read(queryName) as any;
       if (updated?.status === "success" || updated?.status === "error") {
         const entry = cache.get(queryName);
@@ -2464,7 +2412,6 @@ export function createDirectiveContext<M extends ModuleSchema>(
 
     /** Read a fact value (reactive — re-renders on change). */
     useFact: <K extends keyof InferFacts<M> & string>(factKey: K) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
       useFact(useSystem() as SingleModuleSystem<any>, factKey) as
         | InferFacts<M>[K]
         | undefined,
@@ -2473,7 +2420,6 @@ export function createDirectiveContext<M extends ModuleSchema>(
     useDerived: <K extends keyof InferDerivations<M> & string>(
       derivationId: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
       useDerived(
         useSystem() as SingleModuleSystem<any>,
         derivationId,
@@ -2489,9 +2435,7 @@ export function createDirectiveContext<M extends ModuleSchema>(
     useSelector: <R,>(
       selector: (state: InferSelectorState<M>) => R,
       equalityFn?: (a: R, b: R) => boolean,
-    ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Internal type narrowing
-      useSelector(useSystem() as any, selector as any, equalityFn) as R,
+    ) => useSelector(useSystem() as any, selector as any, equalityFn) as R,
 
     /** Watch a key and call a callback on change. */
     useWatch: <K extends string>(

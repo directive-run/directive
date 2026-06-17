@@ -267,15 +267,11 @@ export function sourceFromSupabaseChannel(
       // event; the source publishes the returned Directive event.
       if (presence) {
         for (const binding of presence) {
-          chan = chan.on(
-            "presence",
-            { event: binding.event },
-            (payload) => {
-              const result = binding.map(payload);
-              if (result === null) return;
-              publish(result.name, result.payload);
-            },
-          );
+          chan = chan.on("presence", { event: binding.event }, (payload) => {
+            const result = binding.map(payload);
+            if (result === null) return;
+            publish(result.name, result.payload);
+          });
         }
       }
 
@@ -283,15 +279,11 @@ export function sourceFromSupabaseChannel(
       // payloads the channel emits via the broadcast surface.
       if (broadcast) {
         for (const binding of broadcast) {
-          chan = chan.on(
-            "broadcast",
-            { event: binding.event },
-            (payload) => {
-              const result = binding.map(payload);
-              if (result === null) return;
-              publish(result.name, result.payload);
-            },
-          );
+          chan = chan.on("broadcast", { event: binding.event }, (payload) => {
+            const result = binding.map(payload);
+            if (result === null) return;
+            publish(result.name, result.payload);
+          });
         }
       }
 

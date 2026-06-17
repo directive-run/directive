@@ -207,9 +207,7 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
    * });
    * ```
    */
-  budgetEstimateTokens?:
-    | number
-    | ((input: string, agent: AgentLike) => number);
+  budgetEstimateTokens?: number | ((input: string, agent: AgentLike) => number);
   /**
    * Controls how `circuitBreaker` composes with `agentRetry`.
    *
@@ -366,7 +364,6 @@ export interface LiveContextOptions<
   F extends Record<string, unknown> = Record<string, unknown>,
 > {
   /** The Directive system whose facts feed the agent. */
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies per consumer
   system: System<any>;
   /**
    * Fact keys to watch. The orchestrator subscribes to fact-change
@@ -438,7 +435,6 @@ export interface RunCallOptions {
 
 /** Orchestrator instance */
 export interface AgentOrchestrator<F extends Record<string, unknown>> {
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: System<any>;
   facts: F & OrchestratorState;
   /** Run an agent with guardrails. Pass options to override guardrails per-call. */
@@ -687,11 +683,9 @@ export function createAgentOrchestrator<
 
   // Forward declaration for system (used in resolver converter)
   // biome-ignore lint/style/useConst: forward declaration, assigned later
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   let system: SingleModuleSystem<any>;
 
   // Convert user constraints
-  // biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
   const directiveConstraints: Record<string, any> =
     convertOrchestratorConstraints<F>(constraints);
 
@@ -699,14 +693,12 @@ export function createAgentOrchestrator<
   if (maxTokenBudget) {
     directiveConstraints.__budgetLimit = {
       priority: 100, // High priority
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => getAgentState(facts).tokenUsage > maxTokenBudget,
       require: { type: "__PAUSE_BUDGET_EXCEEDED" } as PauseBudgetExceededReq,
     };
   }
 
   // Convert user resolvers
-  // biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
   const directiveResolvers: Record<string, any> =
     convertOrchestratorResolvers<F>(
       resolvers,
@@ -720,7 +712,6 @@ export function createAgentOrchestrator<
     requirement: requirementGuard<PauseBudgetExceededReq>(
       "__PAUSE_BUDGET_EXCEEDED",
     ),
-    // biome-ignore lint/suspicious/noExplicitAny: Context type varies
     resolve: async (_req: Requirement, context: any) => {
       const currentAgent = getAgentState(context.facts);
       setAgentState(context.facts, {
@@ -758,7 +749,6 @@ export function createAgentOrchestrator<
   );
 
   // Create module
-  // biome-ignore lint/suspicious/noExplicitAny: Bridge module uses dynamic constraints/resolvers
   const orchestratorModule = createModule("directive-ai-orchestrator", {
     schema: combinedSchema,
     init: (facts) => {
@@ -832,10 +822,7 @@ export function createAgentOrchestrator<
   // behavior for consumers that didn't ship the new option.
   const inFlightReservation = { count: 0 };
 
-  function resolveBudgetReservation(
-    agent: AgentLike,
-    input: string,
-  ): number {
+  function resolveBudgetReservation(agent: AgentLike, input: string): number {
     if (budgetEstimateTokens === undefined) return 0;
     if (typeof budgetEstimateTokens === "number") {
       return Math.max(0, Math.floor(budgetEstimateTokens));
@@ -872,15 +859,10 @@ export function createAgentOrchestrator<
     if (maxTokenBudget) {
       const currentUsage = getAgentState(system.facts).tokenUsage;
       reserved = resolveBudgetReservation(agent, input);
-      const projected =
-        currentUsage + inFlightReservation.count + reserved;
+      const projected = currentUsage + inFlightReservation.count + reserved;
       if (projected > maxTokenBudget) {
         throw new Error(
-          `[Directive] Agent budget would be exceeded by this call: ` +
-            `current=${currentUsage} + in-flight=${inFlightReservation.count} + ` +
-            `estimate=${reserved} > maxTokenBudget=${maxTokenBudget}. ` +
-            `Raise \`maxTokenBudget\`, lower \`budgetEstimateTokens\`, ` +
-            `or reset \`tokenUsage\`.`,
+          `[Directive] Agent budget would be exceeded by this call: current=${currentUsage} + in-flight=${inFlightReservation.count} + estimate=${reserved} > maxTokenBudget=${maxTokenBudget}. Raise \`maxTokenBudget\`, lower \`budgetEstimateTokens\`, or reset \`tokenUsage\`.`,
         );
       }
       inFlightReservation.count += reserved;
@@ -1009,8 +991,10 @@ export function createAgentOrchestrator<
           });
         }
         const fallbackAgent = selfHealing.fallbackAgent;
-        return await withFallbackBudgetReservation<T>(fallbackAgent, input, () =>
-          runner<T>(fallbackAgent, input, opts),
+        return await withFallbackBudgetReservation<T>(
+          fallbackAgent,
+          input,
+          () => runner<T>(fallbackAgent, input, opts),
         );
       } catch {
         // Fallback agent also failed
@@ -1965,11 +1949,7 @@ export function createAgentOrchestrator<
         // v1.19.1+ for source-compat with v1.18 call sites. The field
         // is intentionally a runtime no-op; emit a one-shot warning
         // when a consumer actually sets it so they know to drop it.
-        if (
-          // biome-ignore lint/suspicious/noExplicitAny: deprecated field access
-          (liveCfg as any).mode !== undefined &&
-          !deprecatedModeWarned
-        ) {
+        if ((liveCfg as any).mode !== undefined && !deprecatedModeWarned) {
           deprecatedModeWarned = true;
           // eslint-disable-next-line no-console
           console.warn(
@@ -1985,9 +1965,7 @@ export function createAgentOrchestrator<
           );
           if (overlap.length > 0) {
             console.warn(
-              `[Directive] liveContext watches bridge-state keys (${overlap.join(", ")}) on the orchestrator's own system. ` +
-                "The orchestrator's own setAgentState / setConversation / approvalState writes will trigger interruptWhen, " +
-                "self-looping the run. Use a separate system for liveContext, or scope `keys` to user-fact namespaces.",
+              `[Directive] liveContext watches bridge-state keys (${overlap.join(", ")}) on the orchestrator's own system. The orchestrator's own setAgentState / setConversation / approvalState writes will trigger interruptWhen, self-looping the run. Use a separate system for liveContext, or scope \`keys\` to user-fact namespaces.`,
             );
           }
         }
@@ -2041,11 +2019,7 @@ export function createAgentOrchestrator<
             // (audit-ledger, logging) still fire.
             let shouldInterrupt = false;
             try {
-              shouldInterrupt = interruptWhen(
-                // biome-ignore lint/suspicious/noExplicitAny: facts type per consumer
-                current as any,
-                watchedChanged,
-              );
+              shouldInterrupt = interruptWhen(current as any, watchedChanged);
             } catch (err) {
               // eslint-disable-next-line no-console
               console.error(

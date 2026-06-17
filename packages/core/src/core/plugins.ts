@@ -56,25 +56,18 @@ import type { DirectiveError } from "./types.js";
  */
 // Note: PluginManager uses Schema (flat) internally because the engine works with flat schemas.
 // The public API uses ModuleSchema (consolidated), and the conversion happens in createSystem.
-// biome-ignore lint/suspicious/noExplicitAny: Internal type - plugins are schema-agnostic at runtime
 export interface PluginManager<_S extends Schema = any> {
   /** Register a plugin */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
   register(plugin: Plugin<any>): void;
   /** Unregister a plugin by name */
   unregister(name: string): void;
   /** Get all registered plugins */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
   getPlugins(): Plugin<any>[];
 
   // Lifecycle hooks
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
   emitInit(system: System<any>): Promise<void>;
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
   emitStart(system: System<any>): void;
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
   emitStop(system: System<any>): void;
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies between internal/public API
   emitDestroy(system: System<any>): void;
 
   // Fact hooks
@@ -87,7 +80,6 @@ export interface PluginManager<_S extends Schema = any> {
   emitDerivationInvalidate(id: string): void;
 
   // Reconciliation hooks
-  // biome-ignore lint/suspicious/noExplicitAny: Schema type varies
   emitReconcileStart(snapshot: FactsSnapshot<any>): void;
   emitReconcileEnd(result: ReconcileResult): void;
 
@@ -232,10 +224,8 @@ export interface PluginManager<_S extends Schema = any> {
  * @internal
  */
 export function createPluginManager<
-  // biome-ignore lint/suspicious/noExplicitAny: Internal - schema type varies
   S extends Schema = any,
 >(): PluginManager<S> {
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
   const plugins: Plugin<any>[] = [];
 
   /** Safe call - wraps plugin hook calls to prevent errors from breaking the system */
@@ -281,7 +271,6 @@ export function createPluginManager<
   }
 
   /** Create a sync broadcast function for a given plugin hook name */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin hook signatures vary
   function broadcast<K extends keyof Plugin<any>>(hook: K) {
     return (...args: unknown[]) => {
       // — snapshot the plugins array BEFORE iterating so a
@@ -293,7 +282,6 @@ export function createPluginManager<
       // guardrail — by self-unregistering at exactly the right hook.
       const snapshot = [...plugins];
       for (const plugin of snapshot) {
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic hook dispatch
         safeCall(
           () => (plugin as any)[hook]?.(...args),
           plugin.name,
@@ -304,7 +292,6 @@ export function createPluginManager<
   }
 
   const manager: PluginManager<S> = {
-    // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
     register(plugin: Plugin<any>): void {
       // Check for duplicate names
       if (plugins.some((p) => p.name === plugin.name)) {
@@ -323,13 +310,11 @@ export function createPluginManager<
       }
     },
 
-    // biome-ignore lint/suspicious/noExplicitAny: Plugins work with any schema
     getPlugins(): Plugin<any>[] {
       return [...plugins];
     },
 
     // Lifecycle hooks (emitInit is async, handled separately)
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     async emitInit(system: System<any>): Promise<void> {
       // R15 — track which plugins have already received `onInit` via a
       // WeakSet, then loop over the LIVE `plugins` array until quiet.
@@ -346,7 +331,6 @@ export function createPluginManager<
       //      lifecycle events and audit-ledger entries depends on
       //      that observer's `onInit` firing for the same cycle. The
       //      loop-until-quiet shape captures cascaded registrations.
-      // biome-ignore lint/suspicious/noExplicitAny: Plugin shape varies
       const initialized = new WeakSet<Plugin<any>>();
       // Cap iterations to bound an adversarial register-loop scenario
       // (a plugin that registers another plugin in its onInit, and so
@@ -362,9 +346,7 @@ export function createPluginManager<
           // browsers / Bun / Deno / Workers) and only log when the cost is
           // non-trivial to keep dev console noise low.
           const startedAt =
-            typeof performance !== "undefined"
-              ? performance.now()
-              : Date.now();
+            typeof performance !== "undefined" ? performance.now() : Date.now();
           await safeCallAsync(
             () =>
               (plugin.onInit?.(system) ?? Promise.resolve()) as Promise<void>,

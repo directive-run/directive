@@ -502,7 +502,6 @@ export interface MultiAgentRunCallOptions extends RunOptions {
 /** Multi-agent orchestrator instance */
 export interface MultiAgentOrchestrator {
   /** The underlying Directive System */
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies per configuration
   system: System<any>;
   /** Combined facts from all agent modules + coordinator */
   facts: Record<string, unknown>;

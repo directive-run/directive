@@ -387,12 +387,11 @@ describe("@directive-run/mutator", () => {
     // Compile-time check: the inferred schema-type's storage matches
     // `PendingMutation<Mutations> | null` rather than `unknown`. If the
     // generic regresses, this assignment fails at typecheck.
-    const _typed: typeof mut.facts.pendingMutation extends
-      | import("@directive-run/core").SchemaType<
-          import("../index.js").PendingMutation<Mutations> | null
-        >
-      ? true
-      : false = true;
+    type _Storage = typeof mut.facts.pendingMutation;
+    type _Expected = import("@directive-run/core").SchemaType<
+      import("../index.js").PendingMutation<Mutations> | null
+    >;
+    const _typed: _Storage extends _Expected ? true : false = true;
     expect(_typed).toBe(true);
   });
 });

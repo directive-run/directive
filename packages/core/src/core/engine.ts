@@ -187,7 +187,6 @@ interface EngineState<_S extends Schema> {
  *
  * @internal
  */
-// biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
 export function createEngine<S extends Schema>(
   config: SystemConfig<any>,
 ): System<any> {
@@ -213,7 +212,6 @@ export function createEngine<S extends Schema>(
   const definitionOwners = new Map<string, string>();
   // Track resolver-id → owning module def, used to fire module-level resolver hooks
   // (e.g. ModuleHooks.onResolverError) without re-walking config.modules per error.
-  // biome-ignore lint/suspicious/noExplicitAny: Module schema varies; only hooks shape matters here
   const resolverIdToModule = new Map<string, (typeof config.modules)[number]>();
 
   for (const module of config.modules) {
@@ -335,14 +333,12 @@ export function createEngine<S extends Schema>(
   // If any module declares history.snapshotEvents, build the filter set.
   // Modules WITHOUT history.snapshotEvents have all their events added (they still snapshot).
   let snapshotEventNames: Set<string> | null = null;
-  // biome-ignore lint/suspicious/noExplicitAny: Module may have history.snapshotEvents at runtime
   const hasAnySnapshotEvents = config.modules.some(
     (m: any) => m.history?.snapshotEvents,
   );
   if (hasAnySnapshotEvents) {
     snapshotEventNames = new Set<string>();
     for (const module of config.modules) {
-      // biome-ignore lint/suspicious/noExplicitAny: Module may have history.snapshotEvents at runtime
       const mod = module as any;
       if (mod.history?.snapshotEvents) {
         for (const eventName of mod.history.snapshotEvents) {
@@ -803,12 +799,10 @@ export function createEngine<S extends Schema>(
           error instanceof Error ? error : new Error(String(error));
         try {
           hook(normalizedError, req.requirement, {
-            // biome-ignore lint/suspicious/noExplicitAny: Hook receives owning module's facts shape
             facts: facts as any,
           });
         } catch (hookError) {
           // Isolate hook failures so they don't break the engine
-          // biome-ignore lint/suspicious/noConsole: Engine error path needs visibility
           console.error(
             `[Directive] onResolverError hook for module "${ownerModule?.id}" threw:`,
             hookError,
@@ -1312,22 +1306,18 @@ export function createEngine<S extends Schema>(
   }
 
   // Create the system interface
-  // biome-ignore lint/suspicious/noExplicitAny: Engine uses flat schema internally, public API uses ModuleSchema
   const system: System<any> = {
     facts,
     history: historyManager.isEnabled ? historyManager : null,
-    // biome-ignore lint/suspicious/noExplicitAny: Proxy provides both derivation values and control methods at runtime
     derive: deriveAccessor as any,
     events: eventsAccessor,
     constraints: {
       disable: (id: string) => constraintsManager.disable(id),
       enable: (id: string) => constraintsManager.enable(id),
       isDisabled: (id: string) => constraintsManager.isDisabled(id),
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       register: (id: string, def: any) => {
         definitions.register("constraint", id, def);
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any constraint def shape
       assign: (id: string, def: any) => {
         definitions.assign("constraint", id, def);
       },
@@ -1350,11 +1340,9 @@ export function createEngine<S extends Schema>(
       disable: (id: string) => effectsManager.disable(id),
       enable: (id: string) => effectsManager.enable(id),
       isEnabled: (id: string) => effectsManager.isEnabled(id),
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       register: (id: string, def: any) => {
         definitions.register("effect", id, def);
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any effect def shape
       assign: (id: string, def: any) => {
         definitions.assign("effect", id, def);
       },
@@ -1366,12 +1354,10 @@ export function createEngine<S extends Schema>(
       listDynamic: () => definitions.listDynamic("effect"),
     },
     resolvers: {
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       register: (id: string, def: any) => {
         definitions.register("resolver", id, def);
         syncResolverKeys({ [id]: def } as ResolversDef<S>);
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Runtime accepts any resolver def shape
       assign: (id: string, def: any) => {
         definitions.assign("resolver", id, def);
         syncResolverKeys({ [id]: def } as ResolversDef<S>);
@@ -1532,8 +1518,7 @@ export function createEngine<S extends Schema>(
         onConstraintBindingDisabled: (
           id: string,
           reason: "async-declared" | "async-promoted",
-        ) =>
-          observer({ type: "constraint.binding.disabled", id, reason }),
+        ) => observer({ type: "constraint.binding.disabled", id, reason }),
         onRequirementCreated: (req: {
           id: string;
           requirement: { type: string };
@@ -1626,8 +1611,7 @@ export function createEngine<S extends Schema>(
           moduleId: string,
           eventName: string,
           reason: import("./types/sources.js").SourceDropReason,
-        ) =>
-          observer({ type: "source.drop", id, moduleId, eventName, reason }),
+        ) => observer({ type: "source.drop", id, moduleId, eventName, reason }),
         onSourceDetach: (id: string, moduleId: string) =>
           observer({ type: "source.detach", id, moduleId }),
         onSourceError: (
@@ -1683,7 +1667,6 @@ export function createEngine<S extends Schema>(
       for (const module of config.modules) {
         if (module.init) {
           store.batch(() => {
-            // biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
             module.init!(facts as any);
           });
         }
@@ -1746,7 +1729,6 @@ export function createEngine<S extends Schema>(
 
       // Module onStart hooks (may access browser APIs — only in start())
       for (const module of config.modules) {
-        // biome-ignore lint/suspicious/noExplicitAny: Engine internal type coercion
         module.hooks?.onStart?.(system as any);
       }
 
@@ -2857,7 +2839,6 @@ export function createEngine<S extends Schema>(
         if (d.meta) d.meta = freezeMeta(d.meta)!;
       }
       Object.assign(mergedEffects, module.effects);
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       effectsManager.registerDefinitions(module.effects as any);
     }
     if (module.sources) {
@@ -2900,7 +2881,6 @@ export function createEngine<S extends Schema>(
         if (d.meta) d.meta = freezeMeta(d.meta)!;
       }
       Object.assign(mergedConstraints, module.constraints);
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       constraintsManager.registerDefinitions(module.constraints as any);
     }
     if (module.resolvers) {
@@ -2916,14 +2896,12 @@ export function createEngine<S extends Schema>(
           module as (typeof config.modules)[number],
         );
       }
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic module registration
       resolversManager.registerDefinitions(module.resolvers as any);
       // Sync resolver key functions to the constraints manager
       syncResolverKeys(module.resolvers as ResolversDef<S>);
     }
 
     // Register new schema keys with the facts store
-    // biome-ignore lint/suspicious/noExplicitAny: Internal dynamic method
     (store as any).registerKeys(module.schema as Record<string, unknown>);
 
     // Store module meta (frozen)
@@ -2938,7 +2916,6 @@ export function createEngine<S extends Schema>(
     // Run init within a batch
     if (module.init) {
       store.batch(() => {
-        // biome-ignore lint/suspicious/noExplicitAny: Dynamic module init
         module.init!(facts as any);
       });
     }

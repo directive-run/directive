@@ -48,61 +48,51 @@ import {
 // ============================================================================
 
 /** @internal Read the agent state from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getAgentState(facts: any): AgentState {
   return getBridgeFact<AgentState>(facts, AGENT_KEY);
 }
 
 /** @internal Write the agent state to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setAgentState(facts: any, state: AgentState): void {
   setBridgeFact(facts, AGENT_KEY, state);
 }
 
 /** @internal Read the approval state from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getApprovalState(facts: any): ApprovalState {
   return getBridgeFact<ApprovalState>(facts, APPROVAL_KEY);
 }
 
 /** @internal Write the approval state to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setApprovalState(facts: any, state: ApprovalState): void {
   setBridgeFact(facts, APPROVAL_KEY, state);
 }
 
 /** @internal Read the conversation messages from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getConversation(facts: any): Message[] {
   return getBridgeFact<Message[]>(facts, CONVERSATION_KEY);
 }
 
 /** @internal Write conversation messages to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setConversation(facts: any, messages: Message[]): void {
   setBridgeFact(facts, CONVERSATION_KEY, messages);
 }
 
 /** @internal Read the tool calls from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getToolCalls(facts: any): ToolCall[] {
   return getBridgeFact<ToolCall[]>(facts, TOOL_CALLS_KEY);
 }
 
 /** @internal Write tool calls to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setToolCalls(facts: any, toolCalls: ToolCall[]): void {
   setBridgeFact(facts, TOOL_CALLS_KEY, toolCalls);
 }
 
 /** @internal Read the health state map from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getHealthState(facts: any): Record<string, AgentHealthState> {
   return getBridgeFact<Record<string, AgentHealthState>>(facts, HEALTH_KEY);
 }
 
 /** @internal Write the health state map to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setHealthState(
   facts: any,
   state: Record<string, AgentHealthState>,
@@ -111,19 +101,16 @@ export function setHealthState(
 }
 
 /** @internal Read the breakpoint state from bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getBreakpointState(facts: any): BreakpointState {
   return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
 }
 
 /** @internal Write the breakpoint state to bridge facts. */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setBreakpointState(facts: any, state: BreakpointState): void {
   setBridgeFact(facts, BREAKPOINT_KEY, state);
 }
 
 /** Get full orchestrator state from facts */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getOrchestratorState(facts: any): OrchestratorState {
   return {
     agent: getAgentState(facts),
@@ -138,17 +125,14 @@ export function getOrchestratorState(facts: any): OrchestratorState {
 // ============================================================================
 
 /** Convert user-facing OrchestratorConstraint objects into Directive core constraint format */
-// biome-ignore lint/suspicious/noExplicitAny: Constraint types are complex
 export function convertOrchestratorConstraints<
   F extends Record<string, unknown>,
 >(constraints: Record<string, OrchestratorConstraint<F>>): Record<string, any> {
-  // biome-ignore lint/suspicious/noExplicitAny: Result type is complex
   const result: Record<string, any> = Object.create(null);
 
   for (const [id, constraint] of Object.entries(constraints)) {
     result[id] = {
       priority: constraint.priority ?? 0,
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       when: (facts: any) => {
         const state = getOrchestratorState(facts);
         const combinedFacts = { ...facts, ...state } as unknown as F &
@@ -156,7 +140,6 @@ export function convertOrchestratorConstraints<
 
         return constraint.when(combinedFacts);
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       require: (facts: any) => {
         const state = getOrchestratorState(facts);
         const combinedFacts = { ...facts, ...state } as unknown as F &
@@ -173,7 +156,6 @@ export function convertOrchestratorConstraints<
 }
 
 /** Convert user-facing OrchestratorResolver objects into Directive core resolver format */
-// biome-ignore lint/suspicious/noExplicitAny: Resolver types are complex
 export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
   resolvers: Record<string, OrchestratorResolver<F, Requirement>>,
   runAgentWithGuardrails: <T>(
@@ -182,17 +164,14 @@ export function convertOrchestratorResolvers<F extends Record<string, unknown>>(
     currentFacts: F & OrchestratorState,
     opts?: RunOptions,
   ) => Promise<RunResult<T>>,
-  // biome-ignore lint/suspicious/noExplicitAny: Facts getter type varies
   getSystemFacts: () => any,
 ): Record<string, any> {
-  // biome-ignore lint/suspicious/noExplicitAny: Result type is complex
   const result: Record<string, any> = Object.create(null);
 
   for (const [id, resolver] of Object.entries(resolvers)) {
     result[id] = {
       requirement: resolver.requirement,
       key: resolver.key,
-      // biome-ignore lint/suspicious/noExplicitAny: Context type varies
       resolve: async (req: Requirement, context: any) => {
         const state = getOrchestratorState(context.facts);
         const combinedFacts = { ...context.facts, ...state } as unknown as F &

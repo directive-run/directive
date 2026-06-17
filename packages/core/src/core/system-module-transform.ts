@@ -436,10 +436,8 @@ function prefixInit(
     return undefined;
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Facts proxy type coercion
   return (facts: any) => {
     const moduleFactsProxy = createModuleFactsProxy(facts, namespace);
-    // biome-ignore lint/suspicious/noExplicitAny: Module init type coercion
     (mod.init as any)(moduleFactsProxy);
   };
 }
@@ -472,7 +470,6 @@ function prefixDerive(
         derive as Record<string, unknown>,
         namespace,
       );
-      // biome-ignore lint/suspicious/noExplicitAny: Derive function type coercion
       return (fn as any)(factsProxy, deriveProxy);
     };
 
@@ -507,7 +504,6 @@ function prefixEventHandlers(
         facts as Record<string, unknown>,
         namespace,
       );
-      // biome-ignore lint/suspicious/noExplicitAny: Event handler type coercion
       (handler as any)(moduleFactsProxy, event);
     };
 
@@ -695,14 +691,12 @@ function prefixEffects(
   const result: Record<string, unknown> = {};
   for (const [key, effect] of Object.entries(mod.effects)) {
     const effectDef = effect as {
-      // biome-ignore lint/suspicious/noExplicitAny: Effect run function type
       run: (facts: any, prev: any) => void | Promise<void>;
       deps?: string[];
     };
 
     result[prefixKey(namespace, key)] = {
       ...effectDef,
-      // biome-ignore lint/suspicious/noExplicitAny: Effect run function wrapper
       run: (facts: any, prev: any) => {
         const factsProxy = createScopedFactsProxy(
           facts as Record<string, unknown>,

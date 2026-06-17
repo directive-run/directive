@@ -200,7 +200,6 @@ function scanText(
     if (!types.has(pattern.type)) continue;
     pattern.regex.lastIndex = 0;
     let match: RegExpExecArray | null;
-    // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic exec loop
     while ((match = pattern.regex.exec(text)) !== null) {
       if (pattern.validate && !pattern.validate(match[0])) continue;
       out.push({

@@ -276,7 +276,6 @@ export function createFakeTimers(): FakeTimers {
  */
 export interface MockResolverContext {
   /** Facts object (use type assertion for specific facts) */
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies by system
   facts: any;
   /** Abort signal for cancellation */
   signal: AbortSignal;
@@ -613,7 +612,6 @@ export interface CreateTestSystemOptions<Modules extends ModulesMap>
     resolvers?: Record<string, MockResolverOptions>;
   };
   /** Additional plugins (tracking plugin is added automatically) */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
   plugins?: any[];
 }
 
@@ -631,7 +629,6 @@ export interface CreateTestSystemOptionsSingle<S extends ModuleSchema>
     resolvers?: Record<string, MockResolverOptions>;
   };
   /** Additional plugins (tracking plugin is added automatically) */
-  // biome-ignore lint/suspicious/noExplicitAny: Plugins are schema-agnostic
   plugins?: any[];
 }
 
@@ -703,7 +700,6 @@ function createTestSystemSingle<S extends ModuleSchema>(
   }
 
   // Create module with mock resolvers
-  // biome-ignore lint/suspicious/noExplicitAny: Mock resolvers have simplified types
   const moduleWithMocks: ModuleDef<S> = {
     ...options.module,
     resolvers: {
@@ -735,12 +731,10 @@ function createTestSystemSingle<S extends ModuleSchema>(
     ...options,
     module: moduleWithMocks,
     plugins: [trackingPlugin, ...(options.plugins ?? [])],
-    // biome-ignore lint/suspicious/noExplicitAny: Internal overload compatibility
   } as any) as SingleModuleSystem<S>;
 
   // Wrap dispatch to track events
   const originalDispatch = system.dispatch.bind(system);
-  // biome-ignore lint/suspicious/noExplicitAny: Event type varies
   (system as any).dispatch = (event: any) => {
     eventHistory.push(event);
     originalDispatch(event);
@@ -865,7 +859,6 @@ function createTestSystemNamed<Modules extends ModulesMap>(
   // Create modules with mock resolvers
   const modulesWithMocks: Modules = {} as Modules;
   for (const [name, module] of Object.entries(options.modules)) {
-    // biome-ignore lint/suspicious/noExplicitAny: Module types are complex
     (modulesWithMocks as any)[name] = {
       ...module,
       resolvers: {
@@ -923,7 +916,6 @@ function createTestSystemNamed<Modules extends ModulesMap>(
 
   // Wrap dispatch to track events
   const originalDispatch = system.dispatch.bind(system);
-  // biome-ignore lint/suspicious/noExplicitAny: Event type varies
   (system as any).dispatch = (event: any) => {
     eventHistory.push(event);
     originalDispatch(event);
@@ -1177,7 +1169,6 @@ export interface CoverageReport {
  * ```
  */
 export function createCoverageTracker(
-  // biome-ignore lint/suspicious/noExplicitAny: Works with any system type
   system: SingleModuleSystem<any> | NamespacedSystem<any>,
 ): {
   /** Run a test scenario while tracking coverage. */
@@ -1284,7 +1275,6 @@ export function createCoverageTracker(
  * ```
  */
 export function createTestObserver(
-  // biome-ignore lint/suspicious/noExplicitAny: Works with any system type
   system: SingleModuleSystem<any> | NamespacedSystem<any>,
 ): {
   /** All collected events. */

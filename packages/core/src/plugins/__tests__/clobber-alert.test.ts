@@ -213,7 +213,9 @@ describe("clobberAlertPlugin", () => {
         req: {
           id: "req",
           requirement: { type: "T" },
-        } as Parameters<NonNullable<typeof plugin.onResolverWriteRejected>>[0] extends infer X
+        } as Parameters<
+          NonNullable<typeof plugin.onResolverWriteRejected>
+        >[0] extends infer X
           ? X extends { req: infer R }
             ? R
             : never
@@ -677,7 +679,12 @@ describe("clobberAlertPlugin", () => {
 
     try {
       const m = createModule("cap", {
-        schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+        schema: {
+          facts: { _: t.number() },
+          derivations: {},
+          events: {},
+          requirements: {},
+        },
         init: (f) => {
           f._ = 1;
         },
@@ -736,7 +743,12 @@ describe("clobberAlertPlugin", () => {
   it("onSummary fires for resolver-listed irreversible resolvers", async () => {
     const summaries: ClobberSummaryEvent[] = [];
     const m = createModule("summary", {
-      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      schema: {
+        facts: { _: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
       init: (f) => {
         f._ = 1;
       },
@@ -838,7 +850,12 @@ describe("clobberAlertPlugin", () => {
   it("onSummary stays silent when neither filter matches", async () => {
     const summaries: ClobberSummaryEvent[] = [];
     const m = createModule("silent", {
-      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      schema: {
+        facts: { _: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
       init: (f) => {
         f._ = 1;
       },
@@ -873,7 +890,12 @@ describe("clobberAlertPlugin", () => {
   it("isolates a throwing onSummary callback from the dispatch path", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const m = createModule("throwingSummary", {
-      schema: { facts: { _: t.number() }, derivations: {}, events: {}, requirements: {} },
+      schema: {
+        facts: { _: t.number() },
+        derivations: {},
+        events: {},
+        requirements: {},
+      },
       init: (f) => {
         f._ = 1;
       },

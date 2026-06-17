@@ -3,8 +3,8 @@
 // (strict serialization) and Infinity (unbounded).
 
 import { afterEach, describe, expect, it } from "vitest";
-import { runInSandbox } from "../src/index.js";
 import { setMaxConcurrentWorkers } from "../src/host.js";
+import { runInSandbox } from "../src/index.js";
 
 const TRIVIAL = [
   {

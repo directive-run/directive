@@ -175,10 +175,7 @@ export function createSystem<
   // so the caller gets a clear `[Directive]` diagnostic instead of a
   // downstream `Cannot convert undefined or null to object` thrown from
   // `Object.keys(undefined)` deep inside the engine init.
-  if (
-    !options ||
-    (!("module" in options) && !("modules" in options))
-  ) {
+  if (!options || (!("module" in options) && !("modules" in options))) {
     throw new Error(
       "[Directive] createSystem requires either `{ module }` (single-module form) " +
         "or `{ modules: { name: module } }` (namespaced form). Got an options " +
@@ -378,7 +375,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
   let hydratedFacts: Record<string, Record<string, unknown>> | null = null;
 
   // Engine reference (set after creation, used by applyNamespacedFacts)
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
   let engine: any = null;
 
   /**
@@ -429,7 +425,6 @@ function createNamespacedSystem<Modules extends ModulesMap>(
 
   // Create engine with flat modules
   engine = createEngine({
-    // biome-ignore lint/suspicious/noExplicitAny: Module format conversion
     modules: flatModules as any,
     plugins: options.plugins,
     history,
@@ -823,11 +818,8 @@ function createNamespacedSystem<Modules extends ModulesMap>(
       namespaceKeysMap.set(namespace, collectNamespaceKeys(namespace, mod));
 
       // Delegate to engine's registerModule
-      // biome-ignore lint/suspicious/noExplicitAny: Engine registerModule type
       (engine as any).registerModule(flat);
     },
-
-    // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for NamespacedSystem
   } as any;
 
   bindEnginePassthroughs(system, engine);
@@ -883,12 +875,7 @@ function applyZeroConfigDefaults(options: {
  * watch, when, getDistributableSnapshot, watchDistributableSnapshot),
  * only binds them if not already defined on the system object.
  */
-function bindEnginePassthroughs(
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
-  system: any,
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
-  engine: any,
-): void {
+function bindEnginePassthroughs(system: any, engine: any): void {
   Object.defineProperties(system, {
     trace: {
       get() {
@@ -973,10 +960,7 @@ function bindEnginePassthroughs(
 /**
  * Emit a dev-mode warning if system.start() is never called.
  */
-function warnIfNotStarted(
-  // biome-ignore lint/suspicious/noExplicitAny: System type
-  system: any,
-): void {
+function warnIfNotStarted(system: any): void {
   if (
     isDevelopment &&
     (typeof process === "undefined" || process.env?.NODE_ENV !== "test")
@@ -1068,7 +1052,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
   let hydratedFacts: Record<string, unknown> | null = null;
 
   // Engine reference
-  // biome-ignore lint/suspicious/noExplicitAny: Engine type
   let engine: any = null;
 
   // Create engine with the module directly (no prefixing needed)
@@ -1089,7 +1072,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         meta: mod.meta,
         history: mod.history,
       },
-      // biome-ignore lint/suspicious/noExplicitAny: Module format
     ] as any,
     plugins: options.plugins,
     history,
@@ -1274,7 +1256,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
     },
 
     registerModule(moduleDef: ModuleDef<ModuleSchema>): void {
-      // biome-ignore lint/suspicious/noExplicitAny: Engine registerModule type
       (engine as any).registerModule({
         id: moduleDef.id,
         schema: moduleDef.schema.facts,
@@ -1290,7 +1271,6 @@ function createSingleModuleSystem<S extends ModuleSchema>(
         history: moduleDef.history,
       });
     },
-    // biome-ignore lint/suspicious/noExplicitAny: Type narrowing
   } as any;
 
   bindEnginePassthroughs(system, engine);

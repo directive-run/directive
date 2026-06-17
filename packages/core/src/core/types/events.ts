@@ -69,7 +69,6 @@ export type EventHandler<S extends Schema> = (
  */
 export type FlexibleEventHandler<S extends Schema> = (
   facts: Facts<S>,
-  // biome-ignore lint/suspicious/noExplicitAny: Need any for flexible payload types
   event?: any,
 ) => void;
 

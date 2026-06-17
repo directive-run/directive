@@ -130,7 +130,6 @@ describe("JSX runtime", () => {
   });
 
   it("strips innerHTML prop (XSS prevention)", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: testing security guard
     const div = (
       <div {...({ innerHTML: "<img src=x onerror=alert(1)>" } as any)} />
     );
@@ -139,7 +138,6 @@ describe("JSX runtime", () => {
   });
 
   it("strips outerHTML prop (XSS prevention)", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: testing security guard
     const div = (
       <div {...({ outerHTML: "<script>alert(1)</script>" } as any)} />
     );
@@ -154,7 +152,6 @@ describe("JSX runtime", () => {
 
 describe("Fragment", () => {
   it("renders children into a DocumentFragment", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
     const frag = (
       <>
         <li>One</li>
@@ -167,7 +164,6 @@ describe("Fragment", () => {
   });
 
   it("renders text children", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
     // biome-ignore lint/complexity/noUselessFragments: the fragment is the test subject
     const frag = (<>Hello world</>) as any as DocumentFragment;
 
@@ -176,7 +172,6 @@ describe("Fragment", () => {
   });
 
   it("renders mixed element and text children", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
     const frag = (
       <>
         Hello<span>world</span>
@@ -188,7 +183,6 @@ describe("Fragment", () => {
   });
 
   it("renders empty fragment with no children", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
     // biome-ignore lint/complexity/noUselessFragments: the empty fragment is the test subject
     const frag = (<></>) as any as DocumentFragment;
 
@@ -197,7 +191,6 @@ describe("Fragment", () => {
   });
 
   it("appends fragment children to a parent element", () => {
-    // biome-ignore lint/suspicious/noExplicitAny: Fragment returns DocumentFragment at runtime
     const frag = (
       <>
         <li>A</li>

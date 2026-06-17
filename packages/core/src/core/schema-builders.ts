@@ -1080,7 +1080,6 @@ export const t = {
    * schema: { payload: t.any() }
    * ```
    */
-  // biome-ignore lint/suspicious/noExplicitAny: Intentional any type for schema builder
   any() {
     return createChainableType<any>([], "any");
   },

@@ -3,14 +3,11 @@ import { TestIds } from "../../../../shared/test-ids";
 import { testModule } from "../../../../shared/test-module";
 
 export function UseDirectivePage() {
-  const { system, facts, derived, events, dispatch } = useDirective(
-    testModule,
-    {
-      facts: ["count", "name"],
-      derived: ["doubled"],
-      history: { maxSnapshots: 50 },
-    },
-  );
+  const { system, facts, derived, events } = useDirective(testModule, {
+    facts: ["count", "name"],
+    derived: ["doubled"],
+    history: { maxSnapshots: 50 },
+  });
 
   return (
     <div>

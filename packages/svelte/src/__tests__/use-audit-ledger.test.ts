@@ -23,7 +23,7 @@ vi.mock("svelte", () => ({
 vi.mock("svelte/store", () => {
   type Subscriber<T> = (value: T) => void;
   type Unsubscriber = () => void;
-  type StartStopNotifier<T> = (set: Subscriber<T>) => Unsubscriber | void;
+  type StartStopNotifier<T> = (set: Subscriber<T>) => Unsubscriber | undefined;
 
   interface Readable<T> {
     subscribe(run: Subscriber<T>): Unsubscriber;
@@ -35,7 +35,7 @@ vi.mock("svelte/store", () => {
   ): Readable<T> {
     let value = initialValue;
     const subscribers = new Set<Subscriber<T>>();
-    let stop: Unsubscriber | void;
+    let stop: Unsubscriber | undefined;
 
     return {
       subscribe(run: Subscriber<T>): Unsubscriber {

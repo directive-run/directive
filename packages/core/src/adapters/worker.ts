@@ -466,7 +466,6 @@ export function createWorkerClient(options: WorkerClientOptions): WorkerClient {
  * Module registration for worker-side systems.
  * Since functions can't be serialized, modules must be registered in the worker.
  */
-// biome-ignore lint/suspicious/noExplicitAny: Module types vary
 type ModuleRegistry = Map<string, any>;
 
 let workerModuleRegistry: ModuleRegistry | null = null;
@@ -495,7 +494,6 @@ export function getWorkerModuleRegistry(): ModuleRegistry {
  * handleWorkerMessages();
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Module type varies
 export function registerWorkerModule(name: string, module: any): void {
   getWorkerModuleRegistry().set(name, module);
 }
@@ -703,7 +701,6 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
   };
 
   const system = createSystem({
-    // biome-ignore lint/suspicious/noExplicitAny: Dynamic module types
     modules: modules as any,
     plugins: [trackingPlugin],
     history: config.history,
@@ -714,11 +711,9 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
     stop: () => system.stop(),
     destroy: () => system.destroy(),
     setFact: (key: string, value: unknown) => {
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic facts access
       (system.facts as any)[key] = value;
     },
     setFacts: (facts: Record<string, unknown>) => {
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic facts access
       const factsProxy = system.facts as any;
       if (factsProxy.$store?.batch) {
         factsProxy.$store.batch(() => {
@@ -734,7 +729,6 @@ async function createWorkerSystem(config: WorkerSystemConfig) {
       }
     },
     dispatch: (event: { type: string }) => {
-      // biome-ignore lint/suspicious/noExplicitAny: Dynamic dispatch
       (system as any).dispatch(event);
     },
     getSnapshot: (options?: DistributableSnapshotOptions) => {

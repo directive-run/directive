@@ -44,7 +44,7 @@ interface MigrationFile {
   sources: MigrationPattern[];
 }
 
-let cache: ReadonlyArray<MigrationPattern> | null = null;
+let cache: readonly MigrationPattern[] | null = null;
 
 function resolveSourcePath(): string {
   const candidates = [
@@ -59,7 +59,7 @@ function resolveSourcePath(): string {
   return candidates[0] ?? "";
 }
 
-function load(): ReadonlyArray<MigrationPattern> {
+function load(): readonly MigrationPattern[] {
   if (cache) {
     return cache;
   }
@@ -74,12 +74,12 @@ function load(): ReadonlyArray<MigrationPattern> {
 }
 
 /** All supported source library IDs. */
-export function getMigrationSources(): ReadonlyArray<MigrationSourceId> {
+export function getMigrationSources(): readonly MigrationSourceId[] {
   return MIGRATION_SOURCES;
 }
 
 /** All migration patterns, in registry order. */
-export function getMigrationPatterns(): ReadonlyArray<MigrationPattern> {
+export function getMigrationPatterns(): readonly MigrationPattern[] {
   return load();
 }
 

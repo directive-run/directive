@@ -14,10 +14,8 @@ import { PREFIX } from "./internal.js";
 import type { QueryDefinition } from "./types.js";
 import type { MutationDefinition } from "./types.js";
 
-// biome-ignore lint/suspicious/noExplicitAny: Module config shape varies
 type ModuleConfig = Record<string, any>;
 
-// biome-ignore lint/suspicious/noExplicitAny: Union of all query-like definitions
 export type AnyQueryDefinition =
   | QueryDefinition<any>
   | MutationDefinition<any, any>
@@ -92,12 +90,10 @@ export function withQueries(
   const allFacts: Record<string, unknown> = {};
   const allDerivations: Record<string, unknown> = {};
   const allRequirements: Record<string, Record<string, unknown>> = {};
-  // biome-ignore lint/suspicious/noExplicitAny: Derive function signatures vary
   const allDerive: Record<string, (...args: any[]) => unknown> = {};
   const allConstraints: Record<string, unknown> = {};
   const allResolvers: Record<string, unknown> = {};
   const allEffects: Record<string, unknown> = {};
-  // biome-ignore lint/suspicious/noExplicitAny: Init function signatures vary
   const inits: ((facts: any) => void)[] = [];
 
   // Track queries with tags for tag-based invalidation
@@ -239,7 +235,6 @@ export function withQueries(
 
   // Build merged init
   const userInit = config.init;
-  // biome-ignore lint/suspicious/noExplicitAny: Facts proxy type varies
   const mergedInit = (facts: any) => {
     // Run query inits first (set up default ResourceStates)
     for (const init of inits) {

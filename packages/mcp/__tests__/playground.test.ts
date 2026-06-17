@@ -183,7 +183,9 @@ describe("buildPlaygroundLink", () => {
     const DECODER_CAP_BYTES = 1_000_000;
 
     it("max-size single-source roundtrips well under the decoder cap", () => {
-      const big = "// padding\n".repeat(Math.floor(MAX_PLAYGROUND_SOURCE_BYTES / 11));
+      const big = "// padding\n".repeat(
+        Math.floor(MAX_PLAYGROUND_SOURCE_BYTES / 11),
+      );
       const result = buildPlaygroundLink({ source: big });
       const hash = parseHash(result.url);
       const encoded = hash.get("src");
@@ -225,7 +227,10 @@ describe("buildPlaygroundLink", () => {
       // Also verify the JSON shape the decoder expects.
       const parsed = JSON.parse(decoded);
       expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0]).toMatchObject({ path: expect.any(String), source: expect.any(String) });
+      expect(parsed[0]).toMatchObject({
+        path: expect.any(String),
+        source: expect.any(String),
+      });
     });
   });
 });

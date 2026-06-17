@@ -8,10 +8,10 @@
     "rules": {
       "recommended": true,
       "complexity": {
-        "noExcessiveCognitiveComplexity": "warn",
-        "noForEach": "warn",
+        "noExcessiveCognitiveComplexity": "off",
+        "noForEach": "off",
         "useLiteralKeys": "error",
-        "noBannedTypes": "warn"
+        "noBannedTypes": "off"
       },
       "style": {
         "noNonNullAssertion": "off",
@@ -21,7 +21,7 @@
         "useConsistentArrayType": "warn",
         "useTemplate": "warn",
         "noUnusedTemplateLiteral": "error",
-        "noParameterAssign": "warn",
+        "noParameterAssign": "off",
         "useExponentiationOperator": "error",
         "useConst": "error",
         "noUselessElse": "error",
@@ -33,9 +33,9 @@
         "useExhaustiveDependencies": "warn"
       },
       "suspicious": {
-        "noExplicitAny": "warn",
+        "noExplicitAny": "off",
         "noArrayIndexKey": "warn",
-        "noAssignInExpressions": "warn",
+        "noAssignInExpressions": "off",
         "noConfusingVoidType": "warn"
       },
       "security": {
@@ -74,7 +74,11 @@
       "worktrees",
       "packages/knowledge/examples",
       "packages/claude-plugin/skills/*/examples.md",
-      "packages/mcp/src/generated"
+      "packages/mcp/src/generated",
+      "website/.next",
+      "**/.next",
+      "e2e/fixtures/**/env.d.ts",
+      "examples/**"
     ]
   },
   "overrides": [

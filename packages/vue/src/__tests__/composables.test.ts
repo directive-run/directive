@@ -203,7 +203,6 @@ function createSystemWithStatus(
       },
     },
   });
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
   const system = createSystem({
     module: mod,
     plugins: [statusPlugin.plugin as Plugin<any>],
@@ -338,7 +337,6 @@ describe("useFact", () => {
     let value!: Ref<unknown>;
 
     scope.run(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: testing non-existent key
       value = useFact(system, "nonexistent" as any);
     });
 
@@ -941,7 +939,6 @@ describe("useRequirementStatus", () => {
         },
       },
     });
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic variance
     const system = createSystem({
       module: mod,
       plugins: [statusPlugin.plugin as Plugin<any>],

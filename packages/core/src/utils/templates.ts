@@ -44,7 +44,6 @@ function setFact<S extends Schema, K extends keyof S>(
   key: K,
   value: FactValue<S, K> | null | undefined,
 ): void {
-  // biome-ignore lint/suspicious/noExplicitAny: Facts proxy requires dynamic key access
   (facts as any)[key] = value;
 }
 

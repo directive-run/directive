@@ -695,7 +695,6 @@ describe("owner attribution on predicate throws", () => {
     const manager = createConstraintsManager({
       definitions: {
         badMatch: {
-          // biome-ignore lint/suspicious/noExplicitAny: intentionally bad shape — $matches requires RegExp
           when: { phase: { $matches: "abc" } } as any,
           require: { type: "X" },
         },

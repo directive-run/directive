@@ -41,16 +41,13 @@ import { withQueries } from "./with-queries.js";
 // ============================================================================
 
 /** Extract TData from an inline query config (via fetcher return or transform). */
-// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
 type InferQueryData<Q> = Q extends { transform: (raw: any) => infer TData }
   ? TData
-  : // biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
-    Q extends { fetcher: (...args: any[]) => Promise<infer TRaw> }
+  : Q extends { fetcher: (...args: any[]) => Promise<infer TRaw> }
     ? TRaw
     : unknown;
 
 /** Extract TData from a mutation config (via mutator return). */
-// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
 type InferMutationData<M> = M extends {
   mutator: (...args: any[]) => Promise<infer TData>;
 }
@@ -58,7 +55,6 @@ type InferMutationData<M> = M extends {
   : unknown;
 
 /** Extract TVariables from a mutation config (via mutator first param). */
-// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
 type InferMutationVariables<M> = M extends {
   mutator: (variables: infer V, ...args: any[]) => any;
 }
@@ -66,7 +62,6 @@ type InferMutationVariables<M> = M extends {
   : unknown;
 
 /** Extract TData from an infinite query config (via fetcher return). */
-// biome-ignore lint/suspicious/noExplicitAny: Conditional type inference requires any
 type InferInfiniteData<Q> = Q extends {
   fetcher: (...args: any[]) => Promise<infer TData>;
 }
@@ -158,11 +153,8 @@ export type TypedQuerySystem<
   destroy(): void;
   readonly isRunning: boolean;
   readonly isSettled: boolean;
-  // biome-ignore lint/suspicious/noExplicitAny: System settle signature
   settle(...args: any[]): Promise<void>;
-  // biome-ignore lint/suspicious/noExplicitAny: System subscribe signature
   subscribe(ids: string[], listener: () => void): () => void;
-  // biome-ignore lint/suspicious/noExplicitAny: System batch signature
   batch(fn: () => void): void;
 };
 
@@ -184,11 +176,9 @@ export interface QuerySystemConfig {
   init?: (facts: Record<string, unknown>) => void;
 
   /** Query definitions (pull-based data fetching). Key becomes the query name. */
-  // biome-ignore lint/suspicious/noExplicitAny: Query options have varying generics
   queries?: Record<string, Omit<QueryOptions<any, any, any, any>, "name">>;
 
   /** Mutation definitions (write + cache invalidation). Key becomes the mutation name. */
-  // biome-ignore lint/suspicious/noExplicitAny: Mutation options have varying generics
   mutations?: Record<
     string,
     Omit<MutationOptions<any, any, any, any>, "name"> & {
@@ -214,7 +204,6 @@ export interface QuerySystemConfig {
   >;
 
   /** Infinite query definitions (paginated data). Key becomes the query name. */
-  // biome-ignore lint/suspicious/noExplicitAny: Infinite query options have varying generics
   infiniteQueries?: Record<
     string,
     Omit<Parameters<typeof createInfiniteQuery>[0], "name">
@@ -224,7 +213,6 @@ export interface QuerySystemConfig {
    * List query definitions (per-key cached fetches — the "N items each
    * fetched independently" pattern). Key becomes the query name.
    */
-  // biome-ignore lint/suspicious/noExplicitAny: List options have varying generics
   listQueries?: Record<
     string,
     Omit<ListQueryOptions<any, any, any, any>, "name">
@@ -238,7 +226,6 @@ export interface QuerySystemConfig {
       derived: Record<string, unknown>,
     ) => unknown
   >;
-  // biome-ignore lint/suspicious/noExplicitAny: Event handler signatures vary
   events?: Record<string, any>;
   effects?: Record<string, unknown>;
   constraints?: Record<string, unknown>;
@@ -395,7 +382,6 @@ export function createQuerySystem(config: QuerySystemConfig) {
   }
 
   // Convert inline configs to definitions
-  // biome-ignore lint/suspicious/noExplicitAny: Definition types vary
   const allDefinitions: any[] = [];
   const queryDefs: Record<string, ReturnType<typeof createQuery>> = {};
   const mutationDefs: Record<string, ReturnType<typeof createMutation>> = {};
@@ -501,7 +487,6 @@ export function createQuerySystem(config: QuerySystemConfig) {
   // Merge query fragments + create module + create system
   const merged = withQueries(allDefinitions, moduleConfig);
   const mod = createModule("app", merged as Parameters<typeof createModule>[1]);
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies based on merged schema
   const system = createSystem({
     module: mod,
     plugins,
@@ -590,6 +575,5 @@ export function createQuerySystem(config: QuerySystemConfig) {
     system.start();
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Runtime type matches the typed overload
   return extended as any;
 }

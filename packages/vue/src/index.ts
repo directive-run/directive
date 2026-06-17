@@ -82,7 +82,6 @@ export function useFact<
 ): ShallowRef<Pick<InferFacts<S>, K>>;
 /** Implementation */
 export function useFact(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   keyOrKeys: string | string[],
 ): Ref<unknown> | ShallowRef<unknown> {
@@ -103,7 +102,6 @@ export function useFact(
   return _useFactSingle(system, keyOrKeys);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactSingle(
   system: SingleModuleSystem<any>,
   factKey: string,
@@ -125,7 +123,6 @@ function _useFactSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactMulti(
   system: SingleModuleSystem<any>,
   factKeys: string[],
@@ -164,7 +161,6 @@ export function useDerived<
 ): ShallowRef<Pick<InferDerivations<S>, K>>;
 /** Implementation */
 export function useDerived(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   idOrIds: string | string[],
 ): Ref<unknown> | ShallowRef<unknown> {
@@ -185,7 +181,6 @@ export function useDerived(
   return _useDerivedSingle(system, idOrIds);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedSingle(
   system: SingleModuleSystem<any>,
   derivationId: string,
@@ -207,7 +202,6 @@ function _useDerivedSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedMulti(
   system: SingleModuleSystem<any>,
   derivationIds: string[],
@@ -242,7 +236,6 @@ export function useSelector<S extends ModuleSchema, R>(
   equalityFn?: (a: R, b: R) => boolean,
 ): Ref<R>;
 export function useSelector(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   selector: (state: Record<string, unknown>) => unknown,
   equalityFn: (a: unknown, b: unknown) => boolean = defaultEquality,
@@ -360,7 +353,6 @@ export function useWatch<
 ): void;
 /** Implementation */
 export function useWatch(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   key: string,
   callback: (newValue: unknown, prevValue: unknown) => void,
@@ -385,7 +377,6 @@ export interface UseInspectOptions {
  * Returns InspectState with optional throttling.
  */
 export function useInspect(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   options?: UseInspectOptions,
 ): ShallowRef<InspectState> {
@@ -635,7 +626,6 @@ async function _useSuspenseRequirementMulti(
  * Reactively returns the explanation string for a requirement.
  */
 export function useExplain(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   requirementId: string,
 ): Ref<string | null> {
@@ -664,18 +654,15 @@ export function useExplain(
 
 /** Get all constraints */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Overload must work with any schema
   system: SingleModuleSystem<any>,
 ): ComputedRef<ConstraintInfo[]>;
 /** Get a single constraint by ID */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Overload must work with any schema
   system: SingleModuleSystem<any>,
   constraintId: string,
 ): ComputedRef<ConstraintInfo | null>;
 /** Implementation */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): ComputedRef<ConstraintInfo[] | ConstraintInfo | null> {
@@ -709,7 +696,6 @@ export interface OptimisticUpdateResult {
  * a requirement type via statusPlugin, and rolls back on failure.
  */
 export function useOptimisticUpdate(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   statusPlugin?: StatusPlugin,
   requirementType?: string,
@@ -777,7 +763,6 @@ export function useOptimisticUpdate(
  * ```
  */
 export function useHistory(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
 ): ShallowRef<ReturnType<typeof buildHistoryState>> {
   assertSystem("useHistory", system);
@@ -797,13 +782,11 @@ export function useHistory(
 
 /** Configuration for useDirective */
 interface UseDirectiveConfig {
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
   initialFacts?: Record<string, any>;
   status?: boolean;
   /** Fact keys to subscribe to (omit for all) */
@@ -836,7 +819,6 @@ function _buildDirectivePlugins(config: UseDirectiveConfig | undefined): {
   if (config?.status) {
     const sp = createRequirementStatusPlugin();
     statusPlugin = sp;
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
     plugins.push(sp.plugin as Plugin<any>);
   }
 
@@ -856,7 +838,6 @@ function _createDirectiveSystem<M extends ModuleSchema>(
     tickMs: config?.tickMs,
     zeroConfig: config?.zeroConfig,
     initialFacts: config?.initialFacts,
-    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   } as any;
 
   return createSystem(systemConfig) as unknown as SingleModuleSystem<M>;
@@ -1008,7 +989,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       factKey: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
       useFact(system as SingleModuleSystem<any>, factKey) as Ref<
         InferFacts<M>[K] | undefined
       >,
@@ -1016,7 +996,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       derivationId: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
       useDerived(system as SingleModuleSystem<any>, derivationId) as Ref<
         InferDerivations<M>[K]
       >,
@@ -1030,9 +1009,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       key: K,
       callback: (newValue: unknown, previousValue: unknown) => void,
-    ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Type narrowing for internal call
-      useWatch(system as SingleModuleSystem<any>, key, callback),
+    ) => useWatch(system as SingleModuleSystem<any>, key, callback),
   };
 }
 
@@ -1072,7 +1049,6 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
   null;
 
@@ -1118,7 +1094,6 @@ export function useQuerySystem<
     start: () => void;
     destroy: () => void;
     isRunning?: boolean;
-    // biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
     [key: string]: any;
   },
 >(config: Record<string, unknown>): T {

@@ -81,7 +81,6 @@ export function useFact<
 ): Accessor<Pick<InferFacts<S>, K>>;
 /** Implementation */
 export function useFact(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   keyOrKeys: string | string[],
 ): Accessor<unknown> {
@@ -102,7 +101,6 @@ export function useFact(
   return _useFactSingle(system, keyOrKeys);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactSingle(
   system: SingleModuleSystem<any>,
   factKey: string,
@@ -124,7 +122,6 @@ function _useFactSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useFactMulti(
   system: SingleModuleSystem<any>,
   factKeys: string[],
@@ -166,7 +163,6 @@ export function useDerived<
 ): Accessor<Pick<InferDerivations<S>, K>>;
 /** Implementation */
 export function useDerived(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   idOrIds: string | string[],
 ): Accessor<unknown> {
@@ -187,7 +183,6 @@ export function useDerived(
   return _useDerivedSingle(system, idOrIds);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedSingle(
   system: SingleModuleSystem<any>,
   derivationId: string,
@@ -209,7 +204,6 @@ function _useDerivedSingle(
   return value;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Internal
 function _useDerivedMulti(
   system: SingleModuleSystem<any>,
   derivationIds: string[],
@@ -244,9 +238,7 @@ export function useSelector<S extends ModuleSchema, R>(
   equalityFn?: (a: R, b: R) => boolean,
 ): Accessor<R>;
 export function useSelector(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   selector: (state: any) => unknown,
   equalityFn: (a: unknown, b: unknown) => boolean = defaultEquality,
 ): Accessor<unknown> {
@@ -365,7 +357,6 @@ export function useWatch<
 ): void;
 /** Implementation */
 export function useWatch(
-  // biome-ignore lint/suspicious/noExplicitAny: Implementation signature
   system: SingleModuleSystem<any>,
   key: string,
   callback: (newValue: unknown, prevValue: unknown) => void,
@@ -390,7 +381,6 @@ export interface UseInspectOptions {
  * Returns Accessor<InspectState> with optional throttling.
  */
 export function useInspect(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   options?: UseInspectOptions,
 ): Accessor<InspectState> {
@@ -479,7 +469,6 @@ export function useRequirementStatus(
  * Reactively returns the explanation string for a requirement.
  */
 export function useExplain(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   requirementId: string,
 ): Accessor<string | null> {
@@ -514,7 +503,6 @@ export function useConstraintStatus(
 ): Accessor<ConstraintInfo | null>;
 /** Implementation */
 export function useConstraintStatus(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): Accessor<ConstraintInfo[] | ConstraintInfo | null> {
@@ -560,7 +548,6 @@ export interface OptimisticUpdateResult {
  * a requirement type via statusPlugin, and rolls back on failure.
  */
 export function useOptimisticUpdate(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   statusPlugin?: StatusPlugin,
   requirementType?: string,
@@ -681,7 +668,6 @@ export function useSuspenseRequirement(
  * ```
  */
 export function useHistory(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
 ): Accessor<ReturnType<typeof buildHistoryState>> {
   assertSystem("useHistory", system);
@@ -701,13 +687,11 @@ export function useHistory(
 
 /** Configuration for useDirective */
 interface UseDirectiveConfig {
-  // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
   plugins?: Plugin<any>[];
   trace?: TraceOption;
   errorBoundary?: ErrorBoundaryConfig;
   tickMs?: number;
   zeroConfig?: boolean;
-  // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
   initialFacts?: Record<string, any>;
   status?: boolean;
   /** Fact keys to subscribe to (omit for all) */
@@ -740,11 +724,9 @@ export function useDirective<M extends ModuleSchema>(
   if (config?.status) {
     const sp = createRequirementStatusPlugin();
     statusPlugin = sp;
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
     allPlugins.push(sp.plugin as Plugin<any>);
   }
 
-  // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
   const system = createSystem({
     module: moduleDef,
     plugins: allPlugins.length > 0 ? allPlugins : undefined,
@@ -837,7 +819,6 @@ export function useDirective<M extends ModuleSchema>(
  * Create a derivation signal outside of a component.
  */
 export function createDerivedSignal<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): [Accessor<T>, () => void] {
@@ -852,7 +833,6 @@ export function createDerivedSignal<T>(
  * Create a fact signal outside of a component.
  */
 export function createFactSignal<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: Must work with any schema
   system: SingleModuleSystem<any>,
   factKey: string,
 ): [Accessor<T | undefined>, () => void] {
@@ -893,7 +873,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       factKey: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
       useFact(system as SingleModuleSystem<any>, factKey as string) as Accessor<
         InferFacts<M>[K] | undefined
       >,
@@ -901,7 +880,6 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       derivationId: K,
     ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
       useDerived(
         system as SingleModuleSystem<any>,
         derivationId as string,
@@ -916,9 +894,7 @@ export function createTypedHooks<M extends ModuleSchema>(): {
       system: SingleModuleSystem<M>,
       key: K,
       callback: (newValue: unknown, previousValue: unknown) => void,
-    ) =>
-      // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
-      useWatch(system as SingleModuleSystem<any>, key, callback),
+    ) => useWatch(system as SingleModuleSystem<any>, key, callback),
   };
 }
 
@@ -957,7 +933,6 @@ export function useNamespacedSelector<Modules extends ModulesMap, R>(
 // useQuerySystem — Stable query system with lifecycle management
 // ============================================================================
 
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 let _createQuerySystem: ((config: Record<string, unknown>) => any) | null =
   null;
 
@@ -999,7 +974,6 @@ function getCreateQuerySystem() {
  * }
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 export function useQuerySystem<
   T extends {
     start: () => void;

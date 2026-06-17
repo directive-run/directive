@@ -172,7 +172,9 @@ export function checkSandboxFetchUrl(rawUrl: string): UrlCheck {
  * Returns `null` if every resolved address is public; returns a
  * reason string for the first private hit.
  */
-export async function checkResolvedAddresses(host: string): Promise<string | null> {
+export async function checkResolvedAddresses(
+  host: string,
+): Promise<string | null> {
   // Skip DNS resolution for hostnames that are already IP literals —
   // the hostname-level check already covered them.
   if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return null;

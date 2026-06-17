@@ -1181,7 +1181,6 @@ describe("useDirective", () => {
     });
 
     let dispose: () => void;
-    // biome-ignore lint/suspicious/noExplicitAny: test convenience
     let result: any;
     createRoot((_dispose) => {
       dispose = _dispose;
@@ -1220,7 +1219,6 @@ describe("useDirective", () => {
     });
 
     let dispose: () => void;
-    // biome-ignore lint/suspicious/noExplicitAny: test convenience
     let result: any;
     createRoot((_dispose) => {
       dispose = _dispose;

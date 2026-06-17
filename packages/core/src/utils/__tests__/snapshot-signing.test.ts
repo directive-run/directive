@@ -37,9 +37,7 @@ describe("verifySnapshotSignature", () => {
       version: "1.0.0",
     };
     const signed = await signSnapshot(snapshot, SECRET);
-    expect(
-      await verifySnapshotSignature(signed, "wrong-secret"),
-    ).toBe(false);
+    expect(await verifySnapshotSignature(signed, "wrong-secret")).toBe(false);
   });
 
   it("returns false for an EXPIRED snapshot with a valid signature (R1 C1 fix)", async () => {

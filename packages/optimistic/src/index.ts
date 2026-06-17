@@ -165,11 +165,7 @@ export function withOptimistic<F extends Record<string, unknown>>(
  * the rollback. See the README's "Layering with cancellable()" section.
  */
 export function withOptimisticHandlers<
-  H extends Record<
-    string,
-    // biome-ignore lint/suspicious/noExplicitAny: handler ctx is provided by the consumer (e.g. mutator); structural shape is "must include facts: F"
-    (ctx: any) => Promise<void> | void
-  >,
+  H extends Record<string, (ctx: any) => Promise<void> | void>,
   F extends Record<string, unknown>,
 >(keys: { [K in keyof H]?: readonly (keyof F)[] }, handlers: H): H {
   const wrapped: Record<string, H[keyof H]> = {};

@@ -154,12 +154,7 @@ describe("useSelector (SingleModuleSystem)", () => {
   it("uses default value when selector returns undefined", () => {
     system = createTestSystem();
     const { result } = renderHook(() =>
-      useSelector(
-        system,
-        // biome-ignore lint/suspicious/noExplicitAny: testing undefined return
-        (s) => (s as any).nonexistent,
-        "fallback",
-      ),
+      useSelector(system, (s) => (s as any).nonexistent, "fallback"),
     );
 
     expect(result.current).toBe("fallback");
@@ -400,12 +395,7 @@ describe("useSelector (NamespacedSystem)", () => {
   it("uses default value when selector returns undefined", () => {
     system = createNamespacedSystem();
     const { result } = renderHook(() =>
-      useSelector(
-        system,
-        // biome-ignore lint/suspicious/noExplicitAny: testing undefined return
-        (s) => (s as any).facts?.missing?.key,
-        "default-ns",
-      ),
+      useSelector(system, (s) => (s as any).facts?.missing?.key, "default-ns"),
     );
 
     expect(result.current).toBe("default-ns");

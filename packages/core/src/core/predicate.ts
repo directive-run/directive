@@ -162,12 +162,12 @@ export interface PredicateVisitor {
    * A combinator node (`$all` / `$any` / `$not`), called before descending.
    * Return `false` to skip its children.
    */
-  combinator?(kind: "$all" | "$any" | "$not"): boolean | void;
+  combinator?(kind: "$all" | "$any" | "$not"): boolean | undefined;
   /**
    * A nested-object (cross-module pivot) key, called before descending.
    * Return `false` to skip its children.
    */
-  nested?(key: string): boolean | void;
+  nested?(key: string): boolean | undefined;
   /**
    * A `$`-prefixed key appearing where a fact key was expected — either an
    * unknown/typo operator, or an operator mixed with fact keys at predicate

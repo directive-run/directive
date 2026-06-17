@@ -502,7 +502,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       return entry;
     }
     const clone = { ...entry } as AuditEntry & { __internal?: unknown };
-    delete clone.__internal;
+    clone.__internal = undefined;
 
     return clone as AuditEntry;
   }

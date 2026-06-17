@@ -30,11 +30,7 @@ import type { ResourceState } from "./types.js";
  * //   Trigger: key changed (previous: {"userId":"41"})
  * ```
  */
-export function explainQuery(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
-  system: any,
-  queryName: string,
-): string {
+export function explainQuery(system: any, queryName: string): string {
   const stateKey = `${PREFIX}${queryName}_state`;
   const keyKey = `${PREFIX}${queryName}_key`;
   const triggerKey = `${PREFIX}${queryName}_trigger`;

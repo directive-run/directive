@@ -95,9 +95,7 @@ export interface CreateHistoryOptions<S extends Schema> {
 function resolveHistoryOption(option: HistoryOption): {
   enabled: boolean;
   maxSnapshots: number;
-  redactSnapshot?: (
-    facts: Record<string, unknown>,
-  ) => Record<string, unknown>;
+  redactSnapshot?: (facts: Record<string, unknown>) => Record<string, unknown>;
 } {
   if (typeof option === "boolean") {
     return { enabled: option, maxSnapshots: 100 };
@@ -134,8 +132,11 @@ export function createHistoryManager<S extends Schema>(
 ): HistoryManager<S> {
   const { historyOption, facts, store, onSnapshot, onHistoryChange } = options;
 
-  const { enabled: isEnabled, maxSnapshots, redactSnapshot } =
-    resolveHistoryOption(historyOption);
+  const {
+    enabled: isEnabled,
+    maxSnapshots,
+    redactSnapshot,
+  } = resolveHistoryOption(historyOption);
 
   // Ring buffer of snapshots
   const snapshots: Snapshot[] = [];

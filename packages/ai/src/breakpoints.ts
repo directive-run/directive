@@ -127,13 +127,11 @@ export function matchBreakpoint<T extends string>(
 }
 
 /** Get breakpoint state from facts */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function getBreakpointState(facts: any): BreakpointState {
   return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
 }
 
 /** Set breakpoint state in facts */
-// biome-ignore lint/suspicious/noExplicitAny: Facts type varies
 export function setBreakpointState(facts: any, state: BreakpointState): void {
   setBridgeFact(facts, BREAKPOINT_KEY, state);
 }

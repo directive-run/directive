@@ -78,11 +78,9 @@ export const directiveContext = Symbol("directive");
  */
 abstract class DirectiveController implements ReactiveController {
   protected host: ReactiveControllerHost;
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   protected system: SingleModuleSystem<any>;
   protected unsubscribe?: () => void;
 
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   constructor(host: ReactiveControllerHost, system: SingleModuleSystem<any>) {
     this.host = host;
     this.system = system;
@@ -122,7 +120,6 @@ export class DerivedController<T> extends DirectiveController {
 
   constructor(
     host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     system: SingleModuleSystem<any>,
     key: string | string[],
   ) {
@@ -170,7 +167,6 @@ export class FactController<T> extends DirectiveController {
 
   constructor(
     host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     system: SingleModuleSystem<any>,
     factKey: string,
   ) {
@@ -212,7 +208,6 @@ export class InspectController extends DirectiveController {
   private throttleCleanup?: () => void;
   private unsubSettled?: () => void;
 
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   constructor(
     host: ReactiveControllerHost,
     system: SingleModuleSystem<any>,
@@ -404,7 +399,6 @@ export class WatchController<T> extends DirectiveController {
   /** Watch a derivation or fact by key (auto-detected). When a key exists in both facts and derivations, the derivation overload takes priority. */
   constructor(
     host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     system: SingleModuleSystem<any>,
     key: string,
     callback: (newValue: T, previousValue: T | undefined) => void,
@@ -431,7 +425,6 @@ export class ExplainController extends DirectiveController {
   value: string | null;
   private unsubSettled?: () => void;
 
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   constructor(
     host: ReactiveControllerHost,
     system: SingleModuleSystem<any>,
@@ -468,7 +461,6 @@ export class ConstraintStatusController extends DirectiveController {
   value: ConstraintInfo[] | ConstraintInfo | null;
   private unsubSettled?: () => void;
 
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   constructor(
     host: ReactiveControllerHost,
     system: SingleModuleSystem<any>,
@@ -512,7 +504,6 @@ export class ConstraintStatusController extends DirectiveController {
  */
 export class OptimisticUpdateController implements ReactiveController {
   private host: ReactiveControllerHost;
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   private system: SingleModuleSystem<any>;
   private statusPlugin?: StatusPlugin;
   private requirementType?: string;
@@ -524,7 +515,6 @@ export class OptimisticUpdateController implements ReactiveController {
 
   constructor(
     host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     system: SingleModuleSystem<any>,
     statusPlugin?: StatusPlugin,
     requirementType?: string,
@@ -644,13 +634,11 @@ export class ModuleController<M extends ModuleSchema>
   private host: ReactiveControllerHost;
   private moduleDef: ModuleDef<M>;
   private config?: {
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
     plugins?: Plugin<any>[];
     trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
-    // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
     initialFacts?: Record<string, any>;
     status?: boolean;
   };
@@ -680,13 +668,11 @@ export class ModuleController<M extends ModuleSchema>
     host: ReactiveControllerHost,
     moduleDef: ModuleDef<M>,
     config?: {
-      // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
       plugins?: Plugin<any>[];
       trace?: TraceOption;
       errorBoundary?: ErrorBoundaryConfig;
       tickMs?: number;
       zeroConfig?: boolean;
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       initialFacts?: Record<string, any>;
       status?: boolean;
     },
@@ -703,11 +689,9 @@ export class ModuleController<M extends ModuleSchema>
     if (this.config?.status) {
       const sp = createRequirementStatusPlugin();
       this.statusPlugin = sp;
-      // biome-ignore lint/suspicious/noExplicitAny: Plugin generic issues
       allPlugins.push(sp.plugin as Plugin<any>);
     }
 
-    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
     const system = createSystem({
       module: this.moduleDef,
       plugins: allPlugins.length > 0 ? allPlugins : undefined,
@@ -775,7 +759,6 @@ export class ModuleController<M extends ModuleSchema>
 
 export function createDerived<T>(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   key: string | string[],
 ): DerivedController<T> {
@@ -784,7 +767,6 @@ export function createDerived<T>(
 
 export function createFact<T>(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   factKey: string,
 ): FactController<T> {
@@ -797,7 +779,6 @@ export function createFact<T>(
  */
 export function createInspect(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   options?: { throttleMs?: number },
 ): InspectController {
@@ -814,7 +795,6 @@ export function createRequirementStatus(
 
 export function createWatch<T>(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   derivationId: string,
   callback: (newValue: T, previousValue: T | undefined) => void,
@@ -840,7 +820,6 @@ export function createDirectiveSelector<S extends ModuleSchema, R>(
 
 export function createExplain(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   requirementId: string,
 ): ExplainController {
@@ -849,7 +828,6 @@ export function createExplain(
 
 export function createConstraintStatus(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   constraintId?: string,
 ): ConstraintStatusController {
@@ -858,7 +836,6 @@ export function createConstraintStatus(
 
 export function createOptimisticUpdate(
   host: ReactiveControllerHost,
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   statusPlugin?: StatusPlugin,
   requirementType?: string,
@@ -885,13 +862,11 @@ export function createModuleController<M extends ModuleSchema>(
   host: ReactiveControllerHost,
   moduleDef: ModuleDef<M>,
   config?: {
-    // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
     plugins?: Plugin<any>[];
     trace?: TraceOption;
     errorBoundary?: ErrorBoundaryConfig;
     tickMs?: number;
     zeroConfig?: boolean;
-    // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
     initialFacts?: Record<string, any>;
     status?: boolean;
   },
@@ -961,7 +936,6 @@ export class HistoryController implements ReactiveController {
 
   constructor(
     private _host: ReactiveControllerHost,
-    // biome-ignore lint/suspicious/noExplicitAny: System type varies
     private _system: SingleModuleSystem<any>,
   ) {
     this._host.addController(this);
@@ -996,7 +970,6 @@ export class HistoryController implements ReactiveController {
  *
  * For reactive history, use `HistoryController`.
  */
-// biome-ignore lint/suspicious/noExplicitAny: System type varies
 export function getHistory(
   system: SingleModuleSystem<any>,
 ): HistoryState | null {
@@ -1011,7 +984,6 @@ export function getHistory(
  * function-wrapper shape (vs `export const x = y`) ensures the
  * `@deprecated` JSDoc tag renders in every TS-aware editor.
  */
-// biome-ignore lint/suspicious/noExplicitAny: System type varies
 export function useHistory(
   system: SingleModuleSystem<any>,
 ): HistoryState | null {
@@ -1019,7 +991,6 @@ export function useHistory(
 }
 
 export function getDerived<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   derivationId: string,
 ): () => T {
@@ -1027,7 +998,6 @@ export function getDerived<T>(
 }
 
 export function getFact<T>(
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   system: SingleModuleSystem<any>,
   factKey: string,
 ): () => T | undefined {
@@ -1188,7 +1158,6 @@ export function createNamespacedSelector<Modules extends ModulesMap, R>(
  * }
  * ```
  */
-// biome-ignore lint/suspicious/noExplicitAny: Factory return type varies
 export class QuerySystemController<
   T extends {
     start: () => void;
@@ -1198,7 +1167,6 @@ export class QuerySystemController<
   },
 > implements ReactiveController
 {
-  // biome-ignore lint/suspicious/noExplicitAny: System type varies
   private _system: T | null = null;
   private factory: () => T;
 
@@ -1254,7 +1222,6 @@ export class QuerySystemController<
  */
 export class HydrationController implements ReactiveController {
   private snapshot: Record<string, unknown> | undefined;
-  // biome-ignore lint/suspicious/noExplicitAny: Systems vary by module schema
   private systems: SingleModuleSystem<any>[] = [];
 
   constructor(
@@ -1286,13 +1253,11 @@ export class HydrationController implements ReactiveController {
   createSystem<S extends ModuleSchema>(
     moduleDef: ModuleDef<S>,
     config?: {
-      // biome-ignore lint/suspicious/noExplicitAny: Plugin types vary
       plugins?: Plugin<any>[];
       trace?: TraceOption;
       errorBoundary?: ErrorBoundaryConfig;
       tickMs?: number;
       zeroConfig?: boolean;
-      // biome-ignore lint/suspicious/noExplicitAny: Facts type varies
       initialFacts?: Record<string, any>;
     },
   ): SingleModuleSystem<S> {
@@ -1300,7 +1265,6 @@ export class HydrationController implements ReactiveController {
       this.snapshot,
       config?.initialFacts,
     );
-    // biome-ignore lint/suspicious/noExplicitAny: Required for overload compatibility
     const system = createSystem({
       module: moduleDef,
       plugins: config?.plugins,

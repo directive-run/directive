@@ -1192,7 +1192,6 @@ describe("source primitive — end-to-end with createSystem", () => {
     try {
       const manager = createSourcesManager({
         bad: {
-          // biome-ignore lint/suspicious/noExplicitAny: deliberate async attack
           attach: (async (_publish: SourcePublish) => () => undefined) as any,
         },
       });
@@ -1371,16 +1370,19 @@ describe("source primitive — end-to-end with createSystem", () => {
     captured.current?.("BAD", {});
     expect(onPublish).toHaveBeenCalledTimes(1);
     expect(onDrop).toHaveBeenCalledTimes(1);
-    expect(onDrop).toHaveBeenCalledWith("s", "mod", "BAD", "blocked-event-name");
+    expect(onDrop).toHaveBeenCalledWith(
+      "s",
+      "mod",
+      "BAD",
+      "blocked-event-name",
+    );
   });
 
   // R2 fix: onDrop fires with reason "coalesced" when the manager
   // debounces a same-event publish within a single microtask tick.
-  it("onDrop fires with reason \"coalesced\" on the lastWriteWins manager drop", async () => {
+  it('onDrop fires with reason "coalesced" on the lastWriteWins manager drop', async () => {
     const onDrop = vi.fn();
-    const dispatch = vi
-      .fn()
-      .mockReturnValue({ accepted: true });
+    const dispatch = vi.fn().mockReturnValue({ accepted: true });
     const captured: { current: SourcePublish | null } = { current: null };
     const manager = createSourcesManager(
       {
@@ -1773,9 +1775,9 @@ describe("source primitive — end-to-end with createSystem", () => {
     );
     expect(cleanupErrors.length).toBe(1);
     expect(cleanupErrors[0]?.[0]).toBe("hung");
-    expect(
-      (cleanupErrors[0]?.[3] as Error)?.message ?? "",
-    ).toContain("timeout");
+    expect((cleanupErrors[0]?.[3] as Error)?.message ?? "").toContain(
+      "timeout",
+    );
     // ...and the clean source's unsubscribe still ran (reverse-LIFO
     // order — `clean` ran first since it was registered last).
     expect(lastCleaned).toBe(true);
@@ -1827,9 +1829,9 @@ describe("source primitive — end-to-end with createSystem", () => {
     );
     expect(runtimeErrors.length).toBe(1);
     expect(runtimeErrors[0]?.[0]).toBe("hung");
-    expect(
-      (runtimeErrors[0]?.[3] as Error)?.message ?? "",
-    ).toContain("timeout");
+    expect((runtimeErrors[0]?.[3] as Error)?.message ?? "").toContain(
+      "timeout",
+    );
     // The downstream `last` source still got its onEvict — the hang
     // didn't consume its slice of the deadline.
     expect(lastEvicted).toBe(true);

@@ -13,7 +13,6 @@ import type {
 } from "@directive-run/core";
 import { assertSystem } from "@directive-run/core/adapter-utils";
 
-// biome-ignore lint/suspicious/noExplicitAny: internal helper accepts any schema
 type AnySystem = SingleModuleSystem<any>;
 
 // ============================================================================

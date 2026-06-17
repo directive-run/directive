@@ -585,12 +585,8 @@ export function createSourcesManager(
           typeof (unsubscribe as { then?: unknown }).then === "function";
         const err = new Error(
           looksLikePromise
-            ? `[Directive] Module "${record.moduleId}" → Source "${id}" attach() returned a Promise. attach() must be synchronous; ` +
-                "rewrite as `attach: (publish) => { ... return () => unsubscribe(); }`. Do any async work inside the subscription's own internals — " +
-                "the cleanup function must be registered immediately so `system.stop()` can tear the source down."
-            : `[Directive] Module "${record.moduleId}" → Source "${id}" did not return an unsubscribe function from attach(). ` +
-                "Every source must return a cleanup function (e.g. `return () => undefined`) so the system can tear it down at stop(). " +
-                "If the source needs no teardown, return `() => undefined`, not `undefined`.",
+            ? `[Directive] Module "${record.moduleId}" → Source "${id}" attach() returned a Promise. attach() must be synchronous; rewrite as \`attach: (publish) => { ... return () => unsubscribe(); }\`. Do any async work inside the subscription's own internals — the cleanup function must be registered immediately so \`system.stop()\` can tear the source down.`
+            : `[Directive] Module "${record.moduleId}" → Source "${id}" did not return an unsubscribe function from attach(). Every source must return a cleanup function (e.g. \`return () => undefined\`) so the system can tear it down at stop(). If the source needs no teardown, return \`() => undefined\`, not \`undefined\`.`,
         );
         console.error(err);
         reportError(id, record.moduleId, "attach", err);

@@ -9,7 +9,6 @@
 /** Primitive type definitions for schema */
 export interface SchemaType<T> {
   readonly _type: T;
-  // biome-ignore lint/suspicious/noExplicitAny: Validators must use any for covariance
   readonly _validators: Array<(value: any) => boolean>;
   validate(fn: (value: T) => boolean): SchemaType<T>;
 }

@@ -2114,8 +2114,10 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     const bindingDisabled = events.filter(
       (
         e,
-      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
-        e.type === "constraint.binding.disabled",
+      ): e is Extract<
+        ObservationEvent,
+        { type: "constraint.binding.disabled" }
+      > => e.type === "constraint.binding.disabled",
     );
     // Exactly ONE event per (constraintId, reason) regardless of how
     // many dispatches the async-disabled constraint triggers.
@@ -2152,9 +2154,9 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
           // The engine promotes it at runtime and disables abortOn binding.
           deps: ["status"],
           when: ((f: { status: string }) =>
-            Promise.resolve(f.status === "mutating")) as unknown as (
-            facts: { status: string },
-          ) => boolean,
+            Promise.resolve(f.status === "mutating")) as unknown as (facts: {
+            status: string;
+          }) => boolean,
           require: { type: "GO" },
           abortOn: ["status"],
         },
@@ -2183,8 +2185,10 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     const bindingDisabled = events.filter(
       (
         e,
-      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
-        e.type === "constraint.binding.disabled",
+      ): e is Extract<
+        ObservationEvent,
+        { type: "constraint.binding.disabled" }
+      > => e.type === "constraint.binding.disabled",
     );
     expect(bindingDisabled.length).toBe(1);
     expect(bindingDisabled[0]?.id).toBe("mutate");
@@ -2195,7 +2199,8 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     // warning. Both fire once thanks to engine-side dedupe.
     const bindingDisabledWarns = warn.mock.calls.filter(
       (call) =>
-        typeof call[0] === "string" && call[0].includes("abortOn binding disabled"),
+        typeof call[0] === "string" &&
+        call[0].includes("abortOn binding disabled"),
     );
     expect(bindingDisabledWarns.length).toBe(1);
 
@@ -2257,8 +2262,10 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     const bindingDisabled = events.filter(
       (
         e,
-      ): e is Extract<ObservationEvent, { type: "constraint.binding.disabled" }> =>
-        e.type === "constraint.binding.disabled",
+      ): e is Extract<
+        ObservationEvent,
+        { type: "constraint.binding.disabled" }
+      > => e.type === "constraint.binding.disabled",
     );
     // Even across many dispatches, only ONE event per (id, reason) pair fires.
     expect(bindingDisabled.length).toBe(1);

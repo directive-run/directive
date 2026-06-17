@@ -735,9 +735,7 @@ export async function replayTimeline(
     process.env?.NODE_ENV !== "production"
   ) {
     console.warn(
-      `[Directive:timeline] replayTimeline dispatched 0 of ${skipped} candidate frames. ` +
-        `Today \`isDispatchable()\` recognises mutator-shape \`pendingMutation\` writes only — non-mutator systems will not re-dispatch via replay yet. ` +
-        `See packages/timeline/src/index.ts \`isDispatchable\` for the current set.`,
+      `[Directive:timeline] replayTimeline dispatched 0 of ${skipped} candidate frames. Today \`isDispatchable()\` recognises mutator-shape \`pendingMutation\` writes only — non-mutator systems will not re-dispatch via replay yet. See packages/timeline/src/index.ts \`isDispatchable\` for the current set.`,
     );
   }
   return { dispatched, skipped, truncated: 0 };
