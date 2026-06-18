@@ -17,7 +17,7 @@ export interface PackageRegistryEntry {
 export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   {
     "name": "@directive-run/ai",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "AI guardrails and orchestration for Directive. Prompt injection, PII detection, cost tracking, multi-agent patterns.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -62,7 +62,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/claude-plugin",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Claude Code plugin for Directive — 12 skills covering modules, constraints, resolvers, derivations, AI orchestration, and adapters. Installable via Claude Code's plugin marketplace or consumable programmatically as an npm package.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -86,7 +86,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/cli",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "CLI tools for Directive — AI coding rules, scaffolding, and more.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -119,7 +119,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/core",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "The constraint-driven runtime for TypeScript. Declare what must be true — the runtime makes it happen.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -153,7 +153,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/el",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "description": "Vanilla DOM adapter for Directive. Typed element creation + reactive bindings + JSX runtime.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -184,7 +184,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/knowledge",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Knowledge files, examples, and validation for Directive — the constraint-driven TypeScript runtime.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -230,7 +230,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/lit",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Lit web components adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -255,7 +255,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mcp",
-    "version": "0.5.15",
+    "version": "0.6.1",
     "description": "Model Context Protocol server that exposes Directive to AI clients — knowledge files, code examples, and Claude Code skill bundles today, with room to grow into runtime introspection and tooling. stdio for local clients (Claude Desktop, Cursor, MCP Inspector), SSE for hosted deployments at mcp.directive.run.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -289,7 +289,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/mutator",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "description": "Discriminated mutation helper for Directive — collapse the pendingAction ceremony to a typed handler map.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -312,7 +312,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/optimistic",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Resolver-scope optimistic update + automatic rollback for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -361,7 +361,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/react",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "React hooks and components for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -387,7 +387,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/sandbox",
-    "version": "0.3.13",
+    "version": "0.4.1",
     "description": "Execute Directive snippets server-side and return a structured transcript (logs + facts + errors). Consumed by @directive-run/mcp's run_in_sandbox tool and directive.run/playground's live DevTools panel. Uses worker_threads + esbuild bundling + an AST allowlist validator so user-supplied TypeScript runs with a bounded surface (allowlisted imports, allowlisted API calls, 5s wall clock, 32 MB heap).",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -414,7 +414,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/scaffold",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Pure source-string generators for Directive modules and orchestrators. Shared substrate consumed by @directive-run/cli (its `directive new` command) and @directive-run/mcp (its `generate_module` tool). Zero runtime dependencies.",
     "homepage": "https://directive.run/docs/ide-integration",
     "keywords": [
@@ -434,7 +434,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/solid",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Solid.js signals adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -461,7 +461,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/sources",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Source adapters for Directive — wrap Supabase realtime, Cloudflare DO alarms, WebSocket, Sentry, etc. as typed `source` primitives. One package, one install, subpath exports per vendor.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -490,7 +490,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/svelte",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Svelte stores adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -516,7 +516,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/timeline",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "description": "Time-travel test REPL for Directive. Auto-renders the causal-graph timeline of any failing test.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -559,7 +559,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   },
   {
     "name": "@directive-run/vue",
-    "version": "1.20.2",
+    "version": "1.22.0",
     "description": "Vue composition API adapter for Directive.",
     "homepage": "https://directive.run",
     "keywords": [
@@ -585,4 +585,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-13T15:41:56.889Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-06-17T23:56:55.476Z";
