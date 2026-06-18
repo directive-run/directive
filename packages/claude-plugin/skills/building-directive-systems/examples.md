@@ -2744,6 +2744,7 @@ app.post("/snapshot/:userId/verify", async (req, res) => {
 app.get("/audit", (req, res) => {
   const { eventType, since, actorId, limit } = req.query;
 
+  // biome-ignore lint/suspicious/noExplicitAny: eventType comes from query string
   const entries = audit.getEntries({
     eventTypes: eventType ? [eventType as any] : undefined,
     since: since ? Number(since) : undefined,
