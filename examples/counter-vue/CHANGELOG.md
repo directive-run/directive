@@ -1,5 +1,13 @@
 # @directive-run/example-counter-vue
 
+## 0.0.46
+
+### Patch Changes
+
+- Updated dependencies [[`7fe108a`](https://github.com/directive-run/directive/commit/7fe108a430ad58b76dc737ab2a5dc5731047085f)]:
+  - @directive-run/core@1.23.0
+  - @directive-run/vue@1.23.0
+
 ## 0.0.45
 
 ### Patch Changes
