@@ -445,6 +445,36 @@ export interface Plugin<M extends ModuleSchema = ModuleSchema> {
   ) => void;
 
   // ============================================================================
+  // Clobber Loop Hooks (v1.23.0 — R4.J)
+  // ============================================================================
+
+  /**
+   * Called when `clobberLoopPlugin` (or any equivalent detector) publishes
+   * a structured loop event through `system.notify.clobberLoopDetected(...)`.
+   * Surfaces as the `"resolver.clobber.loop.detected"` `ObservationEvent`
+   * for `system.observe()` subscribers + audit-ledger + devtools, so
+   * downstream backends can capture loops without taking a direct
+   * dependency on `clobberLoopPlugin`.
+   */
+  onClobberLoopDetected?: (
+    event: import("./system.js").ObservationEvent & {
+      type: "resolver.clobber.loop.detected";
+    },
+  ) => void;
+
+  /**
+   * Called when a previously-detected loop is considered resolved (quiet
+   * window elapsed, participant unregistered, or predicate narrowed).
+   * Pairs with `onClobberLoopDetected` so dashboards can show "active
+   * loops" rather than "historical loops."
+   */
+  onClobberLoopResolved?: (
+    event: import("./system.js").ObservationEvent & {
+      type: "resolver.clobber.loop.resolved";
+    },
+  ) => void;
+
+  // ============================================================================
   // History Hooks
   // ============================================================================
 

@@ -334,6 +334,35 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           });
         }
         break;
+      case "resolver.clobber.loop.detected":
+        // The clobber-loop plugin already PII-redacts `predicateOverlap`
+        // operands at event-construction time. We surface the verdict
+        // tag here so auditors can cross-reference with the contributing
+        // `rejectionSeqs` without parsing the predicate payload.
+        emit({
+          kind: "resolver.clobber.loop.detected",
+          systemId: event.systemId,
+          fact: event.fact,
+          participants: event.participants,
+          windowMs: event.windowMs,
+          count: event.count,
+          severity: event.severity,
+          rejectionSeqs: event.rejectionSeqs,
+          ...(event.predicateOverlap
+            ? { overlapVerdict: event.predicateOverlap.verdict }
+            : {}),
+        });
+        break;
+      case "resolver.clobber.loop.resolved":
+        emit({
+          kind: "resolver.clobber.loop.resolved",
+          systemId: event.systemId,
+          fact: event.fact,
+          participants: event.participants,
+          durationMs: event.durationMs,
+          resolution: event.resolution,
+        });
+        break;
       case "resolver.complete":
         emit({
           kind: "resolver.complete",

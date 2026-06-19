@@ -35,6 +35,8 @@ export const SCHEMA_VERSION = 1 as const;
 export type AuditEntryKind =
   | "constraint.evaluate"
   | "resolver.write.rejected"
+  | "resolver.clobber.loop.detected"
+  | "resolver.clobber.loop.resolved"
   | "fact.change"
   | "resolver.complete"
   | "resolver.error"
@@ -132,6 +134,42 @@ export type AuditEntry =
       expected?: unknown;
       actual?: unknown;
       dropped?: number;
+    })
+  | (AuditEntryBase & {
+      kind: "resolver.clobber.loop.detected";
+      /** Multi-tenant routing key from `system.meta.systemId`. */
+      systemId: string;
+      fact: string;
+      participants: readonly string[];
+      /** Window over which `count` distinct-requirement rejections accumulated. */
+      windowMs: number;
+      count: number;
+      severity: "warn" | "error";
+      /** Sequence numbers of the contributing `resolver.write.rejected` entries. */
+      rejectionSeqs: readonly number[];
+      /**
+       * Verdict tag from the predicate-overlap proof (when available).
+       * Operands are PII-redacted upstream in the plugin before the
+       * event is constructed, so the audit entry never sees raw values
+       * even when `capturePII: false`.
+       */
+      overlapVerdict?:
+        | "matched"
+        | "overlap"
+        | "indeterminate"
+        | "function-form-opaque";
+    })
+  | (AuditEntryBase & {
+      kind: "resolver.clobber.loop.resolved";
+      systemId: string;
+      fact: string;
+      participants: readonly string[];
+      /** Time between the originating `detected` event and this `resolved` entry. */
+      durationMs: number;
+      resolution:
+        | "no-recurrence-in-window"
+        | "participant-disabled"
+        | "predicate-narrowed";
     })
   | (AuditEntryBase & {
       kind: "fact.change";

@@ -103,6 +103,8 @@ export type {
 // Resolver types
 export type {
   RetryPolicy,
+  ResolverAbortReason,
+  ShouldRetryContext,
   JitterStrategy,
   BatchConfig,
   BatchItemResult,
@@ -157,6 +159,7 @@ export type {
   MetaAccessor,
   MetaMatch,
   ObservationEvent,
+  PredicateOverlapProof,
   FactKeys,
   FactReturnType,
   DerivationKeys,

@@ -1471,6 +1471,30 @@ export function createEngine<S extends Schema>(
           guardrailNotifyDepth -= 1;
         }
       },
+      clobberLoopDetected(event): void {
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        // Same reentry cap as guardrailBlocked — a plugin reacting to
+        // the loop event must not re-emit synchronously and recurse.
+        if (guardrailNotifyDepth >= 4) return;
+        guardrailNotifyDepth += 1;
+        try {
+          pluginManager.emitClobberLoopDetected(event);
+        } finally {
+          guardrailNotifyDepth -= 1;
+        }
+      },
+      clobberLoopResolved(event): void {
+        if (state.isDestroyed) return;
+        if (!hasPlugins()) return;
+        if (guardrailNotifyDepth >= 4) return;
+        guardrailNotifyDepth += 1;
+        try {
+          pluginManager.emitClobberLoopResolved(event);
+        } finally {
+          guardrailNotifyDepth -= 1;
+        }
+      },
     },
 
     observe(
@@ -1635,6 +1659,16 @@ export function createEngine<S extends Schema>(
             count,
             ...(category !== undefined ? { category } : {}),
           }),
+        onClobberLoopDetected: (
+          event: import("./types/system.js").ObservationEvent & {
+            type: "resolver.clobber.loop.detected";
+          },
+        ) => observer(event),
+        onClobberLoopResolved: (
+          event: import("./types/system.js").ObservationEvent & {
+            type: "resolver.clobber.loop.resolved";
+          },
+        ) => observer(event),
         onDerivationCompute: (id: string, value: unknown) =>
           observer({ type: "derivation.compute", id, value }),
         onReconcileStart: () => observer({ type: "reconcile.start" }),

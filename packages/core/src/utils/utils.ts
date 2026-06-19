@@ -114,6 +114,21 @@ export function attributeError<A extends unknown[], R>(
  * @returns The promise result
  * @throws Error if timeout is exceeded
  */
+/**
+ * Symbol marker attached to the Error thrown when {@link withTimeout}
+ * fires. The retry path in `resolvers.ts` reads this to construct
+ * `ShouldRetryContext.reason = "timeout"` so user-supplied
+ * `shouldRetry(err, attempt, ctx)` can branch on `ctx.reason === "timeout"`.
+ *
+ * Non-enumerable so it doesn't leak into JSON serialization of the
+ * thrown error.
+ *
+ * @internal
+ */
+export const TIMEOUT_MARKER: unique symbol = Symbol.for(
+  "@directive-run/core.timeout-marker",
+);
+
 export async function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -122,7 +137,16 @@ export async function withTimeout<T>(
   let timeoutId: ReturnType<typeof setTimeout>;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
+    timeoutId = setTimeout(() => {
+      const err = new Error(errorMessage);
+      Object.defineProperty(err, TIMEOUT_MARKER, {
+        value: true,
+        enumerable: false,
+        configurable: false,
+        writable: false,
+      });
+      reject(err);
+    }, ms);
   });
 
   try {

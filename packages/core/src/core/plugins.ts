@@ -187,6 +187,18 @@ export interface PluginManager<_S extends Schema = any> {
     category?: string,
   ): void;
 
+  // Clobber loop hooks (v1.23.0 — R4.J)
+  emitClobberLoopDetected(
+    event: import("./types/system.js").ObservationEvent & {
+      type: "resolver.clobber.loop.detected";
+    },
+  ): void;
+  emitClobberLoopResolved(
+    event: import("./types/system.js").ObservationEvent & {
+      type: "resolver.clobber.loop.resolved";
+    },
+  ): void;
+
   // History hooks
   emitSnapshot(snapshot: Snapshot): void;
   emitHistoryNavigate(from: number, to: number): void;
@@ -416,6 +428,10 @@ export function createPluginManager<
 
     // Guardrail hooks (RFC 0010)
     emitGuardrailBlocked: broadcast("onGuardrailBlocked"),
+
+    // Clobber loop hooks (v1.23.0 — R4.J)
+    emitClobberLoopDetected: broadcast("onClobberLoopDetected"),
+    emitClobberLoopResolved: broadcast("onClobberLoopResolved"),
 
     // History hooks
     emitSnapshot: broadcast("onSnapshot"),

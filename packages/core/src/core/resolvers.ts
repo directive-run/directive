@@ -10,7 +10,7 @@
  */
 
 import isDevelopment from "#is-development";
-import { withTimeout } from "../utils/utils.js";
+import { TIMEOUT_MARKER, withTimeout } from "../utils/utils.js";
 import type {
   BatchConfig,
   BatchResolveResults,
@@ -24,7 +24,55 @@ import type {
   ResolversDef,
   RetryPolicy,
   Schema,
+  ShouldRetryContext,
 } from "./types.js";
+
+/**
+ * Read the abort reason from an `AbortController`'s signal — the
+ * structured payload our binding stashes via `controller.abort({...})`
+ * at the clobber site. Also handles the "external cancel" path where
+ * `signal.reason` is either undefined or a non-Directive value.
+ *
+ * Never throws. Returns undefined when the signal is not aborted (the
+ * caller should fall through to the regular error path).
+ */
+function readClobberReason(signal: AbortSignal): ShouldRetryContext | undefined {
+  if (!signal.aborted) return undefined;
+  const reason = signal.reason as unknown;
+  if (
+    reason !== null &&
+    typeof reason === "object" &&
+    "kind" in reason &&
+    (reason as { kind: unknown }).kind === "clobbered"
+  ) {
+    const r = reason as {
+      kind: "clobbered";
+      fact: string;
+      expected: unknown;
+      actual: unknown;
+    };
+    return {
+      reason: "clobbered",
+      clobber: { fact: r.fact, expected: r.expected, actual: r.actual },
+    };
+  }
+  // Signal aborted with no Directive-structured reason — external cancel
+  // (system.stop(), ctx.signal piped to an external controller, etc.).
+  return { reason: "cancelled" };
+}
+
+/**
+ * Pull the abort reason for an error path where the signal is NOT
+ * aborted — used to detect timeouts (the timeout error carries a
+ * non-enumerable `TIMEOUT_MARKER` set by `withTimeout`). Any other
+ * thrown error is the resolver's own throw → `reason: "error"`.
+ */
+function readErrorReason(error: Error): ShouldRetryContext {
+  if ((error as unknown as Record<symbol, unknown>)[TIMEOUT_MARKER] === true) {
+    return { reason: "timeout" };
+  }
+  return { reason: "error" };
+}
 
 // ============================================================================
 // Resolvers Manager
@@ -769,7 +817,18 @@ export function createResolversManager<S extends Schema>(
           onClobberSuppressed(clobberCount - CLOBBER_EMIT_CAP);
         }
       }
-      controller.abort();
+      // RFC 0003 + R4.J — tag the abort with structured clobber detail so
+      // `handleRetryError` can construct `ShouldRetryContext.reason =
+      // "clobbered"` for a user-supplied `shouldRetry(err, n, ctx)`.
+      // The reason payload is read via `signal.reason` (Web standard,
+      // Node 17+) and never surfaced to user code other than through
+      // the typed `ShouldRetryContext`.
+      controller.abort({
+        kind: "clobbered" as const,
+        fact: prop,
+        expected: expected.get(prop),
+        actual: rawFacts[prop],
+      });
       return false;
     }
 
@@ -910,13 +969,36 @@ export function createResolversManager<S extends Schema>(
     const normalizedError =
       error instanceof Error ? error : new Error(String(error));
 
+    // Resolve the abort/error reason so `shouldRetry` can branch on
+    // `ctx.reason === "clobbered"` / "timeout" / "cancelled" / "error".
+    // Existing two-arg `shouldRetry(error, attempt)` is unchanged — the
+    // third `context` arg is additive.
+    const abortContext = readClobberReason(controller.signal);
+
     if (controller.signal.aborted) {
+      // R4.J — consult shouldRetry for clobbered/timeout abort reasons
+      // so a user policy can opt to fail-loud on "clobbered" (record an
+      // error) instead of yielding silently. Default behaviour (no
+      // shouldRetry, or `shouldRetry(...) === true`) is the historical
+      // "abort silently" path. For "cancelled" (external cancel,
+      // system.stop) we never record an error — operator intent.
+      if (abortContext?.reason === "clobbered") {
+        if (
+          retryPolicy.shouldRetry &&
+          !retryPolicy.shouldRetry(normalizedError, attempt, abortContext)
+        ) {
+          return { action: "break", error: normalizedError };
+        }
+      }
       return { action: "abort", error: normalizedError };
     }
 
+    // Signal NOT aborted — synchronous resolver throw or timeout fired
+    // via withTimeout (which doesn't touch the controller).
+    const errorContext = readErrorReason(normalizedError);
     if (
       retryPolicy.shouldRetry &&
-      !retryPolicy.shouldRetry(normalizedError, attempt)
+      !retryPolicy.shouldRetry(normalizedError, attempt, errorContext)
     ) {
       return { action: "break", error: normalizedError };
     }

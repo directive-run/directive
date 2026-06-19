@@ -2,6 +2,7 @@
  * System Types - Type definitions for the system
  */
 
+import type { LeafClause } from "../rules-diff.js";
 import type { ErrorBoundaryConfig } from "./errors.js";
 import type { EventsAccessorFromSchema, SystemEvent } from "./events.js";
 import type { Facts } from "./facts.js";
@@ -772,6 +773,51 @@ export interface MetaAccessor {
 // Observation Protocol
 // ============================================================================
 
+/**
+ * Discriminated proof of why two resolvers' `when:` predicates fire on
+ * the same state — attached to `resolver.clobber.loop.detected` events
+ * so the warning can point at the specific clauses that co-fire instead
+ * of stopping at "these resolvers fight."
+ *
+ * - `matched` — both predicates have identical structural clauses.
+ *   The strongest verdict; the rules are syntactic duplicates.
+ * - `overlap` — clauses share at least one path and at least one
+ *   pairwise comparison says they co-fire (with no direct
+ *   contradictions). Strong verdict, slightly weaker than `matched`.
+ * - `indeterminate` — a non-COMPARABLE operator (`$regex`, `$elemMatch`,
+ *   `$matches`, custom) appeared. The proof builder declines to assert
+ *   overlap; the message says so explicitly rather than falsely
+ *   reporting a contradiction.
+ * - `function-form-opaque` — at least one constraint uses a function
+ *   `when:` (`(facts) => ...`), so structural comparison is impossible.
+ *   The warning text disclaims; if audit-ledger is mounted and its
+ *   `whenSourceCache` is available, identifying hashes of the function
+ *   source are included for cross-version diffing.
+ *
+ * @public
+ */
+export type PredicateOverlapProof =
+  | {
+      verdict: "matched";
+      coFireClauses: readonly LeafClause[];
+      conflictingClauses: readonly never[];
+    }
+  | {
+      verdict: "overlap";
+      coFireClauses: readonly LeafClause[];
+      conflictingClauses: readonly LeafClause[];
+    }
+  | {
+      verdict: "indeterminate";
+      reason: "non-comparable-operator";
+      coFireClauses: readonly LeafClause[];
+    }
+  | {
+      verdict: "function-form-opaque";
+      reason: "one-or-both-when-is-a-function";
+      whenSourceHashes?: readonly string[];
+    };
+
 /** Typed events emitted by system.observe(). */
 export type ObservationEvent =
   | { type: "fact.change"; key: string; prev: unknown; next: unknown }
@@ -870,6 +916,55 @@ export type ObservationEvent =
       requirementId: string;
       reason: "clobbered";
       dropped: number;
+    }
+  /**
+   * v1.23.0 — fires when `clobberLoopPlugin` detects a sustained pattern
+   * of clobbers on a fact involving the same set of resolvers above
+   * threshold within a time window. A single clobber is fine; the
+   * binding catches the race and the audit ledger records it. A *loop*
+   * is two or more resolvers whose `when:` predicates both satisfy a
+   * shared state and rewrite the fact every reconcile tick.
+   *
+   * `participants` is the unordered, distinct set of resolver IDs
+   * contributing to the loop. `predicateOverlap` (when both sides use a
+   * data-form `when:`) explains WHY the loop occurs — which clauses
+   * co-fire — so the suggested fix (add `priority:`, narrow `when:`,
+   * merge) is grounded in the actual rules, not a guess.
+   */
+  | {
+      type: "resolver.clobber.loop.detected";
+      systemId: string;
+      fact: string;
+      participants: readonly string[];
+      participantModules: readonly string[];
+      count: number;
+      windowMs: number;
+      firstAt: number;
+      lastAt: number;
+      predicateOverlap?: PredicateOverlapProof;
+      severity: "warn" | "error";
+      factTags: readonly string[];
+      suppressedSinceLastEmit: number;
+      rejectionSeqs: readonly number[];
+    }
+  /**
+   * v1.23.0 — fires when a previously-detected clobber loop closes
+   * cleanly, so dashboards can show "5 active loops" not "47
+   * historical loops". A loop is considered resolved when the
+   * `(fact, participantSet)` goes a quiet window without further
+   * `resolver.write.rejected` events, OR a participant is unregistered,
+   * OR a constraint re-registration changes a participant's `whenSpec`.
+   */
+  | {
+      type: "resolver.clobber.loop.resolved";
+      systemId: string;
+      fact: string;
+      participants: readonly string[];
+      durationMs: number;
+      resolution:
+        | "no-recurrence-in-window"
+        | "participant-disabled"
+        | "predicate-narrowed";
     }
   | { type: "effect.run"; id: string }
   | { type: "effect.error"; id: string; error: unknown }
@@ -1044,6 +1139,31 @@ export interface System<M extends ModuleSchema = ModuleSchema> {
       kind: "redact" | "alert" | "detect",
       count: number,
       category?: string,
+    ): void;
+    /**
+     * v1.23.0 — plugin authoring surface for emitting the
+     * `"resolver.clobber.loop.detected"` ObservationEvent. Used by
+     * `clobberLoopPlugin` (and any compatible third-party detector). The
+     * call fans out to all registered plugins' `onClobberLoopDetected`
+     * hooks (including the synthetic plugins that back `system.observe()`)
+     * so audit-ledger, devtools, and OTel exporters capture the event
+     * without taking a dependency on the originating detector.
+     *
+     * Application code should never call this directly — use
+     * `system.observe()` to subscribe.
+     */
+    clobberLoopDetected(
+      event: ObservationEvent & { type: "resolver.clobber.loop.detected" },
+    ): void;
+    /**
+     * v1.23.0 — companion to {@link clobberLoopDetected}. Fires when a
+     * previously-detected loop is considered resolved (quiet window
+     * elapsed, participant unregistered, or predicate narrowed). Lets
+     * monitoring dashboards show "active loops" rather than
+     * "historical loops."
+     */
+    clobberLoopResolved(
+      event: ObservationEvent & { type: "resolver.clobber.loop.resolved" },
     ): void;
   };
   /** Per-run trace entries (null if trace is not enabled) */

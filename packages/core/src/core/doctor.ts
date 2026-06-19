@@ -221,7 +221,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
  *   candidate `$gte 50`  vs existing `$lt 100` → "overlap"
  *   candidate `$eq "a"`  vs existing `$ne "a"` → "direct"
  */
-function compareClauses(
+export function compareClauses(
   cand: LeafClause,
   exi: LeafClause,
 ): { type: ContradictionType; reason: string } | null {

@@ -407,3 +407,62 @@ to these facts." Same semantics, same audit event payload
 (`resolver.write.rejected { reason: "clobbered" }` is unchanged). Old
 references to `owns:` in shipped issues and blog posts are preserved as
 the historical record.
+
+## Recovery patterns (v1.23.0)
+
+`abortOn:` makes contention legible — but on its own it stops at "this
+write was dropped." The runtime intentionally stays out of the recovery
+business: each strategy below is expressible by composing primitives
+already shipped, and bundling them into the binding would duplicate
+ergonomics the package layer already owns.
+
+**Retry on contention, fail loud on bug.** `RetryPolicy.shouldRetry`
+takes an optional third `context` argument carrying
+`{ reason: "clobbered" | "timeout" | "cancelled" | "error", clobber? }`.
+A resolver can opt into bounded retries on clobbers while still failing
+loud on real errors:
+
+```ts
+retry: {
+  attempts: 5,
+  backoff: "exponential",
+  shouldRetry: (_err, attempt, ctx) => {
+    if (ctx?.reason === "clobbered") return attempt < 5;
+    if (ctx?.reason === "timeout") return attempt < 2;
+    return false; // "error" / "cancelled" → no retry
+  },
+}
+```
+
+The existing two-argument signature continues to work; the third
+argument is undefined when not consulted, and `shouldRetry`-less
+policies retry on all errors as before.
+
+**Salvage partial work.** `@directive-run/mutator`'s
+`recordReplayable.onCancel` lets a resolver capture work-in-progress
+when the binding aborts mid-flight, so the next dispatch resumes from
+the partial state rather than starting over. Pair with the reason-aware
+`shouldRetry` above and the resolver gets both "should I try again?" and
+"with what state?" answered through composition.
+
+**Optimistic UI rollback.** `@directive-run/optimistic`'s
+`withOptimistic` writes a provisional value, runs the resolver, and
+rolls back if the binding aborts. Useful when the user-visible UI
+depends on the abort-bound fact and "flash to old value" is preferable
+to "flash to clobber-loop oscillation."
+
+**Loop detection.** `clobberLoopPlugin` aggregates
+`resolver.write.rejected` events per fact and fires
+`resolver.clobber.loop.detected` when a sustained loop crosses
+threshold. The event carries a `PredicateOverlapProof` naming the
+clauses that co-fire, so the warning points at the specific `whenSpec`
+problem instead of stopping at "these resolvers fight." Default config
+is 5 distinct-requirement rejections from 2+ resolvers within 1s. Runs
+detect-only — recovery is one of the composition patterns above.
+
+**Compensating sagas.** Express via constraints with custom `when:`
+predicates rather than a runtime backdoor on `abortOn:`. A "rollback
+charge" constraint whose `when:` fires on a failed-charge fact pattern
+is the same shape every other constraint has, so `doctor`, `predict`,
+and `replay-under` reason about it the same way they reason about
+domain rules.

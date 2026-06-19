@@ -39,6 +39,62 @@ import type { Schema } from "./schema.js";
  */
 export type JitterStrategy = "none" | "full" | "equal" | { maxMs: number };
 
+/**
+ * Why a resolver attempt was aborted, surfaced to {@link RetryPolicy.shouldRetry}
+ * so the policy can distinguish "retry on race-loss" from "fail loud on bug."
+ *
+ * - `"clobbered"` — an `abortOn`-listed fact was written by something
+ *   outside the resolver between the resolver's baseline read and its
+ *   next write (RFC 0003 optimistic-concurrency check). The retry is
+ *   typically safe — the resolver re-reads the current value and tries
+ *   again with fresh context.
+ * - `"timeout"` — the resolver's `timeout` ms elapsed. Retrying may
+ *   succeed if the underlying I/O was just slow; may fail again if the
+ *   timeout is set too tight for the workload.
+ * - `"cancelled"` — `system.stop()` was called, or external code aborted
+ *   the resolver's `ctx.signal`. Retrying is almost always wrong — the
+ *   cancellation was the caller's explicit intent.
+ * - `"error"` — the resolver threw. Default for back-compat: any abort
+ *   without a more specific reason maps here.
+ *
+ * Core has no supersession concept today; if a future package wants to
+ * surface supersession, it can widen the union additively without
+ * breaking back-compat.
+ *
+ * @public
+ */
+export type ResolverAbortReason =
+  | "clobbered"
+  | "timeout"
+  | "cancelled"
+  | "error";
+
+/**
+ * Context object passed as the optional third argument to
+ * {@link RetryPolicy.shouldRetry}. Lets the policy decide based on WHY
+ * the attempt failed — not just the thrown error.
+ *
+ * Two-argument `shouldRetry(error, attempt)` continues to work; the
+ * context argument is additive. Existing callers see no behavior change.
+ *
+ * @public
+ */
+export interface ShouldRetryContext {
+  /**
+   * Why the attempt was aborted. Undefined when the engine couldn't
+   * classify the cause (very rare — defaults to `"error"` in practice).
+   */
+  reason?: ResolverAbortReason;
+  /**
+   * Populated only when `reason === "clobbered"`. Names the `abortOn`
+   * fact whose mid-flight change tripped the binding, plus the expected
+   * baseline value and the actual current value. Useful for
+   * `shouldRetry: (_, _, ctx) => ctx?.clobber?.fact === "cart.discount"`
+   * patterns that only retry contention on specific facts.
+   */
+  clobber?: { fact: string; expected: unknown; actual: unknown };
+}
+
 /** Retry policy configuration */
 export interface RetryPolicy {
   /** Maximum number of attempts */
@@ -65,10 +121,28 @@ export interface RetryPolicy {
    * Return `true` to retry, `false` to stop immediately.
    * If omitted, all errors are retried (up to `attempts`).
    *
+   * The optional third `context` argument carries the abort reason and,
+   * for clobbers, the fact + expected/actual values. Existing two-arg
+   * callers continue to work — the third arg is undefined when omitted.
+   *
+   * @example Retry on contention, fail loud on bug
+   * ```ts
+   * shouldRetry: (err, attempt, ctx) => {
+   *   if (ctx?.reason === "clobbered") return attempt < 5;
+   *   if (ctx?.reason === "timeout") return attempt < 2;
+   *   return false; // "error" / "cancelled" → don't retry
+   * }
+   * ```
+   *
    * @param error - The error that occurred
    * @param attempt - The attempt number that just failed (1-based)
+   * @param context - Optional abort context (added v1.23.0); undefined for callers that don't pass it
    */
-  shouldRetry?: (error: Error, attempt: number) => boolean;
+  shouldRetry?: (
+    error: Error,
+    attempt: number,
+    context?: ShouldRetryContext,
+  ) => boolean;
 }
 
 /** Batch configuration */

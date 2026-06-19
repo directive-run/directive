@@ -39,6 +39,8 @@ export type {
   RequirementWithId,
   // Constraints + Resolvers (config types)
   RetryPolicy,
+  ResolverAbortReason,
+  ShouldRetryContext,
   BatchConfig,
   // Plugins
   Plugin,
@@ -56,6 +58,7 @@ export type {
   MetaAccessor,
   MetaMatch,
   ObservationEvent,
+  PredicateOverlapProof,
   // Trace
   TraceEntry,
   TraceOption,
