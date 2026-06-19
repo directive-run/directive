@@ -144,7 +144,10 @@ describe("clobberLoopPlugin — detector core", async () => {
 
     expect(detectedEvents.length).toBe(1);
     expect(detectedEvents[0]!.fact).toBe("x");
-    expect(detectedEvents[0]!.participants.slice().sort()).toEqual(["rA", "rB"]);
+    expect(detectedEvents[0]!.participants.slice().sort()).toEqual([
+      "rA",
+      "rB",
+    ]);
     expect(detectedEvents[0]!.count).toBe(5);
 
     system.destroy();
@@ -163,7 +166,11 @@ describe("clobberLoopPlugin — detector core", async () => {
     clobber("rC", "x", "req-6");
 
     expect(detectedEvents.length).toBe(1);
-    expect(detectedEvents[0]!.participants.slice().sort()).toEqual(["rA", "rB", "rC"]);
+    expect(detectedEvents[0]!.participants.slice().sort()).toEqual([
+      "rA",
+      "rB",
+      "rC",
+    ]);
 
     system.destroy();
   });
@@ -306,7 +313,9 @@ describe("clobberLoopPlugin — detector core", async () => {
   });
 
   it("10. observer counts exactly ONE emit per real loop (no recursive amplification)", async () => {
-    const { detectedEvents, clobber, system } = await buildHarness({ threshold: 3 });
+    const { detectedEvents, clobber, system } = await buildHarness({
+      threshold: 3,
+    });
     let observerCount = 0;
     const unsub = system.observe((e) => {
       if (e.type === "resolver.clobber.loop.detected") observerCount += 1;
@@ -346,10 +355,11 @@ describe("clobberLoopPlugin — predicate-overlap proof", async () => {
 
 describe("clobberLoopPlugin — SRE / lifecycle", async () => {
   it("12. resolved event fires after the quiet window elapses", async () => {
-    const { detectedEvents, resolvedEvents, clobber, system } = await buildHarness({
-      threshold: 3,
-      resolvedAfterMs: 5000,
-    });
+    const { detectedEvents, resolvedEvents, clobber, system } =
+      await buildHarness({
+        threshold: 3,
+        resolvedAfterMs: 5000,
+      });
     clobber("rA", "x", "req-1");
     clobber("rB", "x", "req-2");
     clobber("rA", "x", "req-3");

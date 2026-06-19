@@ -226,7 +226,9 @@ interface FactState {
  * to a shared utility. Until then, copy-paste is cheaper than the
  * abstraction tax.
  */
-function createLruMap<K, V>(cap: number): {
+function createLruMap<K, V>(
+  cap: number,
+): {
   get(k: K): V | undefined;
   set(k: K, v: V): void;
   delete(k: K): boolean;
@@ -313,7 +315,8 @@ function buildPredicateOverlap(
     };
   }
 
-  const keyOf = (c: LeafClause) => `${c.path}::${c.op}::${JSON.stringify(c.value)}`;
+  const keyOf = (c: LeafClause) =>
+    `${c.path}::${c.op}::${JSON.stringify(c.value)}`;
   const setA = new Set(flatA.map(keyOf));
   const setB = new Set(flatB.map(keyOf));
 
@@ -385,8 +388,7 @@ function buildPredicateOverlap(
 function isDevMode(): boolean {
   try {
     return (
-      typeof process !== "undefined" &&
-      process.env?.NODE_ENV !== "production"
+      typeof process !== "undefined" && process.env?.NODE_ENV !== "production"
     );
   } catch {
     return true;
@@ -429,8 +431,7 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
   const threshold = options.threshold ?? DEFAULTS.threshold;
   const cooldownMs = options.cooldownMs ?? DEFAULTS.cooldownMs;
   const resolvedAfterMs = options.resolvedAfterMs ?? DEFAULTS.resolvedAfterMs;
-  const maxTrackedFacts =
-    options.maxTrackedFacts ?? DEFAULTS.maxTrackedFacts;
+  const maxTrackedFacts = options.maxTrackedFacts ?? DEFAULTS.maxTrackedFacts;
   const maxParticipantsPerFact =
     options.maxParticipantsPerFact ?? DEFAULTS.maxParticipantsPerFact;
   const maxEmissionsPerSec =
@@ -598,10 +599,11 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
     );
     const firstAt = rejections[0]?.timestamp ?? nowMs;
     const tags = getFactTags(fact);
-    const severity: "warn" | "error" =
-      tags.some((t) => piiTaggedFacts.has(fact) || t === "pii" || t === "money")
-        ? "error"
-        : "warn";
+    const severity: "warn" | "error" = tags.some(
+      (t) => piiTaggedFacts.has(fact) || t === "pii" || t === "money",
+    )
+      ? "error"
+      : "warn";
 
     const overlap = buildOverlapForParticipants(sortedParticipants);
 
@@ -638,9 +640,7 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
     // The user-facing `onLoop` callback still fires below — it's the
     // human-routing path; the bus is for backend wiring.
     try {
-      systemRef?.notify.clobberLoopDetected(
-        eventToObservation(event),
-      );
+      systemRef?.notify.clobberLoopDetected(eventToObservation(event));
     } catch {
       // notify channel unavailable (very old engine? destroyed mid-emit?)
       // — fall back to the direct callback path only.
@@ -759,23 +759,23 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
         event.predicateOverlap?.verdict === "overlap") &&
       event.predicateOverlap.coFireClauses.length > 0
     ) {
-      lines.push(`  Both \`when:\` predicates fire when:`);
+      lines.push("  Both `when:` predicates fire when:");
       for (const c of event.predicateOverlap.coFireClauses.slice(0, 5)) {
         lines.push(`    - ${c.path} ${c.op} ${JSON.stringify(c.value)}`);
       }
     }
     if (event.predicateOverlap?.verdict === "function-form-opaque") {
       lines.push(
-        `  (cannot prove overlap — at least one constraint uses function-form \`when:\`)`,
+        "  (cannot prove overlap — at least one constraint uses function-form `when:`)",
       );
     }
     if (event.predicateOverlap?.verdict === "indeterminate") {
       lines.push(
-        `  (cannot prove overlap — predicate uses non-comparable operator)`,
+        "  (cannot prove overlap — predicate uses non-comparable operator)",
       );
     }
     lines.push(
-      `  Suggested fix: add \`priority:\` to one, narrow \`when:\` to disjoint conditions, or merge into a single resolver.`,
+      "  Suggested fix: add `priority:` to one, narrow `when:` to disjoint conditions, or merge into a single resolver.",
     );
     return lines.join("\n");
   }
@@ -867,10 +867,7 @@ export function clobberLoopPlugin<M extends ModuleSchema>(
         recentDistinct.add(r.requirementId);
         activeParticipants.add(r.resolverId);
       }
-      if (
-        recentDistinct.size >= threshold &&
-        activeParticipants.size >= 2
-      ) {
+      if (recentDistinct.size >= threshold && activeParticipants.size >= 2) {
         fireLoop(fact, state, activeParticipants, now);
       }
     },

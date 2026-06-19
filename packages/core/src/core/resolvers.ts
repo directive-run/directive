@@ -36,7 +36,9 @@ import type {
  * Never throws. Returns undefined when the signal is not aborted (the
  * caller should fall through to the regular error path).
  */
-function readClobberReason(signal: AbortSignal): ShouldRetryContext | undefined {
+function readClobberReason(
+  signal: AbortSignal,
+): ShouldRetryContext | undefined {
   if (!signal.aborted) return undefined;
   const reason = signal.reason as unknown;
   if (
