@@ -1,0 +1,16 @@
+{
+  "$schema": "https://broadcast.directive.run/schema/broadcast-config-v1.json",
+  "templates": {
+    "bluesky": "🚀 ${ref.repo} ${ref.version}\n\n${ref.notes}\n\n${ref.url}",
+    "mastodon": "🚀 ${ref.repo} ${ref.version}\n\n${ref.notes}\n\n${ref.url}",
+    "discord": "**${ref.repo} ${ref.version}** shipped — ${ref.url}\n\n${ref.notes}"
+  },
+  "mastodonInstance": "https://hachyderm.io",
+  "attackerScrub": {
+    "trustedHosts": [
+      "github.com",
+      "directive.run",
+      "broadcast.directive.run"
+    ]
+  }
+}
