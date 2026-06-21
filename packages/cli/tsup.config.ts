@@ -21,5 +21,6 @@ export default defineConfig([
     treeshake: true,
     target: "es2022",
     minify: true,
+    onSuccess: "tsx scripts/write-llms-txt.ts",
   },
 ]);
