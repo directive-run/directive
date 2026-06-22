@@ -158,46 +158,39 @@ jobs:
         env:
           HOOK_URL: ${{ vars.VERCEL_DEPLOY_HOOK_DOCS }}
 
-  # TODO: Re-enable after sizls/broadcast-action@v0.1.0 ships (downstream pkg).
-  # Pin to a commit SHA at that point, NOT a moving tag. Tracking: Phase 11
-  # in sizl-broadcast (task #274 — "Cut broadcast-action v0.1.0 public mirror
-  # release"). Pinning @main here would inherit whatever's on the mirror's
-  # main branch at release time; commenting the entire job out is the safe
-  # defer until the v0.1.0 SHA exists.
-  #
-  # broadcast:
-  #   # Announce the release on social platforms via @sizl/broadcast-action.
-  #   # Tier 1 only — the Action refuses Tier 2/3 events with a structured
-  #   # error and a link to the Worker template for the approval-window path.
-  #   #
-  #   # Adapters whose env secret is unbound below are silently skipped.
-  #   # Day-1 adapters: bluesky, mastodon, discord. The Action's launch set
-  #   # is intentionally narrow — Twitter / LinkedIn / Slack / Reddit /
-  #   # Meta-family need consumer-side config (author URN, channel id,
-  #   # subreddit allowlist, page id) beyond a single env token and live
-  #   # in the Worker template's full config.ts shape.
-  #   name: Broadcast release to social
-  #   needs: release
-  #   if: needs.release.outputs.published == 'true'
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read
-  #   steps:
-  #     - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-  #     - name: Broadcast
-  #       uses: sizls/broadcast-action@<PIN-TO-v0.1.0-SHA>
-  #       with:
-  #         platforms: bluesky,mastodon,discord
-  #         config-path: .sizl/broadcast.config.json
-  #       env:
-  #         # Required for the cassette POST to the posts-index Worker.
-  #         POSTS_INDEX_SECRET: ${{ secrets.POSTS_INDEX_SECRET }}
-  #         # Platform secrets — provision via `gh secret set`. Missing
-  #         # entries cause the corresponding adapter to silently skip.
-  #         BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
-  #         MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
-  #         DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-  #         # Operator-key id stamped into every cassette. Until the
-  #         # Bureau signer lands, this falls through to the dev-key
-  #         # signer and receipts carry DEV-KEY-DO-NOT-USE-FOR-PROD.
-  #         BROADCAST_OPERATOR_KEY_ID: directive-monorepo
+  broadcast:
+    # Announce the release on social platforms via @sizl/broadcast-action.
+    # Tier 1 only — the Action refuses Tier 2/3 events with a structured
+    # error and a link to the Worker template for the approval-window path.
+    #
+    # Adapters whose env secret is unbound below are silently skipped.
+    # Day-1 adapters: bluesky, mastodon, discord. The Action's launch set
+    # is intentionally narrow — Twitter / LinkedIn / Slack / Reddit /
+    # Meta-family need consumer-side config (author URN, channel id,
+    # subreddit allowlist, page id) beyond a single env token and live
+    # in the Worker template's full config.ts shape.
+    name: Broadcast release to social
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Broadcast
+        uses: sizls/broadcast-action@578857b7206711aa552659f359202e690412328d # v0.1.0
+        with:
+          platforms: bluesky,mastodon,discord
+          config-path: .sizl/broadcast.config.json
+        env:
+          # Required for the cassette POST to the posts-index Worker.
+          POSTS_INDEX_SECRET: ${{ secrets.POSTS_INDEX_SECRET }}
+          # Platform secrets — provision via `gh secret set`. Missing
+          # entries cause the corresponding adapter to silently skip.
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # Operator-key id stamped into every cassette. Until the
+          # Bureau signer lands, this falls through to the dev-key
+          # signer and receipts carry DEV-KEY-DO-NOT-USE-FOR-PROD.
+          BROADCAST_OPERATOR_KEY_ID: directive-monorepo
