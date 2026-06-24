@@ -183,7 +183,11 @@ jobs:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
         env:
-          # Required for the cassette POST to the posts-index Worker.
+          # Cassette POSTs go here. Currently the workers.dev URL; will
+          # promote to broadcast.directive.run once that zone moves to
+          # Cloudflare and the Custom Domain binding lands.
+          POSTS_INDEX_URL: https://broadcast-posts-index.directive-run.workers.dev
+          # HMAC secret shared with the posts-index Worker.
           POSTS_INDEX_SECRET: ${{ secrets.POSTS_INDEX_SECRET }}
           # Platform secrets — provision via `gh secret set`. Missing
           # entries cause the corresponding adapter to silently skip.
