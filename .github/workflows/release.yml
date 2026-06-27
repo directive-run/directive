@@ -178,23 +178,18 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Broadcast
-        uses: sizls/broadcast-action@578857b7206711aa552659f359202e690412328d # v0.1.0
+        uses: sizls/broadcast-action@c79122fcb489d6dd02b8d6bdd29b8ec45f81f5f6 # v0.2.0
         with:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
         env:
-          # Cassette POSTs go here. Currently the workers.dev URL; will
-          # promote to broadcast.directive.run once that zone moves to
-          # Cloudflare and the Custom Domain binding lands.
-          POSTS_INDEX_URL: https://broadcast-posts-index.directive-run.workers.dev
-          # HMAC secret shared with the posts-index Worker.
-          POSTS_INDEX_SECRET: ${{ secrets.POSTS_INDEX_SECRET }}
+          # SaaS path. The Worker holds the signing key and signs each
+          # cassette server-side under the tenant's managed keypair.
+          # The receipt URL returned in the action output is the public
+          # verification surface at broadcast.run/r/<token>.
+          BROADCAST_API_KEY: ${{ secrets.BROADCAST_API_KEY }}
           # Platform secrets — provision via `gh secret set`. Missing
           # entries cause the corresponding adapter to silently skip.
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          # Operator-key id stamped into every cassette. Until the
-          # Bureau signer lands, this falls through to the dev-key
-          # signer and receipts carry DEV-KEY-DO-NOT-USE-FOR-PROD.
-          BROADCAST_OPERATOR_KEY_ID: directive-monorepo
