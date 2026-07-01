@@ -7,10 +7,6 @@
   },
   "mastodonInstance": "https://hachyderm.io",
   "attackerScrub": {
-    "trustedHosts": [
-      "github.com",
-      "directive.run",
-      "broadcast.directive.run"
-    ]
+    "trustedHosts": ["github.com", "directive.run", "broadcast.directive.run"]
   }
 }
