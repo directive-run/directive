@@ -178,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Broadcast
-        uses: sizls/broadcast-action@c7731f12eafe17cf815c52a56a90fdf54ec86492 # v0.4.0
+        uses: sizls/broadcast-action@d290e6567453beb6ca05fbf04276486d025c9323 # v0.5.0
         with:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
