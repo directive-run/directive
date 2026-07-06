@@ -213,7 +213,7 @@ install directive@directive-plugins`); the `CLAUDE.md` file the
   Claude Code skill bundle (where the linked files are siblings on
   disk).
 
-  Closes v1.16.A from the IDEAS.md roadmap.
+  Closes the v1.16.A roadmap item.
 
 ## 1.15.0
 

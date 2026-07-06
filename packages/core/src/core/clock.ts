@@ -118,8 +118,8 @@ export function virtualClock(initialMs = 0): SignalClock {
  * Returns `realClock()` always.
  *
  * Earlier drafts auto-detected vitest (`process.env.VITEST === 'true'`)
- * and returned a `virtualClock()` in that environment. AE review
- * flagged this as a footgun: tests that legitimately need real time
+ * and returned a `virtualClock()` in that environment. That behavior
+ * turned out to be a footgun: tests that legitimately need real time
  * (sleep-based debounce checks, real-`setTimeout`-bound integration
  * fixtures) silently received a virtual clock that never advanced
  * unless the test author called `advanceBy()`, producing apparent

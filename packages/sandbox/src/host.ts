@@ -195,7 +195,7 @@ export interface HostRunInput {
    * slot increment. When the signal aborts AFTER worker spawn, the
    * worker is terminated and the slot released. Callers wiring this
    * to an HTTP request signal close the connection-cancel → leaked-
-   * slot DoS vector exposed in the AE review of v0.3.x.
+   * slot DoS vector that landed in v0.3.x.
    */
   signal?: AbortSignal;
 }

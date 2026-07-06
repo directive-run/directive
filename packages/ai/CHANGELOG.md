@@ -593,8 +593,8 @@ feat/source-primitive (PR #52, merge ab97b028); pending v1.18.0 release`.
   behavior.
 
   The complementary `@directive-run/ai/devtools-server.ts` integration
-  (extend `DevToolsServerMessage` with source.\* variants) is deferred to
-  its own PR — documented in `docs/IDEAS.md`.
+  (extend `DevToolsServerMessage` with source.\* variants) is deferred
+  to a follow-up PR.
 
 - [#52](https://github.com/directive-run/directive/pull/52) [`901836e`](https://github.com/directive-run/directive/commit/901836ec59fdb7444b24695ff385b327376382e5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `runStream({ liveContext })` — Reactive Agents (RFC 0005)
 
@@ -1128,7 +1128,7 @@ prototype keys` instead of silently passing through.
   });
   ```
 
-  ### What's deferred (tracked in IDEAS.md)
+  ### What's deferred
 
   - **SQLite / Parquet / Loki sinks** – sink interface is open; v1 ships
     in-memory `memorySink` only.

@@ -166,7 +166,7 @@ export interface PredicateFromIntentOptions<_F = Record<string, unknown>> {
    * customer messages) that becomes a permanent record in
    * `provenance.intent`. The default is opt-in only because flipping it
    * now would silently strip diagnostic data from existing callers; v2
-   * may flip this default (tracked in IDEAS.md).
+   * may flip this default.
    *
    * Pair with a `redact:` sanitizer when the intent itself must be
    * scrubbed BEFORE it lands in the LLM prompt — `redactIntent` controls

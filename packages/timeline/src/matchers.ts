@@ -7,10 +7,11 @@
  * use these matchers to describe what shape of behavior should have
  * happened.
  *
- * v0.1 ships 5 matchers covering the highest-leverage assertions
- * surfaced by the AE-review-loop innovation pass (R1.B). Each matcher
- * is a small predicate over the recorded `ObservationEvent` stream;
- * vitest's `not` modifier composes naturally for negative assertions.
+ * v0.1 ships 5 matchers covering the highest-leverage causal-graph
+ * assertions surfaced while dogfooding recorded timelines. Each
+ * matcher is a small predicate over the recorded `ObservationEvent`
+ * stream; vitest's `not` modifier composes naturally for negative
+ * assertions.
  *
  * @example
  * ```ts

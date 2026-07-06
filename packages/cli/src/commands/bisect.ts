@@ -403,8 +403,8 @@ export async function bisectCommand(args: string[]): Promise<void> {
       ),
     );
   }
-  // R5 DX M3: align with `directive timeline diff` and the rest of
-  // the CLI's exit-code convention. A "standard hit" means we LOCATED
+  // Align with `directive timeline diff` and the rest of the CLI's
+  // exit-code convention. A "standard hit" means we LOCATED
   // a failing frame — the user's original premise (bad.json fails)
   // is now confirmed. CI gates can branch on `directive bisect && echo OK`
   // to mean "the timeline is clean."

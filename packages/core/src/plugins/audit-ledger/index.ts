@@ -614,10 +614,9 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           return tombstone;
         });
       }
-      // (MAJOR-3) Skip the `system.subject-erased` marker when nothing
-      // matched the filter — emitting an "erased: 0" marker pollutes
-      // the chain with noise and confuses auditors looking for real
-      // erasures.
+      // Skip the `system.subject-erased` marker when nothing matched
+      // the filter — emitting an "erased: 0" marker pollutes the chain
+      // with noise and confuses auditors looking for real erasures.
       if (count === 0) {
         return { erased: 0, markerEntry: null };
       }

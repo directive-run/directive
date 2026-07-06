@@ -1,10 +1,10 @@
 /**
  * Fact-PII Guardrail — input guardrail at the fact-store boundary
  *
- * Closes the source → fact → agent prompt PII bypass surfaced by R5's
- * red-team / privacy / AI-integration reviewers: `createPIIGuardrail`
- * only inspects the `data.input` string at runStream entry, so PII that
- * a source publishes into a fact (a Supabase realtime row carrying a
+ * Closes the source → fact → agent prompt PII bypass that
+ * `createPIIGuardrail` alone can't reach: `createPIIGuardrail` only
+ * inspects the `data.input` string at runStream entry, so PII that a
+ * source publishes into a fact (a Supabase realtime row carrying a
  * customer email, a webhook payload with a SSN, an MCP server's
  * resource notification with a card number) reaches the agent's
  * prompt — via fact injection — without ever hitting the input

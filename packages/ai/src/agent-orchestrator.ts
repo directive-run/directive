@@ -2379,7 +2379,7 @@ export function createAgentOrchestrator<
       // subscription alive so the next caller-driven prompt continues
       // against fresh facts. Without this flag the abort triggers the
       // resultPromise's catch path → reject → finally → tearDown, and
-      // the subscription dies anyway (R11 found this).
+      // the subscription dies anyway.
       let interruptInitiated = false;
 
       // .finally returns a new promise that re-rejects when resultPromise

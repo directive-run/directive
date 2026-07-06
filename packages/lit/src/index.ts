@@ -613,7 +613,7 @@ export class SystemController<M extends ModuleSchema>
   }
 
   hostDisconnected(): void {
-    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // RFC 0009 follow-up: destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
     this._system?.destroyAsync().catch((err: unknown) => {
@@ -734,7 +734,7 @@ export class ModuleController<M extends ModuleSchema>
   hostDisconnected(): void {
     this.unsubFacts?.();
     this.unsubDerived?.();
-    // follow-up — R18 Tier 2-B switched `SystemController` and
+    // follow-up — switched `SystemController` and
     // `DirectiveQueryController` to `destroyAsync` but missed the
     // zero-config `ModuleController` (this class). Same rationale:
     // source unsubscribes are async (Supabase, MCP); sync destroy
@@ -1193,7 +1193,7 @@ export class QuerySystemController<
   }
 
   hostDisconnected(): void {
-    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // RFC 0009 follow-up: destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
     this._system?.destroyAsync().catch((err: unknown) => {
@@ -1235,7 +1235,7 @@ export class HydrationController implements ReactiveController {
   hostConnected(): void {}
 
   hostDisconnected(): void {
-    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync per system so
+    // RFC 0009 follow-up: destroyAsync per system so
     // source unsubscribes complete; fire-and-forget with swallow-catch
     // (Lit's hostDisconnected is sync).
     for (const system of this.systems) {

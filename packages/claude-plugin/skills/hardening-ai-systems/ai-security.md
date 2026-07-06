@@ -388,8 +388,8 @@ source publishes PII into a fact and the agent's prompt template embeds
 that fact (`"Hello ${facts.email}..."`), the PII reaches the LLM call
 without hitting the input guardrail chain.
 
-This is the documented R5 audit finding (red team, privacy, AI-integration
-reviewers independently flagged it). The Tier 0 fix:
+This is a documented gap in the input-only guardrail chain — the fix
+is a fact-store-boundary guardrail that runs on every fact write:
 
 ```ts
 import { createSystem, createModule, t } from "@directive-run/core";

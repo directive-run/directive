@@ -315,8 +315,7 @@ export function defineMutator<
       // marker. The resolver's `if (status === "running")` checks at the
       // success and failure paths then leave the fresh dispatch untouched
       // so the next constraint fire picks it up — the in-flight result is
-      // dropped on the floor (caller wanted to move on). See sec M5 / DX M2
-      // in the AE review for the full reasoning.
+      // dropped on the floor (caller wanted to move on).
       (facts as { pendingMutation: Pending | null }).pendingMutation = {
         ...payload,
         status: "pending",

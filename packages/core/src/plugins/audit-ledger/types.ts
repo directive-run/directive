@@ -412,15 +412,15 @@ export interface AuditLedger {
    *
    * Returns `{ erased, markerEntry }` — `markerEntry` is the chained
    * `system.subject-erased` summary (the N per-entry tombstones live
-   * in the sink, not on the return value). (M7)
+   * in the sink, not on the return value).
    *
    * When `erased === 0` (filter matched nothing), `markerEntry` is
    * `null` and no marker is emitted into the chain — avoids polluting
-   * the audit trail with empty "erased: 0" records. (MAJOR-3)
+   * the audit trail with empty "erased: 0" records.
    *
    * WARNING: v1 erases only from THIS sink. External copies (toJSON
    * exports, downstream pipelines, persisted backups) must be erased
-   * separately. (C8)
+   * separately.
    */
   erase(filter: QueryFilter): {
     erased: number;

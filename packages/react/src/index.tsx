@@ -1504,7 +1504,7 @@ export function useDirectiveRef(
     }
 
     return () => {
-      // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+      // RFC 0009 follow-up: destroyAsync so source
       // unsubscribes complete; fire-and-forget with swallow-catch
       // (React's effect cleanup is sync).
       systemRef.current?.destroyAsync().catch((err: unknown) => {
@@ -2213,7 +2213,7 @@ export function useQuerySystem<
     }
 
     return () => {
-      // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+      // RFC 0009 follow-up: destroyAsync so source
       // unsubscribes complete; fire-and-forget with swallow-catch.
       systemRef.current?.destroyAsync().catch((err: unknown) => {
         if (isDevelopment)

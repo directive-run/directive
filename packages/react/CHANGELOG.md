@@ -57,7 +57,7 @@
   `@directive-run/lit` (patch):
 
   - **`ModuleController.hostDisconnected`** switched from sync `destroy()`
-    to `destroyAsync().catch(...)`. The R18 Tier 2-B migration covered
+    to `destroyAsync().catch(...)`. The migration covered
     `SystemController` + `DirectiveQueryController` but missed the
     zero-config `ModuleController` — Lit users using the simplified
     controller were still dropping source-unsubscribe Promises on the
@@ -83,7 +83,7 @@
 
 ### Patch Changes
 
-- [#74](https://github.com/directive-run/directive/pull/74) [`31ae328`](https://github.com/directive-run/directive/commit/31ae3284b66f2ccf1269902d9f6711415532e28e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R18 Tier 2-B — framework adapter async-destroy migration.
+- [#74](https://github.com/directive-run/directive/pull/74) [`31ae328`](https://github.com/directive-run/directive/commit/31ae3284b66f2ccf1269902d9f6711415532e28e) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Framework adapter async-destroy migration.
 
   All five framework adapters now call `system.destroyAsync()` in their
   unmount paths instead of the synchronous `system.destroy()`:
@@ -408,7 +408,7 @@ prototype keys` instead of silently passing through.
   });
   ```
 
-  ### What's deferred (tracked in IDEAS.md)
+  ### What's deferred
 
   - **SQLite / Parquet / Loki sinks** – sink interface is open; v1 ships
     in-memory `memorySink` only.

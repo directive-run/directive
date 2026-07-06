@@ -1205,8 +1205,8 @@ tearDownLiveContext())` ran → subscription died. The distinction
 
   - `system-api.md`'s "23 event types" reference now lists the four
     `source.*` variants (previously stale at "18 event types").
-  - `docs/IDEAS.md` Tier 0 entry cites the 256-char interim ceiling as
-    the floor that `createFactPIIGuardrail` will eventually lift.
+  - The 256-char interim ceiling documented here is the floor that
+    `createFactPIIGuardrail` will eventually lift.
 
 ## 1.17.2
 
@@ -1561,7 +1561,7 @@ prototype keys` instead of silently passing through.
   });
   ```
 
-  ### What's deferred (tracked in IDEAS.md)
+  ### What's deferred
 
   - **SQLite / Parquet / Loki sinks** – sink interface is open; v1 ships
     in-memory `memorySink` only.

@@ -745,7 +745,7 @@ export function useDirective<M extends ModuleSchema>(
   }
 
   onCleanup(() => {
-    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // RFC 0009 follow-up: destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (the framework's onCleanup is sync).
     system.destroyAsync().catch((err: unknown) => {
@@ -990,7 +990,7 @@ export function useQuerySystem<
   }
 
   onCleanup(() => {
-    // RFC 0009 follow-up (R18 Tier 2-B): destroyAsync so source
+    // RFC 0009 follow-up: destroyAsync so source
     // unsubscribes complete; fire-and-forget with swallow-catch
     // (the framework's onCleanup is sync).
     system.destroyAsync().catch((err: unknown) => {

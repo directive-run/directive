@@ -21,9 +21,10 @@
  *     OR export a named `createSystem`-shaped factory we can call.
  *   - No assertion DSL today — the CLI prints the replay diagnostic.
  *     Consumers writing assertions use `replayTimeline()` from the
- *     library directly inside vitest, paired with R1.B matchers.
+ *     library directly inside vitest, paired with `@directive-run/
+ *     timeline`'s matchers.
  *
- * v0.2 scope (deferred, see docs/IDEAS.md):
+ * v0.2 scope (deferred to a follow-up minor):
  *   - `--as-test` flag emits a vitest source file that drives the same
  *     replay loop with structured assertions.
  *   - `--bisect <good.json>` for git-bisect over timeline frames.

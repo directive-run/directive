@@ -151,7 +151,7 @@ export async function loadSystemFactory(
     }
   }
 
-  // R5 DX C4: detect the most common confusion — user passed a file
+  // Detect the most common confusion — user passed a file
   // that exports a STARTED system (the shape `directive replay` wants)
   // and got a confusing "no factory" error. Surface a targeted message
   // explaining how to wrap it.

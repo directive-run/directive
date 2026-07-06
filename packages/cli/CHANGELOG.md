@@ -578,7 +578,7 @@ directive-run/directive` returned 404 from GitHub. Users can now run
 
   **Peer dep:** `@directive-run/timeline@^0.2.0` is now an optional peer of `@directive-run/cli`. The CLI surfaces a clear install-prompt error if the user runs `directive replay` without it installed.
 
-  **v0.2 scope (deferred per `docs/IDEAS.md`):**
+  **v0.2 scope (deferred to a follow-up minor):**
 
   - `--as-test` flag emits a vitest source file with causal-graph matchers.
   - `--bisect <good.json>` for git-bisect over timeline frames.
