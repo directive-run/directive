@@ -62,3 +62,10 @@ packages/claude-plugin/skills/*/examples.md
 tmp/
 temp/
 .vercel
+
+# Internal working notes — never ship in the public repo. These live locally
+# (or in a separate private workspace) and should never be `git add`ed here.
+docs/IDEAS.md
+docs/AE-AUDIT-*.md
+docs/SESSION-HANDOFF-*.md
+docs/SHIP-RECOVERY*.md
