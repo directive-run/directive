@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { Requirement } from "@directive-run/core";
+import type { Facts, Requirement, Schema } from "@directive-run/core";
 import {
   getBridgeFact,
   setBridgeFact,
@@ -48,70 +48,84 @@ import {
 // ============================================================================
 
 /** @internal Read the agent state from bridge facts. */
-export function getAgentState(facts: any): AgentState {
+export function getAgentState(facts: Facts<Schema>): AgentState {
   return getBridgeFact<AgentState>(facts, AGENT_KEY);
 }
 
 /** @internal Write the agent state to bridge facts. */
-export function setAgentState(facts: any, state: AgentState): void {
+export function setAgentState(facts: Facts<Schema>, state: AgentState): void {
   setBridgeFact(facts, AGENT_KEY, state);
 }
 
 /** @internal Read the approval state from bridge facts. */
-export function getApprovalState(facts: any): ApprovalState {
+export function getApprovalState(facts: Facts<Schema>): ApprovalState {
   return getBridgeFact<ApprovalState>(facts, APPROVAL_KEY);
 }
 
 /** @internal Write the approval state to bridge facts. */
-export function setApprovalState(facts: any, state: ApprovalState): void {
+export function setApprovalState(
+  facts: Facts<Schema>,
+  state: ApprovalState,
+): void {
   setBridgeFact(facts, APPROVAL_KEY, state);
 }
 
 /** @internal Read the conversation messages from bridge facts. */
-export function getConversation(facts: any): Message[] {
+export function getConversation(facts: Facts<Schema>): Message[] {
   return getBridgeFact<Message[]>(facts, CONVERSATION_KEY);
 }
 
 /** @internal Write conversation messages to bridge facts. */
-export function setConversation(facts: any, messages: Message[]): void {
+export function setConversation(
+  facts: Facts<Schema>,
+  messages: Message[],
+): void {
   setBridgeFact(facts, CONVERSATION_KEY, messages);
 }
 
 /** @internal Read the tool calls from bridge facts. */
-export function getToolCalls(facts: any): ToolCall[] {
+export function getToolCalls(facts: Facts<Schema>): ToolCall[] {
   return getBridgeFact<ToolCall[]>(facts, TOOL_CALLS_KEY);
 }
 
 /** @internal Write tool calls to bridge facts. */
-export function setToolCalls(facts: any, toolCalls: ToolCall[]): void {
+export function setToolCalls(
+  facts: Facts<Schema>,
+  toolCalls: ToolCall[],
+): void {
   setBridgeFact(facts, TOOL_CALLS_KEY, toolCalls);
 }
 
 /** @internal Read the health state map from bridge facts. */
-export function getHealthState(facts: any): Record<string, AgentHealthState> {
+export function getHealthState(
+  facts: Facts<Schema>,
+): Record<string, AgentHealthState> {
   return getBridgeFact<Record<string, AgentHealthState>>(facts, HEALTH_KEY);
 }
 
 /** @internal Write the health state map to bridge facts. */
 export function setHealthState(
-  facts: any,
+  facts: Facts<Schema>,
   state: Record<string, AgentHealthState>,
 ): void {
   setBridgeFact(facts, HEALTH_KEY, state);
 }
 
 /** @internal Read the breakpoint state from bridge facts. */
-export function getBreakpointState(facts: any): BreakpointState {
+export function getBreakpointState(facts: Facts<Schema>): BreakpointState {
   return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
 }
 
 /** @internal Write the breakpoint state to bridge facts. */
-export function setBreakpointState(facts: any, state: BreakpointState): void {
+export function setBreakpointState(
+  facts: Facts<Schema>,
+  state: BreakpointState,
+): void {
   setBridgeFact(facts, BREAKPOINT_KEY, state);
 }
 
 /** Get full orchestrator state from facts */
-export function getOrchestratorState(facts: any): OrchestratorState {
+export function getOrchestratorState(facts: Facts<Schema>): OrchestratorState {
   return {
     agent: getAgentState(facts),
     approval: getApprovalState(facts),

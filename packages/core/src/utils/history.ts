@@ -210,8 +210,7 @@ export function createHistoryManager<S extends Schema>(
           );
           continue;
         }
-        // @ts-expect-error - dynamic key access
-        facts[key] = value;
+        (facts as Record<string, unknown>)[key] = value;
       }
     });
   }

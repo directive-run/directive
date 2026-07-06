@@ -9,6 +9,7 @@
  * @module
  */
 
+import type { Facts, Schema } from "@directive-run/core";
 import {
   getBridgeFact,
   setBridgeFact,
@@ -127,12 +128,15 @@ export function matchBreakpoint<T extends string>(
 }
 
 /** Get breakpoint state from facts */
-export function getBreakpointState(facts: any): BreakpointState {
+export function getBreakpointState(facts: Facts<Schema>): BreakpointState {
   return getBridgeFact<BreakpointState>(facts, BREAKPOINT_KEY);
 }
 
 /** Set breakpoint state in facts */
-export function setBreakpointState(facts: any, state: BreakpointState): void {
+export function setBreakpointState(
+  facts: Facts<Schema>,
+  state: BreakpointState,
+): void {
   setBridgeFact(facts, BREAKPOINT_KEY, state);
 }
 
