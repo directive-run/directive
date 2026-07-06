@@ -54,7 +54,7 @@ landed in. Open questions are tracked inline.
   async eviction work AND cleared in a `finally` so a rejected
   inner work doesn't latch the gate forever. `system.start()`
   refuses to start while eviction is in flight or after destroy.
-  R18 Tier 2-C, shipped 2026-06-10 in `@directive-run/core` v1.20.0
+  Shipped 2026-06-10 in `@directive-run/core` v1.20.0
   (follow-up added the try/finally + start guard).
 
 - **RFC 0010 / `guardrail.blocked` ObservationEvent** – new
@@ -63,18 +63,17 @@ landed in. Open questions are tracked inline.
   `createFactPIIGuardrail` calls `notify.guardrailBlocked` on
   every detection with `kind: "redact" | "alert" | "detect"`.
   Backend wiring (`attachSourcesToOtel`, timeline, audit-ledger)
-  is consumer-driven via `system.observe()`. R18 Tier 2-A,
-  shipped 2026-06-10 in `@directive-run/core` v1.20.0 +
-  `@directive-run/ai` v1.20.0. follow-up validated the
-  `plugin` field against registered plugin names + added a
-  reentry depth cap.
+  is consumer-driven via `system.observe()`. Shipped 2026-06-10
+  in `@directive-run/core` v1.20.0 + `@directive-run/ai` v1.20.0.
+  A follow-up patch validated the `plugin` field against registered
+  plugin names + added a reentry depth cap.
 
 - **Framework adapter async-destroy migration** – all 5 adapters
   (react / vue / svelte / solid / lit) switched from sync
   `system.destroy()` to `system.destroyAsync().catch(...)` so
   source unsubscribes complete before host hibernation. Dev-mode
-  `console.warn` surfaces any unsubscribe rejection. R18 Tier 2-B,
-  shipped 2026-06-10 in framework adapter v1.20.x.
+  `console.warn` surfaces any unsubscribe rejection. Shipped
+  2026-06-10 in framework adapter v1.20.x.
 
 ## Open follow-up RFCs (tracked but not yet drafted)
 

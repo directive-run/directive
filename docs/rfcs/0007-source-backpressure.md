@@ -2,18 +2,15 @@
 
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
-- **Related:** R5 distributed-systems reviewer findings (R5-CR3
-  "10k events/sec into Tier 2 path"); R6 architecture reviewer's
-  back-pressure gap; `docs/IDEAS.md` Tier 1 architectural follow-up.
+- **Related:** the async-resolver path in `@directive-run/core`.
 
 ## Summary
 
-The R5 distributed-systems reviewer ran throughput analysis and found
-**no back-pressure primitive** in the source path. At 10k publishes/sec
-into Tier 2 (publish → fact → constraint → async resolver), the resolver
-pool grows unbounded, the reconcile-depth guard trips at depth 50, and
-`previousRequirements` is silently reset – **data loss disguised as
-"recovery."**
+Throughput analysis of the source → fact → constraint → async-resolver
+path uncovered **no back-pressure primitive**. At 10k publishes/sec
+into the async-resolver tier, the resolver pool grows unbounded, the
+reconcile-depth guard trips at depth 50, and `previousRequirements`
+is silently reset – **data loss disguised as "recovery."**
 
 This RFC adds an optional `coalesce` field on `SourceDef` so high-frequency
 sources (cursor movement, sensor telemetry, Supabase channel storms) can
@@ -43,7 +40,7 @@ interface SourceDefinition {
 }
 ```
 
-## Throughput budget (from R5)
+## Throughput budget
 
 | Tier | Today's behavior | Recommended budget |
 |---|---|---|
@@ -69,7 +66,7 @@ For `coalesce: "none" | "all"`: no change vs. current behavior.
 
 ## Drop-reason addition
 
-`SourceCounters.lastDropReason` (shipped in R6) gains a fifth variant:
+`SourceCounters.lastDropReason` (introduced with drop-counter observability) gains a fifth variant:
 
 ```ts
 type SourceDropReason =
@@ -85,7 +82,7 @@ The new variant is additive – existing callers do not need updates.
 ## Observability requirements
 
 - `system.inspect().sources[i]` already surfaces `dropCount` /
-  `lastDropReason` / `lastDropAt` (shipped R6). The new "coalesced"
+  `lastDropReason` / `lastDropAt` (previously shipped). The new "coalesced"
   reason flows through unchanged.
 - Logging plugin's `onSourcePublish` fires once per FLUSHED publish, not
   once per raw publish. (Otherwise the coalesce primitive doesn't reduce

@@ -157,8 +157,7 @@ The legacy `rawOutputHash` field is gone – it hashed the raw LLM output string
 > medical / financial details, customer messages) that becomes a
 > permanent record in `provenance.intent` once persisted. The default
 > is opt-in only because flipping it now would silently strip
-> diagnostic data from existing callers; **v2 may flip this default**
-> (tracked in IDEAS.md).
+> diagnostic data from existing callers; **v2 may flip this default**.
 
 The two PII knobs run at different stages of the pipeline. Use both for full coverage:
 

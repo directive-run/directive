@@ -224,12 +224,12 @@ if (markerEntry) {
    `system.subject-erased` summary entry – the `markerEntry`
    returned – carrying `erased: number` plus a PII-safe description
    of the filter that ran. **When zero entries match, `markerEntry`
-   is `null` and no marker is emitted (MAJOR-3)** – keeps the audit
-   trail free of empty `"erased: 0"` records.
+   is `null` and no marker is emitted** – keeps the audit trail
+   free of empty `"erased: 0"` records.
 
-The returned name is `markerEntry` (M7) – the singular chained
+The returned name is `markerEntry` – the singular chained
 summary – to distinguish it from the N per-entry tombstones that
-land in the sink (M1).
+land in the sink.
 
 ### Filter PII safety (N2)
 

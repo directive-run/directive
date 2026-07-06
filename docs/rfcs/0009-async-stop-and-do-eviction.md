@@ -2,13 +2,14 @@
 
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
-- **Related:** R5 distributed-systems reviewer findings (R5-CR1:
-  `system.stop()` doesn't await async unsubscribes; R5-CR4: DO eviction
-  has no recovery hook); `docs/IDEAS.md` Tier 1 architectural follow-up.
+- **Related:** the `SourceUnsubscribeFn` signature; the
+  Cloudflare Durable Objects host-runtime story for
+  `@directive-run/core`.
 
 ## Summary
 
-Two related lifecycle gaps from the R5 distributed-systems audit:
+Two related lifecycle gaps in the source-manager / `system.stop()`
+teardown path:
 
 1. **`system.stop()` fires-and-forgets async unsubscribes.** Supabase
    realtime's `channel.unsubscribe()` returns a Promise. The manager
@@ -117,9 +118,8 @@ The DO consumer wires it in their `alarm()` or
   preserved.
 - New `SourceDef.onEvict` optional hook lands additively.
 - New `System.evict(deadline?)` method lands additively.
-- The R5 DO ghost-subscription scenario passes a regression test (mock
+- The DO ghost-subscription scenario passes a regression test (mock
   DO evict + assert external subscriptions terminate).
 - `packages/knowledge/core/sources.md` adds a "Runtime compatibility"
-  section covering DO/Workers/Bun/Deno (closing R5-M1, R5-M3, R5-M4 from
-  the cross-runtime review).
+  section covering DO/Workers/Bun/Deno.
 - 2.0 changeset (separate) notes the `stop` / `destroy` async-only cut.

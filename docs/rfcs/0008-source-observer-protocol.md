@@ -2,9 +2,9 @@
 
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
-- **Related:** R5 protocol reviewer findings (C-PROTO-1: "SourcePublish
-  is incomplete vs. Observer protocol"); R5 domain-expert (Reactive
-  Systems) finding C2 ("no error channel from source to engine").
+- **Related:** the `source` primitive's public shape in
+  `@directive-run/core`; the Observer / EventEmitter posture question
+  for stream primitives.
 
 ## Summary
 
@@ -96,7 +96,6 @@ extension path is still available without a major bump.
 - `packages/knowledge/core/sources.md` adds an "Error handling" section
   describing the Option A reportError pattern (today: publish a custom
   error event name; future: use `reportError`).
-- The `EffectCleanup` vs `SourceUnsubscribe` asymmetry – flagged by the
-  R5 DX reviewer – is addressed in the RFC 0006 naming sweep
-  (`SourceUnsubscribe` → `SourceUnsubscribeFn`); this RFC does not
-  duplicate that work.
+- The `EffectCleanup` vs `SourceUnsubscribe` asymmetry is addressed in
+  the RFC 0006 naming sweep (`SourceUnsubscribe` →
+  `SourceUnsubscribeFn`); this RFC does not duplicate that work.

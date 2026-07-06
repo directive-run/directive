@@ -203,11 +203,10 @@ under it – typically a single `status`/`phase`/`mode` fact. The constraint's
 - **Richer trigger object form.** Widening from `abortOn: string[]` to
   `abortOn: (string | AbortTrigger)[]` so consumers can express
   conditional abort (e.g. `{ fact: 'status', when: { $eq: 'cancelled' } }`).
-  Captured as a follow-on; deferred until consumer demand surfaces. See
-  IDEAS.md R8.A.
+  Captured as a follow-on; deferred until consumer demand surfaces.
 - **Per-constraint declarative `on*` callbacks.** A second surface
   alongside the event stream (`onAbort`, `onClobber`, etc.). Captured as a
-  follow-on; deferred. See IDEAS.md R8.B.
+  follow-on; deferred.
 - **`bind:` (v2, distinct surface).** The `bind:` field is type-reserved
   on `system.inspect().constraints[]` and on `CheckAbortOnFinding.source`
   as a v2 promise – but it is *not* the v1 `bind: 'auto'` that this RFC
@@ -245,9 +244,9 @@ clobber detection is the in-memory implementation; future write-rejecting
 backends can report other reasons under the same event type.
 
 The `reason: "clobbered"` discriminant stays even though the field was
-renamed from `owns:` to `abortOn:` – it's established vocabulary across the
-plugin hook payload and the clobber-loop detector (IDEAS.md R4.J), and
-renaming it would break consumer log queries with no clarity upside.
+renamed from `owns:` to `abortOn:` – it's established vocabulary across
+the plugin hook payload and the clobber-loop detector, and renaming it
+would break consumer log queries with no clarity upside.
 
 ### Async-disable observation event
 

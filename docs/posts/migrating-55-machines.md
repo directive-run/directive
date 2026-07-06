@@ -92,7 +92,7 @@ Every cycle ended with a "what was painful?" note. Across 55 cycles, those notes
 - No first-class internal-event convention until cycle 12 (see "status as the event bus" above).
 - Two callable shapes for events – `sys.events.X(payload)` versus `sys.dispatch({type, ...})` – and we didn't pick one until late.
 
-**Quality-of-life docs gaps** (P2-P3):
+**Quality-of-life docs gaps** (P2 / P3):
 - `t.string<UnionType>()` was undiscoverable. Once you knew about it, every module used it. New cycles re-learned its existence at the review stage when a reviewer suggested it.
 - `nullable()` semantics on init were ambiguous – `null` versus `undefined` versus default-to-empty.
 - Derivation-of-derivation composition wasn't anywhere in the docs.

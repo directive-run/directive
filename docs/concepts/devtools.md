@@ -7,8 +7,8 @@ description: Browser devtools integration – window.__DIRECTIVE__ inspect API p
 
 > Exposes every running Directive system to `window.__DIRECTIVE__` so
 > you can `inspect()` from the console, and – when `panel: true` – drops
-> a live, dark-themed debug panel into the page with the same view the
-> AE reviewers ship to production-readiness reviews.
+> a live, dark-themed debug panel into the page for hands-on inspection
+> of facts, derivations, constraints, and the requirement stream.
 
 ## What it does
 

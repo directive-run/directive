@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted – shipped 2026-06-10 |
 | Landing | `@directive-run/core` 1.20.0 + `@directive-run/ai` 1.19.7 |
-| Author | R18 Tier 2-A follow-up |
+| Author | Jason Comes |
 
 ## Summary
 
@@ -16,9 +16,9 @@ per-plugin user callbacks.
 
 ## Motivation
 
-R18 found that `createFactPIIGuardrail` calls a per-plugin `onBlocked`
-callback when it detects PII, but no `ObservationEvent` reaches
-`system.observe()`. The downstream effect:
+`createFactPIIGuardrail` calls a per-plugin `onBlocked` callback when
+it detects PII, but no `ObservationEvent` reaches `system.observe()`.
+The downstream effect:
 
 - `attachSourcesToOtel` has no way to surface guardrail activity as
   span events.
@@ -26,13 +26,13 @@ callback when it detects PII, but no `ObservationEvent` reaches
   follow-up redaction write but never shows WHY the redaction happened.
 - Audit-ledger plugins that subscribe to `system.observe()` miss every
   guardrail action and rely on the plugin-specific callback chain.
-- Operators running R5's recommended observability bundle (OTel +
+- Operators running the recommended observability bundle (OTel +
   timeline) think they have PII coverage; the guardrail's activity is
   silent unless they wire `onBlocked` separately.
 
-The Error-message detection path (R17) compounds this: the
-`Error` instance is never redacted (`Error.message` is treated as
-detection-only since the walker can't construct a new Error with
+The `Error`-message detection path compounds this: the `Error`
+instance is never redacted (`Error.message` is treated as
+detection-only since the walker can't construct a new `Error` with
 guaranteed `stack` parity). So even the follow-up `fact.change` doesn't
 fire – the only signal is `onBlocked`. Without an observation event,
 the path is observability-dead.

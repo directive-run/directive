@@ -2,16 +2,15 @@
 
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
-- **Related:** the R5 DX-review finding (Major M1); anti-patterns
-  entry #5 (`context` → `ctx` is wrong); the `docs/IDEAS.md` R5 Tier 1
-  architectural follow-up.
+- **Related:** anti-patterns entry #5 (`context` → `ctx` is wrong).
 
 ## Summary
 
 `@directive-run/core` exports 22+ type names that abbreviate `Definition`
 to `Def`: `ModuleDef`, `SourceDef`, `EffectsDef`, `ConstraintDef`,
-`ResolverDef`, all `TypedXxxDef`, all `CrossModuleXxxDef`, etc. The R5
-DX reviewer flagged this as Major because:
+`ResolverDef`, all `TypedXxxDef`, all `CrossModuleXxxDef`, etc. The
+abbreviation cuts against how consumers actually read the API surface
+because:
 
 - The workspace's own `anti-patterns.md` entry #5 calls out abbreviating
   `context` to `ctx` as wrong. The same logic applies to type names.
@@ -76,7 +75,7 @@ Touches every package that imports a renamed type:
 - `@directive-run/react`, `query`, `timeline`, `mutator`, `optimistic`
 - `@directive-run/vue`, `svelte`, `solid`, `lit`, `el`
 - `@directive-run/scaffold`, `cli`, `lint`, `mcp`, `sandbox`, `claude-plugin`
-- `@directive-run/sources` (post-rename – new in Phase C)
+- `@directive-run/sources` (post-rename)
 - `@directive-run/vite-plugin-api-proxy`
 
 Plus every `.md` in `packages/knowledge/` mentioning the old names
@@ -105,10 +104,11 @@ those via `pnpm --filter @directive-run/knowledge generate-sitemap`).
 
 This rename is **mechanical** (find-and-replace across ~21 packages) but
 **high-blast-radius**: every consumer's import statement changes (or
-falls back to a deprecated alias and gets a warning). The R5 plan-review
-reviewer explicitly flagged it as too risky to bundle with hardening
-work. Shipping it as a dedicated branch with its own audit cycle keeps
-the diff bisectable and the breaking-via-deprecation surface explicit.
+falls back to a deprecated alias and gets a warning). Bundling this
+with any concurrent hardening work risks the rename getting bisected
+into work it has nothing to do with. Shipping it as a dedicated branch
+keeps the diff bisectable and the breaking-via-deprecation surface
+explicit.
 
 ## Acceptance criteria
 

@@ -3,8 +3,7 @@
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the `source` primitive in `@directive-run/core`; the
-  Tier 0 prereq `createFactPIIGuardrail` (shipped); the live-context
-  audit entries in `docs/IDEAS.md`.
+  Tier 0 prereq `createFactPIIGuardrail` (shipped).
 
 ## Summary
 
@@ -28,10 +27,15 @@ PR mid-commit-landing; the agent resets and finishes with the new diff.
 
 ## Motivation
 
-The R5 audit's Innovation reviewer ranked this `viral × speed × impact`
-**10 × 8 × 10 = 800** – the highest score in the entire backlog. The R5
-AI-Integration reviewer scoped it at "~500-550 LOC implementation +
-tests, ~600 LOC docs + example" and named the 300-LOC scope guard.
+Feedback loops between the world and an in-flight LLM are the missing
+half of every "streaming agent" pattern in `@directive-run/ai` today.
+The rest of the runtime is already reactive – sources publish, facts
+propagate, subscribers wake – but the agent's generation loop is a
+one-way trip. Closing that gap unlocks a whole class of demos where
+the model reacts to reality as it changes, not just to the state it
+was prompted with. Scope target: ~500-550 LOC implementation + tests,
+~600 LOC docs + example, with a 300-LOC scope guard on the
+orchestrator changes so the primitive stays additive.
 
 Every primitive needed already exists:
 
@@ -58,7 +62,7 @@ const result = orchestrator.runStream(agent, input, {
 });
 ```
 
-> **R13 update:** the original RFC drafted a `mode: "restart" |
+> **Design update (pre-release):** the original RFC drafted a `mode: "restart" |
 > "inject-system-message"` field for choosing how the orchestrator
 > continues after an interrupt. The 1.18 landing ships a single
 > behavior – abort the LLM run, emit an `interrupted` chunk, hand
@@ -93,13 +97,14 @@ with up-to-date facts.
 it, `liveContext` expands the source → fact → prompt PII bypass surface
 into the mid-stream context updates the agent reads while generating.
 
-**R13 update:** the original RFC drafted a `liveContext.guardrails`
-inline array as the per-`runStream` extension point. The shipped
-design moves PII screening to `createFactPIIGuardrail` wired at
-`createSystem` time – the plugin runs on every fact write (including
-the source publishes liveContext watches), so by the time the
-orchestrator emits a `context_updated` chunk the fact has already
-been redacted in-store. No `runStream`-time guardrail array ships.
+**Design update (pre-release):** the original RFC drafted a
+`liveContext.guardrails` inline array as the per-`runStream` extension
+point. The shipped design moves PII screening to
+`createFactPIIGuardrail` wired at `createSystem` time – the plugin
+runs on every fact write (including the source publishes liveContext
+watches), so by the time the orchestrator emits a `context_updated`
+chunk the fact has already been redacted in-store. No `runStream`-time
+guardrail array ships.
 
 ## Scope guard
 
