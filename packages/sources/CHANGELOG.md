@@ -10,7 +10,7 @@
 
 ### Minor Changes
 
-- [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 remaining Critical fixes to documented surfaces of the source primitive
+- [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - 5 remaining Critical fixes to documented surfaces of the source primitive
 
   This patch closes the 5 R13 CRITs that affect documented but unreachable
   or misleading public APIs of v1.18.0. With Tier 1 (already merged) +
@@ -77,9 +77,9 @@ unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
 
 ### Patch Changes
 
-- [#55](https://github.com/directive-run/directive/pull/55) [`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 Critical fixes to documented surfaces of the source primitive
+- [#55](https://github.com/directive-run/directive/pull/55) [`9ffd758`](https://github.com/directive-run/directive/commit/9ffd7584914b93ca840ae84372fe3e83c75f29e8) Thanks [@jasoncomes](https://github.com/jasoncomes)! - 5 Critical fixes to documented surfaces of the source primitive
 
-  The post-merge R13 audit (full 13-lens panel against the merged
+  The post-merge review (full 13-perspective panel against the merged
   `feat/source-primitive` work) found five Critical issues affecting
   consumer-facing documented APIs of v1.18.0. All five close in this patch.
 

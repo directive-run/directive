@@ -10,7 +10,7 @@
 
 ### Patch Changes
 
-- [#76](https://github.com/directive-run/directive/pull/76) [`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R19 surgical hardening batch — closes audit findings on top of the v1.20.x release.
+- [#76](https://github.com/directive-run/directive/pull/76) [`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Hardening batch closing audit findings on top of the v1.20.x release.
 
   `@directive-run/core` (patch):
 
@@ -74,7 +74,7 @@
     unchanged (the manager's `phase: "runtime"` observability sink
     still receives the per-source error).
 
-  Closes R19 Critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
+  Closes Critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
   lens) + 3, 5, 8 (Arch lens). Bigger Tier 2 items deferred to RFCs:
   Supabase channel-name reuse race, `attachGuardrailsToOtel` helper,
   timeline `guardrail.blocked` renderer, knowledge-bundle docs sync.

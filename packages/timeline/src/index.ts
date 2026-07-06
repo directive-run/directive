@@ -916,7 +916,7 @@ export type BisectResultKind =
 export interface BisectResult {
   /**
    * Discriminator for the four mutually-exclusive outcomes. Prefer
-   * this over the legacy boolean fields. (R5 DX M1.)
+   * this over the legacy boolean fields.
    */
   kind: BisectResultKind;
   /**

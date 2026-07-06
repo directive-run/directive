@@ -280,7 +280,7 @@
 
   The new `withFallbackBudgetReservation` wrapper reserves tokens against the running `inFlightReservation`, runs the fallback work, and releases the reservation in `finally`. When `budgetEstimateTokens` is undefined (default) the reservation is 0 and the wrapper is a no-op — strict back-compat for consumers that haven't adopted the new option.
 
-- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence round following the AE review of last cycle's fix batch. Closes the two HIGH issues + the four MAJOR items the review surfaced.
+- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence release closing HIGH + MAJOR issues from the prior fix batch.
 
   ## sandbox — post-acquisition signal wiring + sanitizeStack export + expanded coverage
 
@@ -318,7 +318,7 @@
 
 ### Patch Changes
 
-- [#76](https://github.com/directive-run/directive/pull/76) [`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R19 surgical hardening batch — closes audit findings on top of the v1.20.x release.
+- [#76](https://github.com/directive-run/directive/pull/76) [`8577c06`](https://github.com/directive-run/directive/commit/8577c06131385983321d2297cff1751e53baec3b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Hardening batch closing audit findings on top of the v1.20.x release.
 
   `@directive-run/core` (patch):
 
@@ -365,7 +365,7 @@
   `@directive-run/lit` (patch):
 
   - **`ModuleController.hostDisconnected`** switched from sync `destroy()`
-    to `destroyAsync().catch(...)`. The R18 Tier 2-B migration covered
+    to `destroyAsync().catch(...)`. The migration covered
     `SystemController` + `DirectiveQueryController` but missed the
     zero-config `ModuleController` — Lit users using the simplified
     controller were still dropping source-unsubscribe Promises on the
@@ -424,7 +424,7 @@
 
 ### Patch Changes
 
-- [#71](https://github.com/directive-run/directive/pull/71) [`f0b8d77`](https://github.com/directive-run/directive/commit/f0b8d77c0bb415c0a6fe49c5f315c3be60bf6dd5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `system.evict()` reentry gate (R18 Tier 2-C / RFC 0009 follow-up):
+- [#71](https://github.com/directive-run/directive/pull/71) [`f0b8d77`](https://github.com/directive-run/directive/commit/f0b8d77c0bb415c0a6fe49c5f315c3be60bf6dd5) Thanks [@jasoncomes](https://github.com/jasoncomes)! - `system.evict()` reentry gate (RFC 0009 follow-up):
 
   The engine now sets `state.isEvicting` BEFORE awaiting any async eviction
   work. Concurrent or repeat `system.evict()` calls observe the flag and
@@ -457,9 +457,9 @@
 
 ### Patch Changes
 
-- [#59](https://github.com/directive-run/directive/pull/59) [`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R15 surgical hardening — walker Proxy / cycle / NaN defenses + emitInit cascading registration + MCP recipe enforcement
+- [#59](https://github.com/directive-run/directive/pull/59) [`f387316`](https://github.com/directive-run/directive/commit/f387316e5ab146b8ddd1a5eeee5d0fb8cb2ce57f) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Hardening batch — walker Proxy / cycle / NaN defenses + emitInit cascading registration + MCP recipe enforcement
 
-  R15 audit against v1.19.1 surfaced three new Proxy-based attack chains in the walker that the R14 array-snapshot fix introduced (each patch round opens a slightly different bypass; this round trades narrower fixes for an architectural rewrite that's queued separately). One asymmetric snapshot bug in `emitInit`, one NaN clamp gap, and a documented-only multi-tenant pattern with a prose/code contradiction.
+  A follow-up audit against v1.19.1 surfaced three new Proxy-based attack chains in the walker that the prior array-snapshot fix introduced (each patch round opens a slightly different bypass; this round trades narrower fixes for an architectural rewrite that's queued separately). One asymmetric snapshot bug in `emitInit`, one NaN clamp gap, and a documented-only multi-tenant pattern with a prose/code contradiction.
 
   ### Walker hardening
 
@@ -489,7 +489,7 @@
 
 - [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
 
-  Three small follow-on fixes for issues surfaced during R14 that R14 Tier 1 didn't cover:
+  Three small follow-on fixes for issues surfaced during the prior round that Tier 1 did not cover:
 
   **MCP holder pattern — multi-tenant safe factory**. The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
 
@@ -497,7 +497,7 @@
 
   **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel**. The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
 
-- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R14 audit Tier 1 — walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
+- [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
 
   The R14 multi-lens audit against the v1.19.0 source-primitive surface
   returned ~30 Critical findings. This patch closes the four highest-
@@ -573,7 +573,7 @@
 
 ### Minor Changes
 
-- [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - R13 audit — 5 remaining Critical fixes to documented surfaces of the source primitive
+- [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - 5 remaining Critical fixes to documented surfaces of the source primitive
 
   This patch closes the 5 R13 CRITs that affect documented but unreachable
   or misleading public APIs of v1.18.0. With Tier 1 (already merged) +
@@ -1066,7 +1066,7 @@ plugin that captures the raw`Error` object.
 
 - [#52](https://github.com/directive-run/directive/pull/52) [`08d84df`](https://github.com/directive-run/directive/commit/08d84dfe4ac558d2dd9013407e6b12a60ec6cfac) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive RFCs — R11 close-out: public alias exports + interrupt() semantic + evict(deadline) detached-work + liveContext setup hoist + self-loop guard + docs drift
 
-  R11 audit on the 5 RFC implementations (0005-0009) surfaced one
+  A follow-up audit on the 5 RFC implementations (0005-0009) surfaced one
   Critical and several Major issues. All shipped without prior review
   in the original implementation pass; this patch closes them.
 

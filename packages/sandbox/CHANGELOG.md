@@ -30,7 +30,7 @@
 
   **`/api/sandbox` consumers**: add `signal: request.signal` to your `runInSandbox(...)` call and `setMaxConcurrentWorkers(N)` at module-init to pick up the slot-leak defence end-to-end.
 
-- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence round following the AE review of last cycle's fix batch. Closes the two HIGH issues + the four MAJOR items the review surfaced.
+- [`0444f55`](https://github.com/directive-run/directive/commit/0444f557f068d6d22fd921fe0eac21c99cca766c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Convergence release closing HIGH + MAJOR issues from the prior fix batch.
 
   ## sandbox — post-acquisition signal wiring + sanitizeStack export + expanded coverage
 

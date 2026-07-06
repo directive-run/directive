@@ -915,7 +915,7 @@ export function useDirective<M extends ModuleSchema>(
   }
 
   onScopeDispose(() => {
-    // RFC 0009 follow-up (R18 Tier 2-B): use destroyAsync so source
+    // RFC 0009 follow-up: use destroyAsync so source
     // unsubscribes actually complete (e.g. Supabase `channel.unsubscribe()`
     // returns a Promise the sync `destroy()` would have dropped on
     // the floor). The framework's onScopeDispose is sync, so we
@@ -1106,7 +1106,7 @@ export function useQuerySystem<
   }
 
   onScopeDispose(() => {
-    // RFC 0009 follow-up (R18 Tier 2-B): use destroyAsync so source
+    // RFC 0009 follow-up: use destroyAsync so source
     // unsubscribes actually complete (e.g. Supabase `channel.unsubscribe()`
     // returns a Promise the sync `destroy()` would have dropped on
     // the floor). The framework's onScopeDispose is sync, so we
