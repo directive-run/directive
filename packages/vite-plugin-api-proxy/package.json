@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/vite-plugin-api-proxy/",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -29,6 +29,6 @@
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vite": "^5.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   }
 }

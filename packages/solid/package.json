@@ -51,7 +51,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/solid/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

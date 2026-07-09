@@ -47,7 +47,7 @@
   "scripts": {
     "build": "tsx scripts/build-package-registry.ts && tsup",
     "build:registry": "tsx scripts/build-package-registry.ts",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/mcp/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist src/generated",
     "prepublishOnly": "pnpm clean && pnpm build"
@@ -70,6 +70,6 @@
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   }
 }

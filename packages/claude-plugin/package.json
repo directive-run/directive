@@ -45,7 +45,7 @@
   "scripts": {
     "build": "tsx scripts/build-skills.ts && tsup",
     "build:skills": "tsx scripts/build-skills.ts",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/claude-plugin/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf skills/* dist"
   },
@@ -55,6 +55,6 @@
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   }
 }

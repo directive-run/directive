@@ -86,7 +86,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/core/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

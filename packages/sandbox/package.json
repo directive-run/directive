@@ -46,7 +46,7 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run",
+    "test": "cd ../.. && vitest run packages/sandbox/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm clean && pnpm build"
@@ -65,6 +65,6 @@
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   }
 }
