@@ -86,6 +86,7 @@ Website: https://directive.run
 - [Persistence](https://directive.run/docs/plugins/persistence)
 - [Performance](https://directive.run/docs/plugins/performance)
 - [Circuit Breaker](https://directive.run/docs/plugins/circuit-breaker)
+- [Clobber Loop Detector](https://directive.run/docs/plugins/clobber-loop)
 - [Observability](https://directive.run/docs/plugins/observability)
 - [Custom Plugins](https://directive.run/docs/plugins/custom)
 
@@ -107,6 +108,14 @@ Website: https://directive.run
 ### Security & Compliance
 - [Resolver Binding](https://directive.run/docs/resolver-binding)
 - [Audit Ledger](https://directive.run/docs/audit-ledger)
+
+### Broadcast
+- [Overview](https://directive.run/docs/broadcast)
+- [GitHub Action](https://directive.run/docs/broadcast/action)
+- [CLI](https://directive.run/docs/broadcast/cli)
+- [Cloudflare Worker](https://directive.run/docs/broadcast/worker)
+- [MCP server](https://directive.run/docs/broadcast/mcp)
+- [README badge](https://directive.run/docs/broadcast/badge)
 
 ### Examples
 - [Number Match](https://directive.run/docs/examples/counter)

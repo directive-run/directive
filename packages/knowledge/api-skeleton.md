@@ -490,6 +490,10 @@
   ```ts
   export interface SchemaType<T> {
   ```
+- `ShouldRetryContext` — Context object passed as the optional third argument to
+  ```ts
+  export interface ShouldRetryContext {
+  ```
 - `SignalClock` — Stable interface for any time source.
   ```ts
   export interface SignalClock {
@@ -684,6 +688,14 @@
 - `PredicateOp` — Comparison operator names — the `$`-prefixed keys inside an operator object.
   ```ts
   export type PredicateOp =
+  ```
+- `PredicateOverlapProof` — Discriminated proof of why two resolvers' `when:` predicates fire on
+  ```ts
+  export type PredicateOverlapProof =
+  ```
+- `ResolverAbortReason` — Why a resolver attempt was aborted, surfaced to {@link RetryPolicy.shouldRetry}
+  ```ts
+  export type ResolverAbortReason =
   ```
 - `ResolversDefinition` — Map of resolver definitions
   ```ts
