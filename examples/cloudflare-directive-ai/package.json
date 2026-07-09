@@ -1,0 +1,27 @@
+{
+  "name": "@directive-run/example-cloudflare-directive-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@directive-run/core": "workspace:*",
+    "@directive-run/query": "workspace:*",
+    "@directive-run/sources": "workspace:*",
+    "@directive-run/ai": "workspace:*",
+    "hono": "^4.6.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260101.0",
+    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.9",
+    "wrangler": "^3.90.0"
+  }
+}
