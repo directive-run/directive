@@ -1,5 +1,13 @@
 # @directive-run/example-sudoku
 
+## 0.0.58
+
+### Patch Changes
+
+- Updated dependencies [[`3a86db7`](https://github.com/directive-run/directive/commit/3a86db7a9ff55cff81150eadc766ae3ca47e5790)]:
+  - @directive-run/core@1.23.1
+  - @directive-run/el@1.1.2
+
 ## 0.0.57
 
 ### Patch Changes

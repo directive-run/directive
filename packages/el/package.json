@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/el",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Vanilla DOM adapter for Directive. Typed element creation + reactive bindings + JSX runtime.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
