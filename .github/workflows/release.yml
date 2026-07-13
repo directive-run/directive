@@ -8,6 +8,20 @@ on:
       - ".changeset/**"
       - ".github/workflows/release.yml"
       - "pnpm-lock.yaml"
+  # Manual entry point for a workflow-wiring rehearsal. dry_run=true
+  # runs the same build/typecheck/test pipeline as a real release, but
+  # gates the changesets publish step off and forwards `dry-run: true`
+  # to the broadcast action so adapters return synthetic post IDs and
+  # the Worker POST is skipped. Use this to verify secret binding,
+  # config-file shape, and adapter env-secret presence WITHOUT posting
+  # to any real account. The safe default is true — the manual entry
+  # point is the rehearsal path.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Rehearsal mode: skip npm publish + skip real platform posts. Exercises adapters + signer + output shape only."
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,7 +35,12 @@ env:
 jobs:
   release:
     outputs:
-      published: ${{ steps.changesets.outputs.published }}
+      # Real publish path (push event) OR forced-true from the dry-run
+      # mark step (workflow_dispatch with dry_run=true). The two paths
+      # are mutually exclusive — one is gated to `push`, the other to
+      # `workflow_dispatch` — so the `||` never has a real-publish
+      # falsy string shadowing a dry-run "true".
+      published: ${{ steps.changesets.outputs.published || steps.dry_run_publish.outputs.published }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,6 +67,9 @@ jobs:
 
       - name: Create Release Pull Request or Publish
         id: changesets
+        # Gate off in dry-run — a manual dispatch would otherwise pick
+        # up any pending Version Packages PR and publish it for real.
+        if: github.event_name == 'push'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # `changeset version` rewrites packages/*/package.json with the
@@ -106,10 +128,20 @@ jobs:
           done < <(echo "$published" | jq -c '.[]')
           exit $fail
 
+      # Dry-run rehearsal: mark the release job's `published` output
+      # true so the downstream broadcast job runs. The action itself
+      # receives `dry-run: true` and returns synthetic post IDs
+      # without touching platform APIs or the Worker.
+      - name: Force published output true for dry-run
+        id: dry_run_publish
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        run: echo "published=true" >> "$GITHUB_OUTPUT"
+
   docs-artifacts:
     name: Publish docs artifacts
     needs: release
-    if: needs.release.outputs.published == 'true'
+    # push-only: dry-run has nothing to attach to (no real GH release).
+    if: needs.release.outputs.published == 'true' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -182,6 +214,10 @@ jobs:
         with:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
+          # Rehearsal path: adapters return synthetic post IDs and the
+          # posts-index Worker POST is skipped. Real releases (push
+          # event) still hit real platforms + the Worker.
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' }}
         env:
           # SaaS path. The Worker holds the signing key and signs each
           # cassette server-side under the tenant's managed keypair.
