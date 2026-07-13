@@ -178,7 +178,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Broadcast
-        uses: sizls/broadcast-action@9e5e934e89091640bccc631b8b36863e2498943a # v0.10.0
+        uses: sizls/broadcast-action@569b116f3e9f98e10dd3ddc7d84c1b82b8d7ad8f # v0.11.0
         with:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
@@ -186,7 +186,7 @@ jobs:
           # SaaS path. The Worker holds the signing key and signs each
           # cassette server-side under the tenant's managed keypair.
           # The receipt URL returned in the action output is the public
-          # verification surface at broadcast.run/r/<token>.
+          # verification surface at broadcast.sizls.com/r/<token>.
           BROADCAST_API_KEY: ${{ secrets.BROADCAST_API_KEY }}
           # Platform secrets — provision via `gh secret set`. Missing
           # entries cause the corresponding adapter to silently skip.
