@@ -1,6 +1,6 @@
 {
   "name": "@directive-run/timeline",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Time-travel test REPL for Directive. Auto-renders the causal-graph timeline of any failing test.",
   "license": "(MIT OR Apache-2.0)",
   "author": "Jason Comes",
