@@ -54,7 +54,7 @@
     "test": "cd ../.. && vitest run packages/lint/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "pnpm clean && pnpm build"
+    "prepublishOnly": "test -d dist"
   },
   "optionalDependencies": {
     "ts-morph": "^25.0.0"

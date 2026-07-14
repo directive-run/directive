@@ -50,7 +50,7 @@
     "test": "cd ../.. && vitest run packages/mcp/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist src/generated",
-    "prepublishOnly": "pnpm clean && pnpm build"
+    "prepublishOnly": "test -d dist"
   },
   "dependencies": {
     "@directive-run/claude-plugin": "workspace:*",
