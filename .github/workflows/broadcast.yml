@@ -51,15 +51,10 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Broadcast
-        uses: sizls/broadcast-action@8571ba14952574db629b30e6252cf3f3db079de0 # v0.11.1
+        uses: sizls/broadcast-action@5c0bb22808a2e4fee51f8529cf8e498961fe5e93 # v0.11.2
         with:
           platforms: bluesky,mastodon,discord
           config-path: .sizl/broadcast.config.json
-          # Override the action's stale default (broadcast.directive.run,
-          # retired 2026-07-13). The SaaS Worker lives at
-          # broadcast.sizls.com/v1/broadcast; the /posts suffix is the
-          # index write path.
-          posts-index-url: https://broadcast.sizls.com/posts
         env:
           # SaaS path. The Worker holds the signing key and signs each
           # cassette server-side under the tenant's managed keypair.
