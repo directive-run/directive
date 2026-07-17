@@ -12,12 +12,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
-env:
-  # Opt into Node 24 for JavaScript actions ahead of GH's 2026-06-02
-  # forced flip; lets us keep current pinned SHAs (Node 20-era) running
-  # until the action authors ship Node 24 releases.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   release:
     outputs:
@@ -157,10 +151,3 @@ jobs:
         run: curl -sS -X POST "$HOOK_URL"
         env:
           HOOK_URL: ${{ vars.VERCEL_DEPLOY_HOOK_DOCS }}
-
-  # Broadcast moved to .github/workflows/broadcast.yml. See that file's
-  # header for the rationale — short version: the action needs a
-  # release:published event, which this push-triggered workflow can't
-  # provide. When changesets publish creates the GitHub Release,
-  # release:published fires and broadcast.yml runs against a real
-  # release payload.

@@ -36,12 +36,6 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
 
-env:
-  # Opt into Node 24 for JavaScript actions ahead of GH's 2026-06-02
-  # forced flip; matches release.yml. Once the pinned actions ship
-  # native Node 24 releases we drop this env from both files together.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   broadcast:
     name: Broadcast release to social
