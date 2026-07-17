@@ -1,5 +1,5 @@
 {
-  "$schema": "https://broadcast.directive.run/schema/broadcast-config-v1.json",
+  "$schema": "https://broadcast.sizls.com/schema/broadcast-config-v1.json",
   "templates": {
     "bluesky": "🚀 ${ref.repo} ${ref.version}\n\n${ref.notes}\n\n${ref.url}",
     "mastodon": "🚀 ${ref.repo} ${ref.version}\n\n${ref.notes}\n\n${ref.url}",
@@ -7,6 +7,6 @@
   },
   "mastodonInstance": "https://hachyderm.io",
   "attackerScrub": {
-    "trustedHosts": ["github.com", "directive.run", "broadcast.directive.run"]
+    "trustedHosts": ["github.com", "directive.run", "broadcast.sizls.com"]
   }
 }

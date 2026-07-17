@@ -8,23 +8,6 @@ on:
       - ".changeset/**"
       - ".github/workflows/release.yml"
       - "pnpm-lock.yaml"
-  # Manual entry point for a workflow-wiring rehearsal. dry_run=true
-  # runs the same build/typecheck/test pipeline as a real release but
-  # skips the changesets publish step. Use to verify pipeline health
-  # or workflow-file changes without cutting a real release.
-  #
-  # Note: dry_run does NOT exercise the broadcast path — broadcast
-  # lives in broadcast.yml and triggers on release:published (see the
-  # header of that file for why the split exists). To rehearse
-  # broadcast, create a draft GitHub Release and publish it; the draft
-  # publish fires release:published and drives broadcast.yml without
-  # touching npm.
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Rehearsal mode: run build+typecheck+tests, skip npm publish."
-        type: boolean
-        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,12 +21,7 @@ env:
 jobs:
   release:
     outputs:
-      # Real publish path (push event) OR forced-true from the dry-run
-      # mark step (workflow_dispatch with dry_run=true). The two paths
-      # are mutually exclusive — one is gated to `push`, the other to
-      # `workflow_dispatch` — so the `||` never has a real-publish
-      # falsy string shadowing a dry-run "true".
-      published: ${{ steps.changesets.outputs.published || steps.dry_run_publish.outputs.published }}
+      published: ${{ steps.changesets.outputs.published }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -70,9 +48,6 @@ jobs:
 
       - name: Create Release Pull Request or Publish
         id: changesets
-        # Gate off in dry-run — a manual dispatch would otherwise pick
-        # up any pending Version Packages PR and publish it for real.
-        if: github.event_name == 'push'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # `changeset version` rewrites packages/*/package.json with the
@@ -131,20 +106,10 @@ jobs:
           done < <(echo "$published" | jq -c '.[]')
           exit $fail
 
-      # Dry-run rehearsal: mark the release job's `published` output
-      # true so the downstream broadcast job runs. The action itself
-      # receives `dry-run: true` and returns synthetic post IDs
-      # without touching platform APIs or the Worker.
-      - name: Force published output true for dry-run
-        id: dry_run_publish
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
-        run: echo "published=true" >> "$GITHUB_OUTPUT"
-
   docs-artifacts:
     name: Publish docs artifacts
     needs: release
-    # push-only: dry-run has nothing to attach to (no real GH release).
-    if: needs.release.outputs.published == 'true' && github.event_name == 'push'
+    if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
