@@ -72,14 +72,20 @@ describe("expireAfter", () => {
 
       // Go idle
       system.facts.userId = "";
-      await wait(50);
 
-      // Wait for expiry
-      await wait(150);
-
-      state = system.read("user") as ResourceState<unknown>;
-      expect(state.isPending).toBe(true);
-      expect(state.data).toBeNull();
+      // Poll for the expire timer to fire and clear the cache. This
+      // replaces a fixed `wait(200)` — the 100ms margin over the
+      // `expireAfter: 100` timer was tight enough that a busy CI
+      // runner could resolve the sleep before the timer's callback
+      // finished, producing a false "isPending is false" flake.
+      await vi.waitFor(
+        () => {
+          state = system.read("user") as ResourceState<unknown>;
+          expect(state.isPending).toBe(true);
+          expect(state.data).toBeNull();
+        },
+        { timeout: 2000, interval: 25 },
+      );
 
       system.destroy();
     }, 10_000);
@@ -206,13 +212,19 @@ describe("expireAfter", () => {
       app.facts.userId = "1";
       await app.settle();
 
-      // Go idle + wait for expiry
+      // Go idle + wait for expiry (poll for the timer to fire rather
+      // than sleeping past the deadline — see notes on the earlier
+      // createQuery expire test for the flake this closes).
       app.facts.userId = "";
-      await wait(200);
 
-      const state = app.read("user") as ResourceState<unknown>;
-      expect(state.isPending).toBe(true);
-      expect(state.data).toBeNull();
+      await vi.waitFor(
+        () => {
+          const state = app.read("user") as ResourceState<unknown>;
+          expect(state.isPending).toBe(true);
+          expect(state.data).toBeNull();
+        },
+        { timeout: 2000, interval: 25 },
+      );
 
       app.destroy();
     }, 10_000);
@@ -259,13 +271,17 @@ describe("expireAfter", () => {
       let state = system.read("feed") as InfiniteResourceState<unknown>;
       expect(state.pages).toHaveLength(1);
 
-      // Go idle + wait for expiry
+      // Go idle + wait for expiry (poll for the timer to fire).
       system.facts.userId = "";
-      await wait(200);
 
-      state = system.read("feed") as InfiniteResourceState<unknown>;
-      expect(state.isPending).toBe(true);
-      expect(state.pages).toEqual([]);
+      await vi.waitFor(
+        () => {
+          state = system.read("feed") as InfiniteResourceState<unknown>;
+          expect(state.isPending).toBe(true);
+          expect(state.pages).toEqual([]);
+        },
+        { timeout: 2000, interval: 25 },
+      );
 
       system.destroy();
     }, 10_000);
