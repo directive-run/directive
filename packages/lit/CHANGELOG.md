@@ -1,5 +1,7 @@
 # @directive-run/lit
 
+## 1.24.0
+
 ## 1.23.1
 
 ### Patch Changes
