@@ -41,6 +41,16 @@ export interface RunResult<T = unknown> {
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Tokens read from the provider's prompt cache, when available.
+   * Populated by adapters with prompt-caching enabled (e.g. Anthropic).
+   */
+  cacheReadTokens?: number;
+  /**
+   * Tokens written to the provider's prompt cache, when available.
+   * Populated by adapters with prompt-caching enabled (e.g. Anthropic).
+   */
+  cacheCreationTokens?: number;
 }
 
 /** Message from agent run */

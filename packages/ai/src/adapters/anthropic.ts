@@ -79,6 +79,23 @@ export interface AnthropicRunnerOptions {
   topP?: number;
   /** Custom stop sequences. The model will stop generating when it encounters one. */
   stopSequences?: string[];
+  /**
+   * Prompt caching strategy. When `"automatic"`, a `cache_control` breakpoint is
+   * placed on the system prompt so the stable instructions prefix is cached across
+   * calls – subsequent runs read it from cache instead of re-processing it. The
+   * variable message suffix is never cached. Cache token usage is surfaced on
+   * `tokenUsage.cacheReadTokens` / `tokenUsage.cacheCreationTokens`.
+   *
+   * Anthropic silently ignores `cache_control` when the cached prefix is below a
+   * per-model minimum (~1024 tokens Sonnet-tier, 2048 for Sonnet-4.6 & Haiku-3.5,
+   * 4096 for Opus & Haiku-4.5) – no error, no caching, and `cacheReadTokens` stays
+   * 0 (that 0 is the diagnostic). Since Directive caches `agent.instructions`,
+   * short instructions commonly fall below this. The `ephemeral` breakpoint has a
+   * 5-minute default TTL.
+   *
+   * @default undefined – caching disabled (bare-string system, current behavior).
+   */
+  promptCaching?: "automatic";
 }
 
 /**
@@ -99,6 +116,21 @@ export interface AnthropicRunnerOptions {
  * const orchestrator = createAgentOrchestrator({ runner });
  * const result = await orchestrator.run(agent, input);
  * ```
+ *
+ * @example Prompt caching – cache the stable instructions prefix and read the
+ * cache-token breakdown back for cost tracking:
+ * ```typescript
+ * const runner = createAnthropicRunner({
+ *   apiKey: process.env.ANTHROPIC_API_KEY!,
+ *   promptCaching: "automatic",
+ * });
+ * const result = await orchestrator.run(agent, input);
+ * // tokenUsage.cacheCreationTokens – tokens written on the first call
+ * // tokenUsage.cacheReadTokens     – tokens served from cache on repeat calls
+ * const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
+ *   result.tokenUsage!;
+ * // Cache reads bill ~0.1x and cache writes ~1.25x the base input rate.
+ * ```
  */
 export function createAnthropicRunner(
   options: AnthropicRunnerOptions,
@@ -114,6 +146,7 @@ export function createAnthropicRunner(
     temperature,
     topP,
     stopSequences,
+    promptCaching,
   } = options;
 
   validateBaseURL(baseURL);
@@ -122,37 +155,80 @@ export function createAnthropicRunner(
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
-      url: `${baseURL}/messages`,
-      init: {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+    buildRequest: (agent, _input, messages) => {
+      const instructions = agent.instructions ?? "";
+      // With prompt caching enabled, send the structured system form so a
+      // `cache_control` breakpoint caches the stable instructions prefix.
+      // Fall back to the bare string – byte-for-byte the prior behavior – when
+      // caching is off, and also when there is nothing stable to cache: an
+      // empty/whitespace-only cached block is wasteful and risks a 400.
+      const system =
+        promptCaching === "automatic" && instructions.trim() !== ""
+          ? [
+              {
+                type: "text",
+                text: instructions,
+                cache_control: { type: "ephemeral" },
+              },
+            ]
+          : instructions;
+
+      return {
+        url: `${baseURL}/messages`,
+        init: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: agent.model ?? model,
+            max_tokens: maxTokens,
+            ...(temperature != null ? { temperature } : {}),
+            ...(topP != null ? { top_p: topP } : {}),
+            ...(stopSequences != null ? { stop_sequences: stopSequences } : {}),
+            system,
+            messages: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+          }),
+          ...(timeoutMs != null
+            ? { signal: AbortSignal.timeout(timeoutMs) }
+            : {}),
         },
-        body: JSON.stringify({
-          model: agent.model ?? model,
-          max_tokens: maxTokens,
-          ...(temperature != null ? { temperature } : {}),
-          ...(topP != null ? { top_p: topP } : {}),
-          ...(stopSequences != null ? { stop_sequences: stopSequences } : {}),
-          system: agent.instructions ?? "",
-          messages: messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
-        ...(timeoutMs != null
-          ? { signal: AbortSignal.timeout(timeoutMs) }
-          : {}),
-      },
-    }),
+      };
+    },
     parseResponse: async (res) => {
       const data = await res.json();
       const text = data.content?.[0]?.text ?? "";
       const inputTokens = data.usage?.input_tokens ?? 0;
       const outputTokens = data.usage?.output_tokens ?? 0;
+
+      // Cache-token emission is gated on the OPTION, not on the response fields:
+      // the live API returns `cache_*_input_tokens: 0` on every response even
+      // when no `cache_control` was sent, so keying off their presence would
+      // wrongly emit `cacheReadTokens: 0` on a caching-off call. When caching is
+      // on we always emit both (default 0, so a cache miss correctly reports 0);
+      // when it's off we omit them entirely so `tokenUsage` is byte-identical to
+      // the pre-caching behavior. `input_tokens` is the uncached remainder, so
+      // cache tokens are additive – include them in `totalTokens`.
+      if (promptCaching === "automatic") {
+        const cacheReadTokens = data.usage?.cache_read_input_tokens ?? 0;
+        const cacheCreationTokens =
+          data.usage?.cache_creation_input_tokens ?? 0;
+
+        return {
+          text,
+          totalTokens:
+            inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens,
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          cacheCreationTokens,
+        };
+      }
 
       return {
         text,

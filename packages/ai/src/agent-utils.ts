@@ -159,6 +159,10 @@ export interface ParsedResponse {
   inputTokens?: number;
   /** Output token count, when available from the provider */
   outputTokens?: number;
+  /** Prompt-cache read token count, when available from the provider */
+  cacheReadTokens?: number;
+  /** Prompt-cache creation token count, when available from the provider */
+  cacheCreationTokens?: number;
 }
 
 /** Options for creating an AgentRunner from buildRequest/parseResponse */
@@ -289,6 +293,12 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
       const tokenUsage: TokenUsage = {
         inputTokens: parsed.inputTokens ?? 0,
         outputTokens: parsed.outputTokens ?? 0,
+        ...(parsed.cacheReadTokens != null
+          ? { cacheReadTokens: parsed.cacheReadTokens }
+          : {}),
+        ...(parsed.cacheCreationTokens != null
+          ? { cacheCreationTokens: parsed.cacheCreationTokens }
+          : {}),
       };
 
       const assistantMessage: Message = {

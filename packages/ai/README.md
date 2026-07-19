@@ -56,6 +56,7 @@ Adapters are thin wrappers around each provider's HTTP API. No SDK dependencies 
 | Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; | `createGeminiStreamingRunner` |
 | Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; | &ndash; |
 | Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | &ndash; | `GEMINI_PRICING` |
+| Prompt caching | &ndash; | `promptCaching: "automatic"` | &ndash; | &ndash; |
 | Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; | &ndash; |
 
 ## Cost Tracking
@@ -74,6 +75,32 @@ const cost =
   estimateCost(inputTokens, OPENAI_PRICING["gpt-4o"].input) +
   estimateCost(outputTokens, OPENAI_PRICING["gpt-4o"].output);
 ```
+
+## Prompt Caching (Anthropic)
+
+Opt in with `promptCaching: "automatic"` to place a `cache_control` breakpoint on the agent's instructions. Anthropic caches that stable system prefix, so repeat calls that share it read from cache (~0.1x input cost) instead of reprocessing it &ndash; the variable message suffix stays uncached. It is off by default (bare-string system, byte-for-byte the prior behavior), non-breaking, and needs no beta header on `anthropic-version: 2023-06-01`.
+
+```typescript
+import { createAnthropicRunner } from "@directive-run/ai/anthropic";
+
+const runner = createAnthropicRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+  promptCaching: "automatic",
+});
+const result = await runner(agent, "Hello");
+
+// Cache usage is surfaced on tokenUsage (present only when caching is active):
+const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
+  result.tokenUsage!;
+// cacheCreationTokens – tokens written to cache on the first call (~1.25x cost)
+// cacheReadTokens     – tokens served from cache on repeat calls (~0.1x cost)
+```
+
+`inputTokens` is the **uncached** remainder only; `cacheReadTokens` / `cacheCreationTokens` are separate, additive fields, and `totalTokens` includes all four (input + output + cache-read + cache-creation). When caching is off the cache fields are omitted and `totalTokens` is `inputTokens + outputTokens`, exactly as before. Currently supported on the non-streaming `createAnthropicRunner`.
+
+> **Minimum cacheable prefix (the #1 gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; roughly 1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, and 4096 on Opus & Haiku-4.5. There is no error: caching just doesn't happen and `cacheReadTokens` stays `0` across repeat calls (that `0` is your diagnostic). Because Directive caches `agent.instructions`, short instructions commonly fall below this threshold. The `ephemeral` breakpoint also has a **5-minute default TTL** &ndash; prefixes not re-read within that window are evicted.
+
+> **Cost tracking caveat.** `withBudget` / `estimateCost` currently weight all tokens equally, so with caching on they do **not** yet reflect the cheaper cache-read (~0.1x) or pricier cache-write (~1.25x) rates &ndash; a cached run will read as more expensive than it actually is. Cache-aware cost pricing is a planned follow-up.
 
 ## Lifecycle Hooks
 

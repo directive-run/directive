@@ -55,7 +55,11 @@ interface RunResult<T = unknown> {
 interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
-  // Note: NO `total` field — sum `inputTokens + outputTokens` when needed, or use `result.totalTokens`.
+  // Populated by adapters with prompt caching active (e.g. Anthropic
+  // `promptCaching: "automatic"`); omitted otherwise.
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  // Note: NO `total` field — sum `inputTokens + outputTokens` (+ cache tokens when present) when needed, or use `result.totalTokens`.
 }
 ```
 

@@ -3,6 +3,7 @@ import {
   createAnthropicRunner,
   createAnthropicStreamingRunner,
 } from "../adapters/anthropic.js";
+import { createOpenAIRunner } from "../adapters/openai.js";
 
 // ============================================================================
 // Helpers
@@ -229,6 +230,218 @@ describe("createAnthropicRunner", () => {
     const body = JSON.parse(init.body as string);
 
     expect(body.max_tokens).toBe(8192);
+  });
+
+  it("sends a bare-string system (no cache_control) when promptCaching is off", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      fetch: mockFetch,
+    });
+    await runner(mockAgent({ instructions: "Be brief." }), "test");
+
+    const [, init] = mockFetch.mock.calls[0]!;
+    const body = JSON.parse(init.body as string);
+
+    expect(body.system).toBe("Be brief.");
+    expect(Array.isArray(body.system)).toBe(false);
+  });
+
+  it("adds a cache_control breakpoint to the system prefix when promptCaching is 'automatic'", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      promptCaching: "automatic",
+      fetch: mockFetch,
+    });
+    await runner(mockAgent({ instructions: "Be brief." }), "test");
+
+    const [, init] = mockFetch.mock.calls[0]!;
+    const body = JSON.parse(init.body as string);
+
+    expect(body.system).toEqual([
+      {
+        type: "text",
+        text: "Be brief.",
+        cache_control: { type: "ephemeral" },
+      },
+    ]);
+    // The cache breakpoint stays on the system prefix only – the variable
+    // message suffix must remain uncached.
+    expect(body.messages[0].content).not.toHaveProperty("cache_control");
+  });
+
+  it("surfaces cache_read/cache_creation tokens onto tokenUsage", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "cached reply" }],
+        usage: {
+          input_tokens: 12,
+          output_tokens: 8,
+          cache_read_input_tokens: 1024,
+          cache_creation_input_tokens: 256,
+        },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      promptCaching: "automatic",
+      fetch: mockFetch,
+    });
+    const result = await runner(mockAgent(), "test");
+
+    expect(result.tokenUsage).toEqual({
+      inputTokens: 12,
+      outputTokens: 8,
+      cacheReadTokens: 1024,
+      cacheCreationTokens: 256,
+    });
+    // input_tokens is the uncached remainder – cache tokens are additive.
+    expect(result.totalTokens).toBe(12 + 8 + 1024 + 256);
+  });
+
+  it("omits cache token fields when the response has no cache usage", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      fetch: mockFetch,
+    });
+    const result = await runner(mockAgent(), "test");
+
+    expect(result.tokenUsage).toEqual({ inputTokens: 10, outputTokens: 5 });
+    expect(result.tokenUsage).not.toHaveProperty("cacheReadTokens");
+    expect(result.totalTokens).toBe(15);
+  });
+
+  it("omits cache fields on a caching-off response that reports cache_*_input_tokens: 0", async () => {
+    // The live Anthropic API returns cache_read/cache_creation_input_tokens: 0
+    // on EVERY response, even when no cache_control was sent. Emission is gated
+    // on the option, not on these fields' presence, so a caching-off call stays
+    // byte-identical to the pre-caching behavior.
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: {
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      fetch: mockFetch,
+    });
+    const result = await runner(mockAgent(), "test");
+
+    expect(result.tokenUsage).toEqual({ inputTokens: 10, outputTokens: 5 });
+    expect(result.tokenUsage).not.toHaveProperty("cacheReadTokens");
+    expect(result.tokenUsage).not.toHaveProperty("cacheCreationTokens");
+    expect(result.totalTokens).toBe(15);
+  });
+
+  it("emits cacheReadTokens: 0 on a caching-on cache miss (0 means active, not absent)", async () => {
+    // First call with caching on: cache is written, nothing read back yet.
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: {
+          input_tokens: 20,
+          output_tokens: 6,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 512,
+        },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      promptCaching: "automatic",
+      fetch: mockFetch,
+    });
+    const result = await runner(mockAgent(), "test");
+
+    expect(result.tokenUsage).toEqual({
+      inputTokens: 20,
+      outputTokens: 6,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 512,
+    });
+    // The 0 read is emitted, not omitted – 0 is the cache-miss diagnostic.
+    expect(result.tokenUsage).toHaveProperty("cacheReadTokens", 0);
+    expect(result.totalTokens).toBe(20 + 6 + 0 + 512);
+  });
+
+  it("sends a bare-string system when promptCaching is on but instructions are empty", async () => {
+    // A fresh Response per call – a Response body can only be read once.
+    const mockFetch = vi.fn().mockImplementation(async () =>
+      jsonResponse({
+        content: [{ text: "ok" }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    );
+
+    const runner = createAnthropicRunner({
+      apiKey: "test-key",
+      promptCaching: "automatic",
+      fetch: mockFetch,
+    });
+
+    // undefined instructions – nothing stable to cache, so no cached block.
+    await runner(mockAgent({ instructions: undefined }), "test");
+    const [, init] = mockFetch.mock.calls[0]!;
+    const body = JSON.parse(init.body as string);
+    expect(body.system).toBe("");
+    expect(Array.isArray(body.system)).toBe(false);
+
+    // whitespace-only instructions – same fallback, bytes preserved.
+    await runner(mockAgent({ instructions: "   " }), "test");
+    const [, init2] = mockFetch.mock.calls[1]!;
+    const body2 = JSON.parse(init2.body as string);
+    expect(body2.system).toBe("   ");
+    expect(Array.isArray(body2.system)).toBe(false);
+  });
+
+  it("does not add cache token fields to a non-Anthropic (OpenAI) runner result", async () => {
+    // Locks the shared createRunner non-regression: adapters that never emit
+    // parsed cache tokens produce a bare { inputTokens, outputTokens } shape.
+    const mockFetch = vi.fn().mockResolvedValue(
+      jsonResponse({
+        choices: [{ message: { content: "ok" } }],
+        usage: { prompt_tokens: 4, completion_tokens: 3 },
+      }),
+    );
+
+    const runner = createOpenAIRunner({
+      apiKey: "test-key",
+      fetch: mockFetch,
+    });
+    const result = await runner(mockAgent(), "test");
+
+    expect(result.tokenUsage).toEqual({ inputTokens: 4, outputTokens: 3 });
+    expect(result.tokenUsage).not.toHaveProperty("cacheReadTokens");
+    expect(result.tokenUsage).not.toHaveProperty("cacheCreationTokens");
   });
 });
 
