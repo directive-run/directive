@@ -1,66 +1,43 @@
 name: Broadcast
 
-# Announces every GitHub release on the configured social platforms via
-# sizls/broadcast-action. This is intentionally separate from release.yml:
+# Announces every GitHub release on the configured social platforms.
 #
-# - release.yml is push-triggered. changesets publish then calls the
-#   GitHub API to create a GitHub Release when new versions ship
-#   (createGithubReleases: true). That API call fires a *release:
-#   published* webhook — a distinct event from the original push.
-# - broadcast-action reads its announceable event from
-#   github.context.payload.release. That field only exists on release:*
-#   events, not on push. Running the action on push simply skips
-#   (2026-07-14 rehearsal confirmed the graceful skip).
-# - Splitting this out lets release.yml stay focused on cutting the
-#   release, and lets broadcast.yml wait for the exact event the action
-#   was designed for. The two workflows compose without either owning
-#   the other's failure surface.
+# This workflow now consumes the reusable-workflow shape from
+# sizls/broadcast-action rather than the bundled JavaScript action.
+# The reusable workflow shells out to `npx @sizl/broadcast-cli`
+# internally, which runs `npm audit signatures` on the CLI tarball
+# before invoking it — a shorter trust chain than pinning the ~3 MB
+# `dist/index.js` bundle by SHA.
 #
 # Trigger sequence during a real release:
 #   1. Push to main lands a Version Packages merge.
 #   2. release.yml runs: build → typecheck → tests → changesets publish
 #      (creates the GitHub Release as its final step).
 #   3. GitHub emits release:published.
-#   4. This workflow fires. The action reads context.payload.release,
-#      sanitises + signs + dispatches to bluesky/mastodon/discord.
+#   4. This workflow fires. The reusable workflow parses the release
+#      payload, sanitises + signs each cassette, and dispatches to
+#      bluesky/mastodon/discord.
 #
 # Missing platform secrets cause silent per-platform skips inside the
-# action (see action.yml + dispatch.ts in sizl-broadcast). Add secrets
-# via `gh secret set` as they become available; no workflow change
-# needed to enable a new platform once its secret is bound.
+# CLI (see broadcast-reusable.yml on sizls/broadcast-action). Add
+# secrets via `gh secret set` as they become available; no workflow
+# change needed to enable a new platform once its secret is bound.
 
 on:
   release:
     types: [published]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
-
 jobs:
   broadcast:
-    name: Broadcast release to social
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Broadcast
-        uses: sizls/broadcast-action@5c0bb22808a2e4fee51f8529cf8e498961fe5e93 # v0.11.2
-        with:
-          platforms: bluesky,mastodon,discord
-          config-path: .sizl/broadcast.config.json
-        env:
-          # SaaS path. The Worker holds the signing key and signs each
-          # cassette server-side under the tenant's managed keypair.
-          # The receipt URL returned in the action output is the public
-          # verification surface at broadcast.sizls.com/r/<token>.
-          BROADCAST_API_KEY: ${{ secrets.BROADCAST_API_KEY }}
-          # Platform secrets — provision via `gh secret set`. Missing
-          # entries cause the corresponding adapter to silently skip.
-          # Bluesky bearer format is `identifier:appPassword` (single
-          # string, colon-separated). Mastodon needs an OAuth app
-          # token with write:statuses. Discord takes the webhook URL
-          # directly, no OAuth flow.
-          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
-          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    # Reusable workflow SHA pin. The reusable-workflow file lands on
+    # sizls/broadcast-action when broadcast-action@v0.11.3 (or later)
+    # mirror-publishes — v0.11.2 predates the reusable-workflow arc.
+    # This pin is a placeholder that MUST be bumped to a v0.11.3+
+    # commit SHA on sizls/broadcast-action before this workflow can
+    # be merged.
+    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@REPLACE_WITH_V0_11_3_SHA
+    with:
+      platforms: bluesky,mastodon,discord
+      config-path: .sizl/broadcast.config.json
+      cli-version: "0.1"
+    secrets: inherit
