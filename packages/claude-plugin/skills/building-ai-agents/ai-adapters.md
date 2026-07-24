@@ -74,6 +74,27 @@ const proxiedRunner = createAnthropicRunner({
 });
 ```
 
+### Prompt Caching (Anthropic)
+
+Opt in with `promptCaching: "automatic"` to add a `cache_control` breakpoint on the agent's instructions. Anthropic caches that stable system prefix so repeat calls that share it read from cache (~0.1x input cost) instead of reprocessing it; the variable message suffix stays uncached. Off by default (bare-string system, unchanged prior behavior), non-breaking, and no beta header is required on `anthropic-version: 2023-06-01`. Supported on the non-streaming `createAnthropicRunner` (streaming is a follow-up).
+
+```typescript
+const runner = createAnthropicRunner({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  promptCaching: "automatic",
+});
+const result = await runner(agent, prompt);
+
+// Cache usage is surfaced on tokenUsage – present only when caching is active:
+const { cacheReadTokens = 0, cacheCreationTokens = 0 } = result.tokenUsage;
+// cacheCreationTokens – tokens written to cache on the first call (~1.25x cost)
+// cacheReadTokens     – tokens served from cache on repeat calls (~0.1x cost)
+```
+
+`inputTokens` remains the uncached remainder; the cache fields are separate and additive, and `totalTokens` includes all four (input + output + cache-read + cache-creation).
+
+**Minimum cacheable prefix (the #1 support gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; ~1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, 4096 on Opus & Haiku-4.5. No error is raised: caching simply doesn't happen and `cacheReadTokens` stays `0` on repeat calls (that `0` is the diagnostic). Since Directive caches `agent.instructions`, short instructions commonly fall below the threshold. The `ephemeral` breakpoint also carries a 5-minute default TTL &ndash; a prefix not re-read within that window is evicted. (Cost note: `withBudget`/`estimateCost` weight all tokens equally today, so cached runs are not yet repriced for the ~0.1x read / ~1.25x write rates &ndash; cache-aware pricing is a planned follow-up.)
+
 ## OpenAI Adapter
 
 ```typescript
@@ -147,7 +168,7 @@ console.log(result.tokenUsage.input_tokens); // undefined!
 const result = await runner.run(agent, prompt);
 console.log(result.tokenUsage.inputTokens);   // number
 console.log(result.tokenUsage.outputTokens);   // number
-console.log(result.totalTokens);               // inputTokens + outputTokens
+console.log(result.totalTokens);               // inputTokens + outputTokens (+ cache tokens when caching is active)
 ```
 
 All adapters normalize token usage to the same shape regardless of provider:
@@ -156,9 +177,14 @@ All adapters normalize token usage to the same shape regardless of provider:
 interface NormalizedTokenUsage {
   inputTokens: number;
   outputTokens: number;
+  // Populated by adapters with prompt caching active (e.g. Anthropic
+  // `promptCaching: "automatic"`); omitted otherwise.
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
 }
 
 // result.totalTokens = inputTokens + outputTokens
+//   + cacheReadTokens + cacheCreationTokens (cache fields are 0 when absent)
 ```
 
 ## Adapter Hooks
@@ -244,7 +270,7 @@ const orchestrator = createAgentOrchestrator({ runner });
 
 | Adapter | Import Path | Key Options |
 |---|---|---|
-| Anthropic | `@directive-run/ai/anthropic` | `apiKey`, `defaultModel`, `maxTokens` |
+| Anthropic | `@directive-run/ai/anthropic` | `apiKey`, `defaultModel`, `maxTokens`, `promptCaching` |
 | OpenAI | `@directive-run/ai/openai` | `apiKey`, `defaultModel`, `organization` |
 | Ollama | `@directive-run/ai/ollama` | `baseURL`, `defaultModel` |
 | Gemini | `@directive-run/ai/gemini` | `apiKey`, `defaultModel` |
