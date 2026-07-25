@@ -1,5 +1,13 @@
 # @directive-run/example-schema-patterns
 
+## 1.0.60
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @directive-run/core@1.24.1
+  - @directive-run/el@1.1.2
+
 ## 1.0.59
 
 ### Patch Changes

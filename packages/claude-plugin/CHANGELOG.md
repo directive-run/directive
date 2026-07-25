@@ -1,5 +1,23 @@
 # @directive-run/claude-plugin
 
+## 1.24.1
+
+### Patch Changes
+
+- [#97](https://github.com/directive-run/directive/pull/97) [`c217cd6`](https://github.com/directive-run/directive/commit/c217cd6fe2b91ab36d5d5a8d239957cf2621257b) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Regenerates the bundled Claude Code skill files so
+  `building-ai-agents/ai-adapters.md` and
+  `building-ai-agents/ai-agents-streaming.md` reflect the opt-in
+  prompt-caching feature that shipped in the previous release
+  (`@directive-run/ai` v1.5.0). Consumers pulling
+  `@directive-run/claude-plugin` see the updated `promptCaching`
+  documentation + cache-token usage examples inside their Claude
+  Code sidebar without needing to regenerate locally.
+
+  No API changes to the plugin itself; the skill files are the
+  only diff. `pnpm --filter @directive-run/claude-plugin
+build:skills` is deterministic against `packages/knowledge/` —
+  this release just runs that regeneration and commits its output.
+
 ## 1.24.0
 
 ## 1.23.1
