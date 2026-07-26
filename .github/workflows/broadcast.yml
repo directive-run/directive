@@ -26,6 +26,18 @@ name: Broadcast
 on:
   release:
     types: [published]
+  # Manual trigger for validation runs. Needed because
+  # `changesets/action` uses `GITHUB_TOKEN` to create GitHub Releases,
+  # and releases created with `GITHUB_TOKEN` do NOT fire downstream
+  # `release: [published]` events (GitHub's recursion protection). So
+  # a real Directive publish leaves this workflow dormant; running it
+  # via `gh workflow run Broadcast --ref main` after a release lets
+  # operators re-fire the dispatch against the latest tag. The
+  # permanent fix is either giving `changesets/action` a PAT or
+  # having release.yml call `gh workflow run Broadcast` explicitly
+  # after `createGithubReleases`; until one of those lands, this
+  # dispatch is how live-fires happen.
+  workflow_dispatch:
 
 jobs:
   broadcast:
