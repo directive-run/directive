@@ -8,5 +8,12 @@
   "mastodonInstance": "https://hachyderm.io",
   "attackerScrub": {
     "trustedHosts": ["github.com", "directive.run", "broadcast.sizls.com"]
+  },
+  "tierPolicy": {
+    "patch": "tier1.auto-post",
+    "minor": "tier1.auto-post",
+    "major": "tier1.auto-post",
+    "recap": "tier1.auto-post",
+    "manual": "tier1.auto-post"
   }
 }
