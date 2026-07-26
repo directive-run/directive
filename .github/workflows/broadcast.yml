@@ -50,7 +50,7 @@ jobs:
     # reflects a broadcast-action release that mirror-published this
     # file (release-action.yml on sizl-broadcast handles that on every
     # broadcast-action-v* tag push).
-    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@191459998516d5354e21ea4d9f0ff12626df29a9 # v0.11.5
+    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@4e36471eda0aafa1d8d20737481582addb1aef2a # v0.11.6
     with:
       platforms: bluesky,mastodon,discord
       config-path: .sizl/broadcast.config.json
