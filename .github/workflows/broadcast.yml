@@ -41,16 +41,19 @@ on:
 
 jobs:
   broadcast:
-    # Reusable workflow SHA pin. e2b1641 is the v0.11.4 tag on
-    # sizls/broadcast-action — the first release under the correctly
-    # named `@sizls/broadcast-cli` npm scope. v0.11.3 shipped as
-    # `@sizl/broadcast-cli` (typo, npm scope didn't exist); v0.11.4
-    # corrects the scope to `@sizls/*` — the actual Sizls npm org
-    # where every other Sizls package publishes. Every future SHA bump
-    # reflects a broadcast-action release that mirror-published this
-    # file (release-action.yml on sizl-broadcast handles that on every
-    # broadcast-action-v* tag push).
-    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@191459998516d5354e21ea4d9f0ff12626df29a9 # v0.11.5
+    # Reusable workflow SHA pin. 94c0e28 is the v0.11.7 tag on
+    # sizls/broadcast-action. Bump history:
+    #   v0.11.3 — @sizl scope typo (never worked on npm)
+    #   v0.11.4 — corrected scope to @sizls
+    #   v0.11.5 — dropped `cache: "npm"` from setup-node (pnpm callers)
+    #   v0.11.6 — dropped `--package-lock-only` from audit install
+    #   v0.11.7 — added --ignore-scripts (install-script supply-chain),
+    #             honest provenance comment, dispatch smoke-test notice,
+    #             timeout 300→480 on npx invocation
+    # Every future bump reflects a broadcast-action release that
+    # mirror-published this file (release-action.yml on sizl-broadcast
+    # handles that on every broadcast-action-v* tag push).
+    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@94c0e28686b2101fcf56cff04f1a446d32427fa0 # v0.11.7
     with:
       platforms: bluesky,mastodon,discord
       config-path: .sizl/broadcast.config.json
