@@ -40,6 +40,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  # TEMPORARY diagnostic: prove which side of the secret propagation
+  # chain is emptying the value. Prints only the character length of
+  # each secret at the caller's context. GitHub Actions doesn't
+  # redact numeric length output, so this shows whether the caller
+  # actually holds a non-empty value. Remove this job once the
+  # BLUESKY_APP_PASSWORD → @directive.run posting path is proven
+  # end-to-end and stable.
+  diagnose-secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Print length of every broadcast secret (values NOT printed)
+        env:
+          BROADCAST_API_KEY_LEN: ${{ secrets.BROADCAST_API_KEY }}
+          BLUESKY_LEN: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          MASTODON_LEN: ${{ secrets.MASTODON_TOKEN }}
+          DISCORD_LEN: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LINKEDIN_LEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          TWITTER_LEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+          FACEBOOK_LEN: ${{ secrets.FACEBOOK_PAGE_TOKEN }}
+          POSTS_INDEX_LEN: ${{ secrets.POSTS_INDEX_SECRET }}
+        run: |
+          echo "BROADCAST_API_KEY len: ${#BROADCAST_API_KEY_LEN}"
+          echo "BLUESKY_APP_PASSWORD len: ${#BLUESKY_LEN}"
+          echo "MASTODON_TOKEN len: ${#MASTODON_LEN}"
+          echo "DISCORD_WEBHOOK_URL len: ${#DISCORD_LEN}"
+          echo "LINKEDIN_ACCESS_TOKEN len: ${#LINKEDIN_LEN}"
+          echo "TWITTER_BEARER_TOKEN len: ${#TWITTER_LEN}"
+          echo "FACEBOOK_PAGE_TOKEN len: ${#FACEBOOK_LEN}"
+          echo "POSTS_INDEX_SECRET len: ${#POSTS_INDEX_LEN}"
+
   broadcast:
     # Reusable workflow SHA pin. dd8ee22 is the v0.11.9 tag on
     # sizls/broadcast-action. Bump history:
