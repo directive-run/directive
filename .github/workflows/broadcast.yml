@@ -41,7 +41,7 @@ on:
 
 jobs:
   broadcast:
-    # Reusable workflow SHA pin. 2e16fc2 is the v0.11.8 tag on
+    # Reusable workflow SHA pin. dd8ee22 is the v0.11.9 tag on
     # sizls/broadcast-action. Bump history:
     #   v0.11.3 — @sizl scope typo (never worked on npm)
     #   v0.11.4 — corrected scope to @sizls
@@ -51,18 +51,32 @@ jobs:
     #             honest provenance comment, dispatch smoke-test notice,
     #             timeout 300→480 on npx invocation
     #   v0.11.8 — cli-version default 0.1 → 0.2 to track the new
-    #             adapter set (linkedin/twitter/facebook/instagram)
+    #             adapter set. Silently non-functional: the reusable
+    #             workflow forwarded only the original three tokens
+    #             (bluesky/mastodon/discord), and the CLI's four new
+    #             adapters shipped with enabled: false so the
+    #             broadcaster filtered them out even when built.
+    #   v0.11.9 — corrects both. Declares + forwards
+    #             LINKEDIN_ACCESS_TOKEN, TWITTER_BEARER_TOKEN,
+    #             FACEBOOK_PAGE_TOKEN through the workflow_call
+    #             surface. Pairs with @sizls/broadcast-cli@0.2.1
+    #             (adapters actually enabled, cost-breaker scales,
+    #             tryAdd throw-safe, wire-format fixes across
+    #             LinkedIn / X / Facebook). Instagram is deferred
+    #             to v0.3.
     # Every future bump reflects a broadcast-action release that
     # mirror-published this file (release-action.yml on sizl-broadcast
     # handles that on every broadcast-action-v* tag push).
-    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@2e16fc218ebf4b72595b87d758d242d767f6ac70 # v0.11.8
+    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@dd8ee22952305ab41950446dad6f8239c3ec33ed # v0.11.9
     with:
-      # Full 7-adapter launch set (CLI v0.2.0+). Each platform
-      # skips its adapter silently if the corresponding env var
-      # is unbound in this repo's secrets — see
-      # `docs/broadcast-secrets.md` (or the checked-in
-      # broadcast-secrets doc) for the setup checklist.
-      platforms: bluesky,mastodon,discord,linkedin,twitter,facebook,instagram
+      # Six-adapter launch set (CLI v0.2.1+). Instagram was in the
+      # v0.2.0 launch set but came out in v0.2.1 pending a media
+      # pipeline (release-payload path has no image source, adapter's
+      # pinned Graph API v18.0 sunsets 2025-09, permalink shape wrong).
+      # Each platform skips its adapter silently if the corresponding
+      # env var is unbound in this repo's secrets — see
+      # `docs/broadcast-secrets.md` for the setup checklist.
+      platforms: bluesky,mastodon,discord,linkedin,twitter,facebook
       config-path: .sizl/broadcast.config.json
       cli-version: "0.2"
     secrets: inherit
