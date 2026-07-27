@@ -79,4 +79,22 @@ jobs:
       platforms: bluesky,mastodon,discord,linkedin,twitter,facebook
       config-path: .sizl/broadcast.config.json
       cli-version: "0.2"
-    secrets: inherit
+    # Named passthrough instead of `secrets: inherit`. The `inherit`
+    # form silently fails to propagate to a reusable workflow in a
+    # different organization — the callee's `${{ secrets.NAME }}`
+    # evaluates to empty string, the CLI reports every platform as
+    # "no secret bound," and the run goes green with zero posts.
+    # Explicit named passing forces the caller-side lookup and hands
+    # the resolved value to the callee. Add a line here whenever a
+    # new secret enters the launch set on the sizls/broadcast-action
+    # side (see `on.workflow_call.secrets:` in the reusable workflow
+    # for the current expected set).
+    secrets:
+      BROADCAST_API_KEY: ${{ secrets.BROADCAST_API_KEY }}
+      BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+      MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+      TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
+      FACEBOOK_PAGE_TOKEN: ${{ secrets.FACEBOOK_PAGE_TOKEN }}
+      POSTS_INDEX_SECRET: ${{ secrets.POSTS_INDEX_SECRET }}
