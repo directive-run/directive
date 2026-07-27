@@ -41,7 +41,7 @@ on:
 
 jobs:
   broadcast:
-    # Reusable workflow SHA pin. 94c0e28 is the v0.11.7 tag on
+    # Reusable workflow SHA pin. 2e16fc2 is the v0.11.8 tag on
     # sizls/broadcast-action. Bump history:
     #   v0.11.3 — @sizl scope typo (never worked on npm)
     #   v0.11.4 — corrected scope to @sizls
@@ -50,12 +50,19 @@ jobs:
     #   v0.11.7 — added --ignore-scripts (install-script supply-chain),
     #             honest provenance comment, dispatch smoke-test notice,
     #             timeout 300→480 on npx invocation
+    #   v0.11.8 — cli-version default 0.1 → 0.2 to track the new
+    #             adapter set (linkedin/twitter/facebook/instagram)
     # Every future bump reflects a broadcast-action release that
     # mirror-published this file (release-action.yml on sizl-broadcast
     # handles that on every broadcast-action-v* tag push).
-    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@94c0e28686b2101fcf56cff04f1a446d32427fa0 # v0.11.7
+    uses: sizls/broadcast-action/.github/workflows/broadcast-reusable.yml@2e16fc218ebf4b72595b87d758d242d767f6ac70 # v0.11.8
     with:
-      platforms: bluesky,mastodon,discord
+      # Full 7-adapter launch set (CLI v0.2.0+). Each platform
+      # skips its adapter silently if the corresponding env var
+      # is unbound in this repo's secrets — see
+      # `docs/broadcast-secrets.md` (or the checked-in
+      # broadcast-secrets doc) for the setup checklist.
+      platforms: bluesky,mastodon,discord,linkedin,twitter,facebook,instagram
       config-path: .sizl/broadcast.config.json
-      cli-version: "0.1"
+      cli-version: "0.2"
     secrets: inherit
