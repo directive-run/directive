@@ -33,7 +33,7 @@ The primitives weren't blocking anything. Domain code was on Directive; new feat
 
 But the primitives were blocking one thing: the claim. `.claude/CLAUDE.md` said the migration was complete. It wasn't. The gap wasn't invisible — it was documented in `docs/IDEAS.md` — it just wasn't a priority until it was. This is what "migration complete" actually looks like in a solo-developer codebase: a bookkeeping catch-up long after the loud work is done.
 
-The trigger was a doc-audit pass that pulled the `IDEAS.md` line to the top of the queue. From flag to ported commit: about a week of clock time. From the "official" migration-complete claim to actual completeness: 88 days.
+The trigger was a doc-audit pass that pulled the `IDEAS.md` line to the top of the queue. From flag to ported commit: about a week of clock time. From the "official" migration-complete claim to actual completeness: 90 days.
 
 Worth writing down. Worth not pretending otherwise.
 
@@ -187,7 +187,7 @@ Three months is a long time for "the migration is complete" and "the migration i
 
 The mechanism is: **domain migrations are visible; primitive migrations aren't.** When you port a game loop, a product surface changes runtime. Somebody notices. When you port a form engine, four signup pages keep behaving identically and nobody notices. The gate that closes a domain migration — "the surface works, ship it" — has no equivalent for a primitive. The primitive keeps working on either substrate. The migration is complete when someone decides to stop.
 
-The bookkeeping catch-up that closes this gap doesn't come from a sprint plan. It comes from a documentation audit that trips over a stale claim. `docs/IDEAS.md` line 2907 was that trip. From flag to closed: about a week. From the original "complete" claim to actual completeness: 88 days.
+The bookkeeping catch-up that closes this gap doesn't come from a sprint plan. It comes from a documentation audit that trips over a stale claim. `docs/IDEAS.md` line 2907 was that trip. From flag to closed: about a week. From the original "complete" claim to actual completeness: 90 days.
 
 The lesson isn't "audit your migration claims more aggressively." The lesson is: the shape of a primitive migration doesn't fit the shape of a domain migration. Neither the estimates nor the gates transfer. If you have both to do, the domain work will ship first because it's louder, and the primitive work will be there when you're ready to catch up.
 
