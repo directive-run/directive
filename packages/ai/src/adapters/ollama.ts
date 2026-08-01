@@ -15,6 +15,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
+import type { TokenPricing } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -22,6 +23,7 @@ import {
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
+  toTokenPricingTable,
 } from "./shared.js";
 
 // ============================================================================
@@ -62,6 +64,32 @@ export const OLLAMA_PRICING: Record<string, { input: number; output: number }> =
     "deepseek-coder": { input: 0, output: 0 },
     "command-r": { input: 0, output: 0 },
   };
+
+/**
+ * The same Ollama rates in {@link TokenPricing} shape, for passing straight to
+ * `withBudget`, `withProviderRouting`, and anything else typed against it.
+ *
+ * Identical numbers to {@link OLLAMA_PRICING} - both are dollars per million tokens.
+ * Only the field names differ. Prefer this one when wiring budgets; prefer
+ * `OLLAMA_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
+ *
+ * Ollama runs locally, so every rate is 0 - the table exists so budget
+ * wiring is identical whether you point at a local model or a paid API.
+ *
+ * @example
+ * ```typescript
+ * import { withBudget } from '@directive-run/ai';
+ * import { OLLAMA_TOKEN_PRICING } from '@directive-run/ai/ollama';
+ *
+ * const pricing = OLLAMA_TOKEN_PRICING["llama3"];
+ * const guarded = withBudget(runner, {
+ *   pricing,
+ *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ * });
+ * ```
+ */
+export const OLLAMA_TOKEN_PRICING: Record<string, TokenPricing> =
+  toTokenPricingTable(OLLAMA_PRICING);
 
 // ============================================================================
 // Ollama Runner

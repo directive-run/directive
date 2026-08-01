@@ -295,3 +295,93 @@ describe("BudgetRunner getSpent", () => {
     expect(runner.getSpent("day")).toBe(0);
   });
 });
+
+// ============================================================================
+// Pricing shape validation
+// ============================================================================
+
+describe("withBudget pricing validation", () => {
+  // Regression pin. Provider tables export `{ input, output }`; TokenPricing
+  // wants `{ inputPerMillion, outputPerMillion }`. Same units, different
+  // names — so a mismatched object used to sail through, every cost came out
+  // NaN, every `estimated > remaining` compared false, and the budget never
+  // tripped. A budget guard that fails open is worse than no guard: spend was
+  // unbounded exactly when the caller believed it was capped.
+  const PROVIDER_TABLE_ENTRY = { input: 3, output: 15 };
+
+  it("rejects a provider pricing table passed as config pricing", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: PROVIDER_TABLE_ENTRY as never,
+      }),
+    ).toThrow("pricing.inputPerMillion must be a finite number");
+  });
+
+  it("names the fix when it sees a provider pricing table", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: PROVIDER_TABLE_ENTRY as never,
+      }),
+    ).toThrow(/\*_TOKEN_PRICING/);
+  });
+
+  it("rejects a provider pricing table passed as budget-window pricing", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        budgets: [
+          {
+            window: "day",
+            maxCost: 10,
+            pricing: PROVIDER_TABLE_ENTRY as never,
+          },
+        ],
+      }),
+    ).toThrow("budgets[day].pricing.inputPerMillion must be a finite number");
+  });
+
+  it("rejects pricing missing outputPerMillion", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: { inputPerMillion: 3 } as never,
+      }),
+    ).toThrow("pricing.outputPerMillion must be a finite number");
+  });
+
+  it("rejects NaN rates", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: { inputPerMillion: Number.NaN, outputPerMillion: 15 },
+      }),
+    ).toThrow("pricing.inputPerMillion must be a finite number");
+  });
+
+  it("accepts a well-formed TokenPricing", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: PRICING,
+        budgets: [{ window: "day", maxCost: 10, pricing: PRICING }],
+      }),
+    ).not.toThrow();
+  });
+
+  it("accepts zero rates (local models bill nothing)", () => {
+    const inner = makeRunner();
+    expect(() =>
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+      }),
+    ).not.toThrow();
+  });
+});

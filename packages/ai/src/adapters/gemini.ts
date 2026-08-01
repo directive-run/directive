@@ -13,6 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
+import type { TokenPricing } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -23,6 +24,7 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
+  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -53,6 +55,29 @@ export const GEMINI_PRICING: Record<string, { input: number; output: number }> =
     "gemini-2.0-flash": { input: 0.1, output: 0.4 },
     "gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
   };
+
+/**
+ * The same Gemini rates in {@link TokenPricing} shape, for passing straight to
+ * `withBudget`, `withProviderRouting`, and anything else typed against it.
+ *
+ * Identical numbers to {@link GEMINI_PRICING} - both are dollars per million tokens.
+ * Only the field names differ. Prefer this one when wiring budgets; prefer
+ * `GEMINI_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
+ *
+ * @example
+ * ```typescript
+ * import { withBudget } from '@directive-run/ai';
+ * import { GEMINI_TOKEN_PRICING } from '@directive-run/ai/gemini';
+ *
+ * const pricing = GEMINI_TOKEN_PRICING["gemini-2.0-flash"];
+ * const guarded = withBudget(runner, {
+ *   pricing,
+ *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ * });
+ * ```
+ */
+export const GEMINI_TOKEN_PRICING: Record<string, TokenPricing> =
+  toTokenPricingTable(GEMINI_PRICING);
 
 // ============================================================================
 // Gemini Runner

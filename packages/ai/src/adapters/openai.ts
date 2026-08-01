@@ -14,6 +14,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
+import type { TokenPricing } from "../budget.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
@@ -25,6 +26,7 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
+  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -60,6 +62,29 @@ export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
     o3: { input: 10, output: 40 },
     "o3-mini": { input: 1.1, output: 4.4 },
   };
+
+/**
+ * The same OpenAI rates in {@link TokenPricing} shape, for passing straight to
+ * `withBudget`, `withProviderRouting`, and anything else typed against it.
+ *
+ * Identical numbers to {@link OPENAI_PRICING} - both are dollars per million tokens.
+ * Only the field names differ. Prefer this one when wiring budgets; prefer
+ * `OPENAI_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
+ *
+ * @example
+ * ```typescript
+ * import { withBudget } from '@directive-run/ai';
+ * import { OPENAI_TOKEN_PRICING } from '@directive-run/ai/openai';
+ *
+ * const pricing = OPENAI_TOKEN_PRICING["gpt-4o"];
+ * const guarded = withBudget(runner, {
+ *   pricing,
+ *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ * });
+ * ```
+ */
+export const OPENAI_TOKEN_PRICING: Record<string, TokenPricing> =
+  toTokenPricingTable(OPENAI_PRICING);
 
 // ============================================================================
 // OpenAI Runner

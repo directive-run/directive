@@ -5,7 +5,37 @@
  * building logic used across Anthropic, OpenAI, and Gemini streaming runners.
  */
 
+import type { TokenPricing } from "../budget.js";
 import type { AdapterHooks, AgentLike, Message, TokenUsage } from "../types.js";
+
+// ============================================================================
+// Pricing
+// ============================================================================
+
+/**
+ * Convert a provider pricing table into {@link TokenPricing} shape.
+ *
+ * Every adapter publishes rates twice: once as `{ input, output }` for
+ * `estimateCost`, which takes bare per-million rates, and once as
+ * `{ inputPerMillion, outputPerMillion }` for `withBudget` and
+ * `withProviderRouting`, which are typed against `TokenPricing`. The numbers
+ * are identical — both are dollars per million tokens — so this derives the
+ * second table from the first rather than restating every rate and letting
+ * the two drift.
+ */
+export function toTokenPricingTable(
+  table: Record<string, { input: number; output: number }>,
+): Record<string, TokenPricing> {
+  const converted: Record<string, TokenPricing> = {};
+  for (const [model, rates] of Object.entries(table)) {
+    converted[model] = {
+      inputPerMillion: rates.input,
+      outputPerMillion: rates.output,
+    };
+  }
+
+  return converted;
+}
 
 // ============================================================================
 // HTTP Error Handling

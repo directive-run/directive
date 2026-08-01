@@ -213,6 +213,41 @@ function estimateCallCost(
   );
 }
 
+/**
+ * Reject a pricing object that would silently produce `NaN` cost.
+ *
+ * A budget guard that fails open is worse than no guard: if either rate is
+ * missing, every cost is `NaN`, every `estimated > remaining` comparison is
+ * `false`, and the budget never trips — so spend is unbounded precisely when
+ * the caller believed it was capped.
+ *
+ * The most common cause is passing a provider pricing table straight in.
+ * Those export `{ input, output }`; this wants `{ inputPerMillion,
+ * outputPerMillion }`. Same units, different field names — so the mistake
+ * type-errors only when the object is typed, and passes silently when it
+ * arrives as `any` or through an index signature. The error message names
+ * the fix rather than describing the symptom.
+ */
+function validateTokenPricing(pricing: TokenPricing, label: string): void {
+  const legacy = pricing as unknown as { input?: unknown; output?: unknown };
+  const looksLikeProviderTable =
+    typeof legacy.input === "number" && typeof legacy.output === "number";
+
+  for (const field of ["inputPerMillion", "outputPerMillion"] as const) {
+    if (Number.isFinite(pricing?.[field])) {
+      continue;
+    }
+
+    const hint = looksLikeProviderTable
+      ? " Received { input, output } — that is a provider pricing table. Use the matching *_TOKEN_PRICING export (e.g. ANTHROPIC_TOKEN_PRICING) which is already in TokenPricing shape."
+      : "";
+
+    throw new Error(
+      `[Directive] withBudget: ${label}.${field} must be a finite number.${hint}`,
+    );
+  }
+}
+
 // ============================================================================
 // Wrapper
 // ============================================================================
@@ -272,12 +307,16 @@ export function withBudget(
       "[Directive] withBudget: maxCostPerCall has no effect without pricing. Provide a pricing config to enable per-call cost estimation.",
     );
   }
+  if (pricing) {
+    validateTokenPricing(pricing, "pricing");
+  }
   for (const budget of budgets) {
     if (!Number.isFinite(budget.maxCost) || budget.maxCost < 0) {
       throw new Error(
         `[Directive] withBudget: budgets[${budget.window}].maxCost must be a non-negative finite number.`,
       );
     }
+    validateTokenPricing(budget.pricing, `budgets[${budget.window}].pricing`);
   }
 
   // Per-window ledgers to avoid double-counting

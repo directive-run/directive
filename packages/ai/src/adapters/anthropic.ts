@@ -13,6 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
+import type { TokenPricing } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -23,6 +24,7 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
+  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -56,6 +58,30 @@ export const ANTHROPIC_PRICING: Record<
   "claude-haiku-3-5-20241022": { input: 0.8, output: 4 },
   "claude-opus-4-20250514": { input: 15, output: 75 },
 };
+
+/**
+ * The same Anthropic rates in {@link TokenPricing} shape, for passing straight
+ * to `withBudget`, `withProviderRouting`, and anything else typed against it.
+ *
+ * Identical numbers to {@link ANTHROPIC_PRICING} — both are dollars per million
+ * tokens. Only the field names differ. Prefer this one when wiring budgets;
+ * prefer `ANTHROPIC_PRICING` when calling `estimateCost`, which takes a bare
+ * per-million rate.
+ *
+ * @example
+ * ```typescript
+ * import { withBudget } from '@directive-run/ai';
+ * import { ANTHROPIC_TOKEN_PRICING } from '@directive-run/ai/anthropic';
+ *
+ * const pricing = ANTHROPIC_TOKEN_PRICING["claude-sonnet-4-5-20250929"];
+ * const guarded = withBudget(runner, {
+ *   pricing,
+ *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ * });
+ * ```
+ */
+export const ANTHROPIC_TOKEN_PRICING: Record<string, TokenPricing> =
+  toTokenPricingTable(ANTHROPIC_PRICING);
 
 // ============================================================================
 // Anthropic Runner

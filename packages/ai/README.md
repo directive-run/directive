@@ -55,7 +55,8 @@ Adapters are thin wrappers around each provider's HTTP API. No SDK dependencies 
 | API key required | Yes | Yes | No | Yes |
 | Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; | `createGeminiStreamingRunner` |
 | Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; | &ndash; |
-| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | &ndash; | `GEMINI_PRICING` |
+| Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | `OLLAMA_PRICING` | `GEMINI_PRICING` |
+| Budget-shaped pricing | `OPENAI_TOKEN_PRICING` | `ANTHROPIC_TOKEN_PRICING` | `OLLAMA_TOKEN_PRICING` | `GEMINI_TOKEN_PRICING` |
 | Prompt caching | &ndash; | `promptCaching: "automatic"` | &ndash; | &ndash; |
 | Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; | &ndash; |
 
@@ -75,6 +76,30 @@ const cost =
   estimateCost(inputTokens, OPENAI_PRICING["gpt-4o"].input) +
   estimateCost(outputTokens, OPENAI_PRICING["gpt-4o"].output);
 ```
+
+### Pricing constants come in two shapes
+
+`estimateCost` takes a bare per-million rate, so it pairs with `*_PRICING`
+(`{ input, output }`). `withBudget` and `withProviderRouting` are typed against
+`TokenPricing`, so they pair with `*_TOKEN_PRICING`
+(`{ inputPerMillion, outputPerMillion }`). Same numbers, different field names —
+pick the one that matches the surface you are calling:
+
+```typescript
+import { withBudget } from "@directive-run/ai";
+import { ANTHROPIC_TOKEN_PRICING } from "@directive-run/ai/anthropic";
+
+const pricing = ANTHROPIC_TOKEN_PRICING["claude-sonnet-4-5-20250929"];
+const guarded = withBudget(runner, {
+  pricing,
+  budgets: [{ window: "day", maxCost: 10, pricing }],
+});
+```
+
+Passing a `*_PRICING` entry where `TokenPricing` is expected throws at
+construction with a message naming the fix. It used to produce `NaN` costs that
+silently disabled the budget, which is the worst possible failure for a spend
+guard.
 
 ## Prompt Caching (Anthropic)
 
