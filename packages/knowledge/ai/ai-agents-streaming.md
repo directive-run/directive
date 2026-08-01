@@ -11,10 +11,11 @@ Need the complete result?
 ├── Yes                          → orchestrator.run(agent, prompt) → Promise<RunResult>
 └── No, need incremental output
     ├── Async-iterator stream    → orchestrator.runStream(agent, prompt) → { stream, result, abort }
+    ├── Real per-token deltas    → add `streamingRunner` to the orchestrator options
     ├── Wrap a base runner       → createStreamingRunner(baseRunner, opts) → StreamRunner
     └── Server-Sent Events to HTTP → createSSETransport(config) → { toResponse, toStream }
 
-Backpressure concern?
+Backpressure concern? (StreamRunOptions only — runStream ignores these)
 ├── Consumer is slow             → backpressure: "buffer" (default)
 ├── Need every token             → backpressure: "block"
 └── Real-time, can drop          → backpressure: "drop"
@@ -116,12 +117,43 @@ const final = await result; // RunResult<T>
 abort();
 ```
 
-## Backpressure strategies
+## Real per-token streaming: `streamingRunner`
 
-Configure how the stream behaves when the consumer can't keep up. Pass via `runStream`'s `options` (orchestrator-side) or via the `StreamRunOptions` if you're calling a `StreamRunner` directly.
+By default the orchestrator only has a non-streaming `runner`, so `runStream` synthesizes one `token` chunk per completed assistant message — the whole response arrives as a single chunk. To get true per-delta tokens, also pass a `streamingRunner` (a `StreamingCallbackRunner`, the callback-based adapter shape). Guardrails, retry, approval, breakpoints, and the facts bridge all stay in effect — the streaming runner is only substituted inside the streaming path.
 
 ```typescript
-const { stream, result } = orchestrator.runStream(agent, "Generate a long report", {
+import { createAgentOrchestrator } from "@directive-run/ai";
+import { createAnthropicRunner, createAnthropicStreamingRunner } from "@directive-run/ai/anthropic";
+
+const orchestrator = createAgentOrchestrator({
+  runner: createAnthropicRunner({ apiKey }),            // used by run() and every non-streaming path
+  streamingRunner: createAnthropicStreamingRunner({ apiKey }), // used by runStream()
+  guardrails: { output: [piiGuardrail] },
+});
+
+const { stream, result } = orchestrator.runStream(agent, "Write a report");
+
+for await (const chunk of stream) {
+  if (chunk.type === "token") {
+    process.stdout.write(chunk.data); // one delta at a time, tokenCount increments by 1
+  }
+}
+```
+
+The same option exists on `createMultiAgentOrchestrator` and applies to `runAgentStream`. It is orchestrator-level, matching `runner` — there is no per-agent form, since a per-agent streaming runner would stream one provider while the same agent's `runAgent` calls hit another.
+
+When `streamingRunner` is set, the trailing whole-message callback still produces a `message` chunk and still updates conversation facts, but does NOT produce a second `token` chunk — otherwise the full text would land on the stream twice.
+
+To adapt a callback runner yourself (outside an orchestrator), use `streamingRunnerToAgentRunner(streamingRunner, { onToken, onToolStart, onToolEnd })` — it returns a plain `AgentRunner` and forwards `onMessage`/`signal` from the call's `RunOptions`.
+
+## Backpressure strategies
+
+Backpressure is configured on `StreamRunOptions` — the options accepted by a `StreamRunner` built with `createStreamingRunner`. `orchestrator.runStream` accepts only `{ signal, liveContext }`; passing `backpressure` or `bufferSize` there does nothing.
+
+```typescript
+const streamRunner = createStreamingRunner(callbackBased);
+
+const { stream, result } = streamRunner(agent, "Generate a long report", {
   signal: abortController.signal,
   backpressure: "buffer",   // default — buffer all tokens
   // backpressure: "block"   // pause generation until consumer catches up

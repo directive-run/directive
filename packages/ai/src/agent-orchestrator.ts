@@ -24,6 +24,7 @@ import type { CircuitBreaker } from "@directive-run/core/plugins";
 import type { AgentMemory } from "./memory.js";
 import { formatSystemMeta } from "./meta-context.js";
 import type { StreamChunk as StreamChunkBase } from "./streaming.js";
+import { streamingRunnerToAgentRunner } from "./streaming.js";
 
 import type {
   AgentLike,
@@ -44,6 +45,7 @@ import type {
   RunOptions,
   RunResult,
   SelfHealingConfig,
+  StreamingCallbackRunner,
 } from "./types.js";
 
 import {
@@ -128,6 +130,27 @@ let deprecatedModeWarned = false;
 export interface OrchestratorOptions<F extends Record<string, unknown>> {
   /** Function to run an agent */
   runner: AgentRunner;
+  /**
+   * Callback-based streaming runner used by `runStream` so token chunks carry
+   * real provider deltas instead of one chunk per completed message. `run` and
+   * every non-streaming path keep using `runner`.
+   *
+   * Guardrails, retry, approval, and the facts bridge stay in effect.
+   *
+   * @example
+   * ```typescript
+   * const orchestrator = createAgentOrchestrator({
+   *   runner: createAnthropicRunner({ apiKey }),
+   *   streamingRunner: createAnthropicStreamingRunner({ apiKey }),
+   * });
+   *
+   * const { stream } = orchestrator.runStream(agent, "Write a haiku");
+   * for await (const chunk of stream) {
+   *   if (chunk.type === "token") process.stdout.write(chunk.data);
+   * }
+   * ```
+   */
+  streamingRunner?: StreamingCallbackRunner;
   /**
    * Schema for custom facts tracked in the orchestrator's Directive System.
    * @example
@@ -573,6 +596,7 @@ export function createAgentOrchestrator<
 >(options: OrchestratorOptions<F>): AgentOrchestrator<F> {
   const {
     runner,
+    streamingRunner,
     factsSchema = {},
     init,
     constraints = {},
@@ -628,6 +652,25 @@ export function createAgentOrchestrator<
         "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
         "  - Provide an onApprovalRequest callback to handle approvals programmatically",
     );
+  }
+
+  // A StreamingCallbackRunner's callbacks are synchronous and return void, so
+  // the bridge cannot drive `RunOptions.onToolCall` — the hook that runs
+  // tool-call guardrails and blocks for approval. Both would silently stop
+  // firing on the streaming path while still appearing configured, which for
+  // a gate is the worst possible failure. Refuse the combination instead.
+  if (streamingRunner) {
+    const gatesToolCalls =
+      (guardrails.toolCall?.length ?? 0) > 0 || !autoApproveToolCalls;
+    if (gatesToolCalls) {
+      throw new Error(
+        "[Directive] Invalid streaming configuration: streamingRunner cannot be combined with tool-call gating. " +
+          "Callback-runner hooks are synchronous, so tool-call guardrails and approval prompts cannot run on the streaming path " +
+          "and would silently pass every tool call. Either:\n" +
+          "  - Drop streamingRunner and stream at message granularity, keeping the gates\n" +
+          "  - Remove guardrails.toolCall and leave autoApproveToolCalls at its default to opt into real token streaming",
+      );
+    }
   }
 
   /** Safe hook caller — user-provided hooks must never crash the orchestrator */
@@ -1927,6 +1970,35 @@ export function createAgentOrchestrator<
         waiters.length = 0;
       };
 
+      // With a callback runner the provider emits both per-token deltas and a
+      // final whole-message callback. Only one of the two may feed token chunks
+      // and the accumulator, or the output lands on the stream twice.
+      const streamRunner = streamingRunner
+        ? streamingRunnerToAgentRunner(streamingRunner, {
+            onToken: (token) => {
+              tokenCount++;
+              accumulatedOutput += token;
+              if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
+                accumulatedOutput = accumulatedOutput.slice(
+                  -MAX_ACCUMULATED_OUTPUT,
+                );
+              }
+              pushChunk({ type: "token", data: token, tokenCount });
+            },
+            onToolStart: (tool, toolCallId, args) => {
+              pushChunk({
+                type: "tool_start",
+                tool,
+                toolCallId,
+                arguments: args,
+              });
+            },
+            onToolEnd: (tool, toolCallId, result) => {
+              pushChunk({ type: "tool_end", tool, toolCallId, result });
+            },
+          })
+        : undefined;
+
       // RFC 0005: wire liveContext subscriptions BEFORE the resultPromise
       // IIFE constructs (which starts running synchronously). Even though
       // the IIFE's sync prefix today does no fact-mutating work before
@@ -2131,7 +2203,7 @@ export function createAgentOrchestrator<
 
           // Run agent with streaming callbacks and retry support
           const result = await executeAgentWithRetry<T>(
-            runner,
+            streamRunner ?? runner,
             agent,
             processedInput,
             {
@@ -2145,7 +2217,11 @@ export function createAgentOrchestrator<
                 pushChunk({ type: "message", message });
 
                 // Approximate token counting from content
-                if (message.role === "assistant" && message.content) {
+                if (
+                  !streamRunner &&
+                  message.role === "assistant" &&
+                  message.content
+                ) {
                   const newTokens = Math.ceil(message.content.length / 4);
                   tokenCount += newTokens;
                   accumulatedOutput += message.content;

@@ -253,6 +253,8 @@ export {
 // Streaming utilities
 export {
   createStreamingRunner,
+  streamingRunnerToAgentRunner,
+  type StreamingBridgeCallbacks,
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
   createToxicityStreamingGuardrail,
