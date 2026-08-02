@@ -1326,6 +1326,10 @@
   ```ts
   function toAIContext(system: {
   ```
+- `toTokenPricingTable` — Widen a table of bare `{ input, output }` rates into {@link ModelPricing},
+  ```ts
+  function toTokenPricingTable(table: Record<string, BareTokenRates>): Record<string, ModelPricing>
+  ```
 - `validateBaseURL` — Validate that a base URL uses the `http:` or `https:` protocol.
   ```ts
   function validateBaseURL(baseURL: string): void
@@ -1535,6 +1539,10 @@
 - `AuditPluginConfig` — Audit plugin configuration
   ```ts
   export interface AuditPluginConfig {
+  ```
+- `BareTokenRates` — A bare per-million rate set, the input shape of {@link toTokenPricingTable}.
+  ```ts
+  export interface BareTokenRates {
   ```
 - `BatchedEmbedder` — Batched embedder instance with destroy capability
   ```ts
@@ -2048,6 +2056,10 @@
   ```ts
   interface MetricDataPoint {
   ```
+- `ModelPricing` — A pricing entry that carries both field spellings for the same rates.
+  ```ts
+  export interface ModelPricing extends TokenPricing {
+  ```
 - `ModelRule` — A single model selection rule. First match wins.
   ```ts
   export interface ModelRule {
@@ -2484,7 +2496,7 @@
   ```ts
   export interface TokenChunk {
   ```
-- `TokenPricing` — Token pricing for a specific model or provider.
+- `TokenPricing` — Per-million-token rates for a specific model or provider.
   ```ts
   export interface TokenPricing {
   ```
@@ -2547,7 +2559,7 @@
   ```ts
   export type BreakpointType =
   ```
-- `BudgetRunner` — Helper type for accessing budget runner's getSpent method.
+- `BudgetRunner` — Helper type for accessing a budget runner's spend accessors.
   ```ts
   export type BudgetRunner = AgentRunner & {
   ```

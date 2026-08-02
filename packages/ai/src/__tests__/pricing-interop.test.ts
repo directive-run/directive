@@ -56,7 +56,7 @@ describe("provider pricing tables carry both field pairs", () => {
         expect(Object.keys(table).length).toBeGreaterThan(0);
       });
 
-      it("every entry carries all four fields, and the pairs agree", () => {
+      it("every entry carries both spellings of every rate it publishes", () => {
         for (const [model, rates] of Object.entries(table)) {
           expect(
             rates,
@@ -66,9 +66,37 @@ describe("provider pricing tables carry both field pairs", () => {
             output: rates.output,
             inputPerMillion: rates.input,
             outputPerMillion: rates.output,
+            ...(rates.cacheRead !== undefined
+              ? {
+                  cacheRead: rates.cacheRead,
+                  cacheReadPerMillion: rates.cacheRead,
+                }
+              : {}),
+            ...(rates.cacheWrite !== undefined
+              ? {
+                  cacheWrite: rates.cacheWrite,
+                  cacheWritePerMillion: rates.cacheWrite,
+                }
+              : {}),
           });
           expect(typeof rates.input).toBe("number");
           expect(typeof rates.output).toBe("number");
+        }
+      });
+
+      it("the table container itself is frozen and has no prototype", () => {
+        // Freezing only the entries left the container swappable: replacing an
+        // entry with an all-zero one passes validation (zero is legal for local
+        // models) and leaves a configured cap permanently unreachable.
+        expect(Object.isFrozen(table)).toBe(true);
+        expect(Object.getPrototypeOf(table)).toBeNull();
+      });
+
+      it("every entry is frozen", () => {
+        for (const [model, rates] of Object.entries(table)) {
+          expect(Object.isFrozen(rates), `${provider}_PRICING[${model}]`).toBe(
+            true,
+          );
         }
       });
 
@@ -188,6 +216,34 @@ describe("toTokenPricingTable lives with TokenPricing", () => {
       inputPerMillion: 3,
       outputPerMillion: 15,
     });
+  });
+
+  it("carries optional cache rates through under both spellings", () => {
+    const widened = toTokenPricingTable({
+      "my-model": { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+    });
+
+    expect(widened["my-model"]).toEqual({
+      input: 3,
+      output: 15,
+      inputPerMillion: 3,
+      outputPerMillion: 15,
+      cacheRead: 0.3,
+      cacheReadPerMillion: 0.3,
+      cacheWrite: 3.75,
+      cacheWritePerMillion: 3.75,
+    });
+  });
+
+  it("an own __proto__ key cannot reroute the table's prototype", () => {
+    const fromJson = JSON.parse(
+      '{"__proto__": {"input": 0, "output": 0}, "my-model": {"input": 3, "output": 15}}',
+    ) as Record<string, { input: number; output: number }>;
+
+    const widened = toTokenPricingTable(fromJson);
+
+    expect(Object.getPrototypeOf(widened)).toBeNull();
+    expect(widened["my-model"]?.inputPerMillion).toBe(3);
   });
 
   it("produces entries a budget accepts without conversion", () => {

@@ -49,6 +49,9 @@ const GEMINI_RATES = {
  * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
  * are derived from one source, so they cannot drift.
  *
+ * No separate cache rates are published for these models, so `withBudget`
+ * prices any cache tokens at the input rate — conservative, and never free.
+ *
  * {@link GEMINI_TOKEN_PRICING} is an alias for this table, kept for callers
  * that already reference it.
  *

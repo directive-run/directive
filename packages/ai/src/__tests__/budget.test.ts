@@ -403,7 +403,7 @@ describe("withBudget rejects negative pricing rates", () => {
         maxCostPerCall: 1,
         pricing: { inputPerMillion: -1000, outputPerMillion: 15 },
       }),
-    ).toThrow("pricing.inputPerMillion must be a non-negative number");
+    ).toThrow("pricing.inputPerMillion must not be negative");
   });
 
   it("rejects a negative output rate", () => {
@@ -413,7 +413,7 @@ describe("withBudget rejects negative pricing rates", () => {
         maxCostPerCall: 1,
         pricing: { inputPerMillion: 3, outputPerMillion: -15 },
       }),
-    ).toThrow("pricing.outputPerMillion must be a non-negative number");
+    ).toThrow("pricing.outputPerMillion must not be negative");
   });
 
   it("rejects a negative rate in a budget window", () => {
@@ -428,9 +428,7 @@ describe("withBudget rejects negative pricing rates", () => {
           },
         ],
       }),
-    ).toThrow(
-      "budgets[day].pricing.inputPerMillion must be a non-negative number",
-    );
+    ).toThrow("budgets[day].pricing.inputPerMillion must not be negative");
   });
 
   it("rejects -0, which is not the same as 0", () => {
@@ -440,7 +438,26 @@ describe("withBudget rejects negative pricing rates", () => {
         maxCostPerCall: 1,
         pricing: { inputPerMillion: -0, outputPerMillion: 15 },
       }),
-    ).toThrow(/must be a non-negative number \(received -0\)/);
+    ).toThrow(/must not be -0 \(signed zero\)/);
+  });
+
+  it("explains why -0 is rejected and that plain 0 is accepted", () => {
+    const inner = makeRunner();
+    let message = "";
+    try {
+      withBudget(inner, {
+        maxCostPerCall: 1,
+        pricing: { inputPerMillion: -0, outputPerMillion: 15 },
+      });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+
+    // The old wording named a rule -0 satisfies: `-0 >= 0` is true, so
+    // "must be a non-negative number (received -0)" reads as a contradiction.
+    expect(message).not.toMatch(/non-negative number \(received -0\)/);
+    expect(message).toMatch(/negative sign/);
+    expect(message).toMatch(/plain 0/);
   });
 
   it("a negative rate can no longer drive the ledger backwards", async () => {
@@ -457,7 +474,7 @@ describe("withBudget rejects negative pricing rates", () => {
           },
         ],
       }),
-    ).toThrow(/non-negative/);
+    ).toThrow(/must not be negative/);
   });
 });
 
@@ -598,8 +615,12 @@ describe("withBudget validates result.tokenUsage", () => {
     ["negative output", 100, -50],
   ];
 
+  // "hello" is 5 characters, so 2 estimated input tokens and, at the default
+  // 1.0 multiplier, 2 estimated output tokens: (2/1M)*3 + (2/1M)*15.
+  const HELLO_ESTIMATE = (2 / 1_000_000) * 3 + (2 / 1_000_000) * 15;
+
   for (const [label, inputTokens, outputTokens] of POISON) {
-    it(`ignores ${label} instead of poisoning the ledger`, async () => {
+    it(`charges the estimate for ${label} instead of poisoning the ledger`, async () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const runner = withBudget(
         makeRunner(resultWithUsage(inputTokens, outputTokens)),
@@ -611,14 +632,40 @@ describe("withBudget validates result.tokenUsage", () => {
 
       await runner(mockAgent(), "hello");
 
-      expect(runner.getSpent("hour")).toBe(0);
-      expect(runner.getSpent("total")).toBe(0);
+      expect(runner.getSpent("hour")).toBeCloseTo(HELLO_ESTIMATE, 12);
+      expect(runner.getSpent("total")).toBeCloseTo(HELLO_ESTIMATE, 12);
+      expect(Number.isFinite(runner.getSpent("hour"))).toBe(true);
+      expect(runner.getUnpricedCallCount()).toBe(1);
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining("non-finite or negative token count"),
       );
       warn.mockRestore();
     });
   }
+
+  it("rejects a poisoned cache token count, not just input and output", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(
+      makeRunner({
+        output: "hello",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 0,
+        tokenUsage: {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadTokens: Number.NaN,
+        },
+      }),
+      { pricing: PRICING },
+    );
+
+    await runner(mockAgent(), "hello");
+
+    expect(Number.isFinite(runner.getSpent("total"))).toBe(true);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+    warn.mockRestore();
+  });
 
   it("warns once, not once per call", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -631,6 +678,8 @@ describe("withBudget validates result.tokenUsage", () => {
     await runner(mockAgent(), "hello");
 
     expect(warn).toHaveBeenCalledOnce();
+    // The one-shot warning is not the only signal: the count keeps rising.
+    expect(runner.getUnpricedCallCount()).toBe(3);
     warn.mockRestore();
   });
 
@@ -651,9 +700,82 @@ describe("withBudget validates result.tokenUsage", () => {
     await runner(mockAgent(), "hello");
     await runner(mockAgent(), "hello");
 
-    // (100K/1M)*3 + (100K/1M)*15 = $1.80 — finite, and exactly the good call.
-    expect(runner.getSpent("total")).toBeCloseTo(1.8, 10);
+    // (100K/1M)*3 + (100K/1M)*15 = $1.80 for the good call, plus the estimate
+    // charged in place of the poisoned one.
+    expect(runner.getSpent("total")).toBeCloseTo(1.8 + HELLO_ESTIMATE, 10);
+    expect(runner.getUnpricedCallCount()).toBe(1);
     warn.mockRestore();
+  });
+});
+
+// ============================================================================
+// A runner that reports no usage at all
+// ============================================================================
+
+describe("withBudget falls back to the estimate when tokenUsage is absent", () => {
+  // Plenty of runners never populate tokenUsage. Counted as nothing, such a
+  // runner reads as $0 spent forever while real money goes out, and every
+  // window budget is silently inert — with no warning at all, since there was
+  // no bad value to warn about.
+  function resultWithoutUsage(): RunResult {
+    return {
+      output: "hello",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 0,
+    };
+  }
+
+  const HELLO_ESTIMATE = (2 / 1_000_000) * 3 + (2 / 1_000_000) * 15;
+
+  it("charges the pre-call estimate rather than nothing", async () => {
+    const runner = withBudget(makeRunner(resultWithoutUsage()), {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 100, pricing: PRICING }],
+    });
+
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getSpent("hour")).toBeCloseTo(HELLO_ESTIMATE, 12);
+    expect(runner.getSpent("total")).toBeCloseTo(HELLO_ESTIMATE, 12);
+  });
+
+  it("counts every estimated call, so the approximation is visible", async () => {
+    const runner = withBudget(makeRunner(resultWithoutUsage()), {
+      pricing: PRICING,
+    });
+
+    await runner(mockAgent(), "hello");
+    await runner(mockAgent(), "hello");
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getUnpricedCallCount()).toBe(3);
+  });
+
+  it("leaves the count at zero when every call reports usable usage", async () => {
+    const runner = withBudget(makeRunner(successResult(100, 50)), {
+      pricing: PRICING,
+    });
+
+    await runner(mockAgent(), "hello");
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
+
+  it("still trips a window budget, because spend is no longer invisible", async () => {
+    const runner = withBudget(makeRunner(resultWithoutUsage()), {
+      pricing: PRICING,
+      budgets: [
+        { window: "hour", maxCost: HELLO_ESTIMATE * 1.5, pricing: PRICING },
+      ],
+    });
+
+    await runner(mockAgent(), "hello");
+
+    await expect(runner(mockAgent(), "hello")).rejects.toThrow(
+      BudgetExceededError,
+    );
   });
 });
 
@@ -688,10 +810,21 @@ describe("BudgetRunner getSpent('total')", () => {
     expect(runner.getSpent("hour")).toBeCloseTo(3.6, 10);
   });
 
-  it("returns 0 when there is no top-level pricing to price a call with", async () => {
+  it("accrues from a budget window's pricing when there is no top-level pricing", async () => {
+    // "hour" reading 1.80 while "total" read 0 was the same unobservable-spend
+    // shape the "total" window was added to remove.
     const runner = withBudget(makeRunner(successResult(100_000, 100_000)), {
       budgets: [{ window: "hour", maxCost: 100, pricing: PRICING }],
     });
+
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getSpent("hour")).toBeCloseTo(1.8, 10);
+    expect(runner.getSpent("total")).toBeCloseTo(1.8, 10);
+  });
+
+  it("returns 0 when neither top-level pricing nor a budget window is configured", async () => {
+    const runner = withBudget(makeRunner(successResult(100_000, 100_000)), {});
 
     await runner(mockAgent(), "hello");
 
@@ -719,8 +852,11 @@ describe("withBudget maxCostPerCall post-call enforcement", () => {
 
     expect(result.output).toBe("hello");
     expect(onBudgetExceeded).toHaveBeenCalledOnce();
+    // `estimated` is the pre-call estimate in both phases; `actual` is what
+    // the provider billed. One field, one meaning.
     expect(onBudgetExceeded).toHaveBeenCalledWith({
-      estimated: 18,
+      estimated: (2 / 1_000_000) * 3 + (2 / 1_000_000) * 15,
+      actual: 18,
       remaining: 0.01,
       window: "per-call",
       phase: "post-call",
@@ -759,5 +895,338 @@ describe("withBudget maxCostPerCall post-call enforcement", () => {
     });
 
     await expect(runner(mockAgent(), "hello")).resolves.toBeDefined();
+  });
+});
+
+// ============================================================================
+// Budget window configuration is validated and snapshotted
+// ============================================================================
+
+describe("withBudget budget window configuration", () => {
+  it("rejects a window name it has no duration for", () => {
+    expect(() =>
+      withBudget(makeRunner(), {
+        budgets: [{ window: "week" as never, maxCost: 0.01, pricing: PRICING }],
+      }),
+    ).toThrow(/window must be one of "hour", "day"/);
+  });
+
+  it("rejects a near-miss window name rather than silently ignoring the cap", async () => {
+    // An unrecognized window has no duration to measure over, so every
+    // comparison against it is false and the cap never trips — a config typo
+    // that reads as configured and behaves as absent.
+    expect(() =>
+      withBudget(makeRunner(), {
+        budgets: [
+          { window: "hourly" as never, maxCost: 0.01, pricing: PRICING },
+        ],
+      }),
+    ).toThrow(/hourly/);
+  });
+
+  it("names the valid windows in the message", () => {
+    let message = "";
+    try {
+      withBudget(makeRunner(), {
+        budgets: [{ window: "" as never, maxCost: 1, pricing: PRICING }],
+      });
+    } catch (err) {
+      message = (err as Error).message;
+    }
+
+    expect(message).toContain('"hour"');
+    expect(message).toContain('"day"');
+  });
+
+  it("rejects a window name that resolves through the prototype chain", () => {
+    expect(() =>
+      withBudget(makeRunner(), {
+        budgets: [
+          { window: "__proto__" as never, maxCost: 0.01, pricing: PRICING },
+        ],
+      }),
+    ).toThrow(/window must be one of/);
+  });
+
+  it("reads maxCost once, so a getter cannot store a value it never validated", async () => {
+    // A getter returning 10, 10, NaN passed validation and stored NaN, which
+    // makes `estimated > remaining` false forever: the cap is configured and
+    // permanently inert.
+    let reads = 0;
+    const budget = {
+      window: "hour" as const,
+      get maxCost() {
+        reads++;
+
+        return reads > 1 ? Number.NaN : 10;
+      },
+      pricing: PRICING,
+    };
+
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      budgets: [budget],
+    });
+
+    // $18 a call against a $10 cap: the first lands, the second is blocked.
+    await runner(mockAgent(), "hello");
+
+    await expect(runner(mockAgent(), "hello")).rejects.toThrow(
+      BudgetExceededError,
+    );
+    expect(reads).toBe(1);
+  });
+});
+
+// ============================================================================
+// A cap that no call can reach
+// ============================================================================
+
+describe("withBudget warns about caps that can never trip", () => {
+  it("warns when a per-call cap is paired with all-zero rates", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    withBudget(makeRunner(), {
+      maxCostPerCall: 5,
+      pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("maxCostPerCall"),
+    );
+    warn.mockRestore();
+  });
+
+  it("warns when a window cap is paired with all-zero rates", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    withBudget(makeRunner(), {
+      budgets: [
+        {
+          window: "day",
+          maxCost: 10,
+          pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+        },
+      ],
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("budgets[day].maxCost"),
+    );
+    warn.mockRestore();
+  });
+
+  it("stays quiet when zero rates are paired with a zero cap", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    withBudget(makeRunner(), {
+      maxCostPerCall: 0,
+      pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("stays quiet for real rates", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    withBudget(makeRunner(), { maxCostPerCall: 5, pricing: PRICING });
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+// ============================================================================
+// The callback cannot rewrite the error it precedes
+// ============================================================================
+
+describe("withBudget onBudgetExceeded receives a copy", () => {
+  const LONG_INPUT = "x".repeat(40_000_000);
+
+  it("still throws BudgetExceededError when the callback rewrites its fields", async () => {
+    // Sharing one object between the callback and the error let a callback set
+    // `estimated` to a string, which made the error's own message template
+    // throw a TypeError — so a hard budget block surfaced as a transient
+    // failure and callers retried it.
+    const runner = withBudget(makeRunner(), {
+      maxCostPerCall: 0.001,
+      pricing: PRICING,
+      onBudgetExceeded: (details) => {
+        (details as unknown as Record<string, unknown>).estimated = "0";
+        (details as unknown as Record<string, unknown>).remaining = "0";
+      },
+    });
+
+    await expect(runner(mockAgent(), LONG_INPUT)).rejects.toThrow(
+      BudgetExceededError,
+    );
+  });
+
+  it("hands the callback a frozen object", async () => {
+    let frozen: boolean | null = null;
+    const runner = withBudget(makeRunner(), {
+      maxCostPerCall: 0.001,
+      pricing: PRICING,
+      onBudgetExceeded: (details) => {
+        frozen = Object.isFrozen(details);
+      },
+    });
+
+    await expect(runner(mockAgent(), LONG_INPUT)).rejects.toThrow(
+      BudgetExceededError,
+    );
+    expect(frozen).toBe(true);
+  });
+
+  it("reports the numbers the error carries, unchanged by the callback", async () => {
+    let seen: { estimated: number; remaining: number } | null = null;
+    const runner = withBudget(makeRunner(), {
+      maxCostPerCall: 0.001,
+      pricing: PRICING,
+      onBudgetExceeded: (details) => {
+        seen = { estimated: details.estimated, remaining: details.remaining };
+      },
+    });
+
+    let error: BudgetExceededError | null = null;
+    try {
+      await runner(mockAgent(), LONG_INPUT);
+    } catch (err) {
+      error = err as BudgetExceededError;
+    }
+
+    expect(error).toBeInstanceOf(BudgetExceededError);
+    expect(seen!.estimated).toBe(error!.estimated);
+    expect(seen!.remaining).toBe(error!.remaining);
+  });
+});
+
+// ============================================================================
+// Cache tokens are billed
+// ============================================================================
+
+describe("withBudget prices cache tokens", () => {
+  function resultWithCache(usage: Record<string, number>): RunResult {
+    return {
+      output: "hello",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 0,
+      tokenUsage: usage as unknown as RunResult["tokenUsage"],
+    };
+  }
+
+  it("does not treat a heavily cached call as free", async () => {
+    // With prompt caching on, inputTokens is only the uncached remainder. A
+    // ledger that prices input and output alone reads a cached run as nearly
+    // costless while the provider bills it in full.
+    const runner = withBudget(
+      makeRunner(
+        resultWithCache({
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 1_000_000,
+        }),
+      ),
+      { pricing: PRICING },
+    );
+
+    await runner(mockAgent(), "hello");
+
+    // Both cache classes default to the $3/M input rate.
+    expect(runner.getSpent("total")).toBeCloseTo(6, 10);
+  });
+
+  it("uses published cache rates when the pricing carries them", async () => {
+    const runner = withBudget(
+      makeRunner(
+        resultWithCache({
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 1_000_000,
+          cacheCreationTokens: 1_000_000,
+        }),
+      ),
+      {
+        pricing: {
+          inputPerMillion: 3,
+          outputPerMillion: 15,
+          cacheReadPerMillion: 0.3,
+          cacheWritePerMillion: 3.75,
+        },
+      },
+    );
+
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getSpent("total")).toBeCloseTo(4.05, 10);
+  });
+
+  it("prices a cache write above plain input, as providers bill it", async () => {
+    const pricing = {
+      inputPerMillion: 3,
+      outputPerMillion: 15,
+      cacheWritePerMillion: 3.75,
+    };
+    const written = withBudget(
+      makeRunner(
+        resultWithCache({
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheCreationTokens: 1_000_000,
+        }),
+      ),
+      { pricing },
+    );
+    const plain = withBudget(
+      makeRunner(resultWithCache({ inputTokens: 1_000_000, outputTokens: 0 })),
+      { pricing },
+    );
+
+    await written(mockAgent(), "hello");
+    await plain(mockAgent(), "hello");
+
+    expect(written.getSpent("total")).toBeGreaterThan(plain.getSpent("total"));
+  });
+});
+
+// ============================================================================
+// An overflowing cost does not brick the runner
+// ============================================================================
+
+describe("withBudget survives a cost that overflows", () => {
+  it("keeps the ledger finite and keeps accepting calls", async () => {
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      // Large enough that the pre-call estimate clears the gate, so the
+      // overflow happens where it used to be recorded: after the call.
+      maxCostPerCall: Number.MAX_VALUE,
+      pricing: {
+        inputPerMillion: Number.MAX_VALUE,
+        outputPerMillion: Number.MAX_VALUE,
+      },
+    });
+
+    await runner(mockAgent(), "hello");
+
+    expect(Number.isFinite(runner.getSpent("total"))).toBe(true);
+
+    // Infinity in the total used to make every later call throw forever.
+    await expect(runner(mockAgent(), "hello")).resolves.toBeDefined();
+  });
+
+  it("counts the overflowing call as unpriced rather than swallowing it", async () => {
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      maxCostPerCall: Number.MAX_VALUE,
+      pricing: {
+        inputPerMillion: Number.MAX_VALUE,
+        outputPerMillion: Number.MAX_VALUE,
+      },
+    });
+
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getUnpricedCallCount()).toBe(1);
   });
 });

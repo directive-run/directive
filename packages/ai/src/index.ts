@@ -570,6 +570,7 @@ export {
   withBudget,
   BudgetExceededError,
   toTokenPricingTable,
+  type BareTokenRates,
   type BudgetConfig,
   type BudgetRunner,
   type BudgetWindow,

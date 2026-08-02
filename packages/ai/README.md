@@ -79,11 +79,13 @@ const cost =
 
 ### One pricing constant, every cost surface
 
-Each `*_PRICING` entry carries the same two rates under both field spellings, so
+Each `*_PRICING` entry carries the same rates under both field spellings, so
 there is no wrong constant to grab. `estimateCost` reads the bare `.input` /
 `.output` numbers; `withBudget` and `createConstraintRouter` are typed against
 `TokenPricing` and read `.inputPerMillion` / `.outputPerMillion`. Both pairs are
-derived from one source, so they cannot drift:
+derived from one source, so they cannot drift. Where a provider prices cache
+tokens separately, `.cacheRead` / `.cacheWrite` and their `*PerMillion`
+spellings come along the same way:
 
 ```typescript
 import { withBudget } from "@directive-run/ai";
@@ -114,6 +116,109 @@ import { toTokenPricingTable } from "@directive-run/ai";
 const MY_PRICING = toTokenPricingTable({ "my-model": { input: 3, output: 15 } });
 ```
 
+### Cache tokens are priced, not free
+
+`TokenPricing` carries two optional cache rates alongside input and output:
+
+```typescript
+const pricing = {
+  inputPerMillion: 3,
+  outputPerMillion: 15,
+  cacheReadPerMillion: 0.3,   // optional – defaults to inputPerMillion
+  cacheWritePerMillion: 3.75, // optional – defaults to inputPerMillion
+};
+```
+
+When a rate is omitted, cache tokens are billed at the **input** rate. That is
+deliberately conservative and never free: with prompt caching on, `inputTokens`
+is only the uncached remainder, so pricing input and output alone would read a
+heavily cached run as nearly costless while the provider bills it in full &ndash;
+and a cache *write* bills above the input rate on every provider that offers
+one. `ANTHROPIC_PRICING` publishes the real ratios (cache read 0.1x input, cache
+write 1.25x input), so no configuration is needed to price Anthropic caching
+correctly.
+
+## Cost Caps &ndash; `withBudget`
+
+`withBudget` wraps any runner with a per-call cap and rolling time-window caps.
+
+```typescript
+import { withBudget, BudgetExceededError } from "@directive-run/ai";
+import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
+
+const pricing = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"];
+
+const guarded = withBudget(baseRunner, {
+  maxCostPerCall: 0.10,
+  pricing,                        // required for maxCostPerCall to do anything
+  charsPerToken: 4,               // input-token estimate, default 4
+  estimatedOutputMultiplier: 1.0, // 0.3 for summarization, 3.0 for generation
+  budgets: [
+    { window: "hour", maxCost: 5.00, pricing },
+    { window: "day", maxCost: 50.00, pricing },
+  ],
+  onBudgetExceeded: ({ estimated, actual, remaining, window, phase }) => {
+    if (phase === "pre-call") {
+      console.warn(`[budget] ${window} blocked – est $${estimated.toFixed(4)}, remaining $${remaining.toFixed(4)}`);
+      return;
+    }
+    console.warn(`[budget] ${window} overran after the fact – billed $${actual!.toFixed(4)} against a $${remaining.toFixed(4)} cap`);
+  },
+});
+```
+
+### `onBudgetExceeded` fires in two phases &ndash; only one of them throws
+
+| `phase` | When | Thrown | Money spent |
+|---|---|---|---|
+| `"pre-call"` | The estimate exceeds a cap | `BudgetExceededError` | none &ndash; the call never ran |
+| `"post-call"` | The provider billed more than `maxCostPerCall` | nothing | already spent |
+
+The `"post-call"` case is the one to read twice if you already use this
+callback: it fires **after a call that succeeded**, once the money is gone.
+`withBudget` gates an *estimate*, so a call estimated at a cent that bills five
+dollars clears the gate; it cannot be blocked, but it is reported rather than
+absorbed in silence. Treat `phase: "post-call"` as an alert, not as a failure,
+and do not retry on it.
+
+`estimated` is always the pre-call estimate, in both phases. `actual` is what
+the provider billed and is present only when `phase` is `"post-call"`. The
+callback receives a frozen copy, so writing to it cannot alter the
+`BudgetExceededError` that follows.
+
+### Reading spend
+
+```typescript
+import type { BudgetRunner } from "@directive-run/ai";
+
+const runner = guarded as BudgetRunner;
+
+runner.getSpent("hour");   // rolling hour window; 0 if no hour budget configured
+runner.getSpent("day");    // rolling day window
+runner.getSpent("total");  // lifetime spend for this runner
+runner.getUnpricedCallCount(); // calls charged at the estimate, not at billed usage
+```
+
+`getSpent("total")` is priced with the top-level `pricing` when supplied, and
+otherwise with the first budget window's rates &ndash; it returns `0` only when
+neither is configured.
+
+`getUnpricedCallCount()` is how you find out the ledger is approximate. When a
+runner reports no `tokenUsage`, or reports a non-finite or negative token count,
+`withBudget` charges the pre-call estimate instead of skipping the call, and
+counts it here. A count that tracks your call count means the runner never
+reports usage and every `getSpent` figure is an estimate.
+
+### Configuration is validated at construction
+
+Rates and caps are read once, validated, and copied when the wrapper is built.
+A rate that is missing, non-finite, negative, or `-0` throws with a message
+naming the fix; a `window` that is not `"hour"` or `"day"` throws rather than
+silently disabling the cap; and mutating the objects you passed in afterwards
+has no effect. Zero rates are accepted &ndash; local models genuinely bill nothing
+&ndash; but pairing all-zero rates with a non-zero cap warns, since that cap can
+never trip.
+
 ## Prompt Caching (Anthropic)
 
 Opt in with `promptCaching: "automatic"` to place a `cache_control` breakpoint on the agent's instructions. Anthropic caches that stable system prefix, so repeat calls that share it read from cache (~0.1x input cost) instead of reprocessing it &ndash; the variable message suffix stays uncached. It is off by default (bare-string system, byte-for-byte the prior behavior), non-breaking, and needs no beta header on `anthropic-version: 2023-06-01`.
@@ -138,7 +243,7 @@ const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
 
 > **Minimum cacheable prefix (the #1 gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; roughly 1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, and 4096 on Opus & Haiku-4.5. There is no error: caching just doesn't happen and `cacheReadTokens` stays `0` across repeat calls (that `0` is your diagnostic). Because Directive caches `agent.instructions`, short instructions commonly fall below this threshold. The `ephemeral` breakpoint also has a **5-minute default TTL** &ndash; prefixes not re-read within that window are evicted.
 
-> **Cost tracking caveat.** `withBudget` / `estimateCost` currently weight all tokens equally, so with caching on they do **not** yet reflect the cheaper cache-read (~0.1x) or pricier cache-write (~1.25x) rates &ndash; a cached run will read as more expensive than it actually is. Cache-aware cost pricing is a planned follow-up.
+> **Cost tracking.** `withBudget` and `createConstraintRouter` price all four token classes. Cache rates come from the pricing object's `cacheReadPerMillion` / `cacheWritePerMillion`, and `ANTHROPIC_PRICING` publishes the real ratios (read 0.1x input, write 1.25x input). A hand-built pricing object that omits them bills cache tokens at the input rate &ndash; conservative, so a cached run reads as somewhat more expensive than it is, never as free. `estimateCost` takes one bare rate and one token count, so it prices whichever class you hand it; sum the classes yourself if you use it directly.
 
 ## Lifecycle Hooks
 

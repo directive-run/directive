@@ -31,24 +31,62 @@ import {
 // Pricing Constants
 // ============================================================================
 
-/** The single source of Anthropic rates. Widened below; never exported raw. */
+/**
+ * The single source of Anthropic rates. Widened below; never exported raw.
+ *
+ * `cacheRead` is 0.1x input and `cacheWrite` is 1.25x input — Anthropic's
+ * published multipliers for the 5-minute ephemeral cache. The write rate is
+ * above the input rate, so cache tokens are the one class where leaving them
+ * unpriced under-counts the ledger the most.
+ */
 const ANTHROPIC_RATES = {
-  "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
-  "claude-sonnet-4-20250514": { input: 3, output: 15 },
-  "claude-haiku-4-5-20250514": { input: 0.8, output: 4 },
-  "claude-haiku-3-5-20241022": { input: 0.8, output: 4 },
-  "claude-opus-4-20250514": { input: 15, output: 75 },
+  "claude-sonnet-4-5-20250929": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-sonnet-4-20250514": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-haiku-4-5-20250514": {
+    input: 0.8,
+    output: 4,
+    cacheRead: 0.08,
+    cacheWrite: 1,
+  },
+  "claude-haiku-3-5-20241022": {
+    input: 0.8,
+    output: 4,
+    cacheRead: 0.08,
+    cacheWrite: 1,
+  },
+  "claude-opus-4-20250514": {
+    input: 15,
+    output: 75,
+    cacheRead: 1.5,
+    cacheWrite: 18.75,
+  },
 };
 
 /**
  * Anthropic model pricing (USD per million tokens).
  *
- * Each entry carries the same two rates under both field spellings, so it works
+ * Each entry carries the same rates under both field spellings, so it works
  * with every cost surface in the library without conversion: `.input` /
- * `.output` for `estimateCost`, which takes a bare per-million number, and
- * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `.output` / `.cacheRead` / `.cacheWrite` for `estimateCost`, which takes a
+ * bare per-million number, and the `*PerMillion` spellings for `withBudget` and
  * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
  * are derived from one source, so they cannot drift.
+ *
+ * Cache rates are included, because Anthropic prices cache tokens differently
+ * from ordinary input: a cache read is ~0.1x the input rate and a cache write
+ * is ~1.25x it. With `promptCaching: "automatic"`, `inputTokens` is only the
+ * uncached remainder, so a budget that priced input and output alone would read
+ * a heavily cached run as nearly free.
  *
  * {@link ANTHROPIC_TOKEN_PRICING} is an alias for this table, kept for callers
  * that already reference it.

@@ -35,6 +35,12 @@
  */
 
 import type { TokenPricing } from "./budget.js";
+import {
+  type ResolvedPricing,
+  calculateUsageCost,
+  snapshotTokenPricing,
+  snapshotTokenUsage,
+} from "./pricing.js";
 import type {
   AgentLike,
   AgentRunner,
@@ -62,7 +68,9 @@ export interface RoutingProvider {
    * Token pricing (cost per million tokens).
    *
    * Any adapter `*_PRICING` entry can be passed directly — they are published
-   * in {@link TokenPricing} shape.
+   * in {@link TokenPricing} shape. Rates are validated and copied at
+   * construction, so mutating the object afterwards has no effect on routing
+   * or on `facts.totalCost`.
    */
   pricing?: TokenPricing;
   /** Geographic region (for compliance routing). */
@@ -129,6 +137,21 @@ export interface ConstraintRouterConfig {
 // Internal
 // ============================================================================
 
+/** The public function name used in this module's error messages. */
+const API = "createConstraintRouter";
+
+/**
+ * A provider read once at construction: its name, runner, region, and
+ * validated rate snapshot. The hot path never reads the caller's provider
+ * objects again.
+ */
+interface ResolvedProvider {
+  name: string;
+  runner: AgentRunner;
+  pricing?: ResolvedPricing;
+  region?: string;
+}
+
 function createEmptyStats(): ProviderStats {
   return {
     callCount: 0,
@@ -139,18 +162,31 @@ function createEmptyStats(): ProviderStats {
   };
 }
 
+/**
+ * Price one call for the routing facts.
+ *
+ * Returns `0` rather than a poisoned number when the usage cannot be priced.
+ * `facts.totalCost` is what user constraints test against — a single `NaN`
+ * makes `facts.totalCost > 1` false forever, so a cost-based failover
+ * constraint stops firing and never fires again. Dropping one call's cost is
+ * survivable; losing every future routing decision is not.
+ */
 function calculateCost(
   usage: TokenUsage | undefined,
-  pricing?: TokenPricing,
+  pricing?: ResolvedPricing,
 ): number {
-  if (!usage || !pricing) {
+  if (!pricing) {
     return 0;
   }
 
-  return (
-    (usage.inputTokens / 1_000_000) * pricing.inputPerMillion +
-    (usage.outputTokens / 1_000_000) * pricing.outputPerMillion
-  );
+  const resolved = snapshotTokenUsage(usage);
+  if (!resolved) {
+    return 0;
+  }
+
+  const cost = calculateUsageCost(resolved, pricing);
+
+  return Number.isFinite(cost) ? cost : 0;
 }
 
 // ============================================================================
@@ -195,9 +231,41 @@ export function createConstraintRouter(
     );
   }
 
+  // Flatten every provider into an owned record at construction. Each field is
+  // read exactly once and each rate is validated, for the same reason a budget
+  // snapshots its pricing: reading `provider.pricing` live on the hot path is a
+  // check-then-use gap. A negative rate would win the cheapest-provider
+  // heuristic on every call and drive `facts.totalCost` downwards, and a rate
+  // mutated to NaN after construction would poison `facts.totalCost`
+  // permanently, so a cost-based failover constraint would never fire again.
+  const resolvedProviders: ResolvedProvider[] = Array.from(
+    providers,
+    (provider) => {
+      const name = provider.name;
+      const providerRunner = provider.runner;
+      const providerPricing = provider.pricing;
+      const region = provider.region;
+
+      return {
+        name,
+        runner: providerRunner,
+        ...(providerPricing
+          ? {
+              pricing: snapshotTokenPricing(
+                providerPricing,
+                `providers[${name}].pricing`,
+                API,
+              ),
+            }
+          : {}),
+        ...(region !== undefined ? { region } : {}),
+      };
+    },
+  );
+
   // Validate
-  const providerMap = new Map<string, RoutingProvider>();
-  for (const provider of providers) {
+  const providerMap = new Map<string, ResolvedProvider>();
+  for (const provider of resolvedProviders) {
     providerMap.set(provider.name, provider);
   }
 
@@ -217,7 +285,7 @@ export function createConstraintRouter(
     providers: Object.create(null) as Record<string, ProviderStats>,
   };
 
-  for (const provider of providers) {
+  for (const provider of resolvedProviders) {
     facts.providers[provider.name] = createEmptyStats();
   }
 
@@ -231,7 +299,7 @@ export function createConstraintRouter(
 
   /** Select provider based on constraints and heuristics. */
   function selectProvider(): {
-    provider: RoutingProvider;
+    provider: ResolvedProvider;
     reason: "constraint" | "cheapest" | "default";
   } {
     const now = Date.now();
@@ -250,7 +318,7 @@ export function createConstraintRouter(
     }
 
     // 2. Filter out providers in error cooldown
-    const availableProviders = providers.filter((p) => {
+    const availableProviders = resolvedProviders.filter((p) => {
       const stats = facts.providers[p.name];
       if (!stats) {
         return true;
@@ -263,6 +331,10 @@ export function createConstraintRouter(
     });
 
     // 3. Cheapest-provider heuristic (opt-in via preferCheapest)
+    //
+    // Compared on input + output only: those are the rates every provider
+    // charges on every call, so they are the comparable part. Cache rates
+    // depend on a caching strategy the router knows nothing about.
     if (preferCheapest && availableProviders.length > 0) {
       const sorted = [...availableProviders].sort((a, b) => {
         const aCost = a.pricing
@@ -307,7 +379,7 @@ export function createConstraintRouter(
     providerName: string,
     latencyMs: number,
     usage: TokenUsage | undefined,
-    pricing?: TokenPricing,
+    pricing?: ResolvedPricing,
     error?: Error,
   ): void {
     const stats = facts.providers[providerName] ?? createEmptyStats();

@@ -32,3 +32,19 @@ Validated rates are also snapshotted into owned primitives at construction. The 
 **`getSpent("total")`** reports lifetime spend for the runner. Spend was previously unobservable when no budget windows were configured, since `getSpent` only read the per-window ledgers.
 
 **`maxCostPerCall` is now enforced after the call, not just before it.** It gated the pre-call estimate only, so a call estimated at a cent that actually billed five dollars passed the gate and was absorbed in silence. The real cost is now recorded, and `onBudgetExceeded` fires when it exceeds the cap. The call cannot be blocked at that point &ndash; the money is spent &ndash; so this is a report rather than a throw, distinguished by a new `phase: "pre-call" | "post-call"` field on `BudgetExceededDetails`.
+
+**Cached tokens are billed.** `TokenPricing` gains optional `cacheReadPerMillion` and `cacheWritePerMillion`. On providers that report cache usage, `inputTokens` is the *uncached remainder* and the cache counts are additive, so pricing only input and output billed a heavily cached call at close to zero while the provider billed it in full &ndash; and cache *writes* cost more than ordinary input, roughly 1.25x, not nothing. All four token classes are now priced, in the budget ledger and in `createConstraintRouter` alike. When the cache rates are absent they default to the input rate: conservative, and never free. The Anthropic table carries its published ratios.
+
+**Budget windows are validated.** `budgets[].window` accepted any string. An unrecognized value &ndash; from a JSON config, or a typo like `"hourly"` &ndash; produced an undefined duration, a `NaN` cutoff, and a window whose spend always read as zero, so the cap could never trip. Unrecognized windows now throw at construction and name the valid values.
+
+**Every caller-supplied budget value is read exactly once.** The snapshotting applied to pricing now covers `maxCost` and `window` too. A getter that returned a valid number during validation and `NaN` afterwards previously stored the second value, leaving `remaining` permanently `NaN`.
+
+**`createConstraintRouter` gets the same protections as `withBudget`.** Provider pricing was read live from the caller's object on every call, unvalidated. A negative rate won `preferCheapest` on every call and drove the cost fact negative; an unusable token count poisoned it permanently, so a cost-threshold failover constraint would never fire again. Providers are now flattened into owned records at construction and their pricing validated and snapshotted through the same helper.
+
+**Calls with no usable token usage are charged the pre-call estimate** rather than nothing, and counted. A runner that does not populate `tokenUsage` previously left every window ledger at zero, silently disabling budgets that looked configured. The new `getUnpricedCallCount()` on `BudgetRunner` reports how many calls were priced by estimate.
+
+**`BudgetExceededDetails.estimated` always holds the pre-call estimate.** The billed figure moved to a new `actual` field, present on `phase: "post-call"`. Previously `estimated` carried the actual cost in that phase, so a handler logging it printed one thing under a name meaning another.
+
+**The `onBudgetExceeded` payload is frozen** before it reaches the callback, and the thrown `BudgetExceededError` is built from the untouched original. A callback could previously rewrite the fields of the error about to be thrown, and assigning a non-number could make a `TypeError` surface in place of `BudgetExceededError` &ndash; which callers would read as transient and retry.
+
+**Pricing tables are frozen containers**, built with a null prototype so a `__proto__` key from parsed JSON cannot reroute the table. Entry substitution previously allowed an all-zero table to pass validation and leave a configured cap inert; that combination now warns once and names the caps it disables.
