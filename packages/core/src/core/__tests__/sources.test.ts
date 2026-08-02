@@ -550,7 +550,7 @@ describe("createSourcesManager", () => {
     // Hot-reload scenario: registerDefinitions called with a source id that is
     // already attached. The previous implementation would leave the old
     // subscription running AND silently drop the new definition (because the
-    // `attachedDefinitionIds.has(id)` guard blocked re-attach). Fixed in R3.
+    // `attachedDefinitionIds.has(id)` guard blocked re-attach). The registry swap fixes this.
     const onAttach = vi.fn();
     const onDetach = vi.fn();
     const oldUnsub = vi.fn();
@@ -654,7 +654,7 @@ describe("source primitive — observability via system.observe()", () => {
     ]);
   });
 
-  it("emits source.drop on system.observe() when the engine rejects a publish (R7 follow-on)", () => {
+  it("emits source.drop on system.observe() when the engine rejects a publish", () => {
     type DropFrame = {
       type: "source.drop";
       id: string;
@@ -1060,7 +1060,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     ).toThrowError(/Definition collision: source "shared"/);
   });
 
-  // R5 fix: BLOCKED_PROPS check on event names (parity with system.dispatch)
+  // BLOCKED_PROPS check on event names (parity with system.dispatch)
   it("dispatcher drops publishes whose event names walk the prototype chain", () => {
     const handler = vi.fn();
     const capturedRef: { current: SourcePublish | null } = { current: null };
@@ -1099,7 +1099,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     system.destroy();
   });
 
-  // R5 fix: dispatcher honors !state.isRunning between stop() and the next start()
+  // dispatcher honors !state.isRunning between stop() and the next start()
   it("publishes between stop() and the next start() silently drop", () => {
     const handler = vi.fn();
     const capturedRef: { current: SourcePublish | null } = { current: null };
@@ -1135,7 +1135,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     system.destroy();
   });
 
-  // R5 fix: per-record detached flag closes the in-flight re-registration race.
+  // per-record detached flag closes the in-flight re-registration race.
   // Exercised against the manager directly because the engine-level
   // registerModule path hits a schema collision when the same module id is
   // re-registered (covered by separate engine tests).
@@ -1170,8 +1170,8 @@ describe("source primitive — end-to-end with createSystem", () => {
       eventName: "TICK",
     });
 
-    // Re-register the same source id with a different attach impl. The R3
-    // registry swap unsubscribes the old definition; this R5 fix also flips
+    // Re-register the same source id with a different attach impl. The
+    // registry swap unsubscribes the old definition; this also flips
     // the per-record `detached` flag so the OLD `perSourcePublish` closure
     // no-ops even though the external transport still holds a reference.
     manager.registerDefinitions("mod-2", {
@@ -1179,14 +1179,14 @@ describe("source primitive — end-to-end with createSystem", () => {
     });
 
     // Stale external transport fires the OLD closure — should silently no-op
-    // (the R3 fix unsubscribed the old definition; the R5 detached flag
+    // (the registry swap unsubscribed the old definition; the detached flag
     // silences the closure too).
     capturedOld.current?.("TICK", undefined);
     capturedOld.current?.("TICK", undefined);
     expect(dispatched).toHaveLength(1);
   });
 
-  // R5 fix: Promise-shaped unsubscribe gets a targeted diagnostic.
+  // Promise-shaped unsubscribe gets a targeted diagnostic.
   it("returning a Promise from attach() gets a Promise-specific error", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
@@ -1209,7 +1209,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     }
   });
 
-  // R5 fix: per-source counters track publishCount + lastPublishAt
+  // per-source counters track publishCount + lastPublishAt
   it("per-source counters bump on publish and surface via inspect()", async () => {
     const handler = vi.fn();
     const capturedRef: { current: SourcePublish | null } = { current: null };
@@ -1255,7 +1255,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     system.destroy();
   });
 
-  // R6 fix: drop telemetry on inspect().sources for rejected publishes.
+  // drop telemetry on inspect().sources for rejected publishes.
   it("rejected publishes bump dropCount + lastDropReason on inspect()", () => {
     const handler = vi.fn();
     const capturedRef: { current: SourcePublish | null } = { current: null };
@@ -1308,7 +1308,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     system.destroy();
   });
 
-  // R6 fix: onPublish plugin hook does NOT fire for engine-rejected publishes.
+  // onPublish plugin hook does NOT fire for engine-rejected publishes.
   it("onPublish only fires for accepted publishes (not for engine-rejected drops)", () => {
     const onPublish = vi.fn();
     const dispatch = vi
@@ -1339,7 +1339,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     expect(onPublish).toHaveBeenCalledWith("s", "mod", "OK");
   });
 
-  // R2 fix: onDrop pairs with onPublish so observers see both halves
+  // onDrop pairs with onPublish so observers see both halves
   // without polling inspect().sources[i].dropCount.
   it("onDrop fires with the engine's drop reason on rejected publishes", () => {
     const onPublish = vi.fn();
@@ -1378,7 +1378,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     );
   });
 
-  // R2 fix: onDrop fires with reason "coalesced" when the manager
+  // onDrop fires with reason "coalesced" when the manager
   // debounces a same-event publish within a single microtask tick.
   it('onDrop fires with reason "coalesced" on the lastWriteWins manager drop', async () => {
     const onDrop = vi.fn();
@@ -1409,7 +1409,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     await Promise.resolve();
   });
 
-  // R6 fix: error.message truncation prevents unbounded payload leakage.
+  // error.message truncation prevents unbounded payload leakage.
   it("lastError.message is truncated at SOURCE_ERROR_MESSAGE_MAX (256) chars", () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")
@@ -1433,7 +1433,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  // R7 fix: truncation applies at the manager boundary so plugins (audit-ledger,
+  // truncation applies at the manager boundary so plugins (audit-ledger,
   // logging) see a bounded `error.message` too — not just inspect().
   it("onError callback receives an Error whose message is truncated to SOURCE_ERROR_MESSAGE_MAX", () => {
     const consoleErrorSpy = vi
@@ -1727,7 +1727,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     await expect(manager.evictAll()).resolves.toBeUndefined();
   });
 
-  // R1 Distrib M4 — `cleanupAllAsync` per-source timeout.
+  // `cleanupAllAsync` per-source timeout.
   //
   // Prior behavior: a single source's `unsubscribe()` returning a Promise
   // that never resolved would block the entire teardown sequence until
@@ -1736,7 +1736,7 @@ describe("source primitive — end-to-end with createSystem", () => {
   // `reportError`, and continues with the remaining sources so the
   // overall manager.stopAsync() / system.stopAsync() chain can
   // complete.
-  it("R1 Distrib M4: cleanupAllAsync isolates a hung unsubscribe via timeout", async () => {
+  it("cleanupAllAsync isolates a hung unsubscribe via timeout", async () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -1784,7 +1784,7 @@ describe("source primitive — end-to-end with createSystem", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  // R1 Distrib M5 — `evictAll` per-source timeout.
+  // `evictAll` per-source timeout.
   //
   // Prior behavior: a slow `onEvict` (e.g., audit-log flush hanging on
   // a saturated sink) consumed the engine's evict deadline at the
@@ -1792,7 +1792,7 @@ describe("source primitive — end-to-end with createSystem", () => {
   // order never got their `onEvict` call. The per-source timeout caps
   // each onEvict at the default and continues so registration-order
   // sources are not starved.
-  it("R1 Distrib M5: evictAll isolates a hung onEvict via timeout", async () => {
+  it("evictAll isolates a hung onEvict via timeout", async () => {
     const consoleErrorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);

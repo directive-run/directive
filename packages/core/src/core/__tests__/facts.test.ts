@@ -573,7 +573,7 @@ describe("createFactsProxy", () => {
       expect("prototype" in facts).toBe(false);
     });
 
-    it("Object.hasOwn returns false for blocked props (R4 FIX 5)", () => {
+    it("Object.hasOwn returns false for blocked props", () => {
       const { facts } = makeProxy();
 
       // getOwnPropertyDescriptor must stay consistent with the get trap —

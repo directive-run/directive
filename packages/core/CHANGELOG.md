@@ -334,8 +334,8 @@
 
   `@directive-run/core` (patch):
 
-  - **`system.notify.guardrailBlocked` plugin-name validation.** The R18
-    Tier 2-A RFC 0010 surface accepted any `plugin` string. A third-party
+  - **`system.notify.guardrailBlocked` plugin-name validation.** The
+    RFC 0010 surface accepted any `plugin` string. A third-party
     plugin holding a `System` reference could forge `"guardrail.blocked"`
     events claiming `plugin: "fact-pii-guardrail"`, misleading compliance
     audit consumers. The method now drops + warns when called with a
@@ -386,16 +386,16 @@
   `@directive-run/react`, `@directive-run/vue`, `@directive-run/svelte`,
   `@directive-run/solid`, `@directive-run/lit` (patch):
 
-  - **Dev-mode `console.warn` on `destroyAsync` rejection.** The R18
-    Tier 2-B fire-and-forget `.catch(() => {})` silently swallowed every
+  - **Dev-mode `console.warn` on `destroyAsync` rejection.** The
+    fire-and-forget `.catch(() => {})` silently swallowed every
     unmount-time unsubscribe error. Operators had zero signal when a
     Supabase channel `removeChannel()` rejected. The catch now logs in
     development (`isDevelopment === true`); production behavior is
     unchanged (the manager's `phase: "runtime"` observability sink
     still receives the per-source error).
 
-  Closes the critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
-  lens) + 3, 5, 8 (Arch lens). Bigger Tier 2 items deferred to RFCs:
+  Closes three critical and three major security findings plus three
+  architecture findings. Larger items deferred to RFCs:
   Supabase channel-name reuse race, `attachGuardrailsToOtel` helper,
   timeline `guardrail.blocked` renderer, knowledge-bundle docs sync.
 
@@ -501,13 +501,13 @@
 
 - [#57](https://github.com/directive-run/directive/pull/57) [`ec5be62`](https://github.com/directive-run/directive/commit/ec5be62a5744ae7b38972b9a74498173dc7bfe4c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Follow-on — MCP holder factory + plugin broadcast snapshot + createFactPIIGuardrail main barrel
 
-  Three small follow-on fixes for issues surfaced during the prior round that Tier 1 did not cover:
+  Three small follow-on fixes not covered by the previous release:
 
   **MCP holder pattern — multi-tenant safe factory**. The MCP source recipe in `ai-sources.md` declared `let publishRef: SourcePublish | null = null` at module scope. Importing the module twice (one Directive system per tenant DO; SSR with one module instance per worker; Vitest with hot-reload boundaries) made the LAST `attach` overwrite the holder — first tenant's adapter callbacks routed into the second tenant's facts. Recipe now wraps adapter + module construction in a `makeOrchestrator()` factory so each call yields an isolated closure pair. Multi-tenant + SSR + hot-reload safe.
 
   **`broadcast` snapshots `plugins` before iteration**. A plugin hook callback that called `manager.unregister(...)` (or whose `system.observe()` unsubscribe spliced the array) used to shift indices mid-iteration, silently skipping the NEXT plugin — typically the audit-ledger or `createFactPIIGuardrail`. The broadcaster now iterates a snapshot taken at call time, so reentrant `unregister` no longer corrupts the broadcast.
 
-  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel**. The Tier 0 Mandatory Companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
+  **`createFactPIIGuardrail` re-exported from `@directive-run/ai` main barrel**. The mandatory companion to `liveContext` was the only guardrail not on the main barrel. Other guardrails (`createPIIGuardrail`, etc.) ship as `@deprecated` re-exports for back-compat; `createFactPIIGuardrail` now ships the same way. Consumers who follow the "main-barrel" idiom every other guardrail supports will find it.
 
 - [#57](https://github.com/directive-run/directive/pull/57) [`018010e`](https://github.com/directive-run/directive/commit/018010e0ef64a839bd8521ba81696aa33823e68c) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Walker DoS / PII bypass + onContextUpdate ordering + mode deprecation restore + docs
 
@@ -553,7 +553,7 @@
   **`LiveContextOptions.mode` restored as `@deprecated` for source-compat**
   . v1.18.0 shipped to npm with `mode: "inject-system-message"
 | "restart"` on the public `LiveContextOptions` interface. v1.19.0
-  removed it. The Tier 2 changeset asserted "v1.18.0 has not yet
+  removed it. The v1.19.0 changeset asserted "v1.18.0 has not yet
   shipped" — `npm view @directive-run/ai time` says otherwise (1.18.0
   published 2026-06-08 05:42 UTC, 1.19.0 published 2026-06-09 14:21
   UTC — 32hr live with the field). Removing an exported field of an
@@ -587,9 +587,10 @@
 
 - [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - 5 remaining Critical fixes to documented surfaces of the source primitive
 
-  This patch closes the 5 R13 CRITs that affect documented but unreachable
-  or misleading public APIs of v1.18.0. With Tier 1 (already merged) +
-  this Tier 2, all 10 R13 ship-blocking CRITs are resolved.
+  This patch closes the 5 remaining critical issues that affect documented
+  but unreachable or misleading public APIs of v1.18.0. With the earlier
+  batch (already merged) plus this one, all 10 ship-blocking critical
+  issues are resolved.
 
   ### Critical fixes
 
@@ -622,7 +623,7 @@
   walker previously short-circuited on `Array.isArray(value)`, so the
   dominant real-world Supabase realtime shape
   (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
-  silently bypassed the Tier 0 guard. The walker now inspects array
+  silently bypassed the guard. The walker now inspects array
   elements at the same depth budget, rebuilding the array if any element
   matched. Maps and Sets remain out of scope by design (consumers must
   wire a `customDetector` for those). 2 new regression tests covering
@@ -842,11 +843,11 @@ Y }` shape, reversed direction). Touches ~21 packages across the
 
   Core test suite: 2109 → 2117 passing.
 
-- [#52](https://github.com/directive-run/directive/pull/52) [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R5 hardening: lifecycle parity, audit-ledger coverage, per-source telemetry, internals export
+- [#52](https://github.com/directive-run/directive/pull/52) [`18c9a46`](https://github.com/directive-run/directive/commit/18c9a4651cdffc607ad4e570af1d4415470bd5a9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — hardening: lifecycle parity, audit-ledger coverage, per-source telemetry, internals export
 
-  Closes the gaps surfaced by a maximum-scope review of `@directive-run/core`'s
+  Closes the gaps surfaced by a full review of `@directive-run/core`'s
   `source` primitive across security, lifecycle, observability, privacy, and
-  portability lenses. All changes are additive (no breaking changes for
+  portability. All changes are additive (no breaking changes for
   existing source declarations).
 
   What changed:
@@ -910,7 +911,7 @@ Y }` shape, reversed direction). Touches ~21 packages across the
   post-stop dispatch guard, re-registration race detached flag, Promise
   unsubscribe diagnostic, per-source publish counter).
 
-- [#52](https://github.com/directive-run/directive/pull/52) [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R6 hardening: dispatch ordering, drop telemetry, error truncation, AuditEntry coverage, timeline render
+- [#52](https://github.com/directive-run/directive/pull/52) [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — hardening: dispatch ordering, drop telemetry, error truncation, AuditEntry coverage, timeline render
 
   Closes a second round of cross-cutting findings against the source primitive
   covering security, observability, privacy, and DX. All changes are additive
@@ -1191,16 +1192,17 @@ tearDownLiveContext())` ran → subscription died. The distinction
   passing; sources typecheck clean; core dist 14,678 B gz (under
   18,000 B budget).
 
-- [#52](https://github.com/directive-run/directive/pull/52) [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R7: error-message truncation applies at the manager
+- [#52](https://github.com/directive-run/directive/pull/52) [`f9a2181`](https://github.com/directive-run/directive/commit/f9a2181838c89585dc44b2b961df6d290b4b6dc2) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — error-message truncation applies at the manager
   boundary so audit-ledger and logging plugin observe a bounded message too
 
-  R6's `lastError.message` truncation closed the inspect-output leak surface,
-  but the `onError` plugin callback continued to receive the raw `Error`
-  object. The audit-ledger's `source.error` entry read `event.error.message`
+  Truncating `lastError.message` closed the inspect-output leak surface, but
+  the `onError` plugin callback continued to receive the raw `Error` object.
+  The audit-ledger's `source.error` entry read `event.error.message`
   directly, and the logging plugin's `error`-level emission logged the raw
   error — both still wrote the full payload into their respective sinks.
 
-  R7 truncates at the `reportError` boundary inside the source manager: any
+  Truncation now happens at the `reportError` boundary inside the source
+  manager: any
   `Error` whose `message` exceeds `SOURCE_ERROR_MESSAGE_MAX` (256 chars) is
   replaced with a sanitized `Error` instance carrying the truncated message
   before the `onError` callback fires. The privacy invariant is now "one

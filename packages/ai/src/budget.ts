@@ -1,5 +1,5 @@
 /**
- * P1: Cost Budget Guards — Pre-call estimation + rolling budget windows.
+ * Cost Budget Guards — Pre-call estimation + rolling budget windows.
  *
  * Prevents runaway LLM costs by estimating costs before each call
  * and tracking actual costs after each call. Supports per-call limits

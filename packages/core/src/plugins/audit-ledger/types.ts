@@ -24,7 +24,7 @@ export const HASH_ALGO = "djb2-1" as const;
 /**
  * Entry schema version. Bumped if `AuditEntry` field shape changes in
  * a way that breaks back-compat parsers. Persisted on every entry so
- * exports remain self-describing across library upgrades. (F-5)
+ * exports remain self-describing across library upgrades.
  */
 export const SCHEMA_VERSION = 1 as const;
 
@@ -84,14 +84,14 @@ interface AuditEntryBase {
   /**
    * Entry schema version — bumped if any `AuditEntry` field shape
    * changes in a way that breaks back-compat. Pair with `hashAlgo`
-   * when migrating older exports. (F-5)
+   * when migrating older exports.
    */
   readonly schemaVersion: typeof SCHEMA_VERSION;
   /**
    * Private sentinel — present (and equal to the in-module token) only
    * on legitimate tombstones minted by `ledger.erase()`. Filtered out
    * of all public read paths (`query`, `recent`, `toJSON`, etc.) so
-   * consumers never see or copy it. (N7)
+   * consumers never see or copy it.
    *
    * NOT serialized. NOT exported. Forging this from outside the module
    * is impossible without the symbol reference; `verify()` rejects any
@@ -242,12 +242,12 @@ export type AuditEntry =
       /**
        * djb2 hash of the filter (via `hashObject(filter)`). PII-safe —
        * the raw filter values never land in the ledger. Pair with
-       * `filterShape` to see which filter fields were used. (N2)
+       * `filterShape` to see which filter fields were used.
        */
       filterHash: string;
       /**
        * Stripped-values shape of the filter — captures WHICH fields were
-       * present without recording their values. (N2)
+       * present without recording their values.
        */
       filterShape: {
         factPath: boolean;
@@ -285,7 +285,7 @@ export interface QueryFilter {
  * Forged tombstones (a caller writes `kind: "system.entry-erased"`
  * directly via `sink.write()` to mask tamper as erasure) are detected:
  * legitimate tombstones carry an in-module sentinel that forgeries
- * cannot mint, so `verify()` reports them as tamper. (N7)
+ * cannot mint, so `verify()` reports them as tamper.
  */
 export type VerifyResult =
   | {
@@ -296,7 +296,7 @@ export type VerifyResult =
        * tombstones. NOT timestamps — each entry pairs this seq with
        * the per-entry `system.entry-erased.erasedAt` (ms epoch) for
        * the timestamp. Empty unless the chain contains erasures.
-       * (N1 + M1; renamed from `erasedAt` in R3)
+       * (renamed from `erasedAt`)
        */
       erasedSeqs?: number[];
     }
@@ -342,7 +342,7 @@ export interface AuditLedgerSink {
    * Optional hook fired by the sink BEFORE shifting the oldest entry
    * out of a bounded ring buffer. The ledger plugin uses this to emit
    * a `system.truncated` marker so an auditor sees that the log was
-   * truncated and where. (M23)
+   * truncated and where.
    */
   onTruncate?(
     handler: (droppedSeq: number, droppedCount: number) => void,
@@ -392,12 +392,12 @@ export interface AuditLedger {
    * Erased entries (via `ledger.erase()`) appear as legitimate chain
    * breaks — `verify()` reports them in `erasedSeqs` and continues
    * the walk from the tombstone's actual hash. Real tamper still
-   * surfaces as `valid: false`. (N1 + M1)
+   * surfaces as `valid: false`.
    *
    * Forged tombstones — `kind: "system.entry-erased"` entries written
    * directly via `sink.write()` to mask tamper — are detected as
    * forgery. Legitimate tombstones carry an in-module sentinel that
-   * forgeries cannot mint. (N7)
+   * forgeries cannot mint.
    *
    * v1 ships sync djb2 only. `verify({ strong: true })` is reserved
    * for v2 (SHA-256) and THROWS today — there is no silent fallback.

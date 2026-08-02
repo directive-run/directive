@@ -34,18 +34,17 @@ landed in. Open questions are tracked inline.
 
 ## Shipped post-1.18.0
 
-- **Walker security rewrite** – three rounds of patches on the
+- **Walker security rewrite** – successive patches on the
   `createFactPIIGuardrail` walker each opened a slightly different
-  Proxy bypass surface (R13 → R14 → R15). R16 landed
-  `structuredClone`-based sanitization-then-walk so the walker only
-  operates on a Proxy-free clone of the fact value. Shipped
-  2026-06-09 in `@directive-run/ai` v1.19.3. R17 hardened the
-  pre-clone array cap + Error/Date/RegExp/Blob/TypedArray
-  short-circuits in v1.19.6. R18 closed a Proxy `length`-getter
-  TOCTOU bypass (via `new Array(len)` materialization), added
-  `Error.cause` + `AggregateError.errors` recursion, restricted
-  the idempotency gate to primitives, and fixed the Error
-  redact-mode contract (shipped in v1.19.7).
+  Proxy bypass surface. v1.19.3 (2026-06-09) replaced the manual walk
+  with `structuredClone`-based sanitization-then-walk, so the walker
+  only operates on a Proxy-free clone of the fact value. v1.19.6
+  hardened the pre-clone array cap and added
+  Error/Date/RegExp/Blob/TypedArray short-circuits. v1.19.7 closed a
+  Proxy `length`-getter TOCTOU bypass (via `new Array(len)`
+  materialization), added `Error.cause` + `AggregateError.errors`
+  recursion, restricted the idempotency gate to primitives, and fixed
+  the Error redact-mode contract.
 
 - **`system.evict()` reentry gate** – Cloudflare DO hibernation can
   signal eviction twice; without a gate, the second call re-runs
@@ -85,7 +84,7 @@ landed in. Open questions are tracked inline.
   redactor; observability plugins (audit-ledger, debug-timeline,
   devtools, custom log shippers) see raw PII on the first `onFactSet`
   emission before the redaction follow-up write fires. Future RFC will
-  spec a pre-emit transform plugin API so Tier 0 PII guards close the
+  spec a pre-emit transform plugin API so PII guards close the
   surface for every plugin, not just future fact reads.
 
   *Partially mitigated by RFC 0010 (`guardrail.blocked` event) – every

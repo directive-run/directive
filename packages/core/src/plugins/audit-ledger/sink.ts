@@ -47,7 +47,7 @@ export function matchesFilter(entry: AuditEntry, filter: QueryFilter): boolean {
     if (!kinds.includes(entry.kind)) return false;
   }
   if (filter.factPath !== undefined) {
-    // Exact match — no LIKE wildcards. (SEC M2)
+    // Exact match — no LIKE wildcards.
     if (entry.kind === "fact.change") {
       if (entry.key !== filter.factPath) return false;
     } else if (entry.kind === "resolver.write.rejected") {
@@ -85,7 +85,7 @@ export function memorySink(opts: { capacity?: number } = {}): AuditLedgerSink {
   const sink: AuditLedgerSink = {
     write(entry) {
       if (entries.length >= capacity) {
-        // (M23) About to overflow — notify the owner BEFORE the shift
+        // About to overflow — notify the owner BEFORE the shift
         // so the dropped seq is still known. The handler may push an
         // entry of its own (a truncation marker), which will itself
         // push us over capacity; we shift one for one until we're back

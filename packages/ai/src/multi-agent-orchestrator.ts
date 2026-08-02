@@ -4685,7 +4685,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Safe wrapper for user-provided callbacks (C1). */
+  /** Safe wrapper for user-provided callbacks. */
   function safeCall<A extends unknown[], R>(
     fn: ((...args: A) => R) | undefined,
     ...args: A
@@ -4703,7 +4703,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Safe wrapper for async user-provided callbacks (C1). */
+  /** Safe wrapper for async user-provided callbacks. */
   async function safeCallAsync<A extends unknown[], R>(
     fn: ((...args: A) => R | Promise<R>) | undefined,
     ...args: A
@@ -4721,7 +4721,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Compute estimatedStepsRemaining and decelerating from step history (M7). */
+  /** Compute estimatedStepsRemaining and decelerating from step history. */
   function computeGoalMetrics(
     currentSatisfaction: number,
     stepMetrics: GoalStepMetrics[],
@@ -4761,7 +4761,7 @@ export function createMultiAgentOrchestrator(
     };
   }
 
-  /** Clamp satisfaction to [0, 1] and guard against NaN/Infinity (M4). */
+  /** Clamp satisfaction to [0, 1] and guard against NaN/Infinity. */
   function clampSatisfaction(value: number | undefined): number {
     if (value == null || !Number.isFinite(value)) {
       return 0;
@@ -4788,7 +4788,7 @@ export function createMultiAgentOrchestrator(
       onStall,
     } = pattern;
 
-    // Shadow copy of nodes so relaxation mutations don't affect the original (M2)
+    // Shadow copy of nodes so relaxation mutations don't affect the original
     const nodes: Record<string, GoalNode> = Object.create(null);
     for (const [id, node] of Object.entries(originalNodes)) {
       nodes[id] = { ...node };

@@ -440,7 +440,7 @@ export function createFactPIIGuardrail(
   // scans (`walkDepth: 0` would skip even top-level string members);
   // upper bound caps pathological recursion on cyclic structures.
   // `Number.isFinite` guards against NaN / Infinity / non-numeric
-  // casts (R15) — `Math.floor(NaN) === NaN`, `Math.min/max(5, NaN) ===
+  // casts — `Math.floor(NaN) === NaN`, `Math.min/max(5, NaN) ===
   // NaN`, so the chain collapsed to NaN without the finite guard;
   // recursion then used `depth - 1 === NaN` and the bound never
   // triggered.
@@ -527,15 +527,15 @@ export function createFactPIIGuardrail(
 
   // Walker — sanitization-first design.
   //
-  // R13 → R14 → R15 patched a manual structural walker that operated
-  // on the consumer-supplied value directly. Each round closed one
-  // class of Proxy-based bypass and opened another:
+  // Successive patches to a manual structural walker operated on the
+  // consumer-supplied value directly. Each patch closed one class of
+  // Proxy-based bypass and opened another:
   //
-  //   - R13: array-shaped payloads silently bypass (added array branch).
-  //   - R14: deeply nested arrays bypass the depth bound; Proxy whose
+  //   - array-shaped payloads silently bypass (added array branch).
+  //   - deeply nested arrays bypass the depth bound; Proxy whose
   //     `get` returns different values per read leaks PII via TOCTOU
   //     (added depth decrement + array snapshot).
-  //   - R15: Proxy whose `Symbol.iterator` yields a billion items
+  //   - Proxy whose `Symbol.iterator` yields a billion items
   //     OOMs the worker; Proxy whose iterator returns undefined
   //     crashes the walker; cycle guard via permanent WeakSet
   //     false-skips shared-leaf references (added size cap +
@@ -690,7 +690,7 @@ export function createFactPIIGuardrail(
       ) {
         // Error class: detection-only path. `Error.message` is a
         // user-controlled string a transport often surfaces, so
-        // we scan it (R17) along with `.cause` and (for AggregateError)
+        // we scan it along with `.cause` and (for AggregateError)
         // `.errors`. PII can hide inside wrapped causes).
         // Errors are returned as-is in `redacted` (the instance ref is
         // the input); the caller MUST treat Error matches as alert-mode,

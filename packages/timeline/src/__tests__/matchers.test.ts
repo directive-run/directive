@@ -53,7 +53,7 @@ function buildCounter(deps: CounterDeps) {
   });
 }
 
-describe("R1.B matchers — toReachInMs", () => {
+describe("matchers — toReachInMs", () => {
   it("passes when fact reaches the value within the budget", async () => {
     clearAllTimelines();
     const sys = createSystem({
@@ -99,7 +99,7 @@ describe("R1.B matchers — toReachInMs", () => {
   });
 });
 
-describe("R1.B matchers — toFireConstraint", () => {
+describe("matchers — toFireConstraint", () => {
   it("passes when constraint fired at least once", async () => {
     clearAllTimelines();
     const sys = createSystem({
@@ -147,7 +147,7 @@ describe("R1.B matchers — toFireConstraint", () => {
   });
 });
 
-describe("R1.B matchers — toResolveWithinMs", () => {
+describe("matchers — toResolveWithinMs", () => {
   it("passes when resolver completed within budget", async () => {
     clearAllTimelines();
     const sys = createSystem({
@@ -180,7 +180,7 @@ describe("R1.B matchers — toResolveWithinMs", () => {
   });
 });
 
-describe("R1.B matchers — toCascade", () => {
+describe("matchers — toCascade", () => {
   it("returns true when ≥2 constraints fire in same reconcile", () => {
     clearAllTimelines();
     // Synthetic frame stream: two constraint.evaluate(active=true)
@@ -253,7 +253,7 @@ describe("R1.B matchers — toCascade", () => {
   });
 });
 
-describe("R1.B matchers — toMutate", () => {
+describe("matchers — toMutate", () => {
   it("returns true when MUTATE-shaped fact change appears", () => {
     const synthetic = {
       id: "mutate",
@@ -294,7 +294,7 @@ describe("R1.B matchers — toMutate", () => {
   });
 });
 
-describe("R1.B matchers — input validation", () => {
+describe("matchers — input validation", () => {
   it("toReachInMs rejects null input", () => {
     expect(() => matchers.toReachInMs(null as never, "x", 1, 100)).toThrow(
       /expected a Timeline/,

@@ -68,7 +68,7 @@ For combinators (`$all`, `$any`, `$not`), `predict()` recurses into children and
 - **Not a SAT solver** – `predict()` reports failing leaves, not the *minimal* set of fact changes that satisfy the rule. For `$any: [A, B]` with both failed, it lists both – you pick which to change.
 - **Doesn't mutate facts** – pure read.
 
-## `$changed` and the `prev` snapshot (M10)
+## `$changed` and the `prev` snapshot
 
 The `$changed` operator compares the current value against the previous one. Without a `prev` snapshot, the clause cannot be evaluated meaningfully.
 

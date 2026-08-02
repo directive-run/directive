@@ -39,7 +39,7 @@
  * v0.1 scope:
  *   - Single-timeline bisect (no good.json/bad.json comparison yet).
  *   - String --assert expression (no `--assert-file` to load a vitest
- *     yet; that's R2.D territory).
+ *     expression from disk yet).
  *   - Reports first failing frame index + reconstructs the dispatch
  *     payload for human readability.
  *
@@ -323,7 +323,7 @@ export async function bisectCommand(args: string[]): Promise<void> {
     // Strip the heavy frame object from JSON output — the index alone
     // is enough for tooling, and the full frame would double the
     // payload size for callers that just want to pipe into jq.
-    // R5 sec #9: emit `null` (not `undefined`) for absent index so jq
+    // Emit `null` (not `undefined`) for absent index so jq
     // consumers can distinguish "fails before frame 0" (index=null,
     // failsOnEmptyReplay=true) from "frame 0 itself triggers"
     // (index=0, failsOnEmptyReplay=false). JSON.stringify drops

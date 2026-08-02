@@ -190,7 +190,7 @@ you suspect it's not exercising what you expect).
   not the at-event state. For the strict at-event view, use
   `JSON.parse(JSON.stringify(value))` snapshots in your handlers.
 
-## Causal-graph vitest matchers (R1.B)
+## Causal-graph vitest matchers
 
 Five matchers for asserting against the *causal chain* a Directive
 system produced – not just final state. Subpath import:
@@ -269,7 +269,7 @@ known dispatchable surface (today: `@directive-run/mutator`-shaped
 skipped by default – opt out with `{ dispatchableOnly: false }` for
 diagnostic walks.
 
-### `bisectTimeline()` – git-bisect for timelines (R2.A)
+### `bisectTimeline()` – git-bisect for timelines
 
 Binary-search a recorded timeline for the first frame whose inclusion
 flips a user-supplied assertion from passing to failing.
@@ -310,7 +310,7 @@ runs ~log₂(N) times. Keep the factory cheap (lazy DB/network init,
 no real I/O in module factories) or expect bisect of large timelines
 to take seconds.
 
-### `diffTimelines()` – semantic causal-graph diff (R2.C)
+### `diffTimelines()` – semantic causal-graph diff
 
 Compare two serialized timelines as a structured causal-graph report.
 Not a textual JSON diff – a per-category delta.

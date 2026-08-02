@@ -408,7 +408,7 @@ describe("loggingPlugin", () => {
         );
       });
 
-      // R2 fix: the bundled plugins now receive whenExplain as a third arg
+      // the bundled plugins now receive whenExplain as a third arg
       // when the constraint's `when` is data-form. Logging summarizes it as
       // a compact pass/fail breakdown so tailing the log shows which
       // clauses tripped without spinning up devtools.

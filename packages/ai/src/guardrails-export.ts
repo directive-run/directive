@@ -61,7 +61,7 @@ export {
   type VPTreeIndexConfig,
 } from "./guardrails/ann-index.js";
 
-// Fact-PII Guardrail — the Tier 0 Mandatory Companion to liveContext.
+// Fact-PII Guardrail — the mandatory companion to liveContext.
 // Closes the source → fact → agent-prompt PII bypass. See ai-sources.md
 // "Sources × Security" for the full recipe.
 export {

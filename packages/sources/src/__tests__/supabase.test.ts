@@ -279,7 +279,7 @@ describe("sourceFromSupabaseChannel", () => {
     expect(handler).toHaveBeenCalledTimes(1);
     system.stop();
     // After stop the source's dispatch is muted by the engine's
-    // !state.isRunning guard (R6). The fake channel still receives the
+    // !state.isRunning guard. The fake channel still receives the
     // event, but the publish dispatch drops at the engine boundary.
     fake.lastChannel?.fireEvent("x", "UPDATE", { v: 2 });
     expect(handler).toHaveBeenCalledTimes(1);

@@ -773,7 +773,7 @@ describe("createEvalSuite", () => {
 // A1: ReDoS pattern detection in evalMatch (regex mode)
 // ============================================================================
 
-describe("evalMatch ReDoS prevention (A1)", () => {
+describe("evalMatch ReDoS prevention", () => {
   it("rejects (a+)+$ pattern", () => {
     const criterion = evalMatch({ mode: "regex" });
     const result = criterion.fn({
@@ -835,7 +835,7 @@ describe("evalMatch ReDoS prevention (A1)", () => {
 // A2: Semaphore underflow guard
 // ============================================================================
 
-describe("semaphore underflow guard (A2)", () => {
+describe("semaphore underflow guard", () => {
   it("double-release does not cause negative active count", async () => {
     const suite = createEvalSuite({
       criteria: { cost: evalCost({ maxTokensPerRun: 500 }) },
@@ -857,7 +857,7 @@ describe("semaphore underflow guard (A2)", () => {
 // A4: evalStructure handles non-object output
 // ============================================================================
 
-describe("evalStructure non-object output (A4)", () => {
+describe("evalStructure non-object output", () => {
   it("rejects JSON array as non-object", () => {
     const criterion = evalStructure({ type: "json", requiredKeys: ["name"] });
     const result = criterion.fn({
@@ -939,7 +939,7 @@ describe("evalStructure non-object output (A4)", () => {
 // A10: NaN score propagation guard
 // ============================================================================
 
-describe("NaN score propagation guard (A10)", () => {
+describe("NaN score propagation guard", () => {
   it("treats NaN score as 0 in weighted calculation", async () => {
     const suite = createEvalSuite({
       criteria: {

@@ -38,7 +38,7 @@ import {
  *
  * Invalid locales (e.g. user-supplied garbage) fall back to `"en-US"`.
  *
- * **(F-4)** Capped at {@link NUMBER_FORMAT_CACHE_LIMIT} entries with FIFO
+ * **** Capped at {@link NUMBER_FORMAT_CACHE_LIMIT} entries with FIFO
  * eviction so an attacker cannot grow the cache unboundedly by emitting a
  * predicate with a fresh `locale` per call.
  *
@@ -68,7 +68,7 @@ export function getNumberFormat(locale: string): Intl.NumberFormat {
     } catch {
       fmt = new Intl.NumberFormat("en-US"); // fallback for invalid locales
     }
-    // (F-4) Evict the oldest entry when the cache hits its cap. Map
+    // Evict the oldest entry when the cache hits its cap. Map
     // iteration order is insertion order, so `.keys().next().value` is
     // the FIFO head. Cheap O(1) maintenance, bounded memory.
     if (numberFormatCache.size >= NUMBER_FORMAT_CACHE_LIMIT) {

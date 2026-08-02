@@ -1,7 +1,7 @@
 /**
  * Tests for `@directive-run/vite-plugin-api-proxy`.
  *
- * Focus: R6 SECURITY fixes — body cap (413), header allowlist (no
+ * Focus: SECURITY: body cap (413), header allowlist (no
  * credentials forwarded), and req.setTimeout slowloris defense.
  */
 

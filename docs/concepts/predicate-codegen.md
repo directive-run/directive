@@ -310,7 +310,7 @@ const rows = await pg.query(sql, params);
 
 ### AI-generated query, safely
 
-Pair this with `R4.D` – an LLM emits a `FactPredicate` (JSON, validated
+Pair this with `predicateFromIntent` – an LLM emits a `FactPredicate` (JSON, validated
 by the type system before it ever reaches a database) – and pass it
 through `predicateToSQL` with an `allowedKeys` list. Three layers of
 defense:

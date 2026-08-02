@@ -100,7 +100,7 @@ export class TimelineReporter {
       // Try the full hierarchical name first (matches
       // `expect.getState().currentTestName`), then the leaf name. We
       // do NOT fall back to substring matching — that produced
-      // cross-test contamination in R1 (substring match between
+      // cross-test contamination (substring match between
       // unrelated tests with similar names).
       let timeline = registry.get(name);
       if (
@@ -157,7 +157,7 @@ function fullTestName(task: ReporterTask): string {
   // The Set guard defends against any future vitest topology that
   // produces a circular parent chain (none today, but the duck-shape
   // contract makes no guarantee). Without it, a cycle would hang the
-  // reporter and starve the rest of the test report. (R2 sec m-R2-1.)
+  // reporter and starve the rest of the test report.
   const segments: string[] = [];
   const seen = new Set<ReporterTask>();
   let cursor: ReporterTask | undefined = task;

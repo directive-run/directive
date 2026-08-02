@@ -234,7 +234,7 @@ describe("listAllPredicateOperators", () => {
 // M5 — hostile getter safety
 // ============================================================================
 
-describe("getKind — hostile-getter safety (M5)", () => {
+describe("getKind — hostile-getter safety", () => {
   it("returns { kind: 'unknown' } if _kind getter throws", () => {
     const hostile = {
       get _kind(): never {
@@ -267,7 +267,7 @@ describe("getKind — hostile-getter safety (M5)", () => {
   });
 });
 
-describe("getSchemaFieldKinds — hostile-getter resilience (M5)", () => {
+describe("getSchemaFieldKinds — hostile-getter resilience", () => {
   it("one hostile builder does not abort the whole walk", () => {
     const hostile = {
       get _kind(): never {
@@ -297,7 +297,7 @@ describe("getSchemaFieldKinds — hostile-getter resilience (M5)", () => {
 // M12 — dev-mode warnings on misuse
 // ============================================================================
 
-describe("getKind — dev-mode warning on function input (M12)", () => {
+describe("getKind — dev-mode warning on function input", () => {
   it("warns when a t.* factory is passed without ()", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
@@ -315,7 +315,7 @@ describe("getKind — dev-mode warning on function input (M12)", () => {
   });
 });
 
-describe("getSchemaFieldKinds — dev-mode warning on empty result (M12)", () => {
+describe("getSchemaFieldKinds — dev-mode warning on empty result", () => {
   it("warns when schema yields zero introspectable keys", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {

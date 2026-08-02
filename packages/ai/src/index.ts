@@ -189,7 +189,7 @@ export {
 } from "./builtin-guardrails.js";
 
 /**
- * Tier 0 Mandatory Companion to `liveContext`. Closes the source →
+ * Mandatory companion to `liveContext`. Closes the source →
  * fact → agent-prompt PII bypass at the fact-store boundary. Symmetric
  * with the other built-in guardrails: re-exported here so consumers
  * who follow the "main-barrel" idiom find it, AND from the

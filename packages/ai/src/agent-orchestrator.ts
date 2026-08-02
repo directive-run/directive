@@ -806,7 +806,7 @@ export function createAgentOrchestrator<
 
   system.start();
 
-  // ---- R1 C7 — Budget pre-flight + TOCTOU reservation ----
+  // ---- Budget pre-flight + TOCTOU reservation ----
   //
   // The legacy budget constraint fires AFTER `tokenUsage` is updated,
   // so a single run can overshoot by the full call cost AND N
@@ -843,7 +843,7 @@ export function createAgentOrchestrator<
     opts?: RunOptions,
     callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
-    // ---- Budget pre-flight (R1 C7) ----
+    // ---- Budget pre-flight ----
     //
     // Reject BEFORE the LLM call when current usage + in-flight
     // reservations + this call's estimated cost would exceed the cap.
@@ -1023,7 +1023,7 @@ export function createAgentOrchestrator<
     opts?: RunOptions,
     callOptions?: RunCallOptions,
   ): Promise<RunResult<T>> {
-    // ---- Circuit-breaker composition (R1 Distrib C2) ----
+    // ---- Circuit-breaker composition ----
     //
     // Two strategies, controlled by `retryInsideCircuit`:
     //
@@ -1260,7 +1260,7 @@ export function createAgentOrchestrator<
       });
     }
 
-    // Circuit-breaker per attempt (R1 Distrib C2). When `circuitBreaker`
+    // Circuit-breaker per attempt. When `circuitBreaker`
     // is configured and `retryInsideCircuit` is false (the new default),
     // wrap the runner so every retry attempt inside
     // `executeAgentWithRetry` is gated by the breaker. Each failure

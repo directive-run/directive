@@ -4,7 +4,7 @@
  *
  * Replaces the `useFact(sys, k) ?? deps.initializeX()` pattern, which
  * produces a fresh identity on every render where the fact is null and
- * breaks downstream memoization (R9-M1 re-render storm).
+ * breaks downstream memoization.
  */
 import { createModule, createSystem, t } from "@directive-run/core";
 import { act, renderHook } from "@testing-library/react";
@@ -171,7 +171,7 @@ describe("useFactWithDefault (RFC-2)", () => {
   });
 
   it("identity stability does NOT depend on unrelated fact changes", () => {
-    // R9-M1 regression: a re-render triggered by a sibling fact must not
+    // Regression guard: a re-render triggered by a sibling fact must not
     // produce a fresh default identity.
     const factory = vi.fn(() => ({ cells: new Set<string>() }));
 

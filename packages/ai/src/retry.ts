@@ -1,5 +1,5 @@
 /**
- * P2: Intelligent Retry — HTTP-status-aware retry wrapper for AgentRunner.
+ * Intelligent Retry — HTTP-status-aware retry wrapper for AgentRunner.
  *
  * Respects 429 Retry-After headers, uses exponential backoff with jitter for 503,
  * and never retries client errors (400/401/403/404/422).

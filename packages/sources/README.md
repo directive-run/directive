@@ -135,7 +135,7 @@ This matches how `@directive-run/core` already uses subpath exports for
 
 - [`@directive-run/core` source primitive](https://github.com/directive-run/directive/blob/main/packages/knowledge/core/sources.md) – the underlying primitive these adapters wrap.
 - [`@directive-run/ai` AI × Sources recipes](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-sources.md) – `runStream({ liveContext })`, MCP lifecycle as a source.
-- [Tier 0 PII guardrail](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-security.md#sources-pii--closing-the-fact-injection-bypass) – `createFactPIIGuardrail` (wire whenever sources feed facts the agent reads).
+- [PII guardrail](https://github.com/directive-run/directive/blob/main/packages/knowledge/ai/ai-security.md#sources-pii--closing-the-fact-injection-bypass) – `createFactPIIGuardrail` (wire whenever sources feed facts the agent reads).
 
 ## License
 

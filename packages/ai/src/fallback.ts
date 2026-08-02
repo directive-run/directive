@@ -1,5 +1,5 @@
 /**
- * P0: Provider Fallback Chains — Automatic failover across multiple AgentRunners.
+ * Provider Fallback Chains — Automatic failover across multiple AgentRunners.
  *
  * Tries runners in order, moving to the next on failure.
  * Composes naturally with {@link withRetry} (each runner can have its own retry policy).

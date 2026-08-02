@@ -70,7 +70,7 @@ await anthropic.messages.create({
 
 > **`predicateToolSpec` (no suffix) is deprecated.** It returns the Anthropic shape for back-compat with v1.12.x callers. Prefer the explicit helper that matches your provider.
 
-## Retry feedback is provider-friendly (M16)
+## Retry feedback is provider-friendly
 
 When a validation error fires a retry, the next prompt only reminds the LLM about the **fact paths that failed**, not the entire schema:
 
@@ -111,7 +111,7 @@ const predicate = await predicateFromIntent({
 });
 ```
 
-**Runner must honor the signal for true mid-call cancellation (N6).** Fetch-based adapters (the bundled OpenAI / Anthropic / Ollama runners) thread the signal through to `fetch`, so the network call aborts mid-stream. A custom runner that ignores the third arg of the `AgentRunner` signature still delivers cancellation – but only at the next retry boundary, since the in-flight request will run to completion before the loop checks `signal.aborted` again.
+**Runner must honor the signal for true mid-call cancellation.** Fetch-based adapters (the bundled OpenAI / Anthropic / Ollama runners) thread the signal through to `fetch`, so the network call aborts mid-stream. A custom runner that ignores the third arg of the `AgentRunner` signature still delivers cancellation – but only at the next retry boundary, since the in-flight request will run to completion before the loop checks `signal.aborted` again.
 
 When the runner honors the signal and throws an abort-shaped error (`DOMException("Aborted", "AbortError")` from fetch, or any throw while `signal.aborted` is true), `predicateFromIntent` rethrows as `Error("aborted")` without burning a retry attempt.
 
@@ -142,14 +142,14 @@ await db.predicates.insert({
 });
 ```
 
-### Hash semantics (N3)
+### Hash semantics
 
 - **`predicateHash`** hashes the VALIDATED predicate object, canonicalized via stable stringification. Two LLM responses that differ only in whitespace or key order produce the **same** hash. This is the right primitive for "did the model emit the same logical rule?" queries.
 - **`intentHash`** hashes the sanitized intent STRING (SHA-256 when `crypto.subtle` is available, djb2 fallback). Use it to dedupe identical intents or to satisfy "we never stored the raw intent" claims.
 
 The legacy `rawOutputHash` field is gone – it hashed the raw LLM output string, which made two semantically-identical responses with different whitespace hash differently. If you have stored `rawOutputHash` values from v1.12.x, re-derive `predicateHash` from the persisted predicate via `predicateHash(predicate)` from `@directive-run/core` (public API – semver-stable, no `/internals` import needed).
 
-### PII guidance – `redact` vs `redactIntent` (M6)
+### PII guidance – `redact` vs `redactIntent`
 
 > ⚠ **`redactIntent` defaults to `false` for back-compat.** For
 > PII-sensitive deployments, ALWAYS pass `redactIntent: true` – the

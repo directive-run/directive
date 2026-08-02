@@ -376,7 +376,7 @@ export function createEngine<S extends Schema>(
   }
   // Cached plugin check — updated on register/unregister for O(1) hot-path access
   let _hasPlugins = pluginManager.getPlugins().length > 0;
-  // R19 hardening — reentry depth counter for `system.notify.guardrailBlocked`
+  // reentry depth counter for `system.notify.guardrailBlocked`
   // so a hostile plugin can't synchronously re-emit through the broadcast
   // fabric and overflow the stack. Capped at depth 4 (one legitimate
   // plugin-reacting-to-plugin chain is fine; deeper is a smell).
@@ -975,7 +975,7 @@ export function createEngine<S extends Schema>(
           `[Directive] Reconcile loop exceeded ${MAX_RECONCILE_DEPTH} iterations. This usually means resolvers are creating circular requirement chains. Check that resolvers aren't mutating facts that re-trigger their own constraints.`,
         );
       }
-      // Drain pending fact changes so they don't leak into the next trace entry (M4)
+      // Drain pending fact changes so they don't leak into the next trace entry
       if (traceEnabled) {
         traceManager.drainPendingChanges();
       }
@@ -1422,7 +1422,7 @@ export function createEngine<S extends Schema>(
         count: number,
         category?: string,
       ): void {
-        // R19 hardening — the public surface accepts a caller-supplied
+        // the public surface accepts a caller-supplied
         // `plugin` string. A malicious or buggy third-party plugin
         // holding a `System` ref could otherwise forge audit events
         // claiming `plugin: "fact-pii-guardrail"` (or any other
@@ -1882,7 +1882,7 @@ export function createEngine<S extends Schema>(
       errorBoundary.clearErrors();
       settlementListeners.clear();
       historyListeners.clear();
-      // Clean up trace state (C1)
+      // Clean up trace state
       traceManager.destroy();
       // Clean up dynamic definition state
       definitions.destroy();
@@ -1941,7 +1941,7 @@ export function createEngine<S extends Schema>(
       // — a partial teardown is better than a hang while the runtime
       // is impatient to evict.
       //
-      // Bug-fix per R11: deadline<=0 used to construct the IIFE,
+      // Bug-fix per deadline<=0 used to construct the IIFE,
       // return synchronously, and let the IIFE run detached with no
       // error path. Now we either await it or attach a swallow-catch
       // so the unhandled-rejection surface is bounded.

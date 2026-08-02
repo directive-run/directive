@@ -54,7 +54,7 @@ import { verify as verifyChain } from "./verify.js";
 
 // Re-export the public surface. `LEDGER_INTERNAL_TOKEN` is intentionally
 // NOT included — the tombstone-forgery defense depends on its
-// unguessability from outside this folder. (N7)
+// unguessability from outside this folder.
 export { memorySink } from "./sink.js";
 export type {
   AuditEntry,
@@ -107,7 +107,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    * Cache of constraint.id → whenSpec (snapshotted at start, refreshed
    * on register/assign/unregister). Spec is already PII-redacted at
    * cache time, so the operand pointer that flows into every
-   * `constraint.evaluate` entry can never leak. (C2)
+   * `constraint.evaluate` entry can never leak.
    */
   const whenSpecCache = new Map<string, FactPredicate<unknown>>();
 
@@ -159,7 +159,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       for (const c of constraints) {
         if (c.whenSpec !== undefined) {
           // Redact PII operands at cache time so the cached pointer
-          // flowing into evaluate entries is already safe. (C2)
+          // flowing into evaluate entries is already safe.
           whenSpecCache.set(
             c.id,
             redactWhenSpec(
@@ -254,7 +254,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    *
    * Entries are deeply-frozen at write time (depth 2 — top-level
    * values + whenExplain clauses) so that downstream consumers cannot
-   * mutate payloads in place and forge the chain. (C3)
+   * mutate payloads in place and forge the chain.
    */
   function emit(partial: Record<string, unknown>): AuditEntry {
     const entry = {
@@ -424,7 +424,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
   /**
    * Re-entrance guard for the truncation handler. The marker entry is
    * itself a write that may trigger another shift; without this we'd
-   * recurse and overflow. (M23)
+   * recurse and overflow.
    */
   let emittingTruncate = false;
 
@@ -436,7 +436,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
     // Wire up the truncation marker — fires BEFORE the sink drops the
     // oldest entry, so the dropped seq is still known. The guard
     // prevents the marker's own write from recursing back through the
-    // capacity overflow path. (M23)
+    // capacity overflow path.
     sink.onTruncate?.((droppedSeq, droppedCount) => {
       if (emittingTruncate) return;
       emittingTruncate = true;
@@ -489,7 +489,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       void id;
     },
     onDefinitionAssign(type, id) {
-      // (C4) Constraint assigned a new spec — refresh the cache so the
+      // Constraint assigned a new spec — refresh the cache so the
       // NEXT evaluate emits the new whenSpec, not the stale one.
       if (type === "constraint") refreshWhenSpecCache();
       void id;
@@ -499,7 +499,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       void id;
     },
     onSnapshot(snapshot) {
-      // (M9) Capture history snapshot as a lifecycle marker. Snapshot
+      // Capture history snapshot as a lifecycle marker. Snapshot
       // contents (facts) are NOT included to keep the entry small and
       // avoid duplicating PII through a different channel.
       emit({
@@ -509,7 +509,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       });
     },
     onHistoryNavigate(from, to) {
-      // (M9) Capture time-travel navigation as a lifecycle marker.
+      // Capture time-travel navigation as a lifecycle marker.
       emit({
         kind: "system.history.navigate",
         from,
@@ -522,7 +522,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
    * Strip the internal sentinel from an entry before it reaches a
    * public read path. Returns a shallow clone with `__internal`
    * removed — keeps the (frozen) live entry intact for verify() while
-   * making sure consumers never see the symbol. (N7)
+   * making sure consumers never see the symbol.
    */
   function stripInternal(entry: AuditEntry): AuditEntry {
     if (
@@ -576,7 +576,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       return verifyChain(sink, opts);
     },
     erase(filter) {
-      // (C8) Replace matching entries with tombstones IN PLACE, keeping
+      // Replace matching entries with tombstones IN PLACE, keeping
       // seq + prevHash + hashAlgo so verify() can resync the chain.
       const erasedAt = Date.now();
       let count = 0;
@@ -585,9 +585,9 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           // Build a tombstone preserving the immutable chain fields.
           // Carry SCHEMA_VERSION from the original so a fresh tombstone
           // doesn't claim to be at a newer schema than the entry it
-          // replaced. (F-5)
+          // replaced.
           //
-          // (N7) Stamp the in-module sentinel so `verify()` can tell
+          // Stamp the in-module sentinel so `verify()` can tell
           // this tombstone apart from a forgery written via
           // `sink.write({ kind: "system.entry-erased", … })`. The
           // sentinel is stripped from every public read path.
@@ -608,7 +608,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
           // which means the NEXT entry's prevHash will no longer match.
           // verify() recognises `system.entry-erased` as a legitimate
           // chain break and reports it in `erasedSeqs` rather than as
-          // tamper. (N1 + M1)
+          // tamper.
           freezeEntry(tombstone);
 
           return tombstone;
@@ -620,7 +620,7 @@ export function createAuditLedger(opts: AuditLedgerOptions = {}): AuditLedger {
       if (count === 0) {
         return { erased: 0, markerEntry: null };
       }
-      // (N2) Don't store the raw filter — PII can land in the values
+      // Don't store the raw filter — PII can land in the values
       // (e.g. `factPath: "alice@x.com"`). Capture a hash + a shape
       // descriptor so an auditor sees WHICH fields were used without
       // exposing the values.

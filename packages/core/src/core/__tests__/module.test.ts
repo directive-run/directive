@@ -423,7 +423,7 @@ describe("createModule — pivot-name conflict", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createModule — reserved `abortOn` keys (R4 FIX 6)
+// createModule — reserved `abortOn` keys
 // ---------------------------------------------------------------------------
 
 describe("createModule — reserved abortOn keys", () => {

@@ -300,7 +300,7 @@ describe("predicateToolSpec", () => {
 // C6 — split Anthropic / OpenAI tool-spec shapes
 // ============================================================================
 
-describe("predicateToolSpecAnthropic (C6) — Anthropic Messages shape", () => {
+describe("predicateToolSpecAnthropic — Anthropic Messages shape", () => {
   it("emits { name, description, input_schema } at top level", () => {
     const spec = predicateToolSpecAnthropic(SCHEMA);
     expect(spec.name).toBe("emit_predicate");
@@ -322,7 +322,7 @@ describe("predicateToolSpecAnthropic (C6) — Anthropic Messages shape", () => {
   });
 });
 
-describe("predicateToolSpecOpenAI (C6) — OpenAI Chat Completions shape", () => {
+describe("predicateToolSpecOpenAI — OpenAI Chat Completions shape", () => {
   it("emits { type: 'function', function: { name, description, parameters } }", () => {
     const spec = predicateToolSpecOpenAI(SCHEMA);
     expect(spec.type).toBe("function");
@@ -363,7 +363,7 @@ describe("predicateToolSpec (deprecated alias) — back-compat", () => {
 // M1 — $in / $nin maxArrayOperandLength enforced end-to-end
 // ============================================================================
 
-describe("predicateFromIntent — maxArrayOperandLength cap (M1)", () => {
+describe("predicateFromIntent — maxArrayOperandLength cap", () => {
   it("rejects a $in operand with > 1000 elements (default cap)", async () => {
     const huge = Array.from({ length: 1001 }, (_, i) => `r${i}`);
     const runner = mockRunner(JSON.stringify({ region: { $in: huge } }));
@@ -400,7 +400,7 @@ describe("predicateFromIntent — maxArrayOperandLength cap (M1)", () => {
 // M7 — AbortSignal cooperative cancellation
 // ============================================================================
 
-describe("predicateFromIntent — AbortSignal (M7)", () => {
+describe("predicateFromIntent — AbortSignal", () => {
   it("throws 'aborted' when signal fires before the first attempt", async () => {
     const controller = new AbortController();
     controller.abort();
@@ -457,7 +457,7 @@ describe("predicateFromIntent — AbortSignal (M7)", () => {
 // M16 — retry feedback scopes schema reminder to offending paths
 // ============================================================================
 
-describe("predicateFromIntent — retry feedback scope (M16)", () => {
+describe("predicateFromIntent — retry feedback scope", () => {
   it("retry prompt only includes kinds for offending paths + 'N more facts' sentinel", async () => {
     // Build a 200-fact schema where only one fact is touched in the bad predicate.
     const wideFacts: Record<string, ReturnType<typeof t.number>> = {};
@@ -501,7 +501,7 @@ describe("predicateFromIntent — retry feedback scope (M16)", () => {
 // M24 — predicateFromIntentWithProvenance
 // ============================================================================
 
-describe("predicateFromIntentWithProvenance (M24)", () => {
+describe("predicateFromIntentWithProvenance", () => {
   it("returns predicate + provenance record on success", async () => {
     const runner = mockRunner('{"cartTotal":{"$gte":50}}');
     const result = await predicateFromIntentWithProvenance({
@@ -678,7 +678,7 @@ describe("predicateFromIntentWithProvenance (M24)", () => {
 // here and assert it does the right thing in Node — vitest IS Node, so
 // the same runtime guard the example uses is exercised here.
 
-describe("mock-runner-style import.meta.env guard (M3)", () => {
+describe("mock-runner-style import.meta.env guard", () => {
   it("the feature-detected env access does NOT throw in Node (vitest IS Node)", () => {
     // Exact pattern used by examples/compliance-audit/src/mock-runner.ts.
     // If `import.meta.env` is undefined (Node), the optional chain
@@ -742,7 +742,7 @@ describe("mock-runner-style import.meta.env guard (M3)", () => {
 // N6 — AbortSignal threaded into runner call (in-flight cancellation)
 // ============================================================================
 
-describe("predicateFromIntent — AbortSignal threaded into runner (N6)", () => {
+describe("predicateFromIntent — AbortSignal threaded into runner", () => {
   it("forwards signal as the runner's third arg via RunOptions", async () => {
     const runner = vi.fn(async () => ({
       output: '{"cartTotal":{"$gte":1}}',

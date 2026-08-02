@@ -241,7 +241,7 @@ describe("withRetry", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("withRetry config validation", () => {
@@ -292,7 +292,7 @@ describe("withRetry config validation", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("withRetry callback isolation", () => {
@@ -335,7 +335,7 @@ describe("withRetry callback isolation", () => {
 });
 
 // ============================================================================
-// AbortSignal (M1)
+// AbortSignal
 // ============================================================================
 
 describe("withRetry AbortSignal", () => {

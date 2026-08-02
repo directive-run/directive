@@ -266,7 +266,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     try {
       const { url, init } = buildRequest(agent, input, messages);
 
-      // (Sec MAJOR) Combine signals — `buildRequest` may set
+      // Combine signals — `buildRequest` may set
       // `init.signal` (e.g. `AbortSignal.timeout(timeoutMs)`) and the
       // caller may pass their own via `runOptions.signal`. Naively
       // overwriting one with the other silently disables whichever was

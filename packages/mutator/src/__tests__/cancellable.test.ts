@@ -10,7 +10,7 @@ import {
   cancellable,
 } from "../index.js";
 
-describe("R1.C cancellable() — basic invocation", () => {
+describe("cancellable() — basic invocation", () => {
   it("invokes the wrapped handler with a non-aborted signal", async () => {
     const wrapped = cancellable<{ count: number }, { delta: number }>(
       {},
@@ -45,7 +45,7 @@ describe("R1.C cancellable() — basic invocation", () => {
   });
 });
 
-describe("R1.C cancellable() — supersession", () => {
+describe("cancellable() — supersession", () => {
   it("aborts the prior in-flight handler when a new dispatch arrives", async () => {
     let releaseFirst: () => void = () => {};
     const seen: string[] = [];
@@ -168,7 +168,7 @@ describe("R1.C cancellable() — supersession", () => {
   });
 });
 
-describe("R1.C cancellable() — timeout", () => {
+describe("cancellable() — timeout", () => {
   it("aborts the signal after timeoutMs (using virtualClock)", async () => {
     const clock = virtualClock(0);
     let abortReason: unknown;
@@ -276,7 +276,7 @@ describe("R1.C cancellable() — timeout", () => {
   });
 });
 
-describe("R2 sec M-1: signal.reason is a CancelError subclass", () => {
+describe("signal.reason is a CancelError subclass", () => {
   it("supersession reason is a SupersededCancelError instance", async () => {
     let releaseFirst: () => void = () => {};
     let abortReason: unknown;
@@ -368,7 +368,7 @@ describe("R2 sec M-1: signal.reason is a CancelError subclass", () => {
   });
 });
 
-describe("R2 sec M-3: cancelTimeout cleanup does not shadow handler errors", () => {
+describe("cancelTimeout cleanup does not shadow handler errors", () => {
   it("a throwing setTimeout cancel-handle does not replace handler exception", async () => {
     const wrapped = cancellable<Record<string, never>, Record<string, never>>(
       {
@@ -389,7 +389,7 @@ describe("R2 sec M-3: cancelTimeout cleanup does not shadow handler errors", () 
   });
 });
 
-describe("R1.C cancellable() — independence between separate HOCs", () => {
+describe("cancellable() — independence between separate HOCs", () => {
   it("two separate cancellable() wraps do NOT cancel each other", async () => {
     let releaseFirst: () => void = () => {};
     const completions: string[] = [];

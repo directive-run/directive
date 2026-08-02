@@ -613,7 +613,7 @@ describe("destroy", () => {
 });
 
 // ============================================================================
-// R1 C-batch 2 — Budget pre-flight (C7)
+// Budget pre-flight
 // ============================================================================
 //
 // Prior behavior: budget was a constraint that fired post-call. N
@@ -621,7 +621,7 @@ describe("destroy", () => {
 // spend was N * maxTokenBudget. The fix adds a pre-flight check that
 // rejects when projected usage (current + in-flight reservations + this
 // call's estimate) would exceed the cap.
-describe("budget pre-flight (R1 C7)", () => {
+describe("budget pre-flight", () => {
   it("default (no budgetEstimateTokens) — rejects when already over cap", async () => {
     // Heavy result to push usage past cap on first call.
     const heavy: RunResult = {
@@ -722,7 +722,7 @@ describe("budget pre-flight (R1 C7)", () => {
 });
 
 // ============================================================================
-// R1 C-batch 2 — Retry-outside-circuit-breaker (Distrib C2)
+// Retry-outside-circuit-breaker
 // ============================================================================
 //
 // Prior: `circuitBreaker.execute(() => runWithRetry(...))` hid retries
@@ -731,7 +731,7 @@ describe("budget pre-flight (R1 C7)", () => {
 // New default: each retry attempt is wrapped in CB.execute individually.
 // Each failure counts toward `failureThreshold`. Opt-in to legacy via
 // `retryInsideCircuit: true`.
-describe("retry-outside-circuit-breaker (R1 Distrib C2)", () => {
+describe("retry-outside-circuit-breaker", () => {
   it("default — each retry attempt counts as a circuit-breaker failure", async () => {
     let cbAttempts = 0;
     const fakeCB = {

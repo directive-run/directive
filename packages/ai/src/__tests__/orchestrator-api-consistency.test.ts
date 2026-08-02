@@ -14,7 +14,7 @@ function mockAgent(name = "test-agent") {
 // budgetWarningThreshold / onBudgetWarning
 // ============================================================================
 
-describe("budgetWarningThreshold / onBudgetWarning (C1)", () => {
+describe("budgetWarningThreshold / onBudgetWarning", () => {
   it("fires onBudgetWarning at threshold", async () => {
     const warnings: Array<{
       currentTokens: number;
@@ -152,7 +152,7 @@ describe("budgetWarningThreshold / onBudgetWarning (C1)", () => {
 // totalTokens convenience property
 // ============================================================================
 
-describe("totalTokens convenience property (C2)", () => {
+describe("totalTokens convenience property", () => {
   it("starts at 0", () => {
     const mock = createMockAgentRunner();
     const orchestrator = createAgentOrchestrator({ runner: mock.run });
@@ -245,7 +245,7 @@ describe("waitForIdle (H1)", () => {
 // agentId in onGuardrailCheck hook
 // ============================================================================
 
-describe("agentId in onGuardrailCheck (M1)", () => {
+describe("agentId in onGuardrailCheck", () => {
   it("includes agentId in guardrail check events", async () => {
     const events: Array<{ agentId?: string; guardrailType: string }> = [];
     const mock = createMockAgentRunner({

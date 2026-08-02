@@ -19,20 +19,20 @@
  * the LLM's retry prompt.
  *
  * This is a **structural** v1. Full SMT-lite (Z3.wasm) is deferred to
- * a dedicated R4.B sprint; the primitive of "doctor says no" is what
+ * a dedicated sprint; the primitive of "doctor says no" is what
  * this slice ships. False negatives are acceptable (no contradiction
  * reported when one exists in semantics that the structural checker
  * can't see). False positives (contradiction reported where none
  * exists) are NOT acceptable — every reported contradiction must be
  * defensible.
  *
- * **v1 scope LIMITATION (M4):** `checkAgainst` operates on predicate
+ * **v1 scope LIMITATION:** `checkAgainst` operates on predicate
  * logic only. It does NOT consult `bind:` / `abortOn:` resolver
  * metadata — a candidate that would *write* to a fact in another
  * constraint's abort-binding will not be flagged here. Use
  * `doctor.checkAbortOn()` for that gate.
  *
- * **INVARIANT (M11):** `checkAgainst` depends on `flattenPredicate`
+ * **INVARIANT:** `checkAgainst` depends on `flattenPredicate`
  * emitting `{ path, op, value }` LeafClause shape — if that shape ever
  * changes, every comparison below silently breaks. See
  * `doctor-leaf-shape.contract.test.ts`.
@@ -101,7 +101,7 @@ export interface ExistingConstraint {
  * {@link CheckAgainstResult} so callers can route both shapes
  * uniformly: by default, abort-binding collisions are `"warning"`
  * (the engine still has a runtime gate), but a caller can promote them
- * to `"error"` for stricter pre-deploy linting. (M5)
+ * to `"error"` for stricter pre-deploy linting.
  */
 export interface CheckAbortOnFinding {
   readonly constraintId: string;
@@ -113,7 +113,7 @@ export interface CheckAbortOnFinding {
   /**
    * Severity discriminator — `"warning"` by default (the engine has
    * its own runtime gate), `"error"` reserved for callers that want
-   * strict pre-deploy lints. (M5)
+   * strict pre-deploy lints.
    */
   readonly severity?: "error" | "warning";
 }
@@ -125,7 +125,7 @@ export interface CheckAbortOnFinding {
  * engine itself enforces the runtime binding gate, so a pre-deploy
  * doctor pass treats them as advisory. The
  * {@link CheckAbortOnFinding.severity} discriminator anticipates v2
- * promotion of findings to errors. (M5, F-3)
+ * promotion of findings to errors.
  */
 export interface CheckAbortOnResult {
   /**
@@ -518,7 +518,7 @@ export const doctor = {
       }
     }
 
-    // (M5, F-3) AbortOn-collisions are warnings by default — the engine
+    // AbortOn-collisions are warnings by default — the engine
     // still enforces the runtime binding gate. v1 result shape is
     // `{ warnings }` only; the per-finding `severity` discriminator
     // anticipates v2 promotion of findings to errors without breaking

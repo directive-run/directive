@@ -174,7 +174,7 @@ describe("withBudget", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("withBudget config validation", () => {
@@ -244,7 +244,7 @@ describe("withBudget config validation", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("withBudget callback isolation", () => {
@@ -267,7 +267,7 @@ describe("withBudget callback isolation", () => {
 });
 
 // ============================================================================
-// BudgetRunner type (C3)
+// BudgetRunner type
 // ============================================================================
 
 describe("BudgetRunner getSpent", () => {

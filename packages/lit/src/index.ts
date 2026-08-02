@@ -1286,7 +1286,7 @@ export class HydrationController implements ReactiveController {
 }
 
 // ============================================================================
-// AuditLedgerController — live ledger entries with filter (R4.I parity)
+// AuditLedgerController — live ledger entries with filter
 // ============================================================================
 
 import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";
@@ -1375,7 +1375,7 @@ export class AuditLedgerController implements ReactiveController {
       // when the seq-window actually moved. At steady-state capacity
       // (e.g. 10k entries rolling over) the length is constant — using
       // length-diff alone misses every change. Compare the first and
-      // last seq instead. (R4.C7)
+      // last seq instead.
       const moved =
         next[0]?.seq !== this.value[0]?.seq ||
         next[next.length - 1]?.seq !== this.value[this.value.length - 1]?.seq;

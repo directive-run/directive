@@ -77,8 +77,6 @@ const MAX_ERROR_LEN = 500;
  * Returns at most {@link MAX_ERROR_LEN} characters of plaintext.
  * Plaintext rendering is still the only supported path on the
  * consumer side; this is defense in depth, not an XSS sanitizer.
- *
- * (R2 sec M-R2-1.)
  */
 function truncateError(input: unknown): string {
   let str: string;
@@ -86,7 +84,7 @@ function truncateError(input: unknown): string {
     // Reading `.message` is wrapped in try/catch because a maliciously
     // constructed Error subclass may install a throwing getter on
     // `message`. Without this guard the throw escapes truncateError →
-    // escapes the resolver's catch → propagates uncaught. (R4 backlog.)
+    // escapes the resolver's catch → propagates uncaught.
     let raw: unknown;
     try {
       raw = input.message;
@@ -414,8 +412,7 @@ export function defineMutator<
             // disambiguate "still in flight" from "stopped on error".
             status: "failed",
             // truncateError handles the unknown shape safely — non-Error
-            // throws, non-string Error.message, hostile toString. (R2
-            // sec M-R2-1.)
+            // throws, non-string Error.message, hostile toString.
             error: truncateError(err),
           };
         }
@@ -471,7 +468,7 @@ export function mutate<M extends MutationMap>(
 }
 
 // ============================================================================
-// cancellable() — auto-cancel-on-supersede (R1.C v0.1)
+// cancellable() — auto-cancel-on-supersede (v0.1)
 // ============================================================================
 
 /**
@@ -532,7 +529,7 @@ export interface CancellableHandlerContext<F, P> {
  * the same shape — `signal.reason instanceof CancelError` is the
  * canonical check. Older usages that did `signal.reason?.kind ===
  * 'superseded'` continue to work because the Error subclass exposes
- * the same `kind` field. (R2 sec M-1.)
+ * the same `kind` field.
  */
 export type CancelReason =
   | { kind: "superseded" }
@@ -543,7 +540,7 @@ export type CancelReason =
  * value survives transit through `fetch(url, { signal })` and other
  * web-platform APIs that re-throw `signal.reason`. Older mutator
  * versions passed plain objects, which `.catch(err => err instanceof
- * Error)` filters silently dropped. (R2 sec M-1.)
+ * Error)` filters silently dropped.
  */
 export class CancelError extends Error {
   constructor(
@@ -650,7 +647,7 @@ export function cancellable<F, P>(
 
   return async (ctx: { facts: F; payload: P; requeue: () => void }) => {
     // Supersession: abort the prior in-flight invocation, if any.
-    // R2 sec M-1: pass an Error subclass so signal.reason survives
+    // pass an Error subclass so signal.reason survives
     // re-throw through fetch / .catch(err => err instanceof Error)
     // / logging frameworks. Plain object reasons silently fail those
     // checks downstream.
@@ -682,7 +679,7 @@ export function cancellable<F, P>(
     } finally {
       // Clean up: clear the timeout (if it hasn't fired) and release
       // the supersession slot if it still belongs to this invocation.
-      // R2 sec M-3: wrap cancelTimeout in try/catch so a hostile
+      // wrap cancelTimeout in try/catch so a hostile
       // setTimeout-cancel-handle (e.g. a custom virtual clock that
       // throws on cancel) cannot shadow the original handler's
       // exception.
@@ -708,7 +705,7 @@ function defaultSetTimeout(cb: () => void, ms: number): () => void {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// recordReplayable — R2.B
+// recordReplayable
 // ────────────────────────────────────────────────────────────────────────────
 
 /**

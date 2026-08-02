@@ -1,5 +1,5 @@
 /**
- * P6: Structured Outputs — Schema validation with auto-retry for LLM responses.
+ * Structured Outputs — Schema validation with auto-retry for LLM responses.
  *
  * Turns unreliable text output into typed, validated data. Appends JSON schema
  * instructions to the system prompt and retries with error feedback on parse failure.

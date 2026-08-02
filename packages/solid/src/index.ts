@@ -1041,7 +1041,7 @@ export function useHydratedSystem<S extends ModuleSchema>(
 }
 
 // ============================================================================
-// useAuditLedger — live ledger entries with filter (R4.I parity)
+// useAuditLedger — live ledger entries with filter
 // ============================================================================
 
 import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";

@@ -503,7 +503,7 @@ describe("createOtelPlugin", () => {
   });
 
   // ============================================================================
-  // New tests for AE review fixes
+  // Trace/span identity, error status, and attribute coverage
   // ============================================================================
 
   it("spans have traceId and spanId", () => {
