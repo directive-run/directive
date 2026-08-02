@@ -14,7 +14,7 @@ Need the complete result?
     ├── Wrap a base runner       → createStreamingRunner(baseRunner, opts) → StreamRunner
     └── Server-Sent Events to HTTP → createSSETransport(config) → { toResponse, toStream }
 
-Backpressure concern?
+Backpressure concern? (StreamRunOptions only — runStream ignores these)
 ├── Consumer is slow             → backpressure: "buffer" (default)
 ├── Need every token             → backpressure: "block"
 └── Real-time, can drop          → backpressure: "drop"
@@ -118,10 +118,12 @@ abort();
 
 ## Backpressure strategies
 
-Configure how the stream behaves when the consumer can't keep up. Pass via `runStream`'s `options` (orchestrator-side) or via the `StreamRunOptions` if you're calling a `StreamRunner` directly.
+Backpressure is configured on `StreamRunOptions` — the options accepted by a `StreamRunner` built with `createStreamingRunner`. `orchestrator.runStream` accepts only `{ signal, liveContext }`; passing `backpressure` or `bufferSize` there does nothing.
 
 ```typescript
-const { stream, result } = orchestrator.runStream(agent, "Generate a long report", {
+const streamRunner = createStreamingRunner(callbackBased);
+
+const { stream, result } = streamRunner(agent, "Generate a long report", {
   signal: abortController.signal,
   backpressure: "buffer",   // default — buffer all tokens
   // backpressure: "block"   // pause generation until consumer catches up
@@ -137,6 +139,8 @@ const { stream, result } = orchestrator.runStream(agent, "Generate a long report
 | `"buffer"` | Buffers all tokens in memory | Consumer is slightly slow; memory is available |
 | `"block"` | Pauses model generation | Consumer must process every token |
 | `"drop"` | Drops unprocessed tokens | Real-time display; some loss acceptable |
+
+> **`"block"` does not pause a provider adapter.** `StreamingCallbackRunner`'s `onToken` is typed `(token: string) => void`, and `parseSSEStream` invokes it without awaiting, so there is no channel for a slow consumer to push back on the provider. Against every adapter shipped here, `"block"` behaves as `"buffer"`. It works only with a custom base runner that awaits `onToken` itself.
 
 ## `createStreamingRunner(baseRunner, options?)`
 
