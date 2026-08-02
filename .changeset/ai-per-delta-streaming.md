@@ -66,3 +66,27 @@ A runner that cannot stream ignores the request and returns its ordinary
 buffered result, and the whole-message chunk is still emitted — so nothing
 breaks. If deltas were requested and none arrived alongside non-empty output,
 the orchestrator says so once instead of leaving it silent.
+
+**A streamed run now leaves the same record behind as a buffered one.** Stream
+chunks are consumed once and then gone, so anything only ever reported as a
+chunk is unavailable to whoever reconstructs the run afterwards.
+
+- `orchestrator.runStream` writes `agent_start` and `agent_complete` to the
+  debug timeline, with the same fields `orchestrator.run` writes and at the same
+  two points. It previously wrote nothing at all, so a streamed run was invisible
+  on the timeline — including which agent ran and what it produced. The
+  multi-agent orchestrator's streaming path already recorded both. Timelines only
+  exist when `debug: true`, so this is additive where it appears at all.
+- The single-agent streaming path caps the `toolCalls` fact at 200 entries, which
+  is the cap the buffered path has always applied. It appended without bound
+  before, so a long streamed session grew the fact forever and a consumer reading
+  it could tell which path had produced it.
+
+**`destroy()` no longer abandons streams that are still open.** It was
+`system.destroy()` and nothing more: a stream in flight kept its consumers parked
+on an iterator that would never resolve, and the provider request — and the spend
+it was accruing — was left with nothing to cancel it. Both orchestrators now
+abort and close every stream still open, so a consumer mid-`for await` observes
+the stream ending. Streams remove themselves as they terminate, so the bookkeeping
+does not grow across a long-lived orchestrator's lifetime, and `destroy()` with
+nothing streaming does exactly what it did before.

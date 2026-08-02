@@ -776,6 +776,15 @@ export function createMultiAgentOrchestrator(
     }
   }
 
+  // Streams handed out by `runAgentStream` that have not reached a terminal
+  // chunk. `destroy()` walks this so an in-flight run is aborted and its
+  // consumers released; a stream left open at that moment parks every
+  // `for await` on a waiter that nothing will ever resolve, and leaves the
+  // provider request – and the spend it is accruing – with nothing to cancel
+  // it. Each entry removes itself the moment its stream closes, so the set
+  // holds only what is genuinely open rather than growing once per run.
+  const liveStreams = new Set<{ shutdown: () => void }>();
+
   // Semaphores for concurrency control
   const semaphores = new Map<string, Semaphore>();
   for (const [agentId, reg] of Object.entries(agents)) {
@@ -2584,7 +2593,13 @@ export function createMultiAgentOrchestrator(
         }
       };
 
+      // Registered in `liveStreams` while this stream is open; the real body
+      // is assigned once the abort controller below exists.
+      const taskHandle: { shutdown: () => void } = { shutdown: () => {} };
+
       const closeTaskStream = () => {
+        // No longer something `destroy()` needs to reach.
+        liveStreams.delete(taskHandle);
         taskClosed = true;
         for (const w of taskWaiters) {
           w(null);
@@ -2605,6 +2620,15 @@ export function createMultiAgentOrchestrator(
           });
         }
       }
+
+      // `abort()` alone leaves consumers parked on `taskWaiters` until the
+      // rejection makes it back round; `destroy()` has to close the stream
+      // itself, because nothing is coming back round after it.
+      taskHandle.shutdown = () => {
+        taskAbortController.abort();
+        closeTaskStream();
+      };
+      liveStreams.add(taskHandle);
 
       const resultPromise = runSingleAgent<T>(agentId, input, {
         signal: taskAbortController.signal,
@@ -2754,7 +2778,12 @@ export function createMultiAgentOrchestrator(
       }
     };
 
+    // Registered in `liveStreams` while this stream is open.
+    const streamHandle: { shutdown: () => void } = { shutdown: () => {} };
+
     const closeStream = () => {
+      // No longer something `destroy()` needs to reach.
+      liveStreams.delete(streamHandle);
       closed = true;
       cleanup();
       for (const waiter of waiters) {
@@ -2762,6 +2791,16 @@ export function createMultiAgentOrchestrator(
       }
       waiters.length = 0;
     };
+
+    // Everything `abort()` does, and what `destroy()` calls on any stream
+    // still open. Registered before the run starts so a stream that fails on
+    // its first tick is still reachable.
+    const shutdownStream = (): void => {
+      abortController.abort();
+      closeStream();
+    };
+    streamHandle.shutdown = shutdownStream;
+    liveStreams.add(streamHandle);
 
     // Bound the partial output without bisecting a surrogate pair.
     const appendToAccumulated = (text: string) => {
@@ -2931,17 +2970,11 @@ export function createMultiAgentOrchestrator(
     return {
       stream,
       result: resultPromise,
-      abort: () => {
-        abortController.abort();
-        closeStream();
-      },
+      abort: shutdownStream,
       // RFC 0005: multi-agent delegate streams don't bind liveContext
       // — interruption maps to abort. Single-agent runStream is the
       // surface where liveContext lives.
-      interrupt: () => {
-        abortController.abort();
-        closeStream();
-      },
+      interrupt: shutdownStream,
     };
   }
 
@@ -7563,6 +7596,15 @@ export function createMultiAgentOrchestrator(
       if (destroyed) {
         return;
       }
+      // Streams still open at this point have consumers parked on the
+      // iterator and a provider request still running. Abort each so the
+      // request stops costing money, and close it so a `for await` observes
+      // the stream ending instead of waiting forever. Iterate a copy – each
+      // shutdown removes its own entry.
+      for (const handle of [...liveStreams]) {
+        handle.shutdown();
+      }
+      liveStreams.clear();
       // Reset before marking as destroyed (reset() calls assertNotDestroyed())
       orchestrator.reset();
       // Clear callback references to allow garbage collection

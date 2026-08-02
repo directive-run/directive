@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAgentOrchestrator } from "../agent-orchestrator.js";
 import type { OrchestratorStreamChunk } from "../agent-orchestrator.js";
 import { BudgetExceededError, withBudget } from "../budget.js";
+import type { DebugTimeline } from "../debug-timeline.js";
 import { createMultiAgentOrchestrator } from "../multi-agent-orchestrator.js";
 import { withRetry } from "../retry.js";
 import { sliceTailByCodePoint } from "../streaming.js";
@@ -957,5 +958,395 @@ describe("both orchestrators stream the same way", () => {
     ]);
     expect(restartOf(multiChunks)).toEqual(restartOf(singleChunks));
     expect(tokenData(singleChunks)).toEqual(tokenData(multiChunks));
+  });
+});
+
+// ============================================================================
+// Durable record of a streamed run
+// ============================================================================
+
+/**
+ * A runner that reports one tool call per name through `options.onToolCall`,
+ * the way a tool-executing runner does, then answers with deltas.
+ */
+function toolCallRunner(toolNames: string[]): AgentRunner {
+  return (async (_agent: AgentLike, _input: string, options?: any) => {
+    const calls = toolNames.map((name, i) => ({
+      id: `call-${i}`,
+      name,
+      arguments: `{"i":${i}}`,
+      result: `result-${i}`,
+    }));
+    for (const call of calls) {
+      await options?.onToolCall?.(call);
+    }
+    if (options?.onToken) {
+      await options.onToken("done");
+    }
+    await options?.onMessage?.({ role: "assistant", content: "done" });
+
+    return { ...resultFor("done"), toolCalls: calls };
+  }) as unknown as AgentRunner;
+}
+
+/** The `toolCalls` bridge fact for the single-agent orchestrator. */
+function singleToolCallsFact(orchestrator: {
+  facts: { toolCalls: unknown };
+}): Array<{ id: string; name: string }> {
+  return orchestrator.facts.toolCalls as Array<{ id: string; name: string }>;
+}
+
+/** The `toolCalls` bridge fact for one agent of the multi-agent orchestrator. */
+function multiToolCallsFact(
+  orchestrator: { facts: Record<string, unknown> },
+  agentId: string,
+): Array<{ id: string; name: string }> {
+  const agentFacts = orchestrator.facts[agentId] as Record<string, unknown>;
+
+  return agentFacts.__toolCalls as Array<{ id: string; name: string }>;
+}
+
+/** Event types recorded on a timeline, in order. */
+function timelineTypes(timeline: DebugTimeline | null): string[] {
+  return (timeline?.getEvents() ?? []).map((event) => event.type);
+}
+
+/**
+ * The fields a timeline entry carries that describe the run rather than when
+ * it happened, so two runs of the same agent can be compared directly.
+ */
+function timelineShape(
+  timeline: DebugTimeline | null,
+): Record<string, unknown>[] {
+  return (timeline?.getEvents() ?? []).map((event) => {
+    const fields: Record<string, unknown> = { ...event };
+
+    return {
+      type: fields.type,
+      agentId: fields.agentId,
+      input: fields.input,
+      inputLength: fields.inputLength,
+      output: fields.output,
+      outputLength: fields.outputLength,
+      totalTokens: fields.totalTokens,
+    };
+  });
+}
+
+describe("streamed runs leave the same record as buffered ones", () => {
+  it("single-agent: the toolCalls fact is identical either way", async () => {
+    const buffered = createAgentOrchestrator({
+      runner: toolCallRunner(["search", "fetch"]),
+      autoApproveToolCalls: true,
+    });
+    await buffered.run(mockAgent(), "hi");
+
+    const streamed = createAgentOrchestrator({
+      runner: toolCallRunner(["search", "fetch"]),
+      autoApproveToolCalls: true,
+    });
+    const { stream, result } = streamed.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    await collect(stream);
+    await result;
+
+    expect(singleToolCallsFact(streamed)).toEqual(
+      singleToolCallsFact(buffered),
+    );
+    expect(singleToolCallsFact(streamed).map((c) => c.name)).toEqual([
+      "search",
+      "fetch",
+    ]);
+  });
+
+  it("multi-agent: the toolCalls fact is identical either way", async () => {
+    const buffered = multiAgent(toolCallRunner(["search", "fetch"]), {
+      autoApproveToolCalls: true,
+    });
+    await buffered.runAgent("assistant", "hi");
+
+    const streamed = multiAgent(toolCallRunner(["search", "fetch"]), {
+      autoApproveToolCalls: true,
+    });
+    const { stream, result } = streamed.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    await collect(stream);
+    await result;
+
+    expect(multiToolCallsFact(streamed, "assistant")).toEqual(
+      multiToolCallsFact(buffered, "assistant"),
+    );
+  });
+
+  it("both orchestrators record one entry per tool call, not two", async () => {
+    const single = createAgentOrchestrator({
+      runner: toolCallRunner(["search"]),
+      autoApproveToolCalls: true,
+    });
+    const singleStream = single.runStream(mockAgent(), "hi", {
+      onToken: () => {},
+    });
+    await collect(singleStream.stream);
+    await singleStream.result;
+
+    const multi = multiAgent(toolCallRunner(["search"]), {
+      autoApproveToolCalls: true,
+    });
+    const multiStream = multi.runAgentStream("assistant", "hi", {
+      onToken: () => {},
+    });
+    await collect(multiStream.stream);
+    await multiStream.result;
+
+    expect(singleToolCallsFact(single)).toHaveLength(1);
+    expect(multiToolCallsFact(multi, "assistant")).toHaveLength(1);
+  });
+
+  it("both cap the streamed toolCalls fact where the buffered path caps it", async () => {
+    const names = Array.from({ length: 205 }, (_, i) => `tool-${i}`);
+
+    const single = createAgentOrchestrator({
+      runner: toolCallRunner(names),
+      autoApproveToolCalls: true,
+    });
+    const singleStream = single.runStream(mockAgent(), "hi", { deltas: true });
+    await collect(singleStream.stream);
+    await singleStream.result;
+
+    const multi = multiAgent(toolCallRunner(names), {
+      autoApproveToolCalls: true,
+    });
+    const multiStream = multi.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    await collect(multiStream.stream);
+    await multiStream.result;
+
+    // 200 is the cap the buffered path has always applied. Before this the
+    // single-agent streaming path appended without bound.
+    expect(singleToolCallsFact(single)).toHaveLength(200);
+    expect(multiToolCallsFact(multi, "assistant")).toHaveLength(200);
+    expect(singleToolCallsFact(single)[0]?.name).toBe("tool-5");
+    expect(multiToolCallsFact(multi, "assistant")[0]?.name).toBe("tool-5");
+  });
+
+  it("both write agent_start and agent_complete to the timeline while streaming", async () => {
+    const single = createAgentOrchestrator({
+      runner: toolCallRunner(["search"]),
+      autoApproveToolCalls: true,
+      debug: true,
+    });
+    const singleStream = single.runStream(mockAgent(), "hi", { deltas: true });
+    await collect(singleStream.stream);
+    await singleStream.result;
+
+    const multi = multiAgent(toolCallRunner(["search"]), {
+      autoApproveToolCalls: true,
+      debug: true,
+    });
+    const multiStream = multi.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    await collect(multiStream.stream);
+    await multiStream.result;
+
+    expect(timelineTypes(single.timeline)).toEqual([
+      "agent_start",
+      "agent_complete",
+    ]);
+    expect(timelineTypes(multi.timeline)).toEqual(
+      timelineTypes(single.timeline),
+    );
+  });
+
+  it("single-agent: the streamed timeline entries carry what the buffered ones carry", async () => {
+    const buffered = createAgentOrchestrator({
+      runner: deltaRunner(["Hello"]),
+      debug: true,
+    });
+    await buffered.run(mockAgent(), "a question");
+
+    const streamed = createAgentOrchestrator({
+      runner: deltaRunner(["Hello"]),
+      debug: true,
+    });
+    const { stream, result } = streamed.runStream(mockAgent(), "a question", {
+      deltas: true,
+    });
+    await collect(stream);
+    await result;
+
+    expect(timelineShape(streamed.timeline)).toEqual(
+      timelineShape(buffered.timeline),
+    );
+  });
+});
+
+// ============================================================================
+// destroy() and streams still in flight
+// ============================================================================
+
+/** A runner that never settles, so the stream stays open until torn down. */
+function hangingRunner(onStart: () => void): AgentRunner {
+  return (async (_agent: AgentLike, _input: string, _options?: any) => {
+    onStart();
+
+    return new Promise<RunResult>(() => {});
+  }) as unknown as AgentRunner;
+}
+
+/** A runner that records the signal it was handed, then answers normally. */
+function signalCapturingRunner(seen: AbortSignal[]): AgentRunner {
+  return (async (_agent: AgentLike, _input: string, options?: any) => {
+    if (options?.signal) {
+      seen.push(options.signal);
+    }
+    await options?.onMessage?.({ role: "assistant", content: "ok" });
+
+    return resultFor("ok");
+  }) as unknown as AgentRunner;
+}
+
+/** Resolve once the microtask and timer queues have drained. */
+function settle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+describe("destroy() and live streams", () => {
+  it("single-agent: releases a consumer parked on the stream", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+
+    const { stream } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const consumed = (async () => {
+      for await (const _chunk of stream) {
+        // drain until the stream ends
+      }
+
+      return "ended";
+    })();
+
+    await hasStarted;
+    await settle();
+    orchestrator.destroy();
+
+    await expect(consumed).resolves.toBe("ended");
+  });
+
+  it("multi-agent: releases a consumer parked on the stream", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = multiAgent(hangingRunner(started));
+
+    const { stream } = orchestrator.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    const consumed = (async () => {
+      for await (const _chunk of stream) {
+        // drain until the stream ends
+      }
+
+      return "ended";
+    })();
+
+    await hasStarted;
+    await settle();
+    orchestrator.destroy();
+
+    await expect(consumed).resolves.toBe("ended");
+  });
+
+  it("single-agent: aborts the in-flight provider request", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let seen: AbortSignal | undefined;
+    const orchestrator = createAgentOrchestrator({
+      runner: (async (_a: AgentLike, _i: string, options?: any) => {
+        seen = options?.signal;
+        started();
+
+        return new Promise<RunResult>(() => {});
+      }) as unknown as AgentRunner,
+    });
+
+    const { stream } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    void collect(stream);
+
+    await hasStarted;
+    await settle();
+    expect(seen?.aborted).toBe(false);
+
+    orchestrator.destroy();
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("single-agent: a completed stream deregisters, so destroy() reaches nothing", async () => {
+    const seen: AbortSignal[] = [];
+    const orchestrator = createAgentOrchestrator({
+      runner: signalCapturingRunner(seen),
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+        deltas: true,
+      });
+      await collect(stream);
+      await result;
+    }
+
+    expect(seen).toHaveLength(3);
+    orchestrator.destroy();
+
+    // A leaked registry would abort every finished run's signal here.
+    expect(seen.map((s) => s.aborted)).toEqual([false, false, false]);
+  });
+
+  it("multi-agent: a completed stream deregisters, so destroy() reaches nothing", async () => {
+    const seen: AbortSignal[] = [];
+    const orchestrator = multiAgent(signalCapturingRunner(seen));
+
+    for (let i = 0; i < 3; i++) {
+      const { stream, result } = orchestrator.runAgentStream(
+        "assistant",
+        "hi",
+        {
+          deltas: true,
+        },
+      );
+      await collect(stream);
+      await result;
+    }
+
+    expect(seen).toHaveLength(3);
+    orchestrator.destroy();
+
+    expect(seen.map((s) => s.aborted)).toEqual([false, false, false]);
+  });
+
+  it("destroy() with nothing streaming behaves exactly as before", async () => {
+    const single = createAgentOrchestrator({ runner: bufferedRunner("ok") });
+    await single.run(mockAgent(), "hi");
+    expect(() => single.destroy()).not.toThrow();
+
+    const multi = multiAgent(bufferedRunner("ok"));
+    await multi.runAgent("assistant", "hi");
+    expect(() => multi.destroy()).not.toThrow();
+    // Second call stays a no-op.
+    expect(() => multi.destroy()).not.toThrow();
   });
 });

@@ -125,6 +125,38 @@ const final = await result; // RunResult<T>
 abort();
 ```
 
+## Teardown: `abort()` and `destroy()`
+
+`abort()` cancels one stream. `orchestrator.destroy()` tears down the whole orchestrator, and any stream still open at that moment is aborted and closed with it — the provider request stops, and a consumer sitting in `for await` sees the loop end rather than waiting forever.
+
+```typescript
+const { stream } = orchestrator.runStream(agent, "Write a report", { deltas: true });
+
+const rendering = (async () => {
+  for await (const chunk of stream) {
+    if (chunk.type === "token") process.stdout.write(chunk.data);
+  }
+  console.log("\nstream ended");
+})();
+
+// Shutting down: the loop above ends, it does not hang.
+orchestrator.destroy();
+await rendering;
+```
+
+A stream that finished on its own costs nothing here — `destroy()` only reaches streams that are genuinely still open.
+
+## What a streamed run leaves behind
+
+Chunks are consumed once and then gone, so do not treat them as the record of what happened. A streamed run writes the same durable state a buffered one does:
+
+| Where | What |
+|---|---|
+| `orchestrator.facts.toolCalls` | Every tool call the run made, capped at the most recent 200 |
+| `orchestrator.timeline` (`debug: true`) | `agent_start` and `agent_complete`, with the same fields `run()` records |
+
+Reading either one cannot tell you whether the run streamed.
+
 ## Chunk granularity: `deltas` and `onToken`
 
 **`runStream` emits one `token` chunk per completed message by default; pass `deltas: true`, or an `onToken` callback, to get one chunk per provider delta.**

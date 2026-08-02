@@ -1678,6 +1678,19 @@ export function createAgentOrchestrator<
   // Assign the function to the forward-declared variable
   runAgentWithGuardrailsFn = runAgentWithGuardrails;
 
+  // ---- Live stream registry ----
+  // Streams handed out by `runStream` that have not reached a terminal chunk.
+  // `destroy()` walks this so an in-flight run is aborted and its consumers
+  // released; a stream left open at that moment parks every `for await` on a
+  // waiter that nothing will ever resolve, and leaves the provider request –
+  // and the spend it is accruing – with nothing to cancel it.
+  //
+  // Each entry removes itself the moment its stream closes, whether that is
+  // `done`, an error, or `abort()`, so the set holds only what is genuinely
+  // open. Without that a long-lived orchestrator would accumulate one entry
+  // per completed run forever, which is the worse version of this bug.
+  const liveStreams = new Set<{ shutdown: () => void }>();
+
   // ---- Breakpoint infrastructure ----
   const breakpointModifications = new Map<string, BreakpointModifications>();
   const breakpointCancelReasons = new Map<string, string>();
@@ -2033,8 +2046,14 @@ export function createAgentOrchestrator<
         }
       };
 
+      // Registered in `liveStreams` for as long as this stream is open. The
+      // real body is assigned below, once `tearDownLiveContext` exists.
+      const streamHandle: { shutdown: () => void } = { shutdown: () => {} };
+
       // Close the stream
       const closeStream = () => {
+        // This stream is no longer something `destroy()` needs to reach.
+        liveStreams.delete(streamHandle);
         closed = true;
         cleanup();
         for (const waiter of waiters) {
@@ -2231,6 +2250,17 @@ export function createAgentOrchestrator<
         }
       };
 
+      // Everything the caller's `abort()` does, and what `destroy()` calls on
+      // any stream still open. Registered before the run starts so a stream
+      // that fails on its first tick is still reachable.
+      const shutdownStream = (): void => {
+        abortController.abort();
+        tearDownLiveContext();
+        closeStream();
+      };
+      streamHandle.shutdown = shutdownStream;
+      liveStreams.add(streamHandle);
+
       // Run the agent with streaming callbacks
       const resultPromise = (async (): Promise<RunResult<T>> => {
         pushChunk({
@@ -2285,6 +2315,33 @@ export function createAgentOrchestrator<
             phase: "generating",
             message: "Starting agent",
           });
+
+          // Same timeline entry `run` writes, at the same point – after input
+          // guardrails pass and before the runner is invoked. Stream chunks
+          // are consumed once and then gone, so without this a streamed run
+          // left nothing behind for anyone reconstructing it afterwards, while
+          // the multi-agent orchestrator's streaming path recorded it all
+          // along. Written verbatim so an entry cannot be traced back to the
+          // path that produced it.
+          if (timeline) {
+            timeline.record({
+              type: "agent_start",
+              timestamp: Date.now(),
+              agentId: agent.name,
+              snapshotId: null,
+              inputLength: processedInput.length,
+              modelId: agent.model ?? undefined,
+              ...(agent.instructions
+                ? {
+                    instructions: agent.instructions.slice(
+                      0,
+                      MAX_VERBOSE_LENGTH,
+                    ),
+                  }
+                : {}),
+              input: processedInput.slice(0, MAX_VERBOSE_LENGTH),
+            });
+          }
 
           // Update state
           system.batch(() => {
@@ -2421,8 +2478,18 @@ export function createAgentOrchestrator<
                   });
                 }
 
+                // Identical to the write `run` performs, cap included. The
+                // streaming path used to append without bounding, so a long
+                // streamed session grew the fact forever and a consumer
+                // reading it could tell which path had produced it.
                 const currentToolCalls = getToolCalls(system.facts);
-                setToolCalls(system.facts, [...currentToolCalls, toolCall]);
+                const updatedToolCalls = [...currentToolCalls, toolCall];
+                setToolCalls(
+                  system.facts,
+                  updatedToolCalls.length > MAX_TOOL_CALLS
+                    ? updatedToolCalls.slice(-MAX_TOOL_CALLS)
+                    : updatedToolCalls,
+                );
 
                 if (toolCall.result) {
                   pushChunk({
@@ -2503,6 +2570,29 @@ export function createAgentOrchestrator<
             if (guardResult.transformed !== undefined) {
               (result as { output: unknown }).output = guardResult.transformed;
             }
+          }
+
+          // The closing half of the pair `run` writes, recorded after output
+          // guardrails have had their chance to transform the output so the
+          // entry describes what the caller actually received.
+          if (timeline) {
+            const outputStr =
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output);
+            timeline.record({
+              type: "agent_complete",
+              timestamp: Date.now(),
+              agentId: agent.name,
+              snapshotId: null,
+              outputLength: outputStr?.length ?? 0,
+              totalTokens: result.totalTokens,
+              inputTokens: result.tokenUsage?.inputTokens ?? 0,
+              outputTokens: result.tokenUsage?.outputTokens ?? 0,
+              durationMs: Date.now() - startTime,
+              modelId: agent.model ?? undefined,
+              output: outputStr?.slice(0, MAX_VERBOSE_LENGTH),
+            });
           }
 
           // Update final state
@@ -2594,11 +2684,7 @@ export function createAgentOrchestrator<
       return {
         stream,
         result: resultPromise,
-        abort: () => {
-          abortController.abort();
-          tearDownLiveContext();
-          closeStream();
-        },
+        abort: shutdownStream,
         interrupt: (reason?: string) => {
           // RFC 0005: distinct from `abort()` — cancel the in-flight
           // LLM run but leave `liveContext` subscriptions alive so
@@ -2849,6 +2935,15 @@ export function createAgentOrchestrator<
     },
 
     destroy(): void {
+      // Streams still open at this point have consumers parked on the
+      // iterator and a provider request still running. Abort each so the
+      // request stops costing money, and close it so a `for await` observes
+      // the stream ending instead of waiting forever. Iterate a copy – each
+      // shutdown removes its own entry.
+      for (const handle of [...liveStreams]) {
+        handle.shutdown();
+      }
+      liveStreams.clear();
       system.destroy();
     },
   };
