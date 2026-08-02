@@ -34,6 +34,7 @@
  * ```
  */
 
+import type { TokenPricing } from "./budget.js";
 import type {
   AgentLike,
   AgentRunner,
@@ -57,8 +58,13 @@ export interface RoutingProvider {
   name: string;
   /** The runner to use for this provider. */
   runner: AgentRunner;
-  /** Token pricing (cost per million tokens). */
-  pricing?: { inputPerMillion: number; outputPerMillion: number };
+  /**
+   * Token pricing (cost per million tokens).
+   *
+   * Any adapter `*_PRICING` entry can be passed directly — they are published
+   * in {@link TokenPricing} shape.
+   */
+  pricing?: TokenPricing;
   /** Geographic region (for compliance routing). */
   region?: string;
 }
@@ -135,7 +141,7 @@ function createEmptyStats(): ProviderStats {
 
 function calculateCost(
   usage: TokenUsage | undefined,
-  pricing?: { inputPerMillion: number; outputPerMillion: number },
+  pricing?: TokenPricing,
 ): number {
   if (!usage || !pricing) {
     return 0;
@@ -301,7 +307,7 @@ export function createConstraintRouter(
     providerName: string,
     latencyMs: number,
     usage: TokenUsage | undefined,
-    pricing?: { inputPerMillion: number; outputPerMillion: number },
+    pricing?: TokenPricing,
     error?: Error,
   ): void {
     const stats = facts.providers[providerName] ?? createEmptyStats();

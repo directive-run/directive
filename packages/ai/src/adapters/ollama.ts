@@ -15,7 +15,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { TokenPricing } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -23,73 +23,77 @@ import {
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  toTokenPricingTable,
 } from "./shared.js";
 
 // ============================================================================
 // Pricing Constants
 // ============================================================================
 
+/** The single source of Ollama rates. Widened below; never exported raw. */
+const OLLAMA_RATES = {
+  llama3: { input: 0, output: 0 },
+  "llama3.1": { input: 0, output: 0 },
+  "llama3.2": { input: 0, output: 0 },
+  "llama3.3": { input: 0, output: 0 },
+  mistral: { input: 0, output: 0 },
+  mixtral: { input: 0, output: 0 },
+  codellama: { input: 0, output: 0 },
+  gemma2: { input: 0, output: 0 },
+  phi3: { input: 0, output: 0 },
+  qwen2: { input: 0, output: 0 },
+  deepseek: { input: 0, output: 0 },
+  "deepseek-coder": { input: 0, output: 0 },
+  "command-r": { input: 0, output: 0 },
+};
+
 /**
  * Ollama model pricing (USD per million tokens).
  *
- * Ollama runs locally — all costs are zero. This table is provided for
- * compatibility with `estimateCost()` so local models integrate seamlessly
- * into cost-tracking pipelines.
+ * Ollama runs locally, so every rate is 0. The table exists so cost tracking
+ * and budget wiring are written identically whether the runner points at a
+ * local model or a paid API.
+ *
+ * Each entry carries the same two rates under both field spellings, so it works
+ * with every cost surface in the library without conversion: `.input` /
+ * `.output` for `estimateCost`, which takes a bare per-million number, and
+ * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
+ * are derived from one source, so they cannot drift.
+ *
+ * {@link OLLAMA_TOKEN_PRICING} is an alias for this table, kept for callers
+ * that already reference it.
  *
  * @example
  * ```typescript
- * import { estimateCost } from '@directive-run/ai';
+ * import { estimateCost, withBudget } from '@directive-run/ai';
  * import { OLLAMA_PRICING } from '@directive-run/ai/ollama';
  *
+ * const rates = OLLAMA_PRICING["llama3"];
+ *
  * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, OLLAMA_PRICING["llama3"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, OLLAMA_PRICING["llama3"].output);
+ *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, rates.output);
  * // → 0
- * ```
- */
-export const OLLAMA_PRICING: Record<string, { input: number; output: number }> =
-  {
-    llama3: { input: 0, output: 0 },
-    "llama3.1": { input: 0, output: 0 },
-    "llama3.2": { input: 0, output: 0 },
-    "llama3.3": { input: 0, output: 0 },
-    mistral: { input: 0, output: 0 },
-    mixtral: { input: 0, output: 0 },
-    codellama: { input: 0, output: 0 },
-    gemma2: { input: 0, output: 0 },
-    phi3: { input: 0, output: 0 },
-    qwen2: { input: 0, output: 0 },
-    deepseek: { input: 0, output: 0 },
-    "deepseek-coder": { input: 0, output: 0 },
-    "command-r": { input: 0, output: 0 },
-  };
-
-/**
- * The same Ollama rates in {@link TokenPricing} shape, for passing straight to
- * `withBudget`, `withProviderRouting`, and anything else typed against it.
  *
- * Identical numbers to {@link OLLAMA_PRICING} - both are dollars per million tokens.
- * Only the field names differ. Prefer this one when wiring budgets; prefer
- * `OLLAMA_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
- *
- * Ollama runs locally, so every rate is 0 - the table exists so budget
- * wiring is identical whether you point at a local model or a paid API.
- *
- * @example
- * ```typescript
- * import { withBudget } from '@directive-run/ai';
- * import { OLLAMA_TOKEN_PRICING } from '@directive-run/ai/ollama';
- *
- * const pricing = OLLAMA_TOKEN_PRICING["llama3"];
  * const guarded = withBudget(runner, {
- *   pricing,
- *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ *   pricing: rates,
+ *   budgets: [{ window: "day", maxCost: 10, pricing: rates }],
  * });
  * ```
  */
-export const OLLAMA_TOKEN_PRICING: Record<string, TokenPricing> =
-  toTokenPricingTable(OLLAMA_PRICING);
+export const OLLAMA_PRICING: Record<string, ModelPricing> =
+  toTokenPricingTable(OLLAMA_RATES);
+
+/**
+ * Alias for {@link OLLAMA_PRICING} — the same object, not a copy.
+ *
+ * The two names once held different shapes, one for `estimateCost` and one for
+ * `withBudget`. They no longer do: a single widened table serves both, so
+ * whichever name a caller reaches for is the right one. This export remains so
+ * existing code keeps working.
+ */
+export const OLLAMA_TOKEN_PRICING: Record<string, ModelPricing> =
+  OLLAMA_PRICING;
 
 // ============================================================================
 // Ollama Runner

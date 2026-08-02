@@ -13,7 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { TokenPricing } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -24,7 +24,6 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
-  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -32,52 +31,60 @@ import {
 // Pricing Constants
 // ============================================================================
 
+/** The single source of Gemini rates. Widened below; never exported raw. */
+const GEMINI_RATES = {
+  "gemini-2.5-pro": { input: 1.25, output: 10 },
+  "gemini-2.5-flash": { input: 0.15, output: 0.6 },
+  "gemini-2.0-flash": { input: 0.1, output: 0.4 },
+  "gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
+};
+
 /**
  * Gemini model pricing (USD per million tokens).
  *
- * Use with `estimateCost()` for per-call cost tracking:
+ * Each entry carries the same two rates under both field spellings, so it works
+ * with every cost surface in the library without conversion: `.input` /
+ * `.output` for `estimateCost`, which takes a bare per-million number, and
+ * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
+ * are derived from one source, so they cannot drift.
+ *
+ * {@link GEMINI_TOKEN_PRICING} is an alias for this table, kept for callers
+ * that already reference it.
+ *
+ * @example
  * ```typescript
- * import { estimateCost } from '@directive-run/ai';
+ * import { estimateCost, withBudget } from '@directive-run/ai';
  * import { GEMINI_PRICING } from '@directive-run/ai/gemini';
  *
+ * const rates = GEMINI_PRICING["gemini-2.0-flash"];
+ *
  * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, GEMINI_PRICING["gemini-2.0-flash"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, GEMINI_PRICING["gemini-2.0-flash"].output);
+ *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, rates.output);
+ *
+ * const guarded = withBudget(runner, {
+ *   pricing: rates,
+ *   budgets: [{ window: "day", maxCost: 10, pricing: rates }],
+ * });
  * ```
  *
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://ai.google.dev/pricing
  */
-export const GEMINI_PRICING: Record<string, { input: number; output: number }> =
-  {
-    "gemini-2.5-pro": { input: 1.25, output: 10 },
-    "gemini-2.5-flash": { input: 0.15, output: 0.6 },
-    "gemini-2.0-flash": { input: 0.1, output: 0.4 },
-    "gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
-  };
+export const GEMINI_PRICING: Record<string, ModelPricing> =
+  toTokenPricingTable(GEMINI_RATES);
 
 /**
- * The same Gemini rates in {@link TokenPricing} shape, for passing straight to
- * `withBudget`, `withProviderRouting`, and anything else typed against it.
+ * Alias for {@link GEMINI_PRICING} — the same object, not a copy.
  *
- * Identical numbers to {@link GEMINI_PRICING} - both are dollars per million tokens.
- * Only the field names differ. Prefer this one when wiring budgets; prefer
- * `GEMINI_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
- *
- * @example
- * ```typescript
- * import { withBudget } from '@directive-run/ai';
- * import { GEMINI_TOKEN_PRICING } from '@directive-run/ai/gemini';
- *
- * const pricing = GEMINI_TOKEN_PRICING["gemini-2.0-flash"];
- * const guarded = withBudget(runner, {
- *   pricing,
- *   budgets: [{ window: "day", maxCost: 10, pricing }],
- * });
- * ```
+ * The two names once held different shapes, one for `estimateCost` and one for
+ * `withBudget`. They no longer do: a single widened table serves both, so
+ * whichever name a caller reaches for is the right one. This export remains so
+ * existing code keeps working.
  */
-export const GEMINI_TOKEN_PRICING: Record<string, TokenPricing> =
-  toTokenPricingTable(GEMINI_PRICING);
+export const GEMINI_TOKEN_PRICING: Record<string, ModelPricing> =
+  GEMINI_PRICING;
 
 // ============================================================================
 // Gemini Runner

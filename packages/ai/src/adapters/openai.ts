@@ -14,7 +14,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { TokenPricing } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../budget.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
@@ -26,7 +26,6 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
-  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -34,57 +33,65 @@ import {
 // Pricing Constants
 // ============================================================================
 
+/** The single source of OpenAI rates. Widened below; never exported raw. */
+const OPENAI_RATES = {
+  "gpt-4.1": { input: 2, output: 8 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4-turbo": { input: 10, output: 30 },
+  "o4-mini": { input: 1.1, output: 4.4 },
+  o3: { input: 10, output: 40 },
+  "o3-mini": { input: 1.1, output: 4.4 },
+};
+
 /**
  * OpenAI model pricing (USD per million tokens).
  *
- * Use with `estimateCost()` for per-call cost tracking:
+ * Each entry carries the same two rates under both field spellings, so it works
+ * with every cost surface in the library without conversion: `.input` /
+ * `.output` for `estimateCost`, which takes a bare per-million number, and
+ * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
+ * are derived from one source, so they cannot drift.
+ *
+ * {@link OPENAI_TOKEN_PRICING} is an alias for this table, kept for callers
+ * that already reference it.
+ *
+ * @example
  * ```typescript
- * import { estimateCost } from '@directive-run/ai';
+ * import { estimateCost, withBudget } from '@directive-run/ai';
  * import { OPENAI_PRICING } from '@directive-run/ai/openai';
  *
+ * const rates = OPENAI_PRICING["gpt-4o"];
+ *
  * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, OPENAI_PRICING["gpt-4o"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, OPENAI_PRICING["gpt-4o"].output);
+ *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, rates.output);
+ *
+ * const guarded = withBudget(runner, {
+ *   pricing: rates,
+ *   budgets: [{ window: "day", maxCost: 10, pricing: rates }],
+ * });
  * ```
  *
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://openai.com/pricing
  */
-export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
-  {
-    "gpt-4.1": { input: 2, output: 8 },
-    "gpt-4.1-mini": { input: 0.4, output: 1.6 },
-    "gpt-4.1-nano": { input: 0.1, output: 0.4 },
-    "gpt-4o": { input: 2.5, output: 10 },
-    "gpt-4o-mini": { input: 0.15, output: 0.6 },
-    "gpt-4-turbo": { input: 10, output: 30 },
-    "o4-mini": { input: 1.1, output: 4.4 },
-    o3: { input: 10, output: 40 },
-    "o3-mini": { input: 1.1, output: 4.4 },
-  };
+export const OPENAI_PRICING: Record<string, ModelPricing> =
+  toTokenPricingTable(OPENAI_RATES);
 
 /**
- * The same OpenAI rates in {@link TokenPricing} shape, for passing straight to
- * `withBudget`, `withProviderRouting`, and anything else typed against it.
+ * Alias for {@link OPENAI_PRICING} — the same object, not a copy.
  *
- * Identical numbers to {@link OPENAI_PRICING} - both are dollars per million tokens.
- * Only the field names differ. Prefer this one when wiring budgets; prefer
- * `OPENAI_PRICING` when calling `estimateCost`, which takes a bare per-million rate.
- *
- * @example
- * ```typescript
- * import { withBudget } from '@directive-run/ai';
- * import { OPENAI_TOKEN_PRICING } from '@directive-run/ai/openai';
- *
- * const pricing = OPENAI_TOKEN_PRICING["gpt-4o"];
- * const guarded = withBudget(runner, {
- *   pricing,
- *   budgets: [{ window: "day", maxCost: 10, pricing }],
- * });
- * ```
+ * The two names once held different shapes, one for `estimateCost` and one for
+ * `withBudget`. They no longer do: a single widened table serves both, so
+ * whichever name a caller reaches for is the right one. This export remains so
+ * existing code keeps working.
  */
-export const OPENAI_TOKEN_PRICING: Record<string, TokenPricing> =
-  toTokenPricingTable(OPENAI_PRICING);
+export const OPENAI_TOKEN_PRICING: Record<string, ModelPricing> =
+  OPENAI_PRICING;
 
 // ============================================================================
 // OpenAI Runner

@@ -56,7 +56,7 @@ Adapters are thin wrappers around each provider's HTTP API. No SDK dependencies 
 | Streaming runner | `createOpenAIStreamingRunner` | `createAnthropicStreamingRunner` | &ndash; | `createGeminiStreamingRunner` |
 | Embedder | `createOpenAIEmbedder` | &ndash; | &ndash; | &ndash; |
 | Pricing constants | `OPENAI_PRICING` | `ANTHROPIC_PRICING` | `OLLAMA_PRICING` | `GEMINI_PRICING` |
-| Budget-shaped pricing | `OPENAI_TOKEN_PRICING` | `ANTHROPIC_TOKEN_PRICING` | `OLLAMA_TOKEN_PRICING` | `GEMINI_TOKEN_PRICING` |
+| Alias (same table) | `OPENAI_TOKEN_PRICING` | `ANTHROPIC_TOKEN_PRICING` | `OLLAMA_TOKEN_PRICING` | `GEMINI_TOKEN_PRICING` |
 | Prompt caching | &ndash; | `promptCaching: "automatic"` | &ndash; | &ndash; |
 | Compatible APIs | Azure, Together, any OpenAI-compatible | &ndash; | &ndash; | &ndash; |
 
@@ -77,29 +77,42 @@ const cost =
   estimateCost(outputTokens, OPENAI_PRICING["gpt-4o"].output);
 ```
 
-### Pricing constants come in two shapes
+### One pricing constant, every cost surface
 
-`estimateCost` takes a bare per-million rate, so it pairs with `*_PRICING`
-(`{ input, output }`). `withBudget` and `withProviderRouting` are typed against
-`TokenPricing`, so they pair with `*_TOKEN_PRICING`
-(`{ inputPerMillion, outputPerMillion }`). Same numbers, different field names —
-pick the one that matches the surface you are calling:
+Each `*_PRICING` entry carries the same two rates under both field spellings, so
+there is no wrong constant to grab. `estimateCost` reads the bare `.input` /
+`.output` numbers; `withBudget` and `createConstraintRouter` are typed against
+`TokenPricing` and read `.inputPerMillion` / `.outputPerMillion`. Both pairs are
+derived from one source, so they cannot drift:
 
 ```typescript
 import { withBudget } from "@directive-run/ai";
-import { ANTHROPIC_TOKEN_PRICING } from "@directive-run/ai/anthropic";
+import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
 
-const pricing = ANTHROPIC_TOKEN_PRICING["claude-sonnet-4-5-20250929"];
+const pricing = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"];
 const guarded = withBudget(runner, {
   pricing,
   budgets: [{ window: "day", maxCost: 10, pricing }],
 });
 ```
 
-Passing a `*_PRICING` entry where `TokenPricing` is expected throws at
-construction with a message naming the fix. It used to produce `NaN` costs that
-silently disabled the budget, which is the worst possible failure for a spend
-guard.
+`ANTHROPIC_TOKEN_PRICING` and its siblings are aliases for the same tables, kept
+so existing code keeps working.
+
+Hand-built pricing objects are still validated at construction. A rate that is
+missing, non-finite, or negative throws with a message naming the fix &ndash; it
+used to produce `NaN` or negative costs that silently disabled the budget, which
+is the worst possible failure for a spend guard. Zero is accepted: local models
+genuinely bill nothing.
+
+Use `toTokenPricingTable` to widen your own `{ input, output }` table the same
+way:
+
+```typescript
+import { toTokenPricingTable } from "@directive-run/ai";
+
+const MY_PRICING = toTokenPricingTable({ "my-model": { input: 3, output: 15 } });
+```
 
 ## Prompt Caching (Anthropic)
 

@@ -1,24 +1,24 @@
 /**
- * Pins the interop between the adapter pricing tables and `withBudget`.
+ * Pins the interop between the adapter pricing tables and the cost surfaces
+ * that consume them.
  *
- * Every adapter publishes its rates twice: `{ input, output }` for
- * `estimateCost`, which takes a bare per-million rate, and
- * `{ inputPerMillion, outputPerMillion }` for `withBudget` and
- * `withProviderRouting`, which are typed against `TokenPricing`. The numbers
- * are the same — both are dollars per million tokens — so the only difference
- * is the field names.
+ * Every adapter used to publish its rates twice: `{ input, output }` for
+ * `estimateCost`, and `{ inputPerMillion, outputPerMillion }` for `withBudget`
+ * and `createConstraintRouter`. Same numbers, different field names — so
+ * handing a `*_PRICING` entry to a budget left both rate fields `undefined`,
+ * every cost computed to `NaN`, every `estimated > remaining` comparison came
+ * out `false`, and the budget never tripped. Spend was unbounded precisely when
+ * the caller believed it was capped, and nothing in the logs said so.
  *
- * That made for a nasty failure mode. Handing a `*_PRICING` entry to
- * `withBudget` left both rate fields `undefined`, so every cost computed to
- * `NaN`, every `estimated > remaining` comparison comes out `false`, and the
- * budget never tripped. Spend was unbounded precisely when the caller believed
- * it was capped, and nothing in the logs said so.
- *
- * These tests hold both halves of the fix: the wrong shape now fails loudly at
- * construction, and the right shape composes with no conversion code in the
- * consumer.
+ * The split is gone. Each entry now carries both field pairs, derived from one
+ * source, so there is no wrong constant to grab and no second list of rates to
+ * drift. These tests hold that: every table entry works with every consumer,
+ * and the two pairs always agree.
  */
 
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
   ANTHROPIC_PRICING,
@@ -27,7 +27,10 @@ import {
 import { GEMINI_PRICING, GEMINI_TOKEN_PRICING } from "../adapters/gemini.js";
 import { OLLAMA_PRICING, OLLAMA_TOKEN_PRICING } from "../adapters/ollama.js";
 import { OPENAI_PRICING, OPENAI_TOKEN_PRICING } from "../adapters/openai.js";
-import { withBudget } from "../budget.js";
+import * as adapterShared from "../adapters/shared.js";
+import { estimateCost } from "../agent-utils.js";
+import { toTokenPricingTable, withBudget } from "../budget.js";
+import { createConstraintRouter } from "../provider-routing.js";
 import type { AgentRunner } from "../types.js";
 
 function makeRunner(): AgentRunner {
@@ -40,33 +43,41 @@ function makeRunner(): AgentRunner {
 }
 
 const TABLES = {
-  ANTHROPIC: {
-    legacy: ANTHROPIC_PRICING,
-    tokenShaped: ANTHROPIC_TOKEN_PRICING,
-  },
-  OPENAI: { legacy: OPENAI_PRICING, tokenShaped: OPENAI_TOKEN_PRICING },
-  GEMINI: { legacy: GEMINI_PRICING, tokenShaped: GEMINI_TOKEN_PRICING },
-  OLLAMA: { legacy: OLLAMA_PRICING, tokenShaped: OLLAMA_TOKEN_PRICING },
+  ANTHROPIC: { table: ANTHROPIC_PRICING, alias: ANTHROPIC_TOKEN_PRICING },
+  OPENAI: { table: OPENAI_PRICING, alias: OPENAI_TOKEN_PRICING },
+  GEMINI: { table: GEMINI_PRICING, alias: GEMINI_TOKEN_PRICING },
+  OLLAMA: { table: OLLAMA_PRICING, alias: OLLAMA_TOKEN_PRICING },
 };
 
-describe("provider pricing tables compose with withBudget", () => {
-  for (const [provider, { legacy, tokenShaped }] of Object.entries(TABLES)) {
+describe("provider pricing tables carry both field pairs", () => {
+  for (const [provider, { table, alias }] of Object.entries(TABLES)) {
     describe(provider, () => {
-      it("exposes a non-empty TokenPricing table", () => {
-        expect(Object.keys(tokenShaped).length).toBeGreaterThan(0);
+      it("exposes a non-empty table", () => {
+        expect(Object.keys(table).length).toBeGreaterThan(0);
       });
 
-      it("carries the same rates as the estimateCost table", () => {
-        for (const [model, rates] of Object.entries(legacy)) {
-          expect(tokenShaped[model]).toEqual({
+      it("every entry carries all four fields, and the pairs agree", () => {
+        for (const [model, rates] of Object.entries(table)) {
+          expect(
+            rates,
+            `${provider}_PRICING[${model}] should carry both field pairs`,
+          ).toEqual({
+            input: rates.input,
+            output: rates.output,
             inputPerMillion: rates.input,
             outputPerMillion: rates.output,
           });
+          expect(typeof rates.input).toBe("number");
+          expect(typeof rates.output).toBe("number");
         }
       });
 
-      it("every model is accepted by withBudget with no conversion", () => {
-        for (const [model, pricing] of Object.entries(tokenShaped)) {
+      it("*_TOKEN_PRICING is an alias for the same table, not a copy", () => {
+        expect(alias).toBe(table);
+      });
+
+      it("every entry is accepted by withBudget with no conversion", () => {
+        for (const [model, pricing] of Object.entries(table)) {
           expect(
             () =>
               withBudget(makeRunner(), {
@@ -74,21 +85,34 @@ describe("provider pricing tables compose with withBudget", () => {
                 maxCostPerCall: 1,
                 budgets: [{ window: "day", maxCost: 10, pricing }],
               }),
-            `${provider}_TOKEN_PRICING[${model}] should be usable as-is`,
+            `${provider}_PRICING[${model}] should be usable as-is`,
           ).not.toThrow();
         }
       });
 
-      it("the estimateCost table is rejected loudly, not silently", () => {
-        const [model, rates] = Object.entries(legacy)[0]!;
-        expect(
-          () =>
-            withBudget(makeRunner(), {
-              pricing: rates as never,
-              maxCostPerCall: 1,
-            }),
-          `${provider}_PRICING[${model}] should throw, not produce NaN costs`,
-        ).toThrow(/TOKEN_PRICING/);
+      it("every entry feeds estimateCost with a finite result", () => {
+        for (const [model, rates] of Object.entries(table)) {
+          const cost =
+            estimateCost(1_000_000, rates.input) +
+            estimateCost(1_000_000, rates.output);
+          expect(
+            Number.isFinite(cost),
+            `${provider}_PRICING[${model}] should price finitely`,
+          ).toBe(true);
+        }
+      });
+
+      it("every entry is accepted as constraint-router pricing", () => {
+        for (const [model, pricing] of Object.entries(table)) {
+          expect(
+            () =>
+              createConstraintRouter({
+                providers: [{ name: model, runner: makeRunner(), pricing }],
+                defaultProvider: model,
+              }),
+            `${provider}_PRICING[${model}] should route as-is`,
+          ).not.toThrow();
+        }
       });
     });
   }
@@ -96,7 +120,7 @@ describe("provider pricing tables compose with withBudget", () => {
 
 describe("budget math is finite for real provider rates", () => {
   it("a real budget actually trips instead of comparing against NaN", async () => {
-    const pricing = ANTHROPIC_TOKEN_PRICING["claude-opus-4-20250514"]!;
+    const pricing = ANTHROPIC_PRICING["claude-opus-4-20250514"]!;
     const runner = withBudget(makeRunner(), {
       pricing,
       // Opus is $15/M input. A 400-char input estimates ~100 input tokens and,
@@ -111,7 +135,7 @@ describe("budget math is finite for real provider rates", () => {
   });
 
   it("zero-cost local models never trip a budget", async () => {
-    const pricing = OLLAMA_TOKEN_PRICING.llama3!;
+    const pricing = OLLAMA_PRICING.llama3!;
     const runner = withBudget(makeRunner(), {
       pricing,
       maxCostPerCall: 0,
@@ -120,5 +144,113 @@ describe("budget math is finite for real provider rates", () => {
     await expect(
       runner({ name: "a", instructions: "" }, "x".repeat(10_000)),
     ).resolves.toBeDefined();
+  });
+
+  it("the router prices a call with the same table the budget uses", async () => {
+    const pricing = ANTHROPIC_PRICING["claude-opus-4-20250514"]!;
+    const inner = vi.fn(async () => ({
+      output: "ok",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 2_000_000,
+      tokenUsage: { inputTokens: 1_000_000, outputTokens: 1_000_000 },
+    })) as unknown as AgentRunner;
+
+    const router = createConstraintRouter({
+      providers: [{ name: "anthropic", runner: inner, pricing }],
+      defaultProvider: "anthropic",
+    });
+
+    await router({ name: "a", instructions: "" }, "hello");
+
+    // $15/M input + $75/M output on 1M each.
+    expect(router.facts.totalCost).toBeCloseTo(90, 10);
+  });
+});
+
+describe("toTokenPricingTable lives with TokenPricing", () => {
+  it("is exported from budget.ts, where the type it produces is declared", () => {
+    expect(typeof toTokenPricingTable).toBe("function");
+  });
+
+  it("no longer sits in the adapters' SSE/HTTP plumbing module", () => {
+    expect("toTokenPricingTable" in adapterShared).toBe(false);
+  });
+
+  it("widens a bare rate table into both field pairs", () => {
+    const widened = toTokenPricingTable({
+      "my-model": { input: 3, output: 15 },
+    });
+
+    expect(widened["my-model"]).toEqual({
+      input: 3,
+      output: 15,
+      inputPerMillion: 3,
+      outputPerMillion: 15,
+    });
+  });
+
+  it("produces entries a budget accepts without conversion", () => {
+    const widened = toTokenPricingTable({
+      "my-model": { input: 3, output: 15 },
+    });
+
+    expect(() =>
+      withBudget(makeRunner(), {
+        maxCostPerCall: 1,
+        pricing: widened["my-model"]!,
+      }),
+    ).not.toThrow();
+  });
+});
+
+// ============================================================================
+// Documented APIs must exist
+// ============================================================================
+
+describe("no phantom APIs are cited in docs or JSDoc", () => {
+  // A routing helper that never existed was named in the README and in four
+  // adapters' JSDoc as though it shipped; the real export is
+  // `createConstraintRouter`. A reader following the docs got a
+  // module-resolution error, which is the cheapest possible way to lose trust
+  // in every other line of the same document.
+  //
+  // The name is assembled rather than written out so this file does not
+  // register as its own violation.
+  const PHANTOM = `with${"Provider"}Routing`;
+  const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+  function collectSourceFiles(dir: string, acc: string[] = []): string[] {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry !== "node_modules" && entry !== "dist") {
+          collectSourceFiles(full, acc);
+        }
+        continue;
+      }
+      if (entry.endsWith(".ts") || entry.endsWith(".md")) {
+        acc.push(full);
+      }
+    }
+
+    return acc;
+  }
+
+  it("the phantom routing helper appears nowhere in the shipped package", () => {
+    const files = [
+      ...collectSourceFiles(join(packageRoot, "src")),
+      join(packageRoot, "README.md"),
+    ];
+
+    const offenders = files.filter((file) =>
+      readFileSync(file, "utf8").includes(PHANTOM),
+    );
+
+    expect(offenders.map((file) => file.slice(packageRoot.length))).toEqual([]);
+  });
+
+  it("createConstraintRouter — the real export — is importable", () => {
+    expect(typeof createConstraintRouter).toBe("function");
   });
 });

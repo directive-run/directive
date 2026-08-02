@@ -13,7 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import type { TokenPricing } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../budget.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -24,7 +24,6 @@ import {
   getSSEReader,
   parseSSEStream,
   throwStreamingHTTPError,
-  toTokenPricingTable,
   warnIfMissingApiKey,
 } from "./shared.js";
 
@@ -32,26 +31,8 @@ import {
 // Pricing Constants
 // ============================================================================
 
-/**
- * Anthropic model pricing (USD per million tokens).
- *
- * Use with `estimateCost()` for per-call cost tracking:
- * ```typescript
- * import { estimateCost } from '@directive-run/ai';
- * import { ANTHROPIC_PRICING } from '@directive-run/ai/anthropic';
- *
- * const cost =
- *   estimateCost(result.tokenUsage!.inputTokens, ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"].input) +
- *   estimateCost(result.tokenUsage!.outputTokens, ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"].output);
- * ```
- *
- * **Note:** Pricing changes over time. These values are provided as a convenience
- * and may not reflect the latest rates. Always verify at https://anthropic.com/pricing
- */
-export const ANTHROPIC_PRICING: Record<
-  string,
-  { input: number; output: number }
-> = {
+/** The single source of Anthropic rates. Widened below; never exported raw. */
+const ANTHROPIC_RATES = {
   "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
   "claude-sonnet-4-20250514": { input: 3, output: 15 },
   "claude-haiku-4-5-20250514": { input: 0.8, output: 4 },
@@ -60,28 +41,51 @@ export const ANTHROPIC_PRICING: Record<
 };
 
 /**
- * The same Anthropic rates in {@link TokenPricing} shape, for passing straight
- * to `withBudget`, `withProviderRouting`, and anything else typed against it.
+ * Anthropic model pricing (USD per million tokens).
  *
- * Identical numbers to {@link ANTHROPIC_PRICING} — both are dollars per million
- * tokens. Only the field names differ. Prefer this one when wiring budgets;
- * prefer `ANTHROPIC_PRICING` when calling `estimateCost`, which takes a bare
- * per-million rate.
+ * Each entry carries the same two rates under both field spellings, so it works
+ * with every cost surface in the library without conversion: `.input` /
+ * `.output` for `estimateCost`, which takes a bare per-million number, and
+ * `.inputPerMillion` / `.outputPerMillion` for `withBudget` and
+ * `createConstraintRouter`, which are typed against `TokenPricing`. Both pairs
+ * are derived from one source, so they cannot drift.
+ *
+ * {@link ANTHROPIC_TOKEN_PRICING} is an alias for this table, kept for callers
+ * that already reference it.
  *
  * @example
  * ```typescript
- * import { withBudget } from '@directive-run/ai';
- * import { ANTHROPIC_TOKEN_PRICING } from '@directive-run/ai/anthropic';
+ * import { estimateCost, withBudget } from '@directive-run/ai';
+ * import { ANTHROPIC_PRICING } from '@directive-run/ai/anthropic';
  *
- * const pricing = ANTHROPIC_TOKEN_PRICING["claude-sonnet-4-5-20250929"];
+ * const rates = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"];
+ *
+ * const cost =
+ *   estimateCost(result.tokenUsage!.inputTokens, rates.input) +
+ *   estimateCost(result.tokenUsage!.outputTokens, rates.output);
+ *
  * const guarded = withBudget(runner, {
- *   pricing,
- *   budgets: [{ window: "day", maxCost: 10, pricing }],
+ *   pricing: rates,
+ *   budgets: [{ window: "day", maxCost: 10, pricing: rates }],
  * });
  * ```
+ *
+ * **Note:** Pricing changes over time. These values are provided as a convenience
+ * and may not reflect the latest rates. Always verify at https://anthropic.com/pricing
  */
-export const ANTHROPIC_TOKEN_PRICING: Record<string, TokenPricing> =
-  toTokenPricingTable(ANTHROPIC_PRICING);
+export const ANTHROPIC_PRICING: Record<string, ModelPricing> =
+  toTokenPricingTable(ANTHROPIC_RATES);
+
+/**
+ * Alias for {@link ANTHROPIC_PRICING} — the same object, not a copy.
+ *
+ * The two names once held different shapes, one for `estimateCost` and one for
+ * `withBudget`. They no longer do: a single widened table serves both, so
+ * whichever name a caller reaches for is the right one. This export remains so
+ * existing code keeps working.
+ */
+export const ANTHROPIC_TOKEN_PRICING: Record<string, ModelPricing> =
+  ANTHROPIC_PRICING;
 
 // ============================================================================
 // Anthropic Runner

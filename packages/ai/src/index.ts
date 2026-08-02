@@ -571,9 +571,11 @@ export {
 export {
   withBudget,
   BudgetExceededError,
+  toTokenPricingTable,
   type BudgetConfig,
   type BudgetRunner,
   type BudgetWindow,
+  type ModelPricing,
   type TokenPricing,
   type BudgetExceededDetails,
 } from "./budget.js";
