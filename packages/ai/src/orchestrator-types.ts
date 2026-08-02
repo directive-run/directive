@@ -499,6 +499,30 @@ export interface MultiAgentRunCallOptions extends RunOptions {
   patternId?: string;
 }
 
+/** Per-call options for multi-agent runAgentStream/runStream */
+export interface MultiAgentStreamCallOptions {
+  /** Abort the in-flight run and close the stream. */
+  signal?: AbortSignal;
+  /**
+   * Request per-delta streaming from the runner. Presence is the opt-in:
+   * without it the stream keeps emitting one `token` chunk per whole assistant
+   * message, exactly as it always has. With it, each provider delta lands as
+   * its own `token` chunk **and** is passed to this callback, so a caller who
+   * only wants the chunks can pass `() => {}` and a caller who wants
+   * backpressure can return a promise – the adapter will not read the next
+   * chunk off the wire until it settles.
+   *
+   * Retry, guardrails, tool-call approval, breakpoints and the facts bridge
+   * all still apply: this is an option travelling the path the orchestrator
+   * already uses, not a substituted runner. When the runner is re-invoked –
+   * agent retry, structured-output schema retry, or a self-healing reroute –
+   * a `stream_restart` chunk marks the boundary.
+   *
+   * Annotated `=> void` to match `RunOptions.onToken`.
+   */
+  onToken?: (token: string) => void;
+}
+
 /** Multi-agent orchestrator instance */
 export interface MultiAgentOrchestrator {
   /** The underlying Directive System */
@@ -515,7 +539,7 @@ export interface MultiAgentOrchestrator {
   runAgentStream<T>(
     agentId: string,
     input: string,
-    options?: { signal?: AbortSignal },
+    options?: MultiAgentStreamCallOptions,
   ): OrchestratorStreamResult<T>;
   /**
    * Run an execution pattern by its registered pattern ID.
@@ -568,7 +592,7 @@ export interface MultiAgentOrchestrator {
   runStream<T>(
     agentId: string,
     input: string,
-    options?: { signal?: AbortSignal },
+    options?: MultiAgentStreamCallOptions,
   ): OrchestratorStreamResult<T>;
   /** Register a new agent dynamically */
   registerAgent(agentId: string, registration: AgentRegistration): void;

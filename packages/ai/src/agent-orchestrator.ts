@@ -23,7 +23,14 @@ import {
 import type { CircuitBreaker } from "@directive-run/core/plugins";
 import type { AgentMemory } from "./memory.js";
 import { formatSystemMeta } from "./meta-context.js";
-import type { StreamChunk as StreamChunkBase } from "./streaming.js";
+import {
+  type StreamChunk as StreamChunkBase,
+  type StreamRestartReason,
+  type TokenSink,
+  isDroppableChunk,
+  reportIfRunnerIgnoredOnToken,
+  sliceTailByCodePoint,
+} from "./streaming.js";
 
 import type {
   AgentLike,
@@ -431,6 +438,23 @@ export interface RunCallOptions {
   outputSchema?: SafeParseable<unknown> | null;
   /** Override max schema retries for this call. */
   maxSchemaRetries?: number;
+  /**
+   * Request per-delta streaming for this call. Deltas arrive here as the
+   * provider produces them while `run` still resolves to one complete
+   * {@link RunResult} – a caller who wants both does not have to reach for
+   * `runStream`.
+   *
+   * This is a request, not a guarantee: a runner that cannot stream ignores it
+   * and the run behaves exactly as it does today. Every runner wrapper
+   * forwards the option verbatim, so it survives `withRetry`, `withBudget`,
+   * `withFallback`, model selection and structured output.
+   *
+   * Annotated `=> void` to match {@link RunOptions.onToken} – TypeScript lets a
+   * callback typed `=> void` return anything, so `(token) => buffer.push(token)`
+   * and an async callback are both assignable, and the promise is awaited
+   * either way.
+   */
+  onToken?: (token: string) => void;
 }
 
 /** Orchestrator instance */
@@ -459,12 +483,38 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
    *
    * const finalResult = await result;
    * ```
+   *
+   * @example Real per-delta streaming
+   * ```typescript
+   * // Without `onToken` a whole assistant message arrives as one `token`
+   * // chunk. With it, the provider's deltas land as they are produced.
+   * const { stream } = orchestrator.runStream(agent, input, {
+   *   onToken: () => {},
+   * });
+   * ```
    */
   runStream<T>(
     agent: AgentLike,
     input: string,
     options?: {
       signal?: AbortSignal;
+      /**
+       * Request per-delta streaming from the runner. Presence is the opt-in:
+       * without it the stream keeps emitting one `token` chunk per whole
+       * assistant message, exactly as it always has. With it, each provider
+       * delta lands as its own `token` chunk **and** is passed to this
+       * callback, so a caller who only wants the chunks can pass
+       * `() => {}` and a caller who wants backpressure can return a promise –
+       * the adapter will not read the next chunk off the wire until it
+       * settles.
+       *
+       * Retry, guardrails, tool-call approval, breakpoints, memory and the
+       * facts bridge all still apply: this is an option travelling the path
+       * the orchestrator already uses, not a substituted runner.
+       *
+       * Annotated `=> void` to match {@link RunOptions.onToken}.
+       */
+      onToken?: (token: string) => void;
       /**
        * RFC 0005: bind the in-flight LLM run to a Directive system's
        * facts. When a watched fact changes, the orchestrator emits a
@@ -1274,6 +1324,27 @@ export function createAgentOrchestrator<
         )) as typeof effectiveRunner;
     }
 
+    // Per-delta streaming for `run`. `RunCallOptions` is a distinct type from
+    // `RunOptions` and the internal `opts` is undefined on this path, so the
+    // caller's `onToken` has to be forwarded explicitly. The wrapper counts
+    // deltas so a runner that quietly ignored the request can be named.
+    //
+    // `onToken` is annotated `=> void` so that `(token) => buffer.push(token)`
+    // stays assignable, but the adapters await whatever it returns. Read it
+    // back as value-returning so the wrapper can hand the caller's promise
+    // along and leave backpressure intact.
+    const callerOnToken = (callOptions?.onToken ?? opts?.onToken) as
+      | TokenSink
+      | undefined;
+    let runDeltaCount = 0;
+    const countingOnToken = callerOnToken
+      ? (token: string): unknown => {
+          runDeltaCount++;
+
+          return callerOnToken(token);
+        }
+      : undefined;
+
     // Run the agent with retry support
     const result = await executeAgentWithRetry<T>(
       effectiveRunner,
@@ -1282,6 +1353,7 @@ export function createAgentOrchestrator<
       {
         ...opts,
         signal: opts?.signal,
+        onToken: countingOnToken,
         onMessage: (message) => {
           const currentConversation = getConversation(system.facts);
           const updated = [...currentConversation, message];
@@ -1390,6 +1462,13 @@ export function createAgentOrchestrator<
             },
           }
         : undefined,
+    );
+
+    reportIfRunnerIgnoredOnToken(
+      agent.name,
+      callerOnToken,
+      runDeltaCount,
+      result.output,
     );
 
     // Breakpoint: pre_output_guardrails
@@ -1875,6 +1954,7 @@ export function createAgentOrchestrator<
       input: string,
       options: {
         signal?: AbortSignal;
+        onToken?: (token: string) => void;
         liveContext?: LiveContextOptions<F & OrchestratorState>;
       } = {},
     ): OrchestratorStreamResult<T> {
@@ -1888,6 +1968,21 @@ export function createAgentOrchestrator<
       let tokenCount = 0;
       const MAX_ACCUMULATED_OUTPUT = 100_000;
       let accumulatedOutput = "";
+      // Chunks lost because the consumer fell behind – reported on `done`.
+      let droppedChunks = 0;
+      // `token` chunks emitted for the current generation. Reset at every
+      // generation boundary so `deltaCount` describes the response the
+      // consumer is currently assembling, not the ones that were abandoned.
+      let deltaCount = 0;
+      // How many of those deltas have already been attributed to a completed
+      // assistant message. The difference tells `onMessage` whether real
+      // deltas arrived for the message it is being handed.
+      let deltasAttributedToMessages = 0;
+      // Deltas that came from the runner rather than from whole-message
+      // synthesis, across every generation. Zero at the end of a run that
+      // asked for streaming means the runner ignored the request.
+      let realDeltaCount = 0;
+      const streamRequested = options.onToken !== undefined;
 
       // Combine external abort signal
       let abortHandler: (() => void) | undefined;
@@ -1909,11 +2004,17 @@ export function createAgentOrchestrator<
         if (waiter) {
           waiter(chunk);
         } else {
-          chunks.push(chunk);
-          // FIFO eviction when buffer exceeds max
-          if (chunks.length > MAX_STREAM_BUFFER) {
-            chunks.shift();
+          // Drop the NEWEST on overflow. Evicting the oldest kept the tail of
+          // a response and silently deleted its beginning, which at per-delta
+          // granularity is the difference between a truncated answer and a
+          // beheaded one. Control and terminal chunks are always admitted –
+          // dropping `done` would take the drop report with it.
+          if (chunks.length >= MAX_STREAM_BUFFER && isDroppableChunk(chunk)) {
+            droppedChunks++;
+
+            return;
           }
+          chunks.push(chunk);
         }
       };
 
@@ -1926,6 +2027,57 @@ export function createAgentOrchestrator<
         }
         waiters.length = 0;
       };
+
+      // Append to the partial output the consumer sees on `interrupted` and
+      // `guardrail_triggered`, keeping the tail bounded without bisecting a
+      // surrogate pair.
+      const appendToAccumulated = (text: string) => {
+        accumulatedOutput = sliceTailByCodePoint(
+          accumulatedOutput + text,
+          MAX_ACCUMULATED_OUTPUT,
+        );
+      };
+
+      // A generation boundary: the runner is about to be re-invoked and will
+      // replay the whole response, so everything the consumer rendered for the
+      // previous generation is void. Only emitted when the caller asked for
+      // deltas – without that the response arrives as a single whole-message
+      // chunk and there is nothing part-rendered to discard.
+      const beginGeneration = (reason: StreamRestartReason) => {
+        if (!streamRequested) {
+          return;
+        }
+        pushChunk({
+          type: "stream_restart",
+          reason,
+          discardBefore: deltaCount,
+        });
+        deltaCount = 0;
+        deltasAttributedToMessages = 0;
+        accumulatedOutput = "";
+      };
+
+      // The orchestrator's own `onToken`, handed to the runner through the
+      // options it already builds – so deltas arrive with retry, guardrails,
+      // tool-call approval and the facts bridge all still in force. The
+      // caller's callback is invoked last and its return value passed back, so
+      // returning a promise still applies backpressure to the provider.
+      const callerOnToken = options.onToken as TokenSink | undefined;
+      const handleDelta = callerOnToken
+        ? (token: string): unknown => {
+            deltaCount++;
+            realDeltaCount++;
+            appendToAccumulated(token);
+            pushChunk({
+              type: "token",
+              data: token,
+              deltaCount,
+              tokenCount: deltaCount,
+            });
+
+            return callerOnToken(token);
+          }
+        : undefined;
 
       // RFC 0005: wire liveContext subscriptions BEFORE the resultPromise
       // IIFE constructs (which starts running synchronously). Even though
@@ -2136,6 +2288,7 @@ export function createAgentOrchestrator<
             processedInput,
             {
               signal: abortController.signal,
+              onToken: handleDelta,
               onMessage: (message) => {
                 const currentConversation = getConversation(system.facts);
                 setConversation(system.facts, [
@@ -2144,19 +2297,29 @@ export function createAgentOrchestrator<
                 ]);
                 pushChunk({ type: "message", message });
 
-                // Approximate token counting from content
                 if (message.role === "assistant" && message.content) {
+                  // Real deltas for this message already landed on the stream
+                  // and in `accumulatedOutput`. Synthesizing a whole-message
+                  // token chunk on top of them would deliver the response
+                  // twice. Measured per message rather than per run, so a
+                  // later turn that arrives without deltas still gets one.
+                  const deltasForThisMessage =
+                    deltaCount - deltasAttributedToMessages;
+                  deltasAttributedToMessages = deltaCount;
+                  if (deltasForThisMessage > 0) {
+                    return;
+                  }
+
+                  // Approximate token counting from content
                   const newTokens = Math.ceil(message.content.length / 4);
                   tokenCount += newTokens;
-                  accumulatedOutput += message.content;
-                  if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                    accumulatedOutput = accumulatedOutput.slice(
-                      -MAX_ACCUMULATED_OUTPUT,
-                    );
-                  }
+                  deltaCount++;
+                  deltasAttributedToMessages = deltaCount;
+                  appendToAccumulated(message.content);
                   pushChunk({
                     type: "token",
                     data: message.content,
+                    deltaCount,
                     tokenCount,
                   });
                 }
@@ -2254,7 +2417,24 @@ export function createAgentOrchestrator<
                 }
               },
             },
-            agentRetry,
+            // Each retry re-invokes the runner and replays the response from
+            // the beginning, so the consumer needs a boundary between the two.
+            agentRetry
+              ? {
+                  ...agentRetry,
+                  onRetry: (attempt, error, delayMs) => {
+                    beginGeneration("retry");
+                    agentRetry.onRetry?.(attempt, error, delayMs);
+                  },
+                }
+              : undefined,
+          );
+
+          reportIfRunnerIgnoredOnToken(
+            agent.name,
+            callerOnToken,
+            realDeltaCount,
+            result.output,
           );
 
           // Run output guardrails
@@ -2326,7 +2506,7 @@ export function createAgentOrchestrator<
             type: "done",
             totalTokens: result.totalTokens,
             duration,
-            droppedTokens: 0,
+            droppedTokens: droppedChunks,
           });
           closeStream();
 

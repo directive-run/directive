@@ -275,6 +275,8 @@ export {
   type DoneChunk,
   type ErrorChunk,
   type StreamChunk,
+  type StreamRestartChunk,
+  type StreamRestartReason,
   type StreamRunOptions,
   type StreamRunner,
   type StreamingRunResult,
@@ -363,6 +365,7 @@ export {
   type HandoffResult,
   type RunAgentRequirement,
   type MultiAgentRunCallOptions,
+  type MultiAgentStreamCallOptions,
 } from "./multi-agent-orchestrator.js";
 
 /**

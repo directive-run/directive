@@ -44,6 +44,129 @@ export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
 export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
 
 // ============================================================================
+// Shared Streaming Helpers
+// ============================================================================
+
+/**
+ * `RunOptions.onToken` is annotated `=> void` so that the shape most callers
+ * write – `(token) => buffer.push(token)` – stays assignable, but the adapters
+ * await whatever it returns. Code that wraps a caller's callback reads it back
+ * through this alias so it can hand the caller's promise along rather than
+ * dropping it, which is what makes backpressure real.
+ *
+ * @internal
+ */
+export type TokenSink = (token: string) => unknown;
+
+/** First code unit of the low-surrogate range. */
+const LOW_SURROGATE_START = 0xdc00;
+/** Last code unit of the low-surrogate range. */
+const LOW_SURROGATE_END = 0xdfff;
+
+/**
+ * Keep the last `maxLength` code units of `text`, moving the cut forward by one
+ * when it would land between the halves of a surrogate pair.
+ *
+ * `String.prototype.slice` counts UTF-16 code units, so a naive tail slice of
+ * accumulated model output can begin on a low surrogate whose high half was
+ * just discarded. The lone surrogate survives in the string and then breaks
+ * everything downstream that re-encodes it – `JSON.stringify` to a plugin or to
+ * devtools, and any regex guardrail run over the partial output.
+ *
+ * @internal
+ */
+export function sliceTailByCodePoint(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  let start = text.length - maxLength;
+  const code = text.charCodeAt(start);
+  if (code >= LOW_SURROGATE_START && code <= LOW_SURROGATE_END) {
+    start++;
+  }
+
+  return text.slice(start);
+}
+
+/**
+ * Chunk types an overflowing orchestrator stream may discard. Everything else
+ * – `done`, `error`, `guardrail_triggered`, `approval_required`,
+ * `approval_resolved`, `interrupted`, `stream_restart`, `context_updated` – is
+ * always admitted, because those chunks carry control flow or end the stream.
+ * Dropping `done` would take the drop report down with it, and dropping
+ * `approval_required` would leave a tool call waiting on an approval the
+ * consumer was never asked for.
+ *
+ * @internal
+ */
+export function isDroppableChunk(chunk: { type: string }): boolean {
+  return (
+    chunk.type === "token" ||
+    chunk.type === "message" ||
+    chunk.type === "progress" ||
+    chunk.type === "tool_start" ||
+    chunk.type === "tool_end"
+  );
+}
+
+let runnerIgnoredOnTokenWarned = false;
+
+/** Did the run actually produce something the caller would have wanted deltas for? */
+function hasNonEmptyOutput(output: unknown): boolean {
+  if (output === undefined || output === null) {
+    return false;
+  }
+  if (typeof output === "string") {
+    return output.length > 0;
+  }
+
+  return true;
+}
+
+/**
+ * Warn when a run asked for per-delta streaming, produced output, and delivered
+ * no deltas at all. Silence in every other case: no request means nothing was
+ * promised, deltas arriving means the runner streamed, and empty output means
+ * there was nothing to stream.
+ *
+ * @internal
+ */
+export function reportIfRunnerIgnoredOnToken(
+  agentName: string,
+  requested: TokenSink | undefined,
+  deltaCount: number,
+  output: unknown,
+): void {
+  if (requested === undefined || deltaCount > 0) {
+    return;
+  }
+  if (!hasNonEmptyOutput(output)) {
+    return;
+  }
+  warnRunnerIgnoredOnToken(agentName);
+}
+
+const RUNNER_IGNORED_ONTOKEN_HINT =
+  "The runner does not support streaming: a runner built with createRunner needs a `streaming` config, and a hand-written runner has to call `options.onToken` itself. Wrappers (withRetry, withBudget, withFallback, withModelSelection, withStructuredOutput) forward `onToken` untouched, so the base runner is where to look. This warning is emitted once per process.";
+
+/**
+ * Warn once per process that a run asked for per-delta streaming and received
+ * none. `onToken` is a request rather than a guarantee, so a runner that cannot
+ * stream returns its ordinary buffered result with no error – which is silent
+ * unless someone counts the deltas that arrived.
+ */
+function warnRunnerIgnoredOnToken(agentName: string): void {
+  if (runnerIgnoredOnTokenWarned) {
+    return;
+  }
+  runnerIgnoredOnTokenWarned = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[Directive] onToken was requested for "${agentName}" but the runner emitted no deltas – the response arrived as one buffered message. ${RUNNER_IGNORED_ONTOKEN_HINT}`,
+  );
+}
+
+// ============================================================================
 // Stream Event Types
 // ============================================================================
 
@@ -51,8 +174,53 @@ export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
 export interface TokenChunk {
   type: "token";
   data: string;
-  /** Running total of tokens received */
+  /**
+   * Ordinal of this chunk within the current generation – how many `token`
+   * chunks have been emitted since the stream started or since the last
+   * {@link StreamRestartChunk}.
+   *
+   * This is **not** a token count. On the per-delta path it counts provider
+   * deltas, and a delta is not a token: Anthropic emits multi-token deltas and
+   * Gemini emits sentence-sized ones. On the whole-message path it counts
+   * messages. For an authoritative count, read `result.tokenUsage` off the
+   * awaited {@link RunResult}.
+   */
+  deltaCount: number;
+  /**
+   * @deprecated Use {@link TokenChunk.deltaCount}, or `result.tokenUsage` for a
+   * real token count. Kept because it is public API.
+   *
+   * On the per-delta path this equals `deltaCount`. On the whole-message path
+   * it retains its historical value – a running `ceil(content.length / 4)`
+   * estimate – so existing consumers see exactly what they saw before. Neither
+   * form is a token count.
+   */
   tokenCount: number;
+}
+
+/** Why a new generation started. */
+export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
+
+/**
+ * A new generation started, and everything emitted for the previous one is
+ * void. The runner was re-invoked – an agent-level retry, a structured-output
+ * schema retry, or a self-healing reroute to an equivalent agent – so the
+ * consumer is about to receive the whole response again from the beginning.
+ *
+ * Emitted only when the caller requested per-delta streaming with `onToken`.
+ * Without it a generation is delivered as a single whole-message chunk and
+ * there is nothing part-rendered to discard.
+ */
+export interface StreamRestartChunk {
+  type: "stream_restart";
+  /** What re-invoked the runner. */
+  reason: StreamRestartReason;
+  /**
+   * How many `token` chunks were emitted for the abandoned generation. Discard
+   * that many – the same content arrives again after this chunk. The next
+   * `token` chunk restarts `deltaCount` at 1.
+   */
+  discardBefore: number;
 }
 
 /** Tool execution started */
@@ -103,7 +271,10 @@ export interface DoneChunk {
   type: "done";
   totalTokens: number;
   duration: number;
-  /** Number of tokens dropped due to backpressure (only with 'drop' strategy) */
+  /**
+   * Number of chunks dropped because the consumer fell behind and the buffer
+   * filled. Zero means nothing was lost.
+   */
   droppedTokens: number;
 }
 
@@ -124,7 +295,8 @@ export type StreamChunk =
   | GuardrailTriggeredChunk
   | ProgressChunk
   | DoneChunk
-  | ErrorChunk;
+  | ErrorChunk
+  | StreamRestartChunk;
 
 // ============================================================================
 // Streaming Run Types
@@ -419,6 +591,7 @@ export function createStreamingRunner(
             await buffer.push({
               type: "token",
               data: token,
+              deltaCount: tokenCount,
               tokenCount,
             });
 

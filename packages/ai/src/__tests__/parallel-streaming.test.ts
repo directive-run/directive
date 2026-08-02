@@ -25,7 +25,7 @@ async function* mockStream(
 }
 
 function tokenChunk(data: string, tokenCount: number): OrchestratorStreamChunk {
-  return { type: "token", data, tokenCount };
+  return { type: "token", data, deltaCount: tokenCount, tokenCount };
 }
 
 function doneChunk(

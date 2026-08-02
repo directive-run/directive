@@ -93,6 +93,17 @@ export interface StructuredOutputConfig<T = unknown> {
   extractJson?: (output: string) => unknown;
   /** Schema description to inject into system prompt. Auto-derived from schema.description if available. */
   schemaDescription?: string;
+  /**
+   * Called just before the runner is re-invoked because the previous response
+   * did not satisfy the schema. `attempt` is the 1-based number of the attempt
+   * that just failed and `error` is the validation message fed back to the
+   * model.
+   *
+   * A re-invocation replays the whole response, so a consumer streaming deltas
+   * needs to know the earlier ones are void. Best-effort – a throw from here is
+   * swallowed rather than failing the run.
+   */
+  onRetry?: (attempt: number, error: string) => void;
 }
 
 // ============================================================================
@@ -263,6 +274,7 @@ export function withStructuredOutput<T = unknown>(
     maxRetries = 2,
     extractJson = extractJsonFromOutput,
     schemaDescription,
+    onRetry,
   } = config;
 
   // Validate config
@@ -297,6 +309,14 @@ export function withStructuredOutput<T = unknown>(
         attempt === 0
           ? input
           : `${input}\n\nYour previous response was not valid JSON. Error: ${lastError}\nPlease try again with valid JSON only.`;
+
+      if (attempt > 0 && onRetry) {
+        try {
+          onRetry(attempt, lastError ?? "");
+        } catch {
+          // Observability hook – a throw here must not fail the run.
+        }
+      }
 
       const result = await runner(structuredAgent, effectiveInput, options);
       lastResult = result;

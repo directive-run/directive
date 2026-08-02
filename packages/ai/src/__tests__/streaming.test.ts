@@ -117,12 +117,19 @@ describe("createStreamingRunner", () => {
     expect(tokenChunks[0]).toEqual({
       type: "token",
       data: "Hello",
+      deltaCount: 1,
       tokenCount: 1,
     });
-    expect(tokenChunks[1]).toEqual({ type: "token", data: " ", tokenCount: 2 });
+    expect(tokenChunks[1]).toEqual({
+      type: "token",
+      data: " ",
+      deltaCount: 2,
+      tokenCount: 2,
+    });
     expect(tokenChunks[2]).toEqual({
       type: "token",
       data: "World",
+      deltaCount: 3,
       tokenCount: 3,
     });
   });
