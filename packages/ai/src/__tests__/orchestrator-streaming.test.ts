@@ -7,14 +7,16 @@
  * line, and hold the two orchestrators to the same behavior.
  */
 
+import { createModule, createSystem, t } from "@directive-run/core";
 import { describe, expect, it, vi } from "vitest";
 import { createAgentOrchestrator } from "../agent-orchestrator.js";
 import type { OrchestratorStreamChunk } from "../agent-orchestrator.js";
 import { BudgetExceededError, withBudget } from "../budget.js";
 import type { DebugTimeline } from "../debug-timeline.js";
+import { withFallback } from "../fallback.js";
 import { createMultiAgentOrchestrator } from "../multi-agent-orchestrator.js";
 import { withRetry } from "../retry.js";
-import { sliceTailByCodePoint } from "../streaming.js";
+import { admitChunk, sliceTailByCodePoint } from "../streaming.js";
 import { GuardrailError } from "../types.js";
 import type { AgentLike, AgentRunner, RunResult } from "../types.js";
 
@@ -339,7 +341,7 @@ describe("stream call options – deltas", () => {
     await result;
 
     expect(chunks.filter((c) => c.type === "stream_restart")).toEqual([
-      { type: "stream_restart", reason: "retry", discardBefore: 1 },
+      { type: "stream_restart", reason: "retry", generation: 2 },
     ]);
   });
 });
@@ -456,7 +458,7 @@ describe("runStream – generation boundaries", () => {
     expect(restarts[0]).toEqual({
       type: "stream_restart",
       reason: "retry",
-      discardBefore: 2,
+      generation: 2,
     });
 
     const restartIndex = chunks.indexOf(restarts[0]!);
@@ -518,7 +520,7 @@ describe("runStream – generation boundaries", () => {
     expect(call).toBe(2);
     const restarts = chunks.filter((c) => c.type === "stream_restart");
     expect(restarts).toHaveLength(1);
-    expect(restarts[0]).toMatchObject({ reason: "reroute", discardBefore: 1 });
+    expect(restarts[0]).toMatchObject({ reason: "reroute", generation: 2 });
   });
 
   it("marks a structured-output schema retry in the multi-agent orchestrator", async () => {
@@ -563,7 +565,7 @@ describe("runStream – generation boundaries", () => {
     expect(restarts).toHaveLength(1);
     expect(restarts[0]).toMatchObject({
       reason: "schema-retry",
-      discardBefore: 1,
+      generation: 2,
     });
   });
 });
@@ -954,7 +956,7 @@ describe("both orchestrators stream the same way", () => {
       chunks.filter((c) => c.type === "stream_restart");
 
     expect(restartOf(singleChunks)).toEqual([
-      { type: "stream_restart", reason: "retry", discardBefore: 1 },
+      { type: "stream_restart", reason: "retry", generation: 2 },
     ]);
     expect(restartOf(multiChunks)).toEqual(restartOf(singleChunks));
     expect(tokenData(singleChunks)).toEqual(tokenData(multiChunks));
@@ -1348,5 +1350,335 @@ describe("destroy() and live streams", () => {
     expect(() => multi.destroy()).not.toThrow();
     // Second call stays a no-op.
     expect(() => multi.destroy()).not.toThrow();
+  });
+});
+
+// ============================================================================
+// Generation boundaries the orchestrator does not perform itself
+// ============================================================================
+
+describe("stream_restart from runner wrappers", () => {
+  /** Fails `failures` times, then streams `deltas`. */
+  function flakyDeltaRunner(failures: number, deltas: string[]): AgentRunner {
+    let call = 0;
+    const inner = deltaRunner(deltas);
+
+    return (async (agent: AgentLike, input: string, options?: any) => {
+      call++;
+      if (call <= failures) {
+        throw new Error("[Directive] request failed: 503");
+      }
+
+      return inner(agent, input, options);
+    }) as unknown as AgentRunner;
+  }
+
+  it("marks a withRetry retry, so the stream is not one run-on response", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: withRetry(flakyDeltaRunner(1, ["The answer ", "is 42"]), {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      }),
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    const restarts = chunks.filter((c) => c.type === "stream_restart");
+    expect(restarts).toEqual([
+      { type: "stream_restart", reason: "retry", generation: 2 },
+    ]);
+  });
+
+  it("marks a withFallback reroute, so the stream and the result agree", async () => {
+    const failing: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      await options?.onToken?.("Sorry, I cannot");
+
+      throw new Error("provider down");
+    }) as unknown as AgentRunner;
+    const orchestrator = createAgentOrchestrator({
+      runner: withFallback([failing, deltaRunner(["Sure, ", "here you go."])]),
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    const final = await result;
+
+    const restartIndex = chunks.findIndex((c) => c.type === "stream_restart");
+    expect(restartIndex).toBeGreaterThan(-1);
+    expect((chunks[restartIndex] as { reason: string }).reason).toBe("reroute");
+
+    // Rendering the current generation reproduces the result exactly.
+    const rendered = tokenData(chunks.slice(restartIndex)).join("");
+    expect(rendered).toBe(final.output);
+  });
+
+  it("gives run({ onToken }) the same boundary through onStreamRestart", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: withRetry(flakyDeltaRunner(1, ["The answer ", "is 42"]), {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      }),
+    });
+
+    let rendered = "";
+    const restarts: string[] = [];
+    const result = await orchestrator.run(mockAgent(), "hi", {
+      onToken: (token) => {
+        rendered += token;
+      },
+      onStreamRestart: (reason) => {
+        restarts.push(reason);
+        rendered = "";
+      },
+    });
+
+    expect(restarts).toEqual(["retry"]);
+    expect(rendered).toBe(result.output);
+  });
+});
+
+// ============================================================================
+// The configured runner applies on the streaming path too
+// ============================================================================
+
+describe("runStream uses the configured runner", () => {
+  it("applies the orchestrator's output schema, and marks the schema retry", async () => {
+    let call = 0;
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      call++;
+      const output = call === 1 ? "not json" : '{"ok":true}';
+      await options?.onToken?.(output);
+
+      return { ...resultFor(output), output };
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      outputSchema: {
+        safeParse: (value: unknown) =>
+          typeof value === "object" && value !== null
+            ? { success: true, data: value }
+            : { success: false, error: { message: "not an object" } },
+      } as never,
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    const final = await result;
+
+    expect(call).toBe(2);
+    expect(final.output).toEqual({ ok: true });
+    expect(chunks.filter((c) => c.type === "stream_restart")).toMatchObject([
+      { reason: "schema-retry", generation: 2 },
+    ]);
+  });
+
+  it("applies the circuit breaker, so a streamed run counts toward it", async () => {
+    const failing: AgentRunner = (async () => {
+      throw new Error("boom");
+    }) as AgentRunner;
+    const orchestrator = createAgentOrchestrator({
+      runner: failing,
+      circuitBreaker: { failureThreshold: 1, resetTimeoutMs: 60_000 },
+    } as never);
+
+    const first = orchestrator.runStream(mockAgent(), "hi", { deltas: true });
+    await collect(first.stream);
+    await expect(first.result).rejects.toThrow();
+
+    const second = orchestrator.runStream(mockAgent(), "hi", { deltas: true });
+    const chunks = await collect(second.stream);
+    await expect(second.result).rejects.toThrow();
+
+    const error = chunks.find((c) => c.type === "error");
+    expect((error as { error: Error }).error.message).toMatch(/circuit/i);
+  });
+});
+
+// ============================================================================
+// Loss is bounded, and reported however the run ends
+// ============================================================================
+
+describe("buffer bounds and drop reporting", () => {
+  it("bounds fact-change notifications on a stream nobody is reading", async () => {
+    const factSystem = createSystem({
+      module: createModule("ticker", {
+        schema: {
+          facts: { price: t.number() },
+          events: { setPrice: { price: t.number() } },
+        },
+        init: (facts) => {
+          facts.price = 0;
+        },
+        events: {
+          setPrice: (facts, payload) => {
+            facts.price = payload.price;
+          },
+        },
+      }),
+    });
+    factSystem.start();
+
+    // Mutates the watched fact far past the buffer cap before returning, with
+    // no consumer pulling from the stream.
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      for (let i = 1; i <= 30_000; i++) {
+        factSystem.events.setPrice({ price: i });
+      }
+      await options?.onToken?.("done");
+
+      return resultFor("done");
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({ runner });
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+      liveContext: {
+        system: factSystem as never,
+        keys: ["price"],
+        notifyOn: "all-changes",
+        interruptWhen: () => false,
+      },
+    });
+
+    await result;
+    const chunks = await collect(stream);
+    factSystem.destroy();
+
+    // The buffer holds its cap, not one chunk per fact change.
+    expect(chunks.length).toBeLessThanOrEqual(10_001);
+
+    const done = chunks.find((c) => c.type === "done");
+    expect((done as { droppedTokens: number }).droppedTokens).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("keeps control chunks ahead of content, and still caps them", () => {
+    const buffer: Array<{ type: string; id: number }> = [];
+    for (let i = 0; i < 4; i++) {
+      admitChunk(buffer, { type: "token", id: i }, 4);
+    }
+
+    // Full: another token is refused.
+    expect(admitChunk(buffer, { type: "token", id: 99 }, 4)).toBe(1);
+    expect(buffer).toHaveLength(4);
+
+    // A control chunk lands, evicting the newest token so the beginning of
+    // the response survives.
+    expect(admitChunk(buffer, { type: "approval_required", id: 100 }, 4)).toBe(
+      1,
+    );
+    expect(buffer.map((c) => c.id)).toEqual([0, 1, 2, 100]);
+
+    // Control chunks are capped too — three more cannot grow the buffer past
+    // four, however many arrive.
+    for (let i = 0; i < 3; i++) {
+      admitChunk(buffer, { type: "approval_required", id: 200 + i }, 4);
+    }
+    expect(buffer).toHaveLength(4);
+
+    // The terminal chunk always lands, even with nothing droppable left.
+    expect(admitChunk(buffer, { type: "done", id: 300 }, 4)).toBe(1);
+    expect(buffer).toHaveLength(4);
+    expect(buffer[buffer.length - 1]!.id).toBe(300);
+  });
+
+  it("reports the loss on the error path, not only on done", async () => {
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      for (let i = 0; i < 10_050; i++) {
+        await options?.onToken?.("x");
+      }
+
+      throw new Error("boom");
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({ runner });
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    await expect(result).rejects.toThrow(/boom/);
+
+    const chunks = await collect(stream);
+    const error = chunks.find((c) => c.type === "error");
+    expect((error as { droppedTokens?: number }).droppedTokens).toBeGreaterThan(
+      0,
+    );
+  });
+});
+
+// ============================================================================
+// Multi-agent paths that accept the option
+// ============================================================================
+
+describe("multi-agent streaming options", () => {
+  it("hands a task's output to onToken as well as to the stream", async () => {
+    const orchestrator = createMultiAgentOrchestrator({
+      runner: bufferedRunner("unused"),
+      agents: { assistant: { agent: mockAgent("assistant") } },
+      tasks: { summarize: { run: async () => "task output" } },
+    } as never);
+
+    const tokens: string[] = [];
+    const { stream, result } = orchestrator.runAgentStream("summarize", "hi", {
+      onToken: (token) => tokens.push(token),
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    expect(tokens).toEqual(["task output"]);
+    expect(tokenData(chunks)).toEqual(["task output"]);
+  });
+
+  it("forwards deltas through runParallelStream", async () => {
+    const orchestrator = createMultiAgentOrchestrator({
+      runner: deltaRunner(["a", "b", "c"]),
+      agents: {
+        one: { agent: mockAgent("one") },
+        two: { agent: mockAgent("two") },
+      },
+    } as never);
+
+    const { stream, results } = orchestrator.runParallelStream(
+      ["one", "two"],
+      "hi",
+      (all) => all.length,
+      { deltas: true },
+    );
+
+    const seen: Record<string, string[]> = { one: [], two: [] };
+    for await (const { chunk, agentId } of stream) {
+      if (chunk.type === "token") {
+        seen[agentId]!.push(chunk.data);
+      }
+    }
+    await results;
+
+    expect(seen.one).toEqual(["a", "b", "c"]);
+    expect(seen.two).toEqual(["a", "b", "c"]);
   });
 });

@@ -30,6 +30,7 @@
  * ```
  */
 
+import { isStreamConsumerError } from "./streaming.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
@@ -103,6 +104,13 @@ export function withFallback(
         const error = err instanceof Error ? err : new Error(String(err));
         errors.push(error);
 
+        // A consumer callback that threw is not a provider failure. Trying the
+        // next provider spends again to hand the same response to the same
+        // broken consumer.
+        if (isStreamConsumerError(error)) {
+          break;
+        }
+
         // Check if we should fall back to next provider
         if (i < runners.length - 1) {
           if (shouldFallback) {
@@ -117,6 +125,16 @@ export function withFallback(
           }
           try {
             onFallback?.(i, i + 1, error);
+          } catch {
+            /* callback error must not disrupt fallback flow */
+          }
+
+          // The next provider answers the prompt from scratch, so anything a
+          // consumer rendered from the failed one is void. Without this the
+          // stream shows one provider's partial answer followed by another's
+          // complete one, while `result` holds only the second.
+          try {
+            options?.onStreamRestart?.("reroute");
           } catch {
             /* callback error must not disrupt fallback flow */
           }

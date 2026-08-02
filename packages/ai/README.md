@@ -113,13 +113,16 @@ const { stream, result } = orchestrator.runStream(agent, "Write a report", {
 
 for await (const chunk of stream) {
   if (chunk.type === "token") process.stdout.write(chunk.data);
-  // `stream_restart` means a retry replayed the response - discard
-  // `chunk.discardBefore` token chunks you already rendered.
-  if (chunk.type === "stream_restart") ui.discardLast(chunk.discardBefore);
+  // `stream_restart` means the response is starting over - a retry, a schema
+  // retry, or a fallback to another provider. Discard everything you rendered
+  // for the current generation.
+  if (chunk.type === "stream_restart") ui.clear();
 }
 
 const final = await result;
 ```
+
+> **`chunk.data` is untrusted text.** It is the model's output byte for byte, and a terminal interprets what you write to it &ndash; escape sequences can clear the screen, move the cursor, or rewrite lines already printed. A single sequence can also arrive split across two deltas, so sanitizing each chunk on its own does not help. Sanitize the accumulated text, or render into something that does not interpret control codes.
 
 Use `onToken` when you want the deltas somewhere of your own. It is awaited, so returning a promise applies real backpressure &ndash; the adapter stops reading the provider stream until it settles.
 

@@ -78,6 +78,9 @@ function parseAnthropicStreamEvent(
   }
 
   const result: StreamEventResult = {};
+  if (event.type === "message_stop") {
+    result.terminal = true;
+  }
   if (
     event.type === "content_block_delta" &&
     (event.delta as Record<string, unknown>)?.type === "text_delta"
@@ -280,6 +283,7 @@ export function createAnthropicRunner(
           outputTokens,
           cacheReadTokens,
           cacheCreationTokens,
+          usageReported: data.usage != null,
         };
       }
 
@@ -288,11 +292,13 @@ export function createAnthropicRunner(
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        usageReported: data.usage != null,
       };
     },
     streaming: {
       adapterName: "Anthropic",
       parseEvent: parseAnthropicStreamEvent,
+      requireTerminalEvent: true,
       // Mirrors `parseResponse` exactly – cache tokens are gated on the option,
       // never on the presence of the response fields, so `tokenUsage` is the
       // same shape whether or not the caller asked for deltas.
@@ -413,12 +419,15 @@ export function createAnthropicStreamingRunner(
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseEventStream(
-        reader,
-        callbacks.onToken,
-        parseAnthropicStreamEvent,
-        "Anthropic",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseAnthropicStreamEvent,
+          "Anthropic",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -434,7 +443,13 @@ export function createAnthropicStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

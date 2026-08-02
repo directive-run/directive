@@ -218,6 +218,7 @@ export {
   validateBaseURL,
   createRunner,
   type CreateRunnerOptions,
+  type ParseEventStreamOptions,
   type ParsedResponse,
   type RunnerStreamingSupport,
   type StreamEventResult,
@@ -287,6 +288,8 @@ export {
   type MultiplexedStreamResult,
   type MergedTaggedStreamResult,
   mergeTaggedStreams,
+  StreamConsumerError,
+  isStreamConsumerError,
 } from "./streaming.js";
 
 /**

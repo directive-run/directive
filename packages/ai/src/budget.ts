@@ -287,6 +287,8 @@ export function withBudget(
   }
   // Base pricing ledger (used when no budget windows are configured)
   const baseLedger = new CostLedger();
+  // Calls the provider declined to report usage for, charged at estimate.
+  let unpricedCalls = 0;
 
   const budgetRunner: AgentRunner = async <T = unknown>(
     agent: AgentLike,
@@ -347,17 +349,36 @@ export function withBudget(
     // Execute the call
     const result = await runner<T>(agent, input, options);
 
+    // A provider that reported no usage has not told us the call was free —
+    // an OpenAI-compatible endpoint that ignores `stream_options.include_usage`
+    // returns zeros for a call that cost real money. Recording those zeros
+    // means the window never accrues and the ceiling never trips, so charge
+    // the same estimate the pre-call check used and count the call as one the
+    // ledger could not price.
+    const unpriceable = result.usageReported === false;
+    if (unpriceable) {
+      unpricedCalls++;
+    }
+
     // Post-call: Record actual costs in per-window ledgers
-    if (result.tokenUsage) {
+    if (result.tokenUsage || unpriceable) {
       for (const budget of budgets) {
         const ledger = windowLedgers.get(budget.window)!;
-        const actualCost = calculateCost(result.tokenUsage, budget.pricing);
-        ledger.record(actualCost);
+        const cost = unpriceable
+          ? estimateCallCost(
+              inputTokens,
+              budget.pricing,
+              estimatedOutputMultiplier,
+            )
+          : calculateCost(result.tokenUsage!, budget.pricing);
+        ledger.record(cost);
       }
       // Record in base ledger when no windows configured
       if (pricing && budgets.length === 0) {
-        const actualCost = calculateCost(result.tokenUsage, pricing);
-        baseLedger.record(actualCost);
+        const cost = unpriceable
+          ? estimateCallCost(inputTokens, pricing, estimatedOutputMultiplier)
+          : calculateCost(result.tokenUsage!, pricing);
+        baseLedger.record(cost);
       }
     }
 
@@ -384,8 +405,29 @@ export function withBudget(
     return ledger.getCostInWindow(windowMs);
   }
 
+  /**
+   * How many calls were charged at estimate because the provider reported no
+   * token usage.
+   *
+   * Non-zero means the recorded spend is an approximation: the endpoint is not
+   * returning usage (a gateway that drops `stream_options.include_usage` is
+   * the usual cause). The spend it stands in for is real either way.
+   *
+   * @example
+   * ```typescript
+   * if (runner.getUnpricedCallCount() > 0) {
+   *   console.warn("Provider is not reporting token usage — budgets are estimates.");
+   * }
+   * ```
+   */
+  function getUnpricedCallCount(): number {
+    return unpricedCalls;
+  }
+
   // Attach getSpent as a direct property for type-safe access without casting
   (budgetRunner as unknown as Record<string, unknown>).getSpent = getSpent;
+  (budgetRunner as unknown as Record<string, unknown>).getUnpricedCallCount =
+    getUnpricedCallCount;
 
   return budgetRunner as unknown as BudgetRunner;
 }
@@ -394,4 +436,6 @@ export function withBudget(
 export type BudgetRunner = AgentRunner & {
   /** Get cost spent within a rolling window. */
   getSpent(window: "hour" | "day"): number;
+  /** How many calls were charged at estimate because usage was not reported. */
+  getUnpricedCallCount(): number;
 };

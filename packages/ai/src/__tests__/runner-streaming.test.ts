@@ -13,8 +13,11 @@ import { createAnthropicRunner } from "../adapters/anthropic.js";
 import { createGeminiRunner } from "../adapters/gemini.js";
 import { createOllamaRunner } from "../adapters/ollama.js";
 import { createOpenAIRunner } from "../adapters/openai.js";
+import { createRunner } from "../agent-utils.js";
 import { BudgetExceededError, withBudget } from "../budget.js";
+import { withFallback } from "../fallback.js";
 import { withRetry } from "../retry.js";
+import { withStructuredOutput } from "../structured-output.js";
 import type {
   AgentLike,
   AgentRunner,
@@ -70,6 +73,7 @@ const ANTHROPIC_SSE = [
   'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}',
   'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" world"}}',
   'data: {"type":"message_delta","usage":{"output_tokens":5}}',
+  'data: {"type":"message_stop"}',
 ];
 
 const OPENAI_SSE = [
@@ -223,15 +227,19 @@ describe("backpressure", () => {
       "token: world",
       "done: world",
       "pull:3",
+      "pull:4",
     ]);
   });
 
   it("a slow consumer takes proportionally longer than a fast one", async () => {
-    const deltas = Array.from(
-      { length: 5 },
-      (_, i) =>
-        `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"t${i}"}}`,
-    );
+    const deltas = [
+      ...Array.from(
+        { length: 5 },
+        (_, i) =>
+          `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"t${i}"}}`,
+      ),
+      'data: {"type":"message_stop"}',
+    ];
     const makeRunner = () =>
       createAnthropicRunner({
         apiKey: "k",
@@ -323,6 +331,7 @@ describe("parity when onToken is absent", () => {
       'data: {"type":"message_start","message":{"usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":40}}}',
       'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}',
       'data: {"type":"message_delta","usage":{"output_tokens":5}}',
+      'data: {"type":"message_stop"}',
     ];
     const runner = createAnthropicRunner({
       apiKey: "k",
@@ -363,7 +372,7 @@ describe("provider wiring", () => {
   it("Gemini switches to streamGenerateContent and keeps the same body", async () => {
     const geminiSSE = [
       'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
-      'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
+      'data: {"candidates":[{"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
     ];
     const bufferedFetch = vi.fn().mockResolvedValue(
       jsonResponse({
@@ -580,5 +589,408 @@ describe("runners without streaming support", () => {
     expect(result.output).toBe("buffered");
     expect(result.totalTokens).toBe(7);
     expect(tokens).toEqual([]);
+  });
+});
+
+// ============================================================================
+// A provider that reports no usage is unpriceable, not free
+// ============================================================================
+
+describe("token accounting when the provider reports no usage", () => {
+  /** What an OpenAI-compatible gateway that drops `include_usage` sends. */
+  const NO_USAGE_SSE = [
+    'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+    'data: {"choices":[{"delta":{"content":" world"},"finish_reason":"stop"}]}',
+    "data: [DONE]",
+  ];
+
+  it("says the usage was not reported rather than reporting zero", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () => streamResponse(NO_USAGE_SSE)),
+    });
+
+    const result = await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.output).toBe("Hello world");
+    expect(result.totalTokens).toBe(0);
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("reports usage as trustworthy when the provider does send it", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockImplementation(async () => streamResponse(OPENAI_SSE)),
+    });
+
+    const result = await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.usageReported).toBe(true);
+  });
+
+  it("says so on the buffered path too, when the body carries no usage", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse({ choices: [{ message: { content: "Hello" } }] }),
+        ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("charges the budget an estimate, so the window still trips", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockImplementation(async () => streamResponse(NO_USAGE_SSE));
+    // $1 per token against a $5 ceiling. "Hi" estimates 1 in + 1 out.
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+    const wrapped = withBudget(
+      createOpenAIRunner({ apiKey: "k", fetch: fetchFn }),
+      { budgets: [{ window: "hour", maxCost: 5, pricing }] },
+    );
+
+    for (let call = 0; call < 2; call++) {
+      await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+    }
+
+    // Recorded spend accrues from the estimate rather than staying at $0
+    // forever, and the caller can tell the figure is an estimate.
+    expect(wrapped.getSpent("hour")).toBeCloseTo(4, 5);
+    expect(wrapped.getUnpricedCallCount()).toBe(2);
+
+    await expect(
+      wrapped(mockAgent(), "Hi", { onToken: () => {} }),
+    ).rejects.toBeInstanceOf(BudgetExceededError);
+  });
+
+  it("counts nothing as unpriced when the provider reports usage", async () => {
+    const wrapped = withBudget(
+      createOpenAIRunner({
+        apiKey: "k",
+        fetch: vi
+          .fn()
+          .mockImplementation(async () => streamResponse(OPENAI_SSE)),
+      }),
+      { budgets: [{ window: "hour", maxCost: 100, pricing: FREE_PRICING }] },
+    );
+
+    await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(wrapped.getUnpricedCallCount()).toBe(0);
+  });
+});
+
+// ============================================================================
+// A stream that ends early ends with an error
+// ============================================================================
+
+describe("truncated streams", () => {
+  it("fails when the body ends before the completion marker", async () => {
+    const truncated = [
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Half an ans"}}',
+    ];
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockImplementation(async () => streamResponse(truncated)),
+    });
+
+    await expect(
+      runner(mockAgent(), "Hi", { onToken: () => {} }),
+    ).rejects.toThrow(/ended without a completion marker/);
+  });
+
+  it("accepts a stream that reaches its completion marker", async () => {
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () => streamResponse(ANTHROPIC_SSE)),
+    });
+
+    await expect(
+      runner(mockAgent(), "Hi", { onToken: () => {} }),
+    ).resolves.toMatchObject({ output: "Hello world" });
+  });
+
+  it("reads a final event that arrives with no trailing newline", async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(`${ANTHROPIC_SSE.join("\n")}\n`));
+        // No newline after the last event, which servers are not obliged to
+        // send – and which now decides whether the run reads as complete.
+        controller.enqueue(encoder.encode('data: {"type":"message_stop"}'));
+        controller.close();
+      },
+    });
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
+    });
+
+    await expect(
+      runner(mockAgent(), "Hi", { onToken: () => {} }),
+    ).resolves.toMatchObject({ output: "Hello world" });
+  });
+
+  it("leaves a hand-written runner that cannot report the marker alone", async () => {
+    const runner = createRunner({
+      fetch: vi
+        .fn()
+        .mockImplementation(async () =>
+          streamResponse(['data: {"text":"Hi"}']),
+        ),
+      buildRequest: () => ({ url: "https://example.test/v1", init: {} }),
+      parseResponse: async () => ({ text: "", totalTokens: 0 }),
+      streaming: {
+        adapterName: "Custom",
+        parseEvent: (event) => ({ text: event.text as string }),
+      },
+    });
+
+    await expect(
+      runner(mockAgent(), "Hi", { onToken: () => {} }),
+    ).resolves.toMatchObject({ output: "Hi" });
+  });
+});
+
+// ============================================================================
+// Cancellation cuts through an awaited consumer callback
+// ============================================================================
+
+describe("abort with a consumer that never settles", () => {
+  it("settles the run and stops reading rather than parking forever", async () => {
+    const controller = new AbortController();
+    let cancelled = false;
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        for (const line of ANTHROPIC_SSE) {
+          streamController.enqueue(encoder.encode(`${line}\n`));
+        }
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
+    });
+
+    const run = runner(mockAgent(), "Hi", {
+      signal: controller.signal,
+      // The shape an adversarial output can produce in a per-delta sink: a
+      // promise that never settles. Awaited outside a race with the abort
+      // signal it holds the reader, the fetch and the run open forever.
+      onToken: () => new Promise<void>(() => {}),
+    });
+    const settled = expect(run).rejects.toThrow();
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort();
+
+    await settled;
+    expect(cancelled).toBe(true);
+  });
+});
+
+// ============================================================================
+// Every wrapper that re-invokes the runner says so
+// ============================================================================
+
+describe("restart signalling across wrappers", () => {
+  /** Fails `failures` times with a retryable error, then succeeds. */
+  function flakyRunner(failures: number): AgentRunner {
+    let call = 0;
+
+    return (async <T>(
+      _agent: AgentLike,
+      _input: string,
+      options?: RunOptions,
+    ): Promise<RunResult<T>> => {
+      call++;
+      if (call <= failures) {
+        throw new Error("[Directive] request failed: 503");
+      }
+      await options?.onToken?.("done");
+
+      return {
+        output: '{"ok":true}' as T,
+        messages: [],
+        toolCalls: [],
+        totalTokens: 1,
+        tokenUsage: { inputTokens: 1, outputTokens: 0 },
+      };
+    }) as AgentRunner;
+  }
+
+  it("withRetry reports every retry", async () => {
+    const restarts: string[] = [];
+
+    await withRetry(flakyRunner(2), { maxRetries: 3, baseDelayMs: 0 })(
+      mockAgent(),
+      "Hi",
+      {
+        onToken: () => {},
+        onStreamRestart: (reason) => restarts.push(reason),
+      },
+    );
+
+    expect(restarts).toEqual(["retry", "retry"]);
+  });
+
+  it("withFallback reports the move to the next provider", async () => {
+    const restarts: string[] = [];
+    const failing: AgentRunner = (async () => {
+      throw new Error("provider down");
+    }) as AgentRunner;
+
+    await withFallback([failing, flakyRunner(0)])(mockAgent(), "Hi", {
+      onToken: () => {},
+      onStreamRestart: (reason) => restarts.push(reason),
+    });
+
+    expect(restarts).toEqual(["reroute"]);
+  });
+
+  it("withStructuredOutput reports every schema retry", async () => {
+    const restarts: string[] = [];
+    let call = 0;
+    const badThenGood: AgentRunner = (async <T>() => {
+      call++;
+
+      return {
+        output: (call === 1 ? "not json" : '{"ok":true}') as T,
+        messages: [],
+        toolCalls: [],
+        totalTokens: 1,
+      };
+    }) as AgentRunner;
+
+    await withStructuredOutput(badThenGood, {
+      schema: {
+        safeParse: (value: unknown) => ({ success: true, data: value }),
+      } as never,
+      maxRetries: 2,
+    })(mockAgent(), "Hi", {
+      onToken: () => {},
+      onStreamRestart: (reason) => restarts.push(reason),
+    });
+
+    expect(restarts).toEqual(["schema-retry"]);
+  });
+
+  it("reaches the base runner through a stack of wrappers", async () => {
+    const restarts: string[] = [];
+
+    await withBudget(
+      withFallback([
+        withRetry(flakyRunner(1), { maxRetries: 1, baseDelayMs: 0 }),
+      ]),
+      { budgets: [{ window: "hour", maxCost: 10, pricing: FREE_PRICING }] },
+    )(mockAgent(), "Hi", {
+      onToken: () => {},
+      onStreamRestart: (reason) => restarts.push(reason),
+    });
+
+    expect(restarts).toEqual(["retry"]);
+  });
+});
+
+// ============================================================================
+// A consumer that throws is not a provider failure
+// ============================================================================
+
+describe("a throwing consumer callback", () => {
+  function countingRunner(counter: { calls: number }): AgentRunner {
+    return (async <T>(
+      _agent: AgentLike,
+      _input: string,
+      options?: RunOptions,
+    ): Promise<RunResult<T>> => {
+      counter.calls++;
+      await options?.onToken?.("delta");
+
+      return {
+        output: "ok" as T,
+        messages: [],
+        toolCalls: [],
+        totalTokens: 1,
+      };
+    }) as AgentRunner;
+  }
+
+  it("is not retried", async () => {
+    const counter = { calls: 0 };
+    const wrapped = withRetry(
+      createAnthropicRunner({
+        apiKey: "k",
+        fetch: vi
+          .fn()
+          .mockImplementation(async () => streamResponse(ANTHROPIC_SSE)),
+      }),
+      { maxRetries: 2, baseDelayMs: 0 },
+    );
+
+    await expect(
+      wrapped(mockAgent(), "Hi", {
+        onToken: () => {
+          counter.calls++;
+
+          throw new Error("render crashed");
+        },
+      }),
+    ).rejects.toThrow(/render crashed/);
+
+    // One invocation, not three: the provider did nothing wrong.
+    expect(counter.calls).toBe(1);
+  });
+
+  it("does not fall through to the next provider", async () => {
+    const second = { calls: 0 };
+    const first = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () => streamResponse(ANTHROPIC_SSE)),
+    });
+
+    await expect(
+      withFallback([first, countingRunner(second)])(mockAgent(), "Hi", {
+        onToken: () => {
+          throw new Error("render crashed");
+        },
+      }),
+    ).rejects.toThrow(/render crashed/);
+
+    expect(second.calls).toBe(0);
+  });
+
+  it("still retries a real provider failure", async () => {
+    let attempt = 0;
+    const fetchFn = vi.fn().mockImplementation(async () => {
+      attempt++;
+      if (attempt === 1) {
+        return new Response("boom", { status: 503, statusText: "Error" });
+      }
+
+      return streamResponse(ANTHROPIC_SSE);
+    });
+
+    await withRetry(createAnthropicRunner({ apiKey: "k", fetch: fetchFn }), {
+      maxRetries: 2,
+      baseDelayMs: 0,
+    })(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(attempt).toBe(2);
   });
 });

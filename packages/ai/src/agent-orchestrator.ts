@@ -27,7 +27,7 @@ import {
   type StreamChunk as StreamChunkBase,
   type StreamRestartReason,
   type TokenSink,
-  isDroppableChunk,
+  admitChunk,
   reportIfRunnerIgnoredOnToken,
   sliceTailByCodePoint,
 } from "./streaming.js";
@@ -455,6 +455,17 @@ export interface RunCallOptions {
    * either way.
    */
   onToken?: (token: string) => void;
+  /**
+   * Called when something re-invokes the runner and the response starts over –
+   * an agent retry, a structured-output schema retry, or a wrapper falling back
+   * to another provider. Everything delivered through {@link RunCallOptions.onToken}
+   * so far is void.
+   *
+   * `runStream` reports the same boundary as a `stream_restart` chunk. This is
+   * the channel for callers who took the documented shortcut of `run` with
+   * `onToken` instead.
+   */
+  onStreamRestart?: (reason: StreamRestartReason) => void;
 }
 
 /** Orchestrator instance */
@@ -1078,6 +1089,46 @@ export function createAgentOrchestrator<
     throw error;
   }
 
+  /**
+   * The runner as configured: structured output first, then the circuit
+   * breaker, so the breaker counts each schema attempt.
+   *
+   * Both entry points build it here. `runStream` used to invoke the bare
+   * `runner` instead, which meant an orchestrator configured with an
+   * `outputSchema` or a `circuitBreaker` quietly had neither the moment the
+   * caller streamed – the one path where a schema retry is also a visible
+   * generation boundary.
+   */
+  function buildEffectiveRunner(callOptions?: RunCallOptions): AgentRunner {
+    const effectiveSchema =
+      callOptions?.outputSchema !== undefined
+        ? callOptions.outputSchema
+        : outputSchema;
+
+    let effectiveRunner = runner;
+    if (effectiveSchema) {
+      effectiveRunner = withStructuredOutput(runner, {
+        schema: effectiveSchema,
+        maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
+      });
+    }
+
+    // Circuit-breaker per attempt. When `circuitBreaker` is configured and
+    // `retryInsideCircuit` is false (the new default), wrap the runner so
+    // every retry attempt inside `executeAgentWithRetry` is gated by the
+    // breaker. Each failure counts toward `failureThreshold`; an open breaker
+    // short-circuits remaining retries.
+    if (circuitBreaker && !retryInsideCircuit) {
+      const inner = effectiveRunner;
+      effectiveRunner = (<U>(a: AgentLike, i: string, o?: RunOptions) =>
+        circuitBreaker!.execute(() =>
+          inner<U>(a, i, o),
+        )) as typeof effectiveRunner;
+    }
+
+    return effectiveRunner;
+  }
+
   async function runAgentWithGuardrailsBody<T>(
     agent: AgentLike,
     input: string,
@@ -1308,33 +1359,7 @@ export function createAgentOrchestrator<
       }
     }
 
-    // Structured output wrapping
-    const effectiveSchema =
-      callOptions?.outputSchema !== undefined
-        ? callOptions.outputSchema
-        : outputSchema;
-
-    let effectiveRunner = runner;
-    if (effectiveSchema) {
-      effectiveRunner = withStructuredOutput(runner, {
-        schema: effectiveSchema,
-        maxRetries: callOptions?.maxSchemaRetries ?? maxSchemaRetries ?? 2,
-      });
-    }
-
-    // Circuit-breaker per attempt. When `circuitBreaker`
-    // is configured and `retryInsideCircuit` is false (the new default),
-    // wrap the runner so every retry attempt inside
-    // `executeAgentWithRetry` is gated by the breaker. Each failure
-    // counts toward `failureThreshold`; an open breaker short-circuits
-    // remaining retries.
-    if (circuitBreaker && !retryInsideCircuit) {
-      const inner = effectiveRunner;
-      effectiveRunner = (<U>(a: AgentLike, i: string, o?: RunOptions) =>
-        circuitBreaker!.execute(() =>
-          inner<U>(a, i, o),
-        )) as typeof effectiveRunner;
-    }
+    const effectiveRunner = buildEffectiveRunner(callOptions);
 
     // Per-delta streaming for `run`. `RunCallOptions` is a distinct type from
     // `RunOptions` and the internal `opts` is undefined on this path, so the
@@ -1357,6 +1382,20 @@ export function createAgentOrchestrator<
         }
       : undefined;
 
+    // The same boundary `runStream` reports as a `stream_restart` chunk. It
+    // travels on the options object, so the wrappers below – retry, fallback,
+    // structured output – report their own re-invocations through it without
+    // the orchestrator having to know they are there.
+    const callerOnStreamRestart =
+      callOptions?.onStreamRestart ?? opts?.onStreamRestart;
+    const notifyStreamRestart = (reason: StreamRestartReason): void => {
+      try {
+        callerOnStreamRestart?.(reason);
+      } catch {
+        /* consumer callback errors must not disrupt the run */
+      }
+    };
+
     // Run the agent with retry support
     const result = await executeAgentWithRetry<T>(
       effectiveRunner,
@@ -1366,6 +1405,9 @@ export function createAgentOrchestrator<
         ...opts,
         signal: opts?.signal,
         onToken: countingOnToken,
+        onStreamRestart: callerOnStreamRestart
+          ? notifyStreamRestart
+          : undefined,
         onMessage: (message) => {
           const currentConversation = getConversation(system.facts);
           const updated = [...currentConversation, message];
@@ -1462,6 +1504,8 @@ export function createAgentOrchestrator<
         ? {
             ...agentRetry,
             onRetry: (attempt, error, delayMs) => {
+              // The orchestrator's own retry re-invokes the runner too.
+              notifyStreamRestart("retry");
               agentRetry.onRetry?.(attempt, error, delayMs);
               fireHook("onAgentRetry", {
                 agentName: agent.name,
@@ -2000,6 +2044,9 @@ export function createAgentOrchestrator<
       // generation boundary so `deltaCount` describes the response the
       // consumer is currently assembling, not the ones that were abandoned.
       let deltaCount = 0;
+      // Which generation the consumer is assembling. 1 until the first
+      // re-invocation of the runner.
+      let generation = 1;
       // How many of those deltas have already been attributed to a completed
       // assistant message. The difference tells `onMessage` whether real
       // deltas arrived for the message it is being handed.
@@ -2032,17 +2079,14 @@ export function createAgentOrchestrator<
         if (waiter) {
           waiter(chunk);
         } else {
-          // Drop the NEWEST on overflow. Evicting the oldest kept the tail of
-          // a response and silently deleted its beginning, which at per-delta
-          // granularity is the difference between a truncated answer and a
-          // beheaded one. Control and terminal chunks are always admitted –
-          // dropping `done` would take the drop report with it.
-          if (chunks.length >= MAX_STREAM_BUFFER && isDroppableChunk(chunk)) {
-            droppedChunks++;
-
-            return;
-          }
-          chunks.push(chunk);
+          // Drop the NEWEST droppable chunk on overflow. Evicting the oldest
+          // kept the tail of a response and silently deleted its beginning,
+          // which at per-delta granularity is the difference between a
+          // truncated answer and a beheaded one. A control chunk is admitted
+          // ahead of any droppable chunk still buffered, but the cap applies
+          // to it too – exempting control chunks let a stalled consumer
+          // accumulate them without limit.
+          droppedChunks += admitChunk(chunks, chunk, MAX_STREAM_BUFFER);
         }
       };
 
@@ -2081,11 +2125,8 @@ export function createAgentOrchestrator<
         if (!streamRequested) {
           return;
         }
-        pushChunk({
-          type: "stream_restart",
-          reason,
-          discardBefore: deltaCount,
-        });
+        generation++;
+        pushChunk({ type: "stream_restart", reason, generation });
         deltaCount = 0;
         deltasAttributedToMessages = 0;
         accumulatedOutput = "";
@@ -2355,14 +2396,21 @@ export function createAgentOrchestrator<
             });
           });
 
-          // Run agent with streaming callbacks and retry support
+          // Run agent with streaming callbacks and retry support. The runner
+          // is the configured one – structured output and the circuit breaker
+          // included – so a streamed run is gated and validated exactly like a
+          // buffered one.
           const result = await executeAgentWithRetry<T>(
-            runner,
+            buildEffectiveRunner(),
             agent,
             processedInput,
             {
               signal: abortController.signal,
               onToken: handleDelta,
+              // Every wrapper that re-invokes the runner – the schema retry
+              // above, and any `withRetry`/`withFallback` the caller composed
+              // around their own runner – reports the boundary here.
+              onStreamRestart: beginGeneration,
               onMessage: (message) => {
                 const currentConversation = getConversation(system.facts);
                 setConversation(system.facts, [
@@ -2622,6 +2670,9 @@ export function createAgentOrchestrator<
           pushChunk({
             type: "error",
             error: error instanceof Error ? error : new Error(String(error)),
+            // A run that dropped chunks and then failed reported nothing about
+            // the loss, because only `done` carried the figure.
+            droppedTokens: droppedChunks,
           });
           closeStream();
           throw error;

@@ -87,6 +87,7 @@ function parseOllamaStreamChunk(
   }
 
   if (chunk.done) {
+    result.terminal = true;
     result.inputTokens = (chunk.prompt_eval_count as number) ?? 0;
     result.outputTokens = (chunk.eval_count as number) ?? 0;
   }
@@ -208,12 +209,15 @@ export function createOllamaRunner(
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        usageReported:
+          data.prompt_eval_count != null || data.eval_count != null,
       };
     },
     streaming: {
       adapterName: "Ollama",
       wireFormat: "ndjson",
       parseEvent: parseOllamaStreamChunk,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -320,13 +324,15 @@ export function createOllamaStreamingRunner(
         throw new Error("[Directive] No response body from Ollama");
       }
 
-      const { fullText, inputTokens, outputTokens } = await parseEventStream(
-        reader,
-        callbacks.onToken,
-        parseOllamaStreamChunk,
-        "Ollama",
-        "ndjson",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseOllamaStreamChunk,
+          "Ollama",
+          "ndjson",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -342,7 +348,13 @@ export function createOllamaStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

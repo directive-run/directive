@@ -74,14 +74,14 @@ interface TokenUsage {
 ```typescript
 type StreamChunk =
   | { type: "token"; data: string; deltaCount: number; tokenCount: number }                  // text; see "Chunk counts are not token counts"
-  | { type: "stream_restart"; reason: "retry" | "schema-retry" | "reroute"; discardBefore: number } // the runner was re-invoked; discard what you rendered
+  | { type: "stream_restart"; reason: "retry" | "schema-retry" | "reroute"; generation: number } // the runner was re-invoked; discard what you rendered
   | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }              // tool started executing
   | { type: "tool_end"; tool: string; toolCallId: string; result: string }                   // tool finished
   | { type: "message"; message: Message }                                                    // a complete message added to history
   | { type: "guardrail_triggered"; guardrailName: string; reason: string; partialOutput: string; stopped: boolean } // a guardrail fired during streaming
   | { type: "progress"; phase: "starting" | "generating" | "tool_calling" | "finishing" }     // coarse progress
   | { type: "done"; totalTokens: number; duration: number; droppedTokens: number }            // stream complete
-  | { type: "error"; error: Error };                                                         // stream aborted with an error
+  | { type: "error"; error: Error; droppedTokens?: number };                                  // stream aborted with an error
 ```
 
 `orchestrator.runStream` yields a slightly wider union — `OrchestratorStreamChunk`, which adds `approval_required`, `approval_resolved`, `interrupted`, and `context_updated`. A `default` branch in your switch keeps it exhaustive as chunk types are added.
@@ -124,6 +124,9 @@ const final = await result; // RunResult<T>
 // Cancel mid-stream
 abort();
 ```
+
+> **`chunk.data` is untrusted text.** It is the model's output byte for byte, and a terminal interprets what you write to it: escape sequences can clear the screen, move the cursor, or rewrite lines already printed, and a single sequence can arrive split across two deltas (`ESC` in one, `[2J[1;1H` in the next), which defeats sanitizing each chunk on its own. Sanitize the accumulated text rather than the chunk, or write to a widget that does not interpret control codes.
+
 
 ## Teardown: `abort()` and `destroy()`
 
@@ -217,15 +220,17 @@ A runner that cannot stream ignores `onToken` and returns its ordinary buffered 
 
 ## `stream_restart`: the runner was re-invoked
 
-Three things re-invoke the runner mid-stream, and each replays the whole response from the beginning:
+Several things re-invoke the runner mid-stream, and each replays the whole response from the beginning:
 
 | `reason` | Fires when |
 |---|---|
-| `"retry"` | An agent-level retry (`agentRetry`) after a failed attempt |
+| `"retry"` | An agent-level retry (`agentRetry`), or a `withRetry`-wrapped runner retrying |
 | `"schema-retry"` | `withStructuredOutput` re-asks because the output failed schema validation |
-| `"reroute"` | The multi-agent self-healing reroute sends the work to an equivalent agent |
+| `"reroute"` | `withFallback` moves to the next provider, or the multi-agent self-healing reroute sends the work to an equivalent agent |
 
-`discardBefore` is how many `token` chunks were emitted for the abandoned generation — throw that many away from what you have rendered. The next `token` chunk restarts `deltaCount` at `1`.
+**Discard everything you have rendered for the current generation** — since the stream started, or since the previous `stream_restart`, whichever is later. The next `token` chunk restarts `deltaCount` at `1`.
+
+`generation` is an opaque marker: `2` for the first restart, `3` for the second. It is not a count of chunks. Nothing counts chunks here on purpose — chunks can be dropped under backpressure, so a count of emitted chunks would not agree with what a consumer received.
 
 `stream_restart` is emitted **only when per-delta streaming was requested**. Without it a generation arrives as a single whole-message chunk and there is nothing part-rendered to discard.
 
@@ -240,13 +245,56 @@ for await (const chunk of stream) {
       break;
     case "stream_restart":
       // Everything from the abandoned attempt is about to arrive again.
-      rendered = rendered.slice(0, rendered.length - chunk.discardBefore);
-      ui.replace(rendered.join(""));
+      rendered = [];
+      ui.replace("");
       console.warn(`restarting: ${chunk.reason}`);
       break;
     case "done":
       break;
   }
+}
+```
+
+## A stream that ends early is an error
+
+The shipped adapters require the provider's end-of-response marker — `[DONE]` or a `finish_reason` for OpenAI-compatible endpoints, `message_stop` for Anthropic, `done: true` for Ollama, a `finishReason` for Gemini. A body cut off mid-response arrives as a clean end of stream, so without that requirement a half-answer resolves successfully and reads exactly like a short one. When the marker never arrives the run rejects:
+
+```
+[Directive] Anthropic stream ended without a completion marker after 412 characters – the response is incomplete.
+```
+
+A runner you built yourself with `createRunner` is unaffected unless you opt in, since a `parseEvent` written before the flag existed cannot report a marker:
+
+```typescript
+const runner = createRunner({
+  buildRequest,
+  parseResponse,
+  streaming: {
+    adapterName: "MyGateway",
+    parseEvent: (event) => ({
+      text: event.delta?.text,
+      terminal: event.type === "response.completed",
+    }),
+    requireTerminalEvent: true,
+  },
+});
+```
+
+## When the provider reports no usage
+
+Not every OpenAI-compatible endpoint honors `stream_options.include_usage` — vLLM, LiteLLM and older gateways commonly strip it. The response then carries no token counts at all, which is not the same as carrying zeros:
+
+```typescript
+const result = await runner(agent, prompt, { onToken: render });
+result.tokenUsage;     // { inputTokens: 0, outputTokens: 0 }
+result.usageReported;  // false — the zeros are absence, not a free call
+```
+
+`withBudget` charges its pre-call estimate for such a call rather than recording `$0`, so rolling windows still accrue and ceilings still trip. Ask how much of the recorded spend is estimated:
+
+```typescript
+if (runner.getUnpricedCallCount() > 0) {
+  console.warn("Provider is not reporting token usage — recorded spend is an estimate.");
 }
 ```
 
@@ -291,7 +339,7 @@ const { stream, result } = streamRunner(agent, "Generate a long report", {
 
 `"block"` genuinely stops the reader pulling. It relies on `onToken` being awaited all the way down, which the shipped adapters do.
 
-`orchestrator.runStream` has its own fixed-size buffer instead of a strategy. On overflow it drops the **newest** droppable chunk — so the beginning of a message survives and the tail is what is lost — and never drops a terminal or control chunk (`done`, `error`, `stream_restart`, `approval_required`, and friends). Every drop is counted and reported:
+`orchestrator.runStream` has its own fixed-size buffer instead of a strategy. On overflow it drops the **newest** droppable chunk — so the beginning of a message survives and the tail is what is lost. Droppable means content and notifications: `token`, `message`, `progress`, `tool_start`, `tool_end`, `context_updated`. A control chunk (`stream_restart`, `approval_required`, `interrupted`, and friends) is admitted ahead of any droppable chunk still buffered, and a terminal chunk (`done`, `error`) always lands — but the cap applies to every type, so a consumer that stops reading cannot make the buffer grow without limit whatever the run emits. Every drop is counted and reported, on `done` and on `error` alike:
 
 ```typescript
 case "done":
@@ -422,10 +470,10 @@ for await (const chunk of stream) {
   if (chunk.type === "token") ui.append(chunk.data);
 }
 
-// CORRECT — discard what the restart says is void
+// CORRECT — clear the generation the restart says is void
 for await (const chunk of stream) {
   if (chunk.type === "token") ui.append(chunk.data);
-  if (chunk.type === "stream_restart") ui.discardLast(chunk.discardBefore);
+  if (chunk.type === "stream_restart") ui.clear();
 }
 ```
 
@@ -479,11 +527,14 @@ case "guardrail_triggered":
 | Type / API | Path | Purpose |
 |---|---|---|
 | `AgentLike` | `@directive-run/ai` | `{ name, instructions?, model?, tools? }` — what runners receive |
-| `RunResult<T>` | `@directive-run/ai` | `{ output, messages, toolCalls, totalTokens, tokenUsage?, isCached? }` |
+| `RunResult<T>` | `@directive-run/ai` | `{ output, messages, toolCalls, totalTokens, tokenUsage?, usageReported?, isCached? }` |
 | `StreamChunk` | `@directive-run/ai` | 9-way discriminated union for streaming output |
-| `StreamRestartChunk` | `@directive-run/ai` | `{ reason, discardBefore }` — the runner was re-invoked; discard and re-render |
+| `StreamRestartChunk` | `@directive-run/ai` | `{ reason, generation }` — the runner was re-invoked; discard the current generation and re-render |
+| `RunOptions.onStreamRestart` | `@directive-run/ai` | The same boundary as a callback, for `run({ onToken })`; wrappers call it when they re-invoke |
+| `StreamConsumerError` | `@directive-run/ai` | Thrown when your `onToken` throws; retry and fallback stop rather than re-spending |
 | `orchestrator.runStream(agent, input, opts?)` | instance method | Returns `{ stream, result, abort }`; `opts` is `{ signal?, deltas?, onToken?, liveContext? }` |
 | `orchestrator.runAgentStream(agentId, input, opts?)` | multi-agent instance method | Same triple; `opts` is `{ signal?, deltas?, onToken? }` |
+| `orchestrator.runParallelStream(ids, inputs, merge, opts?)` | multi-agent instance method | Multiplexed stream; `opts` takes `deltas?` for per-delta chunks tagged by agent |
 | `RunOptions.onToken` | `@directive-run/ai` | Per-delta callback on any runner; awaited, so it applies backpressure |
 | `createStreamingRunner(baseRunner, opts?)` | `@directive-run/ai` | Wrap a `StreamingCallbackRunner` into a `StreamRunner` |
 | `StreamRunOptions` | `@directive-run/ai` | `backpressure` / `bufferSize` / guardrail options for a `StreamRunner` |

@@ -667,7 +667,19 @@ export interface MultiAgentOrchestrator {
     agentIds: string[],
     inputs: string | string[],
     merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-    options?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
+    options?: {
+      minSuccess?: number;
+      timeout?: number;
+      signal?: AbortSignal;
+      /**
+       * Request per-delta `token` chunks from every agent in the merge. Each
+       * chunk arrives tagged with the agent that produced it. Without this the
+       * merged stream carries one whole-message chunk per agent.
+       *
+       * @default false
+       */
+      deltas?: boolean;
+    },
   ): MultiplexedStreamResult<T>;
   /** Resume a paused breakpoint */
   resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;

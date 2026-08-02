@@ -310,9 +310,16 @@ export function withStructuredOutput<T = unknown>(
           ? input
           : `${input}\n\nYour previous response was not valid JSON. Error: ${lastError}\nPlease try again with valid JSON only.`;
 
-      if (attempt > 0 && onRetry) {
+      if (attempt > 0) {
         try {
-          onRetry(attempt, lastError ?? "");
+          onRetry?.(attempt, lastError ?? "");
+        } catch {
+          // Observability hook – a throw here must not fail the run.
+        }
+        // This attempt re-prompts and replays the whole response, so a caller
+        // streaming deltas has to discard what it rendered from the last one.
+        try {
+          options?.onStreamRestart?.("schema-retry");
         } catch {
           // Observability hook – a throw here must not fail the run.
         }

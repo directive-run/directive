@@ -5,6 +5,7 @@
  * building logic used across Anthropic, OpenAI, and Gemini streaming runners.
  */
 
+import { StreamConsumerError } from "../streaming.js";
 import type { AdapterHooks, AgentLike, Message, TokenUsage } from "../types.js";
 
 // ============================================================================
@@ -70,6 +71,15 @@ export function warnIfMissingApiKey(
 export interface StreamEventResult {
   /** Text token to append to output. */
   text?: string;
+  /**
+   * This event is the provider's end-of-response marker – Anthropic's
+   * `message_stop`, Ollama's `done: true`, a `finish_reason` on an OpenAI
+   * choice, a `finishReason` on a Gemini candidate.
+   *
+   * A stream that ends without one ended early. The SSE `[DONE]` sentinel is
+   * recognized by the parser itself and needs no flag here.
+   */
+  terminal?: boolean;
   /** Updated input token count (cumulative, not delta). */
   inputTokens?: number;
   /** Updated output token count (cumulative, not delta). */
@@ -98,6 +108,36 @@ export interface StreamTotals {
   cacheReadTokens?: number;
   /** Only set when the provider reported prompt-cache writes. */
   cacheCreationTokens?: number;
+  /**
+   * Whether any event in the stream carried token usage at all.
+   *
+   * `false` means the counts above are zero because the provider never sent
+   * any – an OpenAI-compatible endpoint that ignores
+   * `stream_options.include_usage`, for instance – rather than because the
+   * call was free. Cost tracking needs to be able to tell those apart.
+   */
+  usageReported: boolean;
+}
+
+/** Options for {@link parseEventStream}. */
+export interface ParseEventStreamOptions {
+  /**
+   * Abort signal for the run. The awaited `onToken` callback is raced against
+   * it, so a callback that never settles cannot hold the reader open past an
+   * `abort()` – without the race the run leaks its socket, its fetch and its
+   * "running" state with no way to reach any of them.
+   */
+  signal?: AbortSignal;
+  /**
+   * Throw when the stream ends without a terminal marker.
+   *
+   * A body truncated before the end of the response arrives as a clean EOF, so
+   * without this a partial answer resolves successfully and is
+   * indistinguishable from a complete one. Off by default because a
+   * hand-written {@link StreamEventResult} parser has no way to report the
+   * marker it was never asked about; the shipped adapters turn it on.
+   */
+  requireTerminalEvent?: boolean;
 }
 
 /**
@@ -116,6 +156,7 @@ export interface StreamTotals {
  * @param parseEvent - Provider-specific function to extract text and tokens from a parsed event.
  * @param adapterName - Adapter name for dev-mode warnings.
  * @param wireFormat - How the provider frames its events. @default "sse"
+ * @param options - Abort signal and terminal-marker enforcement.
  * @returns The full text output and final token counts.
  */
 export async function parseEventStream(
@@ -124,7 +165,9 @@ export async function parseEventStream(
   parseEvent: (event: Record<string, unknown>) => StreamEventResult,
   adapterName: string,
   wireFormat: StreamWireFormat = "sse",
+  options: ParseEventStreamOptions = {},
 ): Promise<StreamTotals> {
+  const { signal, requireTerminalEvent = false } = options;
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
@@ -132,6 +175,65 @@ export async function parseEventStream(
   let outputTokens = 0;
   let cacheReadTokens: number | undefined;
   let cacheCreationTokens: number | undefined;
+  let usageReported = false;
+  let sawTerminal = false;
+
+  const handleLine = async (line: string): Promise<void> => {
+    if (isSseTerminalLine(line, wireFormat)) {
+      sawTerminal = true;
+    }
+    const data = extractPayload(line, wireFormat);
+    if (data === undefined) {
+      return;
+    }
+
+    // Parsing is guarded, delivery is not: a throw from `onToken` belongs
+    // to the caller and must not be mistaken for a malformed event.
+    let result: StreamEventResult;
+    try {
+      result = parseEvent(JSON.parse(data));
+    } catch (parseErr) {
+      if (parseErr instanceof SyntaxError) {
+        if (
+          typeof process !== "undefined" &&
+          process.env?.NODE_ENV === "development"
+        ) {
+          console.warn(
+            `[Directive] Malformed stream event from ${adapterName}:`,
+            data,
+          );
+        }
+
+        return;
+      }
+
+      throw parseErr;
+    }
+
+    if (result.terminal) {
+      sawTerminal = true;
+    }
+    if (result.text) {
+      fullText += result.text;
+      await deliverToken(onToken, result.text, signal);
+    }
+    if (result.inputTokens !== undefined) {
+      inputTokens = result.inputTokens;
+      usageReported = true;
+    }
+    if (result.outputTokens !== undefined) {
+      outputTokens = result.outputTokens;
+      usageReported = true;
+    }
+    if (result.cacheReadTokens !== undefined) {
+      cacheReadTokens = result.cacheReadTokens;
+      usageReported = true;
+    }
+    if (result.cacheCreationTokens !== undefined) {
+      cacheCreationTokens = result.cacheCreationTokens;
+      usageReported = true;
+    }
+  };
 
   try {
     while (true) {
@@ -145,54 +247,27 @@ export async function parseEventStream(
       buf = lines.pop() ?? "";
 
       for (const line of lines) {
-        const data = extractPayload(line, wireFormat);
-        if (data === undefined) {
-          continue;
-        }
-
-        // Parsing is guarded, delivery is not: a throw from `onToken` belongs
-        // to the caller and must not be mistaken for a malformed event.
-        let result: StreamEventResult;
-        try {
-          result = parseEvent(JSON.parse(data));
-        } catch (parseErr) {
-          if (parseErr instanceof SyntaxError) {
-            if (
-              typeof process !== "undefined" &&
-              process.env?.NODE_ENV === "development"
-            ) {
-              console.warn(
-                `[Directive] Malformed stream event from ${adapterName}:`,
-                data,
-              );
-            }
-
-            continue;
-          }
-
-          throw parseErr;
-        }
-
-        if (result.text) {
-          fullText += result.text;
-          await onToken?.(result.text);
-        }
-        if (result.inputTokens !== undefined) {
-          inputTokens = result.inputTokens;
-        }
-        if (result.outputTokens !== undefined) {
-          outputTokens = result.outputTokens;
-        }
-        if (result.cacheReadTokens !== undefined) {
-          cacheReadTokens = result.cacheReadTokens;
-        }
-        if (result.cacheCreationTokens !== undefined) {
-          cacheCreationTokens = result.cacheCreationTokens;
-        }
+        await handleLine(line);
       }
+    }
+
+    // Servers are not obliged to end the body with a newline, so the last
+    // event can arrive with nothing after it. Dropping it silently cost a
+    // token count before; now it would also cost the completion marker and
+    // turn a complete response into a truncation error.
+    if (buf.length > 0) {
+      await handleLine(buf);
     }
   } finally {
     reader.cancel().catch(() => {});
+  }
+
+  // A body cut short arrives as a clean EOF. Without this the caller gets a
+  // short answer and no indication that the rest of it is missing.
+  if (requireTerminalEvent && !sawTerminal) {
+    throw new Error(
+      `[Directive] ${adapterName} stream ended without a completion marker after ${fullText.length} characters – the response is incomplete.`,
+    );
   }
 
   return {
@@ -201,7 +276,98 @@ export async function parseEventStream(
     outputTokens,
     ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
     ...(cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+    usageReported,
   };
+}
+
+/**
+ * Hand one delta to the consumer, and stop waiting on it if the run is
+ * aborted.
+ *
+ * The await is what makes backpressure real, and it is also what a callback
+ * that never settles exploits: outside a race with the abort signal it parks
+ * the reader forever, so `abort()` returns, the result promise never settles,
+ * the `finally` above never runs, and the socket stays open. Racing keeps
+ * backpressure for callbacks that settle and gives cancellation a way through
+ * for the ones that do not.
+ *
+ * A throw from the callback belongs to the consumer, not the provider, and is
+ * named as such so retry and fallback wrappers do not pay for the same
+ * response again on its behalf.
+ */
+async function deliverToken(
+  onToken: ((token: string) => void | Promise<void>) | undefined,
+  token: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  if (!onToken) {
+    return;
+  }
+
+  let pending: void | Promise<void>;
+  try {
+    pending = onToken(token);
+  } catch (err) {
+    throw new StreamConsumerError(err);
+  }
+
+  if (!isPromiseLike(pending)) {
+    return;
+  }
+
+  const settled = Promise.resolve(pending).catch((err) => {
+    throw new StreamConsumerError(err);
+  });
+
+  if (!signal) {
+    return settled;
+  }
+
+  if (signal.aborted) {
+    throw abortReason(signal);
+  }
+
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(abortReason(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+
+  try {
+    await Promise.race([settled, aborted]);
+  } finally {
+    if (onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
+    // Whichever side lost the race is no longer awaited by anyone: give both
+    // a handler so a late rejection is not reported as unhandled.
+    settled.catch(() => {});
+    aborted.catch(() => {});
+  }
+}
+
+function isPromiseLike(value: unknown): value is Promise<void> {
+  return typeof (value as { then?: unknown } | undefined)?.then === "function";
+}
+
+function abortReason(signal: AbortSignal): Error {
+  const { reason } = signal;
+
+  return reason instanceof Error
+    ? reason
+    : new Error("[Directive] Stream aborted");
+}
+
+/** Does this line carry the SSE end-of-stream sentinel? */
+function isSseTerminalLine(
+  line: string,
+  wireFormat: StreamWireFormat,
+): boolean {
+  if (wireFormat !== "sse" || !line.startsWith("data: ")) {
+    return false;
+  }
+
+  return line.slice(6).trim() === "[DONE]";
 }
 
 /**
@@ -300,12 +466,14 @@ export function buildStreamingResult(
   fullText: string,
   totalTokens: number,
   tokenUsage: TokenUsage,
+  usageReported = true,
 ): {
   output: string;
   messages: Message[];
   toolCalls: never[];
   totalTokens: number;
   tokenUsage: TokenUsage;
+  usageReported: boolean;
 } {
   const assistantMsg: Message = { role: "assistant", content: fullText };
 
@@ -315,5 +483,6 @@ export function buildStreamingResult(
     toolCalls: [],
     totalTokens,
     tokenUsage,
+    usageReported,
   };
 }

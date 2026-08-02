@@ -33,9 +33,26 @@ export interface RunResult<T = unknown> {
   totalTokens: number;
   /** Breakdown of input vs output tokens, when available from the provider */
   tokenUsage?: TokenUsage;
+  /**
+   * Whether the provider actually reported token usage for this call.
+   *
+   * `false` means `tokenUsage` holds zeros because nothing was reported – not
+   * because nothing was spent. An OpenAI-compatible endpoint that ignores
+   * `stream_options.include_usage` (vLLM, LiteLLM, older gateways) is the
+   * common case. Cost tracking must treat such a call as *unpriceable* rather
+   * than free: `withBudget` charges its pre-call estimate instead and counts
+   * the call separately.
+   *
+   * Omitted entirely by runners that do not report the distinction, which is
+   * read as "usage is trustworthy" – the behavior every existing runner had.
+   */
+  usageReported?: boolean;
   /** True when result was served from semantic cache */
   isCached?: boolean;
 }
+
+/** Why a new generation started – the runner was re-invoked and replays. */
+export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
 
 /** Breakdown of token usage by input/output */
 export interface TokenUsage {
@@ -132,6 +149,23 @@ export interface RunOptions {
    * write.
    */
   onToken?: (token: string) => void;
+  /**
+   * Called when something is about to re-invoke the runner with the same input,
+   * so everything already delivered through {@link RunOptions.onToken} for this
+   * run is void and the response arrives again from the beginning.
+   *
+   * Rides the same options object as `onToken` for the same reason: a wrapper
+   * that re-invokes the runner is the only code that knows a replay is coming,
+   * and every wrapper forwards these options verbatim. `withRetry`,
+   * `withFallback` and `withStructuredOutput` call it when they re-invoke, and
+   * the orchestrators call it for their own retries and reroutes. A consumer
+   * rendering deltas discards what it has rendered for the current generation
+   * when this fires.
+   *
+   * Without it a caller streaming through a retrying runner renders the first
+   * attempt and the second attempt end to end, as one run-on response.
+   */
+  onStreamRestart?: (reason: StreamRestartReason) => void;
 }
 
 // ============================================================================

@@ -77,11 +77,15 @@ function parseOpenAIStreamEvent(
 ): StreamEventResult {
   const result: StreamEventResult = {};
 
-  const delta = (event.choices as Record<string, unknown>[])?.[0]?.delta as
-    | Record<string, unknown>
-    | undefined;
+  const choice = (event.choices as Record<string, unknown>[])?.[0];
+  const delta = choice?.delta as Record<string, unknown> | undefined;
   if (delta?.content) {
     result.text = delta.content as string;
+  }
+  // The completion ended. `[DONE]` says the same thing and the parser reads it
+  // directly, but gateways vary in which of the two they send.
+  if (choice?.finish_reason != null) {
+    result.terminal = true;
   }
 
   if (event.usage) {
@@ -219,11 +223,15 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        // Gateways that strip `usage` leave zeros behind; say so rather than
+        // letting cost tracking read the response as free.
+        usageReported: data.usage != null,
       };
     },
     streaming: {
       adapterName: "OpenAI",
       parseEvent: parseOpenAIStreamEvent,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -404,12 +412,15 @@ export function createOpenAIStreamingRunner(
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseEventStream(
-        reader,
-        callbacks.onToken,
-        parseOpenAIStreamEvent,
-        "OpenAI",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseOpenAIStreamEvent,
+          "OpenAI",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -425,7 +436,13 @@ export function createOpenAIStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

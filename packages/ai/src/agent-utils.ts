@@ -11,6 +11,7 @@ import { getStreamReader, parseEventStream } from "./adapters/shared.js";
 // Re-exported because `RunnerStreamingSupport` names them and `createRunner`
 // is public – a consumer writing their own adapter needs to spell these out.
 export type {
+  ParseEventStreamOptions,
   StreamEventResult,
   StreamTotals,
   StreamWireFormat,
@@ -176,6 +177,14 @@ export interface ParsedResponse {
   cacheReadTokens?: number;
   /** Prompt-cache creation token count, when available from the provider */
   cacheCreationTokens?: number;
+  /**
+   * Whether the provider reported token usage at all.
+   *
+   * Omit – or pass `true` – when the counts above came from the response. Pass
+   * `false` when they are zeros standing in for numbers the provider never
+   * sent, so cost tracking can treat the call as unpriceable rather than free.
+   */
+  usageReported?: boolean;
 }
 
 /**
@@ -193,6 +202,19 @@ export interface RunnerStreamingSupport {
   parseEvent: (event: Record<string, unknown>) => StreamEventResult;
   /** How the provider frames its streamed events. @default "sse" */
   wireFormat?: StreamWireFormat;
+  /**
+   * Fail the run when the stream ends without the provider's end-of-response
+   * marker – `[DONE]`, a `terminal` event from {@link RunnerStreamingSupport.parseEvent},
+   * or both.
+   *
+   * A truncated body arrives as a clean end of stream, so without this a
+   * partial response resolves successfully and reads as a short answer. Off by
+   * default so a `parseEvent` written before the flag existed keeps working;
+   * the shipped adapters set it.
+   *
+   * @default false
+   */
+  requireTerminalEvent?: boolean;
   /**
    * Build the final parsed response from the accumulated stream totals.
    * Supply this when the buffered path computes `totalTokens` from more than
@@ -234,6 +256,7 @@ function defaultStreamResponse(totals: StreamTotals): ParsedResponse {
     totalTokens: totals.inputTokens + totals.outputTokens,
     inputTokens: totals.inputTokens,
     outputTokens: totals.outputTokens,
+    usageReported: totals.usageReported,
   };
 }
 
@@ -355,17 +378,29 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         );
       }
 
-      const parsed = shouldStream
-        ? (streaming.buildResponse ?? defaultStreamResponse)(
-            await parseEventStream(
-              getStreamReader(response),
-              onToken,
-              streaming.parseEvent,
-              streaming.adapterName,
-              streaming.wireFormat,
-            ),
-          )
-        : await parseResponse(response, messages);
+      let parsed: ParsedResponse;
+      if (shouldStream) {
+        const totals = await parseEventStream(
+          getStreamReader(response),
+          onToken,
+          streaming.parseEvent,
+          streaming.adapterName,
+          streaming.wireFormat,
+          {
+            signal: combined,
+            requireTerminalEvent: streaming.requireTerminalEvent,
+          },
+        );
+        // Read off the totals rather than off `buildResponse`, so an adapter
+        // that supplies its own response builder cannot lose the distinction
+        // between "the provider said zero" and "the provider said nothing".
+        parsed = {
+          ...(streaming.buildResponse ?? defaultStreamResponse)(totals),
+          usageReported: totals.usageReported,
+        };
+      } else {
+        parsed = await parseResponse(response, messages);
+      }
       const tokenUsage: TokenUsage = {
         inputTokens: parsed.inputTokens ?? 0,
         outputTokens: parsed.outputTokens ?? 0,
@@ -402,6 +437,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         toolCalls: [],
         totalTokens: parsed.totalTokens,
         tokenUsage,
+        usageReported: parsed.usageReported ?? true,
       };
     } catch (err) {
       const durationMs = Date.now() - startTime;

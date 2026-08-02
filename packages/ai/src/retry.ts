@@ -29,6 +29,7 @@
  * ```
  */
 
+import { isStreamConsumerError } from "./streaming.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
@@ -268,6 +269,13 @@ export function withRetry(
           break;
         }
 
+        // A consumer callback that threw is not a provider failure. Retrying
+        // buys the same response from the provider again, at full price, to
+        // hand it to the callback that just crashed on it.
+        if (isStreamConsumerError(lastError)) {
+          break;
+        }
+
         // Check custom retryable predicate
         if (isRetryable) {
           try {
@@ -294,6 +302,16 @@ export function withRetry(
         );
         try {
           onRetry?.(attempt + 1, lastError, delayMs);
+        } catch {
+          /* callback error must not disrupt retry flow */
+        }
+
+        // The next attempt replays the response from the beginning, so a
+        // caller streaming deltas has to be told the ones it already rendered
+        // are void. The signal rides `options` for the same reason `onToken`
+        // does: it is the only channel every wrapper already forwards.
+        try {
+          options?.onStreamRestart?.("retry");
         } catch {
           /* callback error must not disrupt retry flow */
         }

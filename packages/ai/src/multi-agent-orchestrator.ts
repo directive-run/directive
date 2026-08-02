@@ -132,9 +132,10 @@ import {
 } from "./checkpoint.js";
 import {
   type MultiplexedStreamResult,
+  StreamConsumerError,
   type StreamRestartReason,
   type TokenSink,
-  isDroppableChunk,
+  admitChunk,
   mergeTaggedStreams,
   reportIfRunnerIgnoredOnToken,
   sliceTailByCodePoint,
@@ -205,24 +206,18 @@ interface PauseBudgetExceededReq extends Requirement {
 const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
 
 /**
- * Internal channel from `runAgentStreamImpl` down to the three places that
- * re-invoke the runner – the agent-level retry, the structured-output schema
- * retry, and the self-healing reroute. Each replays the whole response, so a
- * consumer rendering deltas has to be told the earlier ones are void.
+ * Read the streaming restart channel off an options object, if present.
  *
- * Carried on the options object the way `__isReroute` already is, so it rides
- * along through the reroute's `{ ...opts }` spread. Deliberately not part of
- * {@link MultiAgentRunCallOptions} – it is not a caller-facing option.
+ * `onStreamRestart` is a field of {@link RunOptions}, so it reaches the runner
+ * wrappers on the same object `onToken` travels on and they report their own
+ * re-invocations through it. The orchestrator reads it back here for the
+ * re-invocations it performs itself – the agent-level retry and the
+ * self-healing reroute – which no wrapper can see.
  */
-interface StreamRestartChannel {
-  __onStreamRestart?: (reason: StreamRestartReason) => void;
-}
-
-/** Read the streaming restart channel off an options object, if present. */
 function getStreamRestart(
   opts: unknown,
 ): ((reason: StreamRestartReason) => void) | undefined {
-  return (opts as StreamRestartChannel | undefined)?.__onStreamRestart;
+  return (opts as RunOptions | undefined)?.onStreamRestart;
 }
 
 // ============================================================================
@@ -2123,11 +2118,9 @@ export function createMultiAgentOrchestrator(
             opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
           extractJson: registration.extractJson,
           schemaDescription: registration.schemaDescription,
-          // A schema retry re-prompts the model with the validation error and
-          // replays the whole response.
-          onRetry: () => {
-            getStreamRestart(opts)?.("schema-retry");
-          },
+          // A schema retry re-prompts and replays the whole response.
+          // `withStructuredOutput` reports that boundary itself, through the
+          // `onStreamRestart` it receives on the run options.
         });
       }
 
@@ -2639,6 +2632,20 @@ export function createMultiAgentOrchestrator(
               typeof result.output === "string"
                 ? result.output
                 : safeStringify(result.output);
+            // A task is a function, not a model: its output exists all at
+            // once, so there are no deltas to stream. `deltas: true` gets the
+            // one whole-output chunk below, and an `onToken` callback gets the
+            // same text – ignoring it left a callback-based consumer with
+            // nothing at all while the chunk consumer got everything.
+            try {
+              options.onToken?.(output);
+            } catch (err) {
+              const consumerError = new StreamConsumerError(err);
+              pushTaskChunk({ type: "error", error: consumerError });
+              closeTaskStream();
+
+              throw consumerError;
+            }
             pushTaskChunk({
               type: "token",
               data: output,
@@ -2737,6 +2744,9 @@ export function createMultiAgentOrchestrator(
     // `token` chunks emitted for the current generation, reset at every
     // generation boundary.
     let deltaCount = 0;
+    // Which generation the consumer is assembling. 1 until the first
+    // re-invocation of the runner.
+    let generation = 1;
     // How many of those have already been attributed to a completed assistant
     // message, so `onMessage` can tell whether real deltas arrived for it.
     let deltasAttributedToMessages = 0;
@@ -2762,19 +2772,12 @@ export function createMultiAgentOrchestrator(
       if (waiter) {
         waiter(chunk);
       } else {
-        // Drop the NEWEST on overflow. Evicting the oldest kept the tail of a
-        // response and silently deleted its beginning. Control and terminal
-        // chunks are always admitted – dropping `done` would take the drop
-        // report with it.
-        if (
-          chunks.length >= MAX_AGENT_STREAM_BUFFER &&
-          isDroppableChunk(chunk)
-        ) {
-          droppedChunks++;
-
-          return;
-        }
-        chunks.push(chunk);
+        // Drop the NEWEST droppable chunk on overflow. Evicting the oldest
+        // kept the tail of a response and silently deleted its beginning. A
+        // control chunk is admitted ahead of any droppable chunk still
+        // buffered, but the cap applies to it too – exempting control chunks
+        // let a stalled consumer accumulate them without limit.
+        droppedChunks += admitChunk(chunks, chunk, MAX_AGENT_STREAM_BUFFER);
       }
     };
 
@@ -2818,7 +2821,8 @@ export function createMultiAgentOrchestrator(
       if (!streamRequested) {
         return;
       }
-      pushChunk({ type: "stream_restart", reason, discardBefore: deltaCount });
+      generation++;
+      pushChunk({ type: "stream_restart", reason, generation });
       deltaCount = 0;
       deltasAttributedToMessages = 0;
       accumulatedOutput = "";
@@ -2854,10 +2858,14 @@ export function createMultiAgentOrchestrator(
       });
 
       try {
-        const runOptions: MultiAgentRunCallOptions & StreamRestartChannel = {
+        const runOptions: MultiAgentRunCallOptions = {
           signal: abortController.signal,
           onToken: handleDelta,
-          __onStreamRestart: beginGeneration,
+          // Reaches the runner wrappers on the same object `onToken` does, so
+          // a `withRetry` or `withFallback` the caller composed reports its
+          // own re-invocations here, and the orchestrator reads it back for
+          // the retries and reroutes it performs itself.
+          onStreamRestart: beginGeneration,
           onMessage: (message) => {
             pushChunk({ type: "message", message });
             if (message.role === "assistant" && message.content) {
@@ -2931,6 +2939,9 @@ export function createMultiAgentOrchestrator(
         pushChunk({
           type: "error",
           error: error instanceof Error ? error : new Error(String(error)),
+          // A run that dropped chunks and then failed reported nothing about
+          // the loss, because only `done` carried the figure.
+          droppedTokens: droppedChunks,
         });
         closeStream();
         throw error;
@@ -6956,7 +6967,12 @@ export function createMultiAgentOrchestrator(
       agentIds: string[],
       inputs: string | string[],
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-      opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
+      opts?: {
+        minSuccess?: number;
+        timeout?: number;
+        signal?: AbortSignal;
+        deltas?: boolean;
+      },
     ): MultiplexedStreamResult<T> {
       assertNotDestroyed();
 
@@ -6982,6 +6998,13 @@ export function createMultiAgentOrchestrator(
       const perAgentStreams = agentIds.map((agentId, i) => {
         const streamResult = runAgentStreamImpl(agentId, inputArray[i]!, {
           signal: controller.signal,
+          // Forwarded rather than dropped: without it the multiplexed stream
+          // is structurally incapable of per-delta chunks, whatever the
+          // adapter under it can do. Chunks arrive tagged with the agent that
+          // produced them, so interleaved deltas stay attributable. There is
+          // no `onToken` counterpart – one callback across concurrent agents
+          // could not say which agent it was being called for.
+          ...(opts?.deltas === true ? { deltas: true } : {}),
         });
 
         return {

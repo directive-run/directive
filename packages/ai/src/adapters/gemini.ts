@@ -70,15 +70,18 @@ function parseGeminiStreamEvent(
 ): StreamEventResult {
   const result: StreamEventResult = {};
 
-  const parts = (
-    (event.candidates as Record<string, unknown>[])?.[0]?.content as Record<
-      string,
-      unknown
-    >
-  )?.parts as Record<string, unknown>[] | undefined;
+  const candidate = (event.candidates as Record<string, unknown>[])?.[0];
+  const parts = (candidate?.content as Record<string, unknown>)?.parts as
+    | Record<string, unknown>[]
+    | undefined;
   const textVal = parts?.[0]?.text;
   if (textVal) {
     result.text = textVal as string;
+  }
+  // Gemini's SSE stream carries no `[DONE]` sentinel; the last chunk of a
+  // complete response is the one that says why generation stopped.
+  if (candidate?.finishReason != null) {
+    result.terminal = true;
   }
 
   if (event.usageMetadata) {
@@ -204,11 +207,13 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        usageReported: data.usageMetadata != null,
       };
     },
     streaming: {
       adapterName: "Gemini",
       parseEvent: parseGeminiStreamEvent,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -311,12 +316,15 @@ export function createGeminiStreamingRunner(
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseEventStream(
-        reader,
-        callbacks.onToken,
-        parseGeminiStreamEvent,
-        "Gemini",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseGeminiStreamEvent,
+          "Gemini",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -332,7 +340,13 @@ export function createGeminiStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

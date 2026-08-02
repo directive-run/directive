@@ -27,8 +27,11 @@ import type {
   Message,
   OutputGuardrailData,
   RunResult,
+  StreamRestartReason,
   StreamingCallbackRunner,
 } from "./types.js";
+
+export type { StreamRestartReason } from "./types.js";
 
 // ============================================================================
 // Constants
@@ -89,13 +92,18 @@ export function sliceTailByCodePoint(text: string, maxLength: number): string {
 }
 
 /**
- * Chunk types an overflowing orchestrator stream may discard. Everything else
- * – `done`, `error`, `guardrail_triggered`, `approval_required`,
- * `approval_resolved`, `interrupted`, `stream_restart`, `context_updated` – is
- * always admitted, because those chunks carry control flow or end the stream.
- * Dropping `done` would take the drop report down with it, and dropping
- * `approval_required` would leave a tool call waiting on an approval the
- * consumer was never asked for.
+ * Chunk types an overflowing orchestrator stream may discard: content and
+ * notifications, whose loss costs the consumer detail but never correctness.
+ * `context_updated` is among them because it only names the facts that
+ * changed – the current values are still readable from the system, so a
+ * dropped notification loses nothing a consumer cannot recover.
+ *
+ * Everything else – `done`, `error`, `guardrail_triggered`,
+ * `approval_required`, `approval_resolved`, `interrupted`, `stream_restart` –
+ * carries control flow or ends the stream, and is preferred over any droppable
+ * chunk still in the buffer. Dropping `done` would take the drop report down
+ * with it, and dropping `approval_required` would leave a tool call waiting on
+ * an approval the consumer was never asked for.
  *
  * @internal
  */
@@ -105,8 +113,103 @@ export function isDroppableChunk(chunk: { type: string }): boolean {
     chunk.type === "message" ||
     chunk.type === "progress" ||
     chunk.type === "tool_start" ||
-    chunk.type === "tool_end"
+    chunk.type === "tool_end" ||
+    chunk.type === "context_updated"
   );
+}
+
+/** The two chunks that end a stream. Exactly one of them is ever emitted. */
+function isTerminalChunk(chunk: { type: string }): boolean {
+  return chunk.type === "done" || chunk.type === "error";
+}
+
+/**
+ * Append `chunk` to a bounded buffer, and report how many chunks the buffer
+ * lost doing it (0 or 1).
+ *
+ * The cap applies to every chunk type. Preference, not exemption, is what
+ * separates them: at the cap a droppable chunk is refused, and a control chunk
+ * is admitted by evicting the newest droppable chunk already buffered – so the
+ * beginning of a response survives and its tail is what goes. A terminal chunk
+ * is admitted unconditionally, evicting the oldest buffered chunk if the
+ * buffer holds nothing droppable, because there is exactly one of them per
+ * stream and it carries the drop report.
+ *
+ * Exempting control chunks from the cap entirely – which is what "always
+ * admitted" amounted to – let a stalled consumer accumulate them without
+ * limit.
+ *
+ * @internal
+ */
+export function admitChunk<T extends { type: string }>(
+  buffer: T[],
+  chunk: T,
+  maxSize: number,
+): number {
+  if (buffer.length < maxSize) {
+    buffer.push(chunk);
+
+    return 0;
+  }
+
+  if (isDroppableChunk(chunk)) {
+    return 1;
+  }
+
+  for (let i = buffer.length - 1; i >= 0; i--) {
+    if (isDroppableChunk(buffer[i]!)) {
+      buffer.splice(i, 1);
+      buffer.push(chunk);
+
+      return 1;
+    }
+  }
+
+  if (isTerminalChunk(chunk)) {
+    buffer.shift();
+    buffer.push(chunk);
+
+    return 1;
+  }
+
+  return 1;
+}
+
+/**
+ * A consumer-supplied callback threw while consuming a stream.
+ *
+ * Wrapping it names where the failure came from: a render crash in an
+ * `onToken` callback is not a provider failure, so retry and fallback wrappers
+ * stop rather than paying for the same response two more times to feed the
+ * same broken consumer.
+ */
+export class StreamConsumerError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `[Directive] A stream consumer callback threw: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.name = "StreamConsumerError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Is this error – or anything it was thrown through – a consumer-side throw?
+ *
+ * Checked through `cause` because the runner wrappers see the error after the
+ * adapter, the orchestrator and any user wrapper have had a chance to rethrow
+ * it with context.
+ */
+export function isStreamConsumerError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 10; depth++) {
+    if (current instanceof StreamConsumerError) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return false;
 }
 
 let runnerIgnoredOnTokenWarned = false;
@@ -203,14 +306,16 @@ export interface TokenChunk {
   tokenCount: number;
 }
 
-/** Why a new generation started. */
-export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
-
 /**
  * A new generation started, and everything emitted for the previous one is
  * void. The runner was re-invoked – an agent-level retry, a structured-output
- * schema retry, or a self-healing reroute to an equivalent agent – so the
- * consumer is about to receive the whole response again from the beginning.
+ * schema retry, a fallback to another provider, or a self-healing reroute – so
+ * the consumer is about to receive the whole response again from the
+ * beginning.
+ *
+ * Discard everything rendered since the stream started or since the previous
+ * `stream_restart`, whichever is later. The next `token` chunk restarts
+ * `deltaCount` at 1.
  *
  * Emitted only when the caller requested per-delta streaming – `deltas: true`
  * or an `onToken` callback. Without that a generation is delivered as a single
@@ -221,11 +326,12 @@ export interface StreamRestartChunk {
   /** What re-invoked the runner. */
   reason: StreamRestartReason;
   /**
-   * How many `token` chunks were emitted for the abandoned generation. Discard
-   * that many – the same content arrives again after this chunk. The next
-   * `token` chunk restarts `deltaCount` at 1.
+   * Which generation is now starting: 2 for the first restart, 3 for the
+   * second, and so on. An opaque marker for keying rendered output, not a
+   * count of anything – chunks can be dropped under backpressure, so no count
+   * of emitted chunks could be relied on to say how much to discard.
    */
-  discardBefore: number;
+  generation: number;
 }
 
 /** Tool execution started */
@@ -289,6 +395,12 @@ export interface ErrorChunk {
   error: Error;
   /** Partial output before error */
   partialOutput?: string;
+  /**
+   * Number of chunks dropped because the consumer fell behind and the buffer
+   * filled, for a run that ended in an error rather than reaching `done`.
+   * Omitted by producers that do not buffer.
+   */
+  droppedTokens?: number;
 }
 
 /** Union of all stream chunk types */
@@ -660,6 +772,9 @@ export function createStreamingRunner(
           type: "error",
           error: error instanceof Error ? error : new Error(String(error)),
           partialOutput: partialOutput || undefined,
+          // A run that dropped chunks and then failed reported nothing about
+          // the loss, because only `done` carried the figure.
+          droppedTokens: buffer.getDroppedCount(),
         };
         await buffer.push(errorChunk);
         buffer.close();

@@ -322,7 +322,7 @@ describe("createGeminiStreamingRunner", () => {
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
           'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":"!"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"!"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}',
         ]),
       );
 
@@ -347,7 +347,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
         ]),
       );
 
@@ -371,7 +371,7 @@ describe("createGeminiStreamingRunner", () => {
       .mockResolvedValue(
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"chunk1"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":"chunk2"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"chunk2"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
         ]),
       );
 
@@ -395,7 +395,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"Done"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"Done"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":3}}',
         ]),
       );
 
@@ -419,7 +419,7 @@ describe("createGeminiStreamingRunner", () => {
       .mockResolvedValue(
         sseResponse([
           'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
-          'data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}],"usageMetadata":{"promptTokenCount":15,"candidatesTokenCount":8}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":15,"candidatesTokenCount":8}}',
         ]),
       );
 
@@ -457,7 +457,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"final"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"final"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
           "data: [DONE]",
         ]),
       );
@@ -483,7 +483,7 @@ describe("createGeminiStreamingRunner", () => {
       .fn()
       .mockResolvedValue(
         sseResponse([
-          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"ok"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}',
         ]),
       );
 
