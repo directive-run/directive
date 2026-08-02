@@ -73,6 +73,9 @@ export function warnIfMissingApiKey(
  * Returns the number when the field holds a finite non-negative one, and
  * `undefined` for everything else – a missing field, `null`, a string, `NaN`.
  *
+ * Whether a count is a *report* is a further question, answered by
+ * {@link isReportedCount}: this one only says the field held a number.
+ *
  * The distinction matters because "the provider reported usage" is what decides
  * whether a call is priceable, and testing the container rather than the
  * numbers answered that question wrong: a gateway forwarding
@@ -94,10 +97,34 @@ export function readTokenCount(value: unknown): number | undefined {
 /**
  * Did the provider report at least one usable token count?
  *
+ * "Usable" means a number greater than zero. A call that reached a model
+ * consumed input tokens by definition – a prompt of zero tokens is not a thing
+ * a provider can answer – so an all-zero usage block says the same thing a
+ * missing one does: nobody counted. Accepting it as a report was the third way
+ * the same hole opened: measured against a gateway returning
+ * `"usage":{"prompt_tokens":0,"completion_tokens":0}`, two hundred calls with
+ * four-thousand-character answers ran against a five-cent ceiling with recorded
+ * spend of zero, an unpriced-call count of zero, and no signal of any kind.
+ *
+ * A real zero output count on a real call still reports, because the input
+ * count beside it is non-zero.
+ *
  * @internal
  */
 export function anyTokenCountReported(...values: unknown[]): boolean {
-  return values.some((value) => readTokenCount(value) !== undefined);
+  return values.some((value) => isReportedCount(value));
+}
+
+/**
+ * Is this value a token count the provider actually measured, rather than a
+ * placeholder? See {@link anyTokenCountReported} for why zero is not.
+ *
+ * @internal
+ */
+export function isReportedCount(value: unknown): boolean {
+  const count = readTokenCount(value);
+
+  return count !== undefined && count > 0;
 }
 
 // ============================================================================
@@ -152,6 +179,9 @@ export interface StreamTotals {
    * any – an OpenAI-compatible endpoint that ignores
    * `stream_options.include_usage`, for instance – rather than because the
    * call was free. Cost tracking needs to be able to tell those apart.
+   *
+   * A usage frame carrying only zeros counts as never sent: no call that
+   * reached a model consumed zero input tokens.
    */
   usageReported: boolean;
 }
@@ -281,25 +311,30 @@ export async function parseEventStream(
       sawTerminal = true;
     }
 
+    // Counts are taken as sent, including zeros – a response really can have
+    // produced no output tokens. What a zero does not do is establish that
+    // anyone counted, so `usageReported` needs a number above zero. A frame
+    // carrying nothing but zeros is a placeholder, and treating it as a report
+    // priced two hundred real calls at nothing.
     const nextInput = readTokenCount(result.inputTokens);
     if (nextInput !== undefined) {
       inputTokens = nextInput;
-      usageReported = true;
+      usageReported ||= nextInput > 0;
     }
     const nextOutput = readTokenCount(result.outputTokens);
     if (nextOutput !== undefined) {
       outputTokens = nextOutput;
-      usageReported = true;
+      usageReported ||= nextOutput > 0;
     }
     const nextCacheRead = readTokenCount(result.cacheReadTokens);
     if (nextCacheRead !== undefined) {
       cacheReadTokens = nextCacheRead;
-      usageReported = true;
+      usageReported ||= nextCacheRead > 0;
     }
     const nextCacheCreation = readTokenCount(result.cacheCreationTokens);
     if (nextCacheCreation !== undefined) {
       cacheCreationTokens = nextCacheCreation;
-      usageReported = true;
+      usageReported ||= nextCacheCreation > 0;
     }
   };
 

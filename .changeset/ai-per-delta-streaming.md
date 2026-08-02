@@ -107,51 +107,63 @@ This applies everywhere spend is counted, not only in `withBudget`:
   only ever guarded concurrency. `facts.agent.tokenUsage`,
   `orchestrator.totalTokens` and the multi-agent global counter now rise by an
   estimate for such a call, so `onBudgetWarning` and the ceiling both fire.
-- **A call that throws after reaching the provider is charged.** `withBudget`
+- **Both orchestrators accrue when the call ends, not when the run succeeds.**
+  The accrual sat after the `pre_output_guardrails` breakpoint and the output
+  guardrails, both of which throw, so a prompt that reliably trips an output
+  guardrail bought unlimited unrecorded spend — fifty provider calls and half a
+  million tokens against a thousand-token cap, with `tokenUsage` still reading
+  zero. It now happens against the provider call itself, on either outcome, and
+  charges what the call delivered.
+- **A call is charged for what it delivered, on either outcome.** `withBudget`
   recorded only on the success path, so a response the provider generated,
-  delivered and billed cost nothing on the ledger if anything downstream threw
-  — including the new end-of-response marker check, which by design throws
-  *after* the response has been paid for, and is retryable. Recording now happens
-  on both paths. The one throw not charged is a budget below this one refusing to
-  dispatch, where nothing was sent.
-- **Requests the wrappers made on the budget's behalf are counted.** `withRetry`,
-  `withFallback` and `withStructuredOutput` re-invoke the runner beneath them and
-  report each boundary on `onStreamRestart`; `withBudget` now listens, so a budget
-  composed *around* a retrying, falling-back stack charges for every request that
-  stack made rather than for one. It forwards the signal to your own
-  `onStreamRestart` untouched.
+  delivered and billed cost nothing on the ledger if anything downstream threw —
+  including the end-of-response marker check, which by design throws *after* the
+  response has been paid for. A call that throws now accrues the text that
+  reached the consumer before it failed, which for a marker-stripping gateway is
+  the whole response. A call that delivered nothing accrues nothing: a DNS
+  failure and a refused connection cost no money and no longer spend a budget
+  that outlives the outage.
+- **Requests the wrappers made on the budget's behalf are charged as they
+  arrive.** A budget composed *around* `withRetry` or `withFallback` saw one call
+  where six were made. It now charges every response those wrappers received,
+  because every one of them was delivered through the same `onToken` the caller
+  passed. Nothing is charged on a wrapper's say-so.
 - **`usageReported` tests the numbers, not the container.** A gateway forwarding
   `"usage":{"prompt_tokens":null,"completion_tokens":null}` used to satisfy the
   presence check and record the call as costing exactly zero — no spend, no
   unpriced-call count, no signal of any kind, where the same gateway omitting the
   `usage` key was correctly charged. Every adapter, on both the streamed and the
-  buffered path, now requires a finite non-negative count before treating usage as
-  reported. One count is enough; two nulls are not.
+  buffered path, now requires a count above zero before treating usage as
+  reported. One count is enough; nulls are not, and neither is a frame of zeros —
+  no call that reached a model consumed zero input tokens. A real zero output
+  count still reports, because the input count beside it is not zero.
 
-**The estimate uses what is actually known about the call.** `estimatedOutputMultiplier`
-priced output as a multiple of the *input*, which has nothing to do with the
-response: a retrieval prompt answered in a sentence over-charged by nearly six
-times and tripped a correctly sized budget a sixth of the way through, while a
-one-line prompt answered at length under-charged by two to three orders of
-magnitude. Now:
+**Every charge is measured, and nothing is priced from a declared figure.**
+`estimatedOutputMultiplier` prices output as a multiple of the *input*, which has
+nothing to do with the response: a retrieval prompt answered in a sentence
+over-charges by nearly six times and a one-line prompt answered at length
+under-charges by orders of magnitude. It is now used for one thing only — the
+pre-call check, where there is by definition nothing yet to measure. Every charge
+after the call is made from the text that actually arrived, at the same
+`length / 4` heuristic this package already applies to input.
 
-- a call that completed but reported no usage is measured from the output it
-  produced, the same `length / 4` heuristic this package already applies to input;
-- a call that threw before producing anything falls back to `agent.maxTokens`, a
-  new optional field on `AgentLike` holding the provider's own per-call output
-  ceiling — set it to whatever `max_tokens` your adapter sends;
-- an agent that declares no ceiling keeps the old input-scaled fallback, so
-  nothing changes for a configuration that does not opt in.
-
-`agent.maxTokens` also bounds the *pre-call* estimate, which is where the
-over- and under-charging was measured.
+`AgentLike.maxTokens`, added in an earlier iteration of this change as a bound
+for that estimate, is removed. It is written by the caller whose spend is being
+limited, so it bounded nothing: `maxTokens: 1` shrank a pre-call estimate until a
+five-cent per-call cap admitted a call that cost eighteen dollars, and the same
+field charged a budget four thousand dollars for a connection that was never
+established. Set `max_tokens` on the adapter, which is what sends it.
 
 **`withBudget` gains `maxUnpricedCalls`.** Unset by default. Set it and the
 runner refuses further calls with a new `UnpricedCallLimitError` once that many
-have been charged at estimate rather than at reported usage. A hard budget
-enforced against estimates is still a budget, but an endpoint that has quietly
-stopped reporting usage should not be able to keep it that way indefinitely.
-`getUnpricedCallCount()` now also counts calls that threw after dispatch.
+recent calls have been charged at estimate rather than at reported usage. A hard
+budget enforced against estimates is still a budget, but an endpoint that has
+quietly stopped reporting usage should not be able to keep it that way
+indefinitely. The count is kept over a rolling window — the widest budget window
+configured, or an hour when there is none — like every other figure the wrapper
+keeps, so an outage that ends stops refusing calls once its failures age out.
+`getUnpricedCallCount()` reads that window. Calls a nested budget refused before
+dispatch are neither charged nor counted, by either error it raises.
 
 **A stream that ends early is an error, and the marker ends the response.** The
 shipped adapters now require the provider's end-of-response marker — `[DONE]` or
@@ -215,12 +227,15 @@ the stream ending. Streams remove themselves as they terminate, so the bookkeepi
 does not grow across a long-lived orchestrator's lifetime, and `destroy()` with
 nothing streaming does exactly what it did before.
 
-`destroy()` and `abort()` also settle the `result` promise. Closing the stream
-released consumers parked on the iterator, but nothing settled `result`, so a
-runner that does not honor the `AbortSignal` it was handed left a graceful
-shutdown waiting on it forever. It now rejects with the abort signal's own
-reason — the same value a signal-honoring runner reports — and only while the run
-is still in flight, so a completed run's `result` is untouched.
+`destroy()`, `abort()` and `interrupt()` also settle the `result` promise.
+Closing the stream released consumers parked on the iterator, but nothing settled
+`result`, so a runner that does not honor the `AbortSignal` it was handed left a
+graceful shutdown waiting on it forever. Each now rejects with the abort signal's
+own reason — the same value a signal-honoring runner reports — and only while the
+run is still in flight, so a completed run's `result` is untouched. `interrupt()`
+also ends the stream and stops counting toward `getActiveStreamCount()`, which it
+did not; what it still keeps alive, and the only thing that distinguishes it from
+`abort()`, is the `liveContext` subscription. `destroy()` detaches that.
 
 **Diagnosing a stalled stream from outside the library.** `runStream` and
 `runAgentStream` return a `getStats()` reading the stream's buffered chunk count,
@@ -228,7 +243,14 @@ dropped-chunk count, time to first token, current generation and restart count;
 both orchestrators expose `getActiveStreamCount()`. A consumer that stopped
 pulling and a provider that stopped sending were previously indistinguishable
 from the outside — the first shows a filling buffer, the second shows no first
-token.
+token. `restarts` counts re-invocations whether or not deltas were requested;
+`generation` only moves when they were, so deriving one from the other reported a
+structural zero on the buffered path where it meant "not measured".
+
+**A retry that will not happen no longer announces itself.** `withRetry` emitted
+its restart signal before checking whether the run had been aborted, so an
+aborted retry told the consumer to discard a generation that nothing ever
+replaced.
 
 **`token` chunks carry `generation`.** The same marker `stream_restart` carries,
 repeated on every token, so a boundary the consumer never received is still

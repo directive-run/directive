@@ -31,6 +31,7 @@
  * ```
  */
 
+import type { TokenSink } from "./streaming.js";
 import type {
   AgentLike,
   AgentRunner,
@@ -103,16 +104,19 @@ export interface BudgetConfig {
    */
   estimatedOutputMultiplier?: number;
   /**
-   * Refuse further calls once this many have been charged at estimate rather
-   * than at reported usage.
+   * Refuse further calls once this many recent ones have been charged at
+   * estimate rather than at reported usage.
    *
-   * An unpriced call is one the provider declined to count, or one that threw
-   * after reaching the provider. Both are charged, so the window still accrues
-   * and the ceiling still trips — but at an estimate, and an estimate for an
-   * agent that declares no {@link AgentLike.maxTokens} can be off by orders of
-   * magnitude in either direction. Past some number of them a hard budget is
-   * not being enforced against spend any more, it is being enforced against a
-   * guess.
+   * An unpriced call is one the provider declined to count, or one that threw.
+   * Whatever such a call delivered is charged, so the window still accrues and
+   * the ceiling still trips — but from measured text rather than a counted
+   * response, and a call that delivered nothing before failing is charged
+   * nothing at all. Past some number of them a hard budget is not being
+   * enforced against spend any more, it is being enforced against a guess.
+   *
+   * Counted over a rolling window, like the budgets themselves: the widest
+   * window configured, or an hour when there is none. An outage that ends
+   * stops refusing calls once its failures age out.
    *
    * Unset by default, which keeps the count advisory: read it from
    * {@link BudgetRunner.getUnpricedCallCount} and decide for yourself. Set it
@@ -166,14 +170,14 @@ export class BudgetExceededError extends Error {
  * {@link BudgetConfig.maxUnpricedCalls} is set.
  */
 export class UnpricedCallLimitError extends Error {
-  /** How many calls have been charged at estimate. */
+  /** How many calls in the current window have been charged at estimate. */
   readonly unpricedCalls: number;
   /** The configured tolerance. */
   readonly maxUnpricedCalls: number;
 
   constructor(unpricedCalls: number, maxUnpricedCalls: number) {
     super(
-      `[Directive] Budget can no longer be enforced against reported usage: ${unpricedCalls} call(s) were charged at estimate, at or above the configured limit of ${maxUnpricedCalls}. The endpoint is not returning token counts – a gateway dropping \`stream_options.include_usage\` is the usual cause. Fix the endpoint, raise \`maxUnpricedCalls\`, or set \`agent.maxTokens\` so the estimate is a real bound.`,
+      `[Directive] Budget can no longer be enforced against reported usage: ${unpricedCalls} recent call(s) were charged at estimate, at or above the configured limit of ${maxUnpricedCalls}. The endpoint is not returning token counts – a gateway dropping \`stream_options.include_usage\` is the usual cause – or calls are failing after dispatch. Fix the endpoint, or raise \`maxUnpricedCalls\`.`,
     );
     this.name = "UnpricedCallLimitError";
     this.unpricedCalls = unpricedCalls;
@@ -240,6 +244,25 @@ const WINDOW_MS: Record<string, number> = {
   day: 24 * 60 * 60 * 1000,
 };
 
+/**
+ * The window the unpriced-call count is kept over: the widest budget window
+ * configured, or an hour when none is.
+ *
+ * Every other figure this module keeps decays, and this one did not — it only
+ * ever incremented, for the life of the runner. Twenty-five transient failures
+ * during one provider outage therefore refused every call afterwards, forever,
+ * with the provider healthy again and the budget untouched. Sharing the ledgers'
+ * basis makes the count say what the ledgers say: what has happened lately.
+ */
+function unpricedWindowMs(budgets: BudgetWindow[]): number {
+  let widest = 0;
+  for (const budget of budgets) {
+    widest = Math.max(widest, WINDOW_MS[budget.window] ?? 0);
+  }
+
+  return widest > 0 ? widest : WINDOW_MS.hour!;
+}
+
 function estimateInputTokens(input: string, charsPerToken: number): number {
   return Math.ceil(input.length / charsPerToken);
 }
@@ -263,28 +286,31 @@ function costOf(
 }
 
 /**
- * How many output tokens to assume for a call whose real count is unavailable.
+ * How many output tokens to charge for a call whose real count is unavailable.
  *
- * Three sources, best first:
+ * Two sources:
  *
- * 1. **The output itself**, when the call completed and only its counts are
- *    missing. The text is in hand and `length / charsPerToken` is the estimate
- *    this module already applies to input.
- * 2. **`agent.maxTokens`**, when the call threw and produced nothing to
- *    measure. It is the provider's own ceiling for the call, so it bounds what
- *    the response could have cost rather than guessing at it.
- * 3. **`inputTokens × estimatedOutputMultiplier`**, the historical fallback,
- *    for an agent that declares no ceiling.
+ * 1. **The output that arrived**, whenever any did — the text on a completed
+ *    result, or the deltas already delivered by a call that threw part-way
+ *    through. `length / charsPerToken` is the estimate this module already
+ *    applies to input, and it is a measurement of the response rather than a
+ *    prediction of one.
+ * 2. **`inputTokens × estimatedOutputMultiplier`**, before the call, where
+ *    there is by definition nothing yet to measure.
  *
- * The third is only ever a guess about a quantity it has no relation to: a
+ * The second is only ever a guess about a quantity it has no relation to: a
  * 50k-token retrieval prompt answered in 200 tokens is priced at 50k of output
  * and over-charges by nearly six times, while a one-line prompt answered at
- * length under-charges by two to three orders of magnitude. Either error turns
- * a correctly sized budget into the wrong one, which is why the first two
- * sources are preferred wherever they exist.
+ * length under-charges by two to three orders of magnitude. It is used for the
+ * pre-call check because a pre-call check has nothing better, and never after.
+ *
+ * `agent.maxTokens` used to sit between them, on the reasoning that a declared
+ * ceiling bounds the response. It does not bound anything here: it is written
+ * by the caller whose spend is being limited, and `maxTokens: 1` shrank the
+ * pre-call estimate until a five-cent per-call cap admitted a call that cost
+ * eighteen dollars. Nothing in this module reads it now.
  */
 function estimateOutputTokens(
-  agent: AgentLike,
   outputText: string | undefined,
   inputTokens: number,
   charsPerToken: number,
@@ -292,11 +318,6 @@ function estimateOutputTokens(
 ): number {
   if (outputText !== undefined && outputText.length > 0) {
     return Math.ceil(outputText.length / charsPerToken);
-  }
-
-  const ceiling = agent.maxTokens;
-  if (typeof ceiling === "number" && Number.isFinite(ceiling) && ceiling > 0) {
-    return Math.ceil(ceiling);
   }
 
   return Math.ceil(inputTokens * outputMultiplier);
@@ -406,8 +427,12 @@ export function withBudget(
   }
   // Base pricing ledger (used when no budget windows are configured)
   const baseLedger = new CostLedger();
-  // Calls the provider declined to report usage for, charged at estimate.
-  let unpricedCalls = 0;
+  // Calls charged at estimate rather than at reported usage, timestamped so
+  // the count decays on the same basis as the ledgers beside it.
+  const unpricedLedger = new CostLedger();
+  const unpricedMs = unpricedWindowMs(budgets);
+  const countUnpriced = (): number =>
+    unpricedLedger.getCostInWindow(unpricedMs);
 
   const budgetRunner: AgentRunner = async <T = unknown>(
     agent: AgentLike,
@@ -415,9 +440,8 @@ export function withBudget(
     options?: RunOptions,
   ): Promise<RunResult<T>> => {
     const inputTokens = estimateInputTokens(input, charsPerToken);
-    // Pre-call there is no output to measure, so the ceiling is the bound.
+    // Pre-call there is nothing to measure, so the multiplier is all there is.
     const estimatedOutputTokens = estimateOutputTokens(
-      agent,
       undefined,
       inputTokens,
       charsPerToken,
@@ -429,8 +453,9 @@ export function withBudget(
     // Pre-call: a provider that has stopped reporting usage cannot be
     // budgeted, only approximated. Past the configured tolerance, refuse
     // rather than let a hard ceiling go on being enforced against estimates.
-    if (maxUnpricedCalls != null && unpricedCalls >= maxUnpricedCalls) {
-      throw new UnpricedCallLimitError(unpricedCalls, maxUnpricedCalls);
+    const unpricedSoFar = countUnpriced();
+    if (maxUnpricedCalls != null && unpricedSoFar >= maxUnpricedCalls) {
+      throw new UnpricedCallLimitError(unpricedSoFar, maxUnpricedCalls);
     }
 
     // Pre-call: Check per-call budget
@@ -474,94 +499,107 @@ export function withBudget(
       }
     }
 
-    // How many times the provider was actually called for this one invocation.
-    // Every wrapper that re-invokes the runner beneath it reports the boundary
-    // on `onStreamRestart` — `withRetry`, `withFallback`, a structured-output
-    // schema retry, a self-healing reroute — so a budget wrapped around any of
-    // them can see the requests they make on its behalf. Without the count, a
-    // budget outside a retrying, falling-back stack charged once for what was
-    // measured as six billed requests.
-    let providerCalls = 1;
-    const callerOnStreamRestart = options?.onStreamRestart;
-    const budgetOptions: RunOptions = {
-      ...options,
-      onStreamRestart: (reason) => {
-        providerCalls++;
-        callerOnStreamRestart?.(reason);
-      },
-    };
+    // What the provider actually delivered for this call, counted as it
+    // arrives. This is the only figure here that is observed rather than
+    // declared, and every charge below is derived from it.
+    //
+    // The previous version counted requests off `onStreamRestart` instead, on
+    // the reasoning that every re-invoking wrapper already emits it. It is an
+    // option on the caller's own options object: five hundred calls to it
+    // alongside one real request recorded seven hundred and fifty dollars. A
+    // wrapper's extra requests are charged here when their bytes arrive, and a
+    // caller can no longer charge anything by asking.
+    //
+    // Only wrapped when the caller supplied one — installing a callback of our
+    // own would ask every buffered call to stream.
+    let deliveredChars = 0;
+    const callerOnToken = options?.onToken as TokenSink | undefined;
+    const budgetOptions: RunOptions | undefined = callerOnToken
+      ? {
+          ...options,
+          onToken: ((token: string): unknown => {
+            deliveredChars += token.length;
+
+            return callerOnToken(token);
+          }) as RunOptions["onToken"],
+        }
+      : options;
 
     /**
-     * Charge one call at an estimate, and count it as one the ledger could not
-     * price. `outputText` is whatever the call produced, when it produced
-     * anything; `times` is how many provider requests the charge covers.
+     * Charge one call at an estimate measured from what arrived, and count it
+     * as one the ledger could not price.
+     *
+     * `arrived` is whether the provider delivered anything at all: a response,
+     * or bytes before it failed. A call that delivered nothing is charged
+     * nothing — there is no observation to price — and is still counted,
+     * because a call that fails after dispatch may have been billed for work
+     * whose size is unknowable from here.
      */
-    const recordEstimated = (
-      outputText: string | undefined,
-      times = providerCalls,
-    ): void => {
-      if (times <= 0) {
+    const recordUnpriced = (arrived: boolean, outputChars: number): void => {
+      unpricedLedger.record(1);
+      if (!arrived) {
         return;
       }
-      unpricedCalls += times;
-      const outputTokens = estimateOutputTokens(
-        agent,
-        outputText,
-        inputTokens,
-        charsPerToken,
-        estimatedOutputMultiplier,
-      );
+      const outputTokens = Math.ceil(Math.max(0, outputChars) / charsPerToken);
       for (const budget of budgets) {
         const ledger = windowLedgers.get(budget.window)!;
-        ledger.record(
-          costOf(inputTokens, outputTokens, budget.pricing) * times,
-        );
+        ledger.record(costOf(inputTokens, outputTokens, budget.pricing));
       }
       if (pricing && budgets.length === 0) {
-        baseLedger.record(costOf(inputTokens, outputTokens, pricing) * times);
+        baseLedger.record(costOf(inputTokens, outputTokens, pricing));
       }
     };
 
-    // Execute the call. Everything past this point has reached the provider,
-    // so everything past this point is charged — including the paths that
-    // throw.
     let result: RunResult<T>;
     try {
       result = await runner<T>(agent, input, budgetOptions);
     } catch (err) {
-      // A call that threw after the provider generated its response was still
-      // billed for it. Recording only on the success path meant none of it was:
-      // measured against a marker-stripping gateway, five runs behind
-      // `withRetry` and `withFallback` became thirty billed requests and
-      // fifteen hundred delivered tokens, with recorded spend of zero and an
-      // unpriced-call count of zero — no ceiling, and no signal that there was
-      // no ceiling. A stream that failed on its terminal-marker check is the
-      // clearest case: the response was generated, delivered and charged, and
-      // the throw comes afterwards.
-      //
-      // A budget below this one refused its call before dispatch, so nothing
-      // was sent and nothing is owed; that is the one throw not charged.
-      if (!(err instanceof BudgetExceededError)) {
-        recordEstimated(undefined);
+      // A budget below this one refused before dispatch, so nothing was sent
+      // and nothing is owed — neither a charge nor a count. Both refusals are
+      // pre-dispatch by construction; the nested unpriced-call refusal used to
+      // be charged, which cost an outer ledger thirty dollars across twenty
+      // calls that made no HTTP request at all, and cascaded its own lockout
+      // outward.
+      if (
+        err instanceof BudgetExceededError ||
+        err instanceof UnpricedCallLimitError
+      ) {
+        throw err;
       }
+
+      // Otherwise: charge what arrived before it failed, which for a stream cut
+      // short by a marker check or a truncated body is the whole response the
+      // provider generated and billed. A call that delivered nothing — a DNS
+      // failure, a refused connection, a pre-flight throw — cost nothing and is
+      // charged nothing. Charging those at a declared ceiling locked a $5/hour
+      // budget for a full hour on seventy-four connection refusals that never
+      // reached a provider.
+      recordUnpriced(deliveredChars > 0, deliveredChars);
 
       throw err;
     }
 
+    const deliveredByResult = assistantText(result)?.length ?? 0;
+
     // A provider that reported no usage has not told us the call was free —
     // an OpenAI-compatible endpoint that ignores `stream_options.include_usage`
     // returns zeros for a call that cost real money. Recording those zeros
-    // means the window never accrues and the ceiling never trips, so charge an
-    // estimate instead and count the call as one the ledger could not price.
+    // means the window never accrues and the ceiling never trips, so charge
+    // what arrived instead and count the call as one the ledger could not
+    // price.
     if (result.usageReported === false) {
-      recordEstimated(assistantText(result));
+      recordUnpriced(true, Math.max(deliveredByResult, deliveredChars));
 
       return result;
     }
 
-    // Attempts that failed before this one were generated and billed too, and
-    // the usage on the successful result describes only itself.
-    recordEstimated(undefined, providerCalls - 1);
+    // Bytes delivered beyond what the result describes came from a generation
+    // that was replayed over — a retry, a fallback, a schema re-ask — and the
+    // provider billed for those as well, while the usage on the surviving
+    // result describes only itself. They were observed, so they are charged.
+    if (deliveredChars > deliveredByResult) {
+      recordUnpriced(true, deliveredChars - deliveredByResult);
+    }
 
     // Post-call: Record actual costs in per-window ledgers
     if (result.tokenUsage) {
@@ -600,18 +638,21 @@ export function withBudget(
   }
 
   /**
-   * How many calls were charged at estimate because the provider reported no
+   * How many recent calls were charged at estimate rather than at reported
    * token usage.
    *
-   * Also counts calls that threw after reaching the provider, which are
-   * charged at estimate for the same reason: the response was generated and
-   * billed whether or not it arrived intact.
+   * Counts calls the provider declined to count, and calls that threw, which
+   * cannot be priced from a report that never came. Kept over a rolling window
+   * — the widest configured budget window, or an hour when no window is
+   * configured — so it reads as "lately", like the ledgers it sits beside. A
+   * lifetime total meant one bad afternoon refused every call a long-lived
+   * runner ever made afterwards.
    *
    * Non-zero means the recorded spend is an approximation: the endpoint is not
    * returning usage (a gateway that drops `stream_options.include_usage` is
-   * the usual cause), or calls are failing after dispatch. The spend it stands
-   * in for is real either way. Set {@link BudgetConfig.maxUnpricedCalls} to
-   * make it a ceiling rather than a reading.
+   * the usual cause), or calls are failing after dispatch. Set
+   * {@link BudgetConfig.maxUnpricedCalls} to make it a ceiling rather than a
+   * reading.
    *
    * @example
    * ```typescript
@@ -621,7 +662,7 @@ export function withBudget(
    * ```
    */
   function getUnpricedCallCount(): number {
-    return unpricedCalls;
+    return countUnpriced();
   }
 
   // Attach getSpent as a direct property for type-safe access without casting

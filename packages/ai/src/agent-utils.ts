@@ -78,57 +78,65 @@ export function estimateCost(
 const CHARS_PER_TOKEN = 4;
 
 /**
- * How many tokens a completed run should accrue against a token budget.
+ * How many tokens a run should accrue against a token budget.
  *
- * Normally `result.totalTokens`. When the provider reported no usage at all,
- * that number is zero for a call that cost real money, and accruing it leaves
- * a documented ceiling permanently blind: measured against an endpoint that
- * omits usage frames, an orchestrator with `maxTokenBudget: 100` ran five
- * hundred times with `facts.agent.tokenUsage` still reading zero. Such a run is
- * accrued at an estimate instead — the input it was given plus the output it
- * produced, both measured off the text, which is the same heuristic the
- * streaming path already uses to count whole-message chunks.
+ * The rule is that a ceiling accrues what was observed and never what it was
+ * told:
  *
- * @param agent - The agent that ran, read for its output ceiling.
+ * - The provider's own counts, when it sent any. That is an observation of the
+ *   response, not a claim about a future one.
+ * - Otherwise the text that actually arrived — the assistant messages on the
+ *   result, or the deltas already delivered when the call threw before
+ *   returning one — plus the input that was sent to produce it.
+ * - Nothing at all, when nothing arrived. A call that produced no bytes has no
+ *   observed cost, so it accrues none.
+ *
+ * The version this replaces filled the last case with `agent.maxTokens`, which
+ * is a number the caller writes. A ceiling that accrues a caller-declared
+ * figure is not measuring anything; the same field priced its way past a
+ * five-cent per-call cap for eighteen dollars of real spend. It is a request
+ * parameter and nothing else here reads it.
+ *
  * @param input - The input the run was given.
- * @param result - What the run returned.
+ * @param result - What the run returned, or `undefined` when it threw.
+ * @param observedOutputChars - Characters delivered as deltas for this call.
  * @returns Tokens to add to the budget's running total.
  *
  * @internal
  */
 export function tokensForBudget(
-  agent: AgentLike,
   input: string,
-  result: RunResult<unknown>,
+  result: RunResult<unknown> | undefined,
+  observedOutputChars = 0,
 ): number {
-  if (result.usageReported !== false) {
+  if (result && result.usageReported !== false) {
     return result.totalTokens;
   }
 
   let outputChars = 0;
-  for (const message of result.messages) {
-    if (message.role === "assistant" && typeof message.content === "string") {
-      outputChars += message.content.length;
+  if (result) {
+    for (const message of result.messages) {
+      if (message.role === "assistant" && typeof message.content === "string") {
+        outputChars += message.content.length;
+      }
+    }
+    if (outputChars === 0 && typeof result.output === "string") {
+      outputChars = result.output.length;
     }
   }
-  if (outputChars === 0 && typeof result.output === "string") {
-    outputChars = result.output.length;
+  // A stream that failed part-way delivered what it delivered, and the result
+  // that would have carried it never existed.
+  outputChars = Math.max(outputChars, observedOutputChars);
+
+  // Nothing came back and nothing was delivered: there is nothing to price.
+  if (!result && outputChars === 0) {
+    return 0;
   }
 
-  const inputTokens = Math.ceil(input.length / CHARS_PER_TOKEN);
-  if (outputChars > 0) {
-    return inputTokens + Math.ceil(outputChars / CHARS_PER_TOKEN);
-  }
-
-  // Nothing to measure: fall back to the provider's own ceiling for the call,
-  // and to the input size when the agent declares none.
-  const ceiling = agent.maxTokens;
-  const outputTokens =
-    typeof ceiling === "number" && Number.isFinite(ceiling) && ceiling > 0
-      ? Math.ceil(ceiling)
-      : inputTokens;
-
-  return inputTokens + outputTokens;
+  return (
+    Math.ceil(input.length / CHARS_PER_TOKEN) +
+    Math.ceil(outputChars / CHARS_PER_TOKEN)
+  );
 }
 
 // ============================================================================

@@ -1825,6 +1825,110 @@ describe("maxTokenBudget and usage the provider never reported", () => {
 });
 
 // ============================================================================
+// A ceiling that only accrued when everything after the call went well
+// ============================================================================
+
+describe("maxTokenBudget and a run that ends in an error", () => {
+  /** An output guardrail that refuses everything the agent produces. */
+  const refusingGuardrail = {
+    name: "refuse-everything",
+    fn: () => ({ passed: false, reason: "no" }),
+  };
+
+  /** A runner that delivers text and then fails, the way a gateway does. */
+  function failingAfterDeltas(text: string): AgentRunner {
+    return (async (_agent: AgentLike, _input: string, options?: any) => {
+      await options?.onToken?.(text);
+
+      throw new Error("stream ended without a completion marker");
+    }) as unknown as AgentRunner;
+  }
+
+  it("single-agent: an output guardrail no longer buys unrecorded spend", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: bufferedRunner("ok"),
+      guardrails: { output: [refusingGuardrail] },
+      maxTokenBudget: 25,
+    });
+
+    let calls = 0;
+    for (let i = 0; i < 20; i++) {
+      try {
+        await orchestrator.run(mockAgent(), "hi");
+      } catch (err) {
+        if (!(err instanceof GuardrailError)) {
+          break;
+        }
+      }
+      calls++;
+    }
+
+    // The call was made and billed whether or not its output was allowed
+    // through. Accruing only on the success path ran all twenty at zero.
+    expect(orchestrator.facts.agent.tokenUsage).toBeGreaterThan(0);
+    expect(calls).toBeLessThan(20);
+  });
+
+  it("multi-agent: the same, against the global counter", async () => {
+    const orchestrator = multiAgent(bufferedRunner("ok"), {
+      guardrails: { output: [refusingGuardrail] },
+    });
+
+    await expect(orchestrator.runAgent("assistant", "hi")).rejects.toThrow(
+      GuardrailError,
+    );
+
+    expect(orchestrator.totalTokens).toBe(10);
+  });
+
+  it("single-agent: a streamed run accrues through a refused output too", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: deltaRunner(["a", "b"]),
+      guardrails: { output: [refusingGuardrail] },
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    await collect(stream);
+    await expect(result).rejects.toThrow(GuardrailError);
+
+    expect(orchestrator.facts.agent.tokenUsage).toBe(10);
+  });
+
+  it("accrues what a failing call delivered before it failed", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: failingAfterDeltas("y".repeat(400)),
+    });
+
+    await expect(
+      orchestrator.run(mockAgent(), "x".repeat(400), { onToken: () => {} }),
+    ).rejects.toThrow("completion marker");
+
+    // 100 tokens of prompt plus the 100 tokens of text that arrived.
+    expect(orchestrator.facts.agent.tokenUsage).toBe(200);
+  });
+
+  it("accrues nothing for a failure that delivered nothing", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: (async () => {
+        throw new Error("getaddrinfo ENOTFOUND");
+      }) as unknown as AgentRunner,
+      maxTokenBudget: 1000,
+    });
+
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        orchestrator.run(mockAgent(), "x".repeat(400)),
+      ).rejects.toThrow("ENOTFOUND");
+    }
+
+    // An outage that cost nothing must not spend the ceiling that outlives it.
+    expect(orchestrator.facts.agent.tokenUsage).toBe(0);
+  });
+});
+
+// ============================================================================
 // Shutting down a stream whose runner ignores its signal
 // ============================================================================
 
@@ -1892,6 +1996,57 @@ describe("destroy() and a runner that does not honor its signal", () => {
     abort();
 
     await expect(result).rejects.toBeDefined();
+  });
+
+  it("interrupt() settles `result` the way abort() does", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+
+    const { result, interrupt } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+
+    await hasStarted;
+    interrupt("caller changed their mind");
+
+    // It aborted and returned, and for a runner that ignores its signal that
+    // left `result` pending forever and the stream counted as live.
+    await expect(result).rejects.toBeDefined();
+    expect(orchestrator.getActiveStreamCount()).toBe(0);
+
+    orchestrator.destroy();
+  });
+
+  it("interrupt() still delivers the interrupted chunk before ending", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+
+    const { stream, result, interrupt } = orchestrator.runStream(
+      mockAgent(),
+      "hi",
+      { deltas: true },
+    );
+    const drained = collect(stream);
+
+    await hasStarted;
+    await settle();
+    interrupt("stop");
+    result.catch(() => {});
+
+    const chunks = await drained;
+    expect(chunks.some((c) => c.type === "interrupted")).toBe(true);
+
+    orchestrator.destroy();
   });
 
   it("leaves a completed run's result untouched", async () => {
@@ -1997,6 +2152,42 @@ describe("getStats", () => {
 
     expect(getStats().closed).toBe(true);
     expect(orchestrator.getActiveStreamCount()).toBe(0);
+  });
+
+  it("counts restarts on the buffered path, where no generation moves", async () => {
+    // `generation` only advances when deltas are flowing, so reporting
+    // `generation - 1` made this figure structurally zero without them – a
+    // reading of "no re-invocations happened" that meant "not measured".
+    let attempt = 0;
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      attempt++;
+      if (attempt < 3) {
+        throw new Error("upstream 503");
+      }
+      await options?.onMessage?.({ role: "assistant", content: "ok" });
+
+      return resultFor("ok");
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      agentRetry: { attempts: 3, baseDelayMs: 0 },
+    });
+    const { stream, result, getStats } = orchestrator.runStream(
+      mockAgent(),
+      "hi",
+    );
+    await collect(stream);
+    await result;
+
+    const stats = getStats();
+    expect(stats.restarts).toBe(2);
+    // No deltas were asked for, so nothing was part-rendered to discard.
+    expect(stats.generation).toBe(1);
   });
 
   it("leaves time-to-first-token unset when nothing has arrived", async () => {

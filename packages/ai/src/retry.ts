@@ -306,6 +306,14 @@ export function withRetry(
           /* callback error must not disrupt retry flow */
         }
 
+        // An already-aborted run makes no further attempt, so there is nothing
+        // to replay and no boundary to announce. Signalling first told the
+        // consumer to discard a rendered generation that was never replaced.
+        const signal = options?.signal;
+        if (signal?.aborted) {
+          break;
+        }
+
         // The next attempt replays the response from the beginning, so a
         // caller streaming deltas has to be told the ones it already rendered
         // are void. The signal rides `options` for the same reason `onToken`
@@ -317,10 +325,6 @@ export function withRetry(
         }
 
         // Wait before retrying (abortable via signal)
-        const signal = options?.signal;
-        if (signal?.aborted) {
-          break;
-        }
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => {
             signal?.removeEventListener("abort", onAbort);

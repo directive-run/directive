@@ -2137,16 +2137,91 @@ export function createMultiAgentOrchestrator(
       const callerOnToken = (opts?.onToken ??
         registration.runOptions?.onToken) as TokenSink | undefined;
       let realDeltaCount = 0;
+      // What the provider delivered, measured as it arrives. A call that
+      // throws has no result to price, and this is what it cost.
+      let realDeltaChars = 0;
+
+      /**
+       * Add a call's tokens to this agent's total, the orchestrator's global
+       * total, and the budget warning that watches it.
+       *
+       * Called the moment the provider call ends, on either outcome. The
+       * accrual used to sit after the `pre_output_guardrails` breakpoint and
+       * the output guardrails, both of which throw: an input that reliably
+       * trips an output guardrail bought fifty provider calls and five hundred
+       * thousand tokens against a thousand-token cap, with the agent's
+       * `tokenUsage` still reading zero.
+       */
+      const accrueTokenUsage = (tokens: number): void => {
+        if (tokens <= 0) {
+          return;
+        }
+        system.batch(() => {
+          const currentAgent = getAgentState(agentFacts);
+          setAgentState(agentFacts, {
+            ...currentAgent,
+            tokenUsage: currentAgent.tokenUsage + tokens,
+          });
+        });
+        state.totalTokens += tokens;
+
+        // Update global token count atomically via System facts. Read-modify-
+        // write inside a batch to prevent desync from concurrent runs.
+        const coordFacts = getAgentFacts("__coord");
+        let shouldFireBudgetWarning = false;
+        let budgetPercentage = 0;
+        system.batch(() => {
+          const currentTokens = getBridgeFact<number>(
+            coordFacts,
+            "__globalTokens",
+          );
+          const newTotal = currentTokens + tokens;
+          globalTokenCount = newTotal;
+          setBridgeFact(coordFacts, "__globalTokens", newTotal);
+
+          // Check budget warning threshold
+          if (maxTokenBudget && onBudgetWarning) {
+            budgetPercentage = newTotal / maxTokenBudget;
+            const warningFired = getBridgeFact<boolean>(
+              coordFacts,
+              "__budgetWarningFired",
+            );
+            if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
+              setBridgeFact(coordFacts, "__budgetWarningFired", true);
+              shouldFireBudgetWarning = true;
+            }
+          }
+        });
+
+        // Callbacks should not run inside a batch.
+        if (shouldFireBudgetWarning) {
+          try {
+            onBudgetWarning!({
+              currentTokens: globalTokenCount,
+              maxBudget: maxTokenBudget!,
+              percentage: budgetPercentage,
+            });
+          } catch (callbackError) {
+            if (debug) {
+              console.debug(
+                "[Directive MultiAgent] onBudgetWarning threw:",
+                callbackError,
+              );
+            }
+          }
+        }
+      };
       const countingOnToken = callerOnToken
         ? (token: string): unknown => {
             realDeltaCount++;
+            realDeltaChars += token.length;
 
             return callerOnToken(token);
           }
         : undefined;
 
       // Run agent with retry support
-      const result = await executeAgentWithRetry<T>(
+      const agentCall = executeAgentWithRetry<T>(
         effectiveRunner,
         agent,
         processedInput,
@@ -2270,6 +2345,20 @@ export function createMultiAgentOrchestrator(
           : undefined,
       );
 
+      let result: RunResult<T>;
+      try {
+        result = await agentCall;
+      } catch (err) {
+        // Charge what the provider delivered before it failed, and nothing
+        // when it delivered nothing.
+        accrueTokenUsage(
+          tokensForBudget(processedInput, undefined, realDeltaChars),
+        );
+
+        throw err;
+      }
+      accrueTokenUsage(tokensForBudget(processedInput, result, realDeltaChars));
+
       reportIfRunnerIgnoredOnToken(
         agent.name,
         callerOnToken !== undefined,
@@ -2349,20 +2438,14 @@ export function createMultiAgentOrchestrator(
         }
       }
 
-      // A call whose usage the provider never reported accrues an estimate,
-      // not the zero it reported. Accruing the zero left `maxTokenBudget`
-      // blind to every such call – the same hole the cost budget had, in the
-      // orchestrator's own ceiling.
-      const accruedTokens = tokensForBudget(agent, processedInput, result);
-
-      // Update per-agent facts
+      // Update per-agent facts. Tokens were accrued when the call ended, so
+      // this writes only what the guardrails could still have changed.
       system.batch(() => {
         const currentAgent = getAgentState(agentFacts);
         setAgentState(agentFacts, {
           ...currentAgent,
           status: "completed",
           output: result.output,
-          tokenUsage: currentAgent.tokenUsage + accruedTokens,
           turnCount: currentAgent.turnCount + result.messages.length,
           completedAt: Date.now(),
         });
@@ -2372,54 +2455,7 @@ export function createMultiAgentOrchestrator(
       state.status = "completed";
       state.lastOutput = result.output;
       state.runCount++;
-      state.totalTokens += accruedTokens;
       notifyIdleWaiters();
-
-      // Update global token count atomically via System facts
-      // Use read-modify-write inside batch to prevent desync from concurrent runs
-      const coordFacts = getAgentFacts("__coord");
-      let shouldFireBudgetWarning = false;
-      let budgetPercentage = 0;
-      system.batch(() => {
-        const currentTokens = getBridgeFact<number>(
-          coordFacts,
-          "__globalTokens",
-        );
-        const newTotal = currentTokens + accruedTokens;
-        globalTokenCount = newTotal;
-        setBridgeFact(coordFacts, "__globalTokens", newTotal);
-
-        // Check budget warning threshold
-        if (maxTokenBudget && onBudgetWarning) {
-          budgetPercentage = newTotal / maxTokenBudget;
-          const warningFired = getBridgeFact<boolean>(
-            coordFacts,
-            "__budgetWarningFired",
-          );
-          if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
-            setBridgeFact(coordFacts, "__budgetWarningFired", true);
-            shouldFireBudgetWarning = true;
-          }
-        }
-      });
-
-      // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
-      if (shouldFireBudgetWarning) {
-        try {
-          onBudgetWarning!({
-            currentTokens: globalTokenCount,
-            maxBudget: maxTokenBudget!,
-            percentage: budgetPercentage,
-          });
-        } catch (callbackError) {
-          if (debug) {
-            console.debug(
-              "[Directive MultiAgent] onBudgetWarning threw:",
-              callbackError,
-            );
-          }
-        }
-      }
 
       // Store messages in memory (best-effort — don't fail the run on memory errors)
       // Only store the user message once — agent-utils includes it in every result,
@@ -2774,6 +2810,11 @@ export function createMultiAgentOrchestrator(
     // How many of those have already been attributed to a completed assistant
     // message, so `onMessage` can tell whether real deltas arrived for it.
     let deltasAttributedToMessages = 0;
+    // How many times the runner was re-invoked, whether or not deltas were
+    // asked for. `generation` only moves when they were, so reporting
+    // `generation - 1` made restarts structurally zero on the buffered path –
+    // a figure that read "none happened" when it meant "not measured".
+    let restarts = 0;
     // When the first `token` chunk was emitted, for diagnosing a stall.
     let firstTokenAt: number | undefined;
     // `onToken` implies `deltas` – a callback is only useful if deltas flow.
@@ -2871,6 +2912,9 @@ export function createMultiAgentOrchestrator(
     // deltas; without that a generation arrives as one whole-message chunk
     // and there is nothing part-rendered to discard.
     const beginGeneration = (reason: StreamRestartReason) => {
+      // A re-invocation happened whether or not anyone is rendering deltas,
+      // and `getStats()` reports it either way.
+      restarts++;
       if (!streamRequested) {
         return;
       }
@@ -3052,7 +3096,7 @@ export function createMultiAgentOrchestrator(
           : {}),
         deltaCount,
         generation,
-        restarts: generation - 1,
+        restarts,
         closed,
       }),
       // RFC 0005: multi-agent delegate streams don't bind liveContext

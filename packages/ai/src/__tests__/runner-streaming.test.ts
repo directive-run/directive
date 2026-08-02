@@ -1088,6 +1088,82 @@ describe("a usage object holding no usable count", () => {
     expect(result.usageReported).toBe(false);
   });
 
+  const ZEROED_USAGE_SSE = [
+    'data: {"choices":[{"delta":{"content":"Hello world"}}]}',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+    'data: {"usage":{"prompt_tokens":0,"completion_tokens":0}}',
+    "data: [DONE]",
+  ];
+
+  it("is not a report when the counts are zero — streamed", async () => {
+    // No call that reached a model consumed zero input tokens. A frame of
+    // zeros says exactly what a missing frame says, and reading it as a report
+    // priced two hundred calls with four-thousand-character answers at nothing
+    // against a five-cent ceiling.
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () => streamResponse(ZEROED_USAGE_SSE)),
+    });
+
+    const result = await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("is not a report when the counts are zero — buffered", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          choices: [{ message: { content: "Hello" } }],
+          usage: { prompt_tokens: 0, completion_tokens: 0 },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("charges a zero-count call rather than letting it run free", async () => {
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+    const wrapped = withBudget(
+      createOpenAIRunner({
+        apiKey: "k",
+        fetch: vi
+          .fn()
+          .mockImplementation(async () => streamResponse(ZEROED_USAGE_SSE)),
+      }),
+      { maxCostPerCall: 1_000, pricing, budgets: [] },
+    );
+
+    await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(wrapped.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("still reports usage when a real zero sits beside a real count", async () => {
+    // An empty completion is a thing that happens; a zero prompt is not. The
+    // count beside it is what makes the frame a report.
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          choices: [{ message: { content: "" } }],
+          usage: { prompt_tokens: 10, completion_tokens: 0 },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(true);
+    expect(result.tokenUsage?.outputTokens).toBe(0);
+  });
+
   it("still reports usage when only one of the two counts arrives", async () => {
     const runner = createOpenAIRunner({
       apiKey: "k",
@@ -1254,7 +1330,7 @@ describe("withBudget over a retrying, falling-back stack", () => {
       ) as unknown as typeof globalThis.fetch;
   }
 
-  it("charges every request the wrappers made on its behalf", async () => {
+  it("charges every response the wrappers received on its behalf", async () => {
     const fetchFn = markerStrippingFetch();
     const primary = createOpenAIRunner({ apiKey: "k", fetch: fetchFn });
     const secondary = createOpenAIRunner({ apiKey: "k2", fetch: fetchFn });
@@ -1276,12 +1352,17 @@ describe("withBudget over a retrying, falling-back stack", () => {
       .mock.calls.length;
     // Six requests reached the provider and six responses were billed.
     expect(httpCalls).toBe(6);
-    // The budget knows about all of them, not one, and not none.
-    expect(wrapped.getUnpricedCallCount()).toBe(httpCalls);
-    expect(wrapped.getSpent("hour")).toBeGreaterThan(0);
+    // All six deliveries are charged, because all six arrived: 66 characters
+    // of "Hello world" at four characters a token, plus the prompt. The count
+    // of requests is not taken from any wrapper's word for it — the previous
+    // version read it off `onStreamRestart`, an option on the caller's own
+    // options object, and five hundred calls to that recorded $750 against one
+    // real request.
+    expect(wrapped.getSpent("hour")).toBeCloseTo(18, 5);
+    expect(wrapped.getUnpricedCallCount()).toBe(1);
   });
 
-  it("counts the failed attempts behind a call that eventually succeeded", async () => {
+  it("charges the responses thrown away behind a call that eventually succeeded", async () => {
     let attempt = 0;
     const fetchFn = vi.fn().mockImplementation(async () => {
       attempt++;
@@ -1306,8 +1387,12 @@ describe("withBudget over a retrying, falling-back stack", () => {
     const result = await wrapped(mockAgent(), "Hi", { onToken: () => {} });
 
     expect(result.usageReported).toBe(true);
-    // The two responses thrown away were generated and billed all the same.
-    expect(wrapped.getUnpricedCallCount()).toBe(2);
+    // 10 in + 5 out reported for the response that survived, plus the two
+    // "partial" generations delivered and discarded before it: 14 characters
+    // of text the reported usage says nothing about, and the prompt that was
+    // resent to produce them.
+    expect(wrapped.getSpent("hour")).toBeCloseTo(15 + 1 + 4, 5);
+    expect(wrapped.getUnpricedCallCount()).toBe(1);
   });
 
   it("leaves a single successful call counted exactly as before", async () => {

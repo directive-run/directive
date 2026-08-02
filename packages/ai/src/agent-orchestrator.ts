@@ -323,12 +323,18 @@ export interface StreamStats {
   timeToFirstTokenMs?: number;
   /** `token` chunks emitted for the current generation. */
   deltaCount: number;
-  /** Which generation is being assembled. 1 until the first restart. */
+  /**
+   * Which generation is being assembled. 1 until the first restart, and 1 for
+   * the whole run when deltas were not requested — without them nothing is
+   * part-rendered and there is no boundary to draw.
+   */
   generation: number;
   /**
    * How many times the runner was re-invoked and replayed the response — an
    * agent retry, a schema retry, a fallback, a reroute. Rising steadily means
    * spend is a multiple of what the call count suggests.
+   *
+   * Counted whether or not deltas were requested, unlike {@link generation}.
    */
   restarts: number;
   /** Whether the stream has reached a terminal chunk. */
@@ -953,6 +959,64 @@ export function createAgentOrchestrator<
     }
   }
 
+  /**
+   * Add a call's tokens to the agent's running total, and fire the budget
+   * warning if this is the call that crosses the threshold.
+   *
+   * Called the moment a provider call ends, on either outcome, by both `run`
+   * and `runStream`. The accrual used to sit after the output guardrails and
+   * the `pre_output_guardrails` breakpoint, which put two throwing steps
+   * between the spend and the ceiling that bounds it: an input that reliably
+   * trips an output guardrail bought fifty provider calls and five hundred
+   * thousand tokens against a thousand-token cap, with `facts.agent.tokenUsage`
+   * still reading zero.
+   */
+  function accrueTokenUsage(tokens: number): void {
+    if (tokens <= 0) {
+      return;
+    }
+    let shouldWarn = false;
+    let percentage = 0;
+    system.batch(() => {
+      const currentAgent = getAgentState(system.facts);
+      const newTokenUsage = currentAgent.tokenUsage + tokens;
+      setAgentState(system.facts, {
+        ...currentAgent,
+        tokenUsage: newTokenUsage,
+      });
+
+      if (maxTokenBudget && onBudgetWarning) {
+        percentage = newTokenUsage / maxTokenBudget;
+        const warningFired = getBridgeFact<boolean>(
+          system.facts,
+          "__budgetWarningFired",
+        );
+        if (percentage >= budgetWarningThreshold && !warningFired) {
+          setBridgeFact(system.facts, "__budgetWarningFired", true);
+          shouldWarn = true;
+        }
+      }
+    });
+
+    // Callbacks should not run inside a batch.
+    if (shouldWarn) {
+      try {
+        onBudgetWarning!({
+          currentTokens: getAgentState(system.facts).tokenUsage,
+          maxBudget: maxTokenBudget!,
+          percentage,
+        });
+      } catch (callbackError) {
+        if (debug) {
+          console.debug(
+            "[Directive Orchestrator] onBudgetWarning threw:",
+            callbackError,
+          );
+        }
+      }
+    }
+  }
+
   // Helper to run agent with guardrails
   async function runAgentWithGuardrails<T>(
     agent: AgentLike,
@@ -1419,9 +1483,13 @@ export function createAgentOrchestrator<
       | TokenSink
       | undefined;
     let runDeltaCount = 0;
+    // What the provider delivered, measured as it arrives. A call that throws
+    // has no result to read, and this is all there is to charge it from.
+    let runDeltaChars = 0;
     const countingOnToken = callerOnToken
       ? (token: string): unknown => {
           runDeltaCount++;
+          runDeltaChars += token.length;
 
           return callerOnToken(token);
         }
@@ -1441,8 +1509,9 @@ export function createAgentOrchestrator<
       }
     };
 
-    // Run the agent with retry support
-    const result = await executeAgentWithRetry<T>(
+    // Run the agent with retry support. What it cost is accrued the moment it
+    // ends, before anything that can throw between here and the ceiling.
+    const agentCall = executeAgentWithRetry<T>(
       effectiveRunner,
       agent,
       input,
@@ -1565,6 +1634,17 @@ export function createAgentOrchestrator<
         : undefined,
     );
 
+    let result: RunResult<T>;
+    try {
+      result = await agentCall;
+    } catch (err) {
+      // Charge what arrived before it failed, and nothing when nothing did.
+      accrueTokenUsage(tokensForBudget(input, undefined, runDeltaChars));
+
+      throw err;
+    }
+    accrueTokenUsage(tokensForBudget(input, result, runDeltaChars));
+
     reportIfRunnerIgnoredOnToken(
       agent.name,
       callerOnToken !== undefined,
@@ -1646,56 +1726,18 @@ export function createAgentOrchestrator<
       }
     }
 
-    // Update state
-    let shouldFireBudgetWarning = false;
-    let budgetPercentage = 0;
+    // Update state. Tokens were accrued when the call ended, so this writes
+    // only what the guardrails could still have changed.
     system.batch(() => {
       const currentAgent = getAgentState(system.facts);
-      // A call whose usage the provider never reported accrues an estimate,
-      // not the zero it reported. Accruing the zero left `maxTokenBudget`
-      // blind to every such call, which is the same hole the cost budget had.
-      const newTokenUsage =
-        currentAgent.tokenUsage + tokensForBudget(agent, input, result);
       setAgentState(system.facts, {
         ...currentAgent,
         status: "completed",
         output: result.output,
-        tokenUsage: newTokenUsage,
         turnCount: currentAgent.turnCount + result.messages.length,
         completedAt: Date.now(),
       });
-
-      // Check budget warning threshold
-      if (maxTokenBudget && onBudgetWarning) {
-        budgetPercentage = newTokenUsage / maxTokenBudget;
-        const warningFired = getBridgeFact<boolean>(
-          system.facts,
-          "__budgetWarningFired",
-        );
-        if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
-          setBridgeFact(system.facts, "__budgetWarningFired", true);
-          shouldFireBudgetWarning = true;
-        }
-      }
     });
-
-    // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
-    if (shouldFireBudgetWarning) {
-      try {
-        onBudgetWarning!({
-          currentTokens: getAgentState(system.facts).tokenUsage,
-          maxBudget: maxTokenBudget!,
-          percentage: budgetPercentage,
-        });
-      } catch (callbackError) {
-        if (debug) {
-          console.debug(
-            "[Directive Orchestrator] onBudgetWarning threw:",
-            callbackError,
-          );
-        }
-      }
-    }
 
     // Store messages in memory if configured (best-effort)
     if (memory && result.messages.length > 0) {
@@ -1783,6 +1825,10 @@ export function createAgentOrchestrator<
   // open. Without that a long-lived orchestrator would accumulate one entry
   // per completed run forever, which is the worse version of this bug.
   const liveStreams = new Set<{ shutdown: () => void }>();
+  // `liveContext` subscriptions still attached after their stream closed —
+  // only `interrupt()` leaves one that way, and `destroy()` still has to
+  // detach it.
+  const liveContextTeardowns = new Set<() => void>();
 
   // ---- Breakpoint infrastructure ----
   const breakpointModifications = new Map<string, BreakpointModifications>();
@@ -2106,6 +2152,14 @@ export function createAgentOrchestrator<
       // synthesis, across every generation. Zero at the end of a run that
       // asked for streaming means the runner ignored the request.
       let realDeltaCount = 0;
+      // Characters of those deltas, across every generation. A run that throws
+      // has no result to price, and this is what the provider delivered.
+      let realDeltaChars = 0;
+      // How many times the runner was re-invoked, whether or not deltas were
+      // asked for. `generation` only moves when they were, so reporting
+      // `generation - 1` made restarts structurally zero on the buffered path –
+      // a figure that read "none happened" when it meant "not measured".
+      let restarts = 0;
       // When the first `token` chunk was emitted. Undefined until then, which
       // is what distinguishes a provider that has said nothing from a consumer
       // that has read nothing.
@@ -2180,6 +2234,9 @@ export function createAgentOrchestrator<
       // deltas – without that the response arrives as a single whole-message
       // chunk and there is nothing part-rendered to discard.
       const beginGeneration = (reason: StreamRestartReason) => {
+        // A re-invocation happened whether or not anyone is rendering deltas,
+        // and `getStats()` reports it either way.
+        restarts++;
         if (!streamRequested) {
           return;
         }
@@ -2202,6 +2259,7 @@ export function createAgentOrchestrator<
         ? (token: string): unknown => {
             deltaCount++;
             realDeltaCount++;
+            realDeltaChars += token.length;
             appendToAccumulated(token);
             pushChunk({
               type: "token",
@@ -2348,7 +2406,14 @@ export function createAgentOrchestrator<
           liveContextUnsub();
           liveContextUnsub = null;
         }
+        liveContextTeardowns.delete(tearDownLiveContext);
       };
+      // `interrupt()` deliberately leaves this subscription attached after the
+      // stream itself is gone, so `destroy()` cannot reach it through
+      // `liveStreams` any more. Keep it reachable here instead.
+      if (liveContextUnsub) {
+        liveContextTeardowns.add(tearDownLiveContext);
+      }
 
       // Whether the run has reached its own end – either outcome. Set inside
       // the run itself rather than from a `.then`, so a shutdown issued in the
@@ -2486,7 +2551,7 @@ export function createAgentOrchestrator<
           // is the configured one – structured output and the circuit breaker
           // included – so a streamed run is gated and validated exactly like a
           // buffered one.
-          const result = await executeAgentWithRetry<T>(
+          const agentCall = executeAgentWithRetry<T>(
             buildEffectiveRunner(),
             agent,
             processedInput,
@@ -2649,6 +2714,23 @@ export function createAgentOrchestrator<
               : undefined,
           );
 
+          let result: RunResult<T>;
+          try {
+            result = await agentCall;
+          } catch (err) {
+            // Charge what the provider delivered before it failed. The
+            // guardrails and the breakpoint below can throw too, which is why
+            // this sits against the call rather than after them.
+            accrueTokenUsage(
+              tokensForBudget(processedInput, undefined, realDeltaChars),
+            );
+
+            throw err;
+          }
+          accrueTokenUsage(
+            tokensForBudget(processedInput, result, realDeltaChars),
+          );
+
           reportIfRunnerIgnoredOnToken(
             agent.name,
             streamRequested,
@@ -2737,11 +2819,8 @@ export function createAgentOrchestrator<
               ...currentAgent,
               status: "completed",
               output: result.output,
-              // Same accrual the buffered path performs, estimate included –
-              // a streamed run is the one most likely to arrive unreported.
-              tokenUsage:
-                currentAgent.tokenUsage +
-                tokensForBudget(agent, processedInput, result),
+              // Tokens were accrued when the call ended, the same way the
+              // buffered path accrues them.
               turnCount: currentAgent.turnCount + result.messages.length,
               completedAt: Date.now(),
             });
@@ -2842,7 +2921,7 @@ export function createAgentOrchestrator<
             : {}),
           deltaCount,
           generation,
-          restarts: generation - 1,
+          restarts,
           closed,
         }),
         interrupt: (reason?: string) => {
@@ -2865,6 +2944,20 @@ export function createAgentOrchestrator<
             changedKeys: [],
           });
           abortController.abort();
+          // Everything `abort()` does about settling, which `interrupt` did
+          // not do at all: a runner that ignores its signal left `result`
+          // pending forever, the handle in `liveStreams`, and
+          // `getActiveStreamCount()` counting a stream nobody could reach.
+          // The multi-agent orchestrator's `interrupt` has always mapped to a
+          // full shutdown; the only thing kept alive here is the liveContext
+          // subscription, which is the whole point of the method.
+          closeStream();
+          if (!runSettled) {
+            rejectResult?.(
+              abortController.signal.reason ??
+                new Error("[Directive] Stream was interrupted."),
+            );
+          }
         },
       };
     },
@@ -3108,6 +3201,12 @@ export function createAgentOrchestrator<
         handle.shutdown();
       }
       liveStreams.clear();
+      // An interrupted stream keeps its `liveContext` subscription on purpose;
+      // shutting the orchestrator down is where it finally goes.
+      for (const tearDown of [...liveContextTeardowns]) {
+        tearDown();
+      }
+      liveContextTeardowns.clear();
       system.destroy();
     },
   };

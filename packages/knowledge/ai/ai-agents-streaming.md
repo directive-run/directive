@@ -149,7 +149,9 @@ await rendering;
 
 A stream that finished on its own costs nothing here — `destroy()` only reaches streams that are genuinely still open.
 
-`result` settles too. A runner is handed an `AbortSignal`, but nothing obliges it to honor one, so closing the stream alone would leave `result` pending forever and hang a shutdown waiting on it. Both `abort()` and `destroy()` reject it with the abort signal's own reason when the run is still in flight; a run that already finished keeps the result it produced.
+`result` settles too. A runner is handed an `AbortSignal`, but nothing obliges it to honor one, so closing the stream alone would leave `result` pending forever and hang a shutdown waiting on it. `abort()`, `destroy()` and `interrupt()` all reject it with the abort signal's own reason when the run is still in flight; a run that already finished keeps the result it produced.
+
+`interrupt()` ends the stream like `abort()` does — it stops counting toward `getActiveStreamCount()` — and differs in one thing only: the `liveContext` subscription stays attached, so the next prompt continues against fresh facts. `destroy()` detaches it.
 
 ## Diagnosing a stalled stream
 
@@ -171,7 +173,7 @@ setInterval(() => {
 console.log(orchestrator.getActiveStreamCount());  // streams still open
 ```
 
-`restarts` rising steadily means the runner is being re-invoked and spend is a multiple of the call count. `token` chunks carry the matching `generation`, so a `stream_restart` lost to buffer pressure is still detectable: key rendered output by `chunk.generation` and a new generation replaces the previous one rather than appending to it.
+`restarts` rising steadily means the runner is being re-invoked and spend is a multiple of the call count. It is counted whether or not deltas were requested; `generation` only moves when they were, since without deltas there is nothing part-rendered to discard. `token` chunks carry the matching `generation`, so a `stream_restart` lost to buffer pressure is still detectable: key rendered output by `chunk.generation` and a new generation replaces the previous one rather than appending to it.
 
 ## What a streamed run leaves behind
 
@@ -316,9 +318,9 @@ result.tokenUsage;     // { inputTokens: 0, outputTokens: 0 }
 result.usageReported;  // false — the zeros are absence, not a free call
 ```
 
-A `usage` object whose counts are `null` says exactly the same thing as no `usage` object at all, and is read the same way: `usageReported` requires a finite non-negative number, not a present container.
+A `usage` object whose counts are `null` says exactly the same thing as no `usage` object at all, and so does one whose counts are `0` — no call that reached a model consumed zero input tokens. `usageReported` requires a count above zero, not a present container. A genuinely empty completion still reports, because the input count beside it is not zero.
 
-`withBudget` charges an estimate for such a call rather than recording `$0`, so rolling windows still accrue and ceilings still trip. The orchestrators' own `maxTokenBudget` accrues the same estimate, so `facts.agent.tokenUsage` rises for an unreported call rather than sitting at zero. Ask how much of the recorded spend is estimated:
+`withBudget` charges such a call from the text that arrived rather than recording `$0`, so rolling windows still accrue and ceilings still trip. The orchestrators' own `maxTokenBudget` accrues the same measurement, so `facts.agent.tokenUsage` rises for an unreported call rather than sitting at zero. Ask how much of the recorded spend is estimated:
 
 ```typescript
 if (runner.getUnpricedCallCount() > 0) {
@@ -326,13 +328,16 @@ if (runner.getUnpricedCallCount() > 0) {
 }
 ```
 
-The estimate uses the output the call produced, when there is one. When there is not — a call that threw after reaching the provider is charged too, since the response was generated and billed — it falls back to `agent.maxTokens`, the provider's own per-call output ceiling:
+## What a call is charged, and when
 
-```typescript
-const agent = { name: "writer", instructions: "...", maxTokens: 4096 };
-```
+Everything charged after a call is measured from what the provider delivered, never from a figure something told the budget:
 
-Set it to whatever `max_tokens` your adapter sends. Without it the estimate scales output from input, which is unrelated to the response: a retrieval prompt answered in a sentence over-charges, and a one-line prompt answered at length under-charges by orders of magnitude. `agent.maxTokens` bounds the pre-call estimate as well.
+- **A completed call** is priced from its reported counts, or from the text it produced when there are none.
+- **A call that throws** is priced from whatever reached `onToken` before it failed. A gateway that strips the completion marker generated, delivered and billed the whole response, and the throw comes afterwards.
+- **A call that delivered nothing** costs nothing. A DNS failure or a refused connection is recorded as unpriceable, not as spend.
+- **Extra requests a wrapper made** — a `withRetry` attempt, a `withFallback` reroute — are charged as their bytes arrive, so a budget composed around a retrying stack charges for the responses that stack received rather than for one.
+
+The pre-call check is the only estimate that predicts anything, and it has nothing to measure yet: it scales output from input by `estimatedOutputMultiplier`. Tune that when your workload is shaped unlike the default — `0.3` for summarization, `3.0` for generation from a short prompt.
 
 To stop enforcing a hard budget against estimates indefinitely, cap them:
 
@@ -342,6 +347,8 @@ const runner = withBudget(baseRunner, {
   maxUnpricedCalls: 25,  // then throw UnpricedCallLimitError
 });
 ```
+
+The count is kept over a rolling window — the widest budget window configured, or an hour when there is none — so an outage that ends stops refusing calls once its failures age out. A nested budget's own refusal is neither charged nor counted: nothing was dispatched.
 
 ## Chunk counts are not token counts
 
