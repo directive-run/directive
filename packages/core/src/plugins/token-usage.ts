@@ -17,10 +17,18 @@
 /**
  * A token usage read once, with the cache-write alias already resolved.
  *
- * A field is `undefined` when the source did not carry it as an own property
- * holding a number. No range validation happens here — a consumer that bills
- * money and a consumer that counts metrics reject different things, and both
- * reject after normalization, not during it.
+ * A field is `undefined` when the source did not carry it as an own property,
+ * and `NaN` when it carried one holding something other than a number. The two
+ * are deliberately distinct: absent means "the provider did not report this
+ * class", which every consumer reads as zero, while present-but-not-a-number
+ * means "the provider reported something no ledger can use", which every
+ * consumer must reject. Collapsing both to `undefined` is what let a
+ * `cacheReadTokens` of `"10000000"` bill as zero while the same string in
+ * `inputTokens` was correctly refused.
+ *
+ * No range validation happens here — a consumer that bills money and a consumer
+ * that counts metrics reject different things, and both reject after
+ * normalization, not during it.
  */
 export interface NormalizedTokenUsage {
   readonly inputTokens: number | undefined;
@@ -44,15 +52,25 @@ const COUNT_FIELDS = [
 ] as const;
 
 /**
- * Read one own property off a caller-supplied object, or `undefined`.
+ * Read one own numeric property off a caller-supplied object.
  *
- * Gated on {@link Object.hasOwn}: a count inherited from `Object.prototype` is
- * not a count the provider reported. Without the gate a polluted
+ * Returns `undefined` when the field is absent and `NaN` when it is present but
+ * holds something other than a number. Every caller already refuses `NaN`,
+ * because a non-finite count is unusable however it arrived; returning
+ * `undefined` for a present-but-wrong-typed field would instead have it read as
+ * an absent one, which callers treat as a legitimate zero.
+ *
+ * Gated on {@link Object.hasOwn}: a value inherited from `Object.prototype` is
+ * not a value the caller supplied. Without the gate a polluted
  * `Object.prototype.cacheReadTokens` reaches every usage object that omits
  * cache counts — which is most of them — and silently rewrites what every call
- * appears to have consumed.
+ * appears to have consumed. The same holds for a polluted `cost`, which is why
+ * this reader is shared rather than reimplemented per field.
  */
-function readOwnNumber(source: unknown, field: string): number | undefined {
+export function readOwnNumber(
+  source: unknown,
+  field: string,
+): number | undefined {
   if (typeof source !== "object" || source === null) {
     return undefined;
   }
@@ -62,7 +80,7 @@ function readOwnNumber(source: unknown, field: string): number | undefined {
 
   const value = (source as Record<string, unknown>)[field];
 
-  return typeof value === "number" ? value : undefined;
+  return typeof value === "number" ? value : Number.NaN;
 }
 
 /**

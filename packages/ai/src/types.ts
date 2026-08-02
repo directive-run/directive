@@ -818,6 +818,16 @@ export interface AgentCompleteEvent extends DebugEventBase {
   totalTokens: number;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Tokens read from the provider's prompt cache.
+   *
+   * Carried alongside input and output because `inputTokens` is only the
+   * *uncached remainder* on a provider that reports cache usage — without
+   * these, a heavily cached run reads on the timeline as a tiny one.
+   */
+  cacheReadTokens?: number;
+  /** Tokens written to the provider's prompt cache. */
+  cacheWriteTokens?: number;
   durationMs: number;
   modelId?: string;
   /** Truncated output text (max 5000 chars) */

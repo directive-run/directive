@@ -44,6 +44,7 @@ import {
   type DebugTimeline,
   createDebugTimeline,
   createDebugTimelinePlugin,
+  timelineTokenCounts,
 } from "./debug-timeline.js";
 import {
   executeAgentWithRetry,
@@ -2398,8 +2399,7 @@ export function createMultiAgentOrchestrator(
           snapshotId: null,
           outputLength: outputStr.length,
           totalTokens: result.totalTokens,
-          inputTokens: result.tokenUsage?.inputTokens ?? 0,
-          outputTokens: result.tokenUsage?.outputTokens ?? 0,
+          ...timelineTokenCounts(result.tokenUsage),
           durationMs: Date.now() - startTime,
           modelId: registration.agent.model ?? undefined,
           output: outputStr.slice(0, MAX_VERBOSE_LENGTH),

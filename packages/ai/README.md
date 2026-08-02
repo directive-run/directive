@@ -20,6 +20,13 @@ AI agent orchestration with guardrails, cost tracking, and multi-agent coordinat
 npm install @directive-run/core @directive-run/ai
 ```
 
+Requires **`@directive-run/core` 1.25.0 or newer**. The cost path imports a
+value from core rather than only a type &ndash; the one function that reconciles
+the two spellings of the cache-write token count &ndash; so an older core
+resolves, installs, and then misprices cached calls at runtime. The peer range
+is `^1.25.0`; if your package manager warns about it, upgrade core rather than
+overriding the range.
+
 Provider adapters are subpath exports &ndash; no extra packages needed.
 
 ## Quick Start
@@ -226,18 +233,33 @@ runner.getSpent("hour");   // rolling hour window; 0 if no hour budget configure
 runner.getSpent("day");    // rolling day window
 runner.getSpent("total");  // lifetime spend for this runner
 runner.getUnpricedCallCount(); // calls charged at the estimate, not at billed usage
+runner.getFailedCallSpend("hour"); // how much of getSpent("hour") was charged for calls that threw
 ```
 
 `getSpent("total")` is priced with the top-level `pricing` when supplied, and
 otherwise with the first budget window's rates &ndash; it returns `0` only when
-neither is configured.
+neither is configured. Every set of rates on one runner must agree: two budgets
+sharing a window, or a top-level `pricing` that prices a call differently from a
+window's, are refused at construction rather than resolved by declaration order.
 
 `getUnpricedCallCount()` is how you find out the ledger is approximate. When a
-runner reports no `tokenUsage`, reports a non-finite or negative token count, or
-reports counts that price out to a non-finite cost, `withBudget` charges the
-pre-call estimate instead of skipping the call, counts it here, and warns once
-per condition. A count that tracks your call count means the runner never
-reports usable usage and every `getSpent` figure is an estimate.
+runner reports no `tokenUsage`, reports a token count that is not a non-negative
+integer, reports zero of every token class, throws, or reports counts that price
+out to a non-finite cost, `withBudget` charges the pre-call estimate instead of
+skipping the call, counts it here, and warns once per condition. A count that
+tracks your call count means the runner never reports usable usage and every
+`getSpent` figure is an estimate.
+
+`getFailedCallSpend(window)` splits that figure. A call that throws reports no
+usage, so the estimate is charged &ndash; right when the provider generated and
+billed the tokens before something downstream rejected them, and an over-charge
+when the call never reached the provider at all. A runner wrapper cannot tell
+those apart, so it charges both and reports the total here: subtract it from
+`getSpent(window)` for spend attributable to calls that returned. A figure
+approaching `getSpent` means a cap is filling up with failures rather than work.
+Calls this runner's own caps blocked are in neither figure, and neither is a
+`BudgetExceededError` raised by a nested `withBudget` &ndash; that one provably
+never reached a provider, so it is charged nothing.
 
 `createConstraintRouter` has the same accessor, for the same reason. A cost fact
 pinned at zero is not a smaller error than an approximate one &ndash; it is the

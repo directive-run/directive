@@ -12,17 +12,15 @@
  * amount together with how it arrived at it. There is no shape that means
  * "nothing to bill here" for the caller to drop on the floor.
  *
- * Two rules hold throughout, and both exist because the same defect kept
- * reappearing in whichever sibling had not been patched yet:
+ * Two rules hold throughout:
  *
  * 1. **Every read of a caller-supplied object goes through {@link readOwn}.**
  *    Grep for it and you have found every untrusted read in the cost path.
  *    There is no bare `source?.[field]` or `usage.x ?? 0` anywhere below.
  * 2. **Untrusted input is snapshotted once, at the boundary, into a value.**
- *    {@link priceCall} takes an already-resolved {@link UsageSnapshot}, not a
- *    raw `tokenUsage`, so a caller that prices the same call against several
- *    sets of rates cannot re-read the provider's object between them. That is a
- *    type error now, not a review note.
+ *    {@link priceCall} takes an already-resolved {@link UsageSnapshot} rather
+ *    than a raw `tokenUsage`, so re-reading the provider's object mid-pricing
+ *    is a type error — see {@link UsageSnapshot} for why that matters.
  *
  * @module
  */
@@ -169,16 +167,23 @@ export interface BareTokenRates {
  * second list of rates to keep in sync. Optional `cacheRead` / `cacheWrite`
  * rates are carried through the same way.
  *
- * The returned table is frozen and has a null prototype: a pricing table read
- * from JSON cannot reroute the table's prototype through an own `__proto__`
- * key, and an entry cannot be swapped for an all-zero one that would silently
- * make a configured cap unreachable.
+ * The returned table **and every entry in it** are frozen and have a null
+ * prototype. Frozen, so an entry cannot be swapped for an all-zero one that
+ * would silently make a configured cap unreachable. Null-prototype, so a
+ * pricing table read from JSON cannot reroute the table's prototype through an
+ * own `__proto__` key — and so a missing cache rate reads as missing.
  *
- * Each entry's rates are read through {@link readOwn}, so a rate inherited from
- * `Object.prototype` is not mistaken for one the table published. Without that,
- * `Object.prototype.cacheRead = 0` gives every entry in every table a zero
- * cache-read rate — a hundred million cached tokens billed at nothing, through
- * the documented JSON-table path — and `cacheWrite = -1` makes every table
+ * That last part is why the entries need it and not just the table.
+ * `estimateCost(tokens, rates.cacheRead)` is the documented way to price cache
+ * tokens, and it reads the field directly rather than through a guard. On a
+ * plain object literal, `Object.prototype.cacheRead = 0` answers that read on
+ * every entry that omits the rate — which is most of them — and bills a hundred
+ * million cached tokens at nothing. The internal path was already gated; the
+ * exported one is the whole point of publishing the table.
+ *
+ * Each entry's rates are also read through {@link readOwn} on the way in, so a
+ * rate inherited from the *input* table's prototype is not mistaken for one the
+ * caller published: `cacheWrite = -1` there would otherwise make every table
  * construction throw.
  *
  * @param table - The bare rates, keyed by the exact model ID the provider accepts.
@@ -204,24 +209,24 @@ export function toTokenPricingTable(
     const cacheRead = readOwn(rates, "cacheRead");
     const cacheWrite = readOwn(rates, "cacheWrite");
 
-    widened[model] = Object.freeze({
-      input,
-      output,
-      inputPerMillion: input,
-      outputPerMillion: output,
-      ...(cacheRead !== undefined
-        ? {
-            cacheRead: cacheRead as number,
-            cacheReadPerMillion: cacheRead as number,
-          }
-        : {}),
-      ...(cacheWrite !== undefined
-        ? {
-            cacheWrite: cacheWrite as number,
-            cacheWritePerMillion: cacheWrite as number,
-          }
-        : {}),
-    });
+    // Built on a null prototype rather than spread into a literal: a literal
+    // inherits from `Object.prototype`, and the omitted cache rates are exactly
+    // the fields a polluted prototype answers for.
+    const entry = Object.create(null) as ModelPricing;
+    entry.input = input;
+    entry.output = output;
+    entry.inputPerMillion = input;
+    entry.outputPerMillion = output;
+    if (cacheRead !== undefined) {
+      entry.cacheRead = cacheRead as number;
+      entry.cacheReadPerMillion = cacheRead as number;
+    }
+    if (cacheWrite !== undefined) {
+      entry.cacheWrite = cacheWrite as number;
+      entry.cacheWritePerMillion = cacheWrite as number;
+    }
+
+    widened[model] = Object.freeze(entry);
   }
 
   const frozen = Object.freeze(widened);
@@ -578,7 +583,7 @@ export function describeUnpricedReason(reason: UnpricedReason): string {
     case "missing-usage":
       return "the runner returned no result.tokenUsage, so there is nothing to price the call from";
     case "unusable-usage":
-      return "result.tokenUsage carried a non-finite or negative token count, and recording it would permanently corrupt the running total";
+      return "result.tokenUsage carried a token count that was not a non-negative integer, and recording it would misprice the call or permanently corrupt the running total";
     case "zero-usage":
       return "result.tokenUsage reported zero input, output, and cache tokens, which no provider bills for a call that ran";
     case "failed-call":
@@ -588,8 +593,19 @@ export function describeUnpricedReason(reason: UnpricedReason): string {
   }
 }
 
+/**
+ * Whether a reported token count is one a ledger can bill.
+ *
+ * A token is a discrete thing, so a real report is a non-negative integer.
+ * {@link Number.isInteger} carries the finiteness check with it and closes two
+ * doors at once: `NaN` and `Infinity`, which permanently corrupt a running
+ * total, and a fractional count, which does something quieter. `5e-324` is
+ * finite, positive, and not zero, so it passed every earlier check — it priced
+ * out to nothing while also defeating the all-zero test that exists to catch
+ * exactly that, leaving a call billed at $0 and labelled `"metered"`.
+ */
 function isUsableCount(count: number | undefined): count is number {
-  return count !== undefined && Number.isFinite(count) && count >= 0;
+  return count !== undefined && Number.isInteger(count) && count >= 0;
 }
 
 /**
@@ -612,9 +628,15 @@ function isUsableCount(count: number | undefined): count is number {
  * each consumer both spellings is what left the metrics surface knowing only
  * one of them.
  *
- * All four token classes are validated, not just input and output: a
- * present-but-poisoned cache count is exactly as destructive as a poisoned
- * input count.
+ * All four token classes are validated identically, and a class that is present
+ * but unusable is never confused with one that is absent. An absent count means
+ * the provider does not report that class, and reads as zero. A count of
+ * `"10000000"`, `NaN`, `-1`, or `0.5` means the provider reported something no
+ * ledger can bill, and sends the whole call down the estimate path. The cache
+ * classes are validated exactly as strictly as input and output — a
+ * cache-read count of `"10000000"` billed as zero is a thirty-dollar call
+ * recorded as a tenth of a cent, which is the same fail-open as a poisoned
+ * input count and was reachable through a field nothing checked.
  *
  * **All-zero is not a price.** A call that ran had a prompt, and a prompt has
  * tokens, so every class reading zero is a report no provider produces — it is

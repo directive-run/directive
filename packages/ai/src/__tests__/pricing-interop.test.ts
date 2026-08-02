@@ -348,6 +348,13 @@ describe("the Anthropic table keys real model IDs", () => {
     "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
     "claude-sonnet-4-0": { input: 3, output: 15 },
     "claude-sonnet-4-20250514": { input: 3, output: 15 },
+    "claude-opus-4-5": { input: 5, output: 25 },
+    "claude-opus-4-5-20251101": { input: 5, output: 25 },
+    // Deprecated with a retirement date set, and kept for the same reason the
+    // retired row below is: reconciling an invoice needs the rates the invoice
+    // was billed at, and those do not become irrelevant on the retirement date.
+    "claude-opus-4-1": { input: 15, output: 75 },
+    "claude-opus-4-1-20250805": { input: 15, output: 75 },
     "claude-opus-4-0": { input: 15, output: 75 },
     "claude-opus-4-20250514": { input: 15, output: 75 },
     // Retired, kept for reconciling historical spend.

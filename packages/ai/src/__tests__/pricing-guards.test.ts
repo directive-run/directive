@@ -20,7 +20,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { estimateCost } from "../agent-utils.js";
 import {
+  BudgetExceededError,
   type ModelPricing,
   type TokenPricing,
   toTokenPricingTable,
@@ -613,6 +615,117 @@ describe("a call that fails after the provider generated it", () => {
     expect(router.facts.errorCount).toBe(1);
     expect(router.getUnpricedCallCount()).toBe(1);
   });
+
+  it("reports the failed-attempt charge separately from real spend", async () => {
+    // Fail-closed is right, but a charge for a call whose outcome is unknown
+    // is not the same fact as a charge for one the provider billed, and the
+    // single `getSpent` figure could not tell them apart. Under retry the
+    // difference compounds: five refused connections filled 90% of a $10 cap
+    // with spend that provably never happened, and nothing said so.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(runnerThrowing(), {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    await expect(runner(AGENT, "hello")).rejects.toThrow();
+    warn.mockRestore();
+
+    expect(runner.getFailedCallSpend("hour")).toBe(runner.getSpent("hour"));
+    expect(runner.getFailedCallSpend("total")).toBe(runner.getSpent("total"));
+    expect(runner.getFailedCallSpend("total")).toBeGreaterThan(0);
+  });
+
+  it("leaves the failed-attempt figure at zero when calls succeed", async () => {
+    const runner = withBudget(runnerReporting(MILLION_EACH), {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    await runner(AGENT, "hello");
+
+    expect(runner.getSpent("total")).toBeCloseTo(MILLION_EACH_COST, 10);
+    expect(runner.getFailedCallSpend("total")).toBe(0);
+    expect(runner.getFailedCallSpend("hour")).toBe(0);
+  });
+
+  it("charges nothing when a nested guard blocked the call before the provider", async () => {
+    // The inner guard throws from its own pre-call check, before it invokes
+    // the runner it wraps, so the provider was never contacted and the call
+    // provably cost nothing. Charging it let a chain of guards bill each other
+    // for calls none of them made — and the phantom charge was indistinguishable
+    // from real spend, so it exhausted a real cap.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const inner = withBudget(runnerReporting(MILLION_EACH), {
+      maxCostPerCall: 0,
+      pricing: PRICING,
+    });
+    const outer = withBudget(inner, {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    await expect(outer(AGENT, "hello")).rejects.toThrow(BudgetExceededError);
+    warn.mockRestore();
+
+    expect(outer.getSpent("total")).toBe(0);
+    expect(outer.getSpent("hour")).toBe(0);
+    expect(outer.getFailedCallSpend("total")).toBe(0);
+    expect(outer.getUnpricedCallCount()).toBe(0);
+  });
+
+  it("createConstraintRouter reports the failed-attempt charge separately", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const router = createConstraintRouter({
+      providers: [{ name: "p", runner: runnerThrowing(), pricing: PRICING }],
+      defaultProvider: "p",
+    });
+
+    await expect(router(AGENT, "hello")).rejects.toThrow();
+    warn.mockRestore();
+
+    expect(router.getFailedCallSpend()).toBe(router.facts.totalCost);
+    expect(router.getFailedCallSpend()).toBeGreaterThan(0);
+  });
+
+  it("createConstraintRouter charges nothing when a nested guard blocked the call", async () => {
+    // The same parity the rest of this file exists to keep: a guard present in
+    // withBudget and absent here is, from the outside, no guard at all. A
+    // totalCost that moves on a call the provider never saw makes a
+    // `facts.totalCost > N` failover fire on spend that never happened.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const blocked = withBudget(runnerReporting(MILLION_EACH), {
+      maxCostPerCall: 0,
+      pricing: PRICING,
+    });
+    const router = createConstraintRouter({
+      providers: [{ name: "p", runner: blocked, pricing: PRICING }],
+      defaultProvider: "p",
+    });
+
+    await expect(router(AGENT, "hello")).rejects.toThrow(BudgetExceededError);
+    warn.mockRestore();
+
+    expect(router.facts.totalCost).toBe(0);
+    expect(router.getFailedCallSpend()).toBe(0);
+    expect(router.getUnpricedCallCount()).toBe(0);
+    // The call still failed, and the routing constraints must be able to see it.
+    expect(router.facts.errorCount).toBe(1);
+  });
+
+  it("createConstraintRouter leaves the failed figure at zero when calls succeed", async () => {
+    const router = createConstraintRouter({
+      providers: [
+        { name: "p", runner: runnerReporting(MILLION_EACH), pricing: PRICING },
+      ],
+      defaultProvider: "p",
+    });
+
+    await router(AGENT, "hello");
+
+    expect(router.facts.totalCost).toBeCloseTo(MILLION_EACH_COST, 10);
+    expect(router.getFailedCallSpend()).toBe(0);
+  });
 });
 
 // ============================================================================
@@ -749,6 +862,109 @@ describe("prototype-supplied token counts", () => {
       ).not.toThrow();
     });
   });
+
+  it("a published entry does not answer a rate off the prototype", () => {
+    // The table was built before the pollution, so the read-time gate on the
+    // way *in* cannot help. This is the documented `estimateCost(tokens,
+    // rates.cacheRead)` path, which reads the field directly rather than
+    // through a guard — the internal path was covered and the exported one,
+    // which is the reason to publish a table at all, was not.
+    const entry = toTokenPricingTable({ m: { input: 3, output: 15 } }).m!;
+
+    withPollutedPrototype("cacheRead", 0, () => {
+      expect(entry.cacheRead).toBeUndefined();
+      expect(estimateCost(100_000_000, entry.cacheRead ?? entry.input)).toBe(
+        300,
+      );
+    });
+  });
+
+  it("a published entry answers no inherited key at all", () => {
+    // Not only the rates: the entry is a null-prototype object, so nothing
+    // reaches it through `Object.prototype` — including a key added long after
+    // the table was built.
+    const entry = toTokenPricingTable({ m: { input: 3, output: 15 } }).m!;
+
+    withPollutedPrototype("cacheWritePerMillion", 0, () => {
+      expect(entry.cacheWritePerMillion).toBeUndefined();
+    });
+  });
+});
+
+// ============================================================================
+// A token count is a non-negative integer, or it is not a count
+// ============================================================================
+
+describe("token counts that are not counts", () => {
+  it("refuses a cache count reported as a string rather than zeroing it", async () => {
+    // The asymmetry this closes: a non-numeric `inputTokens` was already
+    // refused, while a non-numeric `cacheReadTokens` read as absent and
+    // therefore as zero. Ten million cached tokens billed $0.00105 instead of
+    // ~$30, labelled "metered", with the unpriced counter left at zero.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(
+      runnerReporting({
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: "10000000" as unknown as number,
+      }),
+      { pricing: PRICING },
+    );
+
+    await runner(AGENT, "hello");
+    const notices = warn.mock.calls.map((call) => String(call[0]));
+    warn.mockRestore();
+
+    expect(runner.getUnpricedCallCount()).toBe(1);
+    expect(
+      notices.filter((notice) => notice.includes("not a non-negative integer")),
+    ).toHaveLength(1);
+  });
+
+  it("refuses a subnormal count that would otherwise bill nothing", async () => {
+    // `5e-324` is finite, positive, and not zero, so it passed the finiteness
+    // check *and* defeated the all-zero check that exists to catch a call
+    // priced at nothing. Both guards held; the call still billed zero.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(
+      runnerReporting({
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheWriteTokens: 5e-324,
+      }),
+      { pricing: PRICING },
+    );
+
+    await runner(AGENT, "hello");
+    warn.mockRestore();
+
+    expect(runner.getSpent("total")).toBeGreaterThan(0);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("refuses a fractional count", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(
+      runnerReporting({ inputTokens: 100.5, outputTokens: 50 }),
+      { pricing: PRICING },
+    );
+
+    await runner(AGENT, "hello");
+    warn.mockRestore();
+
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("still prices an ordinary whole-token report from usage", async () => {
+    const runner = withBudget(runnerReporting(MILLION_EACH), {
+      pricing: PRICING,
+    });
+
+    await runner(AGENT, "hello");
+
+    expect(runner.getSpent("total")).toBeCloseTo(MILLION_EACH_COST, 10);
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
 });
 
 // ============================================================================
@@ -819,6 +1035,49 @@ describe("budgets sharing a window", () => {
       }),
     ).not.toThrow();
   });
+
+  it("rejects a top-level pricing that disagrees with a window", () => {
+    // The same shape, one field over. `pricing` drives maxCostPerCall and the
+    // lifetime total while the window's rates drive that window's ledger, so
+    // this configuration reported getSpent("hour") of $450 beside a
+    // getSpent("total") of a cent for the same run — and maxCostPerCall
+    // estimated fifteen thousand times low, which is a cap that cannot trip.
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        maxCostPerCall: 1,
+        pricing: { inputPerMillion: 0.001, outputPerMillion: 0.001 },
+        budgets: [
+          {
+            window: "hour",
+            maxCost: 1_000,
+            pricing: { inputPerMillion: 15, outputPerMillion: 75 },
+          },
+        ],
+      }),
+    ).toThrow(/pricing prices a call differently from budgets\["hour"\]/);
+  });
+
+  it("accepts a top-level pricing that matches every window", () => {
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        maxCostPerCall: 1_000,
+        pricing: PRICING,
+        budgets: [
+          { window: "hour", maxCost: 1_000, pricing: { ...PRICING } },
+          { window: "day", maxCost: 10_000, pricing: { ...PRICING } },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("leaves a runner with no window budgets alone", () => {
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        maxCostPerCall: 1,
+        pricing: PRICING,
+      }),
+    ).not.toThrow();
+  });
 });
 
 // ============================================================================
@@ -881,29 +1140,38 @@ describe("requireModelPricing", () => {
 /**
  * Whether a module's source reads the shapes this battery guards.
  *
- * Detection is by *reader*, not by mention of a type name. The earlier scan
- * matched `/\bTokenPricing\b/` alone, which a module typed indirectly — say
- * `Parameters<typeof snapshotTokenPricing>[0]` — never trips, and which says
- * nothing at all about a module that consumes token counts for metrics rather
- * than for money. Both gaps hid a real defect.
+ * **Detection is by data shape, not by helper name.** Matching the guarded
+ * helpers finds every module that already uses them — which is exactly the set
+ * that does not need finding. The surfaces that went unguarded are the ones
+ * that never imported a helper: a metrics counter reading `result.cost` bare,
+ * two orchestrators reading `result.tokenUsage?.inputTokens ?? 0` inline. Both
+ * sat inside modules the helper scan already matched, so the module-level
+ * answer was "covered" while the read next door was not.
+ *
+ * So the field names are the signal: reading `.cost` or `.tokenUsage` or any
+ * token count off an object is the thing that needs a guard, whatever the
+ * module imports. Matched as a property access (`.field`, `?.field`,
+ * `["field"]`) rather than as a bare word, so a local variable or a comment
+ * that happens to say "cost" does not register.
  *
  * Probed by its own tests below: a scanner nobody probes is a scanner that
  * quietly stops matching.
  */
 function readsGuardedShapes(source: string): boolean {
+  // Reading a field that carries money or tokens off some object. This is the
+  // primary detector — the other two are backstops for modules that hold the
+  // shapes without dereferencing them.
+  const FIELD_READS =
+    /(\.|\["|\[')(cost|tokenUsage|inputTokens|outputTokens|cacheReadTokens|cacheCreationTokens|cacheWriteTokens)\b/;
   // Any import of a cost-path helper or type, however it is spelled.
   const HELPERS =
-    /\b(snapshotTokenPricing|snapshotCallUsage|priceCall|estimateCallCost|estimateInputRate|isZeroRated|describeUnpricedReason|requireModelPricing|toTokenPricingTable|normalizeTokenUsage)\b/;
+    /\b(snapshotTokenPricing|snapshotCallUsage|priceCall|estimateCallCost|estimateInputRate|isZeroRated|describeUnpricedReason|requireModelPricing|toTokenPricingTable|normalizeTokenUsage|readOwnNumber)\b/;
   // Any mention of a rate or usage type.
   const SHAPES =
     /\b(TokenPricing|ModelPricing|BareTokenRates|ResolvedPricing|ResolvedUsage|UsageSnapshot|PricedCall|UnpricedReason)\b/;
-  // Any read of the cache token classes, which are where money hides: the
-  // metrics surface knew one spelling of these and not the other.
-  const CACHE_COUNTS =
-    /\b(cacheCreationTokens|cacheWriteTokens|cacheReadTokens)\b/;
 
   return (
-    HELPERS.test(source) || SHAPES.test(source) || CACHE_COUNTS.test(source)
+    FIELD_READS.test(source) || HELPERS.test(source) || SHAPES.test(source)
   );
 }
 
@@ -963,6 +1231,10 @@ describe("pricing surface registry", () => {
       "Publishes a rate table via toTokenPricingTable and forwards the provider's cache counts onto TokenUsage. Both are inputs to the cost path, validated by whichever surface consumes them; the adapter enforces no cap and keeps no ledger.",
     ],
     [
+      "ai:adapters/shared.ts",
+      "Copies a provider response's input/output counts onto TokenUsage while assembling a streaming RunResult. Pure transport, like agent-utils.ts: it moves counts, and the surface that bills them re-reads nothing from here.",
+    ],
+    [
       "ai:adapters/openai.ts",
       "Publishes a rate table via toTokenPricingTable. No cap, no ledger, no metrics.",
     ],
@@ -975,8 +1247,28 @@ describe("pricing surface registry", () => {
       "Publishes an all-zero rate table via toTokenPricingTable — local models bill nothing. No cap, no ledger, no metrics.",
     ],
     [
+      "ai:debug-timeline.ts",
+      "Owns timelineTokenCounts, which resolves a provider usage into the four counts an agent_complete event carries. Like token-usage.ts it is the guard, not a place one could be missing — and it charges nothing, since a timeline reports what happened rather than gating it.",
+    ],
+    [
+      "ai:agent-orchestrator.ts",
+      "Reads token counts for two things, neither of which is money: the debug timeline, via timelineTokenCounts, and a maxTokenBudget cap counted in tokens. It accepts no pricing and keeps no ledger, so there are no rates here to validate and no dollar total to corrupt.",
+    ],
+    [
+      "ai:multi-agent-orchestrator.ts",
+      "Same shape as agent-orchestrator.ts, per agent: timeline counts through timelineTokenCounts and a token-denominated budget. No rates, no ledger, no dollars.",
+    ],
+    [
+      "ai:builtin-guardrails.ts",
+      "Reads facts.agent.tokenUsage, which despite the name is a running token count on the fact store rather than a provider usage object. Compares it to a token budget; never sees rates or dollars.",
+    ],
+    [
+      "ai:testing.ts",
+      "Asserts on the same facts.agent.tokenUsage running count in test helpers. Reads a number that a surface already recorded; records nothing itself.",
+    ],
+    [
       "core:plugins/token-usage.ts",
-      "Owns normalizeTokenUsage, the one function that reconciles the two cache-write spellings. Like pricing.ts, it is the thing being enforced.",
+      "Owns normalizeTokenUsage and readOwnNumber, the one function that reconciles the two cache-write spellings and the one door untrusted numbers arrive through. Like pricing.ts, it is the thing being enforced.",
     ],
     [
       "core:plugins/index.ts",
@@ -1085,6 +1377,57 @@ describe("the surface scanner itself", () => {
     `;
 
     expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("flags a bare cost read that imports no helper at all", () => {
+    // The shape the helper-name scan could not see: no pricing import, no
+    // pricing type, no token field. Just a dollar amount off an object the
+    // caller supplied, added to a cumulative counter.
+    const decoy = `
+      export function track(result: { cost?: number }) {
+        if (result.cost !== undefined) {
+          increment("agent.cost", result.cost);
+        }
+      }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("flags an inline token read that drops the cache classes", () => {
+    // Two live modules read exactly this and reported cached runs as tiny.
+    const decoy = `
+      export function record(result: { tokenUsage?: { inputTokens: number } }) {
+        return { inputTokens: result.tokenUsage?.inputTokens ?? 0 };
+      }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("flags a bracket-notation read the dot-access pattern would miss", () => {
+    const decoy = `
+      export function total(result: Record<string, number>) {
+        return result["cost"] + result['outputTokens'];
+      }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("does not flag a local named for a guarded field", () => {
+    // Matching bare words would flag this, and every module that mentions cost
+    // in a comment — a scan that flags everything is one nobody maintains.
+    const innocent = `
+      export function summarize(items: string[]): string {
+        const cost = items.length;
+        const inputTokens = cost * 2;
+
+        return \`\${cost}/\${inputTokens}\`;
+      }
+    `;
+
+    expect(readsGuardedShapes(innocent)).toBe(false);
   });
 
   it("does not flag a module with nothing to do with cost", () => {

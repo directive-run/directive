@@ -157,3 +157,75 @@ describe("createAgentMetrics token accounting", () => {
     expect(obs.getMetric("agent.tokens.output")).toBeUndefined();
   });
 });
+
+describe("createAgentMetrics cost and tool-call accounting", () => {
+  it("records a reported cost and tool-call count", () => {
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      cost: 1.25,
+      toolCalls: 3,
+    });
+
+    expect(obs.getMetric("agent.cost")?.sum).toBe(1.25);
+    expect(obs.getMetric("agent.tool_calls")?.sum).toBe(3);
+  });
+
+  it("does not bill a cost inherited from the prototype", () => {
+    // `cost` and `toolCalls` sat three lines below the token guard, read bare.
+    // A polluted prototype answered for every run that reported no cost —
+    // which is most of them — summing 1e308 into a counter nothing can undo.
+    Object.defineProperty(Object.prototype, "cost", {
+      value: 1e308,
+      configurable: true,
+      enumerable: false,
+    });
+    try {
+      const obs = makeObservability();
+      const metrics = createAgentMetrics(obs);
+
+      metrics.trackRun("support-agent", {
+        success: true,
+        latencyMs: 100,
+        inputTokens: 100,
+        outputTokens: 50,
+      });
+
+      expect(obs.getMetric("agent.cost")).toBeUndefined();
+    } finally {
+      // biome-ignore lint/performance/noDelete: restoring the prototype is the point
+      delete (Object.prototype as Record<string, unknown>).cost;
+    }
+  });
+
+  it("drops a cost no counter can recover from", () => {
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      cost: Number.NaN,
+      toolCalls: Number.POSITIVE_INFINITY,
+    });
+
+    expect(obs.getMetric("agent.cost")).toBeUndefined();
+    expect(obs.getMetric("agent.tool_calls")).toBeUndefined();
+  });
+
+  it("drops a cost reported as a string rather than reading it as absent", () => {
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      cost: "1.25" as unknown as number,
+    });
+
+    expect(obs.getMetric("agent.cost")).toBeUndefined();
+  });
+});

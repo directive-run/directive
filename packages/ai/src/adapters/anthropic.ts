@@ -51,6 +51,15 @@ import {
  * undated alias. Where both exist, both are listed: a row keyed only by the
  * dated form leaves the caller who passes the alias with no pricing at all, and
  * an extra key costs nothing.
+ *
+ * **What belongs here: every model ID a caller might pass, in every spelling.**
+ * Not the current ones — every one. Missing pricing throws, so an absent row
+ * for a model still being served locks that caller out of budget windows
+ * entirely, and an absent row for a retired one makes last quarter's spend
+ * impossible to reconcile. Rows therefore go in and stay in; a model leaving
+ * the API is a reason to move its row down, not to delete it. Each addition is
+ * checked against the published rates rather than inferred from its neighbours
+ * — a plausible row is worse than no row, because it prices silently.
  */
 const ANTHROPIC_RATES = {
   // ---- Current generation ----
@@ -138,6 +147,34 @@ const ANTHROPIC_RATES = {
     output: 15,
     cacheRead: 0.3,
     cacheWrite: 3.75,
+  },
+  "claude-opus-4-5": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  "claude-opus-4-5-20251101": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  // Deprecated, with a retirement date already set. Kept for the same reason
+  // the retired row below is: a caller reconciling last month's invoice needs
+  // rates the month was billed at, and a row that disappears on the retirement
+  // date takes that ability with it.
+  "claude-opus-4-1": {
+    input: 15,
+    output: 75,
+    cacheRead: 1.5,
+    cacheWrite: 18.75,
+  },
+  "claude-opus-4-1-20250805": {
+    input: 15,
+    output: 75,
+    cacheRead: 1.5,
+    cacheWrite: 18.75,
   },
   "claude-opus-4-0": {
     input: 15,

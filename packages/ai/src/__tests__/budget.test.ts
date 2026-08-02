@@ -637,7 +637,7 @@ describe("withBudget validates result.tokenUsage", () => {
       expect(Number.isFinite(runner.getSpent("hour"))).toBe(true);
       expect(runner.getUnpricedCallCount()).toBe(1);
       expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining("non-finite or negative token count"),
+        expect.stringContaining("not a non-negative integer"),
       );
       warn.mockRestore();
     });
@@ -1528,9 +1528,7 @@ describe("withBudget warns about a runner that reports no usage", () => {
       notices.filter((notice) => notice.includes("no result.tokenUsage")),
     ).toHaveLength(1);
     expect(
-      notices.filter((notice) =>
-        notice.includes("non-finite or negative token count"),
-      ),
+      notices.filter((notice) => notice.includes("not a non-negative integer")),
     ).toHaveLength(1);
   });
 });

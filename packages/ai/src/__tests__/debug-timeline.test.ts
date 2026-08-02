@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import { createAgentOrchestrator } from "../agent-orchestrator.js";
 import {
   createDebugTimeline,
   createDebugTimelinePlugin,
+  timelineTokenCounts,
 } from "../debug-timeline.js";
 import {
   assertTimelineEvents,
@@ -9,7 +11,12 @@ import {
   createTestOrchestrator,
   createTestTimeline,
 } from "../testing.js";
-import type { DebugEvent, DebugEventType } from "../types.js";
+import type {
+  AgentCompleteEvent,
+  AgentRunner,
+  DebugEvent,
+  DebugEventType,
+} from "../types.js";
 
 // ============================================================================
 // Helpers
@@ -1240,5 +1247,111 @@ describe("assertTimelineEvents helper", () => {
     expect(() => assertTimelineEvents(timeline, { minEvents: 10 })).toThrow(
       "Expected at least 10 timeline events, got 2",
     );
+  });
+});
+
+// ============================================================================
+// The timeline reports every token class, not just the two it used to
+// ============================================================================
+
+describe("agent_complete token counts", () => {
+  it("resolves all four classes from a provider usage", () => {
+    expect(
+      timelineTokenCounts({
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 10_000_000,
+        cacheWriteTokens: 2_000,
+      }),
+    ).toEqual({
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 10_000_000,
+      cacheWriteTokens: 2_000,
+    });
+  });
+
+  it("resolves the cache-write count under the wire spelling", () => {
+    // Every shipped adapter emits `cacheCreationTokens`. Reading only the
+    // canonical spelling reported none of them.
+    expect(
+      timelineTokenCounts({
+        inputTokens: 1,
+        outputTokens: 1,
+        cacheCreationTokens: 4_096,
+      }).cacheWriteTokens,
+    ).toBe(4_096);
+  });
+
+  it("reports zero for a class the provider did not send", () => {
+    expect(timelineTokenCounts({ inputTokens: 1, outputTokens: 2 })).toEqual({
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    });
+  });
+
+  it("reports zero rather than rendering a count no ledger would accept", () => {
+    expect(
+      timelineTokenCounts({
+        inputTokens: Number.NaN,
+        outputTokens: -5,
+        cacheReadTokens: "10000000",
+        cacheWriteTokens: 0.5,
+      }),
+    ).toEqual({
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    });
+  });
+
+  it("reports zero for a count inherited from the prototype", () => {
+    Object.defineProperty(Object.prototype, "cacheReadTokens", {
+      value: 1e15,
+      configurable: true,
+      enumerable: false,
+    });
+    try {
+      expect(
+        timelineTokenCounts({ inputTokens: 1, outputTokens: 2 })
+          .cacheReadTokens,
+      ).toBe(0);
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "cacheReadTokens");
+    }
+  });
+
+  it("carries the cache classes onto the orchestrator's agent_complete event", async () => {
+    // The whole point: a heavily cached run reads on the timeline as a tiny
+    // one when only input and output are recorded, because `inputTokens` is
+    // the uncached remainder on a provider that reports cache usage.
+    const runner = (async () => ({
+      output: "ok",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 10_000_150,
+      tokenUsage: {
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheReadTokens: 10_000_000,
+        cacheCreationTokens: 4_096,
+      },
+    })) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({ runner, debug: true });
+    await orchestrator.run({ name: "cached-agent" }, "Hi");
+
+    const complete = orchestrator.timeline
+      ?.getEvents()
+      .find((event) => event.type === "agent_complete") as
+      | AgentCompleteEvent
+      | undefined;
+
+    expect(complete?.inputTokens).toBe(100);
+    expect(complete?.cacheReadTokens).toBe(10_000_000);
+    expect(complete?.cacheWriteTokens).toBe(4_096);
   });
 });

@@ -34,6 +34,7 @@
  * ```
  */
 
+import { BudgetExceededError } from "./budget.js";
 import {
   DEFAULT_CHARS_PER_TOKEN,
   DEFAULT_OUTPUT_MULTIPLIER,
@@ -268,6 +269,8 @@ export function createConstraintRouter(
 
   let unpricedCalls = 0;
   const warnedReasons = new Set<UnpricedReason>();
+  /** The part of `facts.totalCost` charged for calls that threw. */
+  let failedCallSpend = 0;
 
   /**
    * Price one call for the routing facts, and count the ones the provider gave
@@ -419,6 +422,9 @@ export function createConstraintRouter(
     const cost = pricing ? chargeCall(snapshot, pricing, estimate) : 0;
     stats.totalCost += cost;
     facts.totalCost += cost;
+    if (snapshot.kind === "unusable" && snapshot.reason === "failed-call") {
+      failedCallSpend += cost;
+    }
 
     // Update average latency
     totalLatencyMs += latencyMs;
@@ -484,12 +490,20 @@ export function createConstraintRouter(
       const latencyMs = Date.now() - startTime;
       const error = err instanceof Error ? err : new Error(String(err));
 
+      // A nested budget guard blocked the call before it reached the provider,
+      // so this throw is the one whose cost is known, and it is zero. The call
+      // is still an error against the provider — the routing constraints should
+      // see that it failed — but charging it would move `facts.totalCost` on a
+      // call that provably cost nothing, and a cost-threshold failover would
+      // then fire on spend that never happened.
+      const provablyFree = error instanceof BudgetExceededError;
+
       recordCall(
         provider.name,
         latencyMs,
         { kind: "unusable", reason: "failed-call" },
         estimate,
-        provider.pricing,
+        provablyFree ? undefined : provider.pricing,
         error,
       );
 
@@ -526,8 +540,27 @@ export function createConstraintRouter(
     return unpricedCalls;
   }
 
+  /**
+   * How much of `facts.totalCost` was charged for calls that threw.
+   *
+   * The peer of `withBudget`'s accessor of the same name. A throw reports no
+   * usage, so the estimate is charged — right when the provider generated and
+   * billed the tokens before something downstream rejected them, and an
+   * over-charge when the call never reached it. Nothing at this layer can tell
+   * those apart, so both are charged and both are reported here. Subtract it
+   * from `facts.totalCost` for spend attributable to calls that returned.
+   *
+   * A figure approaching `facts.totalCost` means a cost-based failover is about
+   * to fire on failures rather than on work, which is usually the wrong
+   * response to a provider that is down.
+   */
+  function getFailedCallSpend(): number {
+    return failedCallSpend;
+  }
+
   const accessors = routerRunner as unknown as Record<string, unknown>;
   accessors.getUnpricedCallCount = getUnpricedCallCount;
+  accessors.getFailedCallSpend = getFailedCallSpend;
 
   return routerRunner as ConstraintRouterRunner;
 }
@@ -541,4 +574,10 @@ export type ConstraintRouterRunner = AgentRunner & {
    * token count, or a cost that priced out non-finite.
    */
   getUnpricedCallCount(): number;
+  /**
+   * Get how much of `facts.totalCost` was charged for calls that threw, rather
+   * than for calls the provider completed. Subtract it from `facts.totalCost`
+   * for spend attributable to calls that returned.
+   */
+  getFailedCallSpend(): number;
 };

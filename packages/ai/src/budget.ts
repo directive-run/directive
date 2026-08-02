@@ -253,6 +253,16 @@ interface WindowLedger {
   windowMs: number;
   pricing: ResolvedPricing;
   ledger: CostLedger;
+  /**
+   * The subset of `ledger` charged for calls that threw.
+   *
+   * Every entry here is also in `ledger` — this is a second view of the same
+   * spend, not a second charge. It exists because a caller looking at
+   * `getSpent("hour")` cannot otherwise tell money the provider billed from
+   * money charged defensively against a call whose outcome is unknown. See
+   * {@link BudgetRunner.getFailedCallSpend}.
+   */
+  failedLedger: CostLedger;
 }
 
 /** Whether two validated rate sets price every token class identically. */
@@ -381,6 +391,7 @@ export function withBudget(
         windowMs,
         pricing: budgetPricing,
         ledger: new CostLedger(),
+        failedLedger: new CostLedger(),
       };
       windowLedgers.set(window, shared);
     } else if (!sameRates(shared.pricing, budgetPricing)) {
@@ -398,6 +409,25 @@ export function withBudget(
 
     return { window, maxCost, windowMs, pricing: budgetPricing, shared };
   });
+
+  // The top-level `pricing` is one more set of rates for the same call, so it
+  // is held to the same rule as two budgets sharing a window: one call cannot
+  // cost two amounts. It prices `maxCostPerCall` and the lifetime total while
+  // the window rates price the window ledgers, and when the two disagree the
+  // two figures describe different runs. `pricing` at $0.001/M against an
+  // hourly budget at $15/$75 reported `getSpent("hour")` of $450 beside a
+  // `getSpent("total")` of one cent, and left `maxCostPerCall` estimating
+  // fifteen thousand times low — a cap that cannot trip, on a runner that was
+  // configured to have one.
+  if (callPricing) {
+    for (const shared of windowLedgers.values()) {
+      if (!sameRates(callPricing, shared.pricing)) {
+        throw new Error(
+          `[Directive] ${API}: pricing prices a call differently from budgets[${JSON.stringify(shared.window)}].pricing (${describeRates(callPricing)} vs ${describeRates(shared.pricing)}). Both price the same call — the top-level rates drive maxCostPerCall and getSpent("total"), the window's drive that window's cap — so a disagreement makes the two report different spend for the same run. Give every set of rates on one runner the same values, or drop the one you did not mean to configure.`,
+        );
+      }
+    }
+  }
 
   // A cap that no number of tokens can reach is not a cap. Zero rates are
   // legitimate for local models, but pairing them with a non-zero cap always
@@ -428,6 +458,8 @@ export function withBudget(
   // grow without bound for the life of the runner.
   const totalPricing = callPricing ?? plans[0]?.pricing;
   let totalSpent = 0;
+  /** The part of `totalSpent` charged for calls that threw. */
+  let totalFailedSpent = 0;
   let unpricedCalls = 0;
   const warnedReasons = new Set<UnpricedReason>();
 
@@ -528,13 +560,17 @@ export function withBudget(
     /**
      * Reconcile one completed attempt against every cap, and record it.
      *
-     * Takes a {@link UsageSnapshot}, never a result: the usage is read once, at
+     * Takes a {@link UsageSnapshot}, never a result: the usage is read once at
      * the boundary below, and this function prices that *value* against each
-     * window's rates and again for the lifetime total. Handing it the result
-     * instead would put N+1 reads of a provider-owned object on the hot path,
-     * and a `tokenUsage` backed by getters answers each one differently.
+     * window's rates and again for the lifetime total.
      */
     function reconcile(snapshot: UsageSnapshot): void {
+      // A charge for a call that threw goes into the window's failed ledger as
+      // well as its main one — same money, recorded twice for two different
+      // questions. See `getFailedCallSpend`.
+      const isFailedCall =
+        snapshot.kind === "unusable" && snapshot.reason === "failed-call";
+
       // `tokenUsage` is optional, and plenty of runners never populate it. Left
       // uncounted, such a runner reads as $0 spent forever while real money
       // goes out, and every window budget is silently inert. `priceCall`
@@ -558,6 +594,9 @@ export function withBudget(
         }
         billedByWindow.set(shared.window, priced.cost);
         shared.ledger.record(priced.cost);
+        if (isFailedCall) {
+          shared.failedLedger.record(priced.cost);
+        }
       }
 
       // The pre-call check gates an *estimate*, against a window cap as much as
@@ -588,6 +627,9 @@ export function withBudget(
           estimatedReason ??= priced.reason;
         }
         totalSpent += priced.cost;
+        if (isFailedCall) {
+          totalFailedSpent += priced.cost;
+        }
 
         // Same reasoning as the window overruns above, for the per-call cap.
         if (
@@ -617,14 +659,31 @@ export function withBudget(
     try {
       result = await runner<T>(agent, input, options);
     } catch (error) {
-      // A throw is not a refund. Plenty of runners fail *after* the provider
-      // has generated and billed the tokens — a structured-output parse that
-      // rejects the completion, an output guardrail that blocks it, a
-      // post-stream validation. Dropping the cost there meant every retry under
-      // `withRetry` burned real money that no window ledger and no lifetime
-      // total ever saw, and the caller's first evidence was the invoice. The
-      // estimate is charged and counted before the error propagates; over-
-      // estimating is the safe direction for a spend guard.
+      // A nested budget guard blocked the call before it reached the provider.
+      // This is the one throw whose cost is *known*, and it is zero: the inner
+      // `withBudget` raises this from its own pre-call check, before it invokes
+      // the runner it wraps. Charging it would let a chain of guards bill each
+      // other for calls none of them made.
+      if (error instanceof BudgetExceededError) {
+        throw error;
+      }
+
+      // Every other throw is charged the estimate, because the alternative is
+      // worse. Plenty of runners fail *after* the provider has generated and
+      // billed the tokens — a structured-output parse that rejects the
+      // completion, an output guardrail that blocks it, a post-stream
+      // validation. Dropping the cost there meant every retry under `withRetry`
+      // burned real money that no ledger ever saw, and the caller's first
+      // evidence was the invoice.
+      //
+      // Nothing at this layer can tell those from a throw that never reached
+      // the provider: an `ECONNREFUSED` and a rejected completion arrive as the
+      // same opaque `Error` from the same opaque function. So the charge stands
+      // — over-estimating is the safe direction for a spend guard — but it is
+      // also recorded separately, and `getFailedCallSpend` reports it. An
+      // operator watching a cap fill up can then see how much of it is money
+      // the provider billed and how much is this guard being careful, which is
+      // the question the single figure could not answer.
       reconcile({ kind: "unusable", reason: "failed-call" });
 
       throw error;
@@ -647,6 +706,9 @@ export function withBudget(
    * returns `0` only when neither was configured, since there is then no rate
    * to price a call with.
    *
+   * Includes the estimate charged for calls that threw — see
+   * {@link BudgetRunner.getFailedCallSpend} to separate that out.
+   *
    * @example
    * ```typescript
    * const runner = withBudget(baseRunner, { budgets: [{ window: "hour", maxCost: 10, pricing }] });
@@ -668,15 +730,49 @@ export function withBudget(
   }
 
   /**
+   * How much of what {@link getSpent} reports was charged for calls that threw.
+   *
+   * Read alongside `getSpent`, never instead of it: `getSpent("hour")` is what
+   * the cap gates on, and this says how much of that figure is defensive. A
+   * throw carries no usage, so the pre-call estimate is charged — right when
+   * the provider generated and billed the tokens before something downstream
+   * rejected them, and wrong when the call never left the process. Both look
+   * identical from here, so both are charged and both are counted here.
+   *
+   * A figure that approaches `getSpent` means the cap is being consumed by
+   * failures rather than by work: a wrong base URL, a provider outage, or a
+   * guardrail rejecting every input. That is worth alerting on, and it used to
+   * be indistinguishable from a runner spending real money.
+   *
+   * Windows use the same rolling cutoff and the same rates as `getSpent`, so
+   * `getSpent(w) - getFailedCallSpend(w)` is spend attributable to calls that
+   * returned. Calls blocked by this runner's own caps are in neither figure —
+   * they never ran.
+   */
+  function getFailedCallSpend(window: "hour" | "day" | "total"): number {
+    if (window === "total") {
+      return totalFailedSpent;
+    }
+
+    const shared = windowLedgers.get(window);
+    if (!shared) {
+      return 0;
+    }
+
+    return shared.failedLedger.getCostInWindow(shared.windowMs);
+  }
+
+  /**
    * How many calls were charged at the pre-call estimate rather than at what
    * the provider billed.
    *
-   * Three conditions land here: the result carried no `tokenUsage`, it carried
-   * a non-finite or negative count, or the counts and rates were both valid but
-   * priced out to a non-finite cost. A non-zero count means the ledger is
-   * approximate for that many calls. A count that tracks the call count means
-   * the runner never reports usable usage at all, and every figure `getSpent`
-   * returns is an estimate.
+   * The result carried no `tokenUsage`, it carried a count that was not a
+   * non-negative integer, it reported zero of every token class, the call
+   * threw, or the counts and rates were both valid but priced out to a
+   * non-finite cost. A non-zero count means the ledger is approximate for that
+   * many calls. A count that tracks the call count means the runner never
+   * reports usable usage at all, and every figure `getSpent` returns is an
+   * estimate.
    */
   function getUnpricedCallCount(): number {
     return unpricedCalls;
@@ -685,6 +781,7 @@ export function withBudget(
   // Attach the accessors as direct properties for type-safe access without casting
   const accessors = budgetRunner as unknown as Record<string, unknown>;
   accessors.getSpent = getSpent;
+  accessors.getFailedCallSpend = getFailedCallSpend;
   accessors.getUnpricedCallCount = getUnpricedCallCount;
 
   return budgetRunner as unknown as BudgetRunner;
@@ -697,9 +794,21 @@ export type BudgetRunner = AgentRunner & {
    */
   getSpent(window: "hour" | "day" | "total"): number;
   /**
+   * Get how much of {@link BudgetRunner.getSpent}'s figure was charged for
+   * calls that threw, rather than for calls the provider completed.
+   *
+   * A throw reports no usage, so the pre-call estimate is charged against every
+   * cap — correct when the provider had already billed the tokens, and an
+   * over-charge when the call never reached it. The two are indistinguishable
+   * to a runner wrapper, so both are charged and both are reported here.
+   * Subtract it from `getSpent` for spend attributable to calls that returned.
+   */
+  getFailedCallSpend(window: "hour" | "day" | "total"): number;
+  /**
    * Get the number of calls whose spend was charged at the pre-call estimate
-   * rather than at what the provider billed — no `tokenUsage`, an unusable
-   * token count, or a cost that priced out non-finite.
+   * rather than at what the provider billed — no `tokenUsage`, a count that was
+   * not a non-negative integer, an all-zero report, a throw, or a cost that
+   * priced out non-finite.
    */
   getUnpricedCallCount(): number;
 };

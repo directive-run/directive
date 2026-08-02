@@ -57,6 +57,7 @@ import {
   type DebugTimeline,
   createDebugTimeline,
   createDebugTimelinePlugin,
+  timelineTokenCounts,
 } from "./debug-timeline.js";
 
 import {
@@ -1546,8 +1547,7 @@ export function createAgentOrchestrator<
         snapshotId: null,
         outputLength: outputStr?.length ?? 0,
         totalTokens: result.totalTokens,
-        inputTokens: result.tokenUsage?.inputTokens ?? 0,
-        outputTokens: result.tokenUsage?.outputTokens ?? 0,
+        ...timelineTokenCounts(result.tokenUsage),
         durationMs: Date.now() - startTime,
         modelId: agent.model ?? undefined,
         output: outputStr.slice(0, MAX_VERBOSE_LENGTH),

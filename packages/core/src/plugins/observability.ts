@@ -34,7 +34,7 @@
  * ```
  */
 
-import { normalizeTokenUsage } from "./token-usage.js";
+import { normalizeTokenUsage, readOwnNumber } from "./token-usage.js";
 
 // ============================================================================
 // Types
@@ -858,13 +858,25 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
       // whole cached prefix with nothing to indicate it.
       const tokens = normalizeTokenUsage(result);
 
-      /** Counters are cumulative: one poisoned addend is permanent. */
-      function countTokens(metric: string, count: number | undefined): void {
-        if (count === undefined || !Number.isFinite(count) || count < 0) {
+      /**
+       * Add one caller-supplied amount to a cumulative counter, or drop it.
+       *
+       * Counters are cumulative, so one poisoned addend is permanent: a `NaN`
+       * turns every later reading of that counter into `NaN`, and an
+       * `Infinity` pins it there for the life of the process. Neither can be
+       * subtracted back out.
+       */
+      function addToCounter(metric: string, amount: number | undefined): void {
+        if (amount === undefined || !Number.isFinite(amount) || amount < 0) {
           return;
         }
-        obs.incrementCounter(metric, labels, count);
-        obs.incrementCounter("agent.tokens", labels, count);
+        obs.incrementCounter(metric, labels, amount);
+      }
+
+      /** Token classes also roll up into the combined `agent.tokens` counter. */
+      function countTokens(metric: string, count: number | undefined): void {
+        addToCounter(metric, count);
+        addToCounter("agent.tokens", count);
       }
 
       countTokens("agent.tokens.input", tokens.inputTokens);
@@ -878,13 +890,14 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
       countTokens("agent.tokens.cache_read", tokens.cacheReadTokens);
       countTokens("agent.tokens.cache_write", tokens.cacheWriteTokens);
 
-      if (result.cost !== undefined) {
-        obs.incrementCounter("agent.cost", labels, result.cost);
-      }
-
-      if (result.toolCalls !== undefined) {
-        obs.incrementCounter("agent.tool_calls", labels, result.toolCalls);
-      }
+      // `cost` and `toolCalls` are read through the same own-property-gated
+      // reader as the token counts, and validated the same way. They sat three
+      // lines below the token guard reading `result.cost` bare, which is how a
+      // polluted `Object.prototype.cost` came to sum `1e308` into `agent.cost`
+      // on a call that reported no cost at all, and a `NaN` came to make the
+      // aggregate unreadable for the life of the process.
+      addToCounter("agent.cost", readOwnNumber(result, "cost"));
+      addToCounter("agent.tool_calls", readOwnNumber(result, "toolCalls"));
     },
 
     trackGuardrail(
