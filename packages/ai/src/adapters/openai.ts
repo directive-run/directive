@@ -82,8 +82,10 @@ const OPENAI_RATES = {
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://openai.com/pricing
  */
-export const OPENAI_PRICING: Record<string, ModelPricing> =
-  toTokenPricingTable(OPENAI_RATES);
+export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
+  OPENAI_RATES,
+  "OPENAI_PRICING",
+);
 
 /**
  * Alias for {@link OPENAI_PRICING} — the same object, not a copy.

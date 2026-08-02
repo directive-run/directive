@@ -45,9 +45,89 @@ import {
  * Keys are the exact model IDs the Messages API accepts. A key that is close to
  * a real ID but not equal to one is worse than an absent row: the caller who
  * passes the *correct* ID gets `undefined` back and prices their run at nothing.
+ *
+ * Current-generation IDs carry no date suffix — `claude-opus-5`,
+ * `claude-sonnet-5` — while some older models have both a dated ID and an
+ * undated alias. Where both exist, both are listed: a row keyed only by the
+ * dated form leaves the caller who passes the alias with no pricing at all, and
+ * an extra key costs nothing.
  */
 const ANTHROPIC_RATES = {
+  // ---- Current generation ----
+  "claude-fable-5": {
+    input: 10,
+    output: 50,
+    cacheRead: 1,
+    cacheWrite: 12.5,
+  },
+  "claude-opus-5": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  "claude-opus-4-8": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  "claude-opus-4-7": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  "claude-opus-4-6": {
+    input: 5,
+    output: 25,
+    cacheRead: 0.5,
+    cacheWrite: 6.25,
+  },
+  // List price. Sonnet 5 carries promotional introductory rates ($2/$10 per
+  // million) that expire; a budget priced at the promotion under-reads the
+  // moment it lapses, and a spend guard that reads low is a spend guard that
+  // does not gate. Over-estimating is the safe direction here.
+  "claude-sonnet-5": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-sonnet-4-6": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-haiku-4-5": {
+    input: 1,
+    output: 5,
+    cacheRead: 0.1,
+    cacheWrite: 1.25,
+  },
+  // Haiku 4.5 is the one current model whose ID has a dated form as well.
+  "claude-haiku-4-5-20251001": {
+    input: 1,
+    output: 5,
+    cacheRead: 0.1,
+    cacheWrite: 1.25,
+  },
+
+  // ---- Previous generation, still served ----
+  "claude-sonnet-4-5": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
   "claude-sonnet-4-5-20250929": {
+    input: 3,
+    output: 15,
+    cacheRead: 0.3,
+    cacheWrite: 3.75,
+  },
+  "claude-sonnet-4-0": {
     input: 3,
     output: 15,
     cacheRead: 0.3,
@@ -59,24 +139,25 @@ const ANTHROPIC_RATES = {
     cacheRead: 0.3,
     cacheWrite: 3.75,
   },
-  "claude-haiku-4-5-20251001": {
-    input: 1,
-    output: 5,
-    cacheRead: 0.1,
-    cacheWrite: 1.25,
-  },
-  // Retired; kept for reconciling historical spend.
-  "claude-3-5-haiku-20241022": {
-    input: 0.8,
-    output: 4,
-    cacheRead: 0.08,
-    cacheWrite: 1,
+  "claude-opus-4-0": {
+    input: 15,
+    output: 75,
+    cacheRead: 1.5,
+    cacheWrite: 18.75,
   },
   "claude-opus-4-20250514": {
     input: 15,
     output: 75,
     cacheRead: 1.5,
     cacheWrite: 18.75,
+  },
+
+  // ---- Retired; kept for reconciling historical spend ----
+  "claude-3-5-haiku-20241022": {
+    input: 0.8,
+    output: 4,
+    cacheRead: 0.08,
+    cacheWrite: 1,
   },
 };
 
@@ -120,7 +201,7 @@ const ANTHROPIC_RATES = {
  * and may not reflect the latest rates. Always verify at https://anthropic.com/pricing
  */
 export const ANTHROPIC_PRICING: Record<string, ModelPricing> =
-  toTokenPricingTable(ANTHROPIC_RATES);
+  toTokenPricingTable(ANTHROPIC_RATES, "ANTHROPIC_PRICING");
 
 /**
  * Alias for {@link ANTHROPIC_PRICING} — the same object, not a copy.

@@ -84,8 +84,10 @@ const OLLAMA_RATES = {
  * });
  * ```
  */
-export const OLLAMA_PRICING: Record<string, ModelPricing> =
-  toTokenPricingTable(OLLAMA_RATES);
+export const OLLAMA_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
+  OLLAMA_RATES,
+  "OLLAMA_PRICING",
+);
 
 /**
  * Alias for {@link OLLAMA_PRICING} — the same object, not a copy.

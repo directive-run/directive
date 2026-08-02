@@ -20,8 +20,18 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { type TokenPricing, withBudget } from "../budget.js";
-import type { PricedCall } from "../pricing.js";
+import {
+  type ModelPricing,
+  type TokenPricing,
+  toTokenPricingTable,
+  withBudget,
+} from "../budget.js";
+import {
+  type PricedCall,
+  priceCall,
+  requireModelPricing,
+  snapshotTokenPricing,
+} from "../pricing.js";
 import { createConstraintRouter } from "../provider-routing.js";
 import type { AgentRunner, RunResult, TokenUsage } from "../types.js";
 
@@ -45,6 +55,13 @@ function runnerReporting(tokenUsage?: TokenUsage): AgentRunner {
       ...(tokenUsage ? { tokenUsage } : {}),
     }),
   ) as unknown as AgentRunner;
+}
+
+/** A runner that fails after the provider has already generated the tokens. */
+function runnerThrowing(): AgentRunner {
+  return vi.fn(async (): Promise<RunResult> => {
+    throw new Error("structured output did not parse");
+  }) as unknown as AgentRunner;
 }
 
 /** One surface, built and ready to run a call. */
@@ -430,6 +447,175 @@ for (const surface of SURFACES) {
 }
 
 // ============================================================================
+// Untrusted input is snapshotted once, not re-read per cap
+// ============================================================================
+
+describe("reading result.tokenUsage", () => {
+  /** A usage object whose counts change on every read. */
+  function shiftingUsage(): { usage: TokenUsage; reads: () => number } {
+    let reads = 0;
+    const counting = (first: number, rest: number) => ({
+      get: () => {
+        reads++;
+
+        return reads <= 2 ? first : rest;
+      },
+      enumerable: true,
+    });
+
+    return {
+      usage: Object.defineProperties(
+        {},
+        {
+          inputTokens: counting(1_000_000, 0),
+          outputTokens: counting(1_000_000, 0),
+        },
+      ) as TokenUsage,
+      reads: () => reads,
+    };
+  }
+
+  it("reads the provider's usage once per call, not once per cap", async () => {
+    // withBudget prices one call against every window ledger and again for the
+    // lifetime total. When each of those read result.tokenUsage itself, a usage
+    // backed by getters answered each one differently and every answer looked
+    // metered: one recorded run read $0 against an hourly cap while the
+    // lifetime total read $1800, with no warning and the unpriced counter at 0.
+    const { usage, reads } = shiftingUsage();
+    const runner = withBudget(runnerReporting(usage), {
+      pricing: PRICING,
+      budgets: [
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+        { window: "day", maxCost: 1_000_000, pricing: PRICING },
+      ],
+    });
+
+    await runner(AGENT, "hello");
+
+    // Two counts, one read each — not one read per ledger plus one for total.
+    expect(reads()).toBe(2);
+  });
+
+  it("bills every cap the same figure for one call", async () => {
+    const { usage } = shiftingUsage();
+    const runner = withBudget(runnerReporting(usage), {
+      pricing: PRICING,
+      budgets: [
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+        { window: "day", maxCost: 1_000_000, pricing: PRICING },
+      ],
+    });
+
+    await runner(AGENT, "hello");
+
+    const hour = runner.getSpent("hour");
+    expect(runner.getSpent("day")).toBeCloseTo(hour, 10);
+    expect(runner.getSpent("total")).toBeCloseTo(hour, 10);
+    expect(hour).toBeCloseTo(MILLION_EACH_COST, 10);
+  });
+
+  it("does not accept a raw tokenUsage where a snapshot is required", () => {
+    // The type is the guard. A caller cannot hand priceCall the provider's
+    // object, so there is no second read site for one to exist in.
+    const rates = snapshotTokenPricing(PRICING, "pricing", "test");
+
+    // @ts-expect-error - priceCall takes a UsageSnapshot, never a TokenUsage.
+    const misuse = () => priceCall(MILLION_EACH, rates, 0);
+
+    expect(typeof misuse).toBe("function");
+  });
+});
+
+// ============================================================================
+// An all-zero metered report is not a price
+// ============================================================================
+
+describe("a call that reports zero of everything", () => {
+  const ALL_ZERO: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+
+  for (const surface of SURFACES) {
+    it(`${surface.name}: charges the estimate rather than nothing`, async () => {
+      // A call that ran had a prompt, and a prompt has tokens. Every class at
+      // zero is a gateway that dropped the usage block or an adapter defaulting
+      // an absent field to 0 — the original fail-open through another door.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const built = surface.build(PRICING, runnerReporting(ALL_ZERO));
+
+      const spent = await built.run();
+      warn.mockRestore();
+
+      expect(spent).toBeGreaterThan(0);
+      expect(built.unpricedCalls()).toBe(1);
+    });
+
+    it(`${surface.name}: says so, once`, async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const built = surface.build(PRICING, runnerReporting(ALL_ZERO));
+
+      await built.run();
+      await built.run();
+
+      const notices = warn.mock.calls.filter((call) =>
+        String(call[0]).includes("zero input, output, and cache tokens"),
+      );
+      warn.mockRestore();
+
+      expect(notices).toHaveLength(1);
+    });
+  }
+
+  it("leaves a genuinely free local model at zero", async () => {
+    // Zero rates are the local-model case and must stay costless. The estimate
+    // that stands in is computed at those same rates, so it is also zero.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(runnerReporting(ALL_ZERO), {
+      pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+    });
+
+    await runner(AGENT, "hello");
+    warn.mockRestore();
+
+    expect(runner.getSpent("total")).toBe(0);
+  });
+});
+
+// ============================================================================
+// A runner that throws has often already been billed
+// ============================================================================
+
+describe("a call that fails after the provider generated it", () => {
+  it("withBudget charges failed attempts to every window and the total", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(runnerThrowing(), {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    await expect(runner(AGENT, "hello")).rejects.toThrow();
+    warn.mockRestore();
+
+    expect(runner.getSpent("hour")).toBeGreaterThan(0);
+    expect(runner.getSpent("total")).toBeGreaterThan(0);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("createConstraintRouter charges failed attempts to facts.totalCost", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const router = createConstraintRouter({
+      providers: [{ name: "p", runner: runnerThrowing(), pricing: PRICING }],
+      defaultProvider: "p",
+    });
+
+    await expect(router(AGENT, "hello")).rejects.toThrow();
+    warn.mockRestore();
+
+    expect(router.facts.totalCost).toBeGreaterThan(0);
+    expect(router.facts.errorCount).toBe(1);
+    expect(router.getUnpricedCallCount()).toBe(1);
+  });
+});
+
+// ============================================================================
 // Rates inherited from the prototype are not rates the caller supplied
 // ============================================================================
 
@@ -479,50 +665,436 @@ describe("prototype-supplied rates", () => {
 });
 
 // ============================================================================
+// Counts inherited from the prototype are not counts the provider reported
+// ============================================================================
+
+describe("prototype-supplied token counts", () => {
+  function withPollutedPrototype(
+    field: string,
+    value: number,
+    body: () => void,
+  ): void {
+    Object.defineProperty(Object.prototype, field, {
+      value,
+      configurable: true,
+      writable: true,
+      enumerable: false,
+    });
+    try {
+      body();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, field);
+    }
+  }
+
+  for (const surface of SURFACES) {
+    it(`${surface.name}: an inherited NaN cache-write count does not downgrade a metered call`, async () => {
+      // Every usage object that omits a cache-write count is reachable this
+      // way. Ungated, one polluted key turned every metered call into the
+      // estimate: an $180 call billed at a cent, uniformly, silently.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      let built: BuiltSurface | undefined;
+      withPollutedPrototype("cacheWriteTokens", Number.NaN, () => {
+        built = surface.build(PRICING, runnerReporting(MILLION_EACH));
+      });
+
+      const spent = await built!.run();
+      warn.mockRestore();
+
+      expect(spent).toBeCloseTo(MILLION_EACH_COST, 10);
+      expect(built!.unpricedCalls()).toBe(0);
+    });
+
+    it(`${surface.name}: an inherited cache-read count does not inflate the bill`, async () => {
+      // The mirror of the same hole: a large inherited count bills every call
+      // for tokens nobody consumed, and every configured cap trips at once.
+      let built: BuiltSurface | undefined;
+      withPollutedPrototype("cacheReadTokens", 1e15, () => {
+        built = surface.build(PRICING, runnerReporting(MILLION_EACH));
+      });
+
+      expect(await built!.run()).toBeCloseTo(MILLION_EACH_COST, 10);
+    });
+  }
+
+  it("an inherited cacheRead rate does not zero a published table", async () => {
+    // The documented JSON-table path. Ungated, `Object.prototype.cacheRead = 0`
+    // gave every entry in every published table a zero cache-read rate, and a
+    // hundred million cached tokens billed nothing.
+    let table: Record<string, ModelPricing> | undefined;
+    withPollutedPrototype("cacheRead", 0, () => {
+      table = toTokenPricingTable({ m: { input: 3, output: 15 } });
+    });
+
+    const runner = withBudget(
+      runnerReporting({
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 100_000_000,
+      }),
+      { pricing: table!.m },
+    );
+    await runner(AGENT, "hello");
+
+    // Absent means "same as input" — conservative, and never free.
+    expect(runner.getSpent("total")).toBeCloseTo(300, 10);
+  });
+
+  it("an inherited cacheWrite rate does not brick table construction", () => {
+    withPollutedPrototype("cacheWrite", -1, () => {
+      const table = toTokenPricingTable({ m: { input: 3, output: 15 } });
+
+      expect(() =>
+        withBudget(runnerReporting(), { pricing: table.m }),
+      ).not.toThrow();
+    });
+  });
+});
+
+// ============================================================================
+// Budgets that share a window must agree on what a call costs
+// ============================================================================
+
+describe("budgets sharing a window", () => {
+  it("rejects two budgets on one window with different rates", () => {
+    // One ledger, one price. Recorded at the first budget's rates, fifty calls
+    // costing $4,500 read as ten cents against a $100 cap that never tripped.
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        budgets: [
+          {
+            window: "hour",
+            maxCost: 1_000_000,
+            pricing: { inputPerMillion: 0.001, outputPerMillion: 0.001 },
+          },
+          {
+            window: "hour",
+            maxCost: 100,
+            pricing: { inputPerMillion: 15, outputPerMillion: 75 },
+          },
+        ],
+      }),
+    ).toThrow(/shares the "hour" window .* prices it differently/s);
+  });
+
+  it("accepts two budgets on one window at identical rates", () => {
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        budgets: [
+          { window: "hour", maxCost: 1_000, pricing: PRICING },
+          { window: "hour", maxCost: 100, pricing: { ...PRICING } },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("treats a differing cache rate as differing rates", () => {
+    // The cache rates price real tokens. Two budgets that agree on input and
+    // output but not on cache reads still record two different figures.
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        budgets: [
+          { window: "day", maxCost: 1_000, pricing: PRICING },
+          {
+            window: "day",
+            maxCost: 100,
+            pricing: { ...PRICING, cacheReadPerMillion: 0.3 },
+          },
+        ],
+      }),
+    ).toThrow(/\[Directive\]/);
+  });
+
+  it("leaves budgets on different windows alone", () => {
+    expect(() =>
+      withBudget(runnerReporting(MILLION_EACH), {
+        budgets: [
+          { window: "hour", maxCost: 100, pricing: PRICING },
+          {
+            window: "day",
+            maxCost: 1_000,
+            pricing: { inputPerMillion: 15, outputPerMillion: 75 },
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+});
+
+// ============================================================================
+// A model with no row fails at the lookup, naming the model
+// ============================================================================
+
+describe("requireModelPricing", () => {
+  const TABLE = toTokenPricingTable(
+    { "known-model": { input: 3, output: 15 } },
+    "TEST_PRICING",
+  );
+
+  it("returns the row when there is one", () => {
+    expect(requireModelPricing(TABLE, "known-model").inputPerMillion).toBe(3);
+  });
+
+  it("names the model, the table, and what is in it", () => {
+    // `TABLE["missing"]` is `undefined`, and undefined pricing surfaced much
+    // later as a complaint about a missing rate — naming the field but not the
+    // model, the table, or the actual mistake.
+    expect(() => requireModelPricing(TABLE, "missing-model")).toThrow(
+      /"missing-model".*TEST_PRICING.*known-model/s,
+    );
+  });
+
+  it("does not answer from the prototype", () => {
+    Object.defineProperty(Object.prototype, "ghost-model", {
+      value: { inputPerMillion: 0, outputPerMillion: 0 },
+      configurable: true,
+      enumerable: false,
+    });
+    try {
+      expect(() => requireModelPricing(TABLE, "ghost-model")).toThrow(
+        /\[Directive\]/,
+      );
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "ghost-model");
+    }
+  });
+
+  it("still fails usefully when pricing is threaded through as undefined", () => {
+    expect(() =>
+      withBudget(runnerReporting(), {
+        budgets: [
+          {
+            window: "hour",
+            maxCost: 10,
+            pricing: undefined as unknown as TokenPricing,
+          },
+        ],
+      }),
+    ).toThrow(/requireModelPricing/);
+  });
+});
+
+// ============================================================================
 // The registry is enforced, not remembered
 // ============================================================================
 
+/**
+ * Whether a module's source reads the shapes this battery guards.
+ *
+ * Detection is by *reader*, not by mention of a type name. The earlier scan
+ * matched `/\bTokenPricing\b/` alone, which a module typed indirectly — say
+ * `Parameters<typeof snapshotTokenPricing>[0]` — never trips, and which says
+ * nothing at all about a module that consumes token counts for metrics rather
+ * than for money. Both gaps hid a real defect.
+ *
+ * Probed by its own tests below: a scanner nobody probes is a scanner that
+ * quietly stops matching.
+ */
+function readsGuardedShapes(source: string): boolean {
+  // Any import of a cost-path helper or type, however it is spelled.
+  const HELPERS =
+    /\b(snapshotTokenPricing|snapshotCallUsage|priceCall|estimateCallCost|estimateInputRate|isZeroRated|describeUnpricedReason|requireModelPricing|toTokenPricingTable|normalizeTokenUsage)\b/;
+  // Any mention of a rate or usage type.
+  const SHAPES =
+    /\b(TokenPricing|ModelPricing|BareTokenRates|ResolvedPricing|ResolvedUsage|UsageSnapshot|PricedCall|UnpricedReason)\b/;
+  // Any read of the cache token classes, which are where money hides: the
+  // metrics surface knew one spelling of these and not the other.
+  const CACHE_COUNTS =
+    /\b(cacheCreationTokens|cacheWriteTokens|cacheReadTokens)\b/;
+
+  return (
+    HELPERS.test(source) || SHAPES.test(source) || CACHE_COUNTS.test(source)
+  );
+}
+
+/** Every `.ts` module under a directory, recursively, tests excluded. */
+function sourceModules(root: string): string[] {
+  const found: string[] = [];
+
+  function walk(relative: string): void {
+    for (const entry of readdirSync(`${root}${relative}`, {
+      withFileTypes: true,
+    })) {
+      if (entry.isDirectory()) {
+        if (entry.name !== "__tests__" && entry.name !== "node_modules") {
+          walk(`${relative}${entry.name}/`);
+        }
+        continue;
+      }
+      if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) {
+        found.push(`${relative}${entry.name}`);
+      }
+    }
+  }
+
+  walk("");
+
+  return found;
+}
+
 describe("pricing surface registry", () => {
   /**
-   * Modules that name the pricing type without pricing a call, and so have no
-   * surface to register. Each is here on purpose; the list is short by design,
-   * because "it's fine, that one doesn't count" is how the last surface came to
-   * be missing.
+   * Modules that touch the guarded shapes without enforcing anything, and so
+   * have no surface to register.
+   *
+   * Every entry carries the reason it does not count. The list is meant to stay
+   * short and to be read, not skimmed: "it's fine, that one doesn't count" is
+   * precisely how the last surface came to be missing.
    */
-  const NOT_A_SURFACE = new Set([
-    // Defines the type and owns the shared policy every surface calls into.
-    "pricing.ts",
-    // Re-exports the public names; prices nothing itself.
-    "index.ts",
+  const NOT_A_SURFACE = new Map<string, string>([
+    [
+      "ai:pricing.ts",
+      "Defines the shapes and owns the policy every surface calls into. It is the thing being enforced, not a place enforcement could be missing.",
+    ],
+    [
+      "ai:index.ts",
+      "Re-exports the public names. Prices nothing, reads nothing.",
+    ],
+    [
+      "ai:types.ts",
+      "Declares TokenUsage. Carries the field names but never reads them.",
+    ],
+    [
+      "ai:agent-utils.ts",
+      "Copies provider-reported cache counts onto TokenUsage while building a RunResult. It transports counts; it never turns them into money or metrics, and the surface that does re-reads nothing from it.",
+    ],
+    [
+      "ai:adapters/anthropic.ts",
+      "Publishes a rate table via toTokenPricingTable and forwards the provider's cache counts onto TokenUsage. Both are inputs to the cost path, validated by whichever surface consumes them; the adapter enforces no cap and keeps no ledger.",
+    ],
+    [
+      "ai:adapters/openai.ts",
+      "Publishes a rate table via toTokenPricingTable. No cap, no ledger, no metrics.",
+    ],
+    [
+      "ai:adapters/gemini.ts",
+      "Publishes a rate table via toTokenPricingTable. No cap, no ledger, no metrics.",
+    ],
+    [
+      "ai:adapters/ollama.ts",
+      "Publishes an all-zero rate table via toTokenPricingTable — local models bill nothing. No cap, no ledger, no metrics.",
+    ],
+    [
+      "core:plugins/token-usage.ts",
+      "Owns normalizeTokenUsage, the one function that reconciles the two cache-write spellings. Like pricing.ts, it is the thing being enforced.",
+    ],
+    [
+      "core:plugins/index.ts",
+      "Re-exports the plugin surface, normalizeTokenUsage among it. Reads nothing.",
+    ],
   ]);
 
-  it("every module that takes a pricing object is covered by SURFACES", () => {
-    const sourceDir = fileURLToPath(new URL("../", import.meta.url));
-    const covered = new Set(SURFACES.map((surface) => surface.module));
+  /**
+   * Surfaces outside `@directive-run/ai` that consume token usage.
+   *
+   * The scan stops at a package boundary only if you let it, and letting it is
+   * how a metrics surface in `@directive-run/core` came to accept one spelling
+   * of the cache-write count while every shipped adapter emitted the other.
+   */
+  const CROSS_PACKAGE_SURFACES = new Set(["core:plugins/observability.ts"]);
 
-    const pricingModules = readdirSync(sourceDir)
-      .filter((name) => name.endsWith(".ts") && !name.endsWith(".d.ts"))
+  function scan(root: string, prefix: string): string[] {
+    return sourceModules(root)
       .filter((name) =>
-        /\bTokenPricing\b/.test(readFileSync(`${sourceDir}${name}`, "utf8")),
-      );
+        readsGuardedShapes(readFileSync(`${root}${name}`, "utf8")),
+      )
+      .map((name) => `${prefix}:${name}`);
+  }
 
-    // Sanity: the scan itself has to find something, or it proves nothing.
-    expect(pricingModules.length).toBeGreaterThan(0);
+  it("every module that reads a guarded shape is registered", () => {
+    const aiRoot = fileURLToPath(new URL("../", import.meta.url));
+    const coreRoot = fileURLToPath(
+      new URL("../../../core/src/", import.meta.url),
+    );
 
-    const unregistered = pricingModules.filter(
-      (name) => !covered.has(name) && !NOT_A_SURFACE.has(name),
+    const readers = [...scan(aiRoot, "ai"), ...scan(coreRoot, "core")];
+
+    // Sanity: a scan that finds nothing proves nothing. The recursive walk has
+    // to reach a subdirectory and the cross-package walk has to reach core.
+    expect(readers).toContain("ai:adapters/anthropic.ts");
+    expect(readers).toContain("core:plugins/observability.ts");
+
+    const covered = new Set(SURFACES.map((surface) => `ai:${surface.module}`));
+    const unregistered = readers.filter(
+      (name) =>
+        !covered.has(name) &&
+        !NOT_A_SURFACE.has(name) &&
+        !CROSS_PACKAGE_SURFACES.has(name),
     );
 
     expect(unregistered).toEqual([]);
   });
 
   it("every registered surface module exists", () => {
-    const sourceDir = fileURLToPath(new URL("../", import.meta.url));
-    const files = new Set(readdirSync(sourceDir));
+    const aiRoot = fileURLToPath(new URL("../", import.meta.url));
+    const modules = new Set(sourceModules(aiRoot));
 
     for (const surface of SURFACES) {
-      expect(files.has(surface.module)).toBe(true);
+      expect(modules.has(surface.module)).toBe(true);
     }
+  });
+
+  it("every NOT_A_SURFACE entry still exists and still reads a guarded shape", () => {
+    // An exemption for a module that no longer reads anything is dead weight
+    // that makes the list harder to take seriously.
+    const roots: Record<string, string> = {
+      ai: fileURLToPath(new URL("../", import.meta.url)),
+      core: fileURLToPath(new URL("../../../core/src/", import.meta.url)),
+    };
+
+    for (const [entry, reason] of NOT_A_SURFACE) {
+      const [prefix, module] = entry.split(":");
+      const source = readFileSync(`${roots[prefix!]}${module}`, "utf8");
+      expect(`${entry}: ${readsGuardedShapes(source)}`).toBe(`${entry}: true`);
+      expect(reason.length).toBeGreaterThan(40);
+    }
+  });
+});
+
+describe("the surface scanner itself", () => {
+  it("flags a module that imports the pricing helpers", () => {
+    const decoy = `
+      import { priceCall, snapshotTokenPricing } from "./pricing.js";
+      export function chargeSomething() { return priceCall; }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("flags a module typed indirectly, without naming the pricing type", () => {
+    // The scan that only matched the type name let this through. It takes the
+    // exact same object every registered surface takes.
+    const decoy = `
+      import { snapshotTokenPricing } from "./pricing.js";
+      export function guard(rates: Parameters<typeof snapshotTokenPricing>[0]) {
+        return rates;
+      }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+    expect(/\bTokenPricing\b/.test(decoy)).toBe(false);
+  });
+
+  it("flags a module that reads cache token counts for metrics rather than money", () => {
+    // No pricing type, no pricing import — and this is exactly the shape of the
+    // surface that under-reported a cached run by its whole cached prefix.
+    const decoy = `
+      export function report(usage: { cacheCreationTokens?: number }) {
+        return usage.cacheCreationTokens ?? 0;
+      }
+    `;
+
+    expect(readsGuardedShapes(decoy)).toBe(true);
+  });
+
+  it("does not flag a module with nothing to do with cost", () => {
+    const innocent = `
+      export function greet(name: string): string {
+        return \`hello \${name}\`;
+      }
+    `;
+
+    expect(readsGuardedShapes(innocent)).toBe(false);
   });
 });
 

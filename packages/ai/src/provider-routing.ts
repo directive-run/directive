@@ -40,19 +40,15 @@ import {
   type ResolvedPricing,
   type TokenPricing,
   type UnpricedReason,
+  type UsageSnapshot,
   describeUnpricedReason,
   estimateCallCost,
   estimateInputTokens,
   priceCall,
+  snapshotCallUsage,
   snapshotTokenPricing,
 } from "./pricing.js";
-import type {
-  AgentLike,
-  AgentRunner,
-  RunOptions,
-  RunResult,
-  TokenUsage,
-} from "./types.js";
+import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
 // Types
@@ -291,11 +287,11 @@ export function createConstraintRouter(
    * to report.
    */
   function chargeCall(
-    usage: TokenUsage | undefined,
+    snapshot: UsageSnapshot,
     pricing: ResolvedPricing,
     estimate: number,
   ): number {
-    const priced = priceCall(usage, pricing, estimate);
+    const priced = priceCall(snapshot, pricing, estimate);
 
     if (priced.basis === "estimated") {
       unpricedCalls++;
@@ -396,7 +392,7 @@ export function createConstraintRouter(
   function recordCall(
     providerName: string,
     latencyMs: number,
-    usage: TokenUsage | undefined,
+    snapshot: UsageSnapshot,
     estimate: number,
     pricing?: ResolvedPricing,
     error?: Error,
@@ -410,11 +406,19 @@ export function createConstraintRouter(
       stats.errorCount++;
       facts.errorCount++;
       stats.lastErrorAt = Date.now();
-    } else {
-      const cost = pricing ? chargeCall(usage, pricing, estimate) : 0;
-      stats.totalCost += cost;
-      facts.totalCost += cost;
     }
+
+    // A failed call is still charged. A throw is not a refund: a runner that
+    // rejects a completion after the provider generated it — a structured-
+    // output parse failure, an output guardrail, post-stream validation — has
+    // already spent the money. Recording nothing meant every retry burned real
+    // spend that `facts.totalCost` never saw, so a cost-threshold failover
+    // constraint stayed unreachable exactly when calls were failing hardest.
+    // `snapshot` carries `failed-call` on that path, so the estimate is charged
+    // and counted through the same door as every other unpriceable call.
+    const cost = pricing ? chargeCall(snapshot, pricing, estimate) : 0;
+    stats.totalCost += cost;
+    facts.totalCost += cost;
 
     // Update average latency
     totalLatencyMs += latencyMs;
@@ -464,10 +468,13 @@ export function createConstraintRouter(
       const result = await provider.runner<T>(agent, input, options);
       const latencyMs = Date.now() - startTime;
 
+      // Read the provider's usage exactly once, here, and pass the value on.
+      // Nothing downstream holds the provider's object, so nothing downstream
+      // can be answered differently on a second read.
       recordCall(
         provider.name,
         latencyMs,
-        result.tokenUsage,
+        snapshotCallUsage(result),
         estimate,
         provider.pricing,
       );
@@ -480,7 +487,7 @@ export function createConstraintRouter(
       recordCall(
         provider.name,
         latencyMs,
-        undefined,
+        { kind: "unusable", reason: "failed-call" },
         estimate,
         provider.pricing,
         error,

@@ -47,23 +47,24 @@ export interface TokenUsage {
    */
   cacheReadTokens?: number;
   /**
-   * Tokens written to the provider's prompt cache, when available.
-   * Populated by adapters with prompt-caching enabled (e.g. Anthropic).
+   * Tokens written to the provider's prompt cache, under Anthropic's wire
+   * spelling. Populated by adapters with prompt-caching enabled.
    *
-   * The rate that prices these is spelled `cacheWritePerMillion`. Both
-   * spellings of the count are accepted — see
-   * {@link TokenUsage.cacheWriteTokens}.
+   * A documented alias of {@link TokenUsage.cacheWriteTokens}, which is the
+   * canonical name. Supply either; the two are reconciled in exactly one
+   * function (`normalizeTokenUsage`, in `@directive-run/core`), which every
+   * consumer of token usage routes through.
    */
   cacheCreationTokens?: number;
   /**
-   * Tokens written to the provider's prompt cache, under the spelling the
-   * pricing side uses. Accepted as an alias of
-   * {@link TokenUsage.cacheCreationTokens}; adapters populate that one.
+   * Tokens written to the provider's prompt cache. The canonical spelling —
+   * it matches the rate that prices it, `cacheWritePerMillion`.
    *
-   * Both exist because the count and the rate that prices it were named
-   * differently, and a runner that followed the rate's spelling reported a
-   * field nothing read — cache writes billed as zero, with no warning and no
-   * failed check. Supply either. When both are present the larger is billed.
+   * Two names exist because the count and its rate were named differently, and
+   * a runner that followed the rate's spelling reported a field nothing read:
+   * cache writes billed as zero, with no warning and no failed check. Supply
+   * either. When both are present the larger is billed, because under-counting
+   * is the failure mode worth avoiding.
    */
   cacheWriteTokens?: number;
 }

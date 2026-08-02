@@ -79,4 +79,81 @@ describe("createAgentMetrics token accounting", () => {
     expect(obs.getMetric("agent.tokens.cache_write")).toBeUndefined();
     expect(obs.getMetric("agent.tokens")?.sum).toBe(150);
   });
+
+  it("counts a cache write reported under the wire spelling", () => {
+    // Every shipped adapter emits `cacheCreationTokens`; this surface read only
+    // `cacheWriteTokens`. Adapter usage passed straight through therefore
+    // reported no cache writes at all and a total of 150 rather than
+    // 10,000,150. Both spellings resolve in one place now, and this is a
+    // consumer of that place rather than a second implementation of it.
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheCreationTokens: 10_000_000,
+    });
+
+    expect(obs.getMetric("agent.tokens.cache_write")?.sum).toBe(10_000_000);
+    expect(obs.getMetric("agent.tokens")?.sum).toBe(10_000_150);
+  });
+
+  it("bills the larger when a runner reports both spellings", () => {
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      cacheCreationTokens: 900,
+      cacheWriteTokens: 1_500,
+    });
+
+    expect(obs.getMetric("agent.tokens.cache_write")?.sum).toBe(1_500);
+  });
+
+  it("does not count a token class inherited from the prototype", () => {
+    Object.defineProperty(Object.prototype, "cacheReadTokens", {
+      value: 1e15,
+      configurable: true,
+      enumerable: false,
+    });
+    try {
+      const obs = makeObservability();
+      const metrics = createAgentMetrics(obs);
+
+      metrics.trackRun("support-agent", {
+        success: true,
+        latencyMs: 100,
+        inputTokens: 100,
+        outputTokens: 50,
+      });
+
+      expect(obs.getMetric("agent.tokens.cache_read")).toBeUndefined();
+      expect(obs.getMetric("agent.tokens")?.sum).toBe(150);
+    } finally {
+      // biome-ignore lint/performance/noDelete: restoring the prototype is the point
+      delete (Object.prototype as Record<string, unknown>).cacheReadTokens;
+    }
+  });
+
+  it("drops a count no counter can recover from", () => {
+    // A counter is cumulative: one NaN addend is permanent, and every later
+    // reading of the metric inherits it.
+    const obs = makeObservability();
+    const metrics = createAgentMetrics(obs);
+
+    metrics.trackRun("support-agent", {
+      success: true,
+      latencyMs: 100,
+      inputTokens: 100,
+      outputTokens: Number.NaN,
+    });
+
+    expect(obs.getMetric("agent.tokens")?.sum).toBe(100);
+    expect(obs.getMetric("agent.tokens.output")).toBeUndefined();
+  });
 });

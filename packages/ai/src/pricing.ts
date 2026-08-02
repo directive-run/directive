@@ -12,10 +12,55 @@
  * amount together with how it arrived at it. There is no shape that means
  * "nothing to bill here" for the caller to drop on the floor.
  *
+ * Two rules hold throughout, and both exist because the same defect kept
+ * reappearing in whichever sibling had not been patched yet:
+ *
+ * 1. **Every read of a caller-supplied object goes through {@link readOwn}.**
+ *    Grep for it and you have found every untrusted read in the cost path.
+ *    There is no bare `source?.[field]` or `usage.x ?? 0` anywhere below.
+ * 2. **Untrusted input is snapshotted once, at the boundary, into a value.**
+ *    {@link priceCall} takes an already-resolved {@link UsageSnapshot}, not a
+ *    raw `tokenUsage`, so a caller that prices the same call against several
+ *    sets of rates cannot re-read the provider's object between them. That is a
+ *    type error now, not a review note.
+ *
  * @module
  */
 
-import type { TokenUsage } from "./types.js";
+import { normalizeTokenUsage } from "@directive-run/core/plugins";
+import type { RunResult } from "./types.js";
+
+// ============================================================================
+// Reading caller-supplied objects
+// ============================================================================
+
+/**
+ * Read one own property off a caller-supplied object.
+ *
+ * The single door through which every untrusted value in this module arrives.
+ *
+ * Gated on {@link Object.hasOwn}, because an inherited property is not a value
+ * the caller supplied. Without the gate a polluted `Object.prototype` reaches
+ * every object that omits an optional field — which, for the cache rates and
+ * the cache counts, is most of them. `Object.prototype.cacheReadPerMillion = 0`
+ * sets cache tokens free; `= -1` makes every construction throw;
+ * `Object.prototype.cacheReadTokens = 1e15` inflates every bill into a budget
+ * that trips on its first call.
+ *
+ * Gating one read site at a time is what left the sibling sites open, so this
+ * is the only reader: a new field cannot be added to the cost path without
+ * going through it.
+ */
+function readOwn(source: unknown, field: string): unknown {
+  if (typeof source !== "object" || source === null) {
+    return undefined;
+  }
+  if (!Object.hasOwn(source, field)) {
+    return undefined;
+  }
+
+  return (source as Record<string, unknown>)[field];
+}
 
 // ============================================================================
 // Caller-facing rate shapes
@@ -129,6 +174,16 @@ export interface BareTokenRates {
  * key, and an entry cannot be swapped for an all-zero one that would silently
  * make a configured cap unreachable.
  *
+ * Each entry's rates are read through {@link readOwn}, so a rate inherited from
+ * `Object.prototype` is not mistaken for one the table published. Without that,
+ * `Object.prototype.cacheRead = 0` gives every entry in every table a zero
+ * cache-read rate — a hundred million cached tokens billed at nothing, through
+ * the documented JSON-table path — and `cacheWrite = -1` makes every table
+ * construction throw.
+ *
+ * @param table - The bare rates, keyed by the exact model ID the provider accepts.
+ * @param label - What to call this table in error messages, e.g. `"ANTHROPIC_PRICING"`.
+ *
  * @example
  * ```typescript
  * const MY_PRICING = toTokenPricingTable({ "my-model": { input: 3, output: 15 } });
@@ -139,27 +194,86 @@ export interface BareTokenRates {
  */
 export function toTokenPricingTable(
   table: Record<string, BareTokenRates>,
+  label?: string,
 ): Record<string, ModelPricing> {
   const widened = Object.create(null) as Record<string, ModelPricing>;
-  for (const [model, rates] of Object.entries(table)) {
+  for (const model of Object.keys(table)) {
+    const rates = readOwn(table, model);
+    const input = readOwn(rates, "input") as number;
+    const output = readOwn(rates, "output") as number;
+    const cacheRead = readOwn(rates, "cacheRead");
+    const cacheWrite = readOwn(rates, "cacheWrite");
+
     widened[model] = Object.freeze({
-      input: rates.input,
-      output: rates.output,
-      inputPerMillion: rates.input,
-      outputPerMillion: rates.output,
-      ...(rates.cacheRead !== undefined
-        ? { cacheRead: rates.cacheRead, cacheReadPerMillion: rates.cacheRead }
-        : {}),
-      ...(rates.cacheWrite !== undefined
+      input,
+      output,
+      inputPerMillion: input,
+      outputPerMillion: output,
+      ...(cacheRead !== undefined
         ? {
-            cacheWrite: rates.cacheWrite,
-            cacheWritePerMillion: rates.cacheWrite,
+            cacheRead: cacheRead as number,
+            cacheReadPerMillion: cacheRead as number,
+          }
+        : {}),
+      ...(cacheWrite !== undefined
+        ? {
+            cacheWrite: cacheWrite as number,
+            cacheWritePerMillion: cacheWrite as number,
           }
         : {}),
     });
   }
 
-  return Object.freeze(widened);
+  const frozen = Object.freeze(widened);
+  if (label !== undefined) {
+    TABLE_LABELS.set(frozen, label);
+  }
+
+  return frozen;
+}
+
+/**
+ * What each published table is called, for error messages.
+ *
+ * A `WeakMap` rather than a property on the table: the tables are frozen, and a
+ * name key on one would show up in `Object.keys` beside the model IDs, where a
+ * caller iterating models would read it as a model.
+ */
+const TABLE_LABELS = new WeakMap<object, string>();
+
+/**
+ * Look up one model's rates in a published pricing table, or throw saying why.
+ *
+ * `TABLE["some-model"]` returns `undefined` for a model the table has no row
+ * for, and `undefined` handed to `withBudget` surfaces much later as a
+ * complaint about a missing rate — which names the field but not the model, not
+ * the table, and not the actual mistake, which is almost always a model ID the
+ * table predates.
+ *
+ * @example
+ * ```typescript
+ * import { ANTHROPIC_PRICING } from '@directive-run/ai/anthropic';
+ *
+ * const pricing = requireModelPricing(ANTHROPIC_PRICING, model);
+ * const runner = withBudget(baseRunner, { maxCostPerCall: 1, pricing });
+ * ```
+ */
+export function requireModelPricing(
+  table: Record<string, ModelPricing>,
+  model: string,
+): ModelPricing {
+  const entry = readOwn(table, model) as ModelPricing | undefined;
+
+  if (entry === undefined) {
+    const name = TABLE_LABELS.get(table) ?? "the pricing table";
+    const known = Object.keys(table).sort().join(", ");
+
+    throw new Error(
+      `[Directive] requireModelPricing: no pricing for model ${JSON.stringify(model)} in ${name}. Published rates change and this table is a convenience snapshot, so a current model may not have a row yet — pass your own TokenPricing ({ inputPerMillion, outputPerMillion }) for it. Models in ${name}: ${known}.`,
+    );
+  }
+
+  return entry;
 }
 
 // ============================================================================
@@ -215,7 +329,7 @@ function formatRate(rate: number): string {
  * NaN` after construction would reopen the exact hole the validation exists to
  * close. Nothing downstream touches the caller's object again.
  *
- * Every read is gated on {@link Object.hasOwn}, so an inherited property is not
+ * Every read goes through {@link readOwn}, so an inherited property is not
  * mistaken for a rate the caller supplied. Without that gate a polluted
  * `Object.prototype.cacheReadPerMillion` reaches every pricing object that
  * omits cache rates — which is most of them — and sets cache tokens free at `0`
@@ -230,26 +344,32 @@ export function snapshotTokenPricing(
   label: string,
   api: string,
 ): ResolvedPricing {
-  const source = pricing as unknown as Record<string, unknown> | undefined;
-
   // Read every property this function considers exactly once, up front, and
   // keep the primitive rather than the property. Re-reading is the same
   // check-then-use gap the snapshot exists to close, and the rule holds for the
   // fields that only feed the error message too — an object that reports one
   // shape to the hint and another to the validator is an object describing a
   // bug that is not there.
+  // No object at all is worth its own message. The overwhelmingly common cause
+  // is `SOME_PRICING["a-model"]` for a model the table has no row for — a
+  // published table is a snapshot, and a caller on a model newer than the
+  // snapshot gets `undefined` here rather than at the lookup.
+  if (pricing === undefined || pricing === null) {
+    throw new Error(
+      `[Directive] ${api}: ${label} is required and was ${String(pricing)}. If this came from a pricing table lookup, the table has no row for that model — use requireModelPricing(TABLE, model) to fail at the lookup with the model named, or pass your own { inputPerMillion, outputPerMillion }.`,
+    );
+  }
+
   const owned = new Map<string, unknown>();
   for (const field of [...RATE_FIELDS, ...BARE_RATE_FIELDS]) {
-    if (source !== undefined && Object.hasOwn(source, field)) {
-      owned.set(field, source[field]);
-    }
+    owned.set(field, readOwn(pricing, field));
   }
 
   const looksLikeBareRatePair =
     typeof owned.get("input") === "number" &&
     typeof owned.get("output") === "number" &&
-    !owned.has("inputPerMillion") &&
-    !owned.has("outputPerMillion");
+    owned.get("inputPerMillion") === undefined &&
+    owned.get("outputPerMillion") === undefined;
 
   const snapshot = {
     inputPerMillion: 0,
@@ -263,7 +383,7 @@ export function snapshotTokenPricing(
     const optional =
       field === "cacheReadPerMillion" || field === "cacheWritePerMillion";
 
-    if (optional && (!owned.has(field) || raw === undefined)) {
+    if (optional && raw === undefined) {
       // Cache tokens are billed at the input rate unless the caller says
       // otherwise. Never free: a cache write bills more than plain input on
       // every provider that offers one, so a zero default would under-count
@@ -397,8 +517,36 @@ export type UnpricedReason =
   | "missing-usage"
   /** `tokenUsage` was present but carried a count no ledger can accept. */
   | "unusable-usage"
+  /** `tokenUsage` reported zero of every token class. */
+  | "zero-usage"
+  /** The runner threw, so the call was never reported at all. */
+  | "failed-call"
   /** The counts and rates were both valid, but their product overflowed. */
   | "unusable-cost";
+
+/**
+ * A call's token usage, read once at the boundary and resolved.
+ *
+ * This is what {@link priceCall} takes, and it is a *value* — four owned
+ * numbers, or a reason there are none. The raw `tokenUsage` is never reachable
+ * from it.
+ *
+ * That is the point. `withBudget` prices one call against every window ledger
+ * and once more for the lifetime total, so it calls {@link priceCall} N+1
+ * times. When those calls each read `result.tokenUsage` themselves, a usage
+ * object backed by getters answers each one differently, and every answer looks
+ * legitimate: one recorded run reported `hour: $0` against a one-dollar cap
+ * while the lifetime total read `$1800`, every result labelled `"metered"`, the
+ * unpriced counter at zero, and not one warning. Snapshotting inside a single
+ * call cannot close that — nothing was snapshotting *across* the calls. So the
+ * snapshot moved out to the boundary and became the thing callers pass around.
+ */
+export type UsageSnapshot =
+  | { readonly kind: "resolved"; readonly usage: ResolvedUsage }
+  | {
+      readonly kind: "unusable";
+      readonly reason: Exclude<UnpricedReason, "unusable-cost">;
+    };
 
 /**
  * What one call costs, and how that number was arrived at.
@@ -431,57 +579,26 @@ export function describeUnpricedReason(reason: UnpricedReason): string {
       return "the runner returned no result.tokenUsage, so there is nothing to price the call from";
     case "unusable-usage":
       return "result.tokenUsage carried a non-finite or negative token count, and recording it would permanently corrupt the running total";
+    case "zero-usage":
+      return "result.tokenUsage reported zero input, output, and cache tokens, which no provider bills for a call that ran";
+    case "failed-call":
+      return "the runner threw, so the call reported no usage at all — the provider may still have billed it";
     case "unusable-cost":
       return "the reported token counts priced out to a non-finite cost, which is unrecoverable once recorded";
   }
 }
 
-function isUsableCount(count: unknown): count is number {
-  return typeof count === "number" && Number.isFinite(count) && count >= 0;
+function isUsableCount(count: number | undefined): count is number {
+  return count !== undefined && Number.isFinite(count) && count >= 0;
 }
 
 /**
- * Resolve the cache-write count from either spelling the ecosystem uses.
+ * Read a call result's token usage exactly once, and resolve it.
  *
- * `TokenUsage` named the field `cacheCreationTokens`, after Anthropic's wire
- * format; the rate that prices it is `cacheWritePerMillion`, and the resolved
- * count is `cacheWriteTokens`. A runner that followed the rate's spelling
- * reported a field nothing read, so ten million cache-write tokens billed as
- * zero, passed validation because input and output were present, and warned
- * nothing. Both spellings are accepted now, and when both are present the
- * larger wins — under-billing is the failure mode worth avoiding.
- *
- * Returns `null` when either present value is unusable.
- */
-function resolveCacheWriteTokens(usage: TokenUsage): number | null {
-  const creationTokens = usage.cacheCreationTokens;
-  const writeTokens = usage.cacheWriteTokens;
-  let resolved = 0;
-
-  if (creationTokens !== undefined) {
-    if (!isUsableCount(creationTokens)) {
-      return null;
-    }
-    resolved = creationTokens;
-  }
-
-  if (writeTokens !== undefined) {
-    if (!isUsableCount(writeTokens)) {
-      return null;
-    }
-    resolved = Math.max(resolved, writeTokens);
-  }
-
-  return resolved;
-}
-
-/**
- * Read a provider-reported token usage exactly once and validate it, returning
- * `null` when it cannot be priced.
- *
- * Deliberately module-private: {@link priceCall} is the only way to turn a
- * usage into money, because a `null` handed to a caller is a decision handed to
- * a caller, and the two callers that had it made it differently.
+ * **The one boundary.** Everything downstream reads the returned value; nothing
+ * downstream can reach `result.tokenUsage`, because {@link priceCall} does not
+ * accept it. Call this once per call, at the point the runner returns, and
+ * thread the result.
  *
  * `tokenUsage` crosses a trust boundary: it is whatever the provider (or a
  * wrapping runner, or a test double) put on the result. A single `NaN`,
@@ -489,39 +606,72 @@ function resolveCacheWriteTokens(usage: TokenUsage): number | null {
  * point, it is a permanent one — every later reading inherits it and no
  * subsequent call can bring the total back.
  *
- * All four token classes are checked, not just input and output: a
+ * Both cache-write spellings are accepted, and the reconciliation happens in
+ * exactly one place: {@link normalizeTokenUsage}, in `@directive-run/core`,
+ * which every consumer of token usage in the workspace routes through. Teaching
+ * each consumer both spellings is what left the metrics surface knowing only
+ * one of them.
+ *
+ * All four token classes are validated, not just input and output: a
  * present-but-poisoned cache count is exactly as destructive as a poisoned
- * input count. The counts are copied rather than re-read for the same reason
- * pricing is snapshotted — validating an object the provider still owns and
- * then reading it again later is a check-then-use gap.
+ * input count.
+ *
+ * **All-zero is not a price.** A call that ran had a prompt, and a prompt has
+ * tokens, so every class reading zero is a report no provider produces — it is
+ * a gateway that dropped the usage block, or an adapter defaulting an absent
+ * field to `0`. Billing it as free is the same fail-open as billing a missing
+ * `tokenUsage` as free, arriving through a different door, so it is treated the
+ * same way: charge the estimate, count it, say so once. A local model that
+ * genuinely bills nothing is unaffected — its rates are zero, so the estimate
+ * is zero too.
+ *
+ * @param result - The runner's result, exactly as it arrived, or `undefined` when it threw.
  */
-function snapshotTokenUsage(
-  usage: TokenUsage | undefined,
-): ResolvedUsage | null {
-  if (!usage) {
-    return null;
+export function snapshotCallUsage(
+  result: Pick<RunResult, "tokenUsage"> | undefined,
+): UsageSnapshot {
+  if (result === undefined) {
+    return { kind: "unusable", reason: "failed-call" };
   }
 
-  const inputTokens = usage.inputTokens;
-  const outputTokens = usage.outputTokens;
-  const cacheReadTokens = usage.cacheReadTokens ?? 0;
-  const cacheWriteTokens = resolveCacheWriteTokens(usage);
+  const raw = readOwn(result, "tokenUsage");
+  if (raw === undefined || raw === null) {
+    return { kind: "unusable", reason: "missing-usage" };
+  }
+
+  const counts = normalizeTokenUsage(raw);
+  const inputTokens = counts.inputTokens;
+  const outputTokens = counts.outputTokens;
+  const cacheReadTokens = counts.cacheReadTokens ?? 0;
+  const cacheWriteTokens = counts.cacheWriteTokens ?? 0;
 
   if (
     !isUsableCount(inputTokens) ||
     !isUsableCount(outputTokens) ||
     !isUsableCount(cacheReadTokens) ||
-    cacheWriteTokens === null
+    !isUsableCount(cacheWriteTokens)
   ) {
-    return null;
+    return { kind: "unusable", reason: "unusable-usage" };
   }
 
-  return Object.freeze({
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheWriteTokens,
-  });
+  if (
+    inputTokens === 0 &&
+    outputTokens === 0 &&
+    cacheReadTokens === 0 &&
+    cacheWriteTokens === 0
+  ) {
+    return { kind: "unusable", reason: "zero-usage" };
+  }
+
+  return {
+    kind: "resolved",
+    usage: Object.freeze({
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+    }),
+  };
 }
 
 /**
@@ -558,31 +708,30 @@ function usableEstimate(estimate: number): number {
  * This is the whole unusable-usage policy, in one place, for every surface that
  * bills. When the provider reports counts a ledger can accept, the call is
  * priced from them. When it does not — no `tokenUsage` at all, a poisoned
- * count, or a product that overflows — the pre-call estimate stands in and the
- * result says so. The estimate is a poor number. It is a far better one than
- * zero, which reads as "this call was free" and leaves a configured cap that
- * can never trip and a cost fact that never moves.
+ * count, an all-zero report, a runner that threw, or a product that overflows —
+ * the pre-call estimate stands in and the result says so. The estimate is a
+ * poor number. It is a far better one than zero, which reads as "this call was
+ * free" and leaves a configured cap that can never trip and a cost fact that
+ * never moves.
  *
- * @param usage - The provider-reported usage, exactly as it arrived.
+ * @param snapshot - The call's usage, from {@link snapshotCallUsage}. A value, never the provider's object.
  * @param pricing - Validated rates from {@link snapshotTokenPricing}.
  * @param estimate - The pre-call estimate to charge when usage cannot price the call.
  */
 export function priceCall(
-  usage: TokenUsage | undefined,
+  snapshot: UsageSnapshot,
   pricing: ResolvedPricing,
   estimate: number,
 ): PricedCall {
-  const resolved = snapshotTokenUsage(usage);
-
-  if (resolved === null) {
+  if (snapshot.kind === "unusable") {
     return {
       basis: "estimated",
       cost: usableEstimate(estimate),
-      reason: usage ? "unusable-usage" : "missing-usage",
+      reason: snapshot.reason,
     };
   }
 
-  const cost = calculateUsageCost(resolved, pricing);
+  const cost = calculateUsageCost(snapshot.usage, pricing);
 
   if (!Number.isFinite(cost)) {
     return {

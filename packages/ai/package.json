@@ -114,7 +114,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^1.0.0"
+    "@directive-run/core": "^1.25.0"
   },
   "devDependencies": {
     "@directive-run/core": "workspace:*",

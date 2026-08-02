@@ -579,6 +579,20 @@ export {
   type BudgetExceededDetails,
 } from "./budget.js";
 
+// Shared cost-pricing primitives — the module every cost surface calls into.
+export {
+  requireModelPricing,
+  snapshotCallUsage,
+  snapshotTokenPricing,
+  priceCall,
+  describeUnpricedReason,
+  type PricedCall,
+  type ResolvedPricing,
+  type ResolvedUsage,
+  type UnpricedReason,
+  type UsageSnapshot,
+} from "./pricing.js";
+
 // Smart Model Selection
 export {
   withModelSelection,

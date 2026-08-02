@@ -34,6 +34,8 @@
  * ```
  */
 
+import { normalizeTokenUsage } from "./token-usage.js";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -797,8 +799,8 @@ export function createObservability(
  * const obs = createObservability({ serviceName: 'my-service' });
  * const agentMetrics = createAgentMetrics(obs);
  *
- * // Track an agent run. Pass the cache classes too when the provider reports
- * // them — `inputTokens` is only the uncached remainder on those providers.
+ * // Track an agent run. Spreading a runner's `tokenUsage` in works directly —
+ * // `inputTokens` is only the uncached remainder on providers that cache.
  * agentMetrics.trackRun('support-agent', {
  *   success: true,
  *   latencyMs: 1500,
@@ -829,6 +831,12 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
          * reports them.
          */
         cacheWriteTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, under Anthropic's wire
+         * spelling. A documented alias of `cacheWriteTokens`, resolved by
+         * {@link normalizeTokenUsage} like everywhere else — supply either.
+         */
+        cacheCreationTokens?: number;
         cost?: number;
         toolCalls?: number;
       },
@@ -843,42 +851,32 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
 
       obs.observeHistogram("agent.latency", result.latencyMs, labels);
 
-      if (result.inputTokens !== undefined) {
-        obs.incrementCounter("agent.tokens.input", labels, result.inputTokens);
-        obs.incrementCounter("agent.tokens", labels, result.inputTokens);
+      // The token counts are read through the shared normalizer, so this
+      // surface accepts exactly the shapes every other token consumer accepts.
+      // It previously read `cacheWriteTokens` only, while every shipped adapter
+      // emits `cacheCreationTokens`, and a cached run under-reported by its
+      // whole cached prefix with nothing to indicate it.
+      const tokens = normalizeTokenUsage(result);
+
+      /** Counters are cumulative: one poisoned addend is permanent. */
+      function countTokens(metric: string, count: number | undefined): void {
+        if (count === undefined || !Number.isFinite(count) || count < 0) {
+          return;
+        }
+        obs.incrementCounter(metric, labels, count);
+        obs.incrementCounter("agent.tokens", labels, count);
       }
 
-      if (result.outputTokens !== undefined) {
-        obs.incrementCounter(
-          "agent.tokens.output",
-          labels,
-          result.outputTokens,
-        );
-        obs.incrementCounter("agent.tokens", labels, result.outputTokens);
-      }
+      countTokens("agent.tokens.input", tokens.inputTokens);
+      countTokens("agent.tokens.output", tokens.outputTokens);
 
       // Cache tokens count toward `agent.tokens` alongside input and output.
       // On a provider that reports cache usage, `inputTokens` is the *uncached
       // remainder*, so a run that reads a large cached prefix looks like a tiny
       // run when only input and output are counted — the same under-reporting
       // the cost ledger carried before cache classes were priced.
-      if (result.cacheReadTokens !== undefined) {
-        obs.incrementCounter(
-          "agent.tokens.cache_read",
-          labels,
-          result.cacheReadTokens,
-        );
-        obs.incrementCounter("agent.tokens", labels, result.cacheReadTokens);
-      }
-
-      if (result.cacheWriteTokens !== undefined) {
-        obs.incrementCounter(
-          "agent.tokens.cache_write",
-          labels,
-          result.cacheWriteTokens,
-        );
-        obs.incrementCounter("agent.tokens", labels, result.cacheWriteTokens);
-      }
+      countTokens("agent.tokens.cache_read", tokens.cacheReadTokens);
+      countTokens("agent.tokens.cache_write", tokens.cacheWriteTokens);
 
       if (result.cost !== undefined) {
         obs.incrementCounter("agent.cost", labels, result.cost);

@@ -35,11 +35,13 @@ import {
   type ResolvedPricing,
   type TokenPricing,
   type UnpricedReason,
+  type UsageSnapshot,
   describeUnpricedReason,
   estimateCallCost,
   estimateInputTokens,
   isZeroRated,
   priceCall,
+  snapshotCallUsage,
   snapshotTokenPricing,
 } from "./pricing.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
@@ -242,16 +244,30 @@ const API = "withBudget";
  * against a shared hour: `getSpent("hour")` read double, and a pair of $100
  * hourly caps blocked after $51 of real spend.
  *
- * The rates that price the window are the first budget's for that window — one
- * ledger, one price. A second budget on the same window may carry different
- * rates, and those still gate its own pre-call estimate; what they cannot do is
- * each write their own figure into a total they share.
+ * One ledger, one price. Budgets sharing a window must therefore agree on the
+ * rates, and {@link withBudget} rejects the configuration at construction when
+ * they do not — see the check there.
  */
 interface WindowLedger {
   window: "hour" | "day";
   windowMs: number;
   pricing: ResolvedPricing;
   ledger: CostLedger;
+}
+
+/** Whether two validated rate sets price every token class identically. */
+function sameRates(a: ResolvedPricing, b: ResolvedPricing): boolean {
+  return (
+    a.inputPerMillion === b.inputPerMillion &&
+    a.outputPerMillion === b.outputPerMillion &&
+    a.cacheReadPerMillion === b.cacheReadPerMillion &&
+    a.cacheWritePerMillion === b.cacheWritePerMillion
+  );
+}
+
+/** Render a rate set for an error message. */
+function describeRates(pricing: ResolvedPricing): string {
+  return `in ${pricing.inputPerMillion}/out ${pricing.outputPerMillion}/cache-read ${pricing.cacheReadPerMillion}/cache-write ${pricing.cacheWritePerMillion} per million`;
 }
 
 // ============================================================================
@@ -367,6 +383,17 @@ export function withBudget(
         ledger: new CostLedger(),
       };
       windowLedgers.set(window, shared);
+    } else if (!sameRates(shared.pricing, budgetPricing)) {
+      // One call cannot cost two amounts. Budgets on the same window share one
+      // running total by design, so the ledger has to record at one set of
+      // rates; whichever budget's rates lose, its cap then gates against a
+      // total that was never computed at its rates. It is not a tie worth
+      // breaking, it is an incoherent configuration: two hourly caps, one at
+      // $0.001/M and one at $15/$75, recorded fifty real calls costing $4,500
+      // as ten cents. Neither cap tripped and nothing was logged.
+      throw new Error(
+        `[Directive] ${API}: budgets[${index}] shares the ${JSON.stringify(window)} window with an earlier budget but prices it differently (${describeRates(shared.pricing)} vs ${describeRates(budgetPricing)}). Budgets on one window share one running total, so a call recorded at one set of rates would be gated by a cap expecting the other. Give every budget on a window the same pricing, or move one to a different window.`,
+      );
     }
 
     return { window, maxCost, windowMs, pricing: budgetPricing, shared };
@@ -498,84 +525,114 @@ export function withBudget(
       }
     }
 
-    // Execute the call
-    const result = await runner<T>(agent, input, options);
+    /**
+     * Reconcile one completed attempt against every cap, and record it.
+     *
+     * Takes a {@link UsageSnapshot}, never a result: the usage is read once, at
+     * the boundary below, and this function prices that *value* against each
+     * window's rates and again for the lifetime total. Handing it the result
+     * instead would put N+1 reads of a provider-owned object on the hot path,
+     * and a `tokenUsage` backed by getters answers each one differently.
+     */
+    function reconcile(snapshot: UsageSnapshot): void {
+      // `tokenUsage` is optional, and plenty of runners never populate it. Left
+      // uncounted, such a runner reads as $0 spent forever while real money
+      // goes out, and every window budget is silently inert. `priceCall`
+      // charges the pre-call estimate whenever usage cannot price the call, and
+      // reports which it did, so the substitution is visible rather than
+      // inferred.
+      let estimatedReason: UnpricedReason | null = null;
 
-    // Post-call: Reconcile against what the provider actually billed.
-    //
-    // `tokenUsage` is optional, and plenty of runners never populate it. Left
-    // uncounted, such a runner reads as $0 spent forever while real money goes
-    // out, and every window budget is silently inert. `priceCall` charges the
-    // pre-call estimate whenever usage cannot price the call, and reports which
-    // it did, so the substitution is visible rather than inferred.
-    let estimatedReason: UnpricedReason | null = null;
-
-    // One record per window, not per budget: the ledger is shared, so a second
-    // budget on the same window must not bill the same call a second time.
-    const billedByWindow = new Map<string, number>();
-    for (const shared of windowLedgers.values()) {
-      const estimate = estimateCallCost(
-        inputTokens,
-        shared.pricing,
-        estimatedOutputMultiplier,
-      );
-      const priced = priceCall(result.tokenUsage, shared.pricing, estimate);
-      if (priced.basis === "estimated") {
-        estimatedReason ??= priced.reason;
+      // One record per window, not per budget: the ledger is shared, so a
+      // second budget on the same window must not bill the same call twice.
+      const billedByWindow = new Map<string, number>();
+      for (const shared of windowLedgers.values()) {
+        const estimate = estimateCallCost(
+          inputTokens,
+          shared.pricing,
+          estimatedOutputMultiplier,
+        );
+        const priced = priceCall(snapshot, shared.pricing, estimate);
+        if (priced.basis === "estimated") {
+          estimatedReason ??= priced.reason;
+        }
+        billedByWindow.set(shared.window, priced.cost);
+        shared.ledger.record(priced.cost);
       }
-      billedByWindow.set(shared.window, priced.cost);
-      shared.ledger.record(priced.cost);
+
+      // The pre-call check gates an *estimate*, against a window cap as much as
+      // against the per-call cap. A call that estimated under its remaining
+      // hour and billed over it used to land in the ledger with nothing said,
+      // and the *next* call was the one that got blocked. It cannot be undone —
+      // the money is spent — but the cap it overran can be named when it
+      // happens.
+      for (const check of planChecks) {
+        const billed = billedByWindow.get(check.plan.window) ?? 0;
+        if (billed > check.remaining) {
+          report({
+            estimated: check.estimated,
+            actual: billed,
+            remaining: Math.max(0, check.remaining),
+            window: check.plan.window,
+            phase: "post-call",
+          });
+        }
+      }
+
+      if (totalPricing) {
+        const totalEstimate = callPricing
+          ? callEstimate
+          : (planChecks[0]?.estimated ?? 0);
+        const priced = priceCall(snapshot, totalPricing, totalEstimate);
+        if (priced.basis === "estimated") {
+          estimatedReason ??= priced.reason;
+        }
+        totalSpent += priced.cost;
+
+        // Same reasoning as the window overruns above, for the per-call cap.
+        if (
+          priced.basis === "metered" &&
+          callPricing &&
+          maxCostPerCall != null &&
+          priced.cost > maxCostPerCall
+        ) {
+          report({
+            estimated: callEstimate,
+            actual: priced.cost,
+            remaining: maxCostPerCall,
+            window: "per-call",
+            phase: "post-call",
+          });
+        }
+      }
+
+      if (estimatedReason !== null) {
+        unpricedCalls++;
+        warnUnpricedOnce(estimatedReason);
+      }
     }
 
-    // The pre-call check gates an *estimate*, against a window cap as much as
-    // against the per-call cap. A call that estimated under its remaining hour
-    // and billed over it used to land in the ledger with nothing said, and the
-    // *next* call was the one that got blocked. It cannot be undone — the money
-    // is spent — but the cap it overran can be named when it happens.
-    for (const check of planChecks) {
-      const billed = billedByWindow.get(check.plan.window) ?? 0;
-      if (billed > check.remaining) {
-        report({
-          estimated: check.estimated,
-          actual: billed,
-          remaining: Math.max(0, check.remaining),
-          window: check.plan.window,
-          phase: "post-call",
-        });
-      }
+    // Execute the call.
+    let result: RunResult<T>;
+    try {
+      result = await runner<T>(agent, input, options);
+    } catch (error) {
+      // A throw is not a refund. Plenty of runners fail *after* the provider
+      // has generated and billed the tokens — a structured-output parse that
+      // rejects the completion, an output guardrail that blocks it, a
+      // post-stream validation. Dropping the cost there meant every retry under
+      // `withRetry` burned real money that no window ledger and no lifetime
+      // total ever saw, and the caller's first evidence was the invoice. The
+      // estimate is charged and counted before the error propagates; over-
+      // estimating is the safe direction for a spend guard.
+      reconcile({ kind: "unusable", reason: "failed-call" });
+
+      throw error;
     }
 
-    if (totalPricing) {
-      const totalEstimate = callPricing
-        ? callEstimate
-        : (planChecks[0]?.estimated ?? 0);
-      const priced = priceCall(result.tokenUsage, totalPricing, totalEstimate);
-      if (priced.basis === "estimated") {
-        estimatedReason ??= priced.reason;
-      }
-      totalSpent += priced.cost;
-
-      // Same reasoning as the window overruns above, for the per-call cap.
-      if (
-        priced.basis === "metered" &&
-        callPricing &&
-        maxCostPerCall != null &&
-        priced.cost > maxCostPerCall
-      ) {
-        report({
-          estimated: callEstimate,
-          actual: priced.cost,
-          remaining: maxCostPerCall,
-          window: "per-call",
-          phase: "post-call",
-        });
-      }
-    }
-
-    if (estimatedReason !== null) {
-      unpricedCalls++;
-      warnUnpricedOnce(estimatedReason);
-    }
+    // Post-call: read the provider's usage exactly once, then reconcile the
+    // value against every cap.
+    reconcile(snapshotCallUsage(result));
 
     return result;
   };

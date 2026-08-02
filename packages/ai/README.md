@@ -147,12 +147,14 @@ correctly.
 > charges. Expressing both would take a pricing dimension the type does not
 > have, and adding one is not part of this change.
 
-The cache-write **count** is read from either `tokenUsage.cacheCreationTokens`
-or `tokenUsage.cacheWriteTokens`. The adapters populate the first, after
-Anthropic's wire format; the second matches the spelling of the rate that prices
-it. A custom runner that reported the field under the rate's name used to bill
-its cache writes at zero &ndash; validation passed, nothing warned &ndash; so both
-are accepted, and when both are present the larger is billed.
+The cache-write **count** has one canonical name, `tokenUsage.cacheWriteTokens`,
+matching the rate that prices it. `tokenUsage.cacheCreationTokens` is a
+documented alias, after Anthropic's wire format, and is what the adapters
+populate. Supply either; when both are present the larger is billed. The two are
+reconciled in a single function &ndash; `normalizeTokenUsage`, in
+`@directive-run/core` &ndash; that every consumer of token usage routes through,
+including `createAgentMetrics().trackRun`. Teaching each consumer both spellings
+is what left one of them knowing only one.
 
 ## Cost Caps &ndash; `withBudget`
 

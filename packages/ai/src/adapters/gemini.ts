@@ -75,8 +75,10 @@ const GEMINI_RATES = {
  * **Note:** Pricing changes over time. These values are provided as a convenience
  * and may not reflect the latest rates. Always verify at https://ai.google.dev/pricing
  */
-export const GEMINI_PRICING: Record<string, ModelPricing> =
-  toTokenPricingTable(GEMINI_RATES);
+export const GEMINI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
+  GEMINI_RATES,
+  "GEMINI_PRICING",
+);
 
 /**
  * Alias for {@link GEMINI_PRICING} — the same object, not a copy.

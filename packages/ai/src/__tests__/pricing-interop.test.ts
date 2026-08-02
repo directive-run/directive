@@ -331,11 +331,27 @@ describe("the Anthropic table keys real model IDs", () => {
   // and the cap they configured never trips. The Haiku 4.5 row shipped a
   // plausible-looking date that belongs to a different model's release.
   const EXPECTED: Record<string, { input: number; output: number }> = {
-    "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
-    "claude-sonnet-4-20250514": { input: 3, output: 15 },
+    // Current generation. These IDs carry no date suffix, with Haiku 4.5 the
+    // exception — it has both forms, so the table carries both.
+    "claude-fable-5": { input: 10, output: 50 },
+    "claude-opus-5": { input: 5, output: 25 },
+    "claude-opus-4-8": { input: 5, output: 25 },
+    "claude-opus-4-7": { input: 5, output: 25 },
+    "claude-opus-4-6": { input: 5, output: 25 },
+    // List price, not the introductory promotion — see the adapter's comment.
+    "claude-sonnet-5": { input: 3, output: 15 },
+    "claude-sonnet-4-6": { input: 3, output: 15 },
+    "claude-haiku-4-5": { input: 1, output: 5 },
     "claude-haiku-4-5-20251001": { input: 1, output: 5 },
-    "claude-3-5-haiku-20241022": { input: 0.8, output: 4 },
+    // Previous generation, still served, dated ID and alias alike.
+    "claude-sonnet-4-5": { input: 3, output: 15 },
+    "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
+    "claude-sonnet-4-0": { input: 3, output: 15 },
+    "claude-sonnet-4-20250514": { input: 3, output: 15 },
+    "claude-opus-4-0": { input: 15, output: 75 },
     "claude-opus-4-20250514": { input: 15, output: 75 },
+    // Retired, kept for reconciling historical spend.
+    "claude-3-5-haiku-20241022": { input: 0.8, output: 4 },
   };
 
   for (const [model, rates] of Object.entries(EXPECTED)) {
