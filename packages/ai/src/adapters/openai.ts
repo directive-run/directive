@@ -18,13 +18,16 @@ import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -97,6 +100,51 @@ export const OPENAI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
  */
 export const OPENAI_TOKEN_PRICING: Record<string, ModelPricing> =
   OPENAI_PRICING;
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one OpenAI chat-completion SSE event.
+ *
+ * Shared by the streaming path of `createOpenAIRunner` and by
+ * `createOpenAIStreamingRunner` so the two cannot drift.
+ */
+function parseOpenAIStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const choice = (event.choices as Record<string, unknown>[])?.[0];
+  const delta = choice?.delta as Record<string, unknown> | undefined;
+  if (delta?.content) {
+    result.text = delta.content as string;
+  }
+  // The completion ended. `[DONE]` says the same thing and the parser reads it
+  // directly, but gateways vary in which of the two they send.
+  if (choice?.finish_reason != null) {
+    result.terminal = true;
+  }
+
+  // Read the counts, not the container. A gateway that forwards
+  // `"usage":{"prompt_tokens":null,"completion_tokens":null}` has reported no
+  // usage at all; treating the object's presence as a report recorded the call
+  // as costing zero, which is the one answer that is certainly wrong.
+  if (event.usage) {
+    const usage = event.usage as Record<string, unknown>;
+    const promptTokens = readTokenCount(usage.prompt_tokens);
+    if (promptTokens !== undefined) {
+      result.inputTokens = promptTokens;
+    }
+    const completionTokens = readTokenCount(usage.completion_tokens);
+    if (completionTokens !== undefined) {
+      result.outputTokens = completionTokens;
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // OpenAI Runner
@@ -176,7 +224,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
+    buildRequest: (agent, _input, messages, stream) => ({
       url: `${baseURL}/chat/completions`,
       init: {
         method: "POST",
@@ -199,6 +247,12 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
               : []),
             ...messages.map((m) => ({ role: m.role, content: m.content })),
           ],
+          // Omitted entirely when buffering, so the non-streaming request
+          // stays byte-for-byte what it was. `include_usage` keeps the token
+          // breakdown available on the streaming path.
+          ...(stream
+            ? { stream: true, stream_options: { include_usage: true } }
+            : {}),
         }),
         ...(timeoutMs != null
           ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -216,7 +270,19 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        // Gateways that strip `usage` – or null out the counts inside it –
+        // leave zeros behind; say so rather than letting cost tracking read
+        // the response as free.
+        usageReported: anyTokenCountReported(
+          data.usage?.prompt_tokens,
+          data.usage?.completion_tokens,
+        ),
       };
+    },
+    streaming: {
+      adapterName: "OpenAI",
+      parseEvent: parseOpenAIStreamEvent,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -395,37 +461,17 @@ export function createOpenAIStreamingRunner(
         await throwStreamingHTTPError(response, "OpenAI");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
-        reader,
-        callbacks.onToken,
-        (event) => {
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-
-          const delta = (event.choices as Record<string, unknown>[])?.[0]
-            ?.delta as Record<string, unknown> | undefined;
-          if (delta?.content) {
-            result.text = delta.content as string;
-          }
-
-          if (event.usage) {
-            result.inputTokens =
-              ((event.usage as Record<string, unknown>)
-                .prompt_tokens as number) ?? 0;
-            result.outputTokens =
-              ((event.usage as Record<string, unknown>)
-                .completion_tokens as number) ?? 0;
-          }
-
-          return result;
-        },
-        "OpenAI",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseOpenAIStreamEvent,
+          "OpenAI",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -441,7 +487,13 @@ export function createOpenAIStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

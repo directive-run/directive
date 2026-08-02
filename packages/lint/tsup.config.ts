@@ -1,6 +1,6 @@
 import { defineConfig } from "tsup";
 
-// AE Audit 0.2.2 finding P0-1: every rule file does `import { SyntaxKind }
+// Every rule file does `import { SyntaxKind }
 // from "ts-morph"` (value import). With the rules + the public-API entry in
 // the same tsup chunk, ESM hoists ts-morph to the top of `dist/index.js`, so
 // every consumer pays the ~25 MB ts-morph load at module-init — defeating the

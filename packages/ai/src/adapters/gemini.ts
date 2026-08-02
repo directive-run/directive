@@ -16,13 +16,16 @@ import { createRunner, validateBaseURL } from "../agent-utils.js";
 import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -90,6 +93,53 @@ export const GEMINI_PRICING: Record<string, ModelPricing> = toTokenPricingTable(
  */
 export const GEMINI_TOKEN_PRICING: Record<string, ModelPricing> =
   GEMINI_PRICING;
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Gemini `streamGenerateContent` event.
+ *
+ * Shared by the streaming path of `createGeminiRunner` and by
+ * `createGeminiStreamingRunner` so the two cannot drift.
+ */
+function parseGeminiStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const candidate = (event.candidates as Record<string, unknown>[])?.[0];
+  const parts = (candidate?.content as Record<string, unknown>)?.parts as
+    | Record<string, unknown>[]
+    | undefined;
+  const textVal = parts?.[0]?.text;
+  if (textVal) {
+    result.text = textVal as string;
+  }
+  // Gemini's SSE stream carries no `[DONE]` sentinel; the last chunk of a
+  // complete response is the one that says why generation stopped.
+  if (candidate?.finishReason != null) {
+    result.terminal = true;
+  }
+
+  // Read the counts, not the container: a `usageMetadata` object whose numbers
+  // are null reports nothing, and recording it as a report of zero prices a
+  // real call at nothing.
+  if (event.usageMetadata) {
+    const meta = event.usageMetadata as Record<string, unknown>;
+    const promptTokenCount = readTokenCount(meta.promptTokenCount);
+    if (promptTokenCount !== undefined) {
+      result.inputTokens = promptTokenCount;
+    }
+    const candidatesTokenCount = readTokenCount(meta.candidatesTokenCount);
+    if (candidatesTokenCount !== undefined) {
+      result.outputTokens = candidatesTokenCount;
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // Gemini Runner
@@ -164,8 +214,11 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
-      url: `${baseURL}/models/${agent.model ?? model}:generateContent`,
+    buildRequest: (agent, _input, messages, stream) => ({
+      // Gemini streams from a different method; the body is identical.
+      url: stream
+        ? `${baseURL}/models/${agent.model ?? model}:streamGenerateContent?alt=sse`
+        : `${baseURL}/models/${agent.model ?? model}:generateContent`,
       init: {
         method: "POST",
         headers: {
@@ -190,15 +243,28 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
     parseResponse: async (res) => {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
-      const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
+      const inputTokens =
+        readTokenCount(data.usageMetadata?.promptTokenCount) ?? 0;
+      const outputTokens =
+        readTokenCount(data.usageMetadata?.candidatesTokenCount) ?? 0;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        // A `usageMetadata` object holding no usable number says the same
+        // thing as no `usageMetadata` at all: nothing was reported.
+        usageReported: anyTokenCountReported(
+          data.usageMetadata?.promptTokenCount,
+          data.usageMetadata?.candidatesTokenCount,
+        ),
       };
+    },
+    streaming: {
+      adapterName: "Gemini",
+      parseEvent: parseGeminiStreamEvent,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -299,41 +365,17 @@ export function createGeminiStreamingRunner(
         await throwStreamingHTTPError(response, "Gemini");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
-        reader,
-        callbacks.onToken,
-        (event) => {
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-
-          const text = (
-            (event.candidates as Record<string, unknown>[])?.[0]
-              ?.content as Record<string, unknown>
-          )?.parts as Record<string, unknown>[] | undefined;
-          const textVal = text?.[0]?.text;
-          if (textVal) {
-            result.text = textVal as string;
-          }
-
-          if (event.usageMetadata) {
-            const meta = event.usageMetadata as Record<string, unknown>;
-            if (meta.promptTokenCount !== undefined) {
-              result.inputTokens = meta.promptTokenCount as number;
-            }
-            if (meta.candidatesTokenCount !== undefined) {
-              result.outputTokens = meta.candidatesTokenCount as number;
-            }
-          }
-
-          return result;
-        },
-        "Gemini",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseGeminiStreamEvent,
+          "Gemini",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -349,7 +391,13 @@ export function createGeminiStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

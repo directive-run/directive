@@ -431,7 +431,7 @@ describe("devtoolsPlugin", () => {
       system.destroy();
     });
 
-    // R2 fix: the data-form clause tree now flows through plugin.emit
+    // the data-form clause tree now flows through plugin.emit
     // (third arg) to bundled plugins, not only via system.observe(). The
     // devtools event log must carry whenExplain on data-form evaluations.
     it("records whenExplain on data-form constraint.evaluate events", async () => {
@@ -1264,7 +1264,7 @@ describe("devtoolsPlugin", () => {
   });
 
   // ============================================================================
-  // importSession security (C1)
+  // importSession security
   // ============================================================================
 
   describe("importSession security", () => {
@@ -1358,7 +1358,7 @@ describe("devtoolsPlugin", () => {
   });
 
   // ============================================================================
-  // maxEvents validation (M7)
+  // maxEvents validation
   // ============================================================================
 
   describe("maxEvents validation", () => {
@@ -1407,7 +1407,7 @@ describe("devtoolsPlugin", () => {
   });
 
   // ============================================================================
-  // Non-writable global (C2)
+  // Non-writable global
   // ============================================================================
 
   describe("non-writable global", () => {

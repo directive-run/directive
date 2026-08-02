@@ -1,8 +1,8 @@
 /**
  * OTel × Sources — emit source-lifecycle spans from `system.observe()`
  *
- * The R5 observability reviewer found `@directive-run/ai/otel.ts`
- * subscribes only to the AI `DebugTimeline` event stream — so the four
+ * `@directive-run/ai/otel.ts` subscribes only to the AI
+ * `DebugTimeline` event stream — so the four
  * `ObservationEvent.source.*` variants (`source.attach`,
  * `source.publish`, `source.detach`, `source.error`) shipped by the
  * source primitive never reach the OTel exporter. SREs running with
@@ -49,7 +49,7 @@
  *   "active" parent.
  * - `directive.source.error` — error-status span carrying the phase
  *   (`attach`/`cleanup`/`runtime` per RFC 0008) and the truncated
- *   message from R6/R7.
+ *   error message the source manager produces.
  *
  * Cardinality budget: ONE active span per (sourceId, moduleId) at a
  * time. Publishes attach as span events (cheap), not as new spans. At

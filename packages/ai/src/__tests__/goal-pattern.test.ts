@@ -1401,9 +1401,9 @@ describe("goal pattern", () => {
     }
   });
 
-  // ---- P5: Checkpoint & Resume ----
+  // ---- Checkpoint & Resume ----
 
-  it("P5: saves checkpoints at configured intervals", async () => {
+  it("saves checkpoints at configured intervals", async () => {
     const store = new InMemoryCheckpointStore();
     let callCount = 0;
 
@@ -1461,7 +1461,7 @@ describe("goal pattern", () => {
     }
   });
 
-  it("P5: resume from checkpoint continues goal achievement", async () => {
+  it("resume from checkpoint continues goal achievement", async () => {
     let callCount = 0;
 
     const makeOrchestrator = () =>
@@ -1562,7 +1562,7 @@ describe("goal pattern", () => {
     expect(result.stepMetrics.length).toBeGreaterThan(3);
   });
 
-  it("P5: resumeGoal rejects invalid checkpoint", async () => {
+  it("resumeGoal rejects invalid checkpoint", async () => {
     const orchestrator = createTestMultiAgentOrchestrator({
       agents: { a: { agent: { name: "a" } } },
       mockResponses: { a: { output: "ok", totalTokens: 5 } },

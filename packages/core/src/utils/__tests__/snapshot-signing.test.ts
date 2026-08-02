@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { signSnapshot, verifySnapshotSignature } from "../utils.js";
 
 // ---------------------------------------------------------------------------
-// Snapshot signing / verification — `expiresAt` enforcement (R1 finding C1)
+// Snapshot signing / verification — `expiresAt` enforcement
 // ---------------------------------------------------------------------------
 
 const SECRET = "test-secret-do-not-use-in-production";
@@ -40,7 +40,7 @@ describe("verifySnapshotSignature", () => {
     expect(await verifySnapshotSignature(signed, "wrong-secret")).toBe(false);
   });
 
-  it("returns false for an EXPIRED snapshot with a valid signature (R1 C1 fix)", async () => {
+  it("returns false for an EXPIRED snapshot with a valid signature", async () => {
     // This is the canonical replay-attack chain the round flagged: a
     // captured-and-replayed valid signature should NOT verify once the
     // snapshot's expiresAt has elapsed.

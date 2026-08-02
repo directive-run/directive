@@ -26,8 +26,8 @@
 
   `@directive-run/core` (patch):
 
-  - **`system.notify.guardrailBlocked` plugin-name validation.** The R18
-    Tier 2-A RFC 0010 surface accepted any `plugin` string. A third-party
+  - **`system.notify.guardrailBlocked` plugin-name validation.** The
+    RFC 0010 surface accepted any `plugin` string. A third-party
     plugin holding a `System` reference could forge `"guardrail.blocked"`
     events claiming `plugin: "fact-pii-guardrail"`, misleading compliance
     audit consumers. The method now drops + warns when called with a
@@ -78,16 +78,16 @@
   `@directive-run/react`, `@directive-run/vue`, `@directive-run/svelte`,
   `@directive-run/solid`, `@directive-run/lit` (patch):
 
-  - **Dev-mode `console.warn` on `destroyAsync` rejection.** The R18
-    Tier 2-B fire-and-forget `.catch(() => {})` silently swallowed every
+  - **Dev-mode `console.warn` on `destroyAsync` rejection.** The
+    fire-and-forget `.catch(() => {})` silently swallowed every
     unmount-time unsubscribe error. Operators had zero signal when a
     Supabase channel `removeChannel()` rejected. The catch now logs in
     development (`isDevelopment === true`); production behavior is
     unchanged (the manager's `phase: "runtime"` observability sink
     still receives the per-source error).
 
-  Closes Critical findings 1, 2, 5 and Major findings 1, 3, 4 (Sec
-  lens) + 3, 5, 8 (Arch lens). Bigger Tier 2 items deferred to RFCs:
+  Closes three critical and three major security findings plus three
+  architecture findings. Larger items deferred to RFCs:
   Supabase channel-name reuse race, `attachGuardrailsToOtel` helper,
   timeline `guardrail.blocked` renderer, knowledge-bundle docs sync.
 

@@ -1,5 +1,5 @@
 /**
- * P4: Constraint-Driven Provider Routing — Directive's unique differentiator.
+ * Constraint-Driven Provider Routing — Directive's unique differentiator.
  *
  * Uses user-supplied constraints to select providers based on runtime state:
  * cost, latency, error rates, and compliance regions.

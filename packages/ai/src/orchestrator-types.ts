@@ -499,6 +499,40 @@ export interface MultiAgentRunCallOptions extends RunOptions {
   patternId?: string;
 }
 
+/** Per-call options for multi-agent runAgentStream/runStream */
+export interface MultiAgentStreamCallOptions {
+  /** Abort the in-flight run and close the stream. */
+  signal?: AbortSignal;
+  /**
+   * Request per-delta `token` chunks on the stream.
+   *
+   * `runAgentStream` emits one token chunk per completed message by default;
+   * pass `deltas: true`, or an `onToken` callback, to get one chunk per
+   * provider delta. Supplying `onToken` implies `deltas: true`, so nothing
+   * that works today changes.
+   *
+   * Retry, guardrails, tool-call approval, breakpoints and the facts bridge
+   * all still apply: this is an option travelling the path the orchestrator
+   * already uses, not a substituted runner. When the runner is re-invoked –
+   * agent retry, structured-output schema retry, or a self-healing reroute –
+   * a `stream_restart` chunk marks the boundary.
+   *
+   * @default false
+   */
+  deltas?: boolean;
+  /**
+   * Receive each provider delta as it arrives, in addition to the per-delta
+   * `token` chunks it turns on. Implies {@link deltas} – a caller who only
+   * wants the chunks should pass `deltas: true` instead of a no-op callback.
+   *
+   * The callback is awaited, so returning a promise applies real backpressure:
+   * the adapter will not read the next chunk off the wire until it settles.
+   *
+   * Annotated `=> void` to match `RunOptions.onToken`.
+   */
+  onToken?: (token: string) => void;
+}
+
 /** Multi-agent orchestrator instance */
 export interface MultiAgentOrchestrator {
   /** The underlying Directive System */
@@ -515,7 +549,7 @@ export interface MultiAgentOrchestrator {
   runAgentStream<T>(
     agentId: string,
     input: string,
-    options?: { signal?: AbortSignal },
+    options?: MultiAgentStreamCallOptions,
   ): OrchestratorStreamResult<T>;
   /**
    * Run an execution pattern by its registered pattern ID.
@@ -568,7 +602,7 @@ export interface MultiAgentOrchestrator {
   runStream<T>(
     agentId: string,
     input: string,
-    options?: { signal?: AbortSignal },
+    options?: MultiAgentStreamCallOptions,
   ): OrchestratorStreamResult<T>;
   /** Register a new agent dynamically */
   registerAgent(agentId: string, registration: AgentRegistration): void;
@@ -633,7 +667,19 @@ export interface MultiAgentOrchestrator {
     agentIds: string[],
     inputs: string | string[],
     merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-    options?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
+    options?: {
+      minSuccess?: number;
+      timeout?: number;
+      signal?: AbortSignal;
+      /**
+       * Request per-delta `token` chunks from every agent in the merge. Each
+       * chunk arrives tagged with the agent that produced it. Without this the
+       * merged stream carries one whole-message chunk per agent.
+       *
+       * @default false
+       */
+      deltas?: boolean;
+    },
   ): MultiplexedStreamResult<T>;
   /** Resume a paused breakpoint */
   resumeBreakpoint(id: string, modifications?: BreakpointModifications): void;
@@ -762,6 +808,14 @@ export interface MultiAgentOrchestrator {
   onDerivedChange(callback: (id: string, value: unknown) => void): () => void;
   /** Shared scratchpad (null when not configured) */
   readonly scratchpad: Scratchpad | null;
+  /**
+   * How many streams handed out by `runAgentStream` are still open.
+   *
+   * A number that only rises is the signature of consumers abandoning streams
+   * without aborting them: each one holds a provider request open and keeps
+   * accruing spend. `destroy()` is what closes them all.
+   */
+  getActiveStreamCount(): number;
   /** Destroy the orchestrator, resetting all state and releasing resources. */
   destroy(): void;
 }

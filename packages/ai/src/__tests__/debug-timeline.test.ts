@@ -1002,7 +1002,7 @@ describe("createDebugTimelinePlugin bridges core events", () => {
 // A6: Listener errors logged in dev mode
 // ============================================================================
 
-describe("listener error handling (A6)", () => {
+describe("listener error handling", () => {
   it("does not throw when a listener throws", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const timeline = createDebugTimeline();
@@ -1060,7 +1060,7 @@ describe("listener error handling (A6)", () => {
 // A12: Import with unknown event type filters correctly
 // ============================================================================
 
-describe("import event type validation (A12)", () => {
+describe("import event type validation", () => {
   it("filters out events with unknown types during import", () => {
     const timeline = createDebugTimeline();
     const json = JSON.stringify({

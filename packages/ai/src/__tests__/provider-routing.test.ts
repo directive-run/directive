@@ -252,7 +252,7 @@ describe("createConstraintRouter", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("createConstraintRouter config validation", () => {
@@ -278,7 +278,7 @@ describe("createConstraintRouter config validation", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("createConstraintRouter callback isolation", () => {
@@ -319,7 +319,7 @@ describe("createConstraintRouter callback isolation", () => {
 });
 
 // ============================================================================
-// Deep-clone RoutingFacts (C4)
+// Deep-clone RoutingFacts
 // ============================================================================
 
 describe("RoutingFacts immutability", () => {
@@ -352,7 +352,7 @@ describe("RoutingFacts immutability", () => {
 });
 
 // ============================================================================
-// Pre-sorted Constraints (M9)
+// Pre-sorted Constraints
 // ============================================================================
 
 describe("constraint priority sorting", () => {

@@ -31,7 +31,7 @@ record. Read this before deploying it as evidence:
 - **No signing keys in v1.** No HMAC, no Ed25519, no key rotation.
   Anyone with write access to the sink can rewrite history. Keyed
   signing is a v2 promise.
-- **Sink-level tombstone forgery (N7).** An attacker holding a
+- **Sink-level tombstone forgery.** An attacker holding a
   `sink.write()` reference can ATTEMPT to forge `system.entry-erased`
   tombstones to hide tampering – without the sentinel defense, a
   swapped payload could be hand-replaced with a `kind:
@@ -51,7 +51,7 @@ record. Read this before deploying it as evidence:
   shape (`seq`, `ts`, `kind`, `prevHash`, `hashAlgo`, `schemaVersion`,
   …payload) is canonicalized via key-sorted JSON, then djb2-hashed to
   a 32-bit hex string. Each entry carries `hashAlgo: "djb2-1"` and
-  `schemaVersion: 1` (F-5) – any future change to the canonicalization,
+  `schemaVersion: 1` – any future change to the canonicalization,
   hash function, or entry shape bumps the matching tag, so existing
   exports remain verifiable against the algorithm and schema they were
   written under.
@@ -119,7 +119,7 @@ Filter shape:
 | `system.entry-erased` | `originalKind`, `erasedAt` (per-entry tombstone, replaces an erased entry in place) |
 | `system.subject-erased` | `filterHash`, `filterShape`, `erased` (chained marker; raw filter values never land in the ledger – see [Erasure](#erasure-gdpr-art-17-stub)) |
 
-### Function-form constraints – `whenSource` is informational only (N5)
+### Function-form constraints – `whenSource` is informational only
 
 For **predicate-form** constraints (`when: { cartTotal: { $gte: 50 } }`), the ledger captures the full `whenSpec` – replayable, queryable, and (with PII redaction) safe to persist.
 
@@ -173,7 +173,7 @@ The per-entry `system.entry-erased` tombstone payload carries an `erasedAt` (ms 
 
 Real tamper still surfaces as `valid: false` even when tombstones are present.
 
-**Algorithm discriminator (N5).** Every entry carries `hashAlgo: "djb2-1"`. `verify()` dispatches on this tag – v1 has a single arm; v2 will add `"sha256-1"` without breaking pre-v2 exports. Entries with an unknown `hashAlgo` cause `verify()` to throw with a clear error.
+**Algorithm discriminator.** Every entry carries `hashAlgo: "djb2-1"`. `verify()` dispatches on this tag – v1 has a single arm; v2 will add `"sha256-1"` without breaking pre-v2 exports. Entries with an unknown `hashAlgo` cause `verify()` to throw with a clear error.
 
 See [Threat model](#threat-model) above for what this catches and what it doesn't.
 
@@ -231,7 +231,7 @@ The returned name is `markerEntry` – the singular chained
 summary – to distinguish it from the N per-entry tombstones that
 land in the sink.
 
-### Filter PII safety (N2)
+### Filter PII safety
 
 The summary marker does **not** record the raw filter – `filterSummary`
 is gone. It carries:

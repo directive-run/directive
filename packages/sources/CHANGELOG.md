@@ -20,9 +20,9 @@
 
 - [#55](https://github.com/directive-run/directive/pull/55) [`5c7a2d6`](https://github.com/directive-run/directive/commit/5c7a2d60f71f527e9afd85a67afa36f61fc0bdfc) Thanks [@jasoncomes](https://github.com/jasoncomes)! - 5 remaining Critical fixes to documented surfaces of the source primitive
 
-  This patch closes the 5 R13 CRITs that affect documented but unreachable
-  or misleading public APIs of v1.18.0. With Tier 1 (already merged) +
-  this Tier 2, all 10 R13 ship-blocking CRITs are resolved.
+  This patch closes the 5 remaining critical issues that affect documented
+  but unreachable or misleading public APIs of v1.18.0. With the earlier batch (already
+  merged) plus this one, all 10 ship-blocking critical issues are resolved.
 
   ### Critical fixes
 
@@ -55,7 +55,7 @@
   walker previously short-circuited on `Array.isArray(value)`, so the
   dominant real-world Supabase realtime shape
   (`payload.new = [{ email, ... }]`) and MCP resource-list notifications
-  silently bypassed the Tier 0 guard. The walker now inspects array
+  silently bypassed the guard. The walker now inspects array
   elements at the same depth budget, rebuilding the array if any element
   matched. Maps and Sets remain out of scope by design (consumers must
   wire a `customDetector` for those). 2 new regression tests covering
@@ -94,7 +94,7 @@ unsubscribe` — a method that doesn't exist on `MCPAdapter`. The actual
   ### Critical fixes
 
   **`createFactPIIGuardrail` not exported from `@directive-run/ai/guardrails`
-  subpath**. The Tier 0 Mandatory Companion to `liveContext` was
+  subpath**. The mandatory companion to `liveContext` was
   declared in `guardrails/index.ts` but the actual tsup entry for the
   subpath (`src/guardrails-export.ts`) didn't re-export it. Every recipe in
   `packages/knowledge/ai/ai-sources.md` (Sources × Security section) failed

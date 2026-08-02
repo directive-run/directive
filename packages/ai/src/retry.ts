@@ -1,5 +1,5 @@
 /**
- * P2: Intelligent Retry — HTTP-status-aware retry wrapper for AgentRunner.
+ * Intelligent Retry — HTTP-status-aware retry wrapper for AgentRunner.
  *
  * Respects 429 Retry-After headers, uses exponential backoff with jitter for 503,
  * and never retries client errors (400/401/403/404/422).
@@ -29,6 +29,7 @@
  * ```
  */
 
+import { isStreamConsumerError } from "./streaming.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
 // ============================================================================
@@ -268,6 +269,13 @@ export function withRetry(
           break;
         }
 
+        // A consumer callback that threw is not a provider failure. Retrying
+        // buys the same response from the provider again, at full price, to
+        // hand it to the callback that just crashed on it.
+        if (isStreamConsumerError(lastError)) {
+          break;
+        }
+
         // Check custom retryable predicate
         if (isRetryable) {
           try {
@@ -298,11 +306,25 @@ export function withRetry(
           /* callback error must not disrupt retry flow */
         }
 
-        // Wait before retrying (abortable via signal)
+        // An already-aborted run makes no further attempt, so there is nothing
+        // to replay and no boundary to announce. Signalling first told the
+        // consumer to discard a rendered generation that was never replaced.
         const signal = options?.signal;
         if (signal?.aborted) {
           break;
         }
+
+        // The next attempt replays the response from the beginning, so a
+        // caller streaming deltas has to be told the ones it already rendered
+        // are void. The signal rides `options` for the same reason `onToken`
+        // does: it is the only channel every wrapper already forwards.
+        try {
+          options?.onStreamRestart?.("retry");
+        } catch {
+          /* callback error must not disrupt retry flow */
+        }
+
+        // Wait before retrying (abortable via signal)
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => {
             signal?.removeEventListener("abort", onAbort);

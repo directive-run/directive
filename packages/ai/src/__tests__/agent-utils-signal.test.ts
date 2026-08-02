@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { combineSignals, createRunner } from "../agent-utils.js";
 import type { AgentLike } from "../types.js";
 
-describe("combineSignals (Sec MAJOR — fetch signal collision)", () => {
+describe("combineSignals — fetch signal collision", () => {
   it("returns undefined when no signals provided", () => {
     expect(combineSignals([undefined, undefined])).toBeUndefined();
     expect(combineSignals([])).toBeUndefined();
@@ -40,7 +40,7 @@ describe("combineSignals (Sec MAJOR — fetch signal collision)", () => {
   });
 });
 
-describe("createRunner — signal collision (Sec MAJOR)", () => {
+describe("createRunner — signal collision", () => {
   it("both buildRequest signal AND runOptions signal can trigger fetch abort", async () => {
     let observedSignal: AbortSignal | undefined;
 

@@ -3,7 +3,7 @@
 - **Status:** Accepted – shipped 2026-06-07 in `feat/source-primitive` (PR #52, merge `ab97b028`); pending v1.18.0 release
 - **Author:** Jason Comes
 - **Related:** the `source` primitive in `@directive-run/core`; the
-  Tier 0 prereq `createFactPIIGuardrail` (shipped).
+  prerequisite `createFactPIIGuardrail` (shipped).
 
 ## Summary
 
@@ -73,9 +73,9 @@ const result = orchestrator.runStream(agent, input, {
 > together once their design is settled.
 >
 > Likewise, the original draft proposed an inline `guardrails` array
-> on `liveContext` itself; the shipped Tier 0 security companion is
+> on `liveContext` itself; the shipped required security companion is
 > `createFactPIIGuardrail`, wired at `createSystem` time (see the
-> "Security – Tier 0 prereq" section below).
+> "Security – prerequisite" section below).
 
 Two additive chunk variants land on the `OrchestratorStreamChunk`
 discriminated union:
@@ -91,7 +91,7 @@ detaches liveContext. `interrupt` cancels the in-flight generation but
 keeps liveContext attached so the next caller-driven prompt continues
 with up-to-date facts.
 
-## Security – Tier 0 prereq
+## Security – prerequisite
 
 `createFactPIIGuardrail` (shipped) is the **mandatory** companion. Without
 it, `liveContext` expands the source → fact → prompt PII bypass surface

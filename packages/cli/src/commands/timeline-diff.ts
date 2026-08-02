@@ -2,7 +2,7 @@
  * `directive timeline diff <a.json> <b.json>`
  *
  * Semantic causal-graph diff between two serialized timelines. Pairs
- * with `@directive-run/timeline`'s `diffTimelines()` (R2.C). Typical
+ * with `@directive-run/timeline`'s `diffTimelines()`. Typical
  * flow:
  *
  *   1. Engineer captures two timelines: a known-good run + a
@@ -24,7 +24,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-// R5 arch C2: import types directly from the timeline package. These
+// Import types directly from the timeline package. These
 // imports are fully erased at compile time (no runtime require), so the
 // optional-peer / lazy `await import()` pattern below is preserved
 // exactly. Sourcing the types from the package eliminates the silent

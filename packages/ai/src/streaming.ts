@@ -27,8 +27,11 @@ import type {
   Message,
   OutputGuardrailData,
   RunResult,
+  StreamRestartReason,
   StreamingCallbackRunner,
 } from "./types.js";
+
+export type { StreamRestartReason } from "./types.js";
 
 // ============================================================================
 // Constants
@@ -37,11 +40,350 @@ import type {
 /** Default buffer size for streaming backpressure */
 export const DEFAULT_BUFFER_SIZE = 1000;
 
+/**
+ * Brand identifying a {@link StreamConsumerError} across module realms.
+ *
+ * Read from the global symbol registry so an ESM copy and a CJS copy of this
+ * package agree on it, which `instanceof` cannot.
+ */
+const STREAM_CONSUMER_ERROR = Symbol.for("directive.streamConsumerError");
+
 /** Default interval (in tokens) between guardrail checks during streaming */
 export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
 
 /** Default toxicity threshold for toxicity streaming guardrail */
 export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
+
+// ============================================================================
+// Shared Streaming Helpers
+// ============================================================================
+
+/**
+ * `RunOptions.onToken` is annotated `=> void` so that the shape most callers
+ * write – `(token) => buffer.push(token)` – stays assignable, but the adapters
+ * await whatever it returns. Code that wraps a caller's callback reads it back
+ * through this alias so it can hand the caller's promise along rather than
+ * dropping it, which is what makes backpressure real.
+ *
+ * @internal
+ */
+export type TokenSink = (token: string) => unknown;
+
+/** First code unit of the low-surrogate range. */
+const LOW_SURROGATE_START = 0xdc00;
+/** Last code unit of the low-surrogate range. */
+const LOW_SURROGATE_END = 0xdfff;
+
+/**
+ * Keep the last `maxLength` code units of `text`, moving the cut forward by one
+ * when it would land between the halves of a surrogate pair.
+ *
+ * `String.prototype.slice` counts UTF-16 code units, so a naive tail slice of
+ * accumulated model output can begin on a low surrogate whose high half was
+ * just discarded. The lone surrogate survives in the string and then breaks
+ * everything downstream that re-encodes it – `JSON.stringify` to a plugin or to
+ * devtools, and any regex guardrail run over the partial output.
+ *
+ * @internal
+ */
+export function sliceTailByCodePoint(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  let start = text.length - maxLength;
+  const code = text.charCodeAt(start);
+  if (code >= LOW_SURROGATE_START && code <= LOW_SURROGATE_END) {
+    start++;
+  }
+
+  return text.slice(start);
+}
+
+/**
+ * Chunk types an overflowing orchestrator stream may discard: content and
+ * notifications, whose loss costs the consumer detail but never correctness.
+ * `context_updated` is among them because it only names the facts that
+ * changed – the current values are still readable from the system, so a
+ * dropped notification loses nothing a consumer cannot recover.
+ *
+ * Everything else – `done`, `error`, `guardrail_triggered`,
+ * `approval_required`, `approval_resolved`, `interrupted`, `stream_restart` –
+ * carries control flow or ends the stream, and is never refused. Dropping
+ * `done` would take the drop report down with it, dropping `approval_required`
+ * would leave a tool call waiting out the full approval timeout for a question
+ * the consumer was never asked, and dropping `stream_restart` would let two
+ * generations of the same response concatenate on screen – which is the exact
+ * defect the restart chunk exists to prevent.
+ *
+ * @internal
+ */
+export function isDroppableChunk(chunk: { type: string }): boolean {
+  return (
+    chunk.type === "token" ||
+    chunk.type === "message" ||
+    chunk.type === "progress" ||
+    chunk.type === "tool_start" ||
+    chunk.type === "tool_end" ||
+    chunk.type === "context_updated"
+  );
+}
+
+/**
+ * A bounded chunk buffer that never refuses a control chunk and never scans.
+ *
+ * The cap applies to every chunk type; preference, not exemption, is what
+ * separates them. At the cap a droppable chunk is refused. A control chunk is
+ * always admitted, making room by evicting the newest droppable chunk still
+ * buffered – so the beginning of a response survives and its tail is what goes
+ * – or, when the buffer holds nothing droppable, by evicting the oldest chunk
+ * of any kind. Old control information is the least costly thing to lose:
+ * an approval the run is currently blocked on matters more than one already
+ * superseded.
+ *
+ * Refusing a control chunk was the previous behavior once the buffer filled
+ * with non-droppable chunks, and it cost more than the cap saved.
+ *
+ * Every operation is O(1) amortized. Consumed slots are tombstoned rather than
+ * spliced, droppable slots are tracked in an ascending index list that is only
+ * ever pushed to or popped from either end, and the backing array is compacted
+ * once its spent prefix outgrows its live tail. The scan-plus-splice this
+ * replaces cost O(n) per admission, which at a 10,000-chunk cap is milliseconds
+ * per chunk on a stalled stream.
+ *
+ * @internal
+ */
+export class ChunkBuffer<T extends { type: string }> {
+  /** Backing store. A `undefined` slot is a chunk already taken or evicted. */
+  private items: Array<T | undefined> = [];
+  /** Lowest slot that may still hold a live chunk. */
+  private head = 0;
+  /** How many live chunks the buffer holds. */
+  private count = 0;
+  /** Ascending slot indices of live droppable chunks. */
+  private droppable: number[] = [];
+  /** Lowest live entry in {@link ChunkBuffer.droppable}. */
+  private droppableHead = 0;
+
+  constructor(private readonly maxSize: number) {}
+
+  /** How many chunks are waiting to be read. */
+  get size(): number {
+    return this.count;
+  }
+
+  /**
+   * Append `chunk`, and report how many chunks the buffer lost doing it
+   * (0 or 1).
+   */
+  admit(chunk: T): number {
+    if (this.count < this.maxSize) {
+      this.append(chunk);
+
+      return 0;
+    }
+
+    if (isDroppableChunk(chunk)) {
+      return 1;
+    }
+
+    if (!this.evictNewestDroppable()) {
+      this.shift();
+    }
+    this.append(chunk);
+
+    return 1;
+  }
+
+  /** Take the oldest chunk, or `undefined` when the buffer is empty. */
+  shift(): T | undefined {
+    while (
+      this.head < this.items.length &&
+      this.items[this.head] === undefined
+    ) {
+      this.head++;
+    }
+    if (this.head >= this.items.length) {
+      return undefined;
+    }
+
+    const chunk = this.items[this.head]!;
+    this.items[this.head] = undefined;
+    this.count--;
+    if (this.droppable[this.droppableHead] === this.head) {
+      this.droppableHead++;
+    }
+    this.head++;
+    this.compact();
+
+    return chunk;
+  }
+
+  /** Forget everything buffered. */
+  clear(): void {
+    this.items = [];
+    this.head = 0;
+    this.count = 0;
+    this.droppable = [];
+    this.droppableHead = 0;
+  }
+
+  private append(chunk: T): void {
+    if (isDroppableChunk(chunk)) {
+      this.droppable.push(this.items.length);
+    }
+    this.items.push(chunk);
+    this.count++;
+  }
+
+  /** Evict the newest droppable chunk, reporting whether there was one. */
+  private evictNewestDroppable(): boolean {
+    if (this.droppable.length <= this.droppableHead) {
+      return false;
+    }
+    const index = this.droppable.pop()!;
+    this.items[index] = undefined;
+    this.count--;
+
+    return true;
+  }
+
+  /**
+   * Drop the spent prefix once it is at least as long as the live tail, so a
+   * long-running stream does not grow its backing array without bound. Copying
+   * happens once per element across the buffer's life.
+   */
+  private compact(): void {
+    if (this.head < 64 || this.head * 2 < this.items.length) {
+      return;
+    }
+    const offset = this.head;
+    this.items = this.items.slice(offset);
+    this.head = 0;
+    if (this.droppableHead > 0) {
+      this.droppable = this.droppable.slice(this.droppableHead);
+      this.droppableHead = 0;
+    }
+    for (let i = 0; i < this.droppable.length; i++) {
+      this.droppable[i]! -= offset;
+    }
+  }
+}
+
+/**
+ * A consumer-supplied callback threw while consuming a stream.
+ *
+ * Wrapping it names where the failure came from: a render crash in an
+ * `onToken` callback is not a provider failure, so retry and fallback wrappers
+ * stop rather than paying for the same response two more times to feed the
+ * same broken consumer.
+ */
+export class StreamConsumerError extends Error {
+  /**
+   * The marker {@link isStreamConsumerError} actually reads.
+   *
+   * `instanceof` compares against one realm's class object, and this package
+   * publishes both ESM and CJS builds: an application that loads the ESM entry
+   * and a dependency that loads the CJS one hold two distinct
+   * `StreamConsumerError` classes, so an error raised through one is invisible
+   * to an `instanceof` check compiled against the other. The classification
+   * silently inverts – a consumer's own crash is retried as a provider failure,
+   * at full price, three more times. A registry symbol is the same value in
+   * every realm, so the marker survives the boundary.
+   */
+  readonly [STREAM_CONSUMER_ERROR] = true;
+
+  constructor(cause: unknown) {
+    super(
+      `[Directive] A stream consumer callback threw: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.name = "StreamConsumerError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Is this error – or anything it was thrown through – a consumer-side throw?
+ *
+ * Checked through `cause` because the runner wrappers see the error after the
+ * adapter, the orchestrator and any user wrapper have had a chance to rethrow
+ * it with context.
+ */
+export function isStreamConsumerError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current != null && depth < 10; depth++) {
+    if (
+      (current as Record<symbol, unknown>)[STREAM_CONSUMER_ERROR] === true &&
+      current instanceof Error
+    ) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return false;
+}
+
+let runnerIgnoredOnTokenWarned = false;
+
+/** Did the run actually produce something the caller would have wanted deltas for? */
+function hasNonEmptyOutput(output: unknown): boolean {
+  if (output === undefined || output === null) {
+    return false;
+  }
+  if (typeof output === "string") {
+    return output.length > 0;
+  }
+
+  return true;
+}
+
+/**
+ * Warn when a run asked for per-delta streaming, produced output, and delivered
+ * no deltas at all. Silence in every other case: no request means nothing was
+ * promised, deltas arriving means the runner streamed, and empty output means
+ * there was nothing to stream.
+ *
+ * `requested` is a boolean rather than the callback itself because a caller can
+ * ask for deltas without supplying one – `runStream(agent, input, { deltas:
+ * true })` wants the chunks and nothing else.
+ *
+ * @internal
+ */
+export function reportIfRunnerIgnoredOnToken(
+  agentName: string,
+  requested: boolean,
+  deltaCount: number,
+  output: unknown,
+): void {
+  if (!requested || deltaCount > 0) {
+    return;
+  }
+  if (!hasNonEmptyOutput(output)) {
+    return;
+  }
+  warnRunnerIgnoredOnToken(agentName);
+}
+
+const RUNNER_IGNORED_ONTOKEN_HINT =
+  "The runner does not support streaming: a runner built with createRunner needs a `streaming` config, and a hand-written runner has to call `options.onToken` itself. Wrappers (withRetry, withBudget, withFallback, withModelSelection, withStructuredOutput) forward `onToken` untouched, so the base runner is where to look. This warning is emitted once per process.";
+
+/**
+ * Warn once per process that a run asked for per-delta streaming and received
+ * none. Asking for deltas – with `onToken` or `deltas: true` – is a request
+ * rather than a guarantee, so a runner that cannot stream returns its ordinary
+ * buffered result with no error, which is silent unless someone counts the
+ * deltas that arrived.
+ */
+function warnRunnerIgnoredOnToken(agentName: string): void {
+  if (runnerIgnoredOnTokenWarned) {
+    return;
+  }
+  runnerIgnoredOnTokenWarned = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[Directive] per-delta streaming was requested for "${agentName}" but the runner emitted no deltas – the response arrived as one buffered message. ${RUNNER_IGNORED_ONTOKEN_HINT}`,
+  );
+}
 
 // ============================================================================
 // Stream Event Types
@@ -51,8 +393,68 @@ export const DEFAULT_TOXICITY_THRESHOLD = 0.8;
 export interface TokenChunk {
   type: "token";
   data: string;
-  /** Running total of tokens received */
+  /**
+   * Ordinal of this chunk within the current generation – how many `token`
+   * chunks have been emitted since the stream started or since the last
+   * {@link StreamRestartChunk}.
+   *
+   * This is **not** a token count. On the per-delta path it counts provider
+   * deltas, and a delta is not a token: Anthropic emits multi-token deltas and
+   * Gemini emits sentence-sized ones. On the whole-message path it counts
+   * messages. For an authoritative count, read `result.tokenUsage` off the
+   * awaited {@link RunResult}.
+   */
+  deltaCount: number;
+  /**
+   * Which generation of the response this chunk belongs to: 1 until the first
+   * {@link StreamRestartChunk}, 2 after it, and so on.
+   *
+   * The same marker {@link StreamRestartChunk.generation} carries, repeated on
+   * every token so a boundary the consumer never received is still detectable.
+   * A `stream_restart` chunk is admitted ahead of any content chunk, but a
+   * buffer saturated with control chunks can still cost one; a consumer that
+   * keys rendered output by this field replaces the previous generation on the
+   * next token either way, rather than concatenating two answers.
+   */
+  generation: number;
+  /**
+   * @deprecated Use {@link TokenChunk.deltaCount}, or `result.tokenUsage` for a
+   * real token count. Kept because it is public API.
+   *
+   * On the per-delta path this equals `deltaCount`. On the whole-message path
+   * it retains its historical value – a running `ceil(content.length / 4)`
+   * estimate – so existing consumers see exactly what they saw before. Neither
+   * form is a token count.
+   */
   tokenCount: number;
+}
+
+/**
+ * A new generation started, and everything emitted for the previous one is
+ * void. The runner was re-invoked – an agent-level retry, a structured-output
+ * schema retry, a fallback to another provider, or a self-healing reroute – so
+ * the consumer is about to receive the whole response again from the
+ * beginning.
+ *
+ * Discard everything rendered since the stream started or since the previous
+ * `stream_restart`, whichever is later. The next `token` chunk restarts
+ * `deltaCount` at 1.
+ *
+ * Emitted only when the caller requested per-delta streaming – `deltas: true`
+ * or an `onToken` callback. Without that a generation is delivered as a single
+ * whole-message chunk and there is nothing part-rendered to discard.
+ */
+export interface StreamRestartChunk {
+  type: "stream_restart";
+  /** What re-invoked the runner. */
+  reason: StreamRestartReason;
+  /**
+   * Which generation is now starting: 2 for the first restart, 3 for the
+   * second, and so on. An opaque marker for keying rendered output, not a
+   * count of anything – chunks can be dropped under backpressure, so no count
+   * of emitted chunks could be relied on to say how much to discard.
+   */
+  generation: number;
 }
 
 /** Tool execution started */
@@ -103,7 +505,10 @@ export interface DoneChunk {
   type: "done";
   totalTokens: number;
   duration: number;
-  /** Number of tokens dropped due to backpressure (only with 'drop' strategy) */
+  /**
+   * Number of chunks dropped because the consumer fell behind and the buffer
+   * filled. Zero means nothing was lost.
+   */
   droppedTokens: number;
 }
 
@@ -113,6 +518,12 @@ export interface ErrorChunk {
   error: Error;
   /** Partial output before error */
   partialOutput?: string;
+  /**
+   * Number of chunks dropped because the consumer fell behind and the buffer
+   * filled, for a run that ended in an error rather than reaching `done`.
+   * Omitted by producers that do not buffer.
+   */
+  droppedTokens?: number;
 }
 
 /** Union of all stream chunk types */
@@ -124,7 +535,8 @@ export type StreamChunk =
   | GuardrailTriggeredChunk
   | ProgressChunk
   | DoneChunk
-  | ErrorChunk;
+  | ErrorChunk
+  | StreamRestartChunk;
 
 // ============================================================================
 // Streaming Run Types
@@ -139,7 +551,12 @@ export type BackpressureStrategy =
   /** Buffer all tokens (lossless, uses memory) */
   | "buffer";
 
-/** Streaming run options */
+/**
+ * Options for a {@link StreamRunner} – the function {@link createStreamingRunner}
+ * returns. These are **not** the options `orchestrator.runStream` accepts:
+ * `backpressure` and `bufferSize` configure this wrapper's own buffer and have
+ * no effect if passed to the orchestrator.
+ */
 export interface StreamRunOptions {
   /** Maximum turns before stopping */
   maxTurns?: number;
@@ -419,6 +836,11 @@ export function createStreamingRunner(
             await buffer.push({
               type: "token",
               data: token,
+              deltaCount: tokenCount,
+              // This wrapper invokes its base runner once and has no
+              // re-invocation of its own to report, so every delta it emits
+              // belongs to the first generation.
+              generation: 1,
               tokenCount,
             });
 
@@ -477,6 +899,9 @@ export function createStreamingRunner(
           type: "error",
           error: error instanceof Error ? error : new Error(String(error)),
           partialOutput: partialOutput || undefined,
+          // A run that dropped chunks and then failed reported nothing about
+          // the loss, because only `done` carried the figure.
+          droppedTokens: buffer.getDroppedCount(),
         };
         await buffer.push(errorChunk);
         buffer.close();

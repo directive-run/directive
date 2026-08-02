@@ -47,7 +47,7 @@ interface SourceDefinition {
 | Bare publish → event dispatch (no constraint cares) | ~50k-200k/sec | **20k/sec sustained, 100k burst** |
 | publish → fact update (constraint re-evaluates) | ~5k-10k/sec before microtask drain visible | **5k/sec sustained, 10k burst** |
 | publish → fact → derivation → async resolver fires | 500/sec before pool unbounded | **500/sec sustained, 2k burst – only with bounded resolver pool** |
-| 10k/sec into Tier 2 (worst case) | **MELT**: reconcile depth 50, previousRequirements reset, data loss | **CAP at 5k/sec via coalesce** |
+| 10k/sec into the fact-update path (worst case) | **MELT**: reconcile depth 50, previousRequirements reset, data loss | **CAP at 5k/sec via coalesce** |
 
 ## Coalescing strategy
 

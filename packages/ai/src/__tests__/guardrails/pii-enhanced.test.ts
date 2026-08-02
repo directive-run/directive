@@ -834,7 +834,7 @@ describe("typed redaction sensitive-category coverage ", () => {
 // M4 — masked style: fixed-width **** + last 4
 // ============================================================================
 
-describe("masked redaction style (M4)", () => {
+describe("masked redaction style", () => {
   it("emits **** + last 4 chars for a long value", () => {
     const items: DetectedPII[] = [
       {
@@ -901,7 +901,7 @@ describe("detectPII timeout race hygiene", () => {
 // masked: only credit_card shows a digit-only last-4 tail
 // ============================================================================
 
-describe("R3 masked redaction — credit_card tail vs full mask", () => {
+describe("masked redaction — credit_card tail vs full mask", () => {
   it("emits **** + last 4 DIGITS for a credit_card, separators stripped", () => {
     // Value carries separators — the tail must be digit-only (****1111),
     // never "1111" with a leading dash or space.
@@ -941,7 +941,7 @@ describe("R3 masked redaction — credit_card tail vs full mask", () => {
 // typed: sensitive categories collapse to [REDACTED]
 // ============================================================================
 
-describe("R3 typed redaction — sensitive vs labeled types", () => {
+describe("typed redaction — sensitive vs labeled types", () => {
   it("emits [REDACTED] for ssn, credit_card, and date_of_birth", () => {
     const cases: Array<{ type: PIIType; value: string }> = [
       { type: "ssn", value: "123-45-6789" },
@@ -989,7 +989,7 @@ describe("R3 typed redaction — sensitive vs labeled types", () => {
 // credit_card single capture group: full PAN, no digit fragment leak
 // ============================================================================
 
-describe("R3 credit_card single-group capture", () => {
+describe("credit_card single-group capture", () => {
   it("captures the whole 16-digit PAN and redacts it entirely", async () => {
     const text = "Card: 4111111111111111";
     const result = await detectPII(text, { types: ["credit_card"] });
@@ -1010,7 +1010,7 @@ describe("R3 credit_card single-group capture", () => {
 // redactPII drops items with malformed position spans
 // ============================================================================
 
-describe("R3 redactPII span validation", () => {
+describe("redactPII span validation", () => {
   it("skips malformed spans and still redacts valid items in the same call", () => {
     const text = "id 123-45-6789 end";
     const validStart = text.indexOf("123-45-6789");

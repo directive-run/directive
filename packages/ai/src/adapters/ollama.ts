@@ -18,11 +18,15 @@ import { createRunner, validateBaseURL } from "../agent-utils.js";
 import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
+  parseEventStream,
+  readTokenCount,
 } from "./shared.js";
 
 // ============================================================================
@@ -101,6 +105,44 @@ export const OLLAMA_TOKEN_PRICING: Record<string, ModelPricing> =
   OLLAMA_PRICING;
 
 // ============================================================================
+// Shared Stream Chunk Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Ollama streaming chunk.
+ *
+ * Ollama frames its stream as newline-delimited JSON rather than server-sent
+ * events, and reports token counts only on the final `done` chunk.
+ */
+function parseOllamaStreamChunk(
+  chunk: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const message = chunk.message as Record<string, unknown> | undefined;
+  const content = message?.content as string | undefined;
+  if (content) {
+    result.text = content;
+  }
+
+  if (chunk.done) {
+    result.terminal = true;
+    // Left unset when the field holds no usable number, so a `done` chunk
+    // stripped of its counts is recorded as unpriceable rather than free.
+    const promptEvalCount = readTokenCount(chunk.prompt_eval_count);
+    if (promptEvalCount !== undefined) {
+      result.inputTokens = promptEvalCount;
+    }
+    const evalCount = readTokenCount(chunk.eval_count);
+    if (evalCount !== undefined) {
+      result.outputTokens = evalCount;
+    }
+  }
+
+  return result;
+}
+
+// ============================================================================
 // Ollama Runner
 // ============================================================================
 
@@ -174,7 +216,7 @@ export function createOllamaRunner(
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
+    buildRequest: (agent, _input, messages, stream) => ({
       url: `${baseURL}/api/chat`,
       init: {
         method: "POST",
@@ -187,7 +229,7 @@ export function createOllamaRunner(
               : []),
             ...messages.map((m) => ({ role: m.role, content: m.content })),
           ],
-          stream: false,
+          stream,
           ...(hasOptions ? { options: ollamaOptions } : {}),
         }),
         ...(timeoutMs != null
@@ -206,15 +248,25 @@ export function createOllamaRunner(
       }
       const text =
         ((data.message as Record<string, unknown>)?.content as string) ?? "";
-      const inputTokens = (data.prompt_eval_count as number) ?? 0;
-      const outputTokens = (data.eval_count as number) ?? 0;
+      const inputTokens = readTokenCount(data.prompt_eval_count) ?? 0;
+      const outputTokens = readTokenCount(data.eval_count) ?? 0;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        usageReported: anyTokenCountReported(
+          data.prompt_eval_count,
+          data.eval_count,
+        ),
       };
+    },
+    streaming: {
+      adapterName: "Ollama",
+      wireFormat: "ndjson",
+      parseEvent: parseOllamaStreamChunk,
+      requireTerminalEvent: true,
     },
   });
 }
@@ -321,62 +373,15 @@ export function createOllamaStreamingRunner(
         throw new Error("[Directive] No response body from Ollama");
       }
 
-      const decoder = new TextDecoder();
-      let buf = "";
-      let fullText = "";
-      let inputTokens = 0;
-      let outputTokens = 0;
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) {
-              continue;
-            }
-
-            let chunk: Record<string, unknown>;
-            try {
-              chunk = JSON.parse(trimmed);
-            } catch {
-              if (
-                typeof process !== "undefined" &&
-                process.env?.NODE_ENV === "development"
-              ) {
-                console.warn(
-                  "[Directive] Malformed streaming chunk from Ollama:",
-                  trimmed,
-                );
-              }
-
-              continue;
-            }
-
-            const msg = chunk.message as Record<string, unknown> | undefined;
-            const content = (msg?.content as string) ?? "";
-            if (content) {
-              fullText += content;
-              callbacks.onToken?.(content);
-            }
-
-            if (chunk.done) {
-              inputTokens = (chunk.prompt_eval_count as number) ?? 0;
-              outputTokens = (chunk.eval_count as number) ?? 0;
-            }
-          }
-        }
-      } finally {
-        reader.cancel().catch(() => {});
-      }
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseOllamaStreamChunk,
+          "Ollama",
+          "ndjson",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -392,7 +397,13 @@ export function createOllamaStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

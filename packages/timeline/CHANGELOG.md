@@ -26,7 +26,7 @@
 
 ### Patch Changes
 
-- [#52](https://github.com/directive-run/directive/pull/52) [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — R6 hardening: dispatch ordering, drop telemetry, error truncation, AuditEntry coverage, timeline render
+- [#52](https://github.com/directive-run/directive/pull/52) [`099490d`](https://github.com/directive-run/directive/commit/099490dc9cb20d85369a69933ab26ef561822585) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Source primitive — hardening: dispatch ordering, drop telemetry, error truncation, AuditEntry coverage, timeline render
 
   Closes a second round of cross-cutting findings against the source primitive
   covering security, observability, privacy, and DX. All changes are additive

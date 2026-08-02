@@ -433,7 +433,7 @@ export function createSourcesManager(
     // `error`-level emission. Without this, a source whose `attach()`
     // throws with a payload-embedded message would have leaked the
     // payload into the immutable hash-chained ledger AND the operator's
-    // structured log backend even after R6 closed the inspect path.
+    // structured log backend even after the inspect path was closed.
     //
     // The original `Error` (with full message + stack) is still
     // `console.error`'d for dev visibility upstream of this call —
@@ -456,7 +456,7 @@ export function createSourcesManager(
     // Pre-build the AttachedSource record so the per-source publish closure
     // can close over `attachedRecord.detached` instead of a captured-once
     // boolean. Without this, an OLD source's external transport that fires
-    // an in-flight callback AFTER re-registration (R3 swap) would still
+    // an in-flight callback AFTER re-registration would still
     // dispatch through the OLD closure with stale attribution. The closure
     // checks `attachedRecord.detached` on every publish; re-registration
     // flips that flag synchronously before the new source attaches.
@@ -639,7 +639,10 @@ export function createSourcesManager(
             // The old source's `perSourcePublish` closure (still referenced by
             // the external transport) reads this flag on every publish and
             // no-ops once it flips — closes the in-flight re-registration
-            // race that R3's registry swap did not cover.
+            // race. Swapping the registry entry alone is not enough: a
+            // publish already in flight holds the old closure directly and
+            // never re-reads the registry, so it would deliver into the
+            // replaced source between the swap and the unsubscribe.
             old.detached = true;
             callbacks.onDetach?.(old.id, old.moduleId);
             const cOld = counters.get(old.id) ?? emptyCounters();
@@ -669,7 +672,7 @@ export function createSourcesManager(
         // immediately using the live dispatcher. `onAttach` fires from
         // inside `attachOne` so the engine emits the plugin event with
         // correct attribution — closes the registerModule observability
-        // gap (R2-CR3) AND the re-registration leak (R3-M1).
+        // gap AND the re-registration leak.
         if (
           phase === "attached" &&
           liveDispatch &&

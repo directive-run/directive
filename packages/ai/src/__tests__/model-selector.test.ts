@@ -163,7 +163,7 @@ describe("withModelSelection", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("withModelSelection callback isolation", () => {
@@ -199,7 +199,7 @@ describe("withModelSelection callback isolation", () => {
 });
 
 // ============================================================================
-// byPattern stateful regex (M7)
+// byPattern stateful regex
 // ============================================================================
 
 describe("byPattern with global regex", () => {

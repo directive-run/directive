@@ -559,7 +559,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
         setupHistoryButtons(refs, sys);
         updateDependencyGraph(refs, sys, depGraph);
 
-        // R4.E: refine the Constraints empty-state. A system with zero
+        // refine the Constraints empty-state. A system with zero
         // constraints would otherwise sit on "Waiting…" forever.
         const hasConstraints = (inspection?.constraints?.length ?? 0) > 0;
         setConstraintsEmptyState(refs, hasConstraints);
@@ -778,7 +778,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       } else {
         depGraph.activeConstraints.delete(id);
       }
-      // R4.E: queue the per-constraint whenExplain row for the next rAF.
+      // queue the per-constraint whenExplain row for the next rAF.
       // Coalescing means a batch that flips 50 constraints repaints once.
       // Function-form `when` passes whenExplain=undefined, which renders
       // a single header line (no clause tree).
@@ -1029,7 +1029,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
         derivRowMap.clear();
         depGraph.derivationDeps.clear();
         panel.refs.derivBody.replaceChildren();
-        // R4.E: constraints will re-evaluate after the snapshot loads;
+        // constraints will re-evaluate after the snapshot loads;
         // wipe the row map + DOM so stale clause trees don't linger.
         constraintRowMap.clear();
         panel.refs.constraintsBody.replaceChildren();
@@ -1088,7 +1088,7 @@ export function devtoolsPlugin<M extends ModuleSchema = ModuleSchema>(
       addEvent("definition.unregister", { type, id });
       recordEvent("definition.unregister", { type, id });
       panelEvent("definition.unregister", { type, id });
-      // R4.E: drop the constraint's clause-tree row when the engine
+      // drop the constraint's clause-tree row when the engine
       // tells us it's gone (disable / removeModule). Avoids stale
       // ✗ rows pinned to constraints that no longer exist.
       if (type === "constraint" && panel) {

@@ -84,7 +84,7 @@ export type { RequirementTypeStatus, InspectState, ConstraintInfo };
 export { shallowEqual };
 
 // ============================================================================
-// useAuditLedger — live ledger entries with filter (R4.I + Ship 4)
+// useAuditLedger — live ledger entries with filter
 // ============================================================================
 
 import type { AuditEntry, AuditLedger, QueryFilter } from "@directive-run/core";

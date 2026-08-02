@@ -1198,10 +1198,10 @@ describe("Factory functions", () => {
 });
 
 // ============================================================================
-// AuditLedgerController — seq-window diff (R4.C7)
+// AuditLedgerController — seq-window diff
 // ============================================================================
 
-describe("AuditLedgerController — seq-window diff (R4.C7)", () => {
+describe("AuditLedgerController — seq-window diff", () => {
   it("requests updates when entries roll over at steady-state capacity", async () => {
     const { createAuditLedger, memorySink } = await import(
       "@directive-run/core"

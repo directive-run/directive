@@ -59,10 +59,25 @@ function runnerReporting(tokenUsage?: TokenUsage): AgentRunner {
   ) as unknown as AgentRunner;
 }
 
-/** A runner that fails after the provider has already generated the tokens. */
+/** A runner that fails before anything reaches the caller. */
 function runnerThrowing(): AgentRunner {
   return vi.fn(async (): Promise<RunResult> => {
     throw new Error("structured output did not parse");
+  }) as unknown as AgentRunner;
+}
+
+/**
+ * A runner that delivers a response and *then* fails — a gateway stripping the
+ * completion marker, a guardrail rejecting a completion the provider already
+ * generated and billed. What arrived is charged; what never arrived is not.
+ */
+function runnerDeliveringThenThrowing(): AgentRunner {
+  return vi.fn(async (_agent, _input, options) => {
+    await (
+      options as { onToken?: (token: string) => unknown } | undefined
+    )?.onToken?.("a delivered and billed response");
+
+    throw new Error("stream ended without a completion marker");
   }) as unknown as AgentRunner;
 }
 
@@ -586,7 +601,30 @@ describe("a call that reports zero of everything", () => {
 // ============================================================================
 
 describe("a call that fails after the provider generated it", () => {
-  it("withBudget charges failed attempts to every window and the total", async () => {
+  it("withBudget charges a failed attempt that delivered, to every window and the total", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(runnerDeliveringThenThrowing(), {
+      pricing: PRICING,
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    await expect(
+      runner(AGENT, "hello", { onToken: () => {} }),
+    ).rejects.toThrow();
+    warn.mockRestore();
+
+    expect(runner.getSpent("hour")).toBeGreaterThan(0);
+    expect(runner.getSpent("total")).toBeGreaterThan(0);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("withBudget charges nothing for a failure that delivered nothing", async () => {
+    // The other half of the same rule. A refused connection, a DNS failure, a
+    // pre-flight throw: no bytes arrived, so there is no observation to price
+    // and no money to record. Charging these at a predicted ceiling locked a
+    // budget for a whole window over an outage that cost nothing. Still
+    // counted, because a call that fails after dispatch may have been billed
+    // for work whose size is unknowable from here.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const runner = withBudget(runnerThrowing(), {
       pricing: PRICING,
@@ -596,8 +634,8 @@ describe("a call that fails after the provider generated it", () => {
     await expect(runner(AGENT, "hello")).rejects.toThrow();
     warn.mockRestore();
 
-    expect(runner.getSpent("hour")).toBeGreaterThan(0);
-    expect(runner.getSpent("total")).toBeGreaterThan(0);
+    expect(runner.getSpent("hour")).toBe(0);
+    expect(runner.getSpent("total")).toBe(0);
     expect(runner.getUnpricedCallCount()).toBe(1);
   });
 
@@ -617,18 +655,20 @@ describe("a call that fails after the provider generated it", () => {
   });
 
   it("reports the failed-attempt charge separately from real spend", async () => {
-    // Fail-closed is right, but a charge for a call whose outcome is unknown
-    // is not the same fact as a charge for one the provider billed, and the
-    // single `getSpent` figure could not tell them apart. Under retry the
-    // difference compounds: five refused connections filled 90% of a $10 cap
-    // with spend that provably never happened, and nothing said so.
+    // A charge measured off a delivery whose token count never arrived is not
+    // the same fact as a charge the provider counted, and the single `getSpent`
+    // figure could not tell them apart. Under retry the difference compounds: a
+    // gateway that strips the completion marker fills a cap with responses that
+    // were delivered and billed but never reported, and nothing said so.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const runner = withBudget(runnerThrowing(), {
+    const runner = withBudget(runnerDeliveringThenThrowing(), {
       pricing: PRICING,
       budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
     });
 
-    await expect(runner(AGENT, "hello")).rejects.toThrow();
+    await expect(
+      runner(AGENT, "hello", { onToken: () => {} }),
+    ).rejects.toThrow();
     warn.mockRestore();
 
     expect(runner.getFailedCallSpend("hour")).toBe(runner.getSpent("hour"));
@@ -1245,6 +1285,10 @@ describe("pricing surface registry", () => {
     [
       "ai:adapters/ollama.ts",
       "Publishes an all-zero rate table via toTokenPricingTable — local models bill nothing. No cap, no ledger, no metrics.",
+    ],
+    [
+      "ai:streaming.ts",
+      "Matched on the phrase `result.tokenUsage` in the doc comment that tells callers a chunk ordinal is not a token count. It reads no count and holds no rate: chunks carry text and an ordinal, and the authoritative usage lives on the awaited RunResult the surfaces above already read.",
     ],
     [
       "ai:debug-timeline.ts",

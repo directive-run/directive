@@ -1,5 +1,5 @@
 /**
- * P3: Smart Model Selection — Rule-based model routing for AgentRunner.
+ * Smart Model Selection — Rule-based model routing for AgentRunner.
  *
  * Route simple tasks to cheaper models and complex tasks to expensive ones,
  * reducing cost without sacrificing quality where it matters.

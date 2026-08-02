@@ -139,7 +139,7 @@ describe("doctor.checkAgainst — reason quality", () => {
 // M4 — doctor.checkAbortOn (abortOn:/bind: awareness)
 // ============================================================================
 
-describe("doctor.checkAbortOn (M4) — abortOn/bind awareness", () => {
+describe("doctor.checkAbortOn — abortOn/bind awareness", () => {
   it("flags a candidate path that matches a constraint's abortOn: (M5: in warnings)", () => {
     const result = doctor.checkAbortOn(
       { cartTotal: { $gte: 100 }, region: { $eq: "US" } },
@@ -184,7 +184,7 @@ describe("doctor.checkAbortOn (M4) — abortOn/bind awareness", () => {
     expect(result.warnings).toEqual([]);
   });
 
-  it("F-3: CheckAbortOnResult shape is { warnings } only — no contradictions field", () => {
+  it("CheckAbortOnResult shape is { warnings } only — no contradictions field", () => {
     const result = doctor.checkAbortOn({ cartTotal: { $gte: 100 } }, [
       { id: "owner", abortOn: ["cartTotal"] },
     ]);
@@ -258,7 +258,7 @@ describe("doctor.checkAbortOn (M4) — abortOn/bind awareness", () => {
 // M11 — doctor contract on flattenPredicate leaf shape
 // ============================================================================
 
-describe("doctor — flattenPredicate leaf shape contract (M11)", () => {
+describe("doctor — flattenPredicate leaf shape contract", () => {
   it("flattenPredicate emits { path, op, value } LeafClause shape", () => {
     const out = flattenPredicate({ x: { $gte: 5 } });
     expect(out).toEqual([{ path: "x", op: "$gte", value: 5 }]);

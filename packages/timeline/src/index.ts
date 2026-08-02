@@ -67,7 +67,7 @@ export interface ObservableSystem {
  * Bounded to {@link DEFAULT_REGISTRY_CAP} entries; insertion past the cap
  * evicts the oldest entry (LRU by insertion order). Without this, long
  * test runs that record per-test without `afterEach(clearAllTimelines)`
- * would retain every ObservationEvent for the entire suite. (R1 sec M3.)
+ * would retain every ObservationEvent for the entire suite.
  */
 const registry = new Map<string, Timeline>();
 
@@ -479,7 +479,7 @@ export function _getRegistry(): ReadonlyMap<string, Timeline> {
 }
 
 // ============================================================================
-// Serialization + replay (R1.A — directive replay v0.1)
+// Serialization + replay (directive replay v0.1)
 // ============================================================================
 
 /**
@@ -545,7 +545,7 @@ export function deserializeTimeline(input: unknown): SerializedTimeline {
   if (!Array.isArray(obj.frames)) {
     throw new TypeError("[timeline] deserialize: frames must be an array");
   }
-  // R2 sec C-2: validate every frame is a structurally-sound object
+  // validate every frame is a structurally-sound object
   // before returning. Without this guard, untrusted input with
   // `frames: [null]` or `frames: [{event: null}]` slips through and
   // crashes the replay loop AND every matcher iteration with a
@@ -617,7 +617,7 @@ export interface ReplayOptions {
    * Maximum number of frames the replay loop will process before
    * stopping. Defaults to {@link DEFAULT_MAX_REPLAY_FRAMES}. Replay
    * of an unbounded prod-error JSON dump otherwise lets a malicious
-   * input run an unbounded synchronous loop in a worker. (R2 sec M-4.)
+   * input run an unbounded synchronous loop in a worker.
    */
   maxFrames?: number;
 }
@@ -629,7 +629,6 @@ export const DEFAULT_MAX_REPLAY_FRAMES = 100_000;
  * Diagnostic result returned by {@link replayTimeline}. Lets callers
  * verify that the replay actually re-dispatched the events they
  * expected, instead of silently no-op'ing on a non-mutator system.
- * (R2 arch M-2.)
  */
 export interface ReplayResult {
   /** Number of frames that produced a dispatch. */
@@ -772,10 +771,10 @@ function reconstructDispatch(
   if (event.key !== "pendingMutation") return null;
   const next = event.next as Record<string, unknown> | null;
   if (next === null) return null;
-  // R2 sec C-1: spread BEFORE the type literal so an attacker-controlled
+  // spread BEFORE the type literal so an attacker-controlled
   // `next.type` from untrusted JSON cannot override the MUTATE
   // dispatch type.
-  // R5 sec #8 (defense-in-depth): drop own `__proto__` / `constructor` /
+  // Defense-in-depth: drop own `__proto__` / `constructor` /
   // `prototype` keys before the spread. JSON.parse already stores these
   // as own properties (no prototype slot manipulation), and a plain
   // spread does not perform `obj["__proto__"] = ...` assignment, so the
@@ -794,7 +793,7 @@ function reconstructDispatch(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Bisect (R2.A) — git-bisect for timelines
+// Bisect — git-bisect for timelines
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -853,8 +852,8 @@ export interface BisectOptions {
    * before searching and refuses to bisect if the two runs produce
    * different oracle verdicts. Non-deterministic timelines silently
    * mislead bisection — the midpoint search picks an arbitrary
-   * direction at each step. R2.A's pre-mortem identified this as the
-   * #1 failure mode.
+   * direction at each step. This is the #1 failure mode for
+   * bisection.
    *
    * Disable only if you know the timeline is deterministic but the
    * oracle has unrelated nondeterminism you've measured to be
@@ -1129,7 +1128,7 @@ export async function bisectTimeline(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Diff (R2.C) — semantic causal-graph diff between two timelines
+// Diff — semantic causal-graph diff between two timelines
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -1433,7 +1432,7 @@ function deltaListFromMaps(
  *     appear in b but not a.
  *   - Mermaid sequence diagram emitter for the IDE/PR-review surface.
  *   - Ordered diff: pinpoint the FIRST frame where divergence appears
- *     (interaction with R2.A bisect — they share the prefix-replay
+ *     (interaction with bisect — they share the prefix-replay
  *     primitive).
  */
 export function diffTimelines(
@@ -1486,7 +1485,7 @@ export function diffTimelines(
   resolverRuns.sort((x, y) => x.resolver.localeCompare(y.resolver));
 
   // Errors: surface entries on each side that have no structural twin
-  // on the other side. R5 arch C1 fix — key on (kind, id, errorJson)
+  // on the other side. Key on (kind, id, errorJson)
   // ONLY; including frameIndex caused false positives when unrelated
   // count deltas earlier in the timeline shifted error indices,
   // making the same logical error appear as both a-only AND b-only.

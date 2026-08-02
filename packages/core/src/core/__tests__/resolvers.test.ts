@@ -1963,7 +1963,7 @@ describe("bound resolver — sibling clobber gap (factsBaseline)", () => {
 });
 
 // ============================================================================
-// R2 — factsBaseline lazy perf (system-level)
+// factsBaseline lazy perf (system-level)
 // ============================================================================
 
 /** Flush microtasks + one setTimeout round so reconcile lands. */
@@ -1973,7 +1973,7 @@ async function flushSettle(): Promise<void> {
   await flushMicrotasks();
 }
 
-describe("R2 — factsBaseline lazy perf", () => {
+describe("factsBaseline lazy perf", () => {
   it("clobber-binding still works with sparse baseline (only owned keys snapshotted)", async () => {
     // Build a module with many facts but only ONE bound constraint owning
     // a single key. The engine should still detect a tail-clobber on the
@@ -2098,10 +2098,10 @@ describe("R2 — factsBaseline lazy perf", () => {
 });
 
 // ============================================================================
-// R2 — Clobber observability
+// Clobber observability
 // ============================================================================
 
-describe("R2 — clobber observability via system.observe", () => {
+describe("clobber observability via system.observe", () => {
   it("emits resolver.write.rejected on a dropped abort-bound write", async () => {
     let release!: () => void;
     const blocker = new Promise<void>((r) => {
@@ -2186,10 +2186,10 @@ describe("R2 — clobber observability via system.observe", () => {
 });
 
 // ============================================================================
-// R4 FIX 7 — clobber-event amplification rate-limit
+// clobber-event amplification rate-limit
 // ============================================================================
 
-describe("R4 — clobber-event rate-limit", () => {
+describe("clobber-event rate-limit", () => {
   it("caps per-instance clobber events at 10 + one suppressed summary", async () => {
     // A single resolver abort-binds 100 facts. An external write clobbers
     // every one, then the resolver tries to write all 100 — without a
@@ -2321,10 +2321,10 @@ describe("R4 — clobber-event rate-limit", () => {
 });
 
 // ============================================================================
-// R2 — Batch baseline staleness
+// Batch baseline staleness
 // ============================================================================
 
-describe("R2 — batch baseline freshness", () => {
+describe("batch baseline freshness", () => {
   it("batched bound resolver uses the latest non-undefined baseline", async () => {
     // Two reqs hit the batch within the window. The first carries a
     // stale baseline (status='ready'). Between the two adds, an external
@@ -2400,7 +2400,7 @@ describe("R2 — batch baseline freshness", () => {
 });
 
 // ============================================================================
-// R1 C-batch 2 — Batch resolver in-flight cancellation (C8)
+// Batch resolver in-flight cancellation
 // ============================================================================
 //
 // Before this fix, `cancel(reqId)` and `cancelAll()` could only see
@@ -2412,7 +2412,7 @@ describe("R2 — batch baseline freshness", () => {
 // The fix tracks in-flight batches in `batchInflight` keyed by an opaque
 // instance id, with a `reqToBatch` reverse index so `cancel(reqId)` can
 // abort the owning batch in O(1).
-describe("batch resolver in-flight cancellation (R1 C8)", () => {
+describe("batch resolver in-flight cancellation", () => {
   it("cancel(reqId) aborts an in-flight batch via the shared controller", async () => {
     // Set up a batch resolver whose `resolveBatch` blocks on a deferred
     // promise so we can issue cancel before it completes.

@@ -526,6 +526,12 @@ export type UnpricedReason =
   | "zero-usage"
   /** The runner threw, so the call was never reported at all. */
   | "failed-call"
+  /**
+   * Text arrived for a generation the surviving result does not describe — a
+   * retry, a fallback, or a schema re-ask that was replayed over. The provider
+   * billed for it; the usage on the result that survived describes only itself.
+   */
+  | "replayed-generation"
   /** The counts and rates were both valid, but their product overflowed. */
   | "unusable-cost";
 
@@ -587,7 +593,9 @@ export function describeUnpricedReason(reason: UnpricedReason): string {
     case "zero-usage":
       return "result.tokenUsage reported zero input, output, and cache tokens, which no provider bills for a call that ran";
     case "failed-call":
-      return "the runner threw, so the call reported no usage at all — the provider may still have billed it";
+      return "the runner threw, so the call reported no usage at all — the provider may still have billed for whatever it delivered first";
+    case "replayed-generation":
+      return "text arrived for a generation that was replayed over — a retry, a fallback, or a schema re-ask — which the reported usage on the surviving result says nothing about";
     case "unusable-cost":
       return "the reported token counts priced out to a non-finite cost, which is unrecoverable once recorded";
   }

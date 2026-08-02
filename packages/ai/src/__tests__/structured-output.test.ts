@@ -132,7 +132,7 @@ describe("extractJsonFromOutput", () => {
   });
 
   // --------------------------------------------------------------------------
-  // R6 SECURITY — prototype pollution defense
+  // SECURITY: prototype pollution defense
   // --------------------------------------------------------------------------
 
   it("throws on extracted JSON with __proto__ key (direct parse path)", () => {
@@ -357,7 +357,7 @@ describe("withStructuredOutput", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("withStructuredOutput config validation", () => {
@@ -396,7 +396,7 @@ describe("withStructuredOutput config validation", () => {
 });
 
 // ============================================================================
-// extractJsonFromOutput length guard (M5)
+// extractJsonFromOutput length guard
 // ============================================================================
 
 describe("extractJsonFromOutput length guard", () => {

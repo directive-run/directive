@@ -33,9 +33,26 @@ export interface RunResult<T = unknown> {
   totalTokens: number;
   /** Breakdown of input vs output tokens, when available from the provider */
   tokenUsage?: TokenUsage;
+  /**
+   * Whether the provider actually reported token usage for this call.
+   *
+   * `false` means `tokenUsage` holds zeros because nothing was reported – not
+   * because nothing was spent. An OpenAI-compatible endpoint that ignores
+   * `stream_options.include_usage` (vLLM, LiteLLM, older gateways) is the
+   * common case. Cost tracking must treat such a call as *unpriceable* rather
+   * than free: `withBudget` charges its pre-call estimate instead and counts
+   * the call separately.
+   *
+   * Omitted entirely by runners that do not report the distinction, which is
+   * read as "usage is trustworthy" – the behavior every existing runner had.
+   */
+  usageReported?: boolean;
   /** True when result was served from semantic cache */
   isCached?: boolean;
 }
+
+/** Why a new generation started – the runner was re-invoked and replays. */
+export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
 
 /** Breakdown of token usage by input/output */
 export interface TokenUsage {
@@ -96,6 +113,18 @@ export type StreamingCallbackRunner = (
   agent: AgentLike,
   input: string,
   callbacks: {
+    /**
+     * Called with each text delta as it arrives. Awaited by the shipped
+     * adapters, so returning a promise applies backpressure to the provider
+     * stream – the reader does not pull the next chunk until it settles.
+     *
+     * Declared as returning `void` rather than `void | Promise<void>` on
+     * purpose. TypeScript lets a callback typed `=> void` return anything,
+     * so both `(t) => buffer.push(t)` and `async (t) => { await sink(t) }`
+     * are assignable, and both behave correctly – the promise is awaited
+     * either way. Widening the annotation would forfeit that rule and
+     * reject the first form, which is the shape most callers reach for.
+     */
     onToken?: (token: string) => void;
     onToolStart?: (tool: string, id: string, args: string) => void;
     onToolEnd?: (tool: string, id: string, result: string) => void;
@@ -110,6 +139,49 @@ export interface RunOptions {
   signal?: AbortSignal;
   onMessage?: (message: Message) => void;
   onToolCall?: (toolCall: ToolCall) => void | Promise<void>;
+  /**
+   * Present ⇒ the caller wants per-delta streaming from this run.
+   *
+   * This is a **request, not a guarantee**. A runner that cannot stream simply
+   * ignores it and returns the same buffered result it always would – there is
+   * no error and no capability to negotiate. Callers that need to know whether
+   * deltas actually arrived should count the calls they receive.
+   *
+   * Because streaming is an option on the runner rather than a second runner,
+   * it survives composition: every wrapper (`withRetry`, `withBudget`,
+   * `withFallback`, `withModelSelection`, `withStructuredOutput`) forwards
+   * `options` verbatim, so a wrapped runner streams with no wrapper changes and
+   * no wrapper can silently drop the capability.
+   *
+   * The callback is awaited, so returning a promise applies real backpressure to
+   * the provider – the adapter will not read the next chunk off the wire until
+   * it settles.
+   *
+   * Annotated `=> void` rather than `=> void | Promise<void>` deliberately.
+   * TypeScript allows a callback typed `=> void` to return any value, so
+   * `(t) => buffer.push(t)` and `async (t) => { await sink(t) }` are both
+   * assignable and both behave correctly. The wider annotation would reject
+   * the first – `push` returns a number – which is the form most callers
+   * write.
+   */
+  onToken?: (token: string) => void;
+  /**
+   * Called when something is about to re-invoke the runner with the same input,
+   * so everything already delivered through {@link RunOptions.onToken} for this
+   * run is void and the response arrives again from the beginning.
+   *
+   * Rides the same options object as `onToken` for the same reason: a wrapper
+   * that re-invokes the runner is the only code that knows a replay is coming,
+   * and every wrapper forwards these options verbatim. `withRetry`,
+   * `withFallback` and `withStructuredOutput` call it when they re-invoke, and
+   * the orchestrators call it for their own retries and reroutes. A consumer
+   * rendering deltas discards what it has rendered for the current generation
+   * when this fires.
+   *
+   * Without it a caller streaming through a retrying runner renders the first
+   * attempt and the second attempt end to end, as one run-on response.
+   */
+  onStreamRestart?: (reason: StreamRestartReason) => void;
 }
 
 // ============================================================================

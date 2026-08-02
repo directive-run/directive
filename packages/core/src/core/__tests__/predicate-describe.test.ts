@@ -449,10 +449,10 @@ describe("describePredicate — nested fact paths", () => {
 });
 
 // ============================================================================
-// F-4 — NumberFormat cache bound (FIFO eviction at NUMBER_FORMAT_CACHE_LIMIT)
+// NumberFormat cache bound (FIFO eviction at NUMBER_FORMAT_CACHE_LIMIT)
 // ============================================================================
 
-describe("getNumberFormat — F-4 cache cap (50 entries, FIFO eviction)", () => {
+describe("getNumberFormat — cache cap (50 entries, FIFO eviction)", () => {
   beforeEach(() => {
     _clearNumberFormatCache();
   });

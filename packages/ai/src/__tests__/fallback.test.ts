@@ -155,7 +155,7 @@ describe("withFallback", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("withFallback callback isolation", () => {

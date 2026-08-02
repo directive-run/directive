@@ -102,7 +102,7 @@ export function virtualClock(initialMs = 0): SignalClock {
         // backward. Without this clamp, `setTimeout(cb2, -5)` from
         // inside a callback would make `clock.now()` return a smaller
         // value mid-advance, breaking elapsedMs (negative results)
-        // and replay determinism. (R1 sec C3.)
+        // and replay determinism.
         nowMs = Math.max(nowMs, next.deadlineMs);
         next.canceled = true;
         next.cb();

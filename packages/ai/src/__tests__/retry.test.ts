@@ -241,7 +241,7 @@ describe("withRetry", () => {
 });
 
 // ============================================================================
-// Config Validation (C1)
+// Config Validation
 // ============================================================================
 
 describe("withRetry config validation", () => {
@@ -292,7 +292,7 @@ describe("withRetry config validation", () => {
 });
 
 // ============================================================================
-// Callback Isolation (C2)
+// Callback Isolation
 // ============================================================================
 
 describe("withRetry callback isolation", () => {
@@ -335,7 +335,7 @@ describe("withRetry callback isolation", () => {
 });
 
 // ============================================================================
-// AbortSignal (M1)
+// AbortSignal
 // ============================================================================
 
 describe("withRetry AbortSignal", () => {
@@ -368,6 +368,31 @@ describe("withRetry AbortSignal", () => {
     await expect(
       runner(mockAgent(), "hello", { signal: controller.signal }),
     ).rejects.toThrow(RetryExhaustedError);
+    expect(inner).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not announce a restart for an attempt it will not make", async () => {
+    // The signal was checked after the announcement, so an aborted run told
+    // its consumer to discard a generation that nothing ever replaced.
+    const inner = makeRunner([
+      new Error("request failed: 503"),
+      successResult("ok"),
+    ]);
+    const controller = new AbortController();
+    controller.abort(new Error("Already cancelled"));
+    const restarts: string[] = [];
+    const runner = withRetry(inner, { maxRetries: 3, baseDelayMs: 1 });
+
+    await expect(
+      runner(mockAgent(), "hello", {
+        signal: controller.signal,
+        onStreamRestart: (reason) => {
+          restarts.push(reason);
+        },
+      }),
+    ).rejects.toThrow(RetryExhaustedError);
+
+    expect(restarts).toEqual([]);
     expect(inner).toHaveBeenCalledTimes(1);
   });
 });

@@ -649,7 +649,7 @@ describe("Trace", () => {
   // -----------------------------------------------------------------------
   // 21. Deep copy in inspect
   // -----------------------------------------------------------------------
-  it("returns deep-copied trace from inspect() (M5)", async () => {
+  it("returns deep-copied trace from inspect()", async () => {
     const system = createSystemWithHistory();
     system.start();
     await system.settle();

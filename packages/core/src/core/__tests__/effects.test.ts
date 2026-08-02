@@ -621,7 +621,7 @@ describe("effects", () => {
       ).toThrow(/does not exist/);
     });
 
-    // R2 fix: onGates leaked across assignDefinition. A data-form `on`
+    // Regression: onGates leaked across assignDefinition. A data-form `on`
     // effect's compiled gate persisted in shouldRun after a swap to a
     // function-form effect, gating runs that should now be unconditional.
     it("clears a stale `on` gate when swapping to a function-form effect", async () => {

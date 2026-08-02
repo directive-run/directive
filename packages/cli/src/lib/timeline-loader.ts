@@ -8,8 +8,6 @@
  * lazy `await import()` semantics are preserved exactly: timeline
  * stays an optional peer, the CLI runs without it for non-timeline
  * commands, and the typed module shape is still single-sourced.
- *
- * (R5 arch C2 + arch M2.)
  */
 
 import pc from "picocolors";

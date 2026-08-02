@@ -3,6 +3,20 @@
  */
 
 import type {
+  StreamEventResult,
+  StreamTotals,
+  StreamWireFormat,
+} from "./adapters/shared.js";
+import { getStreamReader, parseEventStream } from "./adapters/shared.js";
+// Re-exported because `RunnerStreamingSupport` names them and `createRunner`
+// is public – a consumer writing their own adapter needs to spell these out.
+export type {
+  ParseEventStreamOptions,
+  StreamEventResult,
+  StreamTotals,
+  StreamWireFormat,
+} from "./adapters/shared.js";
+import type {
   AdapterHooks,
   AgentLike,
   AgentRunner,
@@ -58,6 +72,71 @@ export function estimateCost(
   ratePerMillionTokens: number,
 ): number {
   return (tokenUsage / 1_000_000) * ratePerMillionTokens;
+}
+
+/** Characters per token, the estimate this package applies throughout. */
+const CHARS_PER_TOKEN = 4;
+
+/**
+ * How many tokens a run should accrue against a token budget.
+ *
+ * The rule is that a ceiling accrues what was observed and never what it was
+ * told:
+ *
+ * - The provider's own counts, when it sent any. That is an observation of the
+ *   response, not a claim about a future one.
+ * - Otherwise the text that actually arrived — the assistant messages on the
+ *   result, or the deltas already delivered when the call threw before
+ *   returning one — plus the input that was sent to produce it.
+ * - Nothing at all, when nothing arrived. A call that produced no bytes has no
+ *   observed cost, so it accrues none.
+ *
+ * The version this replaces filled the last case with `agent.maxTokens`, which
+ * is a number the caller writes. A ceiling that accrues a caller-declared
+ * figure is not measuring anything; the same field priced its way past a
+ * five-cent per-call cap for eighteen dollars of real spend. It is a request
+ * parameter and nothing else here reads it.
+ *
+ * @param input - The input the run was given.
+ * @param result - What the run returned, or `undefined` when it threw.
+ * @param observedOutputChars - Characters delivered as deltas for this call.
+ * @returns Tokens to add to the budget's running total.
+ *
+ * @internal
+ */
+export function tokensForBudget(
+  input: string,
+  result: RunResult<unknown> | undefined,
+  observedOutputChars = 0,
+): number {
+  if (result && result.usageReported !== false) {
+    return result.totalTokens;
+  }
+
+  let outputChars = 0;
+  if (result) {
+    for (const message of result.messages) {
+      if (message.role === "assistant" && typeof message.content === "string") {
+        outputChars += message.content.length;
+      }
+    }
+    if (outputChars === 0 && typeof result.output === "string") {
+      outputChars = result.output.length;
+    }
+  }
+  // A stream that failed part-way delivered what it delivered, and the result
+  // that would have carried it never existed.
+  outputChars = Math.max(outputChars, observedOutputChars);
+
+  // Nothing came back and nothing was delivered: there is nothing to price.
+  if (!result && outputChars === 0) {
+    return 0;
+  }
+
+  return (
+    Math.ceil(input.length / CHARS_PER_TOKEN) +
+    Math.ceil(outputChars / CHARS_PER_TOKEN)
+  );
 }
 
 // ============================================================================
@@ -163,15 +242,66 @@ export interface ParsedResponse {
   cacheReadTokens?: number;
   /** Prompt-cache creation token count, when available from the provider */
   cacheCreationTokens?: number;
+  /**
+   * Whether the provider reported token usage at all.
+   *
+   * Omit – or pass `true` – when the counts above came from the response. Pass
+   * `false` when they are zeros standing in for numbers the provider never
+   * sent, so cost tracking can treat the call as unpriceable rather than free.
+   */
+  usageReported?: boolean;
+}
+
+/**
+ * Optional streaming support for a runner built with {@link createRunner}.
+ *
+ * Supplying this does not change what the runner does by default. It only
+ * teaches the runner how to consume the provider's stream so that a caller who
+ * passes `RunOptions.onToken` gets per-delta callbacks from the *same* runner –
+ * no second runner slot, and so nothing for a wrapper to forget to forward.
+ */
+export interface RunnerStreamingSupport {
+  /** Adapter name, used in dev-mode malformed-event warnings. */
+  adapterName: string;
+  /** Extract text and token counts from one streamed event. */
+  parseEvent: (event: Record<string, unknown>) => StreamEventResult;
+  /** How the provider frames its streamed events. @default "sse" */
+  wireFormat?: StreamWireFormat;
+  /**
+   * Fail the run when the stream ends without the provider's end-of-response
+   * marker – `[DONE]`, a `terminal` event from {@link RunnerStreamingSupport.parseEvent},
+   * or both.
+   *
+   * A truncated body arrives as a clean end of stream, so without this a
+   * partial response resolves successfully and reads as a short answer. Off by
+   * default so a `parseEvent` written before the flag existed keeps working;
+   * the shipped adapters set it.
+   *
+   * @default false
+   */
+  requireTerminalEvent?: boolean;
+  /**
+   * Build the final parsed response from the accumulated stream totals.
+   * Supply this when the buffered path computes `totalTokens` from more than
+   * input + output (e.g. Anthropic with prompt caching) so both paths agree.
+   */
+  buildResponse?: (totals: StreamTotals) => ParsedResponse;
 }
 
 /** Options for creating an AgentRunner from buildRequest/parseResponse */
 export interface CreateRunnerOptions {
   fetch?: typeof globalThis.fetch;
+  /**
+   * Build the HTTP request. `stream` is `true` only when the caller passed
+   * `RunOptions.onToken` *and* {@link CreateRunnerOptions.streaming} is
+   * configured – implementations that ignore the parameter keep their existing
+   * buffered behavior.
+   */
   buildRequest: (
     agent: AgentLike,
     input: string,
     messages: Message[],
+    stream: boolean,
   ) => { url: string; init: RequestInit };
   parseResponse: (
     response: Response,
@@ -180,6 +310,19 @@ export interface CreateRunnerOptions {
   parseOutput?: <T>(text: string) => T;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Enables `RunOptions.onToken` on this runner. Omit for buffered-only. */
+  streaming?: RunnerStreamingSupport;
+}
+
+/** Default stream totals → parsed response mapping. */
+function defaultStreamResponse(totals: StreamTotals): ParsedResponse {
+  return {
+    text: totals.fullText,
+    totalTokens: totals.inputTokens + totals.outputTokens,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    usageReported: totals.usageReported,
+  };
 }
 
 /**
@@ -194,6 +337,11 @@ export interface CreateRunnerOptions {
  *
  * Output parsing defaults to `JSON.parse` with a string fallback. Supply a custom
  * `parseOutput` to override (e.g. for structured output schemas).
+ *
+ * When `streaming` is configured, the same runner streams from the provider for
+ * any call that passes `RunOptions.onToken` and buffers for every call that does
+ * not. Both paths share the response assembly below, so `output`, `messages`,
+ * `tokenUsage` and the adapter hooks are identical either way.
  *
  * @param options - Configuration for the runner, including request building, response parsing, and hooks.
  * @returns An {@link AgentRunner} function that performs LLM calls via fetch.
@@ -241,6 +389,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     parseResponse,
     parseOutput,
     hooks,
+    streaming,
   } = options;
 
   const defaultParseOutput = <T>(text: string): T => {
@@ -263,10 +412,15 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
 
     const messages: Message[] = [{ role: "user", content: input }];
 
-    try {
-      const { url, init } = buildRequest(agent, input, messages);
+    // `onToken` is a request, not a guarantee: a runner without streaming
+    // support ignores it and returns the same buffered result it always would.
+    const onToken = runOptions?.onToken;
+    const shouldStream = onToken !== undefined && streaming !== undefined;
 
-      // (Sec MAJOR) Combine signals — `buildRequest` may set
+    try {
+      const { url, init } = buildRequest(agent, input, messages, shouldStream);
+
+      // Combine signals — `buildRequest` may set
       // `init.signal` (e.g. `AbortSignal.timeout(timeoutMs)`) and the
       // caller may pass their own via `runOptions.signal`. Naively
       // overwriting one with the other silently disables whichever was
@@ -289,7 +443,29 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         );
       }
 
-      const parsed = await parseResponse(response, messages);
+      let parsed: ParsedResponse;
+      if (shouldStream) {
+        const totals = await parseEventStream(
+          getStreamReader(response),
+          onToken,
+          streaming.parseEvent,
+          streaming.adapterName,
+          streaming.wireFormat,
+          {
+            signal: combined,
+            requireTerminalEvent: streaming.requireTerminalEvent,
+          },
+        );
+        // Read off the totals rather than off `buildResponse`, so an adapter
+        // that supplies its own response builder cannot lose the distinction
+        // between "the provider said zero" and "the provider said nothing".
+        parsed = {
+          ...(streaming.buildResponse ?? defaultStreamResponse)(totals),
+          usageReported: totals.usageReported,
+        };
+      } else {
+        parsed = await parseResponse(response, messages);
+      }
       const tokenUsage: TokenUsage = {
         inputTokens: parsed.inputTokens ?? 0,
         outputTokens: parsed.outputTokens ?? 0,
@@ -326,6 +502,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         toolCalls: [],
         totalTokens: parsed.totalTokens,
         tokenUsage,
+        usageReported: parsed.usageReported ?? true,
       };
     } catch (err) {
       const durationMs = Date.now() - startTime;

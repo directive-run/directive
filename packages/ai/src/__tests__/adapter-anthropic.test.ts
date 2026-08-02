@@ -459,6 +459,7 @@ describe("createAnthropicStreamingRunner", () => {
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}',
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" world"}}',
           'data: {"type":"message_delta","usage":{"output_tokens":5}}',
+          'data: {"type":"message_stop"}',
         ]),
       );
 
@@ -485,6 +486,7 @@ describe("createAnthropicStreamingRunner", () => {
           'data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}',
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}',
           'data: {"type":"message_delta","usage":{"output_tokens":2}}',
+          'data: {"type":"message_stop"}',
         ]),
       );
 
@@ -513,6 +515,7 @@ describe("createAnthropicStreamingRunner", () => {
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}',
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" world"}}',
           'data: {"type":"message_delta","usage":{"output_tokens":5}}',
+          'data: {"type":"message_stop"}',
         ]),
       );
 
@@ -523,7 +526,9 @@ describe("createAnthropicStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "Hi", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["Hello", " world"]);
@@ -539,6 +544,7 @@ describe("createAnthropicStreamingRunner", () => {
           'data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}',
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Done"}}',
           'data: {"type":"message_delta","usage":{"output_tokens":3}}',
+          'data: {"type":"message_stop"}',
         ]),
       );
 
@@ -564,6 +570,7 @@ describe("createAnthropicStreamingRunner", () => {
           'data: {"type":"message_start","message":{"usage":{"input_tokens":5}}}',
           'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"reply"}}',
           'data: {"type":"message_delta","usage":{"output_tokens":2}}',
+          'data: {"type":"message_stop"}',
         ]),
       );
 

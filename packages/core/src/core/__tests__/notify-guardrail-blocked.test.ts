@@ -1,10 +1,10 @@
 /**
  * Tests for `system.notify.guardrailBlocked` — RFC 0010 plugin
- * authoring surface + R19 hardening.
+ * authoring surface + .
  *
  * The notify surface is public on `System` so external guardrail
  * plugins can emit `"guardrail.blocked"` events through the same
- * fabric as engine-internal events. R19 closed two surfaces:
+ * fabric as engine-internal events. Two surfaces are closed:
  *   1. `plugin` field validation — must match a registered plugin
  *      name; unknown names are dropped + warned.
  *   2. Reentry depth cap — a plugin's `onGuardrailBlocked` hook
@@ -30,7 +30,7 @@ const module = createModule("nt", {
   },
 });
 
-describe("system.notify.guardrailBlocked — R19 hardening", () => {
+describe("system.notify.guardrailBlocked — ", () => {
   it("emits the typed event when plugin name matches a registered plugin", () => {
     const events: Array<{
       type: string;

@@ -1,6 +1,5 @@
-// End-to-end gate the UX-lens AE review demanded after 0.3.0/0.3.1
-// shipped a playground tool whose URLs booted broken module-only code
-// in StackBlitz. Closes that class of regression: assert that a
+// End-to-end gate added after 0.3.0/0.3.1 shipped a playground tool
+// whose URLs booted broken module-only code in StackBlitz. Closes that class of regression: assert that a
 // generate_module → playground_link composition produces a URL whose
 // decoded payload contains BOTH a library-shape module (createModule +
 // schema) AND a runner (createSystem + system.start), so a future

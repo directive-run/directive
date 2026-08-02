@@ -39,6 +39,7 @@ import {
 import type {
   OrchestratorStreamChunk,
   OrchestratorStreamResult,
+  StreamStats,
 } from "./agent-orchestrator.js";
 import {
   type DebugTimeline,
@@ -132,13 +133,21 @@ import {
   validateCheckpoint,
 } from "./checkpoint.js";
 import {
+  ChunkBuffer,
   type MultiplexedStreamResult,
+  StreamConsumerError,
+  type StreamRestartReason,
+  type TokenSink,
   mergeTaggedStreams,
+  reportIfRunnerIgnoredOnToken,
+  sliceTailByCodePoint,
 } from "./streaming.js";
 import {
   extractJsonFromOutput,
   withStructuredOutput,
 } from "./structured-output.js";
+
+import { tokensForBudget } from "./agent-utils.js";
 
 import { safeStringify } from "@directive-run/core/internals";
 
@@ -173,6 +182,7 @@ import type {
   MultiAgentOrchestratorOptions,
   MultiAgentRunCallOptions,
   MultiAgentState,
+  MultiAgentStreamCallOptions,
   ParallelPattern,
   RacePattern,
   RaceResult,
@@ -198,6 +208,21 @@ interface PauseBudgetExceededReq extends Requirement {
 
 /** Built-in RUN_AGENT requirement guard */
 const isRunAgentReq = requirementGuard<RunAgentRequirement>("RUN_AGENT");
+
+/**
+ * Read the streaming restart channel off an options object, if present.
+ *
+ * `onStreamRestart` is a field of {@link RunOptions}, so it reaches the runner
+ * wrappers on the same object `onToken` travels on and they report their own
+ * re-invocations through it. The orchestrator reads it back here for the
+ * re-invocations it performs itself – the agent-level retry and the
+ * self-healing reroute – which no wrapper can see.
+ */
+function getStreamRestart(
+  opts: unknown,
+): ((reason: StreamRestartReason) => void) | undefined {
+  return (opts as RunOptions | undefined)?.onStreamRestart;
+}
 
 // ============================================================================
 // Implementation
@@ -749,6 +774,15 @@ export function createMultiAgentOrchestrator(
       throw new Error("[Directive MultiAgent] Orchestrator has been destroyed");
     }
   }
+
+  // Streams handed out by `runAgentStream` that have not reached a terminal
+  // chunk. `destroy()` walks this so an in-flight run is aborted and its
+  // consumers released; a stream left open at that moment parks every
+  // `for await` on a waiter that nothing will ever resolve, and leaves the
+  // provider request – and the spend it is accruing – with nothing to cancel
+  // it. Each entry removes itself the moment its stream closes, so the set
+  // holds only what is genuinely open rather than growing once per run.
+  const liveStreams = new Set<{ shutdown: () => void }>();
 
   // Semaphores for concurrency control
   const semaphores = new Map<string, Semaphore>();
@@ -1837,6 +1871,11 @@ export function createMultiAgentOrchestrator(
             });
           }
 
+          // A reroute re-runs the prompt against a different agent, so a
+          // consumer streaming deltas has to discard what it rendered from
+          // the agent that failed.
+          getStreamRestart(opts)?.("reroute");
+
           // Prevent circular reroute (max 1 hop)
           return runSingleAgent<T>(alternate, input, {
             ...opts,
@@ -2083,14 +2122,107 @@ export function createMultiAgentOrchestrator(
             opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
           extractJson: registration.extractJson,
           schemaDescription: registration.schemaDescription,
+          // A schema retry re-prompts and replays the whole response.
+          // `withStructuredOutput` reports that boundary itself, through the
+          // `onStreamRestart` it receives on the run options.
         });
       }
 
       // Effective retry config: per-agent overrides orchestrator default
       const effectiveRetry = registration.retry ?? defaultAgentRetry;
 
+      // Count the deltas that actually arrive so a runner that ignored the
+      // request can be named rather than failing silently. `onToken` is
+      // annotated `=> void` for assignability but the adapters await it, so
+      // read it back as value-returning and hand the caller's promise along.
+      const callerOnToken = (opts?.onToken ??
+        registration.runOptions?.onToken) as TokenSink | undefined;
+      let realDeltaCount = 0;
+      // What the provider delivered, measured as it arrives. A call that
+      // throws has no result to price, and this is what it cost.
+      let realDeltaChars = 0;
+
+      /**
+       * Add a call's tokens to this agent's total, the orchestrator's global
+       * total, and the budget warning that watches it.
+       *
+       * Called the moment the provider call ends, on either outcome. The
+       * accrual used to sit after the `pre_output_guardrails` breakpoint and
+       * the output guardrails, both of which throw: an input that reliably
+       * trips an output guardrail bought fifty provider calls and five hundred
+       * thousand tokens against a thousand-token cap, with the agent's
+       * `tokenUsage` still reading zero.
+       */
+      const accrueTokenUsage = (tokens: number): void => {
+        if (tokens <= 0) {
+          return;
+        }
+        system.batch(() => {
+          const currentAgent = getAgentState(agentFacts);
+          setAgentState(agentFacts, {
+            ...currentAgent,
+            tokenUsage: currentAgent.tokenUsage + tokens,
+          });
+        });
+        state.totalTokens += tokens;
+
+        // Update global token count atomically via System facts. Read-modify-
+        // write inside a batch to prevent desync from concurrent runs.
+        const coordFacts = getAgentFacts("__coord");
+        let shouldFireBudgetWarning = false;
+        let budgetPercentage = 0;
+        system.batch(() => {
+          const currentTokens = getBridgeFact<number>(
+            coordFacts,
+            "__globalTokens",
+          );
+          const newTotal = currentTokens + tokens;
+          globalTokenCount = newTotal;
+          setBridgeFact(coordFacts, "__globalTokens", newTotal);
+
+          // Check budget warning threshold
+          if (maxTokenBudget && onBudgetWarning) {
+            budgetPercentage = newTotal / maxTokenBudget;
+            const warningFired = getBridgeFact<boolean>(
+              coordFacts,
+              "__budgetWarningFired",
+            );
+            if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
+              setBridgeFact(coordFacts, "__budgetWarningFired", true);
+              shouldFireBudgetWarning = true;
+            }
+          }
+        });
+
+        // Callbacks should not run inside a batch.
+        if (shouldFireBudgetWarning) {
+          try {
+            onBudgetWarning!({
+              currentTokens: globalTokenCount,
+              maxBudget: maxTokenBudget!,
+              percentage: budgetPercentage,
+            });
+          } catch (callbackError) {
+            if (debug) {
+              console.debug(
+                "[Directive MultiAgent] onBudgetWarning threw:",
+                callbackError,
+              );
+            }
+          }
+        }
+      };
+      const countingOnToken = callerOnToken
+        ? (token: string): unknown => {
+            realDeltaCount++;
+            realDeltaChars += token.length;
+
+            return callerOnToken(token);
+          }
+        : undefined;
+
       // Run agent with retry support
-      const result = await executeAgentWithRetry<T>(
+      const agentCall = executeAgentWithRetry<T>(
         effectiveRunner,
         agent,
         processedInput,
@@ -2098,6 +2230,7 @@ export function createMultiAgentOrchestrator(
           ...registration.runOptions,
           ...opts,
           signal: controller.signal,
+          onToken: countingOnToken,
           onMessage: (message) => {
             const currentConversation = getConversation(agentFacts);
             const updated = [...currentConversation, message];
@@ -2197,6 +2330,7 @@ export function createMultiAgentOrchestrator(
           ? {
               ...effectiveRetry,
               onRetry: (attempt, error, delayMs) => {
+                getStreamRestart(opts)?.("retry");
                 effectiveRetry.onRetry?.(attempt, error, delayMs);
                 fireHook("onAgentRetry", {
                   agentId,
@@ -2210,6 +2344,27 @@ export function createMultiAgentOrchestrator(
               },
             }
           : undefined,
+      );
+
+      let result: RunResult<T>;
+      try {
+        result = await agentCall;
+      } catch (err) {
+        // Charge what the provider delivered before it failed, and nothing
+        // when it delivered nothing.
+        accrueTokenUsage(
+          tokensForBudget(processedInput, undefined, realDeltaChars),
+        );
+
+        throw err;
+      }
+      accrueTokenUsage(tokensForBudget(processedInput, result, realDeltaChars));
+
+      reportIfRunnerIgnoredOnToken(
+        agent.name,
+        callerOnToken !== undefined,
+        realDeltaCount,
+        result.output,
       );
 
       // ---- Breakpoint: pre_output_guardrails ----
@@ -2284,14 +2439,14 @@ export function createMultiAgentOrchestrator(
         }
       }
 
-      // Update per-agent facts
+      // Update per-agent facts. Tokens were accrued when the call ended, so
+      // this writes only what the guardrails could still have changed.
       system.batch(() => {
         const currentAgent = getAgentState(agentFacts);
         setAgentState(agentFacts, {
           ...currentAgent,
           status: "completed",
           output: result.output,
-          tokenUsage: currentAgent.tokenUsage + result.totalTokens,
           turnCount: currentAgent.turnCount + result.messages.length,
           completedAt: Date.now(),
         });
@@ -2301,54 +2456,7 @@ export function createMultiAgentOrchestrator(
       state.status = "completed";
       state.lastOutput = result.output;
       state.runCount++;
-      state.totalTokens += result.totalTokens;
       notifyIdleWaiters();
-
-      // Update global token count atomically via System facts
-      // Use read-modify-write inside batch to prevent desync from concurrent runs
-      const coordFacts = getAgentFacts("__coord");
-      let shouldFireBudgetWarning = false;
-      let budgetPercentage = 0;
-      system.batch(() => {
-        const currentTokens = getBridgeFact<number>(
-          coordFacts,
-          "__globalTokens",
-        );
-        const newTotal = currentTokens + result.totalTokens;
-        globalTokenCount = newTotal;
-        setBridgeFact(coordFacts, "__globalTokens", newTotal);
-
-        // Check budget warning threshold
-        if (maxTokenBudget && onBudgetWarning) {
-          budgetPercentage = newTotal / maxTokenBudget;
-          const warningFired = getBridgeFact<boolean>(
-            coordFacts,
-            "__budgetWarningFired",
-          );
-          if (budgetPercentage >= budgetWarningThreshold && !warningFired) {
-            setBridgeFact(coordFacts, "__budgetWarningFired", true);
-            shouldFireBudgetWarning = true;
-          }
-        }
-      });
-
-      // Fire budget warning callback outside of batch (callbacks shouldn't run inside batch)
-      if (shouldFireBudgetWarning) {
-        try {
-          onBudgetWarning!({
-            currentTokens: globalTokenCount,
-            maxBudget: maxTokenBudget!,
-            percentage: budgetPercentage,
-          });
-        } catch (callbackError) {
-          if (debug) {
-            console.debug(
-              "[Directive MultiAgent] onBudgetWarning threw:",
-              callbackError,
-            );
-          }
-        }
-      }
 
       // Store messages in memory (best-effort — don't fail the run on memory errors)
       // Only store the user message once — agent-utils includes it in every result,
@@ -2494,7 +2602,11 @@ export function createMultiAgentOrchestrator(
   function runAgentStreamImpl<T>(
     agentId: string,
     input: string,
-    options: { signal?: AbortSignal } = {},
+    options: {
+      signal?: AbortSignal;
+      deltas?: boolean;
+      onToken?: (token: string) => void;
+    } = {},
   ): OrchestratorStreamResult<T> {
     assertNotDestroyed();
 
@@ -2519,7 +2631,13 @@ export function createMultiAgentOrchestrator(
         }
       };
 
+      // Registered in `liveStreams` while this stream is open; the real body
+      // is assigned once the abort controller below exists.
+      const taskHandle: { shutdown: () => void } = { shutdown: () => {} };
+
       const closeTaskStream = () => {
+        // No longer something `destroy()` needs to reach.
+        liveStreams.delete(taskHandle);
         taskClosed = true;
         for (const w of taskWaiters) {
           w(null);
@@ -2541,6 +2659,15 @@ export function createMultiAgentOrchestrator(
         }
       }
 
+      // `abort()` alone leaves consumers parked on `taskWaiters` until the
+      // rejection makes it back round; `destroy()` has to close the stream
+      // itself, because nothing is coming back round after it.
+      taskHandle.shutdown = () => {
+        taskAbortController.abort();
+        closeTaskStream();
+      };
+      liveStreams.add(taskHandle);
+
       const resultPromise = runSingleAgent<T>(agentId, input, {
         signal: taskAbortController.signal,
       })
@@ -2550,7 +2677,29 @@ export function createMultiAgentOrchestrator(
               typeof result.output === "string"
                 ? result.output
                 : safeStringify(result.output);
-            pushTaskChunk({ type: "token", data: output, tokenCount: 0 });
+            // A task is a function, not a model: its output exists all at
+            // once, so there are no deltas to stream. `deltas: true` gets the
+            // one whole-output chunk below, and an `onToken` callback gets the
+            // same text – ignoring it left a callback-based consumer with
+            // nothing at all while the chunk consumer got everything.
+            try {
+              options.onToken?.(output);
+            } catch (err) {
+              const consumerError = new StreamConsumerError(err);
+              pushTaskChunk({ type: "error", error: consumerError });
+              closeTaskStream();
+
+              throw consumerError;
+            }
+            pushTaskChunk({
+              type: "token",
+              data: output,
+              deltaCount: 1,
+              // A task runs once and is never replayed, so its output always
+              // belongs to the first generation.
+              generation: 1,
+              tokenCount: 0,
+            });
             pushTaskChunk({
               type: "done",
               totalTokens: 0,
@@ -2607,6 +2756,16 @@ export function createMultiAgentOrchestrator(
           },
         },
         result: resultPromise,
+        // A task stream emits one chunk and a `done`; it neither buffers nor
+        // drops, and has no generation to restart.
+        getStats: (): StreamStats => ({
+          bufferedChunks: taskChunks.length,
+          droppedChunks: 0,
+          deltaCount: 0,
+          generation: 1,
+          restarts: 0,
+          closed: taskClosed,
+        }),
         abort: () => {
           taskAbortController.abort();
         },
@@ -2632,12 +2791,35 @@ export function createMultiAgentOrchestrator(
     const MAX_AGENT_STREAM_BUFFER = 10_000;
     const MAX_ACCUMULATED_OUTPUT = 100_000;
     const abortController = new AbortController();
-    const chunks: OrchestratorStreamChunk[] = [];
+    const chunks = new ChunkBuffer<OrchestratorStreamChunk>(
+      MAX_AGENT_STREAM_BUFFER,
+    );
     const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
     let closed = false;
     const startTime = Date.now();
     let tokenCount = 0;
     let accumulatedOutput = "";
+    // Chunks lost because the consumer fell behind – reported on `done`.
+    let droppedChunks = 0;
+    // `token` chunks emitted for the current generation, reset at every
+    // generation boundary.
+    let deltaCount = 0;
+    // Which generation the consumer is assembling. 1 until the first
+    // re-invocation of the runner.
+    let generation = 1;
+    // How many of those have already been attributed to a completed assistant
+    // message, so `onMessage` can tell whether real deltas arrived for it.
+    let deltasAttributedToMessages = 0;
+    // How many times the runner was re-invoked, whether or not deltas were
+    // asked for. `generation` only moves when they were, so reporting
+    // `generation - 1` made restarts structurally zero on the buffered path –
+    // a figure that read "none happened" when it meant "not measured".
+    let restarts = 0;
+    // When the first `token` chunk was emitted, for diagnosing a stall.
+    let firstTokenAt: number | undefined;
+    // `onToken` implies `deltas` – a callback is only useful if deltas flow.
+    const streamRequested =
+      options.deltas === true || options.onToken !== undefined;
 
     let abortHandler: (() => void) | undefined;
     if (options.signal) {
@@ -2653,18 +2835,29 @@ export function createMultiAgentOrchestrator(
 
     const pushChunk = (chunk: OrchestratorStreamChunk) => {
       if (closed) return;
+      if (firstTokenAt === undefined && chunk.type === "token") {
+        firstTokenAt = Date.now();
+      }
       const waiter = waiters.shift();
       if (waiter) {
         waiter(chunk);
       } else {
-        if (chunks.length >= MAX_AGENT_STREAM_BUFFER) {
-          chunks.shift();
-        }
-        chunks.push(chunk);
+        // Drop the NEWEST droppable chunk on overflow. Evicting the oldest
+        // kept the tail of a response and silently deleted its beginning. A
+        // control chunk is never refused – it makes room by evicting a
+        // droppable chunk, or the oldest chunk when there is none – but the
+        // cap applies to it too, so a stalled consumer cannot accumulate
+        // control chunks without limit.
+        droppedChunks += chunks.admit(chunk);
       }
     };
 
+    // Registered in `liveStreams` while this stream is open.
+    const streamHandle: { shutdown: () => void } = { shutdown: () => {} };
+
     const closeStream = () => {
+      // No longer something `destroy()` needs to reach.
+      liveStreams.delete(streamHandle);
       closed = true;
       cleanup();
       for (const waiter of waiters) {
@@ -2673,7 +2866,89 @@ export function createMultiAgentOrchestrator(
       waiters.length = 0;
     };
 
-    const resultPromise = (async (): Promise<RunResult<T>> => {
+    // Whether the run has reached its own end – either outcome. Set inside
+    // the run itself, so a shutdown issued in the same tick as the run's
+    // completion cannot see a stale `false`.
+    let runSettled = false;
+    // Rejects the caller's `result` when the stream is torn down and the run
+    // is still going. Nothing obliges a runner to honor the `AbortSignal` it
+    // is handed: aborting and closing released consumers parked on the
+    // iterator and left `result` pending forever, so a graceful shutdown
+    // waiting on it never finished.
+    let rejectResult: ((reason: unknown) => void) | undefined;
+    const shutdownRejection = new Promise<never>((_resolve, reject) => {
+      rejectResult = reject;
+    });
+    shutdownRejection.catch(() => {});
+
+    // Everything `abort()` does, and what `destroy()` calls on any stream
+    // still open. Registered before the run starts so a stream that fails on
+    // its first tick is still reachable.
+    const shutdownStream = (): void => {
+      abortController.abort();
+      closeStream();
+      if (!runSettled) {
+        rejectResult?.(
+          abortController.signal.reason ??
+            new Error(
+              "[Directive] Stream was shut down before the run settled.",
+            ),
+        );
+      }
+    };
+    streamHandle.shutdown = shutdownStream;
+    liveStreams.add(streamHandle);
+
+    // Bound the partial output without bisecting a surrogate pair.
+    const appendToAccumulated = (text: string) => {
+      accumulatedOutput = sliceTailByCodePoint(
+        accumulatedOutput + text,
+        MAX_ACCUMULATED_OUTPUT,
+      );
+    };
+
+    // A generation boundary – retry, schema retry or reroute is about to
+    // replay the whole response. Only emitted when the caller asked for
+    // deltas; without that a generation arrives as one whole-message chunk
+    // and there is nothing part-rendered to discard.
+    const beginGeneration = (reason: StreamRestartReason) => {
+      // A re-invocation happened whether or not anyone is rendering deltas,
+      // and `getStats()` reports it either way.
+      restarts++;
+      if (!streamRequested) {
+        return;
+      }
+      generation++;
+      pushChunk({ type: "stream_restart", reason, generation });
+      deltaCount = 0;
+      deltasAttributedToMessages = 0;
+      accumulatedOutput = "";
+    };
+
+    // The orchestrator's own `onToken`, handed down the path `runSingleAgent`
+    // already uses, so retry, guardrails, tool-call approval and the facts
+    // bridge all still apply. The caller's callback runs last and its return
+    // value is passed back, so returning a promise applies backpressure. With
+    // `deltas: true` and no callback there is nothing to await and the chunks
+    // are the whole point.
+    const callerOnToken = options.onToken as TokenSink | undefined;
+    const handleDelta = streamRequested
+      ? (token: string): unknown => {
+          deltaCount++;
+          appendToAccumulated(token);
+          pushChunk({
+            type: "token",
+            data: token,
+            deltaCount,
+            generation,
+            tokenCount: deltaCount,
+          });
+
+          return callerOnToken?.(token);
+        }
+      : undefined;
+
+    const runPromise = (async (): Promise<RunResult<T>> => {
       pushChunk({
         type: "progress",
         phase: "starting",
@@ -2681,20 +2956,40 @@ export function createMultiAgentOrchestrator(
       });
 
       try {
-        const result = await runSingleAgent<T>(agentId, input, {
+        const runOptions: MultiAgentRunCallOptions = {
           signal: abortController.signal,
+          onToken: handleDelta,
+          // Reaches the runner wrappers on the same object `onToken` does, so
+          // a `withRetry` or `withFallback` the caller composed reports its
+          // own re-invocations here, and the orchestrator reads it back for
+          // the retries and reroutes it performs itself.
+          onStreamRestart: beginGeneration,
           onMessage: (message) => {
             pushChunk({ type: "message", message });
             if (message.role === "assistant" && message.content) {
+              // Real deltas for this message already landed on the stream and
+              // in `accumulatedOutput`; synthesizing a whole-message chunk on
+              // top of them would deliver the response twice. Measured per
+              // message so a later turn without deltas still gets one.
+              const deltasForThisMessage =
+                deltaCount - deltasAttributedToMessages;
+              deltasAttributedToMessages = deltaCount;
+              if (deltasForThisMessage > 0) {
+                return;
+              }
+
               const newTokens = Math.ceil(message.content.length / 4);
               tokenCount += newTokens;
-              accumulatedOutput += message.content;
-              if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                accumulatedOutput = accumulatedOutput.slice(
-                  -MAX_ACCUMULATED_OUTPUT,
-                );
-              }
-              pushChunk({ type: "token", data: message.content, tokenCount });
+              deltaCount++;
+              deltasAttributedToMessages = deltaCount;
+              appendToAccumulated(message.content);
+              pushChunk({
+                type: "token",
+                data: message.content,
+                deltaCount,
+                generation,
+                tokenCount,
+              });
             }
           },
           onToolCall: async (toolCall) => {
@@ -2713,14 +3008,19 @@ export function createMultiAgentOrchestrator(
               });
             }
           },
-        });
+        };
+        // A runner that ignores `onToken` is reported from `runSingleAgentInner`,
+        // which sits at the actual runner boundary. Checking again here would
+        // also fire for a self-healing fallback response, which never reached a
+        // runner at all.
+        const result = await runSingleAgent<T>(agentId, input, runOptions);
 
         const duration = Date.now() - startTime;
         pushChunk({
           type: "done",
           totalTokens: result.totalTokens,
           duration,
-          droppedTokens: 0,
+          droppedTokens: droppedChunks,
         });
         closeStream();
 
@@ -2738,17 +3038,26 @@ export function createMultiAgentOrchestrator(
         pushChunk({
           type: "error",
           error: error instanceof Error ? error : new Error(String(error)),
+          // A run that dropped chunks and then failed reported nothing about
+          // the loss, because only `done` carried the figure.
+          droppedTokens: droppedChunks,
         });
         closeStream();
         throw error;
+      } finally {
+        runSettled = true;
       }
     })();
+
+    // The run itself, or the teardown, whichever reaches an end first. On
+    // every path but a runner that ignores its signal, the run wins.
+    const resultPromise = Promise.race([runPromise, shutdownRejection]);
 
     const stream: AsyncIterable<OrchestratorStreamChunk> = {
       [Symbol.asyncIterator](): AsyncIterator<OrchestratorStreamChunk> {
         return {
           async next(): Promise<IteratorResult<OrchestratorStreamChunk>> {
-            if (chunks.length > 0) {
+            if (chunks.size > 0) {
               return { done: false, value: chunks.shift()! };
             }
             if (closed) {
@@ -2772,22 +3081,28 @@ export function createMultiAgentOrchestrator(
     };
 
     // Prevent unhandled rejection if caller only consumes stream (not .result)
+    runPromise.catch(() => {});
     resultPromise.catch(() => {});
 
     return {
       stream,
       result: resultPromise,
-      abort: () => {
-        abortController.abort();
-        closeStream();
-      },
+      abort: shutdownStream,
+      getStats: (): StreamStats => ({
+        bufferedChunks: chunks.size,
+        droppedChunks,
+        ...(firstTokenAt !== undefined
+          ? { timeToFirstTokenMs: firstTokenAt - startTime }
+          : {}),
+        deltaCount,
+        generation,
+        restarts,
+        closed,
+      }),
       // RFC 0005: multi-agent delegate streams don't bind liveContext
       // — interruption maps to abort. Single-agent runStream is the
       // surface where liveContext lives.
-      interrupt: () => {
-        abortController.abort();
-        closeStream();
-      },
+      interrupt: shutdownStream,
     };
   }
 
@@ -4685,7 +5000,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Safe wrapper for user-provided callbacks (C1). */
+  /** Safe wrapper for user-provided callbacks. */
   function safeCall<A extends unknown[], R>(
     fn: ((...args: A) => R) | undefined,
     ...args: A
@@ -4703,7 +5018,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Safe wrapper for async user-provided callbacks (C1). */
+  /** Safe wrapper for async user-provided callbacks. */
   async function safeCallAsync<A extends unknown[], R>(
     fn: ((...args: A) => R | Promise<R>) | undefined,
     ...args: A
@@ -4721,7 +5036,7 @@ export function createMultiAgentOrchestrator(
     }
   }
 
-  /** Compute estimatedStepsRemaining and decelerating from step history (M7). */
+  /** Compute estimatedStepsRemaining and decelerating from step history. */
   function computeGoalMetrics(
     currentSatisfaction: number,
     stepMetrics: GoalStepMetrics[],
@@ -4761,7 +5076,7 @@ export function createMultiAgentOrchestrator(
     };
   }
 
-  /** Clamp satisfaction to [0, 1] and guard against NaN/Infinity (M4). */
+  /** Clamp satisfaction to [0, 1] and guard against NaN/Infinity. */
   function clampSatisfaction(value: number | undefined): number {
     if (value == null || !Number.isFinite(value)) {
       return 0;
@@ -4788,7 +5103,7 @@ export function createMultiAgentOrchestrator(
       onStall,
     } = pattern;
 
-    // Shadow copy of nodes so relaxation mutations don't affect the original (M2)
+    // Shadow copy of nodes so relaxation mutations don't affect the original
     const nodes: Record<string, GoalNode> = Object.create(null);
     for (const [id, node] of Object.entries(originalNodes)) {
       nodes[id] = { ...node };
@@ -6145,7 +6460,7 @@ export function createMultiAgentOrchestrator(
     runStream<T>(
       agentId: string,
       input: string,
-      options?: { signal?: AbortSignal },
+      options?: MultiAgentStreamCallOptions,
     ): OrchestratorStreamResult<T> {
       return runAgentStreamImpl<T>(agentId, input, options);
     },
@@ -6769,7 +7084,12 @@ export function createMultiAgentOrchestrator(
       agentIds: string[],
       inputs: string | string[],
       merge: (results: RunResult<unknown>[]) => T | Promise<T>,
-      opts?: { minSuccess?: number; timeout?: number; signal?: AbortSignal },
+      opts?: {
+        minSuccess?: number;
+        timeout?: number;
+        signal?: AbortSignal;
+        deltas?: boolean;
+      },
     ): MultiplexedStreamResult<T> {
       assertNotDestroyed();
 
@@ -6795,6 +7115,13 @@ export function createMultiAgentOrchestrator(
       const perAgentStreams = agentIds.map((agentId, i) => {
         const streamResult = runAgentStreamImpl(agentId, inputArray[i]!, {
           signal: controller.signal,
+          // Forwarded rather than dropped: without it the multiplexed stream
+          // is structurally incapable of per-delta chunks, whatever the
+          // adapter under it can do. Chunks arrive tagged with the agent that
+          // produced them, so interleaved deltas stay attributable. There is
+          // no `onToken` counterpart – one callback across concurrent agents
+          // could not say which agent it was being called for.
+          ...(opts?.deltas === true ? { deltas: true } : {}),
         });
 
         return {
@@ -7405,10 +7732,23 @@ export function createMultiAgentOrchestrator(
       return lastReflectionHistory ? [...lastReflectionHistory] : null;
     },
 
+    getActiveStreamCount(): number {
+      return liveStreams.size;
+    },
+
     destroy() {
       if (destroyed) {
         return;
       }
+      // Streams still open at this point have consumers parked on the
+      // iterator and a provider request still running. Abort each so the
+      // request stops costing money, and close it so a `for await` observes
+      // the stream ending instead of waiting forever. Iterate a copy – each
+      // shutdown removes its own entry.
+      for (const handle of [...liveStreams]) {
+        handle.shutdown();
+      }
+      liveStreams.clear();
       // Reset before marking as destroyed (reset() calls assertNotDestroyed())
       orchestrator.reset();
       // Clear callback references to allow garbage collection

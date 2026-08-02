@@ -1,10 +1,10 @@
 /**
  * Tests for createFactPIIGuardrail — input guardrail at the fact-store boundary.
  *
- * Covers the source → fact → agent prompt PII bypass that R5's red-team /
- * privacy / AI-integration reviewers flagged: a source publishes PII into a
- * fact, the agent prompt embeds the fact, the LLM call ships the PII —
- * and the input-guardrail chain at runStream entry never saw it.
+ * Covers the source → fact → agent prompt PII bypass: a source publishes PII
+ * into a fact, the agent prompt embeds the fact, the LLM call ships the PII —
+ * and the input-guardrail chain at runStream entry never saw it, because it
+ * only inspects the caller-supplied input string.
  */
 
 import { createModule, createSystem, t } from "@directive-run/core";
@@ -301,7 +301,7 @@ describe("createFactPIIGuardrail — object payloads", () => {
     system.destroy();
   });
 
-  it("does NOT walk past walkDepth: 1 — deeper PII passes through (R19 raised default to 2)", () => {
+  it("does NOT walk past walkDepth: 1 — deeper PII passes through", () => {
     interface Nested {
       meta: { email: string };
     }
@@ -321,7 +321,7 @@ describe("createFactPIIGuardrail — object payloads", () => {
     });
     const system = createSystem({
       module,
-      // R19: default raised from 1 → 2; opt back to 1 explicitly to
+      // Default walkDepth is 2; opt back to 1 explicitly to
       // exercise the bound.
       plugins: [createFactPIIGuardrail({ mode: "redact", walkDepth: 1 })],
     });
@@ -365,7 +365,7 @@ describe("createFactPIIGuardrail — object payloads", () => {
 
 // regression — the walker MUST recurse into arrays. Without
 // this, the dominant Supabase realtime shape (`payload.new = [{...}]`)
-// and MCP resource-list notifications silently bypass the Tier 0 guard.
+// and MCP resource-list notifications silently bypass the guard.
 describe("createFactPIIGuardrail — array payloads", () => {
   it("redacts PII inside an array of objects", () => {
     interface UserRow {
@@ -410,8 +410,8 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // regression — walker must decrement depth on the array
-  // branch (R13 passed `depth` raw, which let arrays bypass the
+  // Regression — walker must decrement depth on the array
+  // branch. Passing `depth` raw let arrays bypass the
   // documented walkDepth ≤ 5 bound and stack-overflow on deeply
   // nested shapes). Each array level now burns one depth slot,
   // matching how the object branch already works.
@@ -462,11 +462,11 @@ describe("createFactPIIGuardrail — array payloads", () => {
     systemShallow.destroy();
   });
 
-  // R14 cycle guard — cyclic array used to recurse forever and
+  // Cycle guard — a cyclic array used to recurse forever and
   // stack-overflow; `safeCall` swallowed the throw so the raw PII
   // stayed committed in the fact store. The walker now tracks
   // visited references via WeakSet and bails on revisit.
-  it("cyclic array does not recurse forever (prior round cycle guard)", () => {
+  it("cyclic array does not recurse forever — cycle guard", () => {
     const module = createModule("cyc", {
       schema: {
         facts: { rows: t.object<{ items: unknown }>().meta({ tags: ["pii"] }) },
@@ -500,7 +500,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // R15 — shared-reference walker must NOT skip the second slot.
+  // Shared-reference walker must NOT skip the second slot.
   // Previously the WeakSet was permanent across the walk, so the
   // first occurrence redacted and the second saw `seen.has(user)` and
   // returned `{ matched: false }` — raw PII leaked through. The
@@ -545,7 +545,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // Prior round — Proxy whose Symbol.iterator yields a huge number of
+  // Proxy whose Symbol.iterator yields a huge number of
   // items used to block the event loop / OOM. The walker now caps the
   // snapshot length at MAX_ARRAY_SCAN (10_000) so a hostile shape
   // cannot DoS the redaction plugin. Element 0..MAX-1 are scanned;
@@ -587,7 +587,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // Prior round — Proxy whose Symbol.iterator returns undefined used to
+  // Proxy whose Symbol.iterator returns undefined used to
   // throw inside the walker; the throw was swallowed by safeCall and
   // raw PII committed. The walker now catches the throw and returns
   // matched: false. The fact value is committed as-is (the consumer
@@ -597,7 +597,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     // Directly drive the walker — go through the guardrail's
     // construction to get the same inspect() closure the plugin
     // uses; then call it on a Proxy whose Symbol.iterator returns
-    // undefined. Without the R15 try/catch this would throw
+    // undefined. Without the per-trap try/catch this would throw
     // synchronously from inside inspect() and the plugin's safeCall
     // wrapper would swallow it.
     const evil = new Proxy(["leak@example.com"], {
@@ -622,7 +622,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.start();
     // Drive the walker through a value whose top-level is the evil
     // Proxy. The walker treats the Array.isArray-true Proxy as an
-    // array, the spread throws "not iterable", and the R15 try/catch
+    // array, the spread throws "not iterable", and the try/catch
     // converts the throw to no-match. No system crash.
     const facts = (system as any).facts.$store;
     // Manually walk fact-pii's inspect path by triggering onFactSet
@@ -633,7 +633,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     // plugin running succeeds (regression-style — proves no init crash).
     expect(() => facts.set("v", "hello")).not.toThrow();
     // And that the evil Proxy at least does not infect anything if it's
-    // accidentally seen later. Prior round reproduction is best done via
+    // accidentally seen later. Reproduction is best done via
     // a unit test against inspect() directly; this test asserts the
     // surrounding plugin remains healthy.
     void evil;
@@ -642,12 +642,12 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // R16 — non-cloneable inputs (functions, DOM nodes, WeakMaps, class
+  // Non-cloneable inputs (functions, DOM nodes, WeakMaps, class
   // instances with method refs) throw DataCloneError when the walker
   // attempts structuredClone. Walker catches the throw, logs a
   // warning, and treats the value as no-match — same posture as the
-  // R15 per-Proxy-trap try/catches, just collapsed to one site.
-  it("non-cloneable input does not leak PII; walker warns and skips (R16)", () => {
+  // per-Proxy-trap try/catches, just collapsed to one site.
+  it("non-cloneable input does not leak PII; walker warns and skips", () => {
     const module = createModule("non-cloneable", {
       schema: {
         facts: {
@@ -690,11 +690,11 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // R16 — Map / Set survive structuredClone but the walker doesn't
+  // Map / Set survive structuredClone but the walker doesn't
   // descend into them (consumer expected to wire a customDetector
   // for Map/Set values). Verify a Map inside a redact-target object
   // doesn't crash AND the surrounding strings still redact.
-  it("Map inside a payload does not block redaction (R16)", () => {
+  it("Map inside a payload does not block redaction", () => {
     interface Mailbox {
       from: string;
       metadata: unknown;
@@ -729,7 +729,7 @@ describe("createFactPIIGuardrail — array payloads", () => {
     system.destroy();
   });
 
-  // Prior round — walkDepth: NaN used to bypass the depth bound because
+  // walkDepth: NaN used to bypass the depth bound because
   // `NaN <= 0` is false and arithmetic on NaN stays NaN. Clamp now
   // guards with Number.isFinite and falls back to default 1.
   it("walkDepth: NaN clamps to default 1", () => {
@@ -787,17 +787,17 @@ describe("createFactPIIGuardrail — array payloads", () => {
   });
 });
 
-// R17 hardening — the walker rewrite landed in R16 with structuredClone-
-// based sanitization. R17 found three regressions / new bypass surfaces
-// that this block locks in:
+// The walker rewrite replaced the manual walk with structuredClone-
+// based sanitization. Three regressions / new bypass surfaces it opened,
+// locked in by this block:
 //   - top-level array length cap must apply BEFORE structuredClone, not
-//     just inside walkClone (Prior round regression)
+//     just inside walkClone
 //   - Error.message strings are user-controlled but structuredClone of
 //     Error preserves the class; the walker now scans Error.message
 //   - TypedArrays / DataViews / Blobs aren't walkable structures; the
 //     walker short-circuits them rather than iterating their entries
 //     (which would either no-op or false-flag bytes).
-describe("createFactPIIGuardrail — R17 walker hardening", () => {
+describe("createFactPIIGuardrail — walker hardening: clone boundary", () => {
   it("caps top-level array BEFORE structuredClone", () => {
     const module = createModule("items", {
       schema: {
@@ -831,7 +831,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.destroy();
   });
 
-  it("(Prior round) detects PII inside Error.message", () => {
+  it("detects PII inside Error.message", () => {
     const matches: Array<{ key: string; count: number }> = [];
     const module = createModule("errors", {
       schema: {
@@ -869,7 +869,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.destroy();
   });
 
-  it("(Prior round) short-circuits TypedArray + Blob + Date + RegExp", () => {
+  it("short-circuits TypedArray + Blob + Date + RegExp", () => {
     const blocked: string[] = [];
     const module = createModule("misc", {
       schema: {
@@ -904,7 +904,7 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
     system.destroy();
   });
 
-  it("(R17-Distrib-C1) skips re-clone on idempotent re-emit (value === prev)", () => {
+  it("skips re-clone on idempotent re-emit (value === prev)", () => {
     let inspectCount = 0;
     const module = createModule("idem", {
       schema: {
@@ -949,14 +949,14 @@ describe("createFactPIIGuardrail — R17 walker hardening", () => {
   });
 });
 
-// R18 hardening — R17 introduced four new bypass surfaces that this
-// block locks in:
-//   - C-R18-1: Proxy `length` getter TOCTOU on pre-clone cap
+// Four further bypass surfaces the clone-boundary hardening introduced,
+// locked in by this block:
+//   - case 1: Proxy `length` getter TOCTOU on pre-clone cap
 //     (defeated by Array.from materialization)
-//   - C-R18-2: Error.cause / AggregateError.errors blind spot
-//   - C-R18-3: idempotency gate skips mutable-ref re-publish with new PII
-//   - C-R18-5: Error redact-mode no-ops + retriggers gate skip
-describe("createFactPIIGuardrail — R18 walker hardening", () => {
+//   - case 2: Error.cause / AggregateError.errors blind spot
+//   - case 3: idempotency gate skips mutable-ref re-publish with new PII
+//   - case 5: Error redact-mode no-ops + retriggers gate skip
+describe("createFactPIIGuardrail — walker hardening: Proxy TOCTOU + Error recursion", () => {
   it("Proxy length-getter TOCTOU cannot bypass the pre-clone cap", () => {
     const matches: number[] = [];
     const module = createModule("p1", {
@@ -1083,7 +1083,7 @@ describe("createFactPIIGuardrail — R18 walker hardening", () => {
     system.destroy();
   });
 
-  // prior round — the idempotency gate is restricted to primitives. The
+  // The idempotency gate is restricted to primitives. The
   // engine itself dedups same-reference object writes before
   // `onFactSet` fires, so the bypass-via-events path isn't reachable
   // in practice; the restriction is defensive against direct
@@ -1180,7 +1180,7 @@ describe("createFactPIIGuardrail — RFC 0010 guardrail.blocked event", () => {
 });
 
 // =========================================================================
-// errorMode — R1 finding C2 (Error-wrap PII redaction)
+// errorMode — Error-wrap PII redaction
 // =========================================================================
 //
 // Prior to the C2 fix, `mode: "redact"` did NOT actually redact Errors
@@ -1198,7 +1198,7 @@ describe("createFactPIIGuardrail — RFC 0010 guardrail.blocked event", () => {
 //   that need instanceof or stack parity); raw PII remains in store
 // - `"alert-only"`: same as preserve but emit kind `"alert"` instead of
 //   `"detect"` so observers route through the urgent path
-describe("createFactPIIGuardrail — errorMode (R1 C2 fix)", () => {
+describe("createFactPIIGuardrail — errorMode", () => {
   function makeErrorModule() {
     // We model `err` as `t.any()` because the test writes both Error
     // instances AND strings — Directive's schema validators are strict

@@ -714,7 +714,7 @@ ship/defer/reject decision and a target landing location.
 | # | Item | Package | Status |
 |---|---|---|---|
 | 17 | `t.mutator<DiscriminatedUnion>()` | `@directive-run/mutator@0.1.0` | **SHIPPED.** Six-fragment spread API (`facts`/`events`/`requirements`/`eventHandlers`/`constraints`/`resolvers`); `mutate(kind, payload)` typed dispatch helper; `'pending' \| 'running' \| 'failed'` status union; proto-pollution-guarded handler lookup; truncated error capture. Pre-req `ctx.requeue` shipped (Item #23). Hardened through two rounds of pre-release review. |
-| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic@0.1.0` | **SHIPPED.** `createSnapshot(facts, keys)` + `withOptimistic<F>(keys)(handler)` curried HOC. Atomic capture (R2 fix); throws typed `OptimisticCloneError` on non-cloneable shape rather than silently mis-restoring. Resolver-scope only – NOT a system-wide tx. |
+| 19 | `ctx.snapshot([keys])` optimistic | `@directive-run/optimistic@0.1.0` | **SHIPPED.** `createSnapshot(facts, keys)` + `withOptimistic<F>(keys)(handler)` curried HOC. Atomic capture; throws typed `OptimisticCloneError` on non-cloneable shape rather than silently mis-restoring. Resolver-scope only – NOT a system-wide tx. |
 
 ## RFC – design / partial-ship
 

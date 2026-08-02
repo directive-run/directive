@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { BudgetExceededError, withBudget } from "../budget.js";
+import {
+  BudgetExceededError,
+  UnpricedCallLimitError,
+  withBudget,
+} from "../budget.js";
 import type { AgentRunner, RunResult } from "../types.js";
 
 // ============================================================================
@@ -1530,5 +1534,323 @@ describe("withBudget warns about a runner that reports no usage", () => {
     expect(
       notices.filter((notice) => notice.includes("not a non-negative integer")),
     ).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// Calls that reach the provider and then throw
+// ============================================================================
+
+/** $1 per token in either direction, so cost reads as a token count. */
+const DOLLAR_PER_TOKEN = {
+  inputPerMillion: 1_000_000,
+  outputPerMillion: 1_000_000,
+};
+
+describe("withBudget – a call that throws after reaching the provider", () => {
+  it("charges what the provider delivered before it failed", async () => {
+    // A marker-stripping gateway: the response is generated, delivered and
+    // billed, and the throw comes afterwards.
+    const inner = vi.fn(async (_agent, _input, options) => {
+      await options?.onToken?.("y".repeat(400));
+
+      throw new Error("stream ended without a completion marker");
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 1000, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await expect(
+      runner(mockAgent(), "x".repeat(40), { onToken: () => {} }),
+    ).rejects.toThrow("completion marker");
+
+    // 10 input tokens plus the 100 tokens of text that actually arrived.
+    expect(runner.getSpent("hour")).toBeCloseTo(110, 5);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("charges nothing for a failure that delivered nothing", async () => {
+    // A DNS failure, a refused connection, a throw before dispatch: no bytes,
+    // no observation, no charge. Charging these at a declared ceiling locked a
+    // spend guard for an hour over an outage that cost nothing.
+    const inner = vi.fn(async () => {
+      throw new Error("getaddrinfo ENOTFOUND");
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 20, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    for (let i = 0; i < 10; i++) {
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow("ENOTFOUND");
+    }
+
+    expect(runner.getSpent("hour")).toBe(0);
+    // Unknowable rather than free: still counted, so `maxUnpricedCalls` sees
+    // them and a reader can tell the ledger has stopped measuring.
+    expect(runner.getUnpricedCallCount()).toBe(10);
+    expect(inner).toHaveBeenCalledTimes(10);
+  });
+
+  it("refuses on the unpriced-call limit rather than on unspent budget", async () => {
+    const inner = vi.fn(async () => {
+      throw new Error("boom");
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 20, pricing: DOLLAR_PER_TOKEN }],
+      maxUnpricedCalls: 3,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow("boom");
+    }
+    await expect(runner(mockAgent(), "Hi")).rejects.toThrow(
+      UnpricedCallLimitError,
+    );
+
+    expect(inner).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not charge for a call a nested budget refused to dispatch", async () => {
+    const inner = makeRunner();
+    // The inner budget refuses everything; nothing ever reaches a provider.
+    const nested = withBudget(inner, {
+      maxCostPerCall: 0,
+      pricing: DOLLAR_PER_TOKEN,
+    });
+    const runner = withBudget(nested, {
+      budgets: [{ window: "hour", maxCost: 100, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await expect(runner(mockAgent(), "hello")).rejects.toThrow(
+      BudgetExceededError,
+    );
+
+    expect(runner.getSpent("hour")).toBe(0);
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
+
+  it("does not charge or count a nested unpriced-call refusal", async () => {
+    // The nested budget stops dispatching after one unpriced call. Its refusal
+    // makes no HTTP request, so the outer ledger owes nothing for it – and
+    // charging it cascaded the inner lockout outward.
+    const inner = vi.fn(async () => {
+      throw new Error("boom");
+    }) as unknown as AgentRunner;
+    const nested = withBudget(inner, { maxUnpricedCalls: 1 });
+    const runner = withBudget(nested, {
+      budgets: [{ window: "hour", maxCost: 100, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await expect(runner(mockAgent(), "hello")).rejects.toThrow("boom");
+    for (let i = 0; i < 20; i++) {
+      await expect(runner(mockAgent(), "hello")).rejects.toThrow(
+        UnpricedCallLimitError,
+      );
+    }
+
+    expect(runner.getSpent("hour")).toBe(0);
+    // One real dispatch that delivered nothing; twenty refusals that did not.
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("counts unpriced calls over a window rather than for the life of the runner", async () => {
+    vi.useFakeTimers();
+    try {
+      const inner = vi.fn(async () => {
+        throw new Error("boom");
+      }) as unknown as AgentRunner;
+      const runner = withBudget(inner, {
+        budgets: [{ window: "hour", maxCost: 100, pricing: DOLLAR_PER_TOKEN }],
+        maxUnpricedCalls: 2,
+      });
+
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow("boom");
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow("boom");
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow(
+        UnpricedCallLimitError,
+      );
+
+      // The outage ends and its failures age out of the window.
+      vi.advanceTimersByTime(60 * 60 * 1000 + 1);
+      expect(runner.getUnpricedCallCount()).toBe(0);
+      await expect(runner(mockAgent(), "Hi")).rejects.toThrow("boom");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// ============================================================================
+// What the estimate is made of
+// ============================================================================
+
+describe("withBudget – estimating a call the provider did not count", () => {
+  function unreportedRunner(output: string): AgentRunner {
+    return vi.fn(async () => ({
+      output,
+      messages: [{ role: "assistant" as const, content: output }],
+      toolCalls: [],
+      totalTokens: 0,
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+      usageReported: false,
+    })) as unknown as AgentRunner;
+  }
+
+  it("measures the output it has, rather than scaling the input", async () => {
+    // The shape that over-charged: a large retrieval prompt, a short answer.
+    const input = "x".repeat(4_000); // 1000 input tokens
+    const output = "y".repeat(40); // 10 output tokens
+    const runner = withBudget(unreportedRunner(output), {
+      budgets: [{ window: "hour", maxCost: 10_000, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await runner(mockAgent(), input);
+
+    // 1000 in + 10 out. Scaling output from input would have charged 2000.
+    expect(runner.getSpent("hour")).toBeCloseTo(1010, 5);
+  });
+
+  it("charges nothing when the call produced nothing", async () => {
+    const inner = vi.fn(async () => {
+      throw new Error("connection reset");
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 10_000, pricing: DOLLAR_PER_TOKEN }],
+    });
+    // A declared ceiling used to be charged here, so a failure that cost
+    // nothing recorded four thousand dollars against the window.
+    const agent = { ...mockAgent(), maxTokens: 4096 };
+
+    await expect(runner(agent, "Hi")).rejects.toThrow("connection reset");
+
+    expect(runner.getSpent("hour")).toBe(0);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("ignores a declared ceiling when admitting a call", async () => {
+    const inner = makeRunner();
+    const runner = withBudget(inner, {
+      maxCostPerCall: 0.05,
+      pricing: DOLLAR_PER_TOKEN,
+    });
+    // `maxTokens: 1` shrank the pre-call estimate to $1.000001 and bought
+    // admission for a call that then cost eighteen dollars. The field is
+    // written by the caller being limited, so nothing here reads it.
+    const agent = { ...mockAgent(), maxTokens: 1 };
+
+    await expect(runner(agent, "x".repeat(400))).rejects.toThrow(
+      BudgetExceededError,
+    );
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  it("scales the pre-call estimate from the multiplier the budget declares", async () => {
+    const inner = makeRunner();
+    // The retrieval shape – a large prompt, a short answer – is described by
+    // the budget's own multiplier, which the spender does not write.
+    const runner = withBudget(inner, {
+      maxCostPerCall: 150,
+      pricing: DOLLAR_PER_TOKEN,
+      estimatedOutputMultiplier: 0.05,
+    });
+
+    await runner(mockAgent(), "x".repeat(400));
+
+    expect(inner).toHaveBeenCalledOnce();
+  });
+
+  it("charges a long answer from the answer, not from the prompt that asked for it", async () => {
+    // The pre-call estimate cannot know a one-line prompt will be answered at
+    // length. The charge is made from what came back, so the window accrues
+    // the real figure and the next call is checked against it.
+    const runner = withBudget(unreportedRunner("y".repeat(16_384)), {
+      budgets: [{ window: "hour", maxCost: 10_000, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await runner(mockAgent(), "Hi");
+
+    // 1 in + 4096 out, measured off the text that arrived.
+    expect(runner.getSpent("hour")).toBeCloseTo(4097, 5);
+  });
+
+  it("scales the input when there is nothing else to go on, pre-call", async () => {
+    const inner = makeRunner();
+    const runner = withBudget(inner, {
+      maxCostPerCall: 25,
+      pricing: DOLLAR_PER_TOKEN,
+      estimatedOutputMultiplier: 2,
+    });
+
+    // 10 in + 20 out estimated: $30 against a $25 ceiling.
+    await expect(runner(mockAgent(), "x".repeat(40))).rejects.toThrow(
+      BudgetExceededError,
+    );
+  });
+});
+
+// ============================================================================
+// The unpriced-call ceiling
+// ============================================================================
+
+describe("withBudget – maxUnpricedCalls", () => {
+  function unpriceableRunner(): AgentRunner {
+    return vi.fn(async () => ({
+      output: "hi",
+      messages: [{ role: "assistant" as const, content: "hi" }],
+      toolCalls: [],
+      totalTokens: 0,
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+      usageReported: false,
+    })) as unknown as AgentRunner;
+  }
+
+  it("refuses further calls once the tolerance is reached", async () => {
+    const inner = unpriceableRunner();
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+      maxUnpricedCalls: 3,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      await runner(mockAgent(), "Hi");
+    }
+
+    await expect(runner(mockAgent(), "Hi")).rejects.toThrow(
+      UnpricedCallLimitError,
+    );
+    expect(inner).toHaveBeenCalledTimes(3);
+  });
+
+  it("is off by default, leaving the count advisory", async () => {
+    const inner = unpriceableRunner();
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+    });
+
+    for (let i = 0; i < 50; i++) {
+      await runner(mockAgent(), "Hi");
+    }
+
+    expect(runner.getUnpricedCallCount()).toBe(50);
+  });
+
+  it("never triggers when the provider reports usage", async () => {
+    const inner = makeRunner();
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 1_000_000, pricing: PRICING }],
+      maxUnpricedCalls: 1,
+    });
+
+    for (let i = 0; i < 10; i++) {
+      await runner(mockAgent(), "Hi");
+    }
+
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
+
+  it("rejects a negative tolerance at construction", () => {
+    expect(() => withBudget(makeRunner(), { maxUnpricedCalls: -1 })).toThrow(
+      "maxUnpricedCalls",
+    );
   });
 });

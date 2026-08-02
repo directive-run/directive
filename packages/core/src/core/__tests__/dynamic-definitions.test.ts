@@ -1135,7 +1135,7 @@ describe("Concurrent deferred operations", () => {
 });
 
 // ============================================================================
-// 13. Resolver assign triggers reconciliation (M1)
+// 13. Resolver assign triggers reconciliation
 // ============================================================================
 
 describe("Resolver assign triggers reconciliation", () => {

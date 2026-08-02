@@ -516,7 +516,7 @@ describe("createDisabledHistory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R1 C-batch 3 — history.redactSnapshot hook (Privacy A2)
+// history.redactSnapshot hook
 // ---------------------------------------------------------------------------
 //
 // Prior behavior: history ring buffer stored `structuredClone(toObject())`
@@ -527,7 +527,7 @@ describe("createDisabledHistory", () => {
 // The fix adds an optional `redactSnapshot` transform on
 // `HistoryConfig`. Default `undefined` keeps current behavior; consumers
 // opt in by passing a redactor.
-describe("history redactSnapshot (R1 Privacy A2)", () => {
+describe("history redactSnapshot", () => {
   it("applies the redactor to every snapshot", () => {
     const { manager } = setup({
       historyOption: {

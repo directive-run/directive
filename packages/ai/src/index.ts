@@ -189,7 +189,7 @@ export {
 } from "./builtin-guardrails.js";
 
 /**
- * Tier 0 Mandatory Companion to `liveContext`. Closes the source →
+ * Mandatory companion to `liveContext`. Closes the source →
  * fact → agent-prompt PII bypass at the fact-store boundary. Symmetric
  * with the other built-in guardrails: re-exported here so consumers
  * who follow the "main-barrel" idiom find it, AND from the
@@ -218,7 +218,12 @@ export {
   validateBaseURL,
   createRunner,
   type CreateRunnerOptions,
+  type ParseEventStreamOptions,
   type ParsedResponse,
+  type RunnerStreamingSupport,
+  type StreamEventResult,
+  type StreamTotals,
+  type StreamWireFormat,
 } from "./agent-utils.js";
 
 // ============================================================================
@@ -271,6 +276,8 @@ export {
   type DoneChunk,
   type ErrorChunk,
   type StreamChunk,
+  type StreamRestartChunk,
+  type StreamRestartReason,
   type StreamRunOptions,
   type StreamRunner,
   type StreamingRunResult,
@@ -281,6 +288,8 @@ export {
   type MultiplexedStreamResult,
   type MergedTaggedStreamResult,
   mergeTaggedStreams,
+  StreamConsumerError,
+  isStreamConsumerError,
 } from "./streaming.js";
 
 /**
@@ -359,6 +368,7 @@ export {
   type HandoffResult,
   type RunAgentRequirement,
   type MultiAgentRunCallOptions,
+  type MultiAgentStreamCallOptions,
 } from "./multi-agent-orchestrator.js";
 
 /**
@@ -569,6 +579,7 @@ export {
 export {
   withBudget,
   BudgetExceededError,
+  UnpricedCallLimitError,
   toTokenPricingTable,
   type BareTokenRates,
   type BudgetConfig,

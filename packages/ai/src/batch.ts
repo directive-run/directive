@@ -1,5 +1,5 @@
 /**
- * P5: Batch Queue — Application-level batching for agent calls.
+ * Batch Queue — Application-level batching for agent calls.
  *
  * Accumulates calls and flushes them in batches to reduce overhead.
  * Each `submit()` returns a promise that resolves when its individual call completes.

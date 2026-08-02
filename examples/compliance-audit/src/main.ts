@@ -497,7 +497,7 @@ function onErase(): void {
       };
   if (result.valid) {
     const erasedCount = result.erasedSeqs?.length ?? 0;
-    // (MAJOR-3) markerEntry is null when 0 entries matched — guard the
+    // markerEntry is null when 0 entries matched — guard the
     // string interpolation so a "marker #null" never lands in the UI.
     const markerNote = markerEntry
       ? `(marker #${markerEntry.seq})`

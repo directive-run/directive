@@ -593,7 +593,7 @@ describe("namespaced effect `$changed` operator", () => {
 // fix: namespace-pivot nested form in data-form `when`
 // ============================================================================
 
-// Before R2, the cross-module RFC nested form (`when: { self: {...}, auth:
+// Previously, the cross-module RFC nested form (`when: { self: {...}, auth:
 // {...} }`) was mangled by `prefixPredicateSpec` — `self` was treated as a
 // regular fact and prefixed to `<ns>::self`, which is unreachable. The
 // prefixer now recognizes "self" and declared `crossModuleDeps` namespaces
@@ -770,7 +770,7 @@ describe("namespace-pivot `self` and dep-namespace forms", () => {
 // fix: namespaced events both `handler` AND `patch` dev-warn
 // ============================================================================
 
-// Before R2 the engine's single-module path warned when both `handler` and
+// Previously the engine's single-module path warned when both `handler` and
 // `patch` were provided, but the namespaced path silently kept the handler
 // without warning. The normalizer now mirrors the engine's diagnostic so
 // authors of namespaced systems see the same friendly message.

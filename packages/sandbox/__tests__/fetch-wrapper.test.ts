@@ -1,4 +1,4 @@
-// Unit tests for the SSRF fetch wrapper (P0-S2). The wrapper itself
+// Unit tests for the SSRF fetch wrapper. The wrapper itself
 // is pure synchronous URL-checking; the integration with worker fetch
 // is verified through the run-in-sandbox tests.
 

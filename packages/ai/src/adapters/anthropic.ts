@@ -16,13 +16,16 @@ import { createRunner, validateBaseURL } from "../agent-utils.js";
 import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -252,6 +255,77 @@ export const ANTHROPIC_TOKEN_PRICING: Record<string, ModelPricing> =
   ANTHROPIC_PRICING;
 
 // ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Anthropic SSE event.
+ *
+ * Shared by the streaming path of `createAnthropicRunner` and by
+ * `createAnthropicStreamingRunner` so the two cannot drift.
+ */
+function parseAnthropicStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  if (event.type === "error") {
+    throw new Error(
+      `[Directive] Anthropic stream error: ${(event.error as Record<string, unknown>)?.message ?? JSON.stringify(event.error)}`,
+    );
+  }
+
+  const result: StreamEventResult = {};
+  if (event.type === "message_stop") {
+    result.terminal = true;
+  }
+  if (
+    event.type === "content_block_delta" &&
+    (event.delta as Record<string, unknown>)?.type === "text_delta"
+  ) {
+    result.text = (event.delta as Record<string, unknown>).text as string;
+  }
+  // Read the counts, not the container: a `usage` object whose numbers are
+  // null or absent is a provider that reported nothing, and recording it as a
+  // report of zero prices a real call at nothing.
+  if (event.type === "message_delta" && event.usage) {
+    const outputTokens = readTokenCount(
+      (event.usage as Record<string, unknown>).output_tokens,
+    );
+    if (outputTokens !== undefined) {
+      result.outputTokens = outputTokens;
+    }
+  }
+  if (
+    event.type === "message_start" &&
+    (event.message as Record<string, unknown>)?.usage
+  ) {
+    const usage = (event.message as Record<string, unknown>).usage as Record<
+      string,
+      unknown
+    >;
+    const inputTokens = readTokenCount(usage.input_tokens);
+    if (inputTokens !== undefined) {
+      result.inputTokens = inputTokens;
+    }
+    // Emitted whenever reported; whether they reach `tokenUsage` is decided by
+    // the caller, which knows whether prompt caching was requested. Left unset
+    // when the provider sent no number, so a `usage` object with nothing usable
+    // in it cannot make the call look priced by way of a zero.
+    const cacheReadTokens = readTokenCount(usage.cache_read_input_tokens);
+    if (cacheReadTokens !== undefined) {
+      result.cacheReadTokens = cacheReadTokens;
+    }
+    const cacheCreationTokens = readTokenCount(
+      usage.cache_creation_input_tokens,
+    );
+    if (cacheCreationTokens !== undefined) {
+      result.cacheCreationTokens = cacheCreationTokens;
+    }
+  }
+
+  return result;
+}
+
+// ============================================================================
 // Anthropic Runner
 // ============================================================================
 
@@ -349,7 +423,7 @@ export function createAnthropicRunner(
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => {
+    buildRequest: (agent, _input, messages, stream) => {
       const instructions = agent.instructions ?? "";
       // With prompt caching enabled, send the structured system form so a
       // `cache_control` breakpoint caches the stable instructions prefix.
@@ -387,6 +461,9 @@ export function createAnthropicRunner(
               role: m.role,
               content: m.content,
             })),
+            // Omitted entirely when buffering, so the non-streaming request
+            // stays byte-for-byte what it was.
+            ...(stream ? { stream: true } : {}),
           }),
           ...(timeoutMs != null
             ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -397,8 +474,14 @@ export function createAnthropicRunner(
     parseResponse: async (res) => {
       const data = await res.json();
       const text = data.content?.[0]?.text ?? "";
-      const inputTokens = data.usage?.input_tokens ?? 0;
-      const outputTokens = data.usage?.output_tokens ?? 0;
+      const inputTokens = readTokenCount(data.usage?.input_tokens) ?? 0;
+      const outputTokens = readTokenCount(data.usage?.output_tokens) ?? 0;
+      // A `usage` object holding no usable number says the same thing as no
+      // `usage` object at all: nothing was reported. Both are unpriceable.
+      const usageReported = anyTokenCountReported(
+        data.usage?.input_tokens,
+        data.usage?.output_tokens,
+      );
 
       // Cache-token emission is gated on the OPTION, not on the response fields:
       // the live API returns `cache_*_input_tokens: 0` on every response even
@@ -409,9 +492,10 @@ export function createAnthropicRunner(
       // the pre-caching behavior. `input_tokens` is the uncached remainder, so
       // cache tokens are additive – include them in `totalTokens`.
       if (promptCaching === "automatic") {
-        const cacheReadTokens = data.usage?.cache_read_input_tokens ?? 0;
+        const cacheReadTokens =
+          readTokenCount(data.usage?.cache_read_input_tokens) ?? 0;
         const cacheCreationTokens =
-          data.usage?.cache_creation_input_tokens ?? 0;
+          readTokenCount(data.usage?.cache_creation_input_tokens) ?? 0;
 
         return {
           text,
@@ -421,6 +505,7 @@ export function createAnthropicRunner(
           outputTokens,
           cacheReadTokens,
           cacheCreationTokens,
+          usageReported,
         };
       }
 
@@ -429,7 +514,44 @@ export function createAnthropicRunner(
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        usageReported,
       };
+    },
+    streaming: {
+      adapterName: "Anthropic",
+      parseEvent: parseAnthropicStreamEvent,
+      requireTerminalEvent: true,
+      // Mirrors `parseResponse` exactly – cache tokens are gated on the option,
+      // never on the presence of the response fields, so `tokenUsage` is the
+      // same shape whether or not the caller asked for deltas.
+      buildResponse: (totals) => {
+        const { fullText: text, inputTokens, outputTokens } = totals;
+
+        if (promptCaching === "automatic") {
+          const cacheReadTokens = totals.cacheReadTokens ?? 0;
+          const cacheCreationTokens = totals.cacheCreationTokens ?? 0;
+
+          return {
+            text,
+            totalTokens:
+              inputTokens +
+              outputTokens +
+              cacheReadTokens +
+              cacheCreationTokens,
+            inputTokens,
+            outputTokens,
+            cacheReadTokens,
+            cacheCreationTokens,
+          };
+        }
+
+        return {
+          text,
+          totalTokens: inputTokens + outputTokens,
+          inputTokens,
+          outputTokens,
+        };
+      },
     },
   });
 }
@@ -517,52 +639,17 @@ export function createAnthropicStreamingRunner(
         await throwStreamingHTTPError(response, "Anthropic");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
-        reader,
-        callbacks.onToken,
-        (event) => {
-          if (event.type === "error") {
-            throw new Error(
-              `[Directive] Anthropic stream error: ${(event.error as Record<string, unknown>)?.message ?? JSON.stringify(event.error)}`,
-            );
-          }
-
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-          if (
-            event.type === "content_block_delta" &&
-            (event.delta as Record<string, unknown>)?.type === "text_delta"
-          ) {
-            result.text = (event.delta as Record<string, unknown>)
-              .text as string;
-          }
-          if (event.type === "message_delta" && event.usage) {
-            result.outputTokens =
-              ((event.usage as Record<string, unknown>)
-                .output_tokens as number) ?? 0;
-          }
-          if (
-            event.type === "message_start" &&
-            (event.message as Record<string, unknown>)?.usage
-          ) {
-            result.inputTokens =
-              ((
-                (event.message as Record<string, unknown>).usage as Record<
-                  string,
-                  unknown
-                >
-              ).input_tokens as number) ?? 0;
-          }
-
-          return result;
-        },
-        "Anthropic",
-      );
+      const { fullText, inputTokens, outputTokens, usageReported } =
+        await parseEventStream(
+          reader,
+          callbacks.onToken,
+          parseAnthropicStreamEvent,
+          "Anthropic",
+          "sse",
+          { signal: callbacks.signal, requireTerminalEvent: true },
+        );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
@@ -578,7 +665,13 @@ export function createAnthropicStreamingRunner(
         startTime,
       );
 
-      return buildStreamingResult(input, fullText, totalTokens, tokenUsage);
+      return buildStreamingResult(
+        input,
+        fullText,
+        totalTokens,
+        tokenUsage,
+        usageReported,
+      );
     } catch (err) {
       fireErrorHook(hooks, agent, input, err, startTime);
 

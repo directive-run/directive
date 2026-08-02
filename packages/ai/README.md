@@ -11,7 +11,7 @@ AI agent orchestration with guardrails, cost tracking, and multi-agent coordinat
 - **Guardrails** &ndash; input, output, and tool call validation with retry support
 - **Multi-agent orchestration** &ndash; parallel, sequential, and supervisor patterns
 - **Cost tracking** &ndash; per-call token usage with pricing constants for every provider
-- **Streaming** &ndash; async iterable streams with backpressure and streaming guardrails
+- **Streaming** &ndash; per-delta token streaming that survives every runner wrapper, as an async iterable of typed chunks
 - **Provider adapters** &ndash; swap providers by changing one import, not your codebase
 
 ## Install
@@ -232,7 +232,7 @@ const runner = guarded as BudgetRunner;
 runner.getSpent("hour");   // rolling hour window; 0 if no hour budget configured
 runner.getSpent("day");    // rolling day window
 runner.getSpent("total");  // lifetime spend for this runner
-runner.getUnpricedCallCount(); // calls charged at the estimate, not at billed usage
+runner.getUnpricedCallCount(); // recent calls charged from what they delivered, not from billed usage
 runner.getFailedCallSpend("hour"); // how much of getSpent("hour") was charged for calls that threw
 ```
 
@@ -244,22 +244,31 @@ window's, are refused at construction rather than resolved by declaration order.
 
 `getUnpricedCallCount()` is how you find out the ledger is approximate. When a
 runner reports no `tokenUsage`, reports a token count that is not a non-negative
-integer, reports zero of every token class, throws, or reports counts that price
-out to a non-finite cost, `withBudget` charges the pre-call estimate instead of
-skipping the call, counts it here, and warns once per condition. A count that
-tracks your call count means the runner never reports usable usage and every
-`getSpent` figure is an estimate.
+integer, reports zero of every token class or says outright that usage was not
+reported, throws, delivers text for a generation the surviving result does not
+describe, or reports counts that price out to a non-finite cost, `withBudget`
+charges what the call *delivered* &ndash; the assistant text on the result, or
+the deltas that reached your `onToken` &ndash; instead of skipping the call,
+counts it here, and warns once per condition. The count is kept over a rolling
+window, the widest budget window configured or an hour when there is none, so an
+outage that ends ages out of it. A count that tracks your call rate means the
+runner never reports usable usage and every `getSpent` figure is measured rather
+than billed. Set `maxUnpricedCalls` to turn the count into a ceiling: the runner
+then refuses with `UnpricedCallLimitError` rather than enforcing a hard budget
+against measurements indefinitely.
 
 `getFailedCallSpend(window)` splits that figure. A call that throws reports no
-usage, so the estimate is charged &ndash; right when the provider generated and
-billed the tokens before something downstream rejected them, and an over-charge
-when the call never reached the provider at all. A runner wrapper cannot tell
-those apart, so it charges both and reports the total here: subtract it from
-`getSpent(window)` for spend attributable to calls that returned. A figure
-approaching `getSpent` means a cap is filling up with failures rather than work.
-Calls this runner's own caps blocked are in neither figure, and neither is a
-`BudgetExceededError` raised by a nested `withBudget` &ndash; that one provably
-never reached a provider, so it is charged nothing.
+usage, so whatever reached your `onToken` before it failed is measured and
+charged &ndash; a gateway that strips the completion marker generated, delivered
+and billed the whole response, and the throw comes afterwards. A failure that
+delivered nothing is charged nothing: there is no observation to price, and a
+refused connection should not consume a window of a budget that outlives the
+outage. Subtract this from `getSpent(window)` for spend attributable to calls
+that returned. A figure approaching `getSpent` means a cap is filling up with
+calls that break part-way through rather than with work. Calls this runner's own
+caps blocked are in neither figure, and neither is a `BudgetExceededError` or
+`UnpricedCallLimitError` raised by a nested `withBudget` &ndash; those provably
+never reached a provider, so they are charged nothing.
 
 `createConstraintRouter` has the same accessor, for the same reason. A cost fact
 pinned at zero is not a smaller error than an approximate one &ndash; it is the
@@ -308,6 +317,42 @@ const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
 > **Minimum cacheable prefix (the #1 gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; roughly 1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, and 4096 on Opus & Haiku-4.5. There is no error: caching just doesn't happen and `cacheReadTokens` stays `0` across repeat calls (that `0` is your diagnostic). Because Directive caches `agent.instructions`, short instructions commonly fall below this threshold. The `ephemeral` breakpoint also has a **5-minute default TTL** &ndash; prefixes not re-read within that window are evicted.
 
 > **Cost tracking.** `withBudget` and `createConstraintRouter` price all four token classes. Cache rates come from the pricing object's `cacheReadPerMillion` / `cacheWritePerMillion`, and `ANTHROPIC_PRICING` publishes the real ratios (read 0.1x input, write 1.25x input). A hand-built pricing object that omits them bills cache tokens at the input rate &ndash; conservative, so a cached run reads as somewhat more expensive than it is, never as free. `estimateCost` takes one bare rate and one token count, so it prices whichever class you hand it; sum the classes yourself if you use it directly.
+
+## Streaming
+
+`runStream` emits one token chunk per completed message by default. Pass `deltas: true`, or an `onToken` callback, to get one chunk per provider delta.
+
+```typescript
+const { stream, result } = orchestrator.runStream(agent, "Write a report", {
+  deltas: true,
+});
+
+for await (const chunk of stream) {
+  if (chunk.type === "token") process.stdout.write(chunk.data);
+  // `stream_restart` means the response is starting over - a retry, a schema
+  // retry, or a fallback to another provider. Discard everything you rendered
+  // for the current generation.
+  if (chunk.type === "stream_restart") ui.clear();
+}
+
+const final = await result;
+```
+
+> **`chunk.data` is untrusted text.** It is the model's output byte for byte, and a terminal interprets what you write to it &ndash; escape sequences can clear the screen, move the cursor, or rewrite lines already printed. A single sequence can also arrive split across two deltas, so sanitizing each chunk on its own does not help. Sanitize the accumulated text, or render into something that does not interpret control codes.
+
+Use `onToken` when you want the deltas somewhere of your own. It is awaited, so returning a promise applies real backpressure &ndash; the adapter stops reading the provider stream until it settles.
+
+```typescript
+const { stream } = orchestrator.runStream(agent, prompt, {
+  onToken: async (token) => {
+    await socket.send(token);
+  },
+});
+```
+
+Streaming is a field on the options every runner already receives, not a separate runner, so it composes: `withRetry`, `withBudget`, `withFallback`, `withModelSelection` and `withStructuredOutput` all forward it, and a budgeted runner still enforces its budget while streaming.
+
+Backpressure strategies (`backpressure`, `bufferSize`) belong to a `StreamRunner` built by `createStreamingRunner` &ndash; they are not `runStream` options. See the [AI Guide](https://directive.run/docs/ai) for the full chunk union.
 
 ## Lifecycle Hooks
 

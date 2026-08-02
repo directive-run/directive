@@ -86,14 +86,19 @@ const runner = budgetRunner as BudgetRunner;
 runner.getSpent("hour");       // rolling hour window; 0 if no hour budget is configured
 runner.getSpent("day");        // rolling day window
 runner.getSpent("total");      // lifetime spend for this runner
-runner.getUnpricedCallCount(); // calls charged at the estimate rather than at billed usage
+runner.getUnpricedCallCount(); // recent calls charged from what they delivered, not from billed usage
+runner.getFailedCallSpend("hour"); // how much of getSpent("hour") was charged for calls that threw
 ```
 
 `getSpent("total")` is priced with the top-level `pricing` when supplied, otherwise with the first budget window's rates; it returns `0` only when neither is configured.
 
 Two budgets on the same `window` are two caps reading one running total. A call is recorded there once, at the first budget's rates for that window — each budget's own rates still gate its own pre-call estimate.
 
-When a call cannot be priced from what the provider reported, `withBudget` charges the pre-call estimate rather than counting it as free, increments `getUnpricedCallCount()`, and warns once per condition. Five conditions land there: no `tokenUsage` at all, a non-finite or negative count, a report of zero input, output, *and* cache tokens (no provider bills a call that ran at nothing), a runner that threw after the provider had already generated the tokens, and counts that price out to a non-finite cost. A count that tracks your call count means every `getSpent` figure is an estimate.
+When a call cannot be priced from what the provider reported, `withBudget` charges what the call *delivered* — the assistant text on the result, or the deltas that reached your `onToken` — rather than counting it as free, increments `getUnpricedCallCount()`, and warns once per condition. Six conditions land there: no `tokenUsage` at all, a non-finite or negative count, a report of zero input, output, *and* cache tokens (no provider bills a call that ran at nothing), a runner that said outright that usage was not reported, a runner that threw, text delivered for a generation the surviving result does not describe (a retry, a fallback, a schema re-ask), and counts that price out to a non-finite cost. The count is kept over a rolling window — the widest budget window configured, or an hour when there is none — so an outage that ends ages out of it. A count that tracks your call rate means every `getSpent` figure is measured rather than billed.
+
+`getFailedCallSpend(window)` splits that figure out. A call that throws reports no usage, so whatever reached your `onToken` before it failed is measured and charged — a gateway that strips the completion marker generated, delivered and billed the whole response, and the throw comes afterwards. A failure that delivered nothing is charged nothing: a DNS failure or a refused connection never reached a provider, and neither did a call a nested `withBudget` refused before dispatch. Subtract this from `getSpent(window)` for spend attributable to calls that returned.
+
+Set `maxUnpricedCalls` to stop enforcing a hard ceiling against measurements indefinitely — the runner then refuses with `UnpricedCallLimitError` once that many recent calls have gone unpriced.
 
 ### Config is validated and copied at construction
 
