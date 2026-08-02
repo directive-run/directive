@@ -19,11 +19,13 @@ import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
   parseEventStream,
+  readTokenCount,
 } from "./shared.js";
 
 // ============================================================================
@@ -88,8 +90,16 @@ function parseOllamaStreamChunk(
 
   if (chunk.done) {
     result.terminal = true;
-    result.inputTokens = (chunk.prompt_eval_count as number) ?? 0;
-    result.outputTokens = (chunk.eval_count as number) ?? 0;
+    // Left unset when the field holds no usable number, so a `done` chunk
+    // stripped of its counts is recorded as unpriceable rather than free.
+    const promptEvalCount = readTokenCount(chunk.prompt_eval_count);
+    if (promptEvalCount !== undefined) {
+      result.inputTokens = promptEvalCount;
+    }
+    const evalCount = readTokenCount(chunk.eval_count);
+    if (evalCount !== undefined) {
+      result.outputTokens = evalCount;
+    }
   }
 
   return result;
@@ -201,16 +211,18 @@ export function createOllamaRunner(
       }
       const text =
         ((data.message as Record<string, unknown>)?.content as string) ?? "";
-      const inputTokens = (data.prompt_eval_count as number) ?? 0;
-      const outputTokens = (data.eval_count as number) ?? 0;
+      const inputTokens = readTokenCount(data.prompt_eval_count) ?? 0;
+      const outputTokens = readTokenCount(data.eval_count) ?? 0;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
-        usageReported:
-          data.prompt_eval_count != null || data.eval_count != null,
+        usageReported: anyTokenCountReported(
+          data.prompt_eval_count,
+          data.eval_count,
+        ),
       };
     },
     streaming: {

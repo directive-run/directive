@@ -19,12 +19,14 @@ import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
   getStreamReader,
   parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -88,12 +90,20 @@ function parseOpenAIStreamEvent(
     result.terminal = true;
   }
 
+  // Read the counts, not the container. A gateway that forwards
+  // `"usage":{"prompt_tokens":null,"completion_tokens":null}` has reported no
+  // usage at all; treating the object's presence as a report recorded the call
+  // as costing zero, which is the one answer that is certainly wrong.
   if (event.usage) {
-    result.inputTokens =
-      ((event.usage as Record<string, unknown>).prompt_tokens as number) ?? 0;
-    result.outputTokens =
-      ((event.usage as Record<string, unknown>).completion_tokens as number) ??
-      0;
+    const usage = event.usage as Record<string, unknown>;
+    const promptTokens = readTokenCount(usage.prompt_tokens);
+    if (promptTokens !== undefined) {
+      result.inputTokens = promptTokens;
+    }
+    const completionTokens = readTokenCount(usage.completion_tokens);
+    if (completionTokens !== undefined) {
+      result.outputTokens = completionTokens;
+    }
   }
 
   return result;
@@ -223,9 +233,13 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
-        // Gateways that strip `usage` leave zeros behind; say so rather than
-        // letting cost tracking read the response as free.
-        usageReported: data.usage != null,
+        // Gateways that strip `usage` – or null out the counts inside it –
+        // leave zeros behind; say so rather than letting cost tracking read
+        // the response as free.
+        usageReported: anyTokenCountReported(
+          data.usage?.prompt_tokens,
+          data.usage?.completion_tokens,
+        ),
       };
     },
     streaming: {

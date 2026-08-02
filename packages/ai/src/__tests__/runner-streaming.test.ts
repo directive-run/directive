@@ -649,21 +649,22 @@ describe("token accounting when the provider reports no usage", () => {
     const fetchFn = vi
       .fn()
       .mockImplementation(async () => streamResponse(NO_USAGE_SSE));
-    // $1 per token against a $5 ceiling. "Hi" estimates 1 in + 1 out.
+    // $1 per token against a $5 ceiling. "Hi" is 1 input token, and the
+    // response the call actually produced – "Hello world" – is 3 output
+    // tokens, so the call is charged $4 rather than the $2 an input-scaled
+    // guess would have made of it.
     const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
     const wrapped = withBudget(
       createOpenAIRunner({ apiKey: "k", fetch: fetchFn }),
       { budgets: [{ window: "hour", maxCost: 5, pricing }] },
     );
 
-    for (let call = 0; call < 2; call++) {
-      await wrapped(mockAgent(), "Hi", { onToken: () => {} });
-    }
+    await wrapped(mockAgent(), "Hi", { onToken: () => {} });
 
     // Recorded spend accrues from the estimate rather than staying at $0
     // forever, and the caller can tell the figure is an estimate.
     expect(wrapped.getSpent("hour")).toBeCloseTo(4, 5);
-    expect(wrapped.getUnpricedCallCount()).toBe(2);
+    expect(wrapped.getUnpricedCallCount()).toBe(1);
 
     await expect(
       wrapped(mockAgent(), "Hi", { onToken: () => {} }),
@@ -992,5 +993,364 @@ describe("a throwing consumer callback", () => {
     })(mockAgent(), "Hi", { onToken: () => {} });
 
     expect(attempt).toBe(2);
+  });
+});
+
+// ============================================================================
+// Usage that is present but says nothing
+// ============================================================================
+
+describe("a usage object holding no usable count", () => {
+  const NULLED_USAGE_SSE = [
+    'data: {"choices":[{"delta":{"content":"Hello world"}}]}',
+    'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+    'data: {"usage":{"prompt_tokens":null,"completion_tokens":null}}',
+    "data: [DONE]",
+  ];
+
+  it("is not a report of zero — OpenAI, streamed", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () => streamResponse(NULLED_USAGE_SSE)),
+    });
+
+    const result = await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("is not a report of zero — OpenAI, buffered", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          choices: [{ message: { content: "Hello" } }],
+          usage: { prompt_tokens: null, completion_tokens: null },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("is not a report of zero — Anthropic, buffered", async () => {
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          content: [{ text: "Hello" }],
+          usage: { input_tokens: null, output_tokens: null },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("is not a report of zero — Gemini, buffered", async () => {
+    const runner = createGeminiRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          candidates: [{ content: { parts: [{ text: "Hello" }] } }],
+          usageMetadata: {
+            promptTokenCount: null,
+            candidatesTokenCount: null,
+          },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("is not a report of zero — Ollama, buffered", async () => {
+    const runner = createOllamaRunner({
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          message: { content: "Hello" },
+          prompt_eval_count: null,
+          eval_count: null,
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(false);
+  });
+
+  it("still reports usage when only one of the two counts arrives", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(
+        jsonResponse({
+          choices: [{ message: { content: "Hello" } }],
+          usage: { prompt_tokens: 10, completion_tokens: null },
+        }),
+      ),
+    });
+
+    const result = await runner(mockAgent(), "Hi");
+
+    expect(result.usageReported).toBe(true);
+    expect(result.tokenUsage?.inputTokens).toBe(10);
+  });
+
+  it("costs money against a budget rather than nothing", async () => {
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+    const wrapped = withBudget(
+      createOpenAIRunner({
+        apiKey: "k",
+        fetch: vi
+          .fn()
+          .mockImplementation(async () => streamResponse(NULLED_USAGE_SSE)),
+      }),
+      { budgets: [{ window: "hour", maxCost: 100, pricing }] },
+    );
+
+    await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(wrapped.getSpent("hour")).toBeGreaterThan(0);
+    expect(wrapped.getUnpricedCallCount()).toBe(1);
+  });
+});
+
+// ============================================================================
+// The end-of-response marker ends the response
+// ============================================================================
+
+describe("content after the end-of-response marker", () => {
+  it("does not resolve a truncated body as a complete one", async () => {
+    // `[DONE]` first, then a body that was cut short behind it.
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () =>
+          streamResponse([
+            "data: [DONE]",
+            'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+            'data: {"choices":[{"delta":{"content":" wor',
+          ]),
+        ),
+    });
+
+    const seen: string[] = [];
+    const result = await runner(mockAgent(), "Hi", {
+      onToken: (token) => {
+        seen.push(token);
+      },
+    });
+
+    // Nothing past the sentinel reaches the consumer or the result.
+    expect(seen).toEqual([]);
+    expect(result.output).toBe("");
+  });
+
+  it("stops reading at the sentinel rather than draining the body", async () => {
+    let pulled = 0;
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled++;
+        if (pulled === 1) {
+          controller.enqueue(encoder.encode("data: [DONE]\n"));
+
+          return;
+        }
+        if (pulled > 50) {
+          controller.close();
+
+          return;
+        }
+        controller.enqueue(
+          encoder.encode('data: {"choices":[{"delta":{"content":"x"}}]}\n'),
+        );
+      },
+    });
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
+    });
+
+    await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    // A read or two – whatever the stream prefetched – not fifty. Before,
+    // the loop drained the whole body after the sentinel had already ended
+    // the response.
+    expect(pulled).toBeLessThanOrEqual(3);
+  });
+
+  it("discards a second generation joined onto the first", async () => {
+    const runner = createAnthropicRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () =>
+          streamResponse([
+            'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}',
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"first"}}',
+            'data: {"type":"message_stop"}',
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"second"}}',
+          ]),
+        ),
+    });
+
+    const seen: string[] = [];
+    const result = await runner(mockAgent(), "Hi", {
+      onToken: (token) => {
+        seen.push(token);
+      },
+    });
+
+    expect(seen).toEqual(["first"]);
+    expect(result.output).toBe("first");
+  });
+
+  it("still reads the usage frame OpenAI sends after finish_reason", async () => {
+    const runner = createOpenAIRunner({
+      apiKey: "k",
+      fetch: vi
+        .fn()
+        .mockImplementation(async () =>
+          streamResponse([
+            'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+            'data: {"usage":{"prompt_tokens":10,"completion_tokens":5}}',
+            "data: [DONE]",
+          ]),
+        ),
+    });
+
+    const result = await runner(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.usageReported).toBe(true);
+    expect(result.totalTokens).toBe(15);
+  });
+});
+
+// ============================================================================
+// A budget wrapped around retry and fallback
+// ============================================================================
+
+describe("withBudget over a retrying, falling-back stack", () => {
+  /** A gateway that strips the completion marker from every response. */
+  function markerStrippingFetch(): typeof globalThis.fetch {
+    return vi
+      .fn()
+      .mockImplementation(async () =>
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Hello world"}}]}',
+        ]),
+      ) as unknown as typeof globalThis.fetch;
+  }
+
+  it("charges every request the wrappers made on its behalf", async () => {
+    const fetchFn = markerStrippingFetch();
+    const primary = createOpenAIRunner({ apiKey: "k", fetch: fetchFn });
+    const secondary = createOpenAIRunner({ apiKey: "k2", fetch: fetchFn });
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+
+    const wrapped = withBudget(
+      withFallback([
+        withRetry(primary, { maxRetries: 2, baseDelayMs: 0 }),
+        withRetry(secondary, { maxRetries: 2, baseDelayMs: 0 }),
+      ]),
+      { budgets: [{ window: "hour", maxCost: 1_000_000, pricing }] },
+    );
+
+    await expect(
+      wrapped(mockAgent(), "Hi", { onToken: () => {} }),
+    ).rejects.toThrow();
+
+    const httpCalls = (fetchFn as unknown as { mock: { calls: unknown[] } })
+      .mock.calls.length;
+    // Six requests reached the provider and six responses were billed.
+    expect(httpCalls).toBe(6);
+    // The budget knows about all of them, not one, and not none.
+    expect(wrapped.getUnpricedCallCount()).toBe(httpCalls);
+    expect(wrapped.getSpent("hour")).toBeGreaterThan(0);
+  });
+
+  it("counts the failed attempts behind a call that eventually succeeded", async () => {
+    let attempt = 0;
+    const fetchFn = vi.fn().mockImplementation(async () => {
+      attempt++;
+      if (attempt < 3) {
+        return streamResponse([
+          'data: {"choices":[{"delta":{"content":"partial"}}]}',
+        ]);
+      }
+
+      return streamResponse(OPENAI_SSE);
+    });
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+
+    const wrapped = withBudget(
+      withRetry(createOpenAIRunner({ apiKey: "k", fetch: fetchFn }), {
+        maxRetries: 3,
+        baseDelayMs: 0,
+      }),
+      { budgets: [{ window: "hour", maxCost: 1_000_000, pricing }] },
+    );
+
+    const result = await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(result.usageReported).toBe(true);
+    // The two responses thrown away were generated and billed all the same.
+    expect(wrapped.getUnpricedCallCount()).toBe(2);
+  });
+
+  it("leaves a single successful call counted exactly as before", async () => {
+    const pricing = { inputPerMillion: 1_000_000, outputPerMillion: 1_000_000 };
+    const wrapped = withBudget(
+      withRetry(
+        createOpenAIRunner({
+          apiKey: "k",
+          fetch: vi
+            .fn()
+            .mockImplementation(async () => streamResponse(OPENAI_SSE)),
+        }),
+        { maxRetries: 3, baseDelayMs: 0 },
+      ),
+      { budgets: [{ window: "hour", maxCost: 1_000_000, pricing }] },
+    );
+
+    await wrapped(mockAgent(), "Hi", { onToken: () => {} });
+
+    expect(wrapped.getUnpricedCallCount()).toBe(0);
+    // 10 in + 5 out, from the counts the provider reported.
+    expect(wrapped.getSpent("hour")).toBeCloseTo(15, 5);
+  });
+
+  it("still forwards the caller's own restart signal", async () => {
+    const seen: string[] = [];
+    const wrapped = withBudget(
+      withRetry(
+        createOpenAIRunner({ apiKey: "k", fetch: markerStrippingFetch() }),
+        { maxRetries: 1, baseDelayMs: 0 },
+      ),
+      {},
+    );
+
+    await expect(
+      wrapped(mockAgent(), "Hi", {
+        onToken: () => {},
+        onStreamRestart: (reason) => {
+          seen.push(reason);
+        },
+      }),
+    ).rejects.toThrow();
+
+    expect(seen).toEqual(["retry"]);
   });
 });

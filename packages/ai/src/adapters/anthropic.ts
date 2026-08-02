@@ -17,12 +17,14 @@ import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
   getStreamReader,
   parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -87,9 +89,16 @@ function parseAnthropicStreamEvent(
   ) {
     result.text = (event.delta as Record<string, unknown>).text as string;
   }
+  // Read the counts, not the container: a `usage` object whose numbers are
+  // null or absent is a provider that reported nothing, and recording it as a
+  // report of zero prices a real call at nothing.
   if (event.type === "message_delta" && event.usage) {
-    result.outputTokens =
-      ((event.usage as Record<string, unknown>).output_tokens as number) ?? 0;
+    const outputTokens = readTokenCount(
+      (event.usage as Record<string, unknown>).output_tokens,
+    );
+    if (outputTokens !== undefined) {
+      result.outputTokens = outputTokens;
+    }
   }
   if (
     event.type === "message_start" &&
@@ -99,12 +108,24 @@ function parseAnthropicStreamEvent(
       string,
       unknown
     >;
-    result.inputTokens = (usage.input_tokens as number) ?? 0;
-    // Emitted unconditionally; whether they reach `tokenUsage` is decided by
-    // the caller, which knows whether prompt caching was requested.
-    result.cacheReadTokens = (usage.cache_read_input_tokens as number) ?? 0;
-    result.cacheCreationTokens =
-      (usage.cache_creation_input_tokens as number) ?? 0;
+    const inputTokens = readTokenCount(usage.input_tokens);
+    if (inputTokens !== undefined) {
+      result.inputTokens = inputTokens;
+    }
+    // Emitted whenever reported; whether they reach `tokenUsage` is decided by
+    // the caller, which knows whether prompt caching was requested. Left unset
+    // when the provider sent no number, so a `usage` object with nothing usable
+    // in it cannot make the call look priced by way of a zero.
+    const cacheReadTokens = readTokenCount(usage.cache_read_input_tokens);
+    if (cacheReadTokens !== undefined) {
+      result.cacheReadTokens = cacheReadTokens;
+    }
+    const cacheCreationTokens = readTokenCount(
+      usage.cache_creation_input_tokens,
+    );
+    if (cacheCreationTokens !== undefined) {
+      result.cacheCreationTokens = cacheCreationTokens;
+    }
   }
 
   return result;
@@ -259,8 +280,14 @@ export function createAnthropicRunner(
     parseResponse: async (res) => {
       const data = await res.json();
       const text = data.content?.[0]?.text ?? "";
-      const inputTokens = data.usage?.input_tokens ?? 0;
-      const outputTokens = data.usage?.output_tokens ?? 0;
+      const inputTokens = readTokenCount(data.usage?.input_tokens) ?? 0;
+      const outputTokens = readTokenCount(data.usage?.output_tokens) ?? 0;
+      // A `usage` object holding no usable number says the same thing as no
+      // `usage` object at all: nothing was reported. Both are unpriceable.
+      const usageReported = anyTokenCountReported(
+        data.usage?.input_tokens,
+        data.usage?.output_tokens,
+      );
 
       // Cache-token emission is gated on the OPTION, not on the response fields:
       // the live API returns `cache_*_input_tokens: 0` on every response even
@@ -271,9 +298,10 @@ export function createAnthropicRunner(
       // the pre-caching behavior. `input_tokens` is the uncached remainder, so
       // cache tokens are additive – include them in `totalTokens`.
       if (promptCaching === "automatic") {
-        const cacheReadTokens = data.usage?.cache_read_input_tokens ?? 0;
+        const cacheReadTokens =
+          readTokenCount(data.usage?.cache_read_input_tokens) ?? 0;
         const cacheCreationTokens =
-          data.usage?.cache_creation_input_tokens ?? 0;
+          readTokenCount(data.usage?.cache_creation_input_tokens) ?? 0;
 
         return {
           text,
@@ -283,7 +311,7 @@ export function createAnthropicRunner(
           outputTokens,
           cacheReadTokens,
           cacheCreationTokens,
-          usageReported: data.usage != null,
+          usageReported,
         };
       }
 
@@ -292,7 +320,7 @@ export function createAnthropicRunner(
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
-        usageReported: data.usage != null,
+        usageReported,
       };
     },
     streaming: {

@@ -16,7 +16,7 @@ import type { DebugTimeline } from "../debug-timeline.js";
 import { withFallback } from "../fallback.js";
 import { createMultiAgentOrchestrator } from "../multi-agent-orchestrator.js";
 import { withRetry } from "../retry.js";
-import { admitChunk, sliceTailByCodePoint } from "../streaming.js";
+import { ChunkBuffer, sliceTailByCodePoint } from "../streaming.js";
 import { GuardrailError } from "../types.js";
 import type { AgentLike, AgentRunner, RunResult } from "../types.js";
 
@@ -1575,33 +1575,85 @@ describe("buffer bounds and drop reporting", () => {
   });
 
   it("keeps control chunks ahead of content, and still caps them", () => {
-    const buffer: Array<{ type: string; id: number }> = [];
+    const buffer = new ChunkBuffer<{ type: string; id: number }>(4);
+    const drain = () => {
+      const out: number[] = [];
+      let chunk = buffer.shift();
+      while (chunk) {
+        out.push(chunk.id);
+        chunk = buffer.shift();
+      }
+      for (const id of out) {
+        buffer.admit({ type: "token", id });
+      }
+
+      return out;
+    };
+
     for (let i = 0; i < 4; i++) {
-      admitChunk(buffer, { type: "token", id: i }, 4);
+      buffer.admit({ type: "token", id: i });
     }
 
     // Full: another token is refused.
-    expect(admitChunk(buffer, { type: "token", id: 99 }, 4)).toBe(1);
-    expect(buffer).toHaveLength(4);
+    expect(buffer.admit({ type: "token", id: 99 })).toBe(1);
+    expect(buffer.size).toBe(4);
 
     // A control chunk lands, evicting the newest token so the beginning of
     // the response survives.
-    expect(admitChunk(buffer, { type: "approval_required", id: 100 }, 4)).toBe(
-      1,
-    );
-    expect(buffer.map((c) => c.id)).toEqual([0, 1, 2, 100]);
+    expect(buffer.admit({ type: "approval_required", id: 100 })).toBe(1);
+    expect(drain()).toEqual([0, 1, 2, 100]);
 
     // Control chunks are capped too — three more cannot grow the buffer past
     // four, however many arrive.
     for (let i = 0; i < 3; i++) {
-      admitChunk(buffer, { type: "approval_required", id: 200 + i }, 4);
+      buffer.admit({ type: "approval_required", id: 200 + i });
     }
-    expect(buffer).toHaveLength(4);
+    expect(buffer.size).toBe(4);
 
     // The terminal chunk always lands, even with nothing droppable left.
-    expect(admitChunk(buffer, { type: "done", id: 300 }, 4)).toBe(1);
-    expect(buffer).toHaveLength(4);
-    expect(buffer[buffer.length - 1]!.id).toBe(300);
+    expect(buffer.admit({ type: "done", id: 300 })).toBe(1);
+    expect(buffer.size).toBe(4);
+    const remaining = drain();
+    expect(remaining[remaining.length - 1]).toBe(300);
+  });
+
+  it("never refuses a control chunk, whatever the buffer holds", () => {
+    const buffer = new ChunkBuffer<{ type: string; id: number }>(3);
+    // Saturate with non-droppable chunks so there is nothing to evict.
+    for (let i = 0; i < 3; i++) {
+      buffer.admit({ type: "approval_required", id: i });
+    }
+
+    // Previously refused, leaving the tool call to wait out the approval
+    // timeout for a question the consumer was never asked.
+    expect(buffer.admit({ type: "approval_required", id: 9 })).toBe(1);
+    // And a restart boundary, whose loss concatenates two generations.
+    expect(buffer.admit({ type: "stream_restart", id: 10 })).toBe(1);
+    expect(buffer.size).toBe(3);
+
+    const out: number[] = [];
+    let chunk = buffer.shift();
+    while (chunk) {
+      out.push(chunk.id);
+      chunk = buffer.shift();
+    }
+    // The oldest control chunks went; the newest are what remain.
+    expect(out).toEqual([2, 9, 10]);
+  });
+
+  it("admits at a fixed cost however full it is", () => {
+    const buffer = new ChunkBuffer<{ type: string; id: number }>(10_000);
+    for (let i = 0; i < 10_000; i++) {
+      buffer.admit({ type: "approval_required", id: i });
+    }
+
+    const started = Date.now();
+    for (let i = 0; i < 10_000; i++) {
+      buffer.admit({ type: "approval_required", id: 100_000 + i });
+    }
+    // The scan-plus-splice this replaces took ~220ms for this loop.
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(buffer.size).toBe(10_000);
   });
 
   it("reports the loss on the error path, not only on done", async () => {
@@ -1680,5 +1732,290 @@ describe("multi-agent streaming options", () => {
 
     expect(seen.one).toEqual(["a", "b", "c"]);
     expect(seen.two).toEqual(["a", "b", "c"]);
+  });
+});
+
+// ============================================================================
+// The orchestrator's own token budget and unreported usage
+// ============================================================================
+
+/** A runner that answers normally but reports no usage at all. */
+function unreportedRunner(output: string): AgentRunner {
+  return (async (_agent: AgentLike, _input: string, options?: any) => {
+    const message = { role: "assistant" as const, content: output };
+    await options?.onMessage?.(message);
+
+    return {
+      output,
+      messages: [message],
+      toolCalls: [],
+      totalTokens: 0,
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+      usageReported: false,
+    };
+  }) as unknown as AgentRunner;
+}
+
+describe("maxTokenBudget and usage the provider never reported", () => {
+  it("single-agent: accrues an estimate rather than the zero it was handed", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: unreportedRunner("y".repeat(400)),
+    });
+
+    await orchestrator.run(mockAgent(), "x".repeat(400));
+
+    // 100 in + 100 out, not 0.
+    expect(orchestrator.facts.agent.tokenUsage).toBe(200);
+  });
+
+  it("single-agent: the documented ceiling actually stops the run", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: unreportedRunner("y".repeat(400)),
+      maxTokenBudget: 500,
+    });
+
+    let calls = 0;
+    for (let i = 0; i < 20; i++) {
+      try {
+        await orchestrator.run(mockAgent(), "x".repeat(400));
+        calls++;
+      } catch {
+        break;
+      }
+    }
+
+    // Blind to unreported usage, this ran all twenty.
+    expect(calls).toBeLessThan(20);
+    expect(orchestrator.facts.agent.tokenUsage).toBeGreaterThan(0);
+  });
+
+  it("single-agent: a streamed run accrues the same estimate", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: unreportedRunner("y".repeat(400)),
+    });
+
+    const { stream, result } = orchestrator.runStream(
+      mockAgent(),
+      "x".repeat(400),
+      { deltas: true },
+    );
+    await collect(stream);
+    await result;
+
+    expect(orchestrator.facts.agent.tokenUsage).toBe(200);
+  });
+
+  it("multi-agent: the global counter accrues the estimate too", async () => {
+    const orchestrator = multiAgent(unreportedRunner("y".repeat(400)));
+
+    await orchestrator.runAgent("assistant", "x".repeat(400));
+
+    expect(orchestrator.totalTokens).toBe(200);
+  });
+
+  it("leaves a reported run counted exactly as before", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: bufferedRunner("ok"),
+    });
+
+    await orchestrator.run(mockAgent(), "hi");
+
+    expect(orchestrator.facts.agent.tokenUsage).toBe(10);
+  });
+});
+
+// ============================================================================
+// Shutting down a stream whose runner ignores its signal
+// ============================================================================
+
+describe("destroy() and a runner that does not honor its signal", () => {
+  it("single-agent: settles `result` instead of leaving it pending", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+
+    const { result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const settled = result.then(
+      () => "resolved",
+      () => "rejected",
+    );
+
+    await hasStarted;
+    await settle();
+    orchestrator.destroy();
+
+    await expect(settled).resolves.toBe("rejected");
+  });
+
+  it("multi-agent: settles `result` instead of leaving it pending", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = multiAgent(hangingRunner(started));
+
+    const { result } = orchestrator.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    const settled = result.then(
+      () => "resolved",
+      () => "rejected",
+    );
+
+    await hasStarted;
+    await settle();
+    orchestrator.destroy();
+
+    await expect(settled).resolves.toBe("rejected");
+  });
+
+  it("abort() settles it as well, without waiting on the runner", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+
+    const { result, abort } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+
+    await hasStarted;
+    abort();
+
+    await expect(result).rejects.toBeDefined();
+  });
+
+  it("leaves a completed run's result untouched", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: deltaRunner(["a", "b"]),
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    await collect(stream);
+    const value = await result;
+    expect(value.output).toBe("ab");
+
+    // A shutdown after the fact cannot retroactively reject it.
+    orchestrator.destroy();
+    await expect(result).resolves.toBe(value);
+  });
+});
+
+// ============================================================================
+// Token chunks carry their generation
+// ============================================================================
+
+describe("generation on token chunks", () => {
+  it("rises with each restart, so a lost boundary is still detectable", async () => {
+    let attempt = 0;
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      attempt++;
+      await options?.onToken?.(`gen${attempt}`);
+      if (attempt === 1) {
+        throw new Error("transient");
+      }
+      const message = { role: "assistant" as const, content: `gen${attempt}` };
+      await options?.onMessage?.(message);
+
+      return resultFor(`gen${attempt}`);
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({
+      runner,
+      agentRetry: { attempts: 2, baseDelayMs: 0 },
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    const generations = tokenChunks(chunks).map((c) => c.generation);
+    expect(generations).toEqual([1, 2]);
+  });
+});
+
+// ============================================================================
+// Reading a stream's progress from outside
+// ============================================================================
+
+describe("getStats", () => {
+  it("reports a stall the caller could not otherwise see", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const runner: AgentRunner = (async (
+      _agent: AgentLike,
+      _input: string,
+      options?: any,
+    ) => {
+      await options?.onToken?.("first");
+      await held;
+      const message = { role: "assistant" as const, content: "first" };
+      await options?.onMessage?.(message);
+
+      return resultFor("first");
+    }) as unknown as AgentRunner;
+
+    const orchestrator = createAgentOrchestrator({ runner });
+    const { stream, result, getStats } = orchestrator.runStream(
+      mockAgent(),
+      "hi",
+      { deltas: true },
+    );
+
+    await settle();
+    const mid = getStats();
+    // A token arrived and nobody has read it: the consumer is behind, not the
+    // provider.
+    expect(mid.bufferedChunks).toBeGreaterThan(0);
+    expect(mid.timeToFirstTokenMs).toBeGreaterThanOrEqual(0);
+    expect(mid.restarts).toBe(0);
+    expect(mid.closed).toBe(false);
+    expect(orchestrator.getActiveStreamCount()).toBe(1);
+
+    release();
+    await collect(stream);
+    await result;
+
+    expect(getStats().closed).toBe(true);
+    expect(orchestrator.getActiveStreamCount()).toBe(0);
+  });
+
+  it("leaves time-to-first-token unset when nothing has arrived", async () => {
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const orchestrator = createAgentOrchestrator({
+      runner: hangingRunner(started),
+    });
+    const { getStats } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+
+    await hasStarted;
+    await settle();
+
+    expect(getStats().timeToFirstTokenMs).toBeUndefined();
+
+    orchestrator.destroy();
   });
 });

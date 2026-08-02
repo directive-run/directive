@@ -64,6 +64,43 @@ export function warnIfMissingApiKey(
 }
 
 // ============================================================================
+// Token Count Validation
+// ============================================================================
+
+/**
+ * Read a token count that a provider may or may not have sent.
+ *
+ * Returns the number when the field holds a finite non-negative one, and
+ * `undefined` for everything else – a missing field, `null`, a string, `NaN`.
+ *
+ * The distinction matters because "the provider reported usage" is what decides
+ * whether a call is priceable, and testing the container rather than the
+ * numbers answered that question wrong: a gateway forwarding
+ * `"usage":{"prompt_tokens":null,"completion_tokens":null}` satisfied
+ * `usage != null`, so the call was recorded as reporting zero tokens and cost
+ * nothing, while the same gateway omitting the `usage` key entirely was
+ * correctly charged at estimate. The two say exactly the same thing.
+ *
+ * @internal
+ */
+export function readTokenCount(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+/**
+ * Did the provider report at least one usable token count?
+ *
+ * @internal
+ */
+export function anyTokenCountReported(...values: unknown[]): boolean {
+  return values.some((value) => readTokenCount(value) !== undefined);
+}
+
+// ============================================================================
 // Event Stream Parser
 // ============================================================================
 
@@ -176,11 +213,26 @@ export async function parseEventStream(
   let cacheReadTokens: number | undefined;
   let cacheCreationTokens: number | undefined;
   let usageReported = false;
+  /** The response is complete: no further text belongs to it. */
   let sawTerminal = false;
+  /** The wire said the body is over: stop reading. */
+  let sawEndOfStream = false;
+  let warnedAfterTerminal = false;
+
+  // One abort listener and one rejection for the whole stream rather than a
+  // fresh pair per delta. The per-delta form allocated a promise, an executor
+  // closure, a listener, a `.catch` handler and a `Promise.race` array for
+  // every token, which at a thousand concurrent streams is a six-figure
+  // allocation rate for a race that almost never fires. The semantics are
+  // unchanged: one rejection settles every waiter.
+  const abortWatch = watchAbort(signal);
 
   const handleLine = async (line: string): Promise<void> => {
     if (isSseTerminalLine(line, wireFormat)) {
       sawTerminal = true;
+      sawEndOfStream = true;
+
+      return;
     }
     const data = extractPayload(line, wireFormat);
     if (data === undefined) {
@@ -210,33 +262,64 @@ export async function parseEventStream(
       throw parseErr;
     }
 
+    // Text after the end-of-response marker is not part of the response. It
+    // arrives when a gateway concatenates two upstream generations onto one
+    // body, and delivering it hands the consumer both answers as though they
+    // were one. Counts are still read: OpenAI sends its usage frame *after*
+    // the `finish_reason` that marks the response complete, so refusing
+    // everything past the marker would make every streamed OpenAI call
+    // unpriceable.
+    if (result.text) {
+      if (sawTerminal) {
+        warnOnceAfterTerminal();
+      } else {
+        fullText += result.text;
+        await deliverToken(onToken, result.text, abortWatch);
+      }
+    }
     if (result.terminal) {
       sawTerminal = true;
     }
-    if (result.text) {
-      fullText += result.text;
-      await deliverToken(onToken, result.text, signal);
-    }
-    if (result.inputTokens !== undefined) {
-      inputTokens = result.inputTokens;
+
+    const nextInput = readTokenCount(result.inputTokens);
+    if (nextInput !== undefined) {
+      inputTokens = nextInput;
       usageReported = true;
     }
-    if (result.outputTokens !== undefined) {
-      outputTokens = result.outputTokens;
+    const nextOutput = readTokenCount(result.outputTokens);
+    if (nextOutput !== undefined) {
+      outputTokens = nextOutput;
       usageReported = true;
     }
-    if (result.cacheReadTokens !== undefined) {
-      cacheReadTokens = result.cacheReadTokens;
+    const nextCacheRead = readTokenCount(result.cacheReadTokens);
+    if (nextCacheRead !== undefined) {
+      cacheReadTokens = nextCacheRead;
       usageReported = true;
     }
-    if (result.cacheCreationTokens !== undefined) {
-      cacheCreationTokens = result.cacheCreationTokens;
+    const nextCacheCreation = readTokenCount(result.cacheCreationTokens);
+    if (nextCacheCreation !== undefined) {
+      cacheCreationTokens = nextCacheCreation;
       usageReported = true;
     }
   };
 
+  function warnOnceAfterTerminal(): void {
+    if (warnedAfterTerminal) {
+      return;
+    }
+    warnedAfterTerminal = true;
+    if (
+      typeof process !== "undefined" &&
+      process.env?.NODE_ENV === "development"
+    ) {
+      console.warn(
+        `[Directive] ${adapterName} sent content after its end-of-response marker – discarded. The endpoint is joining more than one generation onto a single body.`,
+      );
+    }
+  }
+
   try {
-    while (true) {
+    while (!sawEndOfStream) {
       const { done, value } = await reader.read();
       if (done) {
         break;
@@ -248,6 +331,13 @@ export async function parseEventStream(
 
       for (const line of lines) {
         await handleLine(line);
+        // The sentinel ends the body. Reading past it kept a truncated
+        // response looking complete and let whatever followed reach the
+        // consumer, which is the very failure the marker check was added to
+        // catch.
+        if (sawEndOfStream) {
+          break;
+        }
       }
     }
 
@@ -255,10 +345,11 @@ export async function parseEventStream(
     // event can arrive with nothing after it. Dropping it silently cost a
     // token count before; now it would also cost the completion marker and
     // turn a complete response into a truncation error.
-    if (buf.length > 0) {
+    if (!sawEndOfStream && buf.length > 0) {
       await handleLine(buf);
     }
   } finally {
+    abortWatch?.release();
     reader.cancel().catch(() => {});
   }
 
@@ -281,6 +372,45 @@ export async function parseEventStream(
 }
 
 /**
+ * One abort listener and one rejected promise, shared by every delta of a
+ * single stream.
+ */
+interface AbortWatch {
+  signal: AbortSignal;
+  /** Rejects with the signal's reason once, when the signal aborts. */
+  readonly rejection: Promise<never>;
+  /** Detach the listener. Called once, when the stream is done reading. */
+  release(): void;
+}
+
+/** Start watching `signal` for the life of one stream, if there is one. */
+function watchAbort(signal: AbortSignal | undefined): AbortWatch | undefined {
+  if (!signal) {
+    return undefined;
+  }
+
+  let onAbort: (() => void) | undefined;
+  const rejection = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(abortReason(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  // Nothing awaits this promise until a delta races against it, and a stream
+  // aborted between deltas would otherwise report an unhandled rejection.
+  rejection.catch(() => {});
+
+  return {
+    signal,
+    rejection,
+    release: () => {
+      if (onAbort) {
+        signal.removeEventListener("abort", onAbort);
+        onAbort = undefined;
+      }
+    },
+  };
+}
+
+/**
  * Hand one delta to the consumer, and stop waiting on it if the run is
  * aborted.
  *
@@ -298,7 +428,7 @@ export async function parseEventStream(
 async function deliverToken(
   onToken: ((token: string) => void | Promise<void>) | undefined,
   token: string,
-  signal: AbortSignal | undefined,
+  abortWatch: AbortWatch | undefined,
 ): Promise<void> {
   if (!onToken) {
     return;
@@ -319,30 +449,23 @@ async function deliverToken(
     throw new StreamConsumerError(err);
   });
 
-  if (!signal) {
+  if (!abortWatch) {
     return settled;
   }
 
-  if (signal.aborted) {
-    throw abortReason(signal);
+  if (abortWatch.signal.aborted) {
+    settled.catch(() => {});
+
+    throw abortReason(abortWatch.signal);
   }
 
-  let onAbort: (() => void) | undefined;
-  const aborted = new Promise<never>((_resolve, reject) => {
-    onAbort = () => reject(abortReason(signal));
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-
   try {
-    await Promise.race([settled, aborted]);
+    await Promise.race([settled, abortWatch.rejection]);
   } finally {
-    if (onAbort) {
-      signal.removeEventListener("abort", onAbort);
-    }
-    // Whichever side lost the race is no longer awaited by anyone: give both
-    // a handler so a late rejection is not reported as unhandled.
+    // A callback that lost the race is no longer awaited by anyone: give it a
+    // handler so a late rejection is not reported as unhandled. The shared
+    // rejection already carries one.
     settled.catch(() => {});
-    aborted.catch(() => {});
   }
 }
 

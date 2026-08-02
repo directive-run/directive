@@ -40,6 +40,14 @@ export type { StreamRestartReason } from "./types.js";
 /** Default buffer size for streaming backpressure */
 export const DEFAULT_BUFFER_SIZE = 1000;
 
+/**
+ * Brand identifying a {@link StreamConsumerError} across module realms.
+ *
+ * Read from the global symbol registry so an ESM copy and a CJS copy of this
+ * package agree on it, which `instanceof` cannot.
+ */
+const STREAM_CONSUMER_ERROR = Symbol.for("directive.streamConsumerError");
+
 /** Default interval (in tokens) between guardrail checks during streaming */
 export const DEFAULT_GUARDRAIL_CHECK_INTERVAL = 50;
 
@@ -100,10 +108,12 @@ export function sliceTailByCodePoint(text: string, maxLength: number): string {
  *
  * Everything else – `done`, `error`, `guardrail_triggered`,
  * `approval_required`, `approval_resolved`, `interrupted`, `stream_restart` –
- * carries control flow or ends the stream, and is preferred over any droppable
- * chunk still in the buffer. Dropping `done` would take the drop report down
- * with it, and dropping `approval_required` would leave a tool call waiting on
- * an approval the consumer was never asked for.
+ * carries control flow or ends the stream, and is never refused. Dropping
+ * `done` would take the drop report down with it, dropping `approval_required`
+ * would leave a tool call waiting out the full approval timeout for a question
+ * the consumer was never asked, and dropping `stream_restart` would let two
+ * generations of the same response concatenate on screen – which is the exact
+ * defect the restart chunk exists to prevent.
  *
  * @internal
  */
@@ -118,61 +128,145 @@ export function isDroppableChunk(chunk: { type: string }): boolean {
   );
 }
 
-/** The two chunks that end a stream. Exactly one of them is ever emitted. */
-function isTerminalChunk(chunk: { type: string }): boolean {
-  return chunk.type === "done" || chunk.type === "error";
-}
-
 /**
- * Append `chunk` to a bounded buffer, and report how many chunks the buffer
- * lost doing it (0 or 1).
+ * A bounded chunk buffer that never refuses a control chunk and never scans.
  *
- * The cap applies to every chunk type. Preference, not exemption, is what
- * separates them: at the cap a droppable chunk is refused, and a control chunk
- * is admitted by evicting the newest droppable chunk already buffered – so the
- * beginning of a response survives and its tail is what goes. A terminal chunk
- * is admitted unconditionally, evicting the oldest buffered chunk if the
- * buffer holds nothing droppable, because there is exactly one of them per
- * stream and it carries the drop report.
+ * The cap applies to every chunk type; preference, not exemption, is what
+ * separates them. At the cap a droppable chunk is refused. A control chunk is
+ * always admitted, making room by evicting the newest droppable chunk still
+ * buffered – so the beginning of a response survives and its tail is what goes
+ * – or, when the buffer holds nothing droppable, by evicting the oldest chunk
+ * of any kind. Old control information is the least costly thing to lose:
+ * an approval the run is currently blocked on matters more than one already
+ * superseded.
  *
- * Exempting control chunks from the cap entirely – which is what "always
- * admitted" amounted to – let a stalled consumer accumulate them without
- * limit.
+ * Refusing a control chunk was the previous behavior once the buffer filled
+ * with non-droppable chunks, and it cost more than the cap saved.
+ *
+ * Every operation is O(1) amortized. Consumed slots are tombstoned rather than
+ * spliced, droppable slots are tracked in an ascending index list that is only
+ * ever pushed to or popped from either end, and the backing array is compacted
+ * once its spent prefix outgrows its live tail. The scan-plus-splice this
+ * replaces cost O(n) per admission, which at a 10,000-chunk cap is milliseconds
+ * per chunk on a stalled stream.
  *
  * @internal
  */
-export function admitChunk<T extends { type: string }>(
-  buffer: T[],
-  chunk: T,
-  maxSize: number,
-): number {
-  if (buffer.length < maxSize) {
-    buffer.push(chunk);
+export class ChunkBuffer<T extends { type: string }> {
+  /** Backing store. A `undefined` slot is a chunk already taken or evicted. */
+  private items: Array<T | undefined> = [];
+  /** Lowest slot that may still hold a live chunk. */
+  private head = 0;
+  /** How many live chunks the buffer holds. */
+  private count = 0;
+  /** Ascending slot indices of live droppable chunks. */
+  private droppable: number[] = [];
+  /** Lowest live entry in {@link ChunkBuffer.droppable}. */
+  private droppableHead = 0;
 
-    return 0;
+  constructor(private readonly maxSize: number) {}
+
+  /** How many chunks are waiting to be read. */
+  get size(): number {
+    return this.count;
   }
 
-  if (isDroppableChunk(chunk)) {
-    return 1;
-  }
+  /**
+   * Append `chunk`, and report how many chunks the buffer lost doing it
+   * (0 or 1).
+   */
+  admit(chunk: T): number {
+    if (this.count < this.maxSize) {
+      this.append(chunk);
 
-  for (let i = buffer.length - 1; i >= 0; i--) {
-    if (isDroppableChunk(buffer[i]!)) {
-      buffer.splice(i, 1);
-      buffer.push(chunk);
+      return 0;
+    }
 
+    if (isDroppableChunk(chunk)) {
       return 1;
     }
-  }
 
-  if (isTerminalChunk(chunk)) {
-    buffer.shift();
-    buffer.push(chunk);
+    if (!this.evictNewestDroppable()) {
+      this.shift();
+    }
+    this.append(chunk);
 
     return 1;
   }
 
-  return 1;
+  /** Take the oldest chunk, or `undefined` when the buffer is empty. */
+  shift(): T | undefined {
+    while (
+      this.head < this.items.length &&
+      this.items[this.head] === undefined
+    ) {
+      this.head++;
+    }
+    if (this.head >= this.items.length) {
+      return undefined;
+    }
+
+    const chunk = this.items[this.head]!;
+    this.items[this.head] = undefined;
+    this.count--;
+    if (this.droppable[this.droppableHead] === this.head) {
+      this.droppableHead++;
+    }
+    this.head++;
+    this.compact();
+
+    return chunk;
+  }
+
+  /** Forget everything buffered. */
+  clear(): void {
+    this.items = [];
+    this.head = 0;
+    this.count = 0;
+    this.droppable = [];
+    this.droppableHead = 0;
+  }
+
+  private append(chunk: T): void {
+    if (isDroppableChunk(chunk)) {
+      this.droppable.push(this.items.length);
+    }
+    this.items.push(chunk);
+    this.count++;
+  }
+
+  /** Evict the newest droppable chunk, reporting whether there was one. */
+  private evictNewestDroppable(): boolean {
+    if (this.droppable.length <= this.droppableHead) {
+      return false;
+    }
+    const index = this.droppable.pop()!;
+    this.items[index] = undefined;
+    this.count--;
+
+    return true;
+  }
+
+  /**
+   * Drop the spent prefix once it is at least as long as the live tail, so a
+   * long-running stream does not grow its backing array without bound. Copying
+   * happens once per element across the buffer's life.
+   */
+  private compact(): void {
+    if (this.head < 64 || this.head * 2 < this.items.length) {
+      return;
+    }
+    const offset = this.head;
+    this.items = this.items.slice(offset);
+    this.head = 0;
+    if (this.droppableHead > 0) {
+      this.droppable = this.droppable.slice(this.droppableHead);
+      this.droppableHead = 0;
+    }
+    for (let i = 0; i < this.droppable.length; i++) {
+      this.droppable[i]! -= offset;
+    }
+  }
 }
 
 /**
@@ -184,6 +278,20 @@ export function admitChunk<T extends { type: string }>(
  * same broken consumer.
  */
 export class StreamConsumerError extends Error {
+  /**
+   * The marker {@link isStreamConsumerError} actually reads.
+   *
+   * `instanceof` compares against one realm's class object, and this package
+   * publishes both ESM and CJS builds: an application that loads the ESM entry
+   * and a dependency that loads the CJS one hold two distinct
+   * `StreamConsumerError` classes, so an error raised through one is invisible
+   * to an `instanceof` check compiled against the other. The classification
+   * silently inverts – a consumer's own crash is retried as a provider failure,
+   * at full price, three more times. A registry symbol is the same value in
+   * every realm, so the marker survives the boundary.
+   */
+  readonly [STREAM_CONSUMER_ERROR] = true;
+
   constructor(cause: unknown) {
     super(
       `[Directive] A stream consumer callback threw: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -203,7 +311,10 @@ export class StreamConsumerError extends Error {
 export function isStreamConsumerError(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; current != null && depth < 10; depth++) {
-    if (current instanceof StreamConsumerError) {
+    if (
+      (current as Record<symbol, unknown>)[STREAM_CONSUMER_ERROR] === true &&
+      current instanceof Error
+    ) {
       return true;
     }
     current = (current as { cause?: unknown }).cause;
@@ -294,6 +405,18 @@ export interface TokenChunk {
    * awaited {@link RunResult}.
    */
   deltaCount: number;
+  /**
+   * Which generation of the response this chunk belongs to: 1 until the first
+   * {@link StreamRestartChunk}, 2 after it, and so on.
+   *
+   * The same marker {@link StreamRestartChunk.generation} carries, repeated on
+   * every token so a boundary the consumer never received is still detectable.
+   * A `stream_restart` chunk is admitted ahead of any content chunk, but a
+   * buffer saturated with control chunks can still cost one; a consumer that
+   * keys rendered output by this field replaces the previous generation on the
+   * next token either way, rather than concatenating two answers.
+   */
+  generation: number;
   /**
    * @deprecated Use {@link TokenChunk.deltaCount}, or `result.tokenUsage` for a
    * real token count. Kept because it is public API.
@@ -714,6 +837,10 @@ export function createStreamingRunner(
               type: "token",
               data: token,
               deltaCount: tokenCount,
+              // This wrapper invokes its base runner once and has no
+              // re-invocation of its own to report, so every delta it emits
+              // belongs to the first generation.
+              generation: 1,
               tokenCount,
             });
 

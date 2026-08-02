@@ -73,7 +73,7 @@ interface TokenUsage {
 
 ```typescript
 type StreamChunk =
-  | { type: "token"; data: string; deltaCount: number; tokenCount: number }                  // text; see "Chunk counts are not token counts"
+  | { type: "token"; data: string; deltaCount: number; generation: number; tokenCount: number } // text; see "Chunk counts are not token counts"
   | { type: "stream_restart"; reason: "retry" | "schema-retry" | "reroute"; generation: number } // the runner was re-invoked; discard what you rendered
   | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }              // tool started executing
   | { type: "tool_end"; tool: string; toolCallId: string; result: string }                   // tool finished
@@ -88,7 +88,7 @@ type StreamChunk =
 
 ## Consuming `runStream`
 
-`orchestrator.runStream(agent, input, options?)` returns **`OrchestratorStreamResult<T>`** — a `{ stream, result, abort }` triple, NOT an `AsyncIterable` directly. Destructure it before iterating.
+`orchestrator.runStream(agent, input, options?)` returns **`OrchestratorStreamResult<T>`** — a `{ stream, result, abort, interrupt, getStats }` object, NOT an `AsyncIterable` directly. Destructure it before iterating.
 
 ```typescript
 const { stream, result, abort } = orchestrator.runStream(agent, "Write a report");
@@ -148,6 +148,30 @@ await rendering;
 ```
 
 A stream that finished on its own costs nothing here — `destroy()` only reaches streams that are genuinely still open.
+
+`result` settles too. A runner is handed an `AbortSignal`, but nothing obliges it to honor one, so closing the stream alone would leave `result` pending forever and hang a shutdown waiting on it. Both `abort()` and `destroy()` reject it with the abort signal's own reason when the run is still in flight; a run that already finished keeps the result it produced.
+
+## Diagnosing a stalled stream
+
+A consumer that stopped pulling and a provider that stopped sending look identical from outside. `getStats()` tells them apart — the first shows a filling buffer, the second shows no first token:
+
+```typescript
+const { stream, result, getStats } = orchestrator.runStream(agent, prompt, { deltas: true });
+
+setInterval(() => {
+  const stats = getStats();
+  // { bufferedChunks, droppedChunks, timeToFirstTokenMs?, deltaCount, generation, restarts, closed }
+  if (stats.timeToFirstTokenMs === undefined) {
+    console.warn("nothing from the provider yet");
+  } else if (stats.bufferedChunks > 100) {
+    console.warn("the consumer is falling behind");
+  }
+}, 1000);
+
+console.log(orchestrator.getActiveStreamCount());  // streams still open
+```
+
+`restarts` rising steadily means the runner is being re-invoked and spend is a multiple of the call count. `token` chunks carry the matching `generation`, so a `stream_restart` lost to buffer pressure is still detectable: key rendered output by `chunk.generation` and a new generation replaces the previous one rather than appending to it.
 
 ## What a streamed run leaves behind
 
@@ -263,6 +287,8 @@ The shipped adapters require the provider's end-of-response marker — `[DONE]` 
 [Directive] Anthropic stream ended without a completion marker after 412 characters – the response is incomplete.
 ```
 
+The marker also ends the read. `[DONE]` ends the body — nothing after it is parsed, delivered or accumulated, and the reader stops pulling. Text arriving after an end-of-response event is discarded whatever the provider, which is what a gateway joining two upstream generations onto one body produces. Token counts are still read past the marker, because OpenAI sends its usage frame after the `finish_reason` that ends the response.
+
 A runner you built yourself with `createRunner` is unaffected unless you opt in, since a `parseEvent` written before the flag existed cannot report a marker:
 
 ```typescript
@@ -290,12 +316,31 @@ result.tokenUsage;     // { inputTokens: 0, outputTokens: 0 }
 result.usageReported;  // false — the zeros are absence, not a free call
 ```
 
-`withBudget` charges its pre-call estimate for such a call rather than recording `$0`, so rolling windows still accrue and ceilings still trip. Ask how much of the recorded spend is estimated:
+A `usage` object whose counts are `null` says exactly the same thing as no `usage` object at all, and is read the same way: `usageReported` requires a finite non-negative number, not a present container.
+
+`withBudget` charges an estimate for such a call rather than recording `$0`, so rolling windows still accrue and ceilings still trip. The orchestrators' own `maxTokenBudget` accrues the same estimate, so `facts.agent.tokenUsage` rises for an unreported call rather than sitting at zero. Ask how much of the recorded spend is estimated:
 
 ```typescript
 if (runner.getUnpricedCallCount() > 0) {
   console.warn("Provider is not reporting token usage — recorded spend is an estimate.");
 }
+```
+
+The estimate uses the output the call produced, when there is one. When there is not — a call that threw after reaching the provider is charged too, since the response was generated and billed — it falls back to `agent.maxTokens`, the provider's own per-call output ceiling:
+
+```typescript
+const agent = { name: "writer", instructions: "...", maxTokens: 4096 };
+```
+
+Set it to whatever `max_tokens` your adapter sends. Without it the estimate scales output from input, which is unrelated to the response: a retrieval prompt answered in a sentence over-charges, and a one-line prompt answered at length under-charges by orders of magnitude. `agent.maxTokens` bounds the pre-call estimate as well.
+
+To stop enforcing a hard budget against estimates indefinitely, cap them:
+
+```typescript
+const runner = withBudget(baseRunner, {
+  budgets: [{ window: "hour", maxCost: 5, pricing }],
+  maxUnpricedCalls: 25,  // then throw UnpricedCallLimitError
+});
 ```
 
 ## Chunk counts are not token counts
@@ -339,7 +384,7 @@ const { stream, result } = streamRunner(agent, "Generate a long report", {
 
 `"block"` genuinely stops the reader pulling. It relies on `onToken` being awaited all the way down, which the shipped adapters do.
 
-`orchestrator.runStream` has its own fixed-size buffer instead of a strategy. On overflow it drops the **newest** droppable chunk — so the beginning of a message survives and the tail is what is lost. Droppable means content and notifications: `token`, `message`, `progress`, `tool_start`, `tool_end`, `context_updated`. A control chunk (`stream_restart`, `approval_required`, `interrupted`, and friends) is admitted ahead of any droppable chunk still buffered, and a terminal chunk (`done`, `error`) always lands — but the cap applies to every type, so a consumer that stops reading cannot make the buffer grow without limit whatever the run emits. Every drop is counted and reported, on `done` and on `error` alike:
+`orchestrator.runStream` has its own fixed-size buffer instead of a strategy. On overflow it drops the **newest** droppable chunk — so the beginning of a message survives and the tail is what is lost. Droppable means content and notifications: `token`, `message`, `progress`, `tool_start`, `tool_end`, `context_updated`. A control chunk (`stream_restart`, `approval_required`, `interrupted`, `done`, `error`) is never refused: it makes room by evicting the newest droppable chunk, or the oldest chunk of any kind when nothing droppable is buffered. The cap applies to every type, so a consumer that stops reading cannot make the buffer grow without limit whatever the run emits. Every drop is counted and reported, on `done` and on `error` alike:
 
 ```typescript
 case "done":

@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   type StreamChunk,
+  StreamConsumerError,
   type StreamingGuardrail,
   combineStreamingGuardrails,
   createLengthStreamingGuardrail,
   createPatternStreamingGuardrail,
   createStreamingRunner,
   createToxicityStreamingGuardrail,
+  isStreamConsumerError,
 } from "../streaming.js";
 import type {
   AgentLike,
@@ -117,18 +119,21 @@ describe("createStreamingRunner", () => {
     expect(tokenChunks[0]).toEqual({
       type: "token",
       data: "Hello",
+      generation: 1,
       deltaCount: 1,
       tokenCount: 1,
     });
     expect(tokenChunks[1]).toEqual({
       type: "token",
       data: " ",
+      generation: 1,
       deltaCount: 2,
       tokenCount: 2,
     });
     expect(tokenChunks[2]).toEqual({
       type: "token",
       data: "World",
+      generation: 1,
       deltaCount: 3,
       tokenCount: 3,
     });
@@ -761,5 +766,59 @@ describe("validation", () => {
     expect(() =>
       runner(mockAgent(), "test", { guardrailCheckInterval: Number.NaN }),
     ).toThrow("guardrailCheckInterval must be a positive number");
+  });
+});
+
+// ============================================================================
+// Classifying a consumer-side throw across a duplicated module
+// ============================================================================
+
+const BRAND = Symbol.for("directive.streamConsumerError");
+
+describe("isStreamConsumerError", () => {
+  it("recognizes an error raised by another copy of this class", () => {
+    // What a dual ESM/CJS load produces: a structurally identical error from a
+    // second class object, which `instanceof` cannot see. Misclassifying it
+    // buys the same response from the provider three more times.
+    class OtherRealmStreamConsumerError extends Error {
+      readonly [BRAND] = true;
+
+      constructor(cause: unknown) {
+        super("[Directive] A stream consumer callback threw: render crash");
+        this.name = "StreamConsumerError";
+        this.cause = cause;
+      }
+    }
+
+    const foreign = new OtherRealmStreamConsumerError(new Error("boom"));
+
+    expect(foreign instanceof StreamConsumerError).toBe(false);
+    expect(isStreamConsumerError(foreign)).toBe(true);
+  });
+
+  it("finds it through a chain of causes", () => {
+    const wrapped = new Error("run failed", {
+      cause: new Error("adapter failed", {
+        cause: new StreamConsumerError(new Error("render crash")),
+      }),
+    });
+
+    expect(isStreamConsumerError(wrapped)).toBe(true);
+  });
+
+  it("cannot be forged by a plain object a provider could send", () => {
+    const forged = JSON.parse(
+      '{"name":"StreamConsumerError","message":"nope"}',
+    );
+
+    expect(isStreamConsumerError(forged)).toBe(false);
+    // Nor by an object that carries the marker without being an Error.
+    expect(isStreamConsumerError({ [BRAND]: true })).toBe(false);
+  });
+
+  it("says no to an ordinary provider failure", () => {
+    expect(isStreamConsumerError(new Error("503 Service Unavailable"))).toBe(
+      false,
+    );
   });
 });

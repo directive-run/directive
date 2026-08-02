@@ -579,6 +579,7 @@ export {
 export {
   withBudget,
   BudgetExceededError,
+  UnpricedCallLimitError,
   type BudgetConfig,
   type BudgetRunner,
   type BudgetWindow,

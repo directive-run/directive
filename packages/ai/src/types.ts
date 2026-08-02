@@ -23,6 +23,21 @@ export interface AgentLike {
   instructions?: string;
   model?: string;
   tools?: unknown[];
+  /**
+   * The most output tokens one call to this agent can produce – the provider's
+   * own ceiling, the same number an adapter sends as `max_tokens`.
+   *
+   * Optional, and read only by cost estimation. Supplying it makes a budget
+   * estimate a real bound instead of a guess: `withBudget` otherwise has to
+   * assume output scales with input, which for a retrieval-heavy prompt
+   * over-charges by the ratio of context to answer and for a one-line prompt
+   * under-charges by the ratio of answer to prompt. Both mispricings were
+   * measured in the hundreds of times.
+   *
+   * Set it to whatever `max_tokens` / `maxOutputTokens` the adapter is
+   * configured with.
+   */
+  maxTokens?: number;
 }
 
 /** Agent run result */

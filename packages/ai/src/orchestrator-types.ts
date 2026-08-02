@@ -808,6 +808,14 @@ export interface MultiAgentOrchestrator {
   onDerivedChange(callback: (id: string, value: unknown) => void): () => void;
   /** Shared scratchpad (null when not configured) */
   readonly scratchpad: Scratchpad | null;
+  /**
+   * How many streams handed out by `runAgentStream` are still open.
+   *
+   * A number that only rises is the signature of consumers abandoning streams
+   * without aborting them: each one holds a provider request open and keeps
+   * accruing spend. `destroy()` is what closes them all.
+   */
+  getActiveStreamCount(): number;
   /** Destroy the orchestrator, resetting all state and releasing resources. */
   destroy(): void;
 }

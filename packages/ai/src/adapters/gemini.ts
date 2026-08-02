@@ -17,12 +17,14 @@ import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  anyTokenCountReported,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
   getStreamReader,
   parseEventStream,
+  readTokenCount,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -84,13 +86,18 @@ function parseGeminiStreamEvent(
     result.terminal = true;
   }
 
+  // Read the counts, not the container: a `usageMetadata` object whose numbers
+  // are null reports nothing, and recording it as a report of zero prices a
+  // real call at nothing.
   if (event.usageMetadata) {
     const meta = event.usageMetadata as Record<string, unknown>;
-    if (meta.promptTokenCount !== undefined) {
-      result.inputTokens = meta.promptTokenCount as number;
+    const promptTokenCount = readTokenCount(meta.promptTokenCount);
+    if (promptTokenCount !== undefined) {
+      result.inputTokens = promptTokenCount;
     }
-    if (meta.candidatesTokenCount !== undefined) {
-      result.outputTokens = meta.candidatesTokenCount as number;
+    const candidatesTokenCount = readTokenCount(meta.candidatesTokenCount);
+    if (candidatesTokenCount !== undefined) {
+      result.outputTokens = candidatesTokenCount;
     }
   }
 
@@ -199,15 +206,22 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
     parseResponse: async (res) => {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
-      const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
+      const inputTokens =
+        readTokenCount(data.usageMetadata?.promptTokenCount) ?? 0;
+      const outputTokens =
+        readTokenCount(data.usageMetadata?.candidatesTokenCount) ?? 0;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
-        usageReported: data.usageMetadata != null,
+        // A `usageMetadata` object holding no usable number says the same
+        // thing as no `usageMetadata` at all: nothing was reported.
+        usageReported: anyTokenCountReported(
+          data.usageMetadata?.promptTokenCount,
+          data.usageMetadata?.candidatesTokenCount,
+        ),
       };
     },
     streaming: {

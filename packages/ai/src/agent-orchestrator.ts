@@ -21,13 +21,14 @@ import {
   setBridgeFact,
 } from "@directive-run/core/adapter-utils";
 import type { CircuitBreaker } from "@directive-run/core/plugins";
+import { tokensForBudget } from "./agent-utils.js";
 import type { AgentMemory } from "./memory.js";
 import { formatSystemMeta } from "./meta-context.js";
 import {
+  ChunkBuffer,
   type StreamChunk as StreamChunkBase,
   type StreamRestartReason,
   type TokenSink,
-  admitChunk,
   reportIfRunnerIgnoredOnToken,
   sliceTailByCodePoint,
 } from "./streaming.js";
@@ -300,6 +301,40 @@ export interface OrchestratorOptions<F extends Record<string, unknown>> {
   metaContext?: boolean;
 }
 
+/**
+ * What one live stream is doing right now.
+ *
+ * A stalled stream looks identical from outside the library to a slow one, and
+ * the difference is the whole diagnosis: a consumer that stopped pulling shows
+ * a buffer filling and chunks being dropped, while a provider that stopped
+ * sending shows a buffer at zero and no first token. Reading these is free —
+ * every figure is a counter the stream already keeps.
+ */
+export interface StreamStats {
+  /** Chunks buffered and not yet read by the consumer. */
+  bufferedChunks: number;
+  /** Chunks the buffer refused or evicted because the consumer fell behind. */
+  droppedChunks: number;
+  /**
+   * Milliseconds from the start of the run to the first `token` chunk, or
+   * `undefined` when none has been emitted yet. A stream stuck here has not
+   * heard from the provider.
+   */
+  timeToFirstTokenMs?: number;
+  /** `token` chunks emitted for the current generation. */
+  deltaCount: number;
+  /** Which generation is being assembled. 1 until the first restart. */
+  generation: number;
+  /**
+   * How many times the runner was re-invoked and replayed the response — an
+   * agent retry, a schema retry, a fallback, a reroute. Rising steadily means
+   * spend is a multiple of what the call count suggests.
+   */
+  restarts: number;
+  /** Whether the stream has reached a terminal chunk. */
+  closed: boolean;
+}
+
 /** Streaming run result from orchestrator */
 export interface OrchestratorStreamResult<T = unknown> {
   /** Async iterator for streaming chunks */
@@ -308,6 +343,8 @@ export interface OrchestratorStreamResult<T = unknown> {
   result: Promise<RunResult<T>>;
   /** Abort the stream */
   abort: () => void;
+  /** A reading of this stream's progress, for diagnosing a stall. */
+  getStats: () => StreamStats;
   /**
    * RFC 0005: cancel the in-flight generation but keep the
    * `liveContext` subscription attached. Distinct from `abort()`:
@@ -580,6 +617,14 @@ export interface AgentOrchestrator<F extends Record<string, unknown>> {
   cancelBreakpoint(id: string, reason?: string): void;
   /** Get all currently pending breakpoint requests. */
   getPendingBreakpoints(): BreakpointRequest[];
+  /**
+   * How many streams handed out by `runStream` are still open.
+   *
+   * A number that only rises is the signature of consumers abandoning streams
+   * without aborting them: each one holds a provider request open and keeps
+   * accruing spend. `destroy()` is what closes them all.
+   */
+  getActiveStreamCount(): number;
   /** Destroy the orchestrator, releasing all resources. */
   destroy(): void;
 }
@@ -1606,7 +1651,11 @@ export function createAgentOrchestrator<
     let budgetPercentage = 0;
     system.batch(() => {
       const currentAgent = getAgentState(system.facts);
-      const newTokenUsage = currentAgent.tokenUsage + result.totalTokens;
+      // A call whose usage the provider never reported accrues an estimate,
+      // not the zero it reported. Accruing the zero left `maxTokenBudget`
+      // blind to every such call, which is the same hole the cost budget had.
+      const newTokenUsage =
+        currentAgent.tokenUsage + tokensForBudget(agent, input, result);
       setAgentState(system.facts, {
         ...currentAgent,
         status: "completed",
@@ -2030,7 +2079,9 @@ export function createAgentOrchestrator<
     ): OrchestratorStreamResult<T> {
       const abortController = new AbortController();
       const MAX_STREAM_BUFFER = 10_000;
-      const chunks: OrchestratorStreamChunk[] = [];
+      const chunks = new ChunkBuffer<OrchestratorStreamChunk>(
+        MAX_STREAM_BUFFER,
+      );
       const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> =
         [];
       let closed = false;
@@ -2055,6 +2106,10 @@ export function createAgentOrchestrator<
       // synthesis, across every generation. Zero at the end of a run that
       // asked for streaming means the runner ignored the request.
       let realDeltaCount = 0;
+      // When the first `token` chunk was emitted. Undefined until then, which
+      // is what distinguishes a provider that has said nothing from a consumer
+      // that has read nothing.
+      let firstTokenAt: number | undefined;
       // `onToken` implies `deltas` – a callback is only useful if deltas flow.
       const streamRequested =
         options.deltas === true || options.onToken !== undefined;
@@ -2075,6 +2130,9 @@ export function createAgentOrchestrator<
       // Push a chunk to the stream
       const pushChunk = (chunk: OrchestratorStreamChunk) => {
         if (closed) return;
+        if (firstTokenAt === undefined && chunk.type === "token") {
+          firstTokenAt = Date.now();
+        }
         const waiter = waiters.shift();
         if (waiter) {
           waiter(chunk);
@@ -2086,7 +2144,7 @@ export function createAgentOrchestrator<
           // ahead of any droppable chunk still buffered, but the cap applies
           // to it too – exempting control chunks let a stalled consumer
           // accumulate them without limit.
-          droppedChunks += admitChunk(chunks, chunk, MAX_STREAM_BUFFER);
+          droppedChunks += chunks.admit(chunk);
         }
       };
 
@@ -2149,6 +2207,7 @@ export function createAgentOrchestrator<
               type: "token",
               data: token,
               deltaCount,
+              generation,
               tokenCount: deltaCount,
             });
 
@@ -2291,6 +2350,25 @@ export function createAgentOrchestrator<
         }
       };
 
+      // Whether the run has reached its own end – either outcome. Set inside
+      // the run itself rather than from a `.then`, so a shutdown issued in the
+      // same tick as the run's completion cannot see a stale `false`.
+      let runSettled = false;
+      // Rejects the caller's `result` when the stream is torn down and the run
+      // is still going. A runner is handed an `AbortSignal`, but nothing
+      // obliges it to honor one: aborting and closing released consumers
+      // parked on the iterator and left `result` pending forever, so a
+      // graceful shutdown waiting on it never finished. Rejecting with the
+      // signal's own reason gives that caller exactly what a signal-honoring
+      // runner would have given them.
+      let rejectResult: ((reason: unknown) => void) | undefined;
+      const shutdownRejection = new Promise<never>((_resolve, reject) => {
+        rejectResult = reject;
+      });
+      // Nothing awaits this until the race below, and a stream torn down after
+      // its run settled never reaches the race at all.
+      shutdownRejection.catch(() => {});
+
       // Everything the caller's `abort()` does, and what `destroy()` calls on
       // any stream still open. Registered before the run starts so a stream
       // that fails on its first tick is still reachable.
@@ -2298,12 +2376,20 @@ export function createAgentOrchestrator<
         abortController.abort();
         tearDownLiveContext();
         closeStream();
+        if (!runSettled) {
+          rejectResult?.(
+            abortController.signal.reason ??
+              new Error(
+                "[Directive] Stream was shut down before the run settled.",
+              ),
+          );
+        }
       };
       streamHandle.shutdown = shutdownStream;
       liveStreams.add(streamHandle);
 
       // Run the agent with streaming callbacks
-      const resultPromise = (async (): Promise<RunResult<T>> => {
+      const runPromise = (async (): Promise<RunResult<T>> => {
         pushChunk({
           type: "progress",
           phase: "starting",
@@ -2442,6 +2528,7 @@ export function createAgentOrchestrator<
                     type: "token",
                     data: message.content,
                     deltaCount,
+                    generation,
                     tokenCount,
                   });
                 }
@@ -2650,7 +2737,11 @@ export function createAgentOrchestrator<
               ...currentAgent,
               status: "completed",
               output: result.output,
-              tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+              // Same accrual the buffered path performs, estimate included –
+              // a streamed run is the one most likely to arrive unreported.
+              tokenUsage:
+                currentAgent.tokenUsage +
+                tokensForBudget(agent, processedInput, result),
               turnCount: currentAgent.turnCount + result.messages.length,
               completedAt: Date.now(),
             });
@@ -2676,10 +2767,17 @@ export function createAgentOrchestrator<
           });
           closeStream();
           throw error;
+        } finally {
+          runSettled = true;
         }
       })();
 
+      // The run itself, or the teardown, whichever reaches an end first. On
+      // every path but a runner that ignores its signal, the run wins.
+      const resultPromise = Promise.race([runPromise, shutdownRejection]);
+
       // Prevent unhandled rejection if caller only consumes stream (not .result)
+      runPromise.catch(() => {});
       resultPromise.catch(() => {});
 
       // Create async iterator
@@ -2687,7 +2785,7 @@ export function createAgentOrchestrator<
         [Symbol.asyncIterator](): AsyncIterator<OrchestratorStreamChunk> {
           return {
             async next(): Promise<IteratorResult<OrchestratorStreamChunk>> {
-              if (chunks.length > 0) {
+              if (chunks.size > 0) {
                 return { done: false, value: chunks.shift()! };
               }
               if (closed) {
@@ -2724,7 +2822,7 @@ export function createAgentOrchestrator<
       // rejects; swallow with .catch so a rejected resultPromise (e.g. a
       // guardrail block) doesn't surface as an unhandled rejection when
       // the caller only consumes the stream side of the contract.
-      resultPromise
+      runPromise
         .finally(() => {
           if (!interruptInitiated) {
             tearDownLiveContext();
@@ -2736,6 +2834,17 @@ export function createAgentOrchestrator<
         stream,
         result: resultPromise,
         abort: shutdownStream,
+        getStats: (): StreamStats => ({
+          bufferedChunks: chunks.size,
+          droppedChunks,
+          ...(firstTokenAt !== undefined
+            ? { timeToFirstTokenMs: firstTokenAt - startTime }
+            : {}),
+          deltaCount,
+          generation,
+          restarts: generation - 1,
+          closed,
+        }),
         interrupt: (reason?: string) => {
           // RFC 0005: distinct from `abort()` — cancel the in-flight
           // LLM run but leave `liveContext` subscriptions alive so
@@ -2983,6 +3092,10 @@ export function createAgentOrchestrator<
       const bpState = getBreakpointState(system.facts);
 
       return [...bpState.pending];
+    },
+
+    getActiveStreamCount(): number {
+      return liveStreams.size;
     },
 
     destroy(): void {

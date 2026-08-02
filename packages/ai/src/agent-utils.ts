@@ -74,6 +74,63 @@ export function estimateCost(
   return (tokenUsage / 1_000_000) * ratePerMillionTokens;
 }
 
+/** Characters per token, the estimate this package applies throughout. */
+const CHARS_PER_TOKEN = 4;
+
+/**
+ * How many tokens a completed run should accrue against a token budget.
+ *
+ * Normally `result.totalTokens`. When the provider reported no usage at all,
+ * that number is zero for a call that cost real money, and accruing it leaves
+ * a documented ceiling permanently blind: measured against an endpoint that
+ * omits usage frames, an orchestrator with `maxTokenBudget: 100` ran five
+ * hundred times with `facts.agent.tokenUsage` still reading zero. Such a run is
+ * accrued at an estimate instead — the input it was given plus the output it
+ * produced, both measured off the text, which is the same heuristic the
+ * streaming path already uses to count whole-message chunks.
+ *
+ * @param agent - The agent that ran, read for its output ceiling.
+ * @param input - The input the run was given.
+ * @param result - What the run returned.
+ * @returns Tokens to add to the budget's running total.
+ *
+ * @internal
+ */
+export function tokensForBudget(
+  agent: AgentLike,
+  input: string,
+  result: RunResult<unknown>,
+): number {
+  if (result.usageReported !== false) {
+    return result.totalTokens;
+  }
+
+  let outputChars = 0;
+  for (const message of result.messages) {
+    if (message.role === "assistant" && typeof message.content === "string") {
+      outputChars += message.content.length;
+    }
+  }
+  if (outputChars === 0 && typeof result.output === "string") {
+    outputChars = result.output.length;
+  }
+
+  const inputTokens = Math.ceil(input.length / CHARS_PER_TOKEN);
+  if (outputChars > 0) {
+    return inputTokens + Math.ceil(outputChars / CHARS_PER_TOKEN);
+  }
+
+  // Nothing to measure: fall back to the provider's own ceiling for the call,
+  // and to the input size when the agent declares none.
+  const ceiling = agent.maxTokens;
+  const outputTokens =
+    typeof ceiling === "number" && Number.isFinite(ceiling) && ceiling > 0
+      ? Math.ceil(ceiling)
+      : inputTokens;
+
+  return inputTokens + outputTokens;
+}
+
 // ============================================================================
 // Validation Helpers
 // ============================================================================

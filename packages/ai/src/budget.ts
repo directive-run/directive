@@ -102,6 +102,34 @@ export interface BudgetConfig {
    * @default 1.0
    */
   estimatedOutputMultiplier?: number;
+  /**
+   * Refuse further calls once this many have been charged at estimate rather
+   * than at reported usage.
+   *
+   * An unpriced call is one the provider declined to count, or one that threw
+   * after reaching the provider. Both are charged, so the window still accrues
+   * and the ceiling still trips — but at an estimate, and an estimate for an
+   * agent that declares no {@link AgentLike.maxTokens} can be off by orders of
+   * magnitude in either direction. Past some number of them a hard budget is
+   * not being enforced against spend any more, it is being enforced against a
+   * guess.
+   *
+   * Unset by default, which keeps the count advisory: read it from
+   * {@link BudgetRunner.getUnpricedCallCount} and decide for yourself. Set it
+   * when the budget is a real ceiling rather than a monitor — a gateway that
+   * silently stops reporting usage is otherwise indistinguishable from one that
+   * never did.
+   *
+   * @example
+   * ```typescript
+   * const runner = withBudget(baseRunner, {
+   *   budgets: [{ window: "hour", maxCost: 5, pricing }],
+   *   // Tolerate a handful of unreported calls, then stop.
+   *   maxUnpricedCalls: 25,
+   * });
+   * ```
+   */
+  maxUnpricedCalls?: number;
   /** Called when a budget check fails (before throwing). */
   onBudgetExceeded?: (details: BudgetExceededDetails) => void;
 }
@@ -127,6 +155,29 @@ export class BudgetExceededError extends Error {
     this.estimated = details.estimated;
     this.remaining = details.remaining;
     this.window = details.window;
+  }
+}
+
+/**
+ * Error thrown when too many calls in a row could only be charged at estimate.
+ *
+ * Distinct from {@link BudgetExceededError}: the budget has not been spent, it
+ * has stopped being measurable. Raised only when
+ * {@link BudgetConfig.maxUnpricedCalls} is set.
+ */
+export class UnpricedCallLimitError extends Error {
+  /** How many calls have been charged at estimate. */
+  readonly unpricedCalls: number;
+  /** The configured tolerance. */
+  readonly maxUnpricedCalls: number;
+
+  constructor(unpricedCalls: number, maxUnpricedCalls: number) {
+    super(
+      `[Directive] Budget can no longer be enforced against reported usage: ${unpricedCalls} call(s) were charged at estimate, at or above the configured limit of ${maxUnpricedCalls}. The endpoint is not returning token counts – a gateway dropping \`stream_options.include_usage\` is the usual cause. Fix the endpoint, raise \`maxUnpricedCalls\`, or set \`agent.maxTokens\` so the estimate is a real bound.`,
+    );
+    this.name = "UnpricedCallLimitError";
+    this.unpricedCalls = unpricedCalls;
+    this.maxUnpricedCalls = maxUnpricedCalls;
   }
 }
 
@@ -200,17 +251,76 @@ function calculateCost(usage: TokenUsage, pricing: TokenPricing): number {
   );
 }
 
-function estimateCallCost(
+function costOf(
   inputTokens: number,
+  outputTokens: number,
   pricing: TokenPricing,
-  outputMultiplier = 1.0,
 ): number {
-  const estimatedOutputTokens = Math.ceil(inputTokens * outputMultiplier);
-
   return (
     (inputTokens / 1_000_000) * pricing.inputPerMillion +
-    (estimatedOutputTokens / 1_000_000) * pricing.outputPerMillion
+    (outputTokens / 1_000_000) * pricing.outputPerMillion
   );
+}
+
+/**
+ * How many output tokens to assume for a call whose real count is unavailable.
+ *
+ * Three sources, best first:
+ *
+ * 1. **The output itself**, when the call completed and only its counts are
+ *    missing. The text is in hand and `length / charsPerToken` is the estimate
+ *    this module already applies to input.
+ * 2. **`agent.maxTokens`**, when the call threw and produced nothing to
+ *    measure. It is the provider's own ceiling for the call, so it bounds what
+ *    the response could have cost rather than guessing at it.
+ * 3. **`inputTokens × estimatedOutputMultiplier`**, the historical fallback,
+ *    for an agent that declares no ceiling.
+ *
+ * The third is only ever a guess about a quantity it has no relation to: a
+ * 50k-token retrieval prompt answered in 200 tokens is priced at 50k of output
+ * and over-charges by nearly six times, while a one-line prompt answered at
+ * length under-charges by two to three orders of magnitude. Either error turns
+ * a correctly sized budget into the wrong one, which is why the first two
+ * sources are preferred wherever they exist.
+ */
+function estimateOutputTokens(
+  agent: AgentLike,
+  outputText: string | undefined,
+  inputTokens: number,
+  charsPerToken: number,
+  outputMultiplier: number,
+): number {
+  if (outputText !== undefined && outputText.length > 0) {
+    return Math.ceil(outputText.length / charsPerToken);
+  }
+
+  const ceiling = agent.maxTokens;
+  if (typeof ceiling === "number" && Number.isFinite(ceiling) && ceiling > 0) {
+    return Math.ceil(ceiling);
+  }
+
+  return Math.ceil(inputTokens * outputMultiplier);
+}
+
+/**
+ * Everything a run produced that the provider generated, for measuring output
+ * when it declined to count it.
+ *
+ * Assistant messages are the generated text; the user turn and any tool
+ * results are input to the next call, not output of this one.
+ */
+function assistantText(result: RunResult<unknown>): string | undefined {
+  let text = "";
+  for (const message of result.messages) {
+    if (message.role === "assistant" && typeof message.content === "string") {
+      text += message.content;
+    }
+  }
+  if (text.length > 0) {
+    return text;
+  }
+
+  return typeof result.output === "string" ? result.output : undefined;
 }
 
 // ============================================================================
@@ -242,6 +352,7 @@ export function withBudget(
     pricing,
     charsPerToken = 4,
     estimatedOutputMultiplier = 1.0,
+    maxUnpricedCalls,
     onBudgetExceeded,
   } = config;
 
@@ -265,6 +376,14 @@ export function withBudget(
   ) {
     throw new Error(
       "[Directive] withBudget: estimatedOutputMultiplier must be a non-negative finite number.",
+    );
+  }
+  if (
+    maxUnpricedCalls != null &&
+    (!Number.isFinite(maxUnpricedCalls) || maxUnpricedCalls < 0)
+  ) {
+    throw new Error(
+      "[Directive] withBudget: maxUnpricedCalls must be a non-negative finite number.",
     );
   }
   if (maxCostPerCall != null && !pricing) {
@@ -296,14 +415,27 @@ export function withBudget(
     options?: RunOptions,
   ): Promise<RunResult<T>> => {
     const inputTokens = estimateInputTokens(input, charsPerToken);
+    // Pre-call there is no output to measure, so the ceiling is the bound.
+    const estimatedOutputTokens = estimateOutputTokens(
+      agent,
+      undefined,
+      inputTokens,
+      charsPerToken,
+      estimatedOutputMultiplier,
+    );
+    const estimateCallCost = (forPricing: TokenPricing): number =>
+      costOf(inputTokens, estimatedOutputTokens, forPricing);
+
+    // Pre-call: a provider that has stopped reporting usage cannot be
+    // budgeted, only approximated. Past the configured tolerance, refuse
+    // rather than let a hard ceiling go on being enforced against estimates.
+    if (maxUnpricedCalls != null && unpricedCalls >= maxUnpricedCalls) {
+      throw new UnpricedCallLimitError(unpricedCalls, maxUnpricedCalls);
+    }
 
     // Pre-call: Check per-call budget
     if (maxCostPerCall != null && pricing) {
-      const estimated = estimateCallCost(
-        inputTokens,
-        pricing,
-        estimatedOutputMultiplier,
-      );
+      const estimated = estimateCallCost(pricing);
       if (estimated > maxCostPerCall) {
         const details: BudgetExceededDetails = {
           estimated,
@@ -325,11 +457,7 @@ export function withBudget(
       const ledger = windowLedgers.get(budget.window)!;
       const spent = ledger.getCostInWindow(windowMs);
       const remaining = budget.maxCost - spent;
-      const estimated = estimateCallCost(
-        inputTokens,
-        budget.pricing,
-        estimatedOutputMultiplier,
-      );
+      const estimated = estimateCallCost(budget.pricing);
 
       if (estimated > remaining) {
         const details: BudgetExceededDetails = {
@@ -346,39 +474,105 @@ export function withBudget(
       }
     }
 
-    // Execute the call
-    const result = await runner<T>(agent, input, options);
+    // How many times the provider was actually called for this one invocation.
+    // Every wrapper that re-invokes the runner beneath it reports the boundary
+    // on `onStreamRestart` — `withRetry`, `withFallback`, a structured-output
+    // schema retry, a self-healing reroute — so a budget wrapped around any of
+    // them can see the requests they make on its behalf. Without the count, a
+    // budget outside a retrying, falling-back stack charged once for what was
+    // measured as six billed requests.
+    let providerCalls = 1;
+    const callerOnStreamRestart = options?.onStreamRestart;
+    const budgetOptions: RunOptions = {
+      ...options,
+      onStreamRestart: (reason) => {
+        providerCalls++;
+        callerOnStreamRestart?.(reason);
+      },
+    };
+
+    /**
+     * Charge one call at an estimate, and count it as one the ledger could not
+     * price. `outputText` is whatever the call produced, when it produced
+     * anything; `times` is how many provider requests the charge covers.
+     */
+    const recordEstimated = (
+      outputText: string | undefined,
+      times = providerCalls,
+    ): void => {
+      if (times <= 0) {
+        return;
+      }
+      unpricedCalls += times;
+      const outputTokens = estimateOutputTokens(
+        agent,
+        outputText,
+        inputTokens,
+        charsPerToken,
+        estimatedOutputMultiplier,
+      );
+      for (const budget of budgets) {
+        const ledger = windowLedgers.get(budget.window)!;
+        ledger.record(
+          costOf(inputTokens, outputTokens, budget.pricing) * times,
+        );
+      }
+      if (pricing && budgets.length === 0) {
+        baseLedger.record(costOf(inputTokens, outputTokens, pricing) * times);
+      }
+    };
+
+    // Execute the call. Everything past this point has reached the provider,
+    // so everything past this point is charged — including the paths that
+    // throw.
+    let result: RunResult<T>;
+    try {
+      result = await runner<T>(agent, input, budgetOptions);
+    } catch (err) {
+      // A call that threw after the provider generated its response was still
+      // billed for it. Recording only on the success path meant none of it was:
+      // measured against a marker-stripping gateway, five runs behind
+      // `withRetry` and `withFallback` became thirty billed requests and
+      // fifteen hundred delivered tokens, with recorded spend of zero and an
+      // unpriced-call count of zero — no ceiling, and no signal that there was
+      // no ceiling. A stream that failed on its terminal-marker check is the
+      // clearest case: the response was generated, delivered and charged, and
+      // the throw comes afterwards.
+      //
+      // A budget below this one refused its call before dispatch, so nothing
+      // was sent and nothing is owed; that is the one throw not charged.
+      if (!(err instanceof BudgetExceededError)) {
+        recordEstimated(undefined);
+      }
+
+      throw err;
+    }
 
     // A provider that reported no usage has not told us the call was free —
     // an OpenAI-compatible endpoint that ignores `stream_options.include_usage`
     // returns zeros for a call that cost real money. Recording those zeros
-    // means the window never accrues and the ceiling never trips, so charge
-    // the same estimate the pre-call check used and count the call as one the
-    // ledger could not price.
-    const unpriceable = result.usageReported === false;
-    if (unpriceable) {
-      unpricedCalls++;
+    // means the window never accrues and the ceiling never trips, so charge an
+    // estimate instead and count the call as one the ledger could not price.
+    if (result.usageReported === false) {
+      recordEstimated(assistantText(result));
+
+      return result;
     }
 
+    // Attempts that failed before this one were generated and billed too, and
+    // the usage on the successful result describes only itself.
+    recordEstimated(undefined, providerCalls - 1);
+
     // Post-call: Record actual costs in per-window ledgers
-    if (result.tokenUsage || unpriceable) {
+    if (result.tokenUsage) {
       for (const budget of budgets) {
-        const ledger = windowLedgers.get(budget.window)!;
-        const cost = unpriceable
-          ? estimateCallCost(
-              inputTokens,
-              budget.pricing,
-              estimatedOutputMultiplier,
-            )
-          : calculateCost(result.tokenUsage!, budget.pricing);
-        ledger.record(cost);
+        windowLedgers
+          .get(budget.window)!
+          .record(calculateCost(result.tokenUsage, budget.pricing));
       }
       // Record in base ledger when no windows configured
       if (pricing && budgets.length === 0) {
-        const cost = unpriceable
-          ? estimateCallCost(inputTokens, pricing, estimatedOutputMultiplier)
-          : calculateCost(result.tokenUsage!, pricing);
-        baseLedger.record(cost);
+        baseLedger.record(calculateCost(result.tokenUsage, pricing));
       }
     }
 
@@ -409,9 +603,15 @@ export function withBudget(
    * How many calls were charged at estimate because the provider reported no
    * token usage.
    *
+   * Also counts calls that threw after reaching the provider, which are
+   * charged at estimate for the same reason: the response was generated and
+   * billed whether or not it arrived intact.
+   *
    * Non-zero means the recorded spend is an approximation: the endpoint is not
    * returning usage (a gateway that drops `stream_options.include_usage` is
-   * the usual cause). The spend it stands in for is real either way.
+   * the usual cause), or calls are failing after dispatch. The spend it stands
+   * in for is real either way. Set {@link BudgetConfig.maxUnpricedCalls} to
+   * make it a ceiling rather than a reading.
    *
    * @example
    * ```typescript

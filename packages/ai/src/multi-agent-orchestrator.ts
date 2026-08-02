@@ -39,6 +39,7 @@ import {
 import type {
   OrchestratorStreamChunk,
   OrchestratorStreamResult,
+  StreamStats,
 } from "./agent-orchestrator.js";
 import {
   type DebugTimeline,
@@ -131,11 +132,11 @@ import {
   validateCheckpoint,
 } from "./checkpoint.js";
 import {
+  ChunkBuffer,
   type MultiplexedStreamResult,
   StreamConsumerError,
   type StreamRestartReason,
   type TokenSink,
-  admitChunk,
   mergeTaggedStreams,
   reportIfRunnerIgnoredOnToken,
   sliceTailByCodePoint,
@@ -144,6 +145,8 @@ import {
   extractJsonFromOutput,
   withStructuredOutput,
 } from "./structured-output.js";
+
+import { tokensForBudget } from "./agent-utils.js";
 
 import { safeStringify } from "@directive-run/core/internals";
 
@@ -2346,6 +2349,12 @@ export function createMultiAgentOrchestrator(
         }
       }
 
+      // A call whose usage the provider never reported accrues an estimate,
+      // not the zero it reported. Accruing the zero left `maxTokenBudget`
+      // blind to every such call – the same hole the cost budget had, in the
+      // orchestrator's own ceiling.
+      const accruedTokens = tokensForBudget(agent, processedInput, result);
+
       // Update per-agent facts
       system.batch(() => {
         const currentAgent = getAgentState(agentFacts);
@@ -2353,7 +2362,7 @@ export function createMultiAgentOrchestrator(
           ...currentAgent,
           status: "completed",
           output: result.output,
-          tokenUsage: currentAgent.tokenUsage + result.totalTokens,
+          tokenUsage: currentAgent.tokenUsage + accruedTokens,
           turnCount: currentAgent.turnCount + result.messages.length,
           completedAt: Date.now(),
         });
@@ -2363,7 +2372,7 @@ export function createMultiAgentOrchestrator(
       state.status = "completed";
       state.lastOutput = result.output;
       state.runCount++;
-      state.totalTokens += result.totalTokens;
+      state.totalTokens += accruedTokens;
       notifyIdleWaiters();
 
       // Update global token count atomically via System facts
@@ -2376,7 +2385,7 @@ export function createMultiAgentOrchestrator(
           coordFacts,
           "__globalTokens",
         );
-        const newTotal = currentTokens + result.totalTokens;
+        const newTotal = currentTokens + accruedTokens;
         globalTokenCount = newTotal;
         setBridgeFact(coordFacts, "__globalTokens", newTotal);
 
@@ -2650,6 +2659,9 @@ export function createMultiAgentOrchestrator(
               type: "token",
               data: output,
               deltaCount: 1,
+              // A task runs once and is never replayed, so its output always
+              // belongs to the first generation.
+              generation: 1,
               tokenCount: 0,
             });
             pushTaskChunk({
@@ -2708,6 +2720,16 @@ export function createMultiAgentOrchestrator(
           },
         },
         result: resultPromise,
+        // A task stream emits one chunk and a `done`; it neither buffers nor
+        // drops, and has no generation to restart.
+        getStats: (): StreamStats => ({
+          bufferedChunks: taskChunks.length,
+          droppedChunks: 0,
+          deltaCount: 0,
+          generation: 1,
+          restarts: 0,
+          closed: taskClosed,
+        }),
         abort: () => {
           taskAbortController.abort();
         },
@@ -2733,7 +2755,9 @@ export function createMultiAgentOrchestrator(
     const MAX_AGENT_STREAM_BUFFER = 10_000;
     const MAX_ACCUMULATED_OUTPUT = 100_000;
     const abortController = new AbortController();
-    const chunks: OrchestratorStreamChunk[] = [];
+    const chunks = new ChunkBuffer<OrchestratorStreamChunk>(
+      MAX_AGENT_STREAM_BUFFER,
+    );
     const waiters: Array<(chunk: OrchestratorStreamChunk | null) => void> = [];
     let closed = false;
     const startTime = Date.now();
@@ -2750,6 +2774,8 @@ export function createMultiAgentOrchestrator(
     // How many of those have already been attributed to a completed assistant
     // message, so `onMessage` can tell whether real deltas arrived for it.
     let deltasAttributedToMessages = 0;
+    // When the first `token` chunk was emitted, for diagnosing a stall.
+    let firstTokenAt: number | undefined;
     // `onToken` implies `deltas` – a callback is only useful if deltas flow.
     const streamRequested =
       options.deltas === true || options.onToken !== undefined;
@@ -2768,16 +2794,20 @@ export function createMultiAgentOrchestrator(
 
     const pushChunk = (chunk: OrchestratorStreamChunk) => {
       if (closed) return;
+      if (firstTokenAt === undefined && chunk.type === "token") {
+        firstTokenAt = Date.now();
+      }
       const waiter = waiters.shift();
       if (waiter) {
         waiter(chunk);
       } else {
         // Drop the NEWEST droppable chunk on overflow. Evicting the oldest
         // kept the tail of a response and silently deleted its beginning. A
-        // control chunk is admitted ahead of any droppable chunk still
-        // buffered, but the cap applies to it too – exempting control chunks
-        // let a stalled consumer accumulate them without limit.
-        droppedChunks += admitChunk(chunks, chunk, MAX_AGENT_STREAM_BUFFER);
+        // control chunk is never refused – it makes room by evicting a
+        // droppable chunk, or the oldest chunk when there is none – but the
+        // cap applies to it too, so a stalled consumer cannot accumulate
+        // control chunks without limit.
+        droppedChunks += chunks.admit(chunk);
       }
     };
 
@@ -2795,12 +2825,35 @@ export function createMultiAgentOrchestrator(
       waiters.length = 0;
     };
 
+    // Whether the run has reached its own end – either outcome. Set inside
+    // the run itself, so a shutdown issued in the same tick as the run's
+    // completion cannot see a stale `false`.
+    let runSettled = false;
+    // Rejects the caller's `result` when the stream is torn down and the run
+    // is still going. Nothing obliges a runner to honor the `AbortSignal` it
+    // is handed: aborting and closing released consumers parked on the
+    // iterator and left `result` pending forever, so a graceful shutdown
+    // waiting on it never finished.
+    let rejectResult: ((reason: unknown) => void) | undefined;
+    const shutdownRejection = new Promise<never>((_resolve, reject) => {
+      rejectResult = reject;
+    });
+    shutdownRejection.catch(() => {});
+
     // Everything `abort()` does, and what `destroy()` calls on any stream
     // still open. Registered before the run starts so a stream that fails on
     // its first tick is still reachable.
     const shutdownStream = (): void => {
       abortController.abort();
       closeStream();
+      if (!runSettled) {
+        rejectResult?.(
+          abortController.signal.reason ??
+            new Error(
+              "[Directive] Stream was shut down before the run settled.",
+            ),
+        );
+      }
     };
     streamHandle.shutdown = shutdownStream;
     liveStreams.add(streamHandle);
@@ -2843,6 +2896,7 @@ export function createMultiAgentOrchestrator(
             type: "token",
             data: token,
             deltaCount,
+            generation,
             tokenCount: deltaCount,
           });
 
@@ -2850,7 +2904,7 @@ export function createMultiAgentOrchestrator(
         }
       : undefined;
 
-    const resultPromise = (async (): Promise<RunResult<T>> => {
+    const runPromise = (async (): Promise<RunResult<T>> => {
       pushChunk({
         type: "progress",
         phase: "starting",
@@ -2889,6 +2943,7 @@ export function createMultiAgentOrchestrator(
                 type: "token",
                 data: message.content,
                 deltaCount,
+                generation,
                 tokenCount,
               });
             }
@@ -2945,14 +3000,20 @@ export function createMultiAgentOrchestrator(
         });
         closeStream();
         throw error;
+      } finally {
+        runSettled = true;
       }
     })();
+
+    // The run itself, or the teardown, whichever reaches an end first. On
+    // every path but a runner that ignores its signal, the run wins.
+    const resultPromise = Promise.race([runPromise, shutdownRejection]);
 
     const stream: AsyncIterable<OrchestratorStreamChunk> = {
       [Symbol.asyncIterator](): AsyncIterator<OrchestratorStreamChunk> {
         return {
           async next(): Promise<IteratorResult<OrchestratorStreamChunk>> {
-            if (chunks.length > 0) {
+            if (chunks.size > 0) {
               return { done: false, value: chunks.shift()! };
             }
             if (closed) {
@@ -2976,12 +3037,24 @@ export function createMultiAgentOrchestrator(
     };
 
     // Prevent unhandled rejection if caller only consumes stream (not .result)
+    runPromise.catch(() => {});
     resultPromise.catch(() => {});
 
     return {
       stream,
       result: resultPromise,
       abort: shutdownStream,
+      getStats: (): StreamStats => ({
+        bufferedChunks: chunks.size,
+        droppedChunks,
+        ...(firstTokenAt !== undefined
+          ? { timeToFirstTokenMs: firstTokenAt - startTime }
+          : {}),
+        deltaCount,
+        generation,
+        restarts: generation - 1,
+        closed,
+      }),
       // RFC 0005: multi-agent delegate streams don't bind liveContext
       // — interruption maps to abort. Single-agent runStream is the
       // surface where liveContext lives.
@@ -7613,6 +7686,10 @@ export function createMultiAgentOrchestrator(
 
     getLastReflectionHistory(): ReflectIterationRecord[] | null {
       return lastReflectionHistory ? [...lastReflectionHistory] : null;
+    },
+
+    getActiveStreamCount(): number {
+      return liveStreams.size;
     },
 
     destroy() {
