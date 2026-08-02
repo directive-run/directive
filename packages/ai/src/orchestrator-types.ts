@@ -52,7 +52,6 @@ import type {
   RunResult,
   Scratchpad,
   SequentialCheckpointState,
-  StreamingCallbackRunner,
   SupervisorCheckpointState,
   ToolCallGuardrailData,
 } from "./types.js";
@@ -398,27 +397,6 @@ export interface TaskRegistration {
 export interface MultiAgentOrchestratorOptions {
   /** Base run function */
   runner: AgentRunner;
-  /**
-   * Callback-based streaming runner used by `runAgentStream` so token chunks
-   * carry real provider deltas instead of one chunk per completed message.
-   * Every non-streaming path keeps using `runner`.
-   *
-   * Orchestrator-level to match `runner`, which is also shared by all agents —
-   * a per-agent streaming runner would stream one provider while the same
-   * agent's `runAgent` calls hit another.
-   *
-   * @example
-   * ```typescript
-   * const orchestrator = createMultiAgentOrchestrator({
-   *   runner: createAnthropicRunner({ apiKey }),
-   *   streamingRunner: createAnthropicStreamingRunner({ apiKey }),
-   *   agents: { writer: { agent: writerAgent } },
-   * });
-   *
-   * const { stream } = orchestrator.runAgentStream("writer", "Write a haiku");
-   * ```
-   */
-  streamingRunner?: StreamingCallbackRunner;
   /** Registered agents */
   agents: AgentRegistry;
   /** Imperative code tasks, referenced by ID in patterns (same namespace as agents) */

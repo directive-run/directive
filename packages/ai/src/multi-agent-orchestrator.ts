@@ -133,7 +133,6 @@ import {
 import {
   type MultiplexedStreamResult,
   mergeTaggedStreams,
-  streamingRunnerToAgentRunner,
 } from "./streaming.js";
 import {
   extractJsonFromOutput,
@@ -252,7 +251,6 @@ export function createMultiAgentOrchestrator(
 ): MultiAgentOrchestrator {
   const {
     runner,
-    streamingRunner,
     agents: inputAgents,
     patterns = {},
     onHandoff,
@@ -319,38 +317,6 @@ export function createMultiAgentOrchestrator(
         "  - Set autoApproveToolCalls: true to auto-approve all tool calls\n" +
         "  - Provide an onApprovalRequest callback to handle approvals programmatically",
     );
-  }
-
-  // A StreamingCallbackRunner's callbacks are synchronous and return void, so
-  // the bridge cannot drive `RunOptions.onToolCall` — the hook that runs
-  // tool-call guardrails and blocks for approval. Both would silently stop
-  // firing on the streaming path while still appearing configured, which for
-  // a gate is the worst possible failure. Refuse the combination instead.
-  if (streamingRunner) {
-    const gatedAgents = Object.entries(inputAgents ?? {})
-      .filter(([, registration]) => {
-        return (registration?.guardrails?.toolCall?.length ?? 0) > 0;
-      })
-      .map(([agentId]) => agentId);
-    const gatesToolCalls =
-      (guardrails.toolCall?.length ?? 0) > 0 ||
-      !autoApproveToolCalls ||
-      gatedAgents.length > 0;
-
-    if (gatesToolCalls) {
-      throw new Error(
-        [
-          "[Directive MultiAgent] Invalid streaming configuration: streamingRunner cannot be combined with tool-call gating.",
-          "Callback-runner hooks are synchronous, so tool-call guardrails and approval prompts cannot run on the streaming path and would silently pass every tool call.",
-          ...(gatedAgents.length > 0
-            ? [`Agents with tool-call guardrails: ${gatedAgents.join(", ")}.`]
-            : []),
-          "Either:",
-          "  - Drop streamingRunner and stream at message granularity, keeping the gates",
-          "  - Remove tool-call guardrails and leave autoApproveToolCalls at its default to opt into real token streaming",
-        ].join("\n"),
-      );
-    }
   }
 
   // Validate budget warning threshold
@@ -1788,7 +1754,6 @@ export function createMultiAgentOrchestrator(
     agentId: string,
     input: string,
     opts?: MultiAgentRunCallOptions,
-    runnerOverride?: AgentRunner,
   ): Promise<RunResult<T>> {
     assertNotDestroyed();
 
@@ -1829,23 +1794,11 @@ export function createMultiAgentOrchestrator(
         registration.circuitBreaker ?? orchestratorCircuitBreaker;
       if (effectiveCircuitBreaker) {
         return await effectiveCircuitBreaker.execute(() =>
-          runSingleAgentInner<T>(
-            agentId,
-            registration,
-            input,
-            opts,
-            runnerOverride,
-          ),
+          runSingleAgentInner<T>(agentId, registration, input, opts),
         );
       }
 
-      return await runSingleAgentInner<T>(
-        agentId,
-        registration,
-        input,
-        opts,
-        runnerOverride,
-      );
+      return await runSingleAgentInner<T>(agentId, registration, input, opts);
     } catch (error) {
       // Self-healing: attempt reroute if configured and this is a CB error or health threshold
       // Tasks are imperative code — self-healing reroute/degradation only applies to agents
@@ -1884,15 +1837,10 @@ export function createMultiAgentOrchestrator(
           }
 
           // Prevent circular reroute (max 1 hop)
-          return runSingleAgent<T>(
-            alternate,
-            input,
-            {
-              ...opts,
-              __isReroute: true,
-            } as any,
-            runnerOverride,
-          );
+          return runSingleAgent<T>(alternate, input, {
+            ...opts,
+            __isReroute: true,
+          } as any);
         }
 
         // No equivalents — apply degradation policy
@@ -1929,7 +1877,6 @@ export function createMultiAgentOrchestrator(
     registration: AgentRegistration,
     originalInput: string,
     opts?: MultiAgentRunCallOptions,
-    runnerOverride?: AgentRunner,
   ): Promise<RunResult<T>> {
     const startTime = Date.now();
     const agentFacts = getAgentFacts(agentId);
@@ -2123,14 +2070,13 @@ export function createMultiAgentOrchestrator(
       }
 
       // ---- Per-agent structured output wrapping (per-call overrides per-agent) ----
-      const baseRunner: AgentRunner = runnerOverride ?? runner;
-      let effectiveRunner: AgentRunner = baseRunner;
+      let effectiveRunner: AgentRunner = runner;
       const effectiveSchema =
         opts?.outputSchema !== undefined
           ? opts.outputSchema // null = opt-out, SafeParseable = override
           : registration.outputSchema; // per-agent default
       if (effectiveSchema) {
-        effectiveRunner = withStructuredOutput(baseRunner, {
+        effectiveRunner = withStructuredOutput(runner, {
           schema: effectiveSchema,
           maxRetries:
             opts?.maxSchemaRetries ?? registration.maxSchemaRetries ?? 2,
@@ -2727,35 +2673,6 @@ export function createMultiAgentOrchestrator(
       waiters.length = 0;
     };
 
-    // With a callback runner the provider emits both per-token deltas and a
-    // final whole-message callback. Only one of the two may feed token chunks
-    // and the accumulator, or the output lands on the stream twice.
-    const streamRunner = streamingRunner
-      ? streamingRunnerToAgentRunner(streamingRunner, {
-          onToken: (token) => {
-            tokenCount++;
-            accumulatedOutput += token;
-            if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-              accumulatedOutput = accumulatedOutput.slice(
-                -MAX_ACCUMULATED_OUTPUT,
-              );
-            }
-            pushChunk({ type: "token", data: token, tokenCount });
-          },
-          onToolStart: (tool, toolCallId, args) => {
-            pushChunk({
-              type: "tool_start",
-              tool,
-              toolCallId,
-              arguments: args,
-            });
-          },
-          onToolEnd: (tool, toolCallId, result) => {
-            pushChunk({ type: "tool_end", tool, toolCallId, result });
-          },
-        })
-      : undefined;
-
     const resultPromise = (async (): Promise<RunResult<T>> => {
       pushChunk({
         type: "progress",
@@ -2764,52 +2681,39 @@ export function createMultiAgentOrchestrator(
       });
 
       try {
-        const result = await runSingleAgent<T>(
-          agentId,
-          input,
-          {
-            signal: abortController.signal,
-            onMessage: (message) => {
-              pushChunk({ type: "message", message });
-              if (
-                !streamRunner &&
-                message.role === "assistant" &&
-                message.content
-              ) {
-                const newTokens = Math.ceil(message.content.length / 4);
-                tokenCount += newTokens;
-                accumulatedOutput += message.content;
-                if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
-                  accumulatedOutput = accumulatedOutput.slice(
-                    -MAX_ACCUMULATED_OUTPUT,
-                  );
-                }
-                pushChunk({
-                  type: "token",
-                  data: message.content,
-                  tokenCount,
-                });
+        const result = await runSingleAgent<T>(agentId, input, {
+          signal: abortController.signal,
+          onMessage: (message) => {
+            pushChunk({ type: "message", message });
+            if (message.role === "assistant" && message.content) {
+              const newTokens = Math.ceil(message.content.length / 4);
+              tokenCount += newTokens;
+              accumulatedOutput += message.content;
+              if (accumulatedOutput.length > MAX_ACCUMULATED_OUTPUT) {
+                accumulatedOutput = accumulatedOutput.slice(
+                  -MAX_ACCUMULATED_OUTPUT,
+                );
               }
-            },
-            onToolCall: async (toolCall) => {
+              pushChunk({ type: "token", data: message.content, tokenCount });
+            }
+          },
+          onToolCall: async (toolCall) => {
+            pushChunk({
+              type: "tool_start",
+              tool: toolCall.name,
+              toolCallId: toolCall.id,
+              arguments: toolCall.arguments,
+            });
+            if (toolCall.result) {
               pushChunk({
-                type: "tool_start",
+                type: "tool_end",
                 tool: toolCall.name,
                 toolCallId: toolCall.id,
-                arguments: toolCall.arguments,
+                result: toolCall.result,
               });
-              if (toolCall.result) {
-                pushChunk({
-                  type: "tool_end",
-                  tool: toolCall.name,
-                  toolCallId: toolCall.id,
-                  result: toolCall.result,
-                });
-              }
-            },
+            }
           },
-          streamRunner,
-        );
+        });
 
         const duration = Date.now() - startTime;
         pushChunk({

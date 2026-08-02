@@ -23,11 +23,9 @@
 import type { OrchestratorStreamChunk } from "./agent-orchestrator.js";
 import type {
   AgentLike,
-  AgentRunner,
   GuardrailFn,
   Message,
   OutputGuardrailData,
-  RunOptions,
   RunResult,
   StreamingCallbackRunner,
 } from "./types.js";
@@ -509,75 +507,6 @@ export function createStreamingRunner(
       result: resultPromise,
       abort: () => abortController.abort(),
     };
-  };
-}
-
-// ============================================================================
-// Callback Runner Bridge
-// ============================================================================
-
-/** Hooks forwarded to a {@link StreamingCallbackRunner} by the bridge below. */
-export interface StreamingBridgeCallbacks {
-  /** Fires for every token delta the provider emits. */
-  onToken?: (token: string) => void;
-  /** Fires when the provider starts a tool call. */
-  onToolStart?: (tool: string, id: string, args: string) => void;
-  /** Fires when a tool call completes. */
-  onToolEnd?: (tool: string, id: string, result: string) => void;
-}
-
-/**
- * Adapt a {@link StreamingCallbackRunner} to the {@link AgentRunner} shape so
- * it can be handed to anything that runs agents — including the orchestrators,
- * which then keep input/output guardrails, retry, breakpoints, and the facts
- * bridge in play while real per-token deltas reach your callback.
- *
- * `onMessage` and `signal` come from the `RunOptions` supplied at call time;
- * the token and tool hooks are fixed when the bridge is created.
- *
- * @remarks
- * `RunOptions.onToolCall` is **not** forwarded, and cannot be: a callback
- * runner's hooks are synchronous and return void, so there is nothing to await
- * while a guardrail decides or a human approves. Tool calls still surface as
- * `onToolStart` / `onToolEnd`, but they are observations, not gates. The
- * orchestrators refuse `streamingRunner` outright when `guardrails.toolCall`
- * or manual approval is configured, rather than letting either silently pass
- * every call.
- *
- * @param streamingRunner - Callback-based runner from a provider adapter.
- * @param callbacks - Token and tool hooks to forward.
- * @returns An `AgentRunner` that resolves the same `RunResult` the callback runner produces.
- *
- * @example
- * ```typescript
- * const runner = streamingRunnerToAgentRunner(createAnthropicStreamingRunner({ apiKey }), {
- *   onToken: (token) => process.stdout.write(token),
- * });
- *
- * const result = await runner(agent, "Write a haiku");
- * ```
- */
-export function streamingRunnerToAgentRunner(
-  streamingRunner: StreamingCallbackRunner,
-  callbacks: StreamingBridgeCallbacks = {},
-): AgentRunner {
-  return <T>(
-    agent: AgentLike,
-    input: string,
-    options?: RunOptions,
-  ): Promise<RunResult<T>> => {
-    const run = streamingRunner(agent, input, {
-      onToken: callbacks.onToken,
-      onToolStart: callbacks.onToolStart,
-      onToolEnd: callbacks.onToolEnd,
-      onMessage: options?.onMessage,
-      signal: options?.signal,
-    });
-
-    // A callback runner always resolves `RunResult<unknown>` while `AgentRunner`
-    // is generic in its output. The value is forwarded untouched, so the
-    // caller's `T` is the only annotation with information here.
-    return run as Promise<RunResult<T>>;
   };
 }
 
