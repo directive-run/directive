@@ -413,6 +413,24 @@ export function createEngine<S extends Schema>(
   // Assigned after createHistoryManager() below.
   let historyRef: HistoryManager<S> | null = null;
 
+  /**
+   * Derivations that went stale since the last reconcile.
+   *
+   * Constraints and effects both auto-track what their bodies read, and a body
+   * that reads a derivation records the derivation's *ID* as a dependency.
+   * Incremental evaluation then matched those dependencies against
+   * `changedKeys`, which holds fact keys only — so the derivation half of every
+   * tracked dependency set matched nothing, and a constraint or effect gated on
+   * a derivation ran once, at startup, and never again. The derivation would
+   * flip, every direct reader would see the new value, and the constraint would
+   * sit on its first answer forever.
+   *
+   * Held separately from `changedKeys` rather than merged into it so history
+   * snapshot labels keep describing facts, and so an invalidation that arrives
+   * without a fact change cannot make the system look dirty.
+   */
+  const invalidatedDerivations = new Set<string>();
+
   // Trace management (per-run reconciliation changelog, gated by config.trace)
   const traceManager = createTraceManager({
     traceConfig: config.trace,
@@ -495,6 +513,9 @@ export function createEngine<S extends Schema>(
     },
     onInvalidate: (id) => {
       if (hasPlugins()) pluginManager.emitDerivationInvalidate(id);
+      // A derivation going stale is news for anything that read it — the same
+      // news a changed fact is, delivered on the same channel.
+      invalidatedDerivations.add(id);
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("derivation", id, error);
@@ -1023,7 +1044,18 @@ export function createEngine<S extends Schema>(
       // Note: Derivations are already invalidated immediately when facts change
       // (in the onChange/onBatch callbacks), so we don't need to do it here
 
-      // Run effects for changed keys
+      // Run effects for changed keys.
+      //
+      // Auto-tracked dependencies are whatever the body read, which is fact
+      // keys *and* derivation IDs, so the notification set has to carry both or
+      // half of every tracked dependency set matches nothing. Folded in here
+      // rather than at the source so `changedKeys` stays a record of facts.
+      if (invalidatedDerivations.size > 0) {
+        for (const id of invalidatedDerivations) {
+          state.changedKeys.add(id);
+        }
+        invalidatedDerivations.clear();
+      }
       await effectsManager.runEffects(state.changedKeys);
 
       // Copy changed keys for constraint evaluation before clearing

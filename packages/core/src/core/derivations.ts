@@ -536,6 +536,17 @@ export function createDerivationsManager<
 
   const manager: DerivationsManager<S, D> = {
     get<K extends keyof D>(id: K): ReturnType<D[K]> {
+      // Register the access, exactly as the composition proxy does.
+      //
+      // These are two doors onto one value — `derived.total` inside a
+      // derivation body and `system.derive.total` from anywhere else — and only
+      // one of them used to record that the read happened. So a constraint
+      // whose `when()` consulted `system.derive.total` had its dependency on
+      // `total` silently dropped: it evaluated once and was never brought back,
+      // because nothing knew it cared. A no-op outside a tracking context,
+      // which is where the overwhelming majority of these reads happen.
+      trackAccess(id as string);
+
       const state = getState(id as string);
 
       if (state.isStale) {

@@ -86,12 +86,15 @@ export interface ConstraintsManager<_S extends Schema> {
    */
   enable(id: string): void;
   /**
-   * Mark all constraints that depend on `factKey` as dirty so they are
+   * Mark all constraints that depend on `key` as dirty so they are
    * re-evaluated on the next {@link ConstraintsManager.evaluate | evaluate} call.
    *
-   * @param factKey - The fact store key that changed.
+   * @param key - A dependency name that changed. Constraint dependencies are
+   *   whatever `when()` read under tracking, which is fact store keys *and*
+   *   derivation IDs — so this accepts either. A name nothing tracked is a
+   *   no-op.
    */
-  invalidate(factKey: string): void;
+  invalidate(key: string): void;
   /**
    * Get the auto-tracked or explicit dependency set for a constraint.
    *
@@ -1333,9 +1336,9 @@ export function createConstraintsManager<S extends Schema>(
       return disabled.has(id);
     },
 
-    invalidate(factKey: string): void {
-      // Mark all constraints that depend on this fact as dirty
-      const dependentConstraints = factToConstraints.get(factKey);
+    invalidate(key: string): void {
+      // Mark all constraints that depend on this fact or derivation as dirty
+      const dependentConstraints = factToConstraints.get(key);
       if (dependentConstraints) {
         for (const id of dependentConstraints) {
           dirtyConstraints.add(id);
