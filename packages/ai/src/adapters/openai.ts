@@ -17,13 +17,14 @@ import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -60,6 +61,39 @@ export const OPENAI_PRICING: Record<string, { input: number; output: number }> =
     o3: { input: 10, output: 40 },
     "o3-mini": { input: 1.1, output: 4.4 },
   };
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one OpenAI chat-completion SSE event.
+ *
+ * Shared by the streaming path of `createOpenAIRunner` and by
+ * `createOpenAIStreamingRunner` so the two cannot drift.
+ */
+function parseOpenAIStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const delta = (event.choices as Record<string, unknown>[])?.[0]?.delta as
+    | Record<string, unknown>
+    | undefined;
+  if (delta?.content) {
+    result.text = delta.content as string;
+  }
+
+  if (event.usage) {
+    result.inputTokens =
+      ((event.usage as Record<string, unknown>).prompt_tokens as number) ?? 0;
+    result.outputTokens =
+      ((event.usage as Record<string, unknown>).completion_tokens as number) ??
+      0;
+  }
+
+  return result;
+}
 
 // ============================================================================
 // OpenAI Runner
@@ -139,7 +173,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
+    buildRequest: (agent, _input, messages, stream) => ({
       url: `${baseURL}/chat/completions`,
       init: {
         method: "POST",
@@ -162,6 +196,12 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
               : []),
             ...messages.map((m) => ({ role: m.role, content: m.content })),
           ],
+          // Omitted entirely when buffering, so the non-streaming request
+          // stays byte-for-byte what it was. `include_usage` keeps the token
+          // breakdown available on the streaming path.
+          ...(stream
+            ? { stream: true, stream_options: { include_usage: true } }
+            : {}),
         }),
         ...(timeoutMs != null
           ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -180,6 +220,10 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         inputTokens,
         outputTokens,
       };
+    },
+    streaming: {
+      adapterName: "OpenAI",
+      parseEvent: parseOpenAIStreamEvent,
     },
   });
 }
@@ -358,35 +402,12 @@ export function createOpenAIStreamingRunner(
         await throwStreamingHTTPError(response, "OpenAI");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
+      const { fullText, inputTokens, outputTokens } = await parseEventStream(
         reader,
         callbacks.onToken,
-        (event) => {
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-
-          const delta = (event.choices as Record<string, unknown>[])?.[0]
-            ?.delta as Record<string, unknown> | undefined;
-          if (delta?.content) {
-            result.text = delta.content as string;
-          }
-
-          if (event.usage) {
-            result.inputTokens =
-              ((event.usage as Record<string, unknown>)
-                .prompt_tokens as number) ?? 0;
-            result.outputTokens =
-              ((event.usage as Record<string, unknown>)
-                .completion_tokens as number) ?? 0;
-          }
-
-          return result;
-        },
+        parseOpenAIStreamEvent,
         "OpenAI",
       );
 

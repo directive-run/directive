@@ -219,6 +219,10 @@ export {
   createRunner,
   type CreateRunnerOptions,
   type ParsedResponse,
+  type RunnerStreamingSupport,
+  type StreamEventResult,
+  type StreamTotals,
+  type StreamWireFormat,
 } from "./agent-utils.js";
 
 // ============================================================================

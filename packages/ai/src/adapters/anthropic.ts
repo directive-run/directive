@@ -15,13 +15,14 @@
 import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -56,6 +57,55 @@ export const ANTHROPIC_PRICING: Record<
   "claude-haiku-3-5-20241022": { input: 0.8, output: 4 },
   "claude-opus-4-20250514": { input: 15, output: 75 },
 };
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Anthropic SSE event.
+ *
+ * Shared by the streaming path of `createAnthropicRunner` and by
+ * `createAnthropicStreamingRunner` so the two cannot drift.
+ */
+function parseAnthropicStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  if (event.type === "error") {
+    throw new Error(
+      `[Directive] Anthropic stream error: ${(event.error as Record<string, unknown>)?.message ?? JSON.stringify(event.error)}`,
+    );
+  }
+
+  const result: StreamEventResult = {};
+  if (
+    event.type === "content_block_delta" &&
+    (event.delta as Record<string, unknown>)?.type === "text_delta"
+  ) {
+    result.text = (event.delta as Record<string, unknown>).text as string;
+  }
+  if (event.type === "message_delta" && event.usage) {
+    result.outputTokens =
+      ((event.usage as Record<string, unknown>).output_tokens as number) ?? 0;
+  }
+  if (
+    event.type === "message_start" &&
+    (event.message as Record<string, unknown>)?.usage
+  ) {
+    const usage = (event.message as Record<string, unknown>).usage as Record<
+      string,
+      unknown
+    >;
+    result.inputTokens = (usage.input_tokens as number) ?? 0;
+    // Emitted unconditionally; whether they reach `tokenUsage` is decided by
+    // the caller, which knows whether prompt caching was requested.
+    result.cacheReadTokens = (usage.cache_read_input_tokens as number) ?? 0;
+    result.cacheCreationTokens =
+      (usage.cache_creation_input_tokens as number) ?? 0;
+  }
+
+  return result;
+}
 
 // ============================================================================
 // Anthropic Runner
@@ -155,7 +205,7 @@ export function createAnthropicRunner(
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => {
+    buildRequest: (agent, _input, messages, stream) => {
       const instructions = agent.instructions ?? "";
       // With prompt caching enabled, send the structured system form so a
       // `cache_control` breakpoint caches the stable instructions prefix.
@@ -193,6 +243,9 @@ export function createAnthropicRunner(
               role: m.role,
               content: m.content,
             })),
+            // Omitted entirely when buffering, so the non-streaming request
+            // stays byte-for-byte what it was.
+            ...(stream ? { stream: true } : {}),
           }),
           ...(timeoutMs != null
             ? { signal: AbortSignal.timeout(timeoutMs) }
@@ -236,6 +289,41 @@ export function createAnthropicRunner(
         inputTokens,
         outputTokens,
       };
+    },
+    streaming: {
+      adapterName: "Anthropic",
+      parseEvent: parseAnthropicStreamEvent,
+      // Mirrors `parseResponse` exactly – cache tokens are gated on the option,
+      // never on the presence of the response fields, so `tokenUsage` is the
+      // same shape whether or not the caller asked for deltas.
+      buildResponse: (totals) => {
+        const { fullText: text, inputTokens, outputTokens } = totals;
+
+        if (promptCaching === "automatic") {
+          const cacheReadTokens = totals.cacheReadTokens ?? 0;
+          const cacheCreationTokens = totals.cacheCreationTokens ?? 0;
+
+          return {
+            text,
+            totalTokens:
+              inputTokens +
+              outputTokens +
+              cacheReadTokens +
+              cacheCreationTokens,
+            inputTokens,
+            outputTokens,
+            cacheReadTokens,
+            cacheCreationTokens,
+          };
+        }
+
+        return {
+          text,
+          totalTokens: inputTokens + outputTokens,
+          inputTokens,
+          outputTokens,
+        };
+      },
     },
   });
 }
@@ -323,50 +411,12 @@ export function createAnthropicStreamingRunner(
         await throwStreamingHTTPError(response, "Anthropic");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
+      const { fullText, inputTokens, outputTokens } = await parseEventStream(
         reader,
         callbacks.onToken,
-        (event) => {
-          if (event.type === "error") {
-            throw new Error(
-              `[Directive] Anthropic stream error: ${(event.error as Record<string, unknown>)?.message ?? JSON.stringify(event.error)}`,
-            );
-          }
-
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-          if (
-            event.type === "content_block_delta" &&
-            (event.delta as Record<string, unknown>)?.type === "text_delta"
-          ) {
-            result.text = (event.delta as Record<string, unknown>)
-              .text as string;
-          }
-          if (event.type === "message_delta" && event.usage) {
-            result.outputTokens =
-              ((event.usage as Record<string, unknown>)
-                .output_tokens as number) ?? 0;
-          }
-          if (
-            event.type === "message_start" &&
-            (event.message as Record<string, unknown>)?.usage
-          ) {
-            result.inputTokens =
-              ((
-                (event.message as Record<string, unknown>).usage as Record<
-                  string,
-                  unknown
-                >
-              ).input_tokens as number) ?? 0;
-          }
-
-          return result;
-        },
+        parseAnthropicStreamEvent,
         "Anthropic",
       );
 

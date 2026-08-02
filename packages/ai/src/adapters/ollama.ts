@@ -17,11 +17,13 @@
 import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
+  parseEventStream,
 } from "./shared.js";
 
 // ============================================================================
@@ -62,6 +64,35 @@ export const OLLAMA_PRICING: Record<string, { input: number; output: number }> =
     "deepseek-coder": { input: 0, output: 0 },
     "command-r": { input: 0, output: 0 },
   };
+
+// ============================================================================
+// Shared Stream Chunk Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Ollama streaming chunk.
+ *
+ * Ollama frames its stream as newline-delimited JSON rather than server-sent
+ * events, and reports token counts only on the final `done` chunk.
+ */
+function parseOllamaStreamChunk(
+  chunk: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const message = chunk.message as Record<string, unknown> | undefined;
+  const content = message?.content as string | undefined;
+  if (content) {
+    result.text = content;
+  }
+
+  if (chunk.done) {
+    result.inputTokens = (chunk.prompt_eval_count as number) ?? 0;
+    result.outputTokens = (chunk.eval_count as number) ?? 0;
+  }
+
+  return result;
+}
 
 // ============================================================================
 // Ollama Runner
@@ -137,7 +168,7 @@ export function createOllamaRunner(
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
+    buildRequest: (agent, _input, messages, stream) => ({
       url: `${baseURL}/api/chat`,
       init: {
         method: "POST",
@@ -150,7 +181,7 @@ export function createOllamaRunner(
               : []),
             ...messages.map((m) => ({ role: m.role, content: m.content })),
           ],
-          stream: false,
+          stream,
           ...(hasOptions ? { options: ollamaOptions } : {}),
         }),
         ...(timeoutMs != null
@@ -178,6 +209,11 @@ export function createOllamaRunner(
         inputTokens,
         outputTokens,
       };
+    },
+    streaming: {
+      adapterName: "Ollama",
+      wireFormat: "ndjson",
+      parseEvent: parseOllamaStreamChunk,
     },
   });
 }
@@ -284,62 +320,13 @@ export function createOllamaStreamingRunner(
         throw new Error("[Directive] No response body from Ollama");
       }
 
-      const decoder = new TextDecoder();
-      let buf = "";
-      let fullText = "";
-      let inputTokens = 0;
-      let outputTokens = 0;
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
-
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split("\n");
-          buf = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) {
-              continue;
-            }
-
-            let chunk: Record<string, unknown>;
-            try {
-              chunk = JSON.parse(trimmed);
-            } catch {
-              if (
-                typeof process !== "undefined" &&
-                process.env?.NODE_ENV === "development"
-              ) {
-                console.warn(
-                  "[Directive] Malformed streaming chunk from Ollama:",
-                  trimmed,
-                );
-              }
-
-              continue;
-            }
-
-            const msg = chunk.message as Record<string, unknown> | undefined;
-            const content = (msg?.content as string) ?? "";
-            if (content) {
-              fullText += content;
-              callbacks.onToken?.(content);
-            }
-
-            if (chunk.done) {
-              inputTokens = (chunk.prompt_eval_count as number) ?? 0;
-              outputTokens = (chunk.eval_count as number) ?? 0;
-            }
-          }
-        }
-      } finally {
-        reader.cancel().catch(() => {});
-      }
+      const { fullText, inputTokens, outputTokens } = await parseEventStream(
+        reader,
+        callbacks.onToken,
+        parseOllamaStreamChunk,
+        "Ollama",
+        "ndjson",
+      );
 
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;

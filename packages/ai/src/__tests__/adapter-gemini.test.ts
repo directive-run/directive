@@ -333,7 +333,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "Hi", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["Hello", " world", "!"]);
@@ -380,7 +382,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["chunk1", "chunk2"]);
@@ -465,7 +469,9 @@ describe("createGeminiStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["final"]);

@@ -427,7 +427,9 @@ describe("createOpenAIStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "Hi", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["Hello", " world"]);
@@ -533,7 +535,9 @@ describe("createOpenAIStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["first", " second"]);
@@ -561,7 +565,9 @@ describe("createOpenAIStreamingRunner", () => {
 
     const tokens: string[] = [];
     const result = await streamingRunner(mockAgent(), "test", {
-      onToken: (token) => tokens.push(token),
+      onToken: (token) => {
+        tokens.push(token);
+      },
     });
 
     expect(tokens).toEqual(["ok", " fine"]);

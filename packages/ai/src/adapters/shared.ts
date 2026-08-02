@@ -29,7 +29,7 @@ export async function throwStreamingHTTPError(
 /**
  * Get an SSE reader from a response, throwing if body is missing.
  */
-export function getSSEReader(
+export function getStreamReader(
   response: Response,
 ): ReadableStreamDefaultReader<Uint8Array> {
   const reader = response.body?.getReader();
@@ -63,42 +63,75 @@ export function warnIfMissingApiKey(
 }
 
 // ============================================================================
-// SSE Stream Parser
+// Event Stream Parser
 // ============================================================================
 
-/** Result from parsing a single SSE event (provider-specific). */
-export interface SSEEventResult {
+/** Result from parsing a single streamed event (provider-specific). */
+export interface StreamEventResult {
   /** Text token to append to output. */
   text?: string;
   /** Updated input token count (cumulative, not delta). */
   inputTokens?: number;
   /** Updated output token count (cumulative, not delta). */
   outputTokens?: number;
+  /** Updated prompt-cache read token count (cumulative, not delta). */
+  cacheReadTokens?: number;
+  /** Updated prompt-cache creation token count (cumulative, not delta). */
+  cacheCreationTokens?: number;
 }
 
 /**
- * Parse an SSE stream from a Response, calling `onToken` for each text chunk
+ * How a provider frames the events it streams.
+ *
+ * - `"sse"` – server-sent events: `data: <json>` lines with a `[DONE]` sentinel
+ *   (Anthropic, OpenAI, Gemini).
+ * - `"ndjson"` – newline-delimited JSON objects, one per line (Ollama).
+ */
+export type StreamWireFormat = "sse" | "ndjson";
+
+/** Accumulated totals from a fully consumed event stream. */
+export interface StreamTotals {
+  fullText: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Only set when the provider reported prompt-cache reads. */
+  cacheReadTokens?: number;
+  /** Only set when the provider reported prompt-cache writes. */
+  cacheCreationTokens?: number;
+}
+
+/**
+ * Parse an event stream from a Response, calling `onToken` for each text chunk
  * and `parseEvent` for provider-specific event extraction.
  *
  * Handles buffering, `[DONE]` sentinels, malformed JSON, and reader cleanup.
  *
+ * `onToken` is awaited. A callback that returns a promise therefore applies
+ * real backpressure: the next chunk is not read off the wire until it settles.
+ * A synchronous callback returns `undefined`, which `await` resolves in a
+ * microtask, so streaming semantics are unchanged for callers that pass one.
+ *
  * @param reader - The ReadableStream reader from the response body.
- * @param onToken - Callback for each text token (may be undefined).
- * @param parseEvent - Provider-specific function to extract text and tokens from a parsed SSE event.
+ * @param onToken - Callback for each text token (may be undefined). Awaited.
+ * @param parseEvent - Provider-specific function to extract text and tokens from a parsed event.
  * @param adapterName - Adapter name for dev-mode warnings.
+ * @param wireFormat - How the provider frames its events. @default "sse"
  * @returns The full text output and final token counts.
  */
-export async function parseSSEStream(
+export async function parseEventStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  onToken: ((token: string) => void) | undefined,
-  parseEvent: (event: Record<string, unknown>) => SSEEventResult,
+  onToken: ((token: string) => void | Promise<void>) | undefined,
+  parseEvent: (event: Record<string, unknown>) => StreamEventResult,
   adapterName: string,
-): Promise<{ fullText: string; inputTokens: number; outputTokens: number }> {
+  wireFormat: StreamWireFormat = "sse",
+): Promise<StreamTotals> {
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let cacheReadTokens: number | undefined;
+  let cacheCreationTokens: number | undefined;
 
   try {
     while (true) {
@@ -112,27 +145,16 @@ export async function parseSSEStream(
       buf = lines.pop() ?? "";
 
       for (const line of lines) {
-        if (!line.startsWith("data: ")) {
-          continue;
-        }
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") {
+        const data = extractPayload(line, wireFormat);
+        if (data === undefined) {
           continue;
         }
 
+        // Parsing is guarded, delivery is not: a throw from `onToken` belongs
+        // to the caller and must not be mistaken for a malformed event.
+        let result: StreamEventResult;
         try {
-          const event = JSON.parse(data);
-          const result = parseEvent(event);
-          if (result.text) {
-            fullText += result.text;
-            onToken?.(result.text);
-          }
-          if (result.inputTokens !== undefined) {
-            inputTokens = result.inputTokens;
-          }
-          if (result.outputTokens !== undefined) {
-            outputTokens = result.outputTokens;
-          }
+          result = parseEvent(JSON.parse(data));
         } catch (parseErr) {
           if (parseErr instanceof SyntaxError) {
             if (
@@ -140,13 +162,32 @@ export async function parseSSEStream(
               process.env?.NODE_ENV === "development"
             ) {
               console.warn(
-                `[Directive] Malformed SSE event from ${adapterName}:`,
+                `[Directive] Malformed stream event from ${adapterName}:`,
                 data,
               );
             }
-          } else {
-            throw parseErr;
+
+            continue;
           }
+
+          throw parseErr;
+        }
+
+        if (result.text) {
+          fullText += result.text;
+          await onToken?.(result.text);
+        }
+        if (result.inputTokens !== undefined) {
+          inputTokens = result.inputTokens;
+        }
+        if (result.outputTokens !== undefined) {
+          outputTokens = result.outputTokens;
+        }
+        if (result.cacheReadTokens !== undefined) {
+          cacheReadTokens = result.cacheReadTokens;
+        }
+        if (result.cacheCreationTokens !== undefined) {
+          cacheCreationTokens = result.cacheCreationTokens;
         }
       }
     }
@@ -154,7 +195,35 @@ export async function parseSSEStream(
     reader.cancel().catch(() => {});
   }
 
-  return { fullText, inputTokens, outputTokens };
+  return {
+    fullText,
+    inputTokens,
+    outputTokens,
+    ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+    ...(cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+  };
+}
+
+/**
+ * Pull the JSON payload out of one wire line, or `undefined` when the line
+ * carries no event (an SSE comment, a `[DONE]` sentinel, a blank separator).
+ */
+function extractPayload(
+  line: string,
+  wireFormat: StreamWireFormat,
+): string | undefined {
+  if (wireFormat === "ndjson") {
+    const trimmed = line.trim();
+
+    return trimmed === "" ? undefined : trimmed;
+  }
+
+  if (!line.startsWith("data: ")) {
+    return undefined;
+  }
+  const data = line.slice(6).trim();
+
+  return data === "[DONE]" ? undefined : data;
 }
 
 // ============================================================================

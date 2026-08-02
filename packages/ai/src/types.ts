@@ -80,6 +80,18 @@ export type StreamingCallbackRunner = (
   agent: AgentLike,
   input: string,
   callbacks: {
+    /**
+     * Called with each text delta as it arrives. Awaited by the shipped
+     * adapters, so returning a promise applies backpressure to the provider
+     * stream – the reader does not pull the next chunk until it settles.
+     *
+     * Declared as returning `void` rather than `void | Promise<void>` on
+     * purpose. TypeScript lets a callback typed `=> void` return anything,
+     * so both `(t) => buffer.push(t)` and `async (t) => { await sink(t) }`
+     * are assignable, and both behave correctly – the promise is awaited
+     * either way. Widening the annotation would forfeit that rule and
+     * reject the first form, which is the shape most callers reach for.
+     */
     onToken?: (token: string) => void;
     onToolStart?: (tool: string, id: string, args: string) => void;
     onToolEnd?: (tool: string, id: string, result: string) => void;
@@ -94,6 +106,32 @@ export interface RunOptions {
   signal?: AbortSignal;
   onMessage?: (message: Message) => void;
   onToolCall?: (toolCall: ToolCall) => void | Promise<void>;
+  /**
+   * Present ⇒ the caller wants per-delta streaming from this run.
+   *
+   * This is a **request, not a guarantee**. A runner that cannot stream simply
+   * ignores it and returns the same buffered result it always would – there is
+   * no error and no capability to negotiate. Callers that need to know whether
+   * deltas actually arrived should count the calls they receive.
+   *
+   * Because streaming is an option on the runner rather than a second runner,
+   * it survives composition: every wrapper (`withRetry`, `withBudget`,
+   * `withFallback`, `withModelSelection`, `withStructuredOutput`) forwards
+   * `options` verbatim, so a wrapped runner streams with no wrapper changes and
+   * no wrapper can silently drop the capability.
+   *
+   * The callback is awaited, so returning a promise applies real backpressure to
+   * the provider – the adapter will not read the next chunk off the wire until
+   * it settles.
+   *
+   * Annotated `=> void` rather than `=> void | Promise<void>` deliberately.
+   * TypeScript allows a callback typed `=> void` to return any value, so
+   * `(t) => buffer.push(t)` and `async (t) => { await sink(t) }` are both
+   * assignable and both behave correctly. The wider annotation would reject
+   * the first – `push` returns a number – which is the form most callers
+   * write.
+   */
+  onToken?: (token: string) => void;
 }
 
 // ============================================================================

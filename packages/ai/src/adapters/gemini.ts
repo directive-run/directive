@@ -15,13 +15,14 @@
 import { createRunner, validateBaseURL } from "../agent-utils.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
+import type { StreamEventResult } from "./shared.js";
 import {
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
-  getSSEReader,
-  parseSSEStream,
+  getStreamReader,
+  parseEventStream,
   throwStreamingHTTPError,
   warnIfMissingApiKey,
 } from "./shared.js";
@@ -53,6 +54,45 @@ export const GEMINI_PRICING: Record<string, { input: number; output: number }> =
     "gemini-2.0-flash": { input: 0.1, output: 0.4 },
     "gemini-2.0-flash-lite": { input: 0.025, output: 0.1 },
   };
+
+// ============================================================================
+// Shared Stream Event Parsing
+// ============================================================================
+
+/**
+ * Extract text and token counts from one Gemini `streamGenerateContent` event.
+ *
+ * Shared by the streaming path of `createGeminiRunner` and by
+ * `createGeminiStreamingRunner` so the two cannot drift.
+ */
+function parseGeminiStreamEvent(
+  event: Record<string, unknown>,
+): StreamEventResult {
+  const result: StreamEventResult = {};
+
+  const parts = (
+    (event.candidates as Record<string, unknown>[])?.[0]?.content as Record<
+      string,
+      unknown
+    >
+  )?.parts as Record<string, unknown>[] | undefined;
+  const textVal = parts?.[0]?.text;
+  if (textVal) {
+    result.text = textVal as string;
+  }
+
+  if (event.usageMetadata) {
+    const meta = event.usageMetadata as Record<string, unknown>;
+    if (meta.promptTokenCount !== undefined) {
+      result.inputTokens = meta.promptTokenCount as number;
+    }
+    if (meta.candidatesTokenCount !== undefined) {
+      result.outputTokens = meta.candidatesTokenCount as number;
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // Gemini Runner
@@ -127,8 +167,11 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
   return createRunner({
     fetch: fetchFn,
     hooks,
-    buildRequest: (agent, _input, messages) => ({
-      url: `${baseURL}/models/${agent.model ?? model}:generateContent`,
+    buildRequest: (agent, _input, messages, stream) => ({
+      // Gemini streams from a different method; the body is identical.
+      url: stream
+        ? `${baseURL}/models/${agent.model ?? model}:streamGenerateContent?alt=sse`
+        : `${baseURL}/models/${agent.model ?? model}:generateContent`,
       init: {
         method: "POST",
         headers: {
@@ -162,6 +205,10 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
         inputTokens,
         outputTokens,
       };
+    },
+    streaming: {
+      adapterName: "Gemini",
+      parseEvent: parseGeminiStreamEvent,
     },
   });
 }
@@ -262,39 +309,12 @@ export function createGeminiStreamingRunner(
         await throwStreamingHTTPError(response, "Gemini");
       }
 
-      const reader = getSSEReader(response);
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens } = await parseSSEStream(
+      const { fullText, inputTokens, outputTokens } = await parseEventStream(
         reader,
         callbacks.onToken,
-        (event) => {
-          const result: {
-            text?: string;
-            inputTokens?: number;
-            outputTokens?: number;
-          } = {};
-
-          const text = (
-            (event.candidates as Record<string, unknown>[])?.[0]
-              ?.content as Record<string, unknown>
-          )?.parts as Record<string, unknown>[] | undefined;
-          const textVal = text?.[0]?.text;
-          if (textVal) {
-            result.text = textVal as string;
-          }
-
-          if (event.usageMetadata) {
-            const meta = event.usageMetadata as Record<string, unknown>;
-            if (meta.promptTokenCount !== undefined) {
-              result.inputTokens = meta.promptTokenCount as number;
-            }
-            if (meta.candidatesTokenCount !== undefined) {
-              result.outputTokens = meta.candidatesTokenCount as number;
-            }
-          }
-
-          return result;
-        },
+        parseGeminiStreamEvent,
         "Gemini",
       );
 

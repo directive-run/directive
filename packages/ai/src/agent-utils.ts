@@ -3,6 +3,19 @@
  */
 
 import type {
+  StreamEventResult,
+  StreamTotals,
+  StreamWireFormat,
+} from "./adapters/shared.js";
+import { getStreamReader, parseEventStream } from "./adapters/shared.js";
+// Re-exported because `RunnerStreamingSupport` names them and `createRunner`
+// is public – a consumer writing their own adapter needs to spell these out.
+export type {
+  StreamEventResult,
+  StreamTotals,
+  StreamWireFormat,
+} from "./adapters/shared.js";
+import type {
   AdapterHooks,
   AgentLike,
   AgentRunner,
@@ -165,13 +178,43 @@ export interface ParsedResponse {
   cacheCreationTokens?: number;
 }
 
+/**
+ * Optional streaming support for a runner built with {@link createRunner}.
+ *
+ * Supplying this does not change what the runner does by default. It only
+ * teaches the runner how to consume the provider's stream so that a caller who
+ * passes `RunOptions.onToken` gets per-delta callbacks from the *same* runner –
+ * no second runner slot, and so nothing for a wrapper to forget to forward.
+ */
+export interface RunnerStreamingSupport {
+  /** Adapter name, used in dev-mode malformed-event warnings. */
+  adapterName: string;
+  /** Extract text and token counts from one streamed event. */
+  parseEvent: (event: Record<string, unknown>) => StreamEventResult;
+  /** How the provider frames its streamed events. @default "sse" */
+  wireFormat?: StreamWireFormat;
+  /**
+   * Build the final parsed response from the accumulated stream totals.
+   * Supply this when the buffered path computes `totalTokens` from more than
+   * input + output (e.g. Anthropic with prompt caching) so both paths agree.
+   */
+  buildResponse?: (totals: StreamTotals) => ParsedResponse;
+}
+
 /** Options for creating an AgentRunner from buildRequest/parseResponse */
 export interface CreateRunnerOptions {
   fetch?: typeof globalThis.fetch;
+  /**
+   * Build the HTTP request. `stream` is `true` only when the caller passed
+   * `RunOptions.onToken` *and* {@link CreateRunnerOptions.streaming} is
+   * configured – implementations that ignore the parameter keep their existing
+   * buffered behavior.
+   */
   buildRequest: (
     agent: AgentLike,
     input: string,
     messages: Message[],
+    stream: boolean,
   ) => { url: string; init: RequestInit };
   parseResponse: (
     response: Response,
@@ -180,6 +223,18 @@ export interface CreateRunnerOptions {
   parseOutput?: <T>(text: string) => T;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
+  /** Enables `RunOptions.onToken` on this runner. Omit for buffered-only. */
+  streaming?: RunnerStreamingSupport;
+}
+
+/** Default stream totals → parsed response mapping. */
+function defaultStreamResponse(totals: StreamTotals): ParsedResponse {
+  return {
+    text: totals.fullText,
+    totalTokens: totals.inputTokens + totals.outputTokens,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+  };
 }
 
 /**
@@ -194,6 +249,11 @@ export interface CreateRunnerOptions {
  *
  * Output parsing defaults to `JSON.parse` with a string fallback. Supply a custom
  * `parseOutput` to override (e.g. for structured output schemas).
+ *
+ * When `streaming` is configured, the same runner streams from the provider for
+ * any call that passes `RunOptions.onToken` and buffers for every call that does
+ * not. Both paths share the response assembly below, so `output`, `messages`,
+ * `tokenUsage` and the adapter hooks are identical either way.
  *
  * @param options - Configuration for the runner, including request building, response parsing, and hooks.
  * @returns An {@link AgentRunner} function that performs LLM calls via fetch.
@@ -241,6 +301,7 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
     parseResponse,
     parseOutput,
     hooks,
+    streaming,
   } = options;
 
   const defaultParseOutput = <T>(text: string): T => {
@@ -263,8 +324,13 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
 
     const messages: Message[] = [{ role: "user", content: input }];
 
+    // `onToken` is a request, not a guarantee: a runner without streaming
+    // support ignores it and returns the same buffered result it always would.
+    const onToken = runOptions?.onToken;
+    const shouldStream = onToken !== undefined && streaming !== undefined;
+
     try {
-      const { url, init } = buildRequest(agent, input, messages);
+      const { url, init } = buildRequest(agent, input, messages, shouldStream);
 
       // Combine signals — `buildRequest` may set
       // `init.signal` (e.g. `AbortSignal.timeout(timeoutMs)`) and the
@@ -289,7 +355,17 @@ export function createRunner(options: CreateRunnerOptions): AgentRunner {
         );
       }
 
-      const parsed = await parseResponse(response, messages);
+      const parsed = shouldStream
+        ? (streaming.buildResponse ?? defaultStreamResponse)(
+            await parseEventStream(
+              getStreamReader(response),
+              onToken,
+              streaming.parseEvent,
+              streaming.adapterName,
+              streaming.wireFormat,
+            ),
+          )
+        : await parseResponse(response, messages);
       const tokenUsage: TokenUsage = {
         inputTokens: parsed.inputTokens ?? 0,
         outputTokens: parsed.outputTokens ?? 0,
