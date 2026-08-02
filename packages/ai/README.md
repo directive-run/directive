@@ -11,7 +11,7 @@ AI agent orchestration with guardrails, cost tracking, and multi-agent coordinat
 - **Guardrails** &ndash; input, output, and tool call validation with retry support
 - **Multi-agent orchestration** &ndash; parallel, sequential, and supervisor patterns
 - **Cost tracking** &ndash; per-call token usage with pricing constants for every provider
-- **Streaming** &ndash; async iterable streams with backpressure and streaming guardrails
+- **Streaming** &ndash; per-delta token streaming that survives every runner wrapper, as an async iterable of typed chunks
 - **Provider adapters** &ndash; swap providers by changing one import, not your codebase
 
 ## Install
@@ -101,6 +101,39 @@ const { inputTokens, cacheReadTokens = 0, cacheCreationTokens = 0 } =
 > **Minimum cacheable prefix (the #1 gotcha).** Anthropic silently ignores `cache_control` when the cached prefix is below a per-model minimum &ndash; roughly 1024 tokens on Sonnet-tier models, 2048 on Sonnet-4.6 & Haiku-3.5, and 4096 on Opus & Haiku-4.5. There is no error: caching just doesn't happen and `cacheReadTokens` stays `0` across repeat calls (that `0` is your diagnostic). Because Directive caches `agent.instructions`, short instructions commonly fall below this threshold. The `ephemeral` breakpoint also has a **5-minute default TTL** &ndash; prefixes not re-read within that window are evicted.
 
 > **Cost tracking caveat.** `withBudget` / `estimateCost` currently weight all tokens equally, so with caching on they do **not** yet reflect the cheaper cache-read (~0.1x) or pricier cache-write (~1.25x) rates &ndash; a cached run will read as more expensive than it actually is. Cache-aware cost pricing is a planned follow-up.
+
+## Streaming
+
+`runStream` emits one token chunk per completed message by default. Pass `deltas: true`, or an `onToken` callback, to get one chunk per provider delta.
+
+```typescript
+const { stream, result } = orchestrator.runStream(agent, "Write a report", {
+  deltas: true,
+});
+
+for await (const chunk of stream) {
+  if (chunk.type === "token") process.stdout.write(chunk.data);
+  // `stream_restart` means a retry replayed the response - discard
+  // `chunk.discardBefore` token chunks you already rendered.
+  if (chunk.type === "stream_restart") ui.discardLast(chunk.discardBefore);
+}
+
+const final = await result;
+```
+
+Use `onToken` when you want the deltas somewhere of your own. It is awaited, so returning a promise applies real backpressure &ndash; the adapter stops reading the provider stream until it settles.
+
+```typescript
+const { stream } = orchestrator.runStream(agent, prompt, {
+  onToken: async (token) => {
+    await socket.send(token);
+  },
+});
+```
+
+Streaming is a field on the options every runner already receives, not a separate runner, so it composes: `withRetry`, `withBudget`, `withFallback`, `withModelSelection` and `withStructuredOutput` all forward it, and a budgeted runner still enforces its budget while streaming.
+
+Backpressure strategies (`backpressure`, `bufferSize`) belong to a `StreamRunner` built by `createStreamingRunner` &ndash; they are not `runStream` options. See the [AI Guide](https://directive.run/docs/ai) for the full chunk union.
 
 ## Lifecycle Hooks
 

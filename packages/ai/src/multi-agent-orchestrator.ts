@@ -177,6 +177,7 @@ import type {
   MultiAgentOrchestratorOptions,
   MultiAgentRunCallOptions,
   MultiAgentState,
+  MultiAgentStreamCallOptions,
   ParallelPattern,
   RacePattern,
   RaceResult,
@@ -2266,7 +2267,7 @@ export function createMultiAgentOrchestrator(
 
       reportIfRunnerIgnoredOnToken(
         agent.name,
-        callerOnToken,
+        callerOnToken !== undefined,
         realDeltaCount,
         result.output,
       );
@@ -2556,6 +2557,7 @@ export function createMultiAgentOrchestrator(
     input: string,
     options: {
       signal?: AbortSignal;
+      deltas?: boolean;
       onToken?: (token: string) => void;
     } = {},
   ): OrchestratorStreamResult<T> {
@@ -2714,7 +2716,9 @@ export function createMultiAgentOrchestrator(
     // How many of those have already been attributed to a completed assistant
     // message, so `onMessage` can tell whether real deltas arrived for it.
     let deltasAttributedToMessages = 0;
-    const streamRequested = options.onToken !== undefined;
+    // `onToken` implies `deltas` – a callback is only useful if deltas flow.
+    const streamRequested =
+      options.deltas === true || options.onToken !== undefined;
 
     let abortHandler: (() => void) | undefined;
     if (options.signal) {
@@ -2784,9 +2788,11 @@ export function createMultiAgentOrchestrator(
     // The orchestrator's own `onToken`, handed down the path `runSingleAgent`
     // already uses, so retry, guardrails, tool-call approval and the facts
     // bridge all still apply. The caller's callback runs last and its return
-    // value is passed back, so returning a promise applies backpressure.
+    // value is passed back, so returning a promise applies backpressure. With
+    // `deltas: true` and no callback there is nothing to await and the chunks
+    // are the whole point.
     const callerOnToken = options.onToken as TokenSink | undefined;
-    const handleDelta = callerOnToken
+    const handleDelta = streamRequested
       ? (token: string): unknown => {
           deltaCount++;
           appendToAccumulated(token);
@@ -2797,7 +2803,7 @@ export function createMultiAgentOrchestrator(
             tokenCount: deltaCount,
           });
 
-          return callerOnToken(token);
+          return callerOnToken?.(token);
         }
       : undefined;
 
@@ -6293,7 +6299,7 @@ export function createMultiAgentOrchestrator(
     runStream<T>(
       agentId: string,
       input: string,
-      options?: { signal?: AbortSignal },
+      options?: MultiAgentStreamCallOptions,
     ): OrchestratorStreamResult<T> {
       return runAgentStreamImpl<T>(agentId, input, options);
     },

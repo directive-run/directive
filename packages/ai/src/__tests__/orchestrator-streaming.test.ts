@@ -258,6 +258,92 @@ describe("runStream – onToken", () => {
 });
 
 // ============================================================================
+// deltas: true – asking for chunks without a callback
+// ============================================================================
+
+describe("stream call options – deltas", () => {
+  const deltas = ["Hel", "lo ", "world"];
+
+  it("runStream delivers per-delta chunks with deltas: true and no callback", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: deltaRunner(deltas),
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    expect(tokenData(chunks)).toEqual(deltas);
+  });
+
+  it("runAgentStream delivers per-delta chunks with deltas: true and no callback", async () => {
+    const orchestrator = multiAgent(deltaRunner(deltas));
+
+    const { stream, result } = orchestrator.runAgentStream("assistant", "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    expect(tokenData(chunks)).toEqual(deltas);
+  });
+
+  it("produces the same chunks as the no-op onToken form it replaces", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: deltaRunner(deltas),
+    });
+
+    const viaDeltas = tokenChunks(
+      await collect(
+        orchestrator.runStream(mockAgent(), "hi", { deltas: true }).stream,
+      ),
+    );
+    const viaCallback = tokenChunks(
+      await collect(
+        orchestrator.runStream(mockAgent(), "hi", { onToken: () => {} }).stream,
+      ),
+    );
+
+    expect(viaDeltas.map((c) => [c.data, c.deltaCount, c.tokenCount])).toEqual(
+      viaCallback.map((c) => [c.data, c.deltaCount, c.tokenCount]),
+    );
+  });
+
+  it("deltas: false is the default whole-message behavior", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: deltaRunner(deltas),
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: false,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    expect(tokenData(chunks)).toEqual(["Hello world"]);
+  });
+
+  it("deltas: true still marks a retry with stream_restart", async () => {
+    const orchestrator = createAgentOrchestrator({
+      runner: failOnceRunner(["bad"], ["good"]),
+      agentRetry: { attempts: 2, baseDelayMs: 0 },
+    });
+
+    const { stream, result } = orchestrator.runStream(mockAgent(), "hi", {
+      deltas: true,
+    });
+    const chunks = await collect(stream);
+    await result;
+
+    expect(chunks.filter((c) => c.type === "stream_restart")).toEqual([
+      { type: "stream_restart", reason: "retry", discardBefore: 1 },
+    ]);
+  });
+});
+
+// ============================================================================
 // run() – onToken on RunCallOptions
 // ============================================================================
 

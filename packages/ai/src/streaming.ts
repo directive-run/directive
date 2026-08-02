@@ -129,15 +129,19 @@ function hasNonEmptyOutput(output: unknown): boolean {
  * promised, deltas arriving means the runner streamed, and empty output means
  * there was nothing to stream.
  *
+ * `requested` is a boolean rather than the callback itself because a caller can
+ * ask for deltas without supplying one – `runStream(agent, input, { deltas:
+ * true })` wants the chunks and nothing else.
+ *
  * @internal
  */
 export function reportIfRunnerIgnoredOnToken(
   agentName: string,
-  requested: TokenSink | undefined,
+  requested: boolean,
   deltaCount: number,
   output: unknown,
 ): void {
-  if (requested === undefined || deltaCount > 0) {
+  if (!requested || deltaCount > 0) {
     return;
   }
   if (!hasNonEmptyOutput(output)) {
@@ -151,9 +155,10 @@ const RUNNER_IGNORED_ONTOKEN_HINT =
 
 /**
  * Warn once per process that a run asked for per-delta streaming and received
- * none. `onToken` is a request rather than a guarantee, so a runner that cannot
- * stream returns its ordinary buffered result with no error – which is silent
- * unless someone counts the deltas that arrived.
+ * none. Asking for deltas – with `onToken` or `deltas: true` – is a request
+ * rather than a guarantee, so a runner that cannot stream returns its ordinary
+ * buffered result with no error, which is silent unless someone counts the
+ * deltas that arrived.
  */
 function warnRunnerIgnoredOnToken(agentName: string): void {
   if (runnerIgnoredOnTokenWarned) {
@@ -162,7 +167,7 @@ function warnRunnerIgnoredOnToken(agentName: string): void {
   runnerIgnoredOnTokenWarned = true;
   // eslint-disable-next-line no-console
   console.warn(
-    `[Directive] onToken was requested for "${agentName}" but the runner emitted no deltas – the response arrived as one buffered message. ${RUNNER_IGNORED_ONTOKEN_HINT}`,
+    `[Directive] per-delta streaming was requested for "${agentName}" but the runner emitted no deltas – the response arrived as one buffered message. ${RUNNER_IGNORED_ONTOKEN_HINT}`,
   );
 }
 
@@ -207,9 +212,9 @@ export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
  * schema retry, or a self-healing reroute to an equivalent agent – so the
  * consumer is about to receive the whole response again from the beginning.
  *
- * Emitted only when the caller requested per-delta streaming with `onToken`.
- * Without it a generation is delivered as a single whole-message chunk and
- * there is nothing part-rendered to discard.
+ * Emitted only when the caller requested per-delta streaming – `deltas: true`
+ * or an `onToken` callback. Without that a generation is delivered as a single
+ * whole-message chunk and there is nothing part-rendered to discard.
  */
 export interface StreamRestartChunk {
   type: "stream_restart";
@@ -311,7 +316,12 @@ export type BackpressureStrategy =
   /** Buffer all tokens (lossless, uses memory) */
   | "buffer";
 
-/** Streaming run options */
+/**
+ * Options for a {@link StreamRunner} – the function {@link createStreamingRunner}
+ * returns. These are **not** the options `orchestrator.runStream` accepts:
+ * `backpressure` and `bufferSize` configure this wrapper's own buffer and have
+ * no effect if passed to the orchestrator.
+ */
 export interface StreamRunOptions {
   /** Maximum turns before stopping */
   maxTurns?: number;

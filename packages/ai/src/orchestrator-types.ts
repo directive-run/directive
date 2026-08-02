@@ -504,19 +504,29 @@ export interface MultiAgentStreamCallOptions {
   /** Abort the in-flight run and close the stream. */
   signal?: AbortSignal;
   /**
-   * Request per-delta streaming from the runner. Presence is the opt-in:
-   * without it the stream keeps emitting one `token` chunk per whole assistant
-   * message, exactly as it always has. With it, each provider delta lands as
-   * its own `token` chunk **and** is passed to this callback, so a caller who
-   * only wants the chunks can pass `() => {}` and a caller who wants
-   * backpressure can return a promise – the adapter will not read the next
-   * chunk off the wire until it settles.
+   * Request per-delta `token` chunks on the stream.
+   *
+   * `runAgentStream` emits one token chunk per completed message by default;
+   * pass `deltas: true`, or an `onToken` callback, to get one chunk per
+   * provider delta. Supplying `onToken` implies `deltas: true`, so nothing
+   * that works today changes.
    *
    * Retry, guardrails, tool-call approval, breakpoints and the facts bridge
    * all still apply: this is an option travelling the path the orchestrator
    * already uses, not a substituted runner. When the runner is re-invoked –
    * agent retry, structured-output schema retry, or a self-healing reroute –
    * a `stream_restart` chunk marks the boundary.
+   *
+   * @default false
+   */
+  deltas?: boolean;
+  /**
+   * Receive each provider delta as it arrives, in addition to the per-delta
+   * `token` chunks it turns on. Implies {@link deltas} – a caller who only
+   * wants the chunks should pass `deltas: true` instead of a no-op callback.
+   *
+   * The callback is awaited, so returning a promise applies real backpressure:
+   * the adapter will not read the next chunk off the wire until it settles.
    *
    * Annotated `=> void` to match `RunOptions.onToken`.
    */

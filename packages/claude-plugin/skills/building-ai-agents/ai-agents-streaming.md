@@ -1,8 +1,8 @@
 # AI agents + streaming
 
-> Covers `@directive-run/ai` — `AgentLike`, `RunResult`, `StreamChunk`, backpressure, `createStreamingRunner`, `createSSETransport`.
+> Covers `@directive-run/ai` — `AgentLike`, `RunResult`, `StreamChunk`, per-delta streaming, backpressure, `createStreamingRunner`, `createSSETransport`.
 
-Defines the `AgentLike` shape, the `RunResult` returned by every runner, the `StreamChunk` discriminated union, backpressure strategies, the streaming runner wrapper, and the SSE transport for piping tokens to a browser.
+Defines the `AgentLike` shape, the `RunResult` returned by every runner, the `StreamChunk` discriminated union, how to ask for per-delta token chunks, backpressure strategies, the streaming runner wrapper, and the SSE transport for piping tokens to a browser.
 
 ## Decision tree
 
@@ -14,7 +14,13 @@ Need the complete result?
     ├── Wrap a base runner       → createStreamingRunner(baseRunner, opts) → StreamRunner
     └── Server-Sent Events to HTTP → createSSETransport(config) → { toResponse, toStream }
 
-Backpressure concern?
+How granular should the token chunks be?
+├── One chunk per assistant message → the default; pass nothing
+├── One chunk per provider delta    → runStream(agent, prompt, { deltas: true })
+└── Per delta AND a callback of mine → runStream(agent, prompt, { onToken })
+
+Backpressure concern? → these belong to createStreamingRunner's StreamRunner,
+                        NOT to orchestrator.runStream
 ├── Consumer is slow             → backpressure: "buffer" (default)
 ├── Need every token             → backpressure: "block"
 └── Real-time, can drop          → backpressure: "drop"
@@ -67,15 +73,18 @@ interface TokenUsage {
 
 ```typescript
 type StreamChunk =
-  | { type: "token"; data: string; tokenCount: number }                                   // a text token from the model
-  | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }            // tool started executing
-  | { type: "tool_end"; tool: string; toolCallId: string; result: string }                 // tool finished
-  | { type: "message"; message: Message }                                                  // a complete message added to history
-  | { type: "guardrail_triggered"; guardrailName: string; reason: string; stopped: boolean } // a guardrail fired during streaming
-  | { type: "progress"; phase: "starting" | "generating" | "tool_calling" | "finishing" }   // coarse progress
-  | { type: "done"; totalTokens: number; duration: number; droppedTokens: number }          // stream complete
-  | { type: "error"; error: Error };                                                       // stream aborted with an error
+  | { type: "token"; data: string; deltaCount: number; tokenCount: number }                  // text; see "Chunk counts are not token counts"
+  | { type: "stream_restart"; reason: "retry" | "schema-retry" | "reroute"; discardBefore: number } // the runner was re-invoked; discard what you rendered
+  | { type: "tool_start"; tool: string; toolCallId: string; arguments: string }              // tool started executing
+  | { type: "tool_end"; tool: string; toolCallId: string; result: string }                   // tool finished
+  | { type: "message"; message: Message }                                                    // a complete message added to history
+  | { type: "guardrail_triggered"; guardrailName: string; reason: string; partialOutput: string; stopped: boolean } // a guardrail fired during streaming
+  | { type: "progress"; phase: "starting" | "generating" | "tool_calling" | "finishing" }     // coarse progress
+  | { type: "done"; totalTokens: number; duration: number; droppedTokens: number }            // stream complete
+  | { type: "error"; error: Error };                                                         // stream aborted with an error
 ```
+
+`orchestrator.runStream` yields a slightly wider union — `OrchestratorStreamChunk`, which adds `approval_required`, `approval_resolved`, `interrupted`, and `context_updated`. A `default` branch in your switch keeps it exhaustive as chunk types are added.
 
 ## Consuming `runStream`
 
@@ -116,16 +125,126 @@ const final = await result; // RunResult<T>
 abort();
 ```
 
-## Backpressure strategies
+## Chunk granularity: `deltas` and `onToken`
 
-Configure how the stream behaves when the consumer can't keep up. Pass via `runStream`'s `options` (orchestrator-side) or via the `StreamRunOptions` if you're calling a `StreamRunner` directly.
+**`runStream` emits one `token` chunk per completed message by default; pass `deltas: true`, or an `onToken` callback, to get one chunk per provider delta.**
 
 ```typescript
-const { stream, result } = orchestrator.runStream(agent, "Generate a long report", {
+// Default — one chunk holding the whole assistant message.
+const { stream } = orchestrator.runStream(agent, "Write a report");
+
+// Per-delta chunks, no callback needed.
+const { stream } = orchestrator.runStream(agent, "Write a report", {
+  deltas: true,
+});
+
+// Per-delta chunks AND a callback of your own. Implies `deltas: true`.
+const { stream } = orchestrator.runStream(agent, "Write a report", {
+  onToken: (token) => metrics.record(token.length),
+});
+```
+
+`onToken` is **awaited**, so returning a promise applies real backpressure — the adapter will not read the next chunk off the wire until it settles.
+
+```typescript
+const { stream } = orchestrator.runStream(agent, prompt, {
+  onToken: async (token) => {
+    await socket.send(token); // the provider stream pauses until this resolves
+  },
+});
+```
+
+Both forms are available on the multi-agent orchestrator too, as
+`orchestrator.runAgentStream(agentId, input, { deltas: true })` (and its alias
+`runStream`).
+
+### Streaming is an option, not a runner
+
+`onToken` is a field on `RunOptions` — the same options object every runner already receives. It therefore survives composition untouched: `withRetry`, `withBudget`, `withFallback`, `withModelSelection` and `withStructuredOutput` all forward `options` verbatim, so a budgeted, retrying, fallback-wrapped runner streams with no wrapper changes and no wrapper able to silently drop the capability.
+
+```typescript
+const runner = withBudget(withRetry(createAnthropicRunner({ apiKey })), {
+  maxCostUSD: 5,
+});
+
+// The budget still applies while streaming — same runner, one extra option.
+const { stream, result } = orchestrator.runStream(agent, prompt, { deltas: true });
+```
+
+`run()` accepts `onToken` too, so a caller who wants deltas *and* one awaited `RunResult` does not have to reach for `runStream`. There is no `deltas` flag on `run()` — it has no stream to put chunks on, so the callback is the only way to observe them.
+
+```typescript
+const result = await orchestrator.run(agent, prompt, {
+  onToken: (token) => process.stdout.write(token),
+});
+```
+
+### It is a request, not a guarantee
+
+A runner that cannot stream ignores `onToken` and returns its ordinary buffered result — no error, no negotiation. When that happens the whole-message `token` chunk is still emitted, so the stream stays usable. If deltas were requested and none arrived alongside non-empty output, the orchestrator warns once per process rather than leaving it silent. Base runners are where to look: wrappers forward the option untouched.
+
+## `stream_restart`: the runner was re-invoked
+
+Three things re-invoke the runner mid-stream, and each replays the whole response from the beginning:
+
+| `reason` | Fires when |
+|---|---|
+| `"retry"` | An agent-level retry (`agentRetry`) after a failed attempt |
+| `"schema-retry"` | `withStructuredOutput` re-asks because the output failed schema validation |
+| `"reroute"` | The multi-agent self-healing reroute sends the work to an equivalent agent |
+
+`discardBefore` is how many `token` chunks were emitted for the abandoned generation — throw that many away from what you have rendered. The next `token` chunk restarts `deltaCount` at `1`.
+
+`stream_restart` is emitted **only when per-delta streaming was requested**. Without it a generation arrives as a single whole-message chunk and there is nothing part-rendered to discard.
+
+```typescript
+let rendered: string[] = [];
+
+for await (const chunk of stream) {
+  switch (chunk.type) {
+    case "token":
+      rendered.push(chunk.data);
+      ui.append(chunk.data);
+      break;
+    case "stream_restart":
+      // Everything from the abandoned attempt is about to arrive again.
+      rendered = rendered.slice(0, rendered.length - chunk.discardBefore);
+      ui.replace(rendered.join(""));
+      console.warn(`restarting: ${chunk.reason}`);
+      break;
+    case "done":
+      break;
+  }
+}
+```
+
+## Chunk counts are not token counts
+
+`token` chunks carry `deltaCount` — the ordinal of the chunk within the current generation. `tokenCount` is **deprecated** and kept only because it is public API.
+
+Neither field is a token count. On the per-delta path `deltaCount` counts provider deltas, and a delta is not a token: Anthropic emits multi-token deltas and Gemini emits sentence-sized ones. On the whole-message path it counts messages. For an authoritative count, read `result.tokenUsage` (or `result.totalTokens`) off the awaited `RunResult`.
+
+```typescript
+// WRONG — deltaCount/tokenCount are chunk ordinals, not tokens
+const tokens = chunks.filter((c) => c.type === "token").at(-1)?.deltaCount;
+
+// CORRECT — the result is authoritative
+const final = await result;
+console.log(final.totalTokens, final.tokenUsage);
+```
+
+## Backpressure strategies
+
+Backpressure is configured on a **`StreamRunner` built by `createStreamingRunner`**, through `StreamRunOptions`. `orchestrator.runStream` does **not** accept `backpressure` or `bufferSize` — passing them there does nothing.
+
+```typescript
+import { createStreamingRunner } from "@directive-run/ai";
+
+const streamRunner = createStreamingRunner(callbackBasedRunner);
+
+const { stream, result } = streamRunner(agent, "Generate a long report", {
   signal: abortController.signal,
-  backpressure: "buffer",   // default — buffer all tokens
-  // backpressure: "block"   // pause generation until consumer catches up
-  // backpressure: "drop"    // drop unprocessed tokens; `done.droppedTokens` reports the count
+  backpressure: "block",    // default is "buffer"
   bufferSize: 1000,
   stopOnGuardrail: true,
   guardrailCheckInterval: 100,
@@ -134,9 +253,21 @@ const { stream, result } = orchestrator.runStream(agent, "Generate a long report
 
 | Strategy | Behavior | Use when |
 |---|---|---|
-| `"buffer"` | Buffers all tokens in memory | Consumer is slightly slow; memory is available |
-| `"block"` | Pauses model generation | Consumer must process every token |
-| `"drop"` | Drops unprocessed tokens | Real-time display; some loss acceptable |
+| `"buffer"` | Buffers all chunks in memory | Consumer is slightly slow; memory is available |
+| `"block"` | Pauses model generation — the adapter stops reading the provider stream until the consumer catches up | Consumer must process every token |
+| `"drop"` | Drops chunks that do not fit; `done.droppedTokens` reports the count | Real-time display; some loss acceptable |
+
+`"block"` genuinely stops the reader pulling. It relies on `onToken` being awaited all the way down, which the shipped adapters do.
+
+`orchestrator.runStream` has its own fixed-size buffer instead of a strategy. On overflow it drops the **newest** droppable chunk — so the beginning of a message survives and the tail is what is lost — and never drops a terminal or control chunk (`done`, `error`, `stream_restart`, `approval_required`, and friends). Every drop is counted and reported:
+
+```typescript
+case "done":
+  if (chunk.droppedTokens > 0) {
+    console.warn(`${chunk.droppedTokens} chunks dropped — consumer fell behind`);
+  }
+  break;
+```
 
 ## `createStreamingRunner(baseRunner, options?)`
 
@@ -147,7 +278,8 @@ import { createStreamingRunner, type StreamingCallbackRunner } from "@directive-
 
 // The base runner is callback-driven. You supply this from your provider adapter.
 const callbackBased: StreamingCallbackRunner = (agent, input, { onToken, onToolStart, onToolEnd, onComplete, signal }) => {
-  // … call your provider's streaming API; invoke the callbacks as tokens arrive
+  // … call your provider's streaming API; invoke the callbacks as tokens arrive.
+  // Await onToken — that is what makes backpressure: "block" work.
 };
 
 const streamRunner = createStreamingRunner(callbackBased, {
@@ -176,14 +308,14 @@ const sse = createSSETransport({
 // Modern web frameworks (Hono, Next.js, Bun, Deno) — return a Response directly
 export async function POST(req: Request) {
   const { prompt } = await req.json();
-  const { stream } = orchestrator.runStream(agent, prompt);
+  const { stream } = orchestrator.runStream(agent, prompt, { deltas: true });
 
   return sse.toResponse(stream, agent.name, prompt);
 }
 
 // Express / Koa — write to res via the ReadableStream
 app.post("/api/chat", async (req, res) => {
-  const { stream } = orchestrator.runStream(agent, req.body.prompt);
+  const { stream } = orchestrator.runStream(agent, req.body.prompt, { deltas: true });
   const readable = sse.toStream(stream, agent.name, req.body.prompt);
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -225,28 +357,44 @@ for await (const chunk of stream) { /* … */ }
 const final = await result;
 ```
 
-### Importing `createStreamingCallbackRunner`
+### Passing a no-op `onToken` just to turn deltas on
 
 ```typescript
-// WRONG — no factory by that name
-import { createStreamingCallbackRunner } from "@directive-run/ai";
+// WRONG — a callback whose only job is to signal intent
+const { stream } = orchestrator.runStream(agent, prompt, { onToken: () => {} });
 
-// CORRECT — wrap a callback-based runner with createStreamingRunner
-import { createStreamingRunner } from "@directive-run/ai";
-const wrapped = createStreamingRunner(callbackBasedRunner, { streamingGuardrails: [] });
+// CORRECT — say what you mean
+const { stream } = orchestrator.runStream(agent, prompt, { deltas: true });
 ```
 
-### Importing `createSSEResponse`
+### Passing `backpressure` to `runStream`
 
 ```typescript
-// WRONG — no factory by that name
-import { createSSEResponse } from "@directive-run/ai";
-const sse = createSSEResponse(stream);
+// WRONG — runStream has no such option; this is silently ignored
+const { stream } = orchestrator.runStream(agent, prompt, {
+  backpressure: "block",
+  bufferSize: 100,
+});
 
-// CORRECT — createSSETransport returns { toResponse, toStream }
-import { createSSETransport } from "@directive-run/ai";
-const sse = createSSETransport({ heartbeatIntervalMs: 15_000 });
-return sse.toResponse(stream, agentId, prompt);
+// CORRECT — those belong to a StreamRunner from createStreamingRunner
+const streamRunner = createStreamingRunner(callbackBasedRunner);
+const { stream } = streamRunner(agent, prompt, { backpressure: "block", bufferSize: 100 });
+```
+
+### Ignoring `stream_restart`
+
+```typescript
+// WRONG — the abandoned attempt's tokens stay on screen, then the whole
+// response arrives again after them
+for await (const chunk of stream) {
+  if (chunk.type === "token") ui.append(chunk.data);
+}
+
+// CORRECT — discard what the restart says is void
+for await (const chunk of stream) {
+  if (chunk.type === "token") ui.append(chunk.data);
+  if (chunk.type === "stream_restart") ui.discardLast(chunk.discardBefore);
+}
 ```
 
 ### Reading `tokenUsage.total`
@@ -300,9 +448,13 @@ case "guardrail_triggered":
 |---|---|---|
 | `AgentLike` | `@directive-run/ai` | `{ name, instructions?, model?, tools? }` — what runners receive |
 | `RunResult<T>` | `@directive-run/ai` | `{ output, messages, toolCalls, totalTokens, tokenUsage?, isCached? }` |
-| `StreamChunk` | `@directive-run/ai` | 8-way discriminated union for streaming output |
-| `orchestrator.runStream(agent, input, opts?)` | instance method | Returns `{ stream, result, abort }` |
+| `StreamChunk` | `@directive-run/ai` | 9-way discriminated union for streaming output |
+| `StreamRestartChunk` | `@directive-run/ai` | `{ reason, discardBefore }` — the runner was re-invoked; discard and re-render |
+| `orchestrator.runStream(agent, input, opts?)` | instance method | Returns `{ stream, result, abort }`; `opts` is `{ signal?, deltas?, onToken?, liveContext? }` |
+| `orchestrator.runAgentStream(agentId, input, opts?)` | multi-agent instance method | Same triple; `opts` is `{ signal?, deltas?, onToken? }` |
+| `RunOptions.onToken` | `@directive-run/ai` | Per-delta callback on any runner; awaited, so it applies backpressure |
 | `createStreamingRunner(baseRunner, opts?)` | `@directive-run/ai` | Wrap a `StreamingCallbackRunner` into a `StreamRunner` |
+| `StreamRunOptions` | `@directive-run/ai` | `backpressure` / `bufferSize` / guardrail options for a `StreamRunner` |
 | `createSSETransport(config?)` | `@directive-run/ai` | `{ toResponse, toStream }` for piping a stream to SSE |
 
 ## See also
