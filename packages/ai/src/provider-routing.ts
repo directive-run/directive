@@ -34,12 +34,17 @@
  * ```
  */
 
-import type { TokenPricing } from "./budget.js";
 import {
+  DEFAULT_CHARS_PER_TOKEN,
+  DEFAULT_OUTPUT_MULTIPLIER,
   type ResolvedPricing,
-  calculateUsageCost,
+  type TokenPricing,
+  type UnpricedReason,
+  describeUnpricedReason,
+  estimateCallCost,
+  estimateInputTokens,
+  priceCall,
   snapshotTokenPricing,
-  snapshotTokenUsage,
 } from "./pricing.js";
 import type {
   AgentLike,
@@ -162,33 +167,6 @@ function createEmptyStats(): ProviderStats {
   };
 }
 
-/**
- * Price one call for the routing facts.
- *
- * Returns `0` rather than a poisoned number when the usage cannot be priced.
- * `facts.totalCost` is what user constraints test against — a single `NaN`
- * makes `facts.totalCost > 1` false forever, so a cost-based failover
- * constraint stops firing and never fires again. Dropping one call's cost is
- * survivable; losing every future routing decision is not.
- */
-function calculateCost(
-  usage: TokenUsage | undefined,
-  pricing?: ResolvedPricing,
-): number {
-  if (!pricing) {
-    return 0;
-  }
-
-  const resolved = snapshotTokenUsage(usage);
-  if (!resolved) {
-    return 0;
-  }
-
-  const cost = calculateUsageCost(resolved, pricing);
-
-  return Number.isFinite(cost) ? cost : 0;
-}
-
 // ============================================================================
 // Factory
 // ============================================================================
@@ -292,6 +270,46 @@ export function createConstraintRouter(
   // Total latency for averaging
   let totalLatencyMs = 0;
 
+  let unpricedCalls = 0;
+  const warnedReasons = new Set<UnpricedReason>();
+
+  /**
+   * Price one call for the routing facts, and count the ones the provider gave
+   * no usable number for.
+   *
+   * `facts.totalCost` is what user constraints test against, so what happens to
+   * an unpriceable call decides whether a cost-based failover ever fires. This
+   * used to return `0` — no cost, no count, no warning — which reads as "that
+   * call was free" and is indistinguishable from a provider that genuinely
+   * bills nothing. A runner that never populates `tokenUsage` therefore held
+   * `facts.totalCost` at exactly zero for the life of the router, and a
+   * `facts.totalCost > 10` failover never fired once. The pre-call estimate is
+   * a poor number and a far better one than that.
+   *
+   * A provider with no pricing configured still contributes nothing and is not
+   * counted: that is the caller declining to price it, not a provider failing
+   * to report.
+   */
+  function chargeCall(
+    usage: TokenUsage | undefined,
+    pricing: ResolvedPricing,
+    estimate: number,
+  ): number {
+    const priced = priceCall(usage, pricing, estimate);
+
+    if (priced.basis === "estimated") {
+      unpricedCalls++;
+      if (!warnedReasons.has(priced.reason)) {
+        warnedReasons.add(priced.reason);
+        console.warn(
+          `[Directive] ${API}: ${describeUnpricedReason(priced.reason)}. The pre-call estimate is being charged to facts.totalCost instead — see getUnpricedCallCount() for how many calls this covers. Logged once per condition.`,
+        );
+      }
+    }
+
+    return priced.cost;
+  }
+
   // Pre-sort constraints at construction time (not per-call)
   const sortedConstraints = [...constraints].sort(
     (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
@@ -379,6 +397,7 @@ export function createConstraintRouter(
     providerName: string,
     latencyMs: number,
     usage: TokenUsage | undefined,
+    estimate: number,
     pricing?: ResolvedPricing,
     error?: Error,
   ): void {
@@ -392,7 +411,7 @@ export function createConstraintRouter(
       facts.errorCount++;
       stats.lastErrorAt = Date.now();
     } else {
-      const cost = calculateCost(usage, pricing);
+      const cost = pricing ? chargeCall(usage, pricing, estimate) : 0;
       stats.totalCost += cost;
       facts.totalCost += cost;
     }
@@ -424,20 +443,48 @@ export function createConstraintRouter(
       /* callback error must not disrupt routing flow */
     }
 
+    // What this call is charged when the provider reports nothing usable. The
+    // estimate reads the input string alone — no instructions, no history, no
+    // tools — so it runs under the real bill, and the shared per-token defaults
+    // are approximations of an approximation. It exists so that a cost fact
+    // moves at all: a `totalCost` pinned at zero is not a smaller error than a
+    // low one, it is a different kind of error, and it is the kind that makes a
+    // failover constraint unreachable.
+    const estimate = provider.pricing
+      ? estimateCallCost(
+          estimateInputTokens(input, DEFAULT_CHARS_PER_TOKEN),
+          provider.pricing,
+          DEFAULT_OUTPUT_MULTIPLIER,
+        )
+      : 0;
+
     const startTime = Date.now();
 
     try {
       const result = await provider.runner<T>(agent, input, options);
       const latencyMs = Date.now() - startTime;
 
-      recordCall(provider.name, latencyMs, result.tokenUsage, provider.pricing);
+      recordCall(
+        provider.name,
+        latencyMs,
+        result.tokenUsage,
+        estimate,
+        provider.pricing,
+      );
 
       return result;
     } catch (err) {
       const latencyMs = Date.now() - startTime;
       const error = err instanceof Error ? err : new Error(String(err));
 
-      recordCall(provider.name, latencyMs, undefined, provider.pricing, error);
+      recordCall(
+        provider.name,
+        latencyMs,
+        undefined,
+        estimate,
+        provider.pricing,
+        error,
+      );
 
       throw error;
     }
@@ -458,10 +505,33 @@ export function createConstraintRouter(
     enumerable: true,
   });
 
+  /**
+   * How many calls were charged at the pre-call estimate rather than at what
+   * the provider billed.
+   *
+   * The peer of `withBudget`'s accessor of the same name, and here for the same
+   * reason: a `facts.totalCost` built partly from estimates is not wrong, but a
+   * caller reading it for a failover threshold should be able to find out. A
+   * count that tracks the call count means the runner never reports usable
+   * usage and `totalCost` is entirely estimated.
+   */
+  function getUnpricedCallCount(): number {
+    return unpricedCalls;
+  }
+
+  const accessors = routerRunner as unknown as Record<string, unknown>;
+  accessors.getUnpricedCallCount = getUnpricedCallCount;
+
   return routerRunner as ConstraintRouterRunner;
 }
 
-/** Helper type for accessing router facts. */
+/** Helper type for accessing router facts and pricing coverage. */
 export type ConstraintRouterRunner = AgentRunner & {
   readonly facts: RoutingFacts;
+  /**
+   * Get the number of calls whose cost was charged at the pre-call estimate
+   * rather than at what the provider billed — no `tokenUsage`, an unusable
+   * token count, or a cost that priced out non-finite.
+   */
+  getUnpricedCallCount(): number;
 };

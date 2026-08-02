@@ -13,7 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import { type ModelPricing, toTokenPricingTable } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {

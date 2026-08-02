@@ -2571,7 +2571,7 @@
   ```ts
   type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
   ```
-- `ConstraintRouterRunner` — Helper type for accessing router facts.
+- `ConstraintRouterRunner` — Helper type for accessing router facts and pricing coverage.
   ```ts
   export type ConstraintRouterRunner = AgentRunner & {
   ```

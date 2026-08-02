@@ -142,12 +142,12 @@ describe("createAnthropicRunner", () => {
       apiKey: "test-key",
       fetch: mockFetch,
     });
-    await runner(mockAgent({ model: "claude-haiku-3-5-20241022" }), "test");
+    await runner(mockAgent({ model: "claude-3-5-haiku-20241022" }), "test");
 
     const [, init] = mockFetch.mock.calls[0]!;
     const body = JSON.parse(init.body as string);
 
-    expect(body.model).toBe("claude-haiku-3-5-20241022");
+    expect(body.model).toBe("claude-3-5-haiku-20241022");
   });
 
   it("parses content[0].text and token counts correctly", async () => {

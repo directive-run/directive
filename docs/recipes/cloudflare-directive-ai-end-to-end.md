@@ -107,7 +107,7 @@ matches a line in the example.
    not in `guardrails.input`.
 
 7. **Real Anthropic model IDs.** `claude-sonnet-4-5-20250929`,
-   `claude-haiku-4-5-20250514`, `claude-opus-4-20250514`. See
+   `claude-haiku-4-5-20251001`, `claude-opus-4-20250514`. See
    `packages/ai/src/adapters/anthropic.ts` `ANTHROPIC_PRICING` for
    the current set.
 

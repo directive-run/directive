@@ -494,10 +494,16 @@ describe("createConstraintRouter provider pricing", () => {
       ],
     });
 
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await router(mockAgent(), "hello");
+    warn.mockRestore();
 
     expect(Number.isFinite(router.facts.totalCost)).toBe(true);
-    expect(router.facts.providers.primary?.totalCost).toBe(0);
+    // Charged at the estimate rather than dropped: a poisoned count is a
+    // reporting failure, not a free call, and zero would leave the cost fact
+    // permanently below any threshold a constraint tests against.
+    expect(router.facts.providers.primary?.totalCost).toBeGreaterThan(0);
+    expect(router.getUnpricedCallCount()).toBe(1);
   });
 
   it("bills cache tokens into facts.totalCost", async () => {

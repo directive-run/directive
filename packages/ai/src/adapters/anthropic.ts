@@ -13,7 +13,7 @@
  */
 
 import { createRunner, validateBaseURL } from "../agent-utils.js";
-import { type ModelPricing, toTokenPricingTable } from "../budget.js";
+import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import {
@@ -35,9 +35,16 @@ import {
  * The single source of Anthropic rates. Widened below; never exported raw.
  *
  * `cacheRead` is 0.1x input and `cacheWrite` is 1.25x input — Anthropic's
- * published multipliers for the 5-minute ephemeral cache. The write rate is
- * above the input rate, so cache tokens are the one class where leaving them
- * unpriced under-counts the ledger the most.
+ * published multipliers for the **5-minute** ephemeral cache, which is the TTL
+ * the adapter requests. The 1-hour cache writes at 2.0x instead, and a single
+ * `cacheWrite` rate cannot say both; a caller using the 1-hour TTL should pass
+ * their own pricing object. The write rate is above the input rate, so cache
+ * tokens are the one class where leaving them unpriced under-counts the ledger
+ * the most.
+ *
+ * Keys are the exact model IDs the Messages API accepts. A key that is close to
+ * a real ID but not equal to one is worse than an absent row: the caller who
+ * passes the *correct* ID gets `undefined` back and prices their run at nothing.
  */
 const ANTHROPIC_RATES = {
   "claude-sonnet-4-5-20250929": {
@@ -52,13 +59,14 @@ const ANTHROPIC_RATES = {
     cacheRead: 0.3,
     cacheWrite: 3.75,
   },
-  "claude-haiku-4-5-20250514": {
-    input: 0.8,
-    output: 4,
-    cacheRead: 0.08,
-    cacheWrite: 1,
+  "claude-haiku-4-5-20251001": {
+    input: 1,
+    output: 5,
+    cacheRead: 0.1,
+    cacheWrite: 1.25,
   },
-  "claude-haiku-3-5-20241022": {
+  // Retired; kept for reconciling historical spend.
+  "claude-3-5-haiku-20241022": {
     input: 0.8,
     output: 4,
     cacheRead: 0.08,

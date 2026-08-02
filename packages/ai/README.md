@@ -138,6 +138,22 @@ one. `ANTHROPIC_PRICING` publishes the real ratios (cache read 0.1x input, cache
 write 1.25x input), so no configuration is needed to price Anthropic caching
 correctly.
 
+> **Which cache TTL the write rate assumes.** Anthropic prices a cache write at
+> 1.25x the input rate on the **5-minute** cache and 2.0x on the **1-hour**
+> cache. `cacheWritePerMillion` is one number and cannot express both, and the
+> published tables carry the 5-minute multiplier &ndash; the default TTL, and the
+> one the shipped adapter requests. If you use the 1-hour cache, pass your own
+> pricing object; otherwise cache writes bill at 1.6x under what the provider
+> charges. Expressing both would take a pricing dimension the type does not
+> have, and adding one is not part of this change.
+
+The cache-write **count** is read from either `tokenUsage.cacheCreationTokens`
+or `tokenUsage.cacheWriteTokens`. The adapters populate the first, after
+Anthropic's wire format; the second matches the spelling of the rate that prices
+it. A custom runner that reported the field under the rate's name used to bill
+its cache writes at zero &ndash; validation passed, nothing warned &ndash; so both
+are accepted, and when both are present the larger is billed.
+
 ## Cost Caps &ndash; `withBudget`
 
 `withBudget` wraps any runner with a per-call cap and rolling time-window caps.
@@ -186,6 +202,17 @@ the provider billed and is present only when `phase` is `"post-call"`. The
 callback receives a frozen copy, so writing to it cannot alter the
 `BudgetExceededError` that follows.
 
+Window caps are reported after the fact too, not only `maxCostPerCall`: a call
+that estimated under its remaining hour and billed over it lands in the ledger
+with `window: "hour"` and `phase: "post-call"`. It used to pass unremarked, and
+the *next* call was the one that got blocked.
+
+**Two budgets on the same window share one ledger.** A call is recorded there
+once, at the first budget's rates for that window; each budget's own rates still
+gate its own pre-call estimate. Recording once per *budget* billed a $3 call as
+$6 against a shared hour, so `getSpent` read double and a pair of $100 hourly
+caps started blocking at roughly half the spend they were configured for.
+
 ### Reading spend
 
 ```typescript
@@ -204,10 +231,23 @@ otherwise with the first budget window's rates &ndash; it returns `0` only when
 neither is configured.
 
 `getUnpricedCallCount()` is how you find out the ledger is approximate. When a
-runner reports no `tokenUsage`, or reports a non-finite or negative token count,
-`withBudget` charges the pre-call estimate instead of skipping the call, and
-counts it here. A count that tracks your call count means the runner never
-reports usage and every `getSpent` figure is an estimate.
+runner reports no `tokenUsage`, reports a non-finite or negative token count, or
+reports counts that price out to a non-finite cost, `withBudget` charges the
+pre-call estimate instead of skipping the call, counts it here, and warns once
+per condition. A count that tracks your call count means the runner never
+reports usable usage and every `getSpent` figure is an estimate.
+
+`createConstraintRouter` has the same accessor, for the same reason. A cost fact
+pinned at zero is not a smaller error than an approximate one &ndash; it is the
+kind that makes a `facts.totalCost > N` failover unreachable.
+
+**What the estimate is, and is not.** It reads the input string alone: no agent
+instructions, no conversation history, no tool definitions, all of which the
+provider bills. It charges input tokens at the highest of the input, cache-read,
+and cache-write rates, because before the call there is no way to know how the
+provider will split them and an estimate below the eventual bill is a cap that
+does not gate. It is a floor, useful for gating and for standing in when a
+provider reports nothing &ndash; not a prediction.
 
 ### Configuration is validated at construction
 

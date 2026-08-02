@@ -49,8 +49,23 @@ export interface TokenUsage {
   /**
    * Tokens written to the provider's prompt cache, when available.
    * Populated by adapters with prompt-caching enabled (e.g. Anthropic).
+   *
+   * The rate that prices these is spelled `cacheWritePerMillion`. Both
+   * spellings of the count are accepted — see
+   * {@link TokenUsage.cacheWriteTokens}.
    */
   cacheCreationTokens?: number;
+  /**
+   * Tokens written to the provider's prompt cache, under the spelling the
+   * pricing side uses. Accepted as an alias of
+   * {@link TokenUsage.cacheCreationTokens}; adapters populate that one.
+   *
+   * Both exist because the count and the rate that prices it were named
+   * differently, and a runner that followed the rate's spelling reported a
+   * field nothing read — cache writes billed as zero, with no warning and no
+   * failed check. Supply either. When both are present the larger is billed.
+   */
+  cacheWriteTokens?: number;
 }
 
 /** Message from agent run */

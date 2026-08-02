@@ -797,12 +797,15 @@ export function createObservability(
  * const obs = createObservability({ serviceName: 'my-service' });
  * const agentMetrics = createAgentMetrics(obs);
  *
- * // Track an agent run
+ * // Track an agent run. Pass the cache classes too when the provider reports
+ * // them — `inputTokens` is only the uncached remainder on those providers.
  * agentMetrics.trackRun('support-agent', {
  *   success: true,
  *   latencyMs: 1500,
  *   inputTokens: 100,
  *   outputTokens: 500,
+ *   cacheReadTokens: 12_000,
+ *   cacheWriteTokens: 0,
  *   cost: 0.05,
  * });
  * ```
@@ -816,6 +819,16 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
         latencyMs: number;
         inputTokens?: number;
         outputTokens?: number;
+        /**
+         * Tokens read from the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheReadTokens?: number;
+        /**
+         * Tokens written to the provider's prompt cache, when the provider
+         * reports them.
+         */
+        cacheWriteTokens?: number;
         cost?: number;
         toolCalls?: number;
       },
@@ -842,6 +855,29 @@ export function createAgentMetrics(obs: ObservabilityInstance) {
           result.outputTokens,
         );
         obs.incrementCounter("agent.tokens", labels, result.outputTokens);
+      }
+
+      // Cache tokens count toward `agent.tokens` alongside input and output.
+      // On a provider that reports cache usage, `inputTokens` is the *uncached
+      // remainder*, so a run that reads a large cached prefix looks like a tiny
+      // run when only input and output are counted — the same under-reporting
+      // the cost ledger carried before cache classes were priced.
+      if (result.cacheReadTokens !== undefined) {
+        obs.incrementCounter(
+          "agent.tokens.cache_read",
+          labels,
+          result.cacheReadTokens,
+        );
+        obs.incrementCounter("agent.tokens", labels, result.cacheReadTokens);
+      }
+
+      if (result.cacheWriteTokens !== undefined) {
+        obs.incrementCounter(
+          "agent.tokens.cache_write",
+          labels,
+          result.cacheWriteTokens,
+        );
+        obs.incrementCounter("agent.tokens", labels, result.cacheWriteTokens);
       }
 
       if (result.cost !== undefined) {

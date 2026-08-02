@@ -30,6 +30,7 @@ import { OPENAI_PRICING, OPENAI_TOKEN_PRICING } from "../adapters/openai.js";
 import * as adapterShared from "../adapters/shared.js";
 import { estimateCost } from "../agent-utils.js";
 import { toTokenPricingTable, withBudget } from "../budget.js";
+import * as pricingModule from "../pricing.js";
 import { createConstraintRouter } from "../provider-routing.js";
 import type { AgentRunner } from "../types.js";
 
@@ -197,8 +198,16 @@ describe("budget math is finite for real provider rates", () => {
 });
 
 describe("toTokenPricingTable lives with TokenPricing", () => {
-  it("is exported from budget.ts, where the type it produces is declared", () => {
-    expect(typeof toTokenPricingTable).toBe("function");
+  it("is exported from the pricing module, where the type it produces is declared", () => {
+    expect(typeof pricingModule.toTokenPricingTable).toBe("function");
+  });
+
+  it("is still reachable from budget.ts, as the same function", () => {
+    // `provider-routing.ts` used to import its central type from `budget.js`
+    // purely because that is where the type happened to live — a router
+    // depending on a budget for a shape neither owns. The type moved to the
+    // module both consume; this re-export keeps existing imports working.
+    expect(toTokenPricingTable).toBe(pricingModule.toTokenPricingTable);
   });
 
   it("no longer sits in the adapters' SSE/HTTP plumbing module", () => {
@@ -308,5 +317,64 @@ describe("no phantom APIs are cited in docs or JSDoc", () => {
 
   it("createConstraintRouter — the real export — is importable", () => {
     expect(typeof createConstraintRouter).toBe("function");
+  });
+});
+
+// ============================================================================
+// A pricing key is a model ID, and a wrong one prices nothing
+// ============================================================================
+
+describe("the Anthropic table keys real model IDs", () => {
+  // A key that is close to a real model ID but not equal to one is worse than
+  // an absent row. The caller who passes the *correct* ID gets `undefined`
+  // back, and `undefined` pricing is no pricing: the run is billed at nothing
+  // and the cap they configured never trips. The Haiku 4.5 row shipped a
+  // plausible-looking date that belongs to a different model's release.
+  const EXPECTED: Record<string, { input: number; output: number }> = {
+    "claude-sonnet-4-5-20250929": { input: 3, output: 15 },
+    "claude-sonnet-4-20250514": { input: 3, output: 15 },
+    "claude-haiku-4-5-20251001": { input: 1, output: 5 },
+    "claude-3-5-haiku-20241022": { input: 0.8, output: 4 },
+    "claude-opus-4-20250514": { input: 15, output: 75 },
+  };
+
+  for (const [model, rates] of Object.entries(EXPECTED)) {
+    it(`${model} is priced at $${rates.input}/$${rates.output} per million`, () => {
+      const entry = ANTHROPIC_PRICING[model];
+
+      expect(entry).toBeDefined();
+      expect(entry?.input).toBe(rates.input);
+      expect(entry?.output).toBe(rates.output);
+    });
+  }
+
+  it("carries no keys beyond the ones pinned above", () => {
+    expect(Object.keys(ANTHROPIC_PRICING).sort()).toEqual(
+      Object.keys(EXPECTED).sort(),
+    );
+  });
+
+  it("derives cache rates from the published multipliers", () => {
+    // Cache read is 0.1x input, cache write 1.25x — the 5-minute TTL. Derived
+    // from the wrong base rate they are wrong throughout, and nothing in the
+    // ledger flags a rate that is merely too low.
+    for (const entry of Object.values(ANTHROPIC_PRICING)) {
+      expect(entry.cacheRead).toBeCloseTo(entry.input * 0.1, 10);
+      expect(entry.cacheWrite).toBeCloseTo(entry.input * 1.25, 10);
+    }
+  });
+
+  it("documents which cache TTL the write rate assumes", () => {
+    // Anthropic bills a cache write at 1.25x input on the 5-minute cache and
+    // 2.0x on the 1-hour cache. One field cannot hold both, so the table has to
+    // say which one it is, or a 1-hour-cache user under-bills by 1.6x with
+    // nothing to tell them.
+    const source = readFileSync(
+      fileURLToPath(new URL("../adapters/anthropic.ts", import.meta.url)),
+      "utf8",
+    );
+
+    expect(source).toMatch(/5-minute/);
+    expect(source).toMatch(/1-hour/);
   });
 });

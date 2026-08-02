@@ -1230,3 +1230,307 @@ describe("withBudget survives a cost that overflows", () => {
     expect(runner.getUnpricedCallCount()).toBe(1);
   });
 });
+
+// ============================================================================
+// Two budgets on one window are two caps over one running total
+// ============================================================================
+
+describe("withBudget records a call once per window", () => {
+  /** 1M input + 1M output at PRICING is $3 + $15. */
+  const CALL_COST = 18;
+
+  function millionEachRunner(): AgentRunner {
+    return makeRunner(successResult(1_000_000, 1_000_000));
+  }
+
+  it("does not double-charge a shared window ledger", async () => {
+    const runner = withBudget(millionEachRunner(), {
+      budgets: [
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+      ],
+    });
+
+    await runner(mockAgent(), "hello");
+
+    expect(runner.getSpent("hour")).toBeCloseTo(CALL_COST, 10);
+  });
+
+  it("keeps getSpent honest across many calls on two budgets", async () => {
+    const runner = withBudget(millionEachRunner(), {
+      budgets: [
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+      ],
+    });
+
+    for (let call = 0; call < 10; call++) {
+      await runner(mockAgent(), "hello");
+    }
+
+    // Reported to dashboards. Double-counting here reads as twice the burn
+    // rate, on top of blocking at half the configured cap.
+    expect(runner.getSpent("hour")).toBeCloseTo(CALL_COST * 10, 8);
+  });
+
+  it("spends the whole cap before blocking, not half of it", async () => {
+    // $18 a call against a $100 hour. The gate compares an estimate, and these
+    // prompts estimate at fractions of a cent, so the block lands on the first
+    // call after real spend passes the cap - the seventh. Billed twice, the
+    // ledger crossed $100 on the third call and the runner stopped at four,
+    // having actually spent $54 against a $100 cap.
+    const runner = withBudget(millionEachRunner(), {
+      budgets: [
+        { window: "hour", maxCost: 100, pricing: PRICING },
+        { window: "hour", maxCost: 100, pricing: PRICING },
+      ],
+    });
+
+    let completed = 0;
+    for (let call = 0; call < 20; call++) {
+      try {
+        await runner(mockAgent(), "hello");
+        completed++;
+      } catch {
+        break;
+      }
+    }
+
+    expect(completed).toBe(6);
+    expect(runner.getSpent("hour")).toBeCloseTo(CALL_COST * 6, 8);
+  });
+
+  it("still gates each budget on its own cap", async () => {
+    const runner = withBudget(millionEachRunner(), {
+      budgets: [
+        { window: "hour", maxCost: 1_000_000, pricing: PRICING },
+        { window: "hour", maxCost: 20, pricing: PRICING },
+      ],
+    });
+
+    await runner(mockAgent(), "hello");
+
+    // $18 recorded once against the shared hour, so the tighter cap has $2
+    // left; a prompt estimating above that cannot fit inside it, while the
+    // roomier budget on the same window would have taken it.
+    await expect(runner(mockAgent(), "x".repeat(1_000_000))).rejects.toThrow(
+      BudgetExceededError,
+    );
+  });
+});
+
+// ============================================================================
+// A window cap overrun is reported, not only a per-call one
+// ============================================================================
+
+describe("withBudget reports post-call window overruns", () => {
+  it("names the window a call pushed past", async () => {
+    const seen: {
+      window: string;
+      phase: string;
+      actual?: number;
+      estimated: number;
+    }[] = [];
+
+    // The estimate reads the input string alone, so a short prompt that bills
+    // 1M tokens clears the gate and lands over the cap.
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      budgets: [{ window: "hour", maxCost: 5, pricing: PRICING }],
+      onBudgetExceeded: (details) => {
+        seen.push({
+          window: details.window,
+          phase: details.phase,
+          actual: details.actual,
+          estimated: details.estimated,
+        });
+      },
+    });
+
+    await runner(mockAgent(), "hi");
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.window).toBe("hour");
+    expect(seen[0]?.phase).toBe("post-call");
+    expect(seen[0]?.actual).toBeCloseTo(18, 10);
+    expect(seen[0]?.estimated).toBeLessThan(1);
+  });
+
+  it("stays quiet for a call that fits inside the window", async () => {
+    const seen: string[] = [];
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      budgets: [{ window: "hour", maxCost: 1_000, pricing: PRICING }],
+      onBudgetExceeded: (details) => seen.push(details.window),
+    });
+
+    await runner(mockAgent(), "hi");
+
+    expect(seen).toEqual([]);
+  });
+
+  it("reports the window even when no per-call cap is configured", async () => {
+    const phases: string[] = [];
+    const runner = withBudget(makeRunner(successResult(1_000_000, 1_000_000)), {
+      budgets: [{ window: "day", maxCost: 1, pricing: PRICING }],
+      onBudgetExceeded: (details) =>
+        phases.push(`${details.window}:${details.phase}`),
+    });
+
+    await runner(mockAgent(), "hi");
+
+    expect(phases).toEqual(["day:post-call"]);
+  });
+});
+
+// ============================================================================
+// The estimate reads every rate dimension the pricing type carries
+// ============================================================================
+
+describe("withBudget estimates against cache rates too", () => {
+  const CACHE_HEAVY = {
+    inputPerMillion: 3,
+    outputPerMillion: 0,
+    cacheWritePerMillion: 3.75,
+  };
+
+  it("does not price the estimate below the highest input-side rate", async () => {
+    const blocked = withBudget(makeRunner(), {
+      // 1,000 characters is ~250 tokens. At the cache-write rate that is
+      // $0.0009375; at the input rate alone, $0.00075. The cap sits between.
+      maxCostPerCall: 0.0008,
+      pricing: CACHE_HEAVY,
+    });
+
+    await expect(blocked(mockAgent(), "x".repeat(1000))).rejects.toThrow(
+      BudgetExceededError,
+    );
+  });
+
+  it("leaves the estimate unchanged when no cache rate is published", async () => {
+    const estimates: number[] = [];
+    const runner = withBudget(makeRunner(), {
+      maxCostPerCall: 0,
+      pricing: { inputPerMillion: 3, outputPerMillion: 15 },
+      onBudgetExceeded: (details) => estimates.push(details.estimated),
+    });
+
+    await expect(runner(mockAgent(), "x".repeat(1000))).rejects.toThrow(
+      BudgetExceededError,
+    );
+
+    // 250 input tokens at $3 plus 250 estimated output tokens at $15.
+    expect(estimates[0]).toBeCloseTo(0.00075 + 0.00375, 12);
+  });
+});
+
+// ============================================================================
+// An inert cap is judged by what the estimate can produce
+// ============================================================================
+
+describe("withBudget warns about caps the estimate can never reach", () => {
+  it("does not call a table with a non-zero cache rate zero-rated", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const pricing = {
+      inputPerMillion: 0,
+      outputPerMillion: 0,
+      cacheReadPerMillion: 5,
+    };
+
+    const runner = withBudget(makeRunner(), {
+      maxCostPerCall: 0.01,
+      pricing,
+    });
+
+    const inertWarnings = warn.mock.calls.filter((call) =>
+      String(call[0]).includes("can never trip"),
+    );
+    warn.mockRestore();
+
+    expect(inertWarnings).toEqual([]);
+
+    // And the cap is not inert: the estimate charges the cache rate, so a large
+    // enough input blocks. It used to sail through at $0 a call.
+    await expect(runner(mockAgent(), "x".repeat(100_000))).rejects.toThrow(
+      BudgetExceededError,
+    );
+  });
+
+  it("still warns when every rate the estimate reads is zero", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    withBudget(makeRunner(), {
+      maxCostPerCall: 0.01,
+      pricing: { inputPerMillion: 0, outputPerMillion: 0 },
+    });
+
+    const inertWarnings = warn.mock.calls.filter((call) =>
+      String(call[0]).includes("can never trip"),
+    );
+    warn.mockRestore();
+
+    expect(inertWarnings).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// A runner that never reports usage says so once
+// ============================================================================
+
+describe("withBudget warns about a runner that reports no usage", () => {
+  function usagelessRunner(): AgentRunner {
+    return vi.fn(async () => ({
+      output: "ok",
+      messages: [],
+      toolCalls: [],
+      totalTokens: 0,
+    })) as unknown as AgentRunner;
+  }
+
+  it("warns once, not once per call", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const runner = withBudget(usagelessRunner(), { pricing: PRICING });
+
+    for (let call = 0; call < 5; call++) {
+      await runner(mockAgent(), "hello");
+    }
+
+    const notices = warn.mock.calls.filter((call) =>
+      String(call[0]).includes("no result.tokenUsage"),
+    );
+    warn.mockRestore();
+
+    expect(notices).toHaveLength(1);
+    expect(runner.getUnpricedCallCount()).toBe(5);
+  });
+
+  it("says something different about a poisoned count than about a missing one", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const results = [
+      { output: "ok", messages: [], toolCalls: [], totalTokens: 0 },
+      {
+        output: "ok",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 0,
+        tokenUsage: { inputTokens: Number.NaN, outputTokens: 50 },
+      },
+    ] as RunResult[];
+    let next = 0;
+    const inner = vi.fn(async () => results[next++]!) as unknown as AgentRunner;
+
+    const runner = withBudget(inner, { pricing: PRICING });
+    await runner(mockAgent(), "hello");
+    await runner(mockAgent(), "hello");
+
+    const notices = warn.mock.calls.map((call) => String(call[0]));
+    warn.mockRestore();
+
+    expect(
+      notices.filter((notice) => notice.includes("no result.tokenUsage")),
+    ).toHaveLength(1);
+    expect(
+      notices.filter((notice) =>
+        notice.includes("non-finite or negative token count"),
+      ),
+    ).toHaveLength(1);
+  });
+});

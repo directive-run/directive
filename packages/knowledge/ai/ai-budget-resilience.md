@@ -56,7 +56,7 @@ const budgetRunner = withBudget(baseRunner, {
 | `phase` | Trigger | Throws | Money spent |
 |---|---|---|---|
 | `"pre-call"` | The pre-call estimate exceeds a cap | `BudgetExceededError` | none — the call never ran |
-| `"post-call"` | The provider billed more than `maxCostPerCall` | nothing | already spent |
+| `"post-call"` | The provider billed more than `maxCostPerCall`, or pushed a rolling window past its cap | nothing | already spent |
 
 `withBudget` gates an *estimate*. A call estimated at a cent that bills five dollars clears the gate, so the overrun can only be reported, never blocked. Treat `phase: "post-call"` as an alert, not a failure — do NOT retry on it.
 
@@ -91,13 +91,17 @@ runner.getUnpricedCallCount(); // calls charged at the estimate rather than at b
 
 `getSpent("total")` is priced with the top-level `pricing` when supplied, otherwise with the first budget window's rates; it returns `0` only when neither is configured.
 
-When a runner reports no `tokenUsage`, or reports a non-finite or negative token count, `withBudget` charges the pre-call estimate rather than counting the call as free, and increments `getUnpricedCallCount()`. A count that tracks your call count means every `getSpent` figure is an estimate.
+Two budgets on the same `window` are two caps reading one running total. A call is recorded there once, at the first budget's rates for that window — each budget's own rates still gate its own pre-call estimate.
+
+When a runner reports no `tokenUsage`, reports a non-finite or negative token count, or reports counts that price out to a non-finite cost, `withBudget` charges the pre-call estimate rather than counting the call as free, increments `getUnpricedCallCount()`, and warns once per condition. A count that tracks your call count means every `getSpent` figure is an estimate.
 
 ### Config is validated and copied at construction
 
 Rates, caps, and window names are read once, validated, and copied when the wrapper is built. A rate that is missing, non-finite, negative, or `-0` throws; a `window` other than `"hour"` or `"day"` throws rather than silently disabling the cap; mutating the objects you passed in afterwards has no effect. Zero rates are accepted (local models bill nothing) but warn when paired with a non-zero cap, since such a cap can never trip.
 
-All four token classes are priced: input, output, cache read, and cache write. Cache rates default to the input rate when omitted — conservative, never free.
+All four token classes are priced: input, output, cache read, and cache write. Cache rates default to the input rate when omitted — conservative, never free. The cache-write count is read from either `tokenUsage.cacheCreationTokens` or `tokenUsage.cacheWriteTokens`; adapters populate the first, and the second matches the rate's spelling. Published `cacheWritePerMillion` rates assume the 5-minute cache TTL — a 1-hour cache writes at 2.0x input rather than 1.25x, so pass your own rate if you use it.
+
+The pre-call estimate charges input tokens at the highest of the input, cache-read, and cache-write rates: before the call there is no way to know how the provider will split them, and an estimate under the eventual bill is a cap that does not gate. It still reads the input string alone — not instructions, history, or tools — so it runs well under a real bill and is a floor, not a prediction.
 
 ## `withRetry(runner, config)` — transient-error retry
 
@@ -328,7 +332,9 @@ const router = createConstraintRouter({
 
 There is NO `costPerMillion` field and NO `prefer` key: providers take `pricing` in `TokenPricing` shape (any `*_PRICING` entry works as-is), and a constraint names its target with `provider`. The `when` predicate receives `RoutingFacts` — `totalCost`, `callCount`, `errorCount`, `lastProvider`, `avgLatencyMs`, and per-provider stats under `providers` — not an ad-hoc context object.
 
-`router` returns an `AgentRunner` you pass directly to an orchestrator, plus a `facts` getter for inspection. Provider pricing is validated and copied at construction, on the same terms as `withBudget`: negative, `-0`, and non-finite rates throw, and a poisoned `tokenUsage` is skipped rather than allowed to make `facts.totalCost` `NaN` — which would stop every cost-based constraint from ever firing again.
+`router` returns an `AgentRunner` you pass directly to an orchestrator, plus a `facts` getter for inspection and a `getUnpricedCallCount()` accessor. Provider pricing is validated and copied at construction, on the same terms as `withBudget`: negative, `-0`, and non-finite rates throw, and a poisoned `tokenUsage` never reaches `facts.totalCost` as `NaN` — which would stop every cost-based constraint from ever firing again.
+
+A call the provider reported no usable usage for is charged its pre-call estimate and counted, exactly as in `withBudget`. It used to be charged `0`, which reads as a free call: `facts.totalCost` stayed at zero for the life of a router whose runner never populated `tokenUsage`, and a `facts.totalCost > N` failover never fired.
 
 ## Composing wrappers
 

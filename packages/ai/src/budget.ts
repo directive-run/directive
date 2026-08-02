@@ -32,11 +32,15 @@
  */
 
 import {
-  calculateUsageCost,
+  type ResolvedPricing,
+  type TokenPricing,
+  type UnpricedReason,
+  describeUnpricedReason,
   estimateCallCost,
+  estimateInputTokens,
   isZeroRated,
+  priceCall,
   snapshotTokenPricing,
-  snapshotTokenUsage,
 } from "./pricing.js";
 import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 
@@ -44,133 +48,17 @@ import type { AgentLike, AgentRunner, RunOptions, RunResult } from "./types.js";
 // Types
 // ============================================================================
 
-/**
- * Per-million-token rates for a specific model or provider.
- *
- * Every adapter publishes its rates in this shape, so the usual answer is to
- * import a table rather than write the rates out: `ANTHROPIC_PRICING`,
- * `OPENAI_PRICING`, `GEMINI_PRICING`, `OLLAMA_PRICING`. To publish your own
- * table in the same shape, widen a bare `{ input, output }` map with
- * {@link toTokenPricingTable} rather than hand-writing both field spellings.
- *
- * The two cache rates are optional. When omitted, cache tokens are billed at
- * the **input** rate — conservative, and never free. Pricing them at zero would
- * make a heavily cached run read as almost costless while the provider bills it
- * in full, and a cache *write* bills more than plain input on every provider
- * that offers one.
- *
- * @example
- * ```typescript
- * import { ANTHROPIC_PRICING } from '@directive-run/ai/anthropic';
- *
- * // Preferred: a published table entry, already in TokenPricing shape.
- * const pricing: TokenPricing = ANTHROPIC_PRICING["claude-sonnet-4-5-20250929"]!;
- *
- * // Hand-written, for a model with no published table:
- * const custom: TokenPricing = {
- *   inputPerMillion: 5,
- *   outputPerMillion: 15,
- *   cacheReadPerMillion: 0.5,   // optional — defaults to inputPerMillion
- *   cacheWritePerMillion: 6.25, // optional — defaults to inputPerMillion
- * };
- * ```
- */
-export interface TokenPricing {
-  /** Cost per million input tokens (in dollars). */
-  inputPerMillion: number;
-  /** Cost per million output tokens (in dollars). */
-  outputPerMillion: number;
-  /**
-   * Cost per million tokens read from the provider's prompt cache.
-   * Defaults to {@link TokenPricing.inputPerMillion} when omitted.
-   */
-  cacheReadPerMillion?: number;
-  /**
-   * Cost per million tokens written to the provider's prompt cache.
-   * Defaults to {@link TokenPricing.inputPerMillion} when omitted — which
-   * under-counts, since a cache write typically bills above the input rate.
-   */
-  cacheWritePerMillion?: number;
-}
-
-/**
- * A pricing entry that carries both field spellings for the same rates.
- *
- * `estimateCost(tokenUsage, ratePerMillionTokens)` takes a bare per-million
- * number, so it reads `.input` / `.output` / `.cacheRead` / `.cacheWrite`.
- * `withBudget` and `createConstraintRouter` are typed against
- * {@link TokenPricing}, so they read the `*PerMillion` spellings. Every adapter
- * pricing table is published in this widened shape, derived from one source of
- * numbers, so the pairs cannot drift and no constant is the wrong constant.
- */
-export interface ModelPricing extends TokenPricing {
-  /** Cost per million input tokens, as a bare rate for `estimateCost`. */
-  input: number;
-  /** Cost per million output tokens, as a bare rate for `estimateCost`. */
-  output: number;
-  /** Cost per million cache-read tokens, as a bare rate for `estimateCost`. */
-  cacheRead?: number;
-  /** Cost per million cache-write tokens, as a bare rate for `estimateCost`. */
-  cacheWrite?: number;
-}
-
-/** A bare per-million rate set, the input shape of {@link toTokenPricingTable}. */
-export interface BareTokenRates {
-  input: number;
-  output: number;
-  /** Omit when the provider does not price cache reads separately. */
-  cacheRead?: number;
-  /** Omit when the provider does not price cache writes separately. */
-  cacheWrite?: number;
-}
-
-/**
- * Widen a table of bare `{ input, output }` rates into {@link ModelPricing},
- * where each entry carries both field spellings of the same numbers.
- *
- * Adapters call this to publish their pricing tables. Both rate pairs are
- * derived from the single bare source, so `entry.input` and
- * `entry.inputPerMillion` are the same number by construction — there is no
- * second list of rates to keep in sync. Optional `cacheRead` / `cacheWrite`
- * rates are carried through the same way.
- *
- * The returned table is frozen and has a null prototype: a pricing table read
- * from JSON cannot reroute the table's prototype through an own `__proto__`
- * key, and an entry cannot be swapped for an all-zero one that would silently
- * make a configured cap unreachable.
- *
- * @example
- * ```typescript
- * const MY_PRICING = toTokenPricingTable({ "my-model": { input: 3, output: 15 } });
- *
- * estimateCost(inputTokens, MY_PRICING["my-model"].input);
- * withBudget(runner, { maxCostPerCall: 1, pricing: MY_PRICING["my-model"] });
- * ```
- */
-export function toTokenPricingTable(
-  table: Record<string, BareTokenRates>,
-): Record<string, ModelPricing> {
-  const widened = Object.create(null) as Record<string, ModelPricing>;
-  for (const [model, rates] of Object.entries(table)) {
-    widened[model] = Object.freeze({
-      input: rates.input,
-      output: rates.output,
-      inputPerMillion: rates.input,
-      outputPerMillion: rates.output,
-      ...(rates.cacheRead !== undefined
-        ? { cacheRead: rates.cacheRead, cacheReadPerMillion: rates.cacheRead }
-        : {}),
-      ...(rates.cacheWrite !== undefined
-        ? {
-            cacheWrite: rates.cacheWrite,
-            cacheWritePerMillion: rates.cacheWrite,
-          }
-        : {}),
-    });
-  }
-
-  return Object.freeze(widened);
-}
+// The rate shapes live in `pricing.ts`, next to the validation and the cost
+// math that read them, and are re-exported here so existing imports keep
+// working. `withBudget` is one consumer of the pricing type among several —
+// `createConstraintRouter` and every adapter table are others — so a module
+// that only needs the type should not have to import a budget to get it.
+export {
+  toTokenPricingTable,
+  type BareTokenRates,
+  type ModelPricing,
+  type TokenPricing,
+} from "./pricing.js";
 
 /**
  * Rolling budget window configuration.
@@ -345,8 +233,25 @@ const WINDOW_NAMES = [...WINDOW_MS.keys()]
 /** The public function name used in this module's error messages. */
 const API = "withBudget";
 
-function estimateInputTokens(input: string, charsPerToken: number): number {
-  return Math.ceil(input.length / charsPerToken);
+/**
+ * One rolling window's shared ledger.
+ *
+ * Budgets are per-cap; ledgers are per-window. Two budgets on the same window
+ * are two caps reading one running total, so a call is recorded there once. The
+ * post-call loop used to record once per *budget*, which billed a $3 call as $6
+ * against a shared hour: `getSpent("hour")` read double, and a pair of $100
+ * hourly caps blocked after $51 of real spend.
+ *
+ * The rates that price the window are the first budget's for that window — one
+ * ledger, one price. A second budget on the same window may carry different
+ * rates, and those still gate its own pre-call estimate; what they cannot do is
+ * each write their own figure into a total they share.
+ */
+interface WindowLedger {
+  window: "hour" | "day";
+  windowMs: number;
+  pricing: ResolvedPricing;
+  ledger: CostLedger;
 }
 
 // ============================================================================
@@ -420,12 +325,12 @@ export function withBudget(
     : undefined;
 
   // Per-window ledgers, keyed by window so two budgets on the same window
-  // share one ledger rather than double-counting against each other.
-  const windowLedgers = new Map<string, CostLedger>();
+  // share one running total rather than double-counting against each other.
+  const windowLedgers = new Map<string, WindowLedger>();
 
   // Each budget window is flattened into an owned plan at construction: its
-  // name, its cap, its rates, and its ledger, all read once and snapshotted.
-  // The hot path never reads the caller's `budgets` array again.
+  // name, its cap, its rates, and its window's shared ledger, all read once and
+  // snapshotted. The hot path never reads the caller's `budgets` array again.
   const plans = Array.from(budgets, (budget, index) => {
     const window = budget.window;
     const maxCost = budget.maxCost;
@@ -447,23 +352,24 @@ export function withBudget(
       );
     }
 
-    let ledger = windowLedgers.get(window);
-    if (!ledger) {
-      ledger = new CostLedger();
-      windowLedgers.set(window, ledger);
+    const budgetPricing = snapshotTokenPricing(
+      budget.pricing,
+      `budgets[${window}].pricing`,
+      API,
+    );
+
+    let shared = windowLedgers.get(window);
+    if (!shared) {
+      shared = {
+        window,
+        windowMs,
+        pricing: budgetPricing,
+        ledger: new CostLedger(),
+      };
+      windowLedgers.set(window, shared);
     }
 
-    return {
-      window,
-      maxCost,
-      windowMs,
-      pricing: snapshotTokenPricing(
-        budget.pricing,
-        `budgets[${window}].pricing`,
-        API,
-      ),
-      ledger,
-    };
+    return { window, maxCost, windowMs, pricing: budgetPricing, shared };
   });
 
   // A cap that no number of tokens can reach is not a cap. Zero rates are
@@ -496,7 +402,7 @@ export function withBudget(
   const totalPricing = callPricing ?? plans[0]?.pricing;
   let totalSpent = 0;
   let unpricedCalls = 0;
-  let warnedUnusableUsage = false;
+  const warnedReasons = new Set<UnpricedReason>();
 
   /**
    * Notify the caller, never letting their callback disrupt the budget flow.
@@ -515,19 +421,25 @@ export function withBudget(
   }
 
   /**
-   * Flag a provider that reported a token count no ledger can accept.
+   * Flag a call the provider gave no usable price for.
    *
-   * Once, not once per call: a misreporting provider should be visible without
-   * turning every call into a log line. `getUnpricedCallCount()` carries the
-   * running tally for anyone who wants to alert on it.
+   * Once per distinct condition, not once per call: a runner that never reports
+   * usage would otherwise turn every call into the same log line.
+   * `getUnpricedCallCount()` carries the running tally for anyone who wants to
+   * alert on it.
+   *
+   * The missing-usage case warns too. It was the quieter of the two and the
+   * likelier one — a runner that simply never populates `tokenUsage` is an
+   * ordinary thing to write — and it left the ledger running entirely on
+   * estimates with nothing in the log to say so.
    */
-  function warnUnusableUsageOnce(): void {
-    if (warnedUnusableUsage) {
+  function warnUnpricedOnce(reason: UnpricedReason): void {
+    if (warnedReasons.has(reason)) {
       return;
     }
-    warnedUnusableUsage = true;
+    warnedReasons.add(reason);
     console.warn(
-      `[Directive] ${API}: result.tokenUsage carried a non-finite or negative token count. Recording it would permanently corrupt the cost ledger, so the pre-call estimate is being charged instead. See getUnpricedCallCount() for how many calls this covers.`,
+      `[Directive] ${API}: ${describeUnpricedReason(reason)}. The pre-call estimate is being charged instead — see getUnpricedCallCount() for how many calls this covers. Logged once per condition.`,
     );
   }
 
@@ -559,16 +471,20 @@ export function withBudget(
     }
 
     // Pre-call: Check rolling window budgets
-    const planEstimates: number[] = [];
+    const planChecks: {
+      plan: (typeof plans)[number];
+      remaining: number;
+      estimated: number;
+    }[] = [];
     for (const plan of plans) {
-      const spent = plan.ledger.getCostInWindow(plan.windowMs);
+      const spent = plan.shared.ledger.getCostInWindow(plan.windowMs);
       const remaining = plan.maxCost - spent;
       const estimated = estimateCallCost(
         inputTokens,
         plan.pricing,
         estimatedOutputMultiplier,
       );
-      planEstimates.push(estimated);
+      planChecks.push({ plan, remaining, estimated });
 
       if (estimated > remaining) {
         const details: BudgetExceededDetails = {
@@ -589,61 +505,66 @@ export function withBudget(
     //
     // `tokenUsage` is optional, and plenty of runners never populate it. Left
     // uncounted, such a runner reads as $0 spent forever while real money goes
-    // out, and every window budget is silently inert. The pre-call estimate is
-    // a poor number, but it is a far better one than zero, so it stands in
-    // whenever usage is missing or unusable — and the substitution is counted,
-    // so it is visible rather than inferred.
-    const usage = snapshotTokenUsage(result.tokenUsage);
+    // out, and every window budget is silently inert. `priceCall` charges the
+    // pre-call estimate whenever usage cannot price the call, and reports which
+    // it did, so the substitution is visible rather than inferred.
+    let estimatedReason: UnpricedReason | null = null;
 
-    if (result.tokenUsage !== undefined && usage === null) {
-      warnUnusableUsageOnce();
+    // One record per window, not per budget: the ledger is shared, so a second
+    // budget on the same window must not bill the same call a second time.
+    const billedByWindow = new Map<string, number>();
+    for (const shared of windowLedgers.values()) {
+      const estimate = estimateCallCost(
+        inputTokens,
+        shared.pricing,
+        estimatedOutputMultiplier,
+      );
+      const priced = priceCall(result.tokenUsage, shared.pricing, estimate);
+      if (priced.basis === "estimated") {
+        estimatedReason ??= priced.reason;
+      }
+      billedByWindow.set(shared.window, priced.cost);
+      shared.ledger.record(priced.cost);
     }
 
-    let pricedFromUsage = usage !== null;
-
-    for (let index = 0; index < plans.length; index++) {
-      const plan = plans[index]!;
-      const billed = usage
-        ? calculateUsageCost(usage, plan.pricing)
-        : Number.NaN;
-      if (!Number.isFinite(billed)) {
-        pricedFromUsage = false;
+    // The pre-call check gates an *estimate*, against a window cap as much as
+    // against the per-call cap. A call that estimated under its remaining hour
+    // and billed over it used to land in the ledger with nothing said, and the
+    // *next* call was the one that got blocked. It cannot be undone — the money
+    // is spent — but the cap it overran can be named when it happens.
+    for (const check of planChecks) {
+      const billed = billedByWindow.get(check.plan.window) ?? 0;
+      if (billed > check.remaining) {
+        report({
+          estimated: check.estimated,
+          actual: billed,
+          remaining: Math.max(0, check.remaining),
+          window: check.plan.window,
+          phase: "post-call",
+        });
       }
-      plan.ledger.record(
-        Number.isFinite(billed) ? billed : planEstimates[index]!,
-      );
     }
 
     if (totalPricing) {
       const totalEstimate = callPricing
         ? callEstimate
-        : (planEstimates[0] ?? 0);
-      const billed = usage
-        ? calculateUsageCost(usage, totalPricing)
-        : Number.NaN;
-      const billedIsUsable = Number.isFinite(billed);
-      if (!billedIsUsable) {
-        pricedFromUsage = false;
+        : (planChecks[0]?.estimated ?? 0);
+      const priced = priceCall(result.tokenUsage, totalPricing, totalEstimate);
+      if (priced.basis === "estimated") {
+        estimatedReason ??= priced.reason;
       }
+      totalSpent += priced.cost;
 
-      const cost = billedIsUsable ? billed : totalEstimate;
-      if (Number.isFinite(cost)) {
-        totalSpent += cost;
-      }
-
-      // The pre-call check gates an *estimate*. A call estimated at a cent
-      // that bills five dollars clears the gate and, without this, is
-      // absorbed in silence. It cannot be blocked — the money is spent —
-      // but it can be reported.
+      // Same reasoning as the window overruns above, for the per-call cap.
       if (
-        billedIsUsable &&
+        priced.basis === "metered" &&
         callPricing &&
         maxCostPerCall != null &&
-        billed > maxCostPerCall
+        priced.cost > maxCostPerCall
       ) {
         report({
           estimated: callEstimate,
-          actual: billed,
+          actual: priced.cost,
           remaining: maxCostPerCall,
           window: "per-call",
           phase: "post-call",
@@ -651,8 +572,9 @@ export function withBudget(
       }
     }
 
-    if (totalPricing && !pricedFromUsage) {
+    if (estimatedReason !== null) {
       unpricedCalls++;
+      warnUnpricedOnce(estimatedReason);
     }
 
     return result;
@@ -680,22 +602,24 @@ export function withBudget(
       return totalSpent;
     }
 
-    const ledger = windowLedgers.get(window);
-    const windowMs = WINDOW_MS.get(window);
-    if (!ledger || windowMs === undefined) {
+    const shared = windowLedgers.get(window);
+    if (!shared) {
       return 0;
     }
 
-    return ledger.getCostInWindow(windowMs);
+    return shared.ledger.getCostInWindow(shared.windowMs);
   }
 
   /**
-   * How many calls were charged at the pre-call estimate because the provider
-   * reported no usable `tokenUsage`.
+   * How many calls were charged at the pre-call estimate rather than at what
+   * the provider billed.
    *
-   * A non-zero count means the ledger is approximate for that many calls. A
-   * count that tracks the call count means the runner never reports usage at
-   * all, and every figure `getSpent` returns is an estimate.
+   * Three conditions land here: the result carried no `tokenUsage`, it carried
+   * a non-finite or negative count, or the counts and rates were both valid but
+   * priced out to a non-finite cost. A non-zero count means the ledger is
+   * approximate for that many calls. A count that tracks the call count means
+   * the runner never reports usable usage at all, and every figure `getSpent`
+   * returns is an estimate.
    */
   function getUnpricedCallCount(): number {
     return unpricedCalls;
@@ -717,7 +641,8 @@ export type BudgetRunner = AgentRunner & {
   getSpent(window: "hour" | "day" | "total"): number;
   /**
    * Get the number of calls whose spend was charged at the pre-call estimate
-   * because the provider reported no usable `tokenUsage`.
+   * rather than at what the provider billed — no `tokenUsage`, an unusable
+   * token count, or a cost that priced out non-finite.
    */
   getUnpricedCallCount(): number;
 };
