@@ -169,19 +169,57 @@ export interface PresetConfig {
  * chain that stops before its first burst and reports `"budget"` — technically
  * correct, and indistinguishable from a misconfiguration.
  */
-export const presetSchema = z.object({
-  id: z.string().min(1),
-  meta: metaSchema.optional(),
-  model: z.string().min(1),
-  temperature: z.number().min(0).max(1).optional(),
-  personas: z.array(personaSchema).min(1),
-  tokensPerBurst: z.number().int().positive(),
-  budgetUsd: z.number().positive(),
-  maxIterations: z.number().int().positive(),
-  promptTemplate: z.string().min(1),
-  synthesizer: synthesizerSchema,
-  budgetWarningThreshold: z.number().gt(0).lte(1).optional(),
-});
+export const presetSchema = z
+  .object({
+    id: z.string().min(1),
+    meta: metaSchema.optional(),
+    model: z.string().min(1),
+    temperature: z.number().min(0).max(1).optional(),
+    personas: z.array(personaSchema).min(1),
+    tokensPerBurst: z.number().int().positive(),
+    budgetUsd: z.number().positive(),
+    maxIterations: z.number().int().positive(),
+    promptTemplate: z.string().min(1),
+    synthesizer: synthesizerSchema,
+    budgetWarningThreshold: z.number().gt(0).lte(1).optional(),
+  })
+  /**
+   * Every voice in a preset needs its own name.
+   *
+   * A name is not a label here — it is the orchestrator's agent ID, and the
+   * registry is keyed by it. Two personas sharing a name silently collapse into
+   * one registration, so the second one's system prompt is discarded while turn
+   * order keeps calling on it and the transcript keeps attributing bursts to
+   * it. A persona sharing the synthesizer's name is worse: the token cap is
+   * chosen by comparing the agent name against the synthesizer's, so that
+   * persona would run with the closing document's much larger cap and quietly
+   * cost several times what the preset budgeted for a burst.
+   *
+   * Neither failure raises anything at runtime, which is exactly why it belongs
+   * in the schema.
+   */
+  .superRefine((preset, context) => {
+    const seen = new Set<string>();
+
+    for (const [index, persona] of preset.personas.entries()) {
+      if (seen.has(persona.name)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["personas", index, "name"],
+          message: `duplicate agent name "${persona.name}" — every persona needs its own, because the name is the orchestrator's agent ID`,
+        });
+      }
+      seen.add(persona.name);
+    }
+
+    if (seen.has(preset.synthesizer.name)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["synthesizer", "name"],
+        message: `"${preset.synthesizer.name}" is already a persona name — the synthesizer needs its own, or that persona runs with the closing document's token cap`,
+      });
+    }
+  });
 
 /** Default fraction of the budget at which `budget:warning` fires. */
 export const DEFAULT_BUDGET_WARNING_THRESHOLD = 0.8;

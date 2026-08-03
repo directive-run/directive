@@ -23,8 +23,8 @@ export const codeReviewPreset: PresetConfig = {
   model: "claude-sonnet-4-5-20250929",
   temperature: 0.6,
   tokensPerBurst: 700,
-  budgetUsd: 2,
-  maxIterations: 12,
+  budgetUsd: 0.3,
+  maxIterations: 8,
   budgetWarningThreshold: 0.8,
 
   personas: [

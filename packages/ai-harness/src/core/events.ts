@@ -59,6 +59,27 @@ export type StopReason =
 /** Which part of the chain an error came from. */
 export type ErrorScope = "burst" | "synthesis";
 
+/**
+ * Which step of a composition is speaking.
+ *
+ * A composition runs several presets end to end, and every one of them emits
+ * the ordinary chain events. A surface rendering a composition needs to know
+ * which step a `burst:completed` belongs to — and it can, because the steps are
+ * strictly sequential and each is bracketed by a `composition:step:started` and
+ * a `composition:step:complete`. The bracket carries the attribution, so the
+ * events inside it do not have to and stay identical to a single run's.
+ */
+export interface CompositionStep {
+  /** One-based position in the composition. */
+  step: number;
+  /** How many steps the composition has in total. */
+  total: number;
+  /** The preset driving this step. */
+  presetId: string;
+  /** The run ID of this step's own chain, and the stem of its transcript files. */
+  runId: string;
+}
+
 // ============================================================================
 // Events
 // ============================================================================
@@ -201,6 +222,53 @@ export type HarnessEvent =
       message: string;
       /** The burst this happened on; absent for synthesis. */
       iteration?: number;
+      at: number;
+    }
+  /**
+   * Several presets are about to run end to end.
+   *
+   * Only a composition emits the four `composition:*` events. A single run
+   * emits none of them, so a surface written against the chain events alone
+   * renders a composition correctly — it just cannot say which step it is
+   * looking at.
+   */
+  | {
+      type: "composition:started";
+      runId: string;
+      /** The preset IDs, in the order they will run. */
+      presets: string[];
+      input: string;
+      at: number;
+    }
+  /** One step is about to run. Every chain event until its pair belongs to it. */
+  | ({ type: "composition:step:started"; at: number } & CompositionStep)
+  /**
+   * One step finished, and its synthesis is about to become context for the
+   * next one.
+   */
+  | ({
+      type: "composition:step:complete";
+      stopReason: StopReason;
+      iterations: number;
+      spentUsd: number;
+      /** This step's closing document — the next step's prior context. */
+      synthesis: string;
+      transcriptPath: string;
+      jsonlPath: string;
+      at: number;
+    } & CompositionStep)
+  /** Every step is done. Always the last event of a composition. */
+  | {
+      type: "composition:complete";
+      runId: string;
+      /** Steps that actually ran, which is fewer than planned after an interrupt. */
+      steps: number;
+      /** Every step's spend, summed. */
+      spentUsd: number;
+      /** The file holding every step's synthesis, in order. */
+      combinedPath: string;
+      /** Whether an operator stopped the composition before its last step. */
+      interrupted: boolean;
       at: number;
     };
 

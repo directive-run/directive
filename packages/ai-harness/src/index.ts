@@ -13,9 +13,9 @@
  *
  * @example
  * ```typescript
- * import { codeReviewPreset, createHarnessSystem } from "@sizls/ai-harness";
+ * import { codeReviewPreset, createHarness } from "@sizls/ai-harness";
  *
- * const harness = createHarnessSystem(codeReviewPreset, {
+ * const harness = createHarness(codeReviewPreset, {
  *   apiKey: process.env.ANTHROPIC_API_KEY!,
  *   onEvent: (event) => {
  *     if (event.type === "burst:completed") {
@@ -34,6 +34,17 @@
  */
 
 // ---------------------------------------------------------------------------
+// The programmatic surface
+// ---------------------------------------------------------------------------
+export {
+  createHarness,
+  definePreset,
+  runHarness,
+  type CreateHarnessOptions,
+  type SdkHarness,
+} from "./adapters/sdk/index.js";
+
+// ---------------------------------------------------------------------------
 // The chain
 // ---------------------------------------------------------------------------
 export {
@@ -42,6 +53,13 @@ export {
   type HarnessOptions,
   type HarnessRunResult,
 } from "./core/system.js";
+
+export {
+  runChain,
+  type ChainRunResult,
+  type ChainStepResult,
+  type RunChainOptions,
+} from "./core/composition.js";
 
 export {
   chainSchema,
@@ -58,6 +76,7 @@ export {
 export type {
   BurstSummary,
   ChainPhase,
+  CompositionStep,
   CostSnapshot,
   ErrorScope,
   HarnessEvent,
@@ -88,7 +107,18 @@ export {
   type PresetValidation,
 } from "./core/preset-registry.js";
 
-export { BUILTIN_PRESETS, codeReviewPreset } from "./presets/index.js";
+export {
+  BUILTIN_PRESETS,
+  PRESET_LIST,
+  archaeologyPreset,
+  brainstormPreset,
+  codeReviewPreset,
+  crypto101Preset,
+  decipherPreset,
+  moonshotPreset,
+  preMortemPreset,
+  researchPreset,
+} from "./presets/index.js";
 
 // ---------------------------------------------------------------------------
 // Agents and transcript

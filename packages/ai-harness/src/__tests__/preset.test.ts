@@ -77,7 +77,41 @@ describe("presets", () => {
   });
 
   it("lists the built-ins", () => {
-    expect(listPresets()).toEqual(["code-review"]);
+    expect(listPresets()).toEqual([
+      "archaeology",
+      "brainstorm",
+      "code-review",
+      "crypto-101",
+      "decipher",
+      "moonshot",
+      "pre-mortem",
+      "research",
+    ]);
+  });
+
+  it("refuses two voices sharing one agent name", () => {
+    // The name is the orchestrator's agent ID: a duplicate silently discards a
+    // system prompt, and a persona sharing the synthesizer's name silently
+    // takes the closing document's token cap.
+    const duplicated = validatePreset(
+      testPreset({
+        personas: [
+          { name: "alpha", systemPrompt: "one" },
+          { name: "alpha", systemPrompt: "two" },
+        ],
+      }),
+    );
+    expect(duplicated.valid).toBe(false);
+
+    const shadowsSynthesizer = validatePreset(
+      testPreset({
+        personas: [{ name: "synth", systemPrompt: "one" }],
+      }),
+    );
+    expect(shadowsSynthesizer.valid).toBe(false);
+    if (!shadowsSynthesizer.valid) {
+      expect(shadowsSynthesizer.errors.join("\n")).toContain("synthesizer");
+    }
   });
 
   it("loads by name, by JSON string, and by path", async () => {
