@@ -21,17 +21,50 @@
 
 import { existsSync } from "node:fs";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
-import { resolveWithin } from "../../core/safety.js";
+import { dirname, join, resolve, sep } from "node:path";
 import {
   type Transcript,
   type TranscriptStore,
   createTranscript,
+  renderSidecarLine,
 } from "../../core/transcript.js";
 
 export interface FileTranscriptStoreOptions {
   /** Directory the artefacts are written into. Created if absent. */
   dir?: string;
+}
+
+/**
+ * Resolve a name inside a directory, or refuse.
+ *
+ * The independent half of the file-write fix. It asks the only question that
+ * matters at a write — *is this path inside that directory* — and answers it
+ * from the resolved forms of both, so it holds for an absolute name, a name
+ * full of `..`, a symlink-free relative directory, and anything a future caller
+ * assembles without knowing this rule exists.
+ *
+ * Lives here rather than beside the other boundary checks in `core/safety.js`,
+ * because it is the only one of them that needs `node:path`, and the core is
+ * where the package's claim to run without a filesystem is kept. Containment of
+ * a filesystem path belongs with the filesystem.
+ *
+ * @param dir - The directory the file must live in. Resolved against the
+ *   process's working directory when relative.
+ * @param name - The filename. Not a path — a name that resolves anywhere other
+ *   than directly inside `dir` is refused rather than normalized.
+ */
+export function resolveWithin(dir: string, name: string): string {
+  const base = resolve(dir);
+  const candidate = resolve(base, name);
+  const prefix = base.endsWith(sep) ? base : `${base}${sep}`;
+
+  if (!candidate.startsWith(prefix)) {
+    throw new Error(
+      `[ai-harness] refusing to write ${JSON.stringify(name)}: it resolves to ${JSON.stringify(candidate)}, which is outside the output directory ${JSON.stringify(base)}. Run identifiers name files inside the output directory and nothing else — pass a plain name, or point the output directory where the file should go.`,
+    );
+  }
+
+  return candidate;
 }
 
 /**
@@ -78,9 +111,9 @@ export function createFileTranscriptStore(
             await writeFile(markdownPath, markdown, "utf8");
 
             if (appended.length > 0) {
-              const lines = appended
-                .map((record) => `${JSON.stringify(record)}\n`)
-                .join("");
+              // Through the shared renderer, so the sidecar has one shape and
+              // not one per sink — see `renderSidecarLine`.
+              const lines = appended.map(renderSidecarLine).join("");
               await appendFile(jsonlPath, lines, "utf8");
             }
           },

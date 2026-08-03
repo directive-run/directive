@@ -92,12 +92,7 @@ import {
   createModule,
   t,
 } from "@directive-run/core";
-import {
-  CHARS_PER_TOKEN,
-  type HarnessAgents,
-  assertBudgetCoversSynthesis,
-  harnessSystemPrompt,
-} from "./agents.js";
+import { type HarnessAgents, assertBudgetCoversSynthesis } from "./agents.js";
 import type { ChainPhase, HarnessEventSink, StopReason } from "./events.js";
 import { assertPreset } from "./preset-registry.js";
 import {
@@ -105,6 +100,14 @@ import {
   type PresetConfig,
   renderTemplate,
 } from "./preset-types.js";
+import {
+  canAffordTurn,
+  chainStopped,
+  projectTurnUsd,
+  projectedReserveUsd,
+  stopReasonFor,
+  synthesisReserveUsd,
+} from "./projection.js";
 import { fence } from "./safety.js";
 import type { Transcript, TurnRecord } from "./transcript.js";
 
@@ -143,16 +146,15 @@ export interface ChainDerived {
   /**
    * What the *next* turn is expected to cost.
    *
-   * The last turn plus the growth between the last two, floored at the last
-   * turn's cost. Prompt growth per turn is roughly constant — each turn
-   * appends about `tokensPerTurn` to a transcript every later turn re-sends —
-   * so cost grows roughly linearly, and extrapolating the last observed step
-   * tracks that. Unlike a mean it can never sit below the last measurement,
-   * which is the property that matters: a predictor that under-shoots on a
-   * monotone series stops the chain one turn too late, every time.
+   * See `projectTurnUsd` in `./projection.js`, which is where this and every
+   * other figure on this interface are computed. The offline replay behind
+   * `--list-presets` calls the same functions, so a preset's advertised
+   * behaviour and its actual behaviour cannot be two different pieces of
+   * arithmetic — which is what they had already become.
    *
-   * One data point (the first turn) degrades to that turn's cost; zero data
-   * points is zero.
+   * Before the first turn this is an a-priori figure rather than zero. Zero was
+   * the claim that the first turn is free, and the chain authorizes that turn
+   * against a reserve computed on it.
    */
   projectedTurnUsd: number;
   /**
@@ -165,6 +167,11 @@ export interface ChainDerived {
    * held back one *average turn*, while a synthesizer running at 2500–4000
    * tokens against a `tokensPerTurn` of 450–700, reading the entire transcript,
    * costs five to thirty times that.
+   *
+   * "Both halves are known" is exact for the output half and a heuristic for
+   * the input half — see the note on the four-characters-per-token measure in
+   * `./projection.js`, which under-measures code and therefore under-measures
+   * the three presets aimed at it.
    */
   synthesisReserveUsd: number;
   /**
@@ -541,6 +548,40 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
    */
   let announcedPhase: ChainPhase = "idle";
 
+  /**
+   * Copy the ledger into the facts. The `finally` of every resolver that can
+   * reach a provider, and the only place `spentUsd` is written.
+   *
+   * A resolver used to do this itself, inline, at the point it wrote the rest
+   * of the turn's facts. That works exactly as long as the call returns. A
+   * provider that streams and then throws — a rate limit mid-response, a
+   * gateway 502, a truncated body, which is the ordinary failure of a streaming
+   * provider — has already been billed for what it delivered, and `withBudget`
+   * records that charge. The resolver never reached its fact writes, the error
+   * hook wrote `failure` and nothing else, and `spentUsd` stayed at whatever
+   * the last *successful* turn left it. A composition then computed the next
+   * step's allowance from a run that appeared to have spent nothing, and handed
+   * every later step a full budget.
+   *
+   * The direct fix is one line in the error hook. This is the general one: the
+   * copy is attached to the resolver's *exit*, not to any of its outcomes, so
+   * no way out of a resolver can skip it — return, throw, or abort.
+   *
+   * **Why a `finally` written into each resolver rather than a wrapper around
+   * them.** A wrapper has to `await` the body, and an `await` is a microtask
+   * boundary: the turn's facts would land in one tick and its spend in the
+   * next. The module is built on those moving together — the constraints
+   * re-evaluate between the two ticks and would authorize the synthesis before
+   * the last turn had been announced, and the budget-warning edge detector
+   * compares against a snapshot taken between them. A `finally` on the body
+   * itself runs in the same synchronous block as the writes above it, which is
+   * the property that has to hold. Two lines of duplication buys an invariant
+   * the module cannot function without.
+   */
+  function settleSpend(facts: { spentUsd: number }): void {
+    facts.spentUsd = budgetRunner.getSpent("total");
+  }
+
   return createModule("ai-harness-chain", {
     schema: chainSchema,
 
@@ -605,58 +646,37 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       averageTurnUsd: (facts) =>
         facts.iteration > 0 ? facts.spentUsd / facts.iteration : 0,
 
-      projectedTurnUsd: (facts) => {
-        if (facts.iteration === 0) {
-          return 0;
-        }
-        if (facts.iteration === 1) {
-          return facts.lastTurnUsd;
-        }
+      // Every figure below comes out of `./projection.js`. Nothing about the
+      // chain's stopping arithmetic is written here, because it is also written
+      // in the offline replay behind `--list-presets`, and two copies of a
+      // stopping rule is two answers to when a preset stops.
+      projectedTurnUsd: (facts) =>
+        projectTurnUsd(facts.preset, pricing, {
+          iteration: facts.iteration,
+          lastTurnUsd: facts.lastTurnUsd,
+          previousTurnUsd: facts.previousTurnUsd,
+          transcriptChars: facts.transcriptChars,
+          inputChars: facts.input.length,
+        }),
 
-        // Linear extrapolation of the last observed step, floored at the last
-        // turn. Growth is clamped at zero so a turn that happened to come in
-        // cheaper than its predecessor does not predict a cheaper one still on
-        // a transcript that only ever gets longer.
-        const growth = Math.max(0, facts.lastTurnUsd - facts.previousTurnUsd);
+      synthesisReserveUsd: (facts) =>
+        synthesisReserveUsd(facts.preset, pricing, {
+          transcriptChars: facts.transcriptChars,
+          inputChars: facts.input.length,
+        }),
 
-        return facts.lastTurnUsd + growth;
-      },
-
-      synthesisReserveUsd: (facts) => {
-        const { synthesizer } = facts.preset;
-        // Everything the synthesizer will be sent: the transcript, the template
-        // around it, the original input the template interpolates, and the
-        // system prompt — the one that actually goes out, which is the preset's
-        // plus the standing notice the harness appends to every voice. Measuring
-        // the preset's alone would under-reserve by the length of that notice on
-        // every run, which is the difference between affording the closing
-        // document and stopping one turn short of it on a budget the chain is
-        // designed to spend to the last cent.
-        const promptChars =
-          facts.transcriptChars +
-          synthesizer.promptTemplate.length +
-          facts.input.length +
-          harnessSystemPrompt(synthesizer.systemPrompt).length;
-        const inputTokens = Math.ceil(promptChars / CHARS_PER_TOKEN);
-
-        return (
-          (inputTokens / 1_000_000) * pricing.inputPerMillion +
-          (synthesizer.maxTokens / 1_000_000) * pricing.outputPerMillion
-        );
-      },
-
-      // A turn appends about `tokensPerTurn` to the transcript, and the
-      // synthesizer reads the transcript — so the turn about to be authorized
-      // is also the turn that raises the closing document's bill. Priced at the
-      // input rate, which is what re-reading it costs.
-      projectedReserveUsd: (facts, derived) =>
-        derived.synthesisReserveUsd +
-        (facts.preset.tokensPerTurn / 1_000_000) * pricing.inputPerMillion,
+      projectedReserveUsd: (facts) =>
+        projectedReserveUsd(facts.preset, pricing, {
+          transcriptChars: facts.transcriptChars,
+          inputChars: facts.input.length,
+        }),
 
       canAffordTurn: (_facts, derived) =>
-        derived.remainingUsd > 0 &&
-        derived.remainingUsd >=
-          derived.projectedTurnUsd + derived.projectedReserveUsd,
+        canAffordTurn({
+          remainingUsd: derived.remainingUsd,
+          projectedTurnUsd: derived.projectedTurnUsd,
+          projectedReserveUsd: derived.projectedReserveUsd,
+        }),
 
       canAffordSynthesis: (_facts, derived) =>
         derived.remainingUsd >= derived.synthesisReserveUsd,
@@ -665,11 +685,13 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
         facts.iteration >= facts.preset.maxIterations,
 
       chainStopped: (facts, derived) =>
-        facts.budgetHalted ||
-        facts.failure !== "" ||
-        facts.interrupted ||
-        !derived.canAffordTurn ||
-        derived.iterationsExhausted,
+        chainStopped({
+          budgetHalted: facts.budgetHalted,
+          failed: facts.failure !== "",
+          interrupted: facts.interrupted,
+          canAffordTurn: derived.canAffordTurn,
+          iterationsExhausted: derived.iterationsExhausted,
+        }),
 
       synthesisSkipped: (facts, derived) =>
         facts.running &&
@@ -679,25 +701,14 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
         !facts.synthesisFailed &&
         (facts.synthesisRefused || !derived.canAffordSynthesis),
 
-      stopReason: (facts, derived): StopReason => {
-        if (!derived.chainStopped) {
-          return "";
-        }
-        if (facts.budgetHalted) {
-          return "budget";
-        }
-        if (facts.failure !== "") {
-          return "error";
-        }
-        if (facts.interrupted) {
-          return "interrupted";
-        }
-        if (!derived.canAffordTurn) {
-          return "budget";
-        }
-
-        return "max-iterations";
-      },
+      stopReason: (facts, derived): StopReason =>
+        stopReasonFor({
+          budgetHalted: facts.budgetHalted,
+          failed: facts.failure !== "",
+          interrupted: facts.interrupted,
+          canAffordTurn: derived.canAffordTurn,
+          iterationsExhausted: derived.iterationsExhausted,
+        }),
 
       nextPersona: (facts) => {
         const { personas } = facts.preset;
@@ -787,73 +798,80 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       runTurn: {
         requirement: "RUN_TURN",
         key: (req) => `turn-${req.iteration}`,
+        // The `finally` is the whole of the failed-turn accounting — see
+        // `settleSpend`. A turn that streamed and then threw has been billed
+        // for what it delivered, and this is what carries that forward.
         resolve: async (req, context) => {
-          emit({
-            type: "turn:started",
-            iteration: req.iteration,
-            persona: req.persona,
-            at: now(),
-          });
-          transcript.beginTurn();
-
           const spentBefore = budgetRunner.getSpent("total");
-          const prompt = renderTemplate(context.facts.preset.promptTemplate, {
-            input: quote("subject", req.input),
-            persona: req.persona,
-            iteration: req.iteration + 1,
-            previousTurn: quote("previous-turn", req.previousTurn),
-            // Already fenced, one turn at a time — see `Transcript.text`.
-            transcript: transcript.text(),
-            tokensPerTurn: context.facts.preset.tokensPerTurn,
-          });
 
-          const result = await orchestrator.runAgent(req.persona, prompt, {
-            signal: context.signal,
-            onToken: (token) => {
-              transcript.appendToken(token);
-              emit({
-                type: "turn:delta",
-                iteration: req.iteration,
-                persona: req.persona,
-                text: token,
-              });
-            },
-            // The runner is about to replay this response from the beginning.
-            // Clearing the buffer is what keeps the abandoned attempt out of
-            // the transcript; the event is what keeps it off a surface that
-            // rendered the deltas.
-            onStreamRestart: (reason) => {
-              transcript.beginTurn();
-              emit({
-                type: "turn:restarted",
-                iteration: req.iteration,
-                persona: req.persona,
-                reason,
-              });
-            },
-          });
+          try {
+            emit({
+              type: "turn:started",
+              iteration: req.iteration,
+              persona: req.persona,
+              at: now(),
+            });
+            transcript.beginTurn();
 
-          const text = readOutputText(result.output, transcript.pending());
-          const spentAfter = budgetRunner.getSpent("total");
-          const record = transcript.completeTurn({
-            iteration: req.iteration,
-            persona: req.persona,
-            text,
-            costUsd: spentAfter - spentBefore,
-            at: now(),
-          });
+            const prompt = renderTemplate(context.facts.preset.promptTemplate, {
+              input: quote("subject", req.input),
+              persona: req.persona,
+              iteration: req.iteration + 1,
+              previousTurn: quote("previous-turn", req.previousTurn),
+              // Already fenced, one turn at a time — see `Transcript.text`.
+              transcript: transcript.text(),
+              tokensPerTurn: context.facts.preset.tokensPerTurn,
+            });
 
-          context.facts.previousTurn = text;
-          context.facts.lastTurn = record;
-          context.facts.spentUsd = spentAfter;
-          // The two figures the next-turn projection extrapolates from, and
-          // the measured half of the synthesis reserve. All three are what this
-          // turn actually cost and actually wrote, read off the ledger and the
-          // transcript rather than recomputed.
-          context.facts.previousTurnUsd = context.facts.lastTurnUsd;
-          context.facts.lastTurnUsd = spentAfter - spentBefore;
-          context.facts.transcriptChars = transcript.text().length;
-          context.facts.iteration = req.iteration + 1;
+            const result = await orchestrator.runAgent(req.persona, prompt, {
+              signal: context.signal,
+              onToken: (token) => {
+                transcript.appendToken(token);
+                emit({
+                  type: "turn:delta",
+                  iteration: req.iteration,
+                  persona: req.persona,
+                  text: token,
+                });
+              },
+              // The runner is about to replay this response from the beginning.
+              // Clearing the buffer is what keeps the abandoned attempt out of
+              // the transcript; the event is what keeps it off a surface that
+              // rendered the deltas.
+              onStreamRestart: (reason) => {
+                transcript.beginTurn();
+                emit({
+                  type: "turn:restarted",
+                  iteration: req.iteration,
+                  persona: req.persona,
+                  reason,
+                });
+              },
+            });
+
+            const text = readOutputText(result.output, transcript.pending());
+            const spentAfter = budgetRunner.getSpent("total");
+            const record = transcript.completeTurn({
+              iteration: req.iteration,
+              persona: req.persona,
+              text,
+              costUsd: spentAfter - spentBefore,
+              at: now(),
+            });
+
+            context.facts.previousTurn = text;
+            context.facts.lastTurn = record;
+            // The two figures the next-turn projection extrapolates from, and
+            // the measured half of the synthesis reserve. All three are what
+            // this turn actually cost and actually wrote, read off the ledger
+            // and the transcript rather than recomputed.
+            context.facts.previousTurnUsd = context.facts.lastTurnUsd;
+            context.facts.lastTurnUsd = spentAfter - spentBefore;
+            context.facts.transcriptChars = transcript.text().length;
+            context.facts.iteration = req.iteration + 1;
+          } finally {
+            settleSpend(context.facts);
+          }
         },
         meta: withPresetMeta(preset, {
           label: "Run persona turn",
@@ -871,36 +889,46 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       synthesize: {
         requirement: "SYNTHESIZE",
         key: () => "synthesis",
+        // Same `finally`, same reason. A synthesis that streamed half a
+        // document and then failed has been billed for it, and a composition
+        // reads this step's spend to decide what the next one may have.
         resolve: async (req, context) => {
-          emit({
-            type: "synthesis:started",
-            iteration: req.iteration,
-            stopReason: req.stopReason,
-            at: now(),
-          });
+          try {
+            emit({
+              type: "synthesis:started",
+              iteration: req.iteration,
+              stopReason: req.stopReason,
+              at: now(),
+            });
 
-          const { synthesizer } = context.facts.preset;
-          const prompt = renderTemplate(synthesizer.promptTemplate, {
-            input: quote("subject", context.facts.input),
-            transcript: transcript.text(),
-            iterations: req.iteration,
-            spentUsd: context.facts.spentUsd.toFixed(4),
-            stopReason: req.stopReason,
-          });
+            const { synthesizer } = context.facts.preset;
+            const prompt = renderTemplate(synthesizer.promptTemplate, {
+              input: quote("subject", context.facts.input),
+              transcript: transcript.text(),
+              iterations: req.iteration,
+              spentUsd: context.facts.spentUsd.toFixed(4),
+              stopReason: req.stopReason,
+            });
 
-          const result = await orchestrator.runAgent(synthesizer.name, prompt, {
-            signal: context.signal,
-            onToken: (token) => {
-              emit({ type: "synthesis:chunk", text: token });
-            },
-          });
+            const result = await orchestrator.runAgent(
+              synthesizer.name,
+              prompt,
+              {
+                signal: context.signal,
+                onToken: (token) => {
+                  emit({ type: "synthesis:chunk", text: token });
+                },
+              },
+            );
 
-          const text = readOutputText(result.output, "");
-          transcript.setSynthesis(text);
+            const text = readOutputText(result.output, "");
+            transcript.setSynthesis(text);
 
-          context.facts.synthesis = text;
-          context.facts.spentUsd = budgetRunner.getSpent("total");
-          context.facts.synthesized = true;
+            context.facts.synthesis = text;
+            context.facts.synthesized = true;
+          } finally {
+            settleSpend(context.facts);
+          }
         },
         meta: withPresetMeta(preset, {
           label: "Synthesize transcript",
@@ -1107,6 +1135,14 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
        * without a fact recording the failure, the constraint that produced the
        * requirement would still hold, the requirement would still be keyed the
        * same, and the chain would sit with an unmet requirement forever.
+       *
+       * **Nothing here reads the ledger, deliberately.** A call that streamed
+       * and then threw has already been billed for what it delivered, and this
+       * hook used to be a path that ended a turn without copying that forward —
+       * so a failed turn reported `$0.0000` while the money was gone. The fix
+       * is not a `spentUsd` write here; it is that {@link callAgent} settles
+       * the ledger into the facts in a `finally`, so this hook runs *after* the
+       * copy has already happened and there is no second place to keep in step.
        */
       onResolverError: (error, requirement, context) => {
         // The lifetime floor refused the call. Nothing is broken — the run

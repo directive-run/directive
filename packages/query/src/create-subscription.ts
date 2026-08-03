@@ -84,6 +84,14 @@ export interface SubscriptionDefinition<TData> {
   readonly constraints: Record<string, unknown>;
   readonly resolvers: Record<string, unknown>;
   readonly effects: Record<string, unknown>;
+  /**
+   * Close every established stream. Wired by `withQueries` to the module's
+   * `onStop`, which Directive calls after every effect cleanup has fired.
+   *
+   * A stream cannot be closed from an effect cleanup: that fires before every
+   * re-run of the effect too, and the two are indistinguishable from inside it.
+   */
+  readonly onStop: () => void;
   setData: (facts: Record<string, unknown>, data: TData) => void;
 }
 
@@ -126,6 +134,52 @@ export function createSubscription<
   // closure WeakMap removes that read-write self-trigger while still
   // letting each system keep its own prev-key bookkeeping.
   const prevKeyByFacts = new WeakMap<object, string>();
+
+  /**
+   * The stream currently established, per system.
+   *
+   * Directive fires an effect's cleanup **before** re-running it as well as
+   * when the system is torn down, and the two are indistinguishable from
+   * inside the cleanup. Aborting there killed the stream on every re-run — and
+   * an auto-tracked effect whose `key()` reads no facts records no
+   * dependencies, which Directive reads as "unknown" and re-runs on every
+   * reconcile. So a subscription with a constant key died the first time
+   * anything else in the system moved, silently: the controller was aborted,
+   * the body's same-key early return declined to re-establish anything, and
+   * every callback became a no-op with the resource state frozen on whatever
+   * had already arrived.
+   *
+   * So the cleanup *marks* rather than tears down, and the two things that
+   * genuinely end a stream do it themselves: a re-key, which the body handles
+   * because it is building the replacement, and system stop, which arrives on
+   * `onStop` after every cleanup has fired. A re-run marks and then clears the
+   * mark, and the stream never notices.
+   */
+  const liveByFacts = new WeakMap<
+    object,
+    {
+      controller: AbortController;
+      unsubscribe: (() => void) | undefined;
+      teardown: () => void;
+      /** Set by the cleanup, cleared by the body when it is only a re-run. */
+      marked: boolean;
+    }
+  >();
+  /** Every system's live stream, for the one signal that means teardown. */
+  const allLive = new Set<{
+    controller: AbortController;
+    unsubscribe: (() => void) | undefined;
+  }>();
+
+  /** Close a stream for good. */
+  function close(record: {
+    controller: AbortController;
+    unsubscribe: (() => void) | undefined;
+  }): void {
+    allLive.delete(record);
+    record.controller.abort();
+    record.unsubscribe?.();
+  }
 
   /** Build ResourceState derivation. */
   function buildState(facts: Record<string, unknown>): ResourceState<TData> {
@@ -175,6 +229,11 @@ export function createSubscription<
             // contract, so the AbortController is torn down already; here
             // we just clear the prev-key bookkeeping so a future re-key
             // to the same value still establishes a fresh subscription.
+            const gone = liveByFacts.get(facts);
+            if (gone !== undefined) {
+              liveByFacts.delete(facts);
+              close(gone);
+            }
             if (prevKeyByFacts.delete(facts)) {
               facts[keyKey] = null;
               // Reset the resource state to idle so consumers re-render
@@ -193,9 +252,22 @@ export function createSubscription<
           // Track prev key off-fact so we don't depend on our own writes.
           const prevKey = prevKeyByFacts.get(facts) ?? null;
 
-          // Key hasn't changed and subscription already active — skip
-          if (serializedKey === prevKey) {
-            return;
+          const live = liveByFacts.get(facts);
+
+          // Key hasn't changed and the stream is still established — this is a
+          // re-run, not a re-key. Clear the mark the cleanup left and hand the
+          // same teardown back, so Directive goes on holding it.
+          if (serializedKey === prevKey && live !== undefined) {
+            live.marked = false;
+
+            return live.teardown;
+          }
+
+          // Re-keyed. The stream being replaced goes now, because its
+          // successor is built below and the two must not overlap.
+          if (live !== undefined) {
+            liveByFacts.delete(facts);
+            close(live);
           }
 
           // Update key tracking (in closure + in facts for downstream
@@ -284,15 +356,39 @@ export function createSubscription<
             signal: controller.signal,
           };
 
-          const cleanup = subscribe(currentKey, callbacks);
-
-          return () => {
-            controller.abort();
-            cleanup?.();
+          const unsubscribe = subscribe(currentKey, callbacks) ?? undefined;
+          const record = {
+            controller,
+            unsubscribe,
+            teardown: () => {},
+            marked: false,
           };
+          // Marks, and nothing more. See `liveByFacts` for why a cleanup is
+          // the wrong place to end a stream.
+          record.teardown = () => {
+            record.marked = true;
+          };
+          liveByFacts.set(facts, record);
+          allLive.add(record);
+
+          return record.teardown;
         },
         // Re-run when key facts change (auto-tracked via proxy)
       },
+    },
+
+    /**
+     * The one signal that means teardown.
+     *
+     * Fired by `withQueries` from the module's `onStop`, which Directive calls
+     * after every effect cleanup — so by this point a cleanup that was really
+     * a re-run has already been cleared by the body that followed it, and what
+     * is left is a stream nobody is going to re-establish.
+     */
+    onStop: () => {
+      for (const record of [...allLive]) {
+        close(record);
+      }
     },
 
     setData: (facts: Record<string, unknown>, data: TData) => {

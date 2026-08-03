@@ -174,6 +174,40 @@ export function describeDep(dep: string): string {
 }
 
 /**
+ * A declared `deps` array, translated into the names an invalidation set uses.
+ *
+ * Auto-tracking writes derivation dependencies under {@link derivationDep};
+ * `deps` is written by hand and arrives as bare names, so the two sides of the
+ * comparison have to be brought onto one keyspace or the hand-written half
+ * matches nothing. That is not a hypothetical: `deps: ["doubled"]` naming a
+ * derivation recorded `"doubled"`, the invalidation set carried the namespaced
+ * form, the effect never re-ran — and an async constraint, which cannot
+ * auto-track at all, has `deps` as its only way to say what it reads.
+ *
+ * `isDerivation` decides per name, and is asked rather than assumed because
+ * only the engine knows what the merged module set declares. A name it does not
+ * claim stays exactly as written, so a fact key is untouched.
+ *
+ * @param deps - Names as the caller wrote them.
+ * @param isDerivation - Whether a name refers to a derivation. A name that is
+ *   both a fact key and a derivation ID is expected to answer `false`: `deps`
+ *   has always meant fact keys, and the engine already warns on the collision.
+ *
+ * @internal
+ */
+export function normalizeExplicitDeps(
+  deps: readonly string[],
+  isDerivation: (name: string) => boolean,
+): Set<string> {
+  const resolved = new Set<string>();
+  for (const dep of deps) {
+    resolved.add(isDerivation(dep) ? derivationDep(dep) : dep);
+  }
+
+  return resolved;
+}
+
+/**
  * Prototype pollution guard — shared across all proxy handlers.
  *
  * @remarks

@@ -21,6 +21,7 @@ import {
   resolvePresets,
   runCli,
 } from "../adapters/cli/index.js";
+import { createRenderer } from "../adapters/cli/render.js";
 import { PRESET_LIST } from "../presets/index.js";
 import { type Scratch, createScratch, testPreset } from "./fixtures.js";
 
@@ -298,6 +299,67 @@ describe("--list-presets", () => {
     expect(rendered).toContain("deliberately unusual");
     expect(rendered).toContain("three tokens a turn");
     expect(rendered).toContain("Writing a preset");
+  });
+});
+
+describe("a run that could not afford a turn", () => {
+  /**
+   * The quiet outcome. A budget clears the closing document's price — which is
+   * all construction checks — and not a first turn alongside the reserve that
+   * turn would leave owing. The run is correct and it is also an empty screen,
+   * so the renderer says which of the two happened.
+   */
+  it("says why, rather than printing an empty run", () => {
+    const chunks: string[] = [];
+    const renderer = createRenderer({
+      verbose: false,
+      write: (text) => chunks.push(text),
+    });
+
+    renderer({
+      type: "chain:complete",
+      runId: "r",
+      phase: "complete",
+      stopReason: "budget",
+      iterations: 0,
+      spentUsd: 0,
+      budgetUsd: 0.04,
+      synthesis: "",
+      synthesisSkipped: false,
+      transcriptPath: "memory://r.md",
+      jsonlPath: "memory://r.jsonl",
+      at: 1,
+    });
+
+    const printed = chunks.join("");
+    expect(printed).toContain("no turns");
+    expect(printed).toContain("$0.0400");
+    expect(printed).toContain("Raise the budget");
+  });
+
+  it("says nothing extra when turns did run", () => {
+    const chunks: string[] = [];
+    const renderer = createRenderer({
+      verbose: false,
+      write: (text) => chunks.push(text),
+    });
+
+    renderer({
+      type: "chain:complete",
+      runId: "r",
+      phase: "complete",
+      stopReason: "budget",
+      iterations: 3,
+      spentUsd: 0.02,
+      budgetUsd: 0.04,
+      synthesis: "done",
+      synthesisSkipped: false,
+      transcriptPath: "memory://r.md",
+      jsonlPath: "memory://r.jsonl",
+      at: 1,
+    });
+
+    expect(chunks.join("")).not.toContain("no turns");
   });
 });
 

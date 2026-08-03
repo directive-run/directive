@@ -9,7 +9,6 @@
  * @module
  */
 
-import { readFile } from "node:fs/promises";
 import { BUILTIN_PRESETS } from "../presets/index.js";
 import { type PresetConfig, presetSchema } from "./preset-types.js";
 
@@ -116,6 +115,13 @@ export async function loadPreset(
 
   let contents: string;
   try {
+    // Imported here rather than at the top of the file. This is the one branch
+    // of the one function in `./` that needs a filesystem, and a static import
+    // would put `node:fs` in the package's entry graph — so every consumer of
+    // `createHarness` on a runtime without one would fail to load the module
+    // over a branch it never takes. A runtime with no filesystem lands in the
+    // `catch` below, which is the right answer: this path is not available.
+    const { readFile } = await import("node:fs/promises");
     contents = await readFile(nameOrPathOrJson, "utf8");
   } catch (error) {
     const known = listPresets().join(", ");

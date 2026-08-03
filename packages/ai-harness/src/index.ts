@@ -12,16 +12,14 @@
  * which is the file worth reading.
  *
  * Nothing here touches a disk unless you say where. A run writes through a
- * `TranscriptStore` and defaults to the in-memory one; `createFileTranscriptStore`
- * is the filesystem, opted into.
+ * `TranscriptStore` and defaults to the in-memory one; the filesystem lives on
+ * the `@sizls/ai-harness/node` subpath, so importing this module does not
+ * import `node:fs`.
  *
  * @example
  * ```typescript
- * import {
- *   codeReviewPreset,
- *   createFileTranscriptStore,
- *   createHarness,
- * } from "@sizls/ai-harness";
+ * import { codeReviewPreset, createHarness } from "@sizls/ai-harness";
+ * import { createFileTranscriptStore } from "@sizls/ai-harness/node";
  *
  * const harness = createHarness(codeReviewPreset, {
  *   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -146,6 +144,7 @@ export {
   createMemoryTranscriptStore,
   createRunId,
   createTranscript,
+  renderSidecarLine,
   type MemoryTranscriptStore,
   type OpenTranscriptOptions,
   type Transcript,
@@ -154,11 +153,12 @@ export {
   type TurnRecord,
 } from "./core/transcript.js";
 
-export {
-  createFileTranscriptStore,
-  defaultTranscriptDir,
-  type FileTranscriptStoreOptions,
-} from "./adapters/node/transcript.js";
+// `createFileTranscriptStore` is **not** here. It lives on the `/node`
+// subpath, because it imports `node:fs` — and a static re-export from the
+// package entry means importing this package imports the node filesystem,
+// whether or not anything asks for a file. A chain has no filesystem
+// dependency; the entry point should not invent one for a worker, an edge
+// runtime, or a browser bundle. See `./node.js`.
 
 export {
   createMockRunner,
@@ -176,11 +176,15 @@ export {
 // to write — including escape sequences that clear the screen, hide text, or ask
 // the terminal to set the clipboard. The bundled command line runs its output
 // through these; anything else printing the same events needs to as well.
+//
+// `resolveWithin` is on the `/node` subpath with the store that uses it — it
+// is the only one of these that needs `node:path`, and containment of a
+// filesystem path belongs with the filesystem.
 export {
   QUOTED_MATERIAL_NOTICE,
   createTerminalSanitizer,
+  isSafeAgentName,
   isSafeIdentifier,
-  resolveWithin,
   sanitizeForTerminal,
   type TerminalSanitizer,
 } from "./core/safety.js";

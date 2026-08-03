@@ -14,9 +14,12 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createRenderer } from "../adapters/cli/render.js";
-import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import {
+  createFileTranscriptStore,
+  resolveWithin,
+} from "../adapters/node/transcript.js";
 import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
@@ -24,7 +27,7 @@ import { loadPreset, validatePreset } from "../core/preset-registry.js";
 import {
   QUOTED_MATERIAL_NOTICE,
   createTerminalSanitizer,
-  resolveWithin,
+  isSafeAgentName,
   sanitizeForTerminal,
 } from "../core/safety.js";
 import { createHarnessSystem } from "../core/system.js";
@@ -315,6 +318,98 @@ describe("model output cannot drive the terminal", () => {
     // not printed — and not carried into whatever is sanitized next.
     expect(sanitizer.flush()).toBe("");
     expect(sanitizer.push("after")).toBe("after");
+  });
+
+  it("serializes an array field rather than joining it", () => {
+    const chunks: string[] = [];
+    const renderer = createRenderer({
+      verbose: true,
+      write: (text) => chunks.push(text),
+    });
+
+    renderer({
+      type: "chain:started",
+      runId: "r",
+      input: "go",
+      // A preset's own strings. The array branch used to `join(",")`, so these
+      // reached the terminal exactly as written.
+      personas: [`alpha${CLEAR}`, `beta${CLIPBOARD}`],
+      budgetUsd: 1,
+      transcriptPath: "/tmp/r.md",
+      jsonlPath: "/tmp/r.jsonl",
+      at: 1,
+    });
+
+    const printed = chunks.join("");
+    expect(printed).not.toContain(`${ESC}[2J`);
+    expect(printed).not.toContain(`${ESC}]`);
+    expect(printed).not.toContain(BEL);
+    expect(printed).toContain("alpha");
+    expect(printed).toContain("beta");
+  });
+});
+
+// ============================================================================
+// Agent names
+// ============================================================================
+
+describe("an agent name is a token, because it is more than a label", () => {
+  it("refuses a persona name carrying an escape sequence", () => {
+    const preset = testPreset();
+    const result = validatePreset({
+      ...preset,
+      personas: [
+        { name: `alpha${ESC}[2J`, systemPrompt: "You are alpha." },
+        ...preset.personas.slice(1),
+      ],
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.valid === false && result.errors.join(" ")).toMatch(
+      /letters, digits, and dashes/,
+    );
+  });
+
+  it("refuses a synthesizer name carrying one too", () => {
+    const preset = testPreset();
+    const result = validatePreset({
+      ...preset,
+      synthesizer: { ...preset.synthesizer, name: `synth${ESC}]0;owned${BEL}` },
+    });
+
+    expect(result.valid).toBe(false);
+  });
+
+  /**
+   * The name is registered as a Directive module ID by the orchestrator, and
+   * core reports a non-kebab-case module ID with `console.warn` — on stderr,
+   * on the default path, before any renderer here is involved. The only place
+   * that can be closed is the schema.
+   */
+  it("keeps core quiet about the module identifiers it is handed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const preset = testPreset({ budgetUsd: 100, maxIterations: 1 });
+
+    const harness = createHarnessSystem(preset, {
+      runner: createMockRunner({ responses: cannedResponses() }),
+      retry: { maxRetries: 0 },
+    });
+    await harness.run("go");
+    harness.system.destroy();
+
+    expect(
+      warn.mock.calls.filter((call) => String(call[0]).includes("kebab-case")),
+    ).toHaveLength(0);
+    warn.mockRestore();
+  });
+
+  it("accepts the names the shipped presets actually use", () => {
+    for (const name of ["correctness", "cross-referencer", "crypto-writeup"]) {
+      expect(isSafeAgentName(name)).toBe(true);
+    }
+    for (const name of ["", "-leading", "has space", "under_score", "1first"]) {
+      expect(isSafeAgentName(name)).toBe(false);
+    }
   });
 });
 

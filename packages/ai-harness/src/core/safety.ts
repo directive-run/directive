@@ -40,8 +40,6 @@
  * @module
  */
 
-import { randomBytes } from "node:crypto";
-import { resolve, sep } from "node:path";
 import { z } from "zod";
 
 // ============================================================================
@@ -63,12 +61,39 @@ export const MAX_PRESET_ID_LENGTH = 64;
 export const MAX_RUN_ID_LENGTH = 160;
 
 /**
+ * An agent name — a persona's, or the synthesizer's. Long enough to be
+ * descriptive, and bounded because it is registered as a module identifier.
+ */
+export const MAX_AGENT_NAME_LENGTH = 64;
+
+/**
  * Letters, digits, dot, dash, underscore. Anchored at both ends, and the first
  * character must be a letter or a digit — which is what rules out a leading
  * dot, and with it the whole family of names that mean something to a path
  * resolver rather than to a filesystem.
  */
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Letters, digits, and dashes, starting with a letter. Kebab-case and a little
+ * more.
+ *
+ * Tighter than {@link IDENTIFIER_PATTERN} because an agent name has more jobs
+ * than a filename stem. It is the orchestrator's agent ID; the orchestrator
+ * registers each agent as a **Directive module**, so it is also a module
+ * identifier; and it is printed — to a transcript, to an event, and to a
+ * terminal. The last of those is why the rule is a character set rather than a
+ * length: a preset is loadable from an arbitrary JSON file, and a persona named
+ * with an escape sequence reaches a terminal through paths this package does
+ * not own. Directive core, for one, warns about a module identifier that is not
+ * kebab-case by printing it with `console.warn` — on the default path, before
+ * any renderer of ours is involved. The fix for that cannot be to sanitize what
+ * core prints; it is to not hand core anything that needs sanitizing.
+ *
+ * Matching core's own module-ID convention as well means the well-formed case
+ * raises no warning at all.
+ */
+const AGENT_NAME_PATTERN = /^[A-Za-z][A-Za-z0-9-]*$/;
 
 /**
  * Whether a string is safe to build a filename out of.
@@ -112,6 +137,30 @@ export function identifierSchema(
   });
 }
 
+/** Whether a string is safe to register, print, and name a module with. */
+export function isSafeAgentName(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= MAX_AGENT_NAME_LENGTH &&
+    AGENT_NAME_PATTERN.test(value)
+  );
+}
+
+/**
+ * The agent-name rule as a schema fragment.
+ *
+ * A schema fragment rather than a check at the point of registration, because
+ * the point of registration is inside `@directive-run/ai` and the value has
+ * already been printed by the time anything there could object.
+ */
+export function agentNameSchema(
+  field: string,
+): z.ZodEffects<z.ZodString, string, string> {
+  return z.string().refine(isSafeAgentName, {
+    message: `${field} must be letters, digits, and dashes, start with a letter, and be at most ${MAX_AGENT_NAME_LENGTH} characters. It is the orchestrator's agent ID, it becomes a Directive module identifier, and it is printed to a terminal — including by core, which reports a non-kebab-case module ID on stderr before this package sees it.`,
+  });
+}
+
 /** The throwing form, for a value that does not arrive through the schema. */
 export function assertSafeIdentifier(
   value: string,
@@ -125,38 +174,6 @@ export function assertSafeIdentifier(
   }
 
   return value;
-}
-
-// ============================================================================
-// Containment
-// ============================================================================
-
-/**
- * Resolve a name inside a directory, or refuse.
- *
- * The independent half of the file-write fix. It asks the only question that
- * matters at a write — *is this path inside that directory* — and answers it
- * from the resolved forms of both, so it holds for an absolute name, a name
- * full of `..`, a symlink-free relative directory, and anything a future caller
- * assembles without knowing this rule exists.
- *
- * @param dir - The directory the file must live in. Resolved against the
- *   process's working directory when relative.
- * @param name - The filename. Not a path — a name that resolves anywhere other
- *   than directly inside `dir` is refused rather than normalized.
- */
-export function resolveWithin(dir: string, name: string): string {
-  const base = resolve(dir);
-  const candidate = resolve(base, name);
-  const prefix = base.endsWith(sep) ? base : `${base}${sep}`;
-
-  if (!candidate.startsWith(prefix)) {
-    throw new Error(
-      `[ai-harness] refusing to write ${JSON.stringify(name)}: it resolves to ${JSON.stringify(candidate)}, which is outside the output directory ${JSON.stringify(base)}. Run identifiers name files inside the output directory and nothing else — pass a plain name, or point the output directory where the file should go.`,
-    );
-  }
-
-  return candidate;
 }
 
 // ============================================================================
@@ -360,9 +377,19 @@ export function sanitizeForTerminal(text: string): string {
  *
  * Hex rather than base36 so it is safe inside a tag name, and long enough that
  * a model asked to guess it has nothing to work with.
+ *
+ * Web Crypto rather than `node:crypto`. It is the same CSPRNG on Node, and it
+ * is the one every other runtime has — this module is the untrusted-input
+ * boundary, which is on the path of every run, so a builtin here is a builtin
+ * in the package's entry graph.
  */
 export function createFenceToken(): string {
-  return randomBytes(6).toString("hex");
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
 }
 
 /** Remove every occurrence of the run's marker from quoted material. */

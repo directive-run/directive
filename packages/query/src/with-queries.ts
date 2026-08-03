@@ -106,6 +106,14 @@ export function withQueries(
         ) => (string | { type: string; id?: string | number })[]);
   }[] = [];
   let hasMutationsWithTags = false;
+  /**
+   * Teardown callbacks a query asked to have run at system stop.
+   *
+   * Separate from effect cleanups because they mean a different thing: a
+   * cleanup fires before every re-run of its effect, and these fire only when
+   * the system is actually going away.
+   */
+  const stops: Array<() => void> = [];
 
   for (const query of queries) {
     // Merge schema facts
@@ -127,6 +135,9 @@ export function withQueries(
     }
     if (query.effects) {
       Object.assign(allEffects, query.effects);
+    }
+    if (typeof (query as { onStop?: () => void }).onStop === "function") {
+      stops.push((query as { onStop: () => void }).onStop);
     }
 
     // Collect init functions
@@ -246,6 +257,25 @@ export function withQueries(
     }
   };
 
+  // Module hooks, with the queries' teardowns appended to whatever the caller
+  // declared. Runs after `effectsManager.cleanupAll()`, which is what lets a
+  // subscription's cleanup mark rather than abort.
+  const userHooks = (
+    config as { hooks?: { onStop?: (system: unknown) => void } }
+  ).hooks;
+  const mergedHooks =
+    stops.length === 0
+      ? userHooks
+      : {
+          ...userHooks,
+          onStop: (system: unknown) => {
+            userHooks?.onStop?.(system);
+            for (const stop of stops) {
+              stop();
+            }
+          },
+        };
+
   return {
     ...config,
     schema: {
@@ -260,5 +290,6 @@ export function withQueries(
     constraints: { ...(config.constraints ?? {}), ...allConstraints },
     resolvers: { ...(config.resolvers ?? {}), ...allResolvers },
     effects: { ...(config.effects ?? {}), ...allEffects },
+    hooks: mergedHooks,
   };
 }

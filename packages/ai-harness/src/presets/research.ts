@@ -63,10 +63,16 @@ export const researchPreset: PresetConfig = {
       meta: { label: "Domain expert", tags: ["research"] },
     },
     {
-      name: "synthesizer",
+      // Not `synthesizer`. That word names one role in this package — the
+      // voice that reads the finished transcript and writes the closing
+      // document — and this persona is the opposite of it: it consolidates
+      // mid-stream and is explicitly told not to write the brief. The schema
+      // would have caught the two colliding; nothing catches a name that is
+      // merely wrong about what it is.
+      name: "consolidator",
       systemPrompt:
         "You consolidate mid-stream, so later rounds build on structure rather than on a growing pile. State what the transcript has actually established, what is still contested and why, and the two or three questions that would move the topic forward most if answered. You do not write the final brief — you leave the next round a better starting point than it would have had.",
-      meta: { label: "Mid-chain synthesizer", tags: ["research"] },
+      meta: { label: "Mid-chain consolidator", tags: ["research"] },
     },
   ],
 

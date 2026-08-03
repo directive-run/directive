@@ -4,10 +4,7 @@
     "label": "Dream",
     "description": "Five unlike voices circle one idea. Ships as a file rather than a built-in, so loading a preset off disk is exercised from the first release.",
     "category": "ideation",
-    "tags": [
-      "dream",
-      "user-defined"
-    ]
+    "tags": ["dream", "user-defined"]
   },
   "model": "claude-sonnet-4-5-20250929",
   "temperature": 0.95,
@@ -21,9 +18,7 @@
       "systemPrompt": "You ask what would have to be true, and whether it is. Take the idea seriously enough to find the specific place it breaks rather than the general reason ideas fail. Where it survives you, say so.",
       "meta": {
         "label": "Skeptic",
-        "tags": [
-          "dream"
-        ]
+        "tags": ["dream"]
       }
     },
     {
@@ -31,9 +26,7 @@
       "systemPrompt": "You ask what it would take to build. Name the pieces, the ones that already exist, and the one that does not and would have to be invented. Give a rough size and say what you would build first to find out whether the rest is worth it.",
       "meta": {
         "label": "Engineer",
-        "tags": [
-          "dream"
-        ]
+        "tags": ["dream"]
       }
     },
     {
@@ -41,9 +34,7 @@
       "systemPrompt": "You say when this was tried before. Name the case, what conditions it needed, why it failed or stalled, and what is different now. An analogy without its failure points is worse than none.",
       "meta": {
         "label": "Historian",
-        "tags": [
-          "dream"
-        ]
+        "tags": ["dream"]
       }
     },
     {
@@ -51,9 +42,7 @@
       "systemPrompt": "You say what the idea is really about. Find the image or the single sentence that makes someone care, and name the thing the practical voices are describing without noticing. Be brief and concrete; a metaphor that does not survive being written down does not count.",
       "meta": {
         "label": "Poet",
-        "tags": [
-          "dream"
-        ]
+        "tags": ["dream"]
       }
     },
     {
@@ -61,9 +50,7 @@
       "systemPrompt": "You follow it out ten years. If this works, what else becomes ordinary, who is displaced, and what second-order problem does it create? Say which of those is the reason to do it and which is the reason not to.",
       "meta": {
         "label": "Futurist",
-        "tags": [
-          "dream"
-        ]
+        "tags": ["dream"]
       }
     }
   ],
@@ -75,10 +62,7 @@
     "maxTokens": 2000,
     "meta": {
       "label": "Dream report",
-      "tags": [
-        "dream",
-        "synthesis"
-      ]
+      "tags": ["dream", "synthesis"]
     }
   }
 }

@@ -75,6 +75,19 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
 // ============================================================================
 
 /**
+ * The changed-key the error boundary raises to ask for another reconcile after
+ * an effect threw under the `"retry"` strategy.
+ *
+ * Not a fact key — no fact by this name can exist, and no dependency set names
+ * it. It exists to make the pending set non-empty so the tail of `reconcile`
+ * schedules another pass. It is deliberately *not* carried across the effects
+ * boundary in that pass: it is raised from inside the effects phase, about the
+ * effects phase, and handing it back to the same phase has no fixed point —
+ * the effect that failed re-runs, fails again, and raises it again.
+ */
+const EFFECT_RETRY_KEY = "*";
+
+/**
  * Unwrap object-form events ({ handler, meta } or { patch, meta }) into bare
  * handler functions in place, and capture any meta into `eventMeta`. After
  * this pass, every value in `events` is a bare `(facts, event) => void`
@@ -381,6 +394,24 @@ export function createEngine<S extends Schema>(
     }
   }
 
+  /**
+   * Whether an explicit `deps` entry names a derivation.
+   *
+   * Auto-tracking already files a derivation read under {@link derivationDep};
+   * a `deps` array is written by hand and cannot. This is what brings the two
+   * onto one keyspace, and it is answered here because the engine is the only
+   * thing holding the merged module set — a name that means nothing at
+   * registration time can mean a derivation after a second module joins, so it
+   * is a live lookup rather than a snapshot.
+   *
+   * A fact key of the same name wins. `deps` has meant fact keys since it
+   * existed, the collision is already warned about above, and resolving it
+   * toward the older meaning cannot break a module that predates derivation
+   * dependencies working at all.
+   */
+  const isDerivationDepName = (name: string): boolean =>
+    name in mergedDerive && !(name in mergedSchema);
+
   // Create plugin manager
   const pluginManager: PluginManager<S> = createPluginManager();
   for (const plugin of config.plugins ?? []) {
@@ -556,6 +587,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedEffects,
     facts,
     store,
+    isDerivation: isDerivationDepName,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {
@@ -585,7 +617,7 @@ export function createEngine<S extends Schema>(
       }
 
       if (strategy === "retry") {
-        state.changedKeys.add("*");
+        state.changedKeys.add(EFFECT_RETRY_KEY);
         scheduleReconcile();
       }
     },
@@ -660,6 +692,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedConstraints,
     facts,
     requirementKeys,
+    isDerivation: isDerivationDepName,
     onEvaluate: (id, active) => {
       if (hasPlugins()) {
         // For data-form `when` constraints, pass the per-clause breakdown
@@ -1079,13 +1112,35 @@ export function createEngine<S extends Schema>(
         }
         invalidatedDerivations.clear();
       }
-      await effectsManager.runEffects(state.changedKeys);
-
-      // Copy changed keys for constraint evaluation before clearing
-      const keysForConstraints = new Set(state.changedKeys);
-
-      // Clear changed keys
+      //
+      // Cleared *before* the effects run, not after. `runEffects` is async, and
+      // a resolver resuming across an await — or an effect writing a fact —
+      // adds to `state.changedKeys` while it is open. Clearing the whole set
+      // afterwards threw those keys away before any effect had been offered
+      // them: the constraints saw them, the effects never did, and an effect
+      // declared on that exact key simply did not run. It looked like a
+      // scheduling wobble, because whether it happened depended on which
+      // microtask a resolver's writes landed in.
+      //
+      // Keys that arrive while this is open now stay pending, and the tail of
+      // this function schedules the pass that delivers them — the same
+      // treatment keys arriving during constraint evaluation already got.
+      const keysForEffects = new Set(state.changedKeys);
       state.changedKeys.clear();
+
+      await effectsManager.runEffects(keysForEffects);
+
+      // See EFFECT_RETRY_KEY. The one signal that must not survive this
+      // boundary, because it is the effects phase asking to be re-run and the
+      // ask is re-raised by the re-run.
+      state.changedKeys.delete(EFFECT_RETRY_KEY);
+
+      // Constraints are evaluated against everything known now, which is what
+      // the effects were given plus anything that arrived behind them.
+      const keysForConstraints = new Set(keysForEffects);
+      for (const key of state.changedKeys) {
+        keysForConstraints.add(key);
+      }
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
       const currentRequirements =

@@ -406,6 +406,18 @@ export interface QueryDefinition<TData> {
   /** Effect fragments to merge (focus, reconnect, polling). */
   readonly effects: Record<string, unknown>;
 
+  /**
+   * Run when the system stops, after every effect cleanup has fired.
+   *
+   * A query holding a long-lived resource — a subscription's stream — needs a
+   * teardown signal it can tell apart from an effect re-run. An effect cleanup
+   * cannot do that: Directive fires it before *every* re-run as well as at
+   * teardown, and the two look identical from inside it. This fires only at
+   * teardown, so a cleanup is free to mark rather than tear down and let this
+   * be the one that acts.
+   */
+  readonly onStop?: () => void;
+
   // --- Imperative handles ---
 
   /** Trigger a manual refetch for this query. */

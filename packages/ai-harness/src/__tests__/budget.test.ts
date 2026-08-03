@@ -11,8 +11,10 @@
  * floor underneath both.
  */
 
+import type { AgentRunner } from "@directive-run/ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import { createHarnessAgents } from "../core/agents.js";
 import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
@@ -422,5 +424,115 @@ describe("budget", () => {
     const warnings = events.filter((event) => event.type === "budget:warning");
     expect(warnings).toHaveLength(1);
     expect(warnings[0]?.fraction).toBeGreaterThanOrEqual(0.3);
+  });
+
+  // ==========================================================================
+  // A call that was billed and then threw
+  // ==========================================================================
+  //
+  // The ordinary failure of a streaming provider is a response that starts and
+  // stops: a rate limit part-way, a gateway 502, a truncated body. The provider
+  // billed for what it sent, the ledger records it, and the turn that would
+  // have written the facts never got there. Every figure the chain reports
+  // afterwards — and every allowance a composition computes from it — comes off
+  // `spentUsd`, so a path that ends a turn without carrying the ledger forward
+  // hands out money that has already been spent.
+
+  /** Streams most of a turn, then fails. Nothing retries it. */
+  function failingTurnRunner(agent: string, call = 1) {
+    return createMockRunner({
+      responses: cannedResponses(),
+      failures: [{ agent, call, afterDeltas: 20 }],
+    });
+  }
+
+  it("carries a billed-then-failed turn's spend into the facts", async () => {
+    const preset = testPreset({ budgetUsd: 0.05, maxIterations: 40 });
+
+    const harness = createHarnessSystem(preset, {
+      // The first turn, so nothing else can have moved the ledger.
+      runner: failingTurnRunner("alpha"),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+    });
+
+    const result = await harness.run("go");
+    harness.system.destroy();
+
+    expect(result.stopReason).toBe("error");
+    // The whole point. This reported $0.0000 for a call the provider had
+    // already billed, because the error path never read the ledger.
+    expect(result.spentUsd).toBeGreaterThan(0);
+    expect(chainFacts(harness).spentUsd).toBe(result.spentUsd);
+  });
+
+  it("counts a failed step's spend against the composition's ceiling", async () => {
+    const totalBudgetUsd = 0.05;
+    const presets = [
+      testPreset({ id: "one", budgetUsd: 0.05, maxIterations: 40 }),
+      testPreset({ id: "two", budgetUsd: 0.05, maxIterations: 40 }),
+      testPreset({ id: "three", budgetUsd: 0.05, maxIterations: 40 }),
+      testPreset({ id: "four", budgetUsd: 0.05, maxIterations: 40 }),
+    ];
+
+    const result = await runComposition(presets, "go", {
+      // Every step's first turn is billed and then fails, so every step is a
+      // step whose spend used to read as zero.
+      runner: failingTurnRunner("alpha"),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+      totalBudgetUsd,
+    });
+
+    // Each step's own report is honest…
+    for (const step of result.steps) {
+      expect(step.spentUsd).toBeGreaterThan(0);
+    }
+    // …and the composition's is the sum of them, which is what the per-step
+    // clamp and the remaining-budget check are computed from.
+    const summed = result.steps.reduce(
+      (total, step) => total + step.spentUsd,
+      0,
+    );
+    expect(result.spentUsd).toBeCloseTo(summed, 10);
+    expect(result.spentUsd).toBeLessThanOrEqual(totalBudgetUsd);
+  });
+
+  // ==========================================================================
+  // The floor, and the retries underneath it
+  // ==========================================================================
+
+  it("dispatches nothing further once the ledger reaches the ceiling, retries included", async () => {
+    const preset = testPreset({ budgetUsd: 0.02 });
+    let calls = 0;
+
+    // One attempt delivers far more than the whole budget and then throws —
+    // the provider billed for it, and `withBudget` charges what arrived. A
+    // second attempt must not go out.
+    const runner: AgentRunner = async (_agent, _input, options) => {
+      calls += 1;
+      const sink = options?.onToken as ((token: string) => unknown) | undefined;
+      await sink?.("x".repeat(200_000));
+
+      throw new Error("gateway 502");
+    };
+
+    const agents = createHarnessAgents({
+      preset,
+      runner,
+      retry: { maxRetries: 5, baseDelayMs: 0, maxDelayMs: 0 },
+    });
+
+    await expect(
+      agents.orchestrator.runAgent("alpha", "go", { onToken: () => {} }),
+    ).rejects.toThrow();
+
+    expect(agents.budgetRunner.getSpent("total")).toBeGreaterThanOrEqual(
+      preset.budgetUsd,
+    );
+    // With the retry policy wrapping the ledger rather than the other way
+    // round, the floor is consulted before every attempt instead of once for
+    // the whole sequence. Six calls used to go out.
+    expect(calls).toBe(1);
   });
 });

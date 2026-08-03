@@ -94,9 +94,21 @@ const MAX_FIELD_CHARS = 80;
 /** Token-level events, omitted from `--verbose`. See the module note. */
 const TOKEN_EVENTS = new Set(["turn:delta", "synthesis:chunk"]);
 
+/**
+ * One field of an event, as `--verbose` prints it.
+ *
+ * Every string goes through `JSON.stringify`, which is what makes this path
+ * safe: an escape sequence in model output or in a preset's persona name comes
+ * out as `` rather than as an instruction to the terminal.
+ *
+ * The array branch used to `join(",")`, which put the elements on screen raw —
+ * so `chain:started`'s persona list, which is a preset's own strings, reached
+ * the terminal unserialized. Each element is rendered the same way a scalar is,
+ * so there is one rule and it applies at every depth.
+ */
 function renderValue(value: unknown): string {
   if (Array.isArray(value)) {
-    return value.join(",");
+    return value.map(renderValue).join(",");
   }
   if (typeof value !== "string") {
     return String(value);
@@ -187,10 +199,22 @@ function renderProse(
     case "error":
       return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` turn ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;
 
-    case "chain:complete":
-      return pc.dim(
+    case "chain:complete": {
+      // A run that could not afford even its first turn. It is a legitimate
+      // outcome — the budget cleared the closing document's price at
+      // construction and not the first turn plus the reserve that turn would
+      // leave owing — and it is the one that reads as a silent failure, because
+      // there is no transcript, no closing document, and no `budget:warning`
+      // to explain the empty screen.
+      const nothingRan =
+        event.iterations === 0
+          ? `${pc.yellow("  no turns —")} ${pc.dim(`${dollars(event.budgetUsd)} covers the closing document but not a first turn alongside it. Raise the budget.`)}\n`
+          : "";
+
+      return `${nothingRan}${pc.dim(
         `\n\n  ${plural(event.iterations, "turn")} · ${money(event.spentUsd)} of ${dollars(event.budgetUsd)}${costCaveat} · stopped on ${event.stopReason || "settled"}\n  ${safe(event.transcriptPath)}\n\n`,
-      );
+      )}`;
+    }
 
     case "composition:budget-exhausted":
       return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${safe(event.presetId)})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${dollars(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;

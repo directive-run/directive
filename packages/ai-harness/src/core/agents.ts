@@ -4,13 +4,25 @@
  * ## The composition order, and why it is that order
  *
  * ```
- * withBudget( withRetry( dispatch → adapter ) )
+ * withRetry( withBudget( dispatch → adapter ) )
  * ```
  *
- * Retry sits *inside* the budget so a retried call is billed once per attempt,
- * which is what the provider does. Inverting them would meter the successful
- * attempt and give away the failed ones — an outage would then cost real money
- * against a ledger reading zero.
+ * The budget sits *inside* the retry, so every attempt is metered and every
+ * attempt is gated. That is the order the hard floor's guarantee depends on:
+ * `maxTotalCost` is a pre-call check, and a pre-call check consulted once while
+ * a retry loop dispatches underneath it bounds the overshoot at a whole retry
+ * sequence rather than at one call. With the budget on the inside, an attempt
+ * that pushes the ledger to the ceiling is the last thing dispatched — the next
+ * attempt is refused before it reaches a provider.
+ *
+ * Billing is the same either way, which is why the ordering is free to be
+ * decided on the floor's behalf. `withBudget` charges a call that failed
+ * part-way from the bytes it delivered, so a failed attempt is billed whether it
+ * is settled on its own (this order) or folded into the surviving attempt's
+ * charge as replayed output (the other one). What is not the same is that a
+ * refusal must not itself be retried: a budget refusal is a decision, not a
+ * transient failure, so the retry policy is given a predicate that declines to
+ * replay one.
  *
  * ## One ledger, one retry policy, several adapters
  *
@@ -45,9 +57,11 @@
 import {
   type AgentRegistry,
   type AgentRunner,
+  BudgetExceededError,
   type MultiAgentOrchestrator,
   type RetryConfig,
   type TokenPricing,
+  UnpricedCallLimitError,
   createMultiAgentOrchestrator,
   requireModelPricing,
   withBudget,
@@ -198,6 +212,52 @@ const DEFAULT_RETRY: RetryConfig = {
   maxDelayMs: 8_000,
 };
 
+/**
+ * Whether an error is the ledger declining to dispatch, rather than a call
+ * going wrong.
+ *
+ * Checked by name as well as by `instanceof`, because the two packages can be
+ * resolved through different module instances and a mis-identified refusal is
+ * a refusal that gets replayed.
+ */
+function isLedgerRefusal(error: Error): boolean {
+  return (
+    error instanceof BudgetExceededError ||
+    error instanceof UnpricedCallLimitError ||
+    error.name === "BudgetExceededError" ||
+    error.name === "UnpricedCallLimitError"
+  );
+}
+
+/**
+ * The retry policy, with one rule the caller cannot switch off.
+ *
+ * With the ledger inside the retry loop, a refusal now reaches the retry
+ * policy — and the default policy treats an error carrying no HTTP status as
+ * transient, which a budget refusal emphatically is not. Replaying one would
+ * spend the backoff delays learning what the first refusal already said, and
+ * would bury the error the chain identifies a budget stop by under two more
+ * layers of wrapping.
+ *
+ * Composed with the caller's own predicate rather than replacing it: the
+ * caller's answer still decides everything except this.
+ */
+function retryPolicy(config: RetryConfig | undefined): RetryConfig {
+  const base = config ?? DEFAULT_RETRY;
+  const callerPredicate = base.isRetryable;
+
+  return {
+    ...base,
+    isRetryable: (error) => {
+      if (isLedgerRefusal(error)) {
+        return false;
+      }
+
+      return callerPredicate?.(error) ?? true;
+    },
+  };
+}
+
 export function createHarnessAgents(
   options: HarnessAgentsOptions,
 ): HarnessAgents {
@@ -240,13 +300,18 @@ export function createHarnessAgents(
   // the derivation stops while money is left and the floor only speaks when
   // there is none — and when it does fire the chain records it as a budget stop
   // (see the `budgetHalted` fact), so the two agree about what happened.
-  const budgetRunner = withBudget(withRetry(base, retry ?? DEFAULT_RETRY), {
+  //
+  // "Bounds the damage to a single call" is a property of this order and only
+  // this order — see the module note. The retry policy wraps the ledger, so
+  // each attempt is checked against it rather than the whole sequence being
+  // waved through on one check.
+  const budgetRunner = withBudget(base, {
     pricing: rates,
     maxTotalCost: preset.budgetUsd,
   });
 
   const orchestrator = createMultiAgentOrchestrator({
-    runner: budgetRunner,
+    runner: withRetry(budgetRunner, retryPolicy(retry)),
     agents: buildRegistry(preset),
     plugins,
   });

@@ -339,6 +339,59 @@ describe("createSubscription", () => {
       expect(state.isComplete).toBe(false);
     });
 
+    it("survives an unrelated fact change", async () => {
+      let capturedCallbacks: { onData: (d: unknown) => void } | null = null;
+      const subscribe = vi.fn((_params: unknown, callbacks: unknown) => {
+        capturedCallbacks = callbacks as { onData: (d: unknown) => void };
+      });
+
+      const sub = createSubscription({
+        name: "price",
+        // A constant key, which is the ordinary case — and the one where the
+        // effect records no dependencies, so Directive re-runs it on every
+        // reconcile. A re-run fires the effect's cleanup, and the cleanup used
+        // to abort the stream and never put it back: the subscription died the
+        // first time anything else in the system moved, with no error and the
+        // resource state frozen on whatever had arrived.
+        key: () => ({ ticker: "AAPL" }),
+        subscribe,
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: { unrelated: t.number() },
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+          init: (facts: Record<string, unknown>) => {
+            facts.unrelated = 0;
+          },
+        }),
+      );
+      const system = createSystem({ module: mod });
+      system.start();
+      await flushMicrotasks(20);
+
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      // Something else entirely changes.
+      (system.facts as Record<string, unknown>).unrelated = 1;
+      await flushMicrotasks(20);
+
+      // The stream was not re-established, because it was never torn down.
+      expect(subscribe).toHaveBeenCalledTimes(1);
+
+      capturedCallbacks!.onData({ price: 1, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      const state = system.read("price") as ResourceState<unknown>;
+      expect(state.status).toBe("success");
+
+      system.destroy();
+    });
+
     it("calls cleanup when system is destroyed", async () => {
       const cleanup = vi.fn();
       const sub = createSubscription({

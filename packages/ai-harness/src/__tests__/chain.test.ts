@@ -131,6 +131,16 @@ describe("chain", () => {
       "beta",
       "gamma",
     ]);
+
+    // The two artefacts number turns the same way, so joining them on the
+    // number attributes each turn to the persona that took it. The sidecar
+    // used to carry the zero-based `iteration` beside a markdown heading that
+    // counts from one, and nothing said so.
+    const records = lines.map((line) => JSON.parse(line));
+    expect(records.map((record) => record.turn)).toEqual([1, 2, 3]);
+    for (const record of records) {
+      expect(markdown).toContain(`## ${record.turn}. ${record.persona}`);
+    }
   });
 
   it("gives every persona the whole transcript, not just the last turn", async () => {

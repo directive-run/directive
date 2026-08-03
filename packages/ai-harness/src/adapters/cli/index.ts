@@ -521,7 +521,7 @@ export function renderPresetList(): string {
   }
 
   for (const line of wrap(
-    "The dollar figure is a ceiling, not a price: the chain refuses to start a turn it cannot pay for alongside the closing document it still owes. The expected figure assumes an empty input and every turn using its full token allowance, so a real run on a long subject sits at or above it.",
+    "The dollar figure is a ceiling, not a price: the chain refuses to start a turn it cannot pay for alongside the closing document it still owes. The expected figure assumes an empty input, which puts it low, and every turn using its full token allowance, which puts it high — so it is a middle estimate a real run can land either side of. The cap is not an estimate.",
     "",
   )) {
     lines.push(pc.dim(line));

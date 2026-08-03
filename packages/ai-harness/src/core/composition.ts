@@ -10,6 +10,29 @@
  * lists, and it is why a four-preset chain does not end up with a thirty-turn
  * transcript no single persona can read.
  *
+ * ## This is a module, for the same reasons the chain is
+ *
+ * It was a `for` loop with a `break`, two mutable flags, and a running total,
+ * which is exactly the shape `./module.js` argues against — and it had the same
+ * defects that shape always has. "Is the ceiling used up" was a `let` assigned
+ * at one `break` site, so nothing outside the loop could read it and no second
+ * reason to stop could be added without editing the body. "Was this
+ * interrupted" was a flag written in three places: once from the signal's
+ * initial state, once from its listener, once from a step's own stop reason.
+ * And a step's spend reached the ceiling check only if the loop remembered to
+ * add it.
+ *
+ * Here the same driver is facts for where the composition is, derivations for
+ * what that means, one constraint for what must happen next, and one resolver
+ * that runs a step. `budgetExhausted` is a derivation — steps remain and none
+ * is affordable — rather than a flag somebody sets on the way out. A caller
+ * holding the system can read `remainingUsd` mid-run. Adding a stop condition
+ * is one clause of `compositionStopped`.
+ *
+ * The step *is* still a whole other Directive system, built and destroyed
+ * inside the resolver. That is not a nesting problem, it is what a resolver is
+ * for: the chain's turn resolver calls a provider, and this one calls a chain.
+ *
  * ## Sequential only
  *
  * There is no parallel form here, deliberately. Two presets running at once
@@ -28,6 +51,12 @@
  * @module
  */
 
+import {
+  type ModuleSchema,
+  createModule,
+  createSystem,
+  t,
+} from "@directive-run/core";
 import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
 import type { HarnessEvent, HarnessEventSink } from "./events.js";
 import type { PresetConfig } from "./preset-types.js";
@@ -218,6 +247,126 @@ function renderCombined(
 }
 
 // ============================================================================
+// The module
+// ============================================================================
+
+/** Everything the composition computes about itself. */
+interface CompositionDerived {
+  /** Dollars left of the composition's ceiling, floored at zero. */
+  remainingUsd: number;
+  /** Whether every preset has had its turn. */
+  stepsExhausted: boolean;
+  /**
+   * The least the next step needs to be worth starting: its closing document
+   * plus one turn. Zero once there is no next step.
+   *
+   * Below this there is no step worth running — it could buy a turn or two but
+   * not the closing document that makes them useful to the next step, and a
+   * step whose synthesis is skipped contributes nothing downstream.
+   */
+  nextStepFloorUsd: number;
+  /** Whether what is left can pay for the next step. */
+  canAffordStep: boolean;
+  /**
+   * Whether the ceiling ran out with steps still to run.
+   *
+   * A derivation, not a flag. It used to be a `let` set at the one `break` that
+   * noticed, which meant it was only ever true if that particular exit was
+   * taken — and a second reason to stop would have had to remember to set it.
+   */
+  budgetExhausted: boolean;
+  /** Whether the composition is done starting steps, for any reason. */
+  compositionStopped: boolean;
+  /**
+   * Whether a step has been started and has not yet reported.
+   *
+   * The composition can be told to stop while a step is still running — that
+   * is what an interrupt is — and the step still finishes and still
+   * synthesizes. So "nothing further will start" and "nothing is running" are
+   * two different questions, and closing the composition needs both.
+   */
+  stepInFlight: boolean;
+  /** Whether another step should start right now. */
+  stepPending: boolean;
+  /** Whether the composition is finished and can be written up. */
+  compositionSettled: boolean;
+}
+
+/** Read one derivation. Pointed at the system between build and start. */
+type ReadDerived = <K extends keyof CompositionDerived>(
+  key: K,
+) => CompositionDerived[K];
+
+const compositionSchema = {
+  facts: {
+    runId: t.string().meta({ label: "Run ID", category: "config" }),
+    input: t.string().meta({ label: "Input", category: "config" }),
+    /** Flipped by the `start` event. Nothing happens until it is true. */
+    running: t.boolean().meta({ label: "Running", category: "lifecycle" }),
+    /** Steps completed. Also the index of the step about to run. */
+    step: t.number().meta({ label: "Step", category: "chain" }),
+    /**
+     * Steps dispatched, which leads {@link step} by one while a step runs.
+     *
+     * Two counters rather than a boolean, so the gap between them is the
+     * answer to "is a step in flight" rather than a flag somebody has to
+     * remember to clear on every way out of the resolver.
+     */
+    stepsStarted: t
+      .number()
+      .meta({ label: "Steps started", category: "chain" }),
+    /** The composition's ceiling, across every step. */
+    budgetUsd: t.number().meta({ label: "Budget (USD)", category: "cost" }),
+    /** Every finished step's spend, summed. */
+    spentUsd: t.number().meta({ label: "Spent (USD)", category: "cost" }),
+    /**
+     * Set by `abort()` and by a step that reported an interrupt of its own.
+     *
+     * One fact rather than three assignments. An interrupt inside a step ends
+     * the composition, not just that step — the operator asked the run to stop,
+     * and carrying on into the next preset would answer a question they had
+     * already withdrawn.
+     */
+    interrupted: t
+      .boolean()
+      .meta({ label: "Interrupted", category: "lifecycle" }),
+    /** The most recently finished step. The effects' change signal. */
+    lastStep: t
+      .object<CompositionStepResult>()
+      .meta({ label: "Last step", category: "chain" })
+      .nullable(),
+    /** Where the combined document landed. Written once, at the end. */
+    combinedPath: t.string().meta({ label: "Combined", category: "io" }),
+    /** Set once the combined document has been written and announced. */
+    closed: t.boolean().meta({ label: "Closed", category: "lifecycle" }),
+  },
+
+  derivations: {
+    remainingUsd: t.number(),
+    stepsExhausted: t.boolean(),
+    stepInFlight: t.boolean(),
+    compositionSettled: t.boolean(),
+    nextStepFloorUsd: t.number(),
+    canAffordStep: t.boolean(),
+    budgetExhausted: t.boolean(),
+    compositionStopped: t.boolean(),
+    stepPending: t.boolean(),
+  },
+
+  events: {
+    start: { input: t.string() },
+    interrupt: {},
+  },
+
+  requirements: {
+    RUN_STEP: {
+      step: t.number(),
+      presetId: t.string(),
+    },
+  },
+} satisfies ModuleSchema;
+
+// ============================================================================
 // runComposition
 // ============================================================================
 
@@ -268,8 +417,18 @@ export async function runComposition(
   const store = transcripts ?? createMemoryTranscriptStore();
   /** This composition's fence marker. Distinct from any step's. */
   const fenceToken = createFenceToken();
+  // One fan-out, subscribed to the same way a surface subscribes. The promise
+  // this function returns resolves off the event stream rather than off a
+  // second completion signal, so it cannot resolve on a different notion of
+  // "done" than the caller is watching.
+  const listeners = new Set<HarnessEventSink>();
+  if (onEvent) {
+    listeners.add(onEvent);
+  }
   const emit: HarnessEventSink = (event: HarnessEvent) => {
-    onEvent?.(event);
+    for (const listener of [...listeners]) {
+      listener(event);
+    }
   };
 
   const budgetUsd =
@@ -282,144 +441,347 @@ export async function runComposition(
     );
   }
 
-  emit({
-    type: "composition:started",
-    runId,
-    presets: presets.map((preset) => preset.id),
-    input,
-    at: now(),
-  });
-
+  // The two growing records, held beside the facts rather than in them — the
+  // same arrangement the chain uses for its transcript. A fact is where the
+  // composition *is*; these are what it has produced, and `lastStep` is the
+  // fact that says one of them moved.
   const steps: CompositionStepResult[] = [];
   const prior: PriorSynthesis[] = [];
-  let spentUsd = 0;
-  let interrupted = signal?.aborted === true;
-  let budgetExhausted = false;
 
-  for (const [index, preset] of presets.entries()) {
-    if (interrupted) {
-      break;
+  /** The step in flight, for an abort that arrives while one is running. */
+  let running: Harness | undefined;
+
+  const binding: { derived?: CompositionDerived } = {};
+  const readDerived: ReadDerived = (key) => {
+    const derived = binding.derived;
+    if (derived === undefined) {
+      throw new Error(
+        "[ai-harness] a composition derivation was read before the system was built.",
+      );
     }
 
-    const step = index + 1;
-    const stepRunId = `${runId}-${step}-${preset.id}`;
-    const stepMeta = { step, total: presets.length, presetId: preset.id };
+    return derived[key];
+  };
 
-    // What this step may spend: its own budget, or whatever is left of the
-    // composition's, whichever is smaller. The clamp is a no-op on the default
-    // ceiling — the sum of the steps' own budgets — and is the whole mechanism
-    // when a caller sets one.
-    const remainingUsd = budgetUsd - spentUsd;
-    const pricing = resolvePresetPricing(preset, rest.pricing);
-    const floorUsd = minimumStepBudgetUsd(preset, pricing);
-
-    // Below the floor there is no step worth running: it could buy a turn or
-    // two but not the closing document that makes them useful to the next step,
-    // and a step whose synthesis is skipped contributes nothing downstream.
-    // Stop, and say so, rather than start something that cannot finish.
-    if (remainingUsd < floorUsd) {
-      budgetExhausted = true;
-      emit({
-        type: "composition:budget-exhausted",
-        runId,
-        ...stepMeta,
-        spentUsd,
-        budgetUsd,
-        requiredUsd: floorUsd,
-        at: now(),
-      });
-      break;
+  /** The floor for a step, or zero when there is no next step. */
+  const floorFor = (index: number): number => {
+    const preset = presets[index];
+    if (preset === undefined) {
+      return 0;
     }
 
-    const stepPreset: PresetConfig =
-      remainingUsd < preset.budgetUsd
-        ? { ...preset, budgetUsd: remainingUsd }
-        : preset;
+    return minimumStepBudgetUsd(
+      preset,
+      resolvePresetPricing(preset, rest.pricing),
+    );
+  };
 
-    emit({
-      type: "composition:step:started",
-      ...stepMeta,
-      runId: stepRunId,
-      at: now(),
-    });
+  const module = createModule("ai-harness-composition", {
+    schema: compositionSchema,
 
-    const harness: Harness = createHarnessSystem(stepPreset, {
-      ...rest,
-      transcripts: store,
-      runId: stepRunId,
-      onEvent: emit,
-    });
+    meta: {
+      label: "Composition",
+      description:
+        "Several presets run end to end, each reading what the last one concluded.",
+      category: "harness",
+    },
 
-    const onAbort = () => {
-      interrupted = true;
-      harness.abort();
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
+    init: (facts) => {
+      facts.runId = runId;
+      facts.input = "";
+      facts.running = false;
+      facts.step = 0;
+      facts.stepsStarted = 0;
+      facts.budgetUsd = budgetUsd;
+      facts.spentUsd = 0;
+      // An already-aborted signal is the same fact as one aborted mid-run,
+      // recorded at the only moment it can be: before anything starts.
+      facts.interrupted = signal?.aborted === true;
+      facts.lastStep = null;
+      facts.combinedPath = "";
+      facts.closed = false;
+    },
 
-    let result: HarnessRunResult;
-    try {
-      result = await harness.run(composeInput(input, prior, fenceToken));
-    } finally {
-      signal?.removeEventListener("abort", onAbort);
-      harness.system.destroy();
-    }
+    events: {
+      start: (facts, event) => {
+        facts.input = event.input;
+        facts.running = true;
+      },
+      interrupt: (facts) => {
+        facts.interrupted = true;
+      },
+    },
 
-    const stepResult: CompositionStepResult = { ...result, ...stepMeta };
-    steps.push(stepResult);
-    spentUsd += result.spentUsd;
-    if (result.synthesis !== "") {
-      prior.push({ step, presetId: preset.id, text: result.synthesis });
-    }
+    derive: {
+      remainingUsd: (facts) => Math.max(0, facts.budgetUsd - facts.spentUsd),
 
-    emit({
-      type: "composition:step:complete",
-      ...stepMeta,
-      runId: stepRunId,
-      stopReason: result.stopReason,
-      iterations: result.iterations,
-      spentUsd: result.spentUsd,
-      synthesis: result.synthesis,
-      transcriptPath: result.transcriptPath,
-      jsonlPath: result.jsonlPath,
-      at: now(),
-    });
+      stepsExhausted: (facts) => facts.step >= presets.length,
 
-    // An interrupt inside a step ends the composition, not just that step. The
-    // operator asked the run to stop; carrying on into the next preset would
-    // answer a question they had already withdrawn.
-    if (result.stopReason === "interrupted") {
-      interrupted = true;
-    }
-  }
+      nextStepFloorUsd: (facts) => floorFor(facts.step),
 
-  // Through the same store every step's transcript went through, so containment
-  // — and whether there is a filesystem here at all — is decided in one place
-  // rather than asserted again by a second writer that has to remember the rule.
-  const combinedPath = await store.writeDocument(
-    `${runId}.md`,
-    renderCombined(runId, input, steps),
-  );
+      canAffordStep: (_facts, derived) =>
+        !derived.stepsExhausted &&
+        derived.remainingUsd >= derived.nextStepFloorUsd,
 
-  emit({
-    type: "composition:complete",
-    runId,
-    steps: steps.length,
-    spentUsd,
-    budgetUsd,
-    combinedPath,
-    interrupted,
-    budgetExhausted,
-    at: now(),
+      budgetExhausted: (_facts, derived) =>
+        !derived.stepsExhausted && !derived.canAffordStep,
+
+      compositionStopped: (facts, derived) =>
+        facts.interrupted || derived.stepsExhausted || !derived.canAffordStep,
+
+      stepInFlight: (facts) => facts.stepsStarted > facts.step,
+
+      stepPending: (facts, derived) =>
+        facts.running && !derived.compositionStopped && !derived.stepInFlight,
+
+      compositionSettled: (facts, derived) =>
+        facts.running && derived.compositionStopped && !derived.stepInFlight,
+    },
+
+    constraints: {
+      /**
+       * While another step should start, one must.
+       *
+       * The whole decision is `stepPending`. Nothing about budgets, interrupts,
+       * or step order appears here.
+       */
+      runStep: {
+        when: () => readDerived("stepPending"),
+        require: (facts) => ({
+          type: "RUN_STEP" as const,
+          step: facts.step,
+          presetId: presets[facts.step]?.id ?? "",
+        }),
+        meta: { label: "Next step", category: "chain" },
+      },
+    },
+
+    resolvers: {
+      /**
+       * Run one preset, end to end, and report what it cost.
+       *
+       * Keyed by index, so every re-emission of the same step collapses into
+       * one requirement however many times the facts underneath it move.
+       */
+      runStep: {
+        requirement: "RUN_STEP",
+        key: (req) => `step-${req.step}`,
+        resolve: async (req, context) => {
+          const preset = presets[req.step];
+          if (preset === undefined) {
+            return;
+          }
+
+          // Dispatched. `stepInFlight` holds from here until the facts below
+          // are written, which is what keeps the composition from writing
+          // itself up while a step it interrupted is still synthesizing.
+          context.facts.stepsStarted = req.step + 1;
+
+          const step = req.step + 1;
+          const stepRunId = `${context.facts.runId}-${step}-${preset.id}`;
+          const stepMeta = { step, total: presets.length, presetId: preset.id };
+
+          // What this step may spend: its own budget, or whatever is left of
+          // the composition's, whichever is smaller. The clamp is a no-op on
+          // the default ceiling — the sum of the steps' own budgets — and is
+          // the whole mechanism when a caller sets one.
+          const remainingUsd = readDerived("remainingUsd");
+          const stepPreset: PresetConfig =
+            remainingUsd < preset.budgetUsd
+              ? { ...preset, budgetUsd: remainingUsd }
+              : preset;
+
+          emit({
+            type: "composition:step:started",
+            ...stepMeta,
+            runId: stepRunId,
+            at: now(),
+          });
+
+          const harness = createHarnessSystem(stepPreset, {
+            ...rest,
+            transcripts: store,
+            runId: stepRunId,
+            onEvent: emit,
+          });
+          running = harness;
+
+          let result: HarnessRunResult;
+          try {
+            result = await harness.run(
+              composeInput(context.facts.input, prior, fenceToken),
+            );
+          } finally {
+            running = undefined;
+            harness.system.destroy();
+          }
+
+          const stepResult: CompositionStepResult = { ...result, ...stepMeta };
+          steps.push(stepResult);
+          if (result.synthesis !== "") {
+            prior.push({ step, presetId: preset.id, text: result.synthesis });
+          }
+
+          context.facts.spentUsd = context.facts.spentUsd + result.spentUsd;
+          context.facts.lastStep = stepResult;
+          context.facts.step = req.step + 1;
+          // The step said an operator stopped it, which stops the composition
+          // too — written as the same fact `abort()` writes, not as a second
+          // way of saying it.
+          if (result.stopReason === "interrupted") {
+            context.facts.interrupted = true;
+          }
+        },
+        meta: { label: "Run composition step", category: "chain" },
+      },
+    },
+
+    effects: {
+      /** Announce a finished step. */
+      announceStep: {
+        deps: ["lastStep"],
+        run: (facts, previous) => {
+          const finished = facts.lastStep;
+          if (
+            finished === null ||
+            previous === null ||
+            previous.lastStep === finished
+          ) {
+            return;
+          }
+
+          emit({
+            type: "composition:step:complete",
+            step: finished.step,
+            total: presets.length,
+            presetId: finished.presetId,
+            runId: finished.runId,
+            stopReason: finished.stopReason,
+            iterations: finished.iterations,
+            spentUsd: finished.spentUsd,
+            synthesis: finished.synthesis,
+            transcriptPath: finished.transcriptPath,
+            jsonlPath: finished.jsonlPath,
+            at: now(),
+          });
+        },
+        meta: { label: "Announce step", category: "events" },
+      },
+
+      /**
+       * Close the composition out once nothing further will start.
+       *
+       * Deliberately has no `deps` — it reads `compositionStopped`, which is
+       * derived from most of the fact set, and repeating that list here would
+       * be a second copy of the derivation's dependencies. Every read happens
+       * before the one `await`, because auto-tracking closes when the body
+       * returns its promise.
+       */
+      close: {
+        run: async (facts) => {
+          if (facts.closed || !readDerived("compositionSettled")) {
+            return;
+          }
+          facts.closed = true;
+
+          const budgetExhausted = readDerived("budgetExhausted");
+          const composedRunId = facts.runId;
+          const composedInput = facts.input;
+          const spentUsd = facts.spentUsd;
+
+          // Said before the composition closes: the step that did *not* start,
+          // and what it would have needed. What ran before it is whole — this
+          // is not a partial step, it is a step declined.
+          if (budgetExhausted) {
+            emit({
+              type: "composition:budget-exhausted",
+              runId: composedRunId,
+              step: facts.step + 1,
+              total: presets.length,
+              presetId: presets[facts.step]?.id ?? "",
+              spentUsd,
+              budgetUsd: facts.budgetUsd,
+              requiredUsd: readDerived("nextStepFloorUsd"),
+              at: now(),
+            });
+          }
+
+          // Through the same store every step's transcript went through, so
+          // containment — and whether there is a filesystem here at all — is
+          // decided in one place rather than asserted again by a second writer
+          // that has to remember the rule.
+          const combinedPath = await store.writeDocument(
+            `${composedRunId}.md`,
+            renderCombined(composedRunId, composedInput, steps),
+          );
+          facts.combinedPath = combinedPath;
+
+          emit({
+            type: "composition:complete",
+            runId: composedRunId,
+            steps: steps.length,
+            spentUsd,
+            budgetUsd: facts.budgetUsd,
+            combinedPath,
+            interrupted: facts.interrupted,
+            budgetExhausted,
+            at: now(),
+          });
+        },
+        meta: { label: "Close the composition", category: "events" },
+      },
+    },
   });
 
-  return {
-    runId,
-    steps,
-    spentUsd,
-    budgetUsd,
-    synthesis: steps.at(-1)?.synthesis ?? "",
-    combinedPath,
-    interrupted,
-    budgetExhausted,
+  const system = createSystem({ module });
+  binding.derived = system.derive as unknown as CompositionDerived;
+  system.start();
+
+  const onAbort = () => {
+    system.dispatch({ type: "interrupt" });
+    running?.abort();
   };
+  signal?.addEventListener("abort", onAbort, { once: true });
+
+  const finished = new Promise<void>((resolve) => {
+    const onComplete: HarnessEventSink = (event) => {
+      if (event.type === "composition:complete") {
+        listeners.delete(onComplete);
+        resolve();
+      }
+    };
+    listeners.add(onComplete);
+  });
+
+  try {
+    // Emitted here rather than from an effect, because it reports what the
+    // composition was *asked* to do — which is known before a fact moves, and
+    // is the one thing about the run that no state describes.
+    emit({
+      type: "composition:started",
+      runId,
+      presets: presets.map((preset) => preset.id),
+      input,
+      at: now(),
+    });
+    system.dispatch({ type: "start", input });
+    await finished;
+
+    // Read while the system is still alive, and read from the derivation
+    // rather than reconstructed: `budgetExhausted` is one expression, and this
+    // is a report of it rather than a second opinion about it.
+    return {
+      runId,
+      steps,
+      spentUsd: system.facts.spentUsd,
+      budgetUsd,
+      synthesis: steps.at(-1)?.synthesis ?? "",
+      combinedPath: system.facts.combinedPath,
+      interrupted: system.facts.interrupted,
+      budgetExhausted: readDerived("budgetExhausted"),
+    };
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+    system.destroy();
+  }
 }

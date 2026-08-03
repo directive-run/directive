@@ -17,7 +17,7 @@ import {
   walkPredicate,
 } from "./predicate.js";
 import { RequirementSet, createRequirementWithId } from "./requirements.js";
-import { withTracking } from "./tracking.js";
+import { normalizeExplicitDeps, withTracking } from "./tracking.js";
 import type {
   ConstraintState,
   ConstraintsDef,
@@ -211,6 +211,20 @@ export interface CreateConstraintsOptions<S extends Schema> {
   requirementKeys?: Record<string, RequirementKeyFn>;
   /** Default timeout in milliseconds for async constraint evaluation (defaults to 5 000). */
   defaultTimeout?: number;
+  /**
+   * Whether a name in an explicit `deps` array refers to a derivation.
+   *
+   * Auto-tracked derivation reads are recorded under an internal namespace, and
+   * a hand-written `deps` entry is not — so without this, `deps: ["total"]`
+   * naming a derivation records a name nothing ever invalidates. That matters
+   * most for async constraints, which cannot auto-track and are told by core's
+   * own warning to declare `deps`.
+   *
+   * Supplied by the engine, which is the only thing that knows the merged
+   * module set. Defaults to "nothing is a derivation", which is the correct
+   * answer for a manager built without derivations.
+   */
+  isDerivation?: (name: string) => boolean;
   /** Called after each constraint evaluation with the constraint ID and whether `when()` was active. */
   onEvaluate?: (id: string, active: boolean) => void;
   /** Called when a constraint's `when()` or `require()` throws. */
@@ -264,9 +278,20 @@ export function createConstraintsManager<S extends Schema>(
     facts,
     requirementKeys = {},
     defaultTimeout = DEFAULT_TIMEOUT,
+    isDerivation = () => false,
     onEvaluate,
     onError,
   } = options;
+
+  /**
+   * A constraint's declared `deps`, on the same keyspace auto-tracking uses.
+   *
+   * Both places that read `def.deps` go through this, so a derivation named in
+   * `deps` cannot be live on one path and dead on the other.
+   */
+  function explicitDeps(deps: readonly string[]): Set<string> {
+    return normalizeExplicitDeps(deps, isDerivation);
+  }
 
   // Side store for the original data-form `when` spec (when present), used
   // by inspect()/explain()/devtools to render the predicate structure.
@@ -664,7 +689,7 @@ export function createConstraintsManager<S extends Schema>(
     const whenFn = def.when as WhenFn;
 
     if (def.deps) {
-      latestWhenDeps.set(id, new Set(def.deps));
+      latestWhenDeps.set(id, explicitDeps(def.deps));
 
       return whenFn(facts);
     }
@@ -775,7 +800,7 @@ export function createConstraintsManager<S extends Schema>(
 
     // Register explicit deps before await (auto-tracking can't work across async boundaries)
     if (def.deps?.length) {
-      const depsSet = new Set(def.deps);
+      const depsSet = explicitDeps(def.deps);
       updateDependencies(id, depsSet);
       latestWhenDeps.set(id, depsSet);
     }
@@ -929,7 +954,7 @@ export function createConstraintsManager<S extends Schema>(
     for (const [id, def] of Object.entries(defs)) {
       if (def.async && !def.deps) {
         console.warn(
-          `[Directive] Async constraint "${id}" has no \`deps\` declared. Auto-tracking cannot work across async boundaries. Add \`deps: ["key1", "key2"]\` to enable dependency tracking.`,
+          `[Directive] Async constraint "${id}" has no \`deps\` declared. Auto-tracking cannot work across async boundaries. Add \`deps: ["key1", "key2"]\` to enable dependency tracking — fact keys and derivation IDs both work.`,
         );
       }
     }

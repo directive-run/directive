@@ -284,6 +284,159 @@ describe("a fact and a derivation with the same name", () => {
     system.destroy();
   });
 
+  // ==========================================================================
+  // Explicit `deps`
+  // ==========================================================================
+  //
+  // Auto-tracking files a derivation read under an internal namespace. A `deps`
+  // array is written by hand and arrives as a bare name, so the two have to be
+  // brought onto one keyspace before they are compared — otherwise the
+  // documented escape hatch is dead for exactly the dependency it is most often
+  // reached for, and it is dead silently: the auto-tracked equivalent works, so
+  // it reads as correct until someone declares the dependency they were told to
+  // declare.
+
+  it("re-runs an effect whose explicit deps name a derivation", async () => {
+    const runs: number[] = [];
+    let readDoubled: () => number = () => 0;
+
+    const mod = createModule("explicit-effect", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { doubled: t.number() },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      derive: { doubled: (facts) => facts.count * 2 },
+      effects: {
+        watch: {
+          deps: ["doubled"],
+          run: () => {
+            runs.push(readDoubled());
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    readDoubled = () => system.derive.doubled;
+    system.start();
+    await settle();
+
+    const afterStart = runs.length;
+
+    system.facts.count = 4;
+    await settle();
+
+    expect(runs.length).toBeGreaterThan(afterStart);
+    expect(runs.at(-1)).toBe(8);
+
+    system.destroy();
+  });
+
+  it("re-evaluates an async constraint whose explicit deps name a derivation", async () => {
+    const evaluations: boolean[] = [];
+    let readReady: () => boolean = () => false;
+
+    const mod = createModule("explicit-async", {
+      schema: {
+        facts: { count: t.number(), fired: t.boolean() },
+        derivations: { ready: t.boolean() },
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.count = 0;
+        facts.fired = false;
+      },
+      derive: { ready: (facts) => facts.count >= 2 },
+      constraints: {
+        go: {
+          // An async `when()` cannot auto-track — the tracking context closes
+          // when the body returns its promise — so `deps` is the only way it
+          // can say what it reads, and core's own warning says to use it.
+          async: true,
+          deps: ["ready"],
+          when: async () => {
+            const value = readReady();
+            evaluations.push(value);
+
+            return value;
+          },
+          require: { type: "GO" },
+        },
+      },
+      resolvers: {
+        go: {
+          requirement: "GO",
+          key: () => "go",
+          resolve: async (_req, context) => {
+            context.facts.fired = true;
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    readReady = () => system.derive.ready;
+    system.start();
+    await settle();
+
+    const afterStart = evaluations.length;
+
+    system.facts.count = 2;
+    await settle();
+
+    expect(evaluations.length).toBeGreaterThan(afterStart);
+    expect(system.facts.fired).toBe(true);
+
+    system.destroy();
+  });
+
+  it("keeps an explicit dep that names a fact working", async () => {
+    const runs: number[] = [];
+
+    const mod = createModule("explicit-fact", {
+      schema: {
+        facts: { count: t.number(), other: t.number() },
+        derivations: { doubled: t.number() },
+      },
+      init: (facts) => {
+        facts.count = 0;
+        facts.other = 0;
+      },
+      derive: { doubled: (facts) => facts.count * 2 },
+      effects: {
+        watch: {
+          deps: ["count"],
+          run: (facts) => {
+            runs.push(facts.count);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await settle();
+
+    const afterStart = runs.length;
+
+    system.facts.count = 3;
+    await settle();
+
+    expect(runs.length).toBeGreaterThan(afterStart);
+    expect(runs.at(-1)).toBe(3);
+
+    // And a fact it did not name still leaves it alone.
+    const afterCount = runs.length;
+    system.facts.other = 9;
+    await settle();
+    expect(runs.length).toBe(afterCount);
+
+    system.destroy();
+  });
+
   it("still invalidates a derivation that reads the like-named fact", async () => {
     const mod = createModule("collide-derive", {
       schema: {

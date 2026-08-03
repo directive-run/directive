@@ -22,6 +22,11 @@
       "require": "./dist/index.cjs",
       "import": "./dist/index.js"
     },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "require": "./dist/node.cjs",
+      "import": "./dist/node.js"
+    },
     "./package.json": "./package.json"
   },
   "files": ["dist", "presets", "README.md"],

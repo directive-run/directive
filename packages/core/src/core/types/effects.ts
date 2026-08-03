@@ -67,14 +67,27 @@ export type EffectCleanup = () => void;
  * }
  * ```
  */
-export interface EffectDef<S extends Schema> {
+export interface EffectDef<
+  S extends Schema,
+  DerivationIds extends string = never,
+> {
   run(
     facts: Facts<S>,
     prev: InferSchema<S> | null,
     // biome-ignore lint/suspicious/noConfusingVoidType: void semantics needed for implicit no-return
   ): void | EffectCleanup | Promise<void | EffectCleanup>;
-  /** Optional explicit dependencies for optimization */
-  deps?: Array<keyof InferSchema<S>>;
+  /**
+   * Optional explicit dependencies for optimization.
+   *
+   * Fact keys **and** derivation IDs. A derivation is a legitimate thing for an
+   * effect to depend on — it is what auto-tracking records when the body reads
+   * one — and an async effect, whose reads happen past an `await` where
+   * auto-tracking cannot see them, has this as its only way to say so.
+   *
+   * `DerivationIds` is supplied by the module that owns the effect; standalone
+   * uses of this type get fact keys alone, which is all they have.
+   */
+  deps?: Array<(keyof InferSchema<S> & string) | DerivationIds>;
   /**
    * Optional declarative trigger — a {@link FactPredicate} that gates whether
    * `run()` fires: even when a dependency changes, the effect runs only if
@@ -89,4 +102,7 @@ export interface EffectDef<S extends Schema> {
 }
 
 /** Map of effect definitions */
-export type EffectsDef<S extends Schema> = Record<string, EffectDef<S>>;
+export type EffectsDef<
+  S extends Schema,
+  DerivationIds extends string = never,
+> = Record<string, EffectDef<S, DerivationIds>>;

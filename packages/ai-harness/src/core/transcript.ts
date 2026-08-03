@@ -195,6 +195,35 @@ function renderMarkdownTurn(record: TurnRecord): string {
 }
 
 /**
+ * One turn, as one line of the JSONL sidecar.
+ *
+ * Here rather than in each sink, because there are two sinks and the sidecar's
+ * shape is not theirs to decide — a sink chooses where bytes land, not what
+ * they say. Exported for the same reason: a surface that keeps its artefacts
+ * somewhere else writes the same line.
+ *
+ * **`turn`, not `iteration`.** The two artefacts a reader is told to correlate
+ * are this file and the markdown, and the markdown heads each turn `## 1.`,
+ * `## 2.` — while `TurnRecord.iteration` is a zero-based index, which is what
+ * the fact store and the event stream mean by it. Writing the record out
+ * verbatim therefore published the same word under two numbering schemes one
+ * apart, and joining the two files on it silently attributed every turn to the
+ * persona before it. The sidecar says `turn` and counts from one, which is what
+ * the markdown says and what a prompt's `{{iteration}}` says; `iteration` keeps
+ * its zero-based meaning everywhere it is a programmatic index and appears in
+ * neither artefact.
+ */
+export function renderSidecarLine(record: TurnRecord): string {
+  return `${JSON.stringify({
+    turn: record.iteration + 1,
+    persona: record.persona,
+    text: record.text,
+    costUsd: record.costUsd,
+    at: record.at,
+  })}\n`;
+}
+
+/**
  * One turn, as the next persona reads it.
  *
  * The other rendering, and the reason there are two. Every turn is context for
@@ -370,9 +399,7 @@ export function createMemoryTranscriptStore(): MemoryTranscriptStore {
           jsonlPath: memoryLocation(jsonlName),
           write: async (markdown, appended) => {
             documents.set(markdownName, markdown);
-            const lines = appended
-              .map((record) => `${JSON.stringify(record)}\n`)
-              .join("");
+            const lines = appended.map(renderSidecarLine).join("");
             documents.set(jsonlName, (documents.get(jsonlName) ?? "") + lines);
           },
         },

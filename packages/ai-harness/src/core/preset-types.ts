@@ -18,7 +18,11 @@
 
 import type { DefinitionMeta } from "@directive-run/core";
 import { z } from "zod";
-import { MAX_PRESET_ID_LENGTH, identifierSchema } from "./safety.js";
+import {
+  MAX_PRESET_ID_LENGTH,
+  agentNameSchema,
+  identifierSchema,
+} from "./safety.js";
 
 // ============================================================================
 // Meta
@@ -57,6 +61,9 @@ export interface PersonaConfig {
    * The agent name. Used as the orchestrator's agent ID, so it must be unique
    * within a preset and stable across runs — it is what a transcript line and
    * a `turn:completed` event identify the speaker by.
+   *
+   * Letters, digits, and dashes, starting with a letter. See
+   * `agentNameSchema` in `./safety.js` for the three jobs that constrain it.
    */
   name: string;
   /** The persona's system prompt, verbatim. */
@@ -66,7 +73,7 @@ export interface PersonaConfig {
 }
 
 export const personaSchema = z.object({
-  name: z.string().min(1),
+  name: agentNameSchema("A persona's name"),
   systemPrompt: z.string().min(1),
   meta: metaSchema.optional(),
 });
@@ -90,7 +97,7 @@ export interface SynthesizerConfig {
 }
 
 export const synthesizerSchema = z.object({
-  name: z.string().min(1),
+  name: agentNameSchema("The synthesizer's name"),
   systemPrompt: z.string().min(1),
   promptTemplate: z.string().min(1),
   maxTokens: z.number().int().positive(),

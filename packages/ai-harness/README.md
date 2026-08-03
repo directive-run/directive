@@ -12,6 +12,11 @@ Node 18 or newer.
 npm install -g @sizls/ai-harness
 ```
 
+> **Not published yet.** The line above is the one that will work once this
+> package is on npm; today it is private, and the way in is a checkout of the
+> monorepo — `pnpm install`, then `pnpm --filter @sizls/ai-harness build`, and
+> `node packages/ai-harness/dist/cli.js` wherever `harness` appears below.
+
 ## One command
 
 Offline first, so it runs with no API key:
@@ -101,7 +106,7 @@ Both runs wrote two files: the transcript and a JSONL sidecar. See [Interrupting
 
 ## What it costs
 
-The dollar figure on a preset is a **ceiling, not an expected cost**. It is the number the chain refuses to cross, and about half the shipped presets never approach it – they run out of turns first.
+The dollar figure on a preset is a **ceiling, not an expected cost**. It is the number the chain refuses to cross. One of the eight shipped presets never approaches it – `code-review` runs out of turns first, at about $0.23 of its $0.30 cap – and the other seven spend theirs.
 
 The chain stops adding turns while it can still pay for the closing document. That document is the expensive call: the synthesizer is capped at several thousand output tokens against a turn's few hundred, and it reads the entire transcript on the way in. In the live run above, four turns came to $0.0444 and the closing document came to $0.0399 on its own – roughly three times the last turn.
 
@@ -116,7 +121,13 @@ budget on turns and then have nothing left to summarise them with. Raise the
 budget above $0.0375, or lower `synthesizer.maxTokens`.
 ```
 
-The reserve is arithmetic, not a guess – the synthesizer's cap and the transcript's length are both known before the call – but it can still come up short on a budget spent down to the last cent. When it does, the chain declines the synthesis rather than spending past its number, and says so: the run is `"complete"`, `synthesis` is `""`, and `synthesisSkipped` is true on the result and on a `budget:synthesis-skipped` event. That is the budget working, not breaking, and it is the one way a finished run has no closing document without anything having failed.
+The reserve is arithmetic, not a guess – the synthesizer's cap and the transcript's length are both known before the call – but it can still come up short on a budget spent down to the last cent. When it does, the chain declines the synthesis rather than spending past its number, and says so: the run is `"complete"`, `synthesis` is `""`, and `synthesisSkipped` is true on the result and on a `budget:synthesis-skipped` event. That is the budget working, not breaking.
+
+There is a second way to finish with no closing document and nothing having failed, and it is the quieter one: a budget that covers the synthesis but not a first turn *alongside* the synthesis that turn would leave owing. The chain is refused at construction only when the budget cannot pay for the closing document at all, so a figure between the two is accepted and produces a run of zero turns – `iterations: 0`, `stopReason: "budget"`, `synthesisSkipped: false`, because no synthesis ever came due. The command line names it rather than printing an empty run:
+
+```
+  no turns — $0.0400 covers the closing document but not a first turn alongside it. Raise the budget.
+```
 
 Offline costs are fictional rather than approximate: `--dry-run` bills every model at one nominal rate and answers with a fixed paragraph that ignores `tokensPerTurn`, so the figures compare neither between presets nor to a live run. They exist so the ledger moves, because a chain whose spend never moves never reaches the condition it terminates on.
 
@@ -144,11 +155,12 @@ Built-in presets
 
 The dollar figure is a ceiling, not a price: the chain refuses to start a
 turn it cannot pay for alongside the closing document it still owes. The
-expected figure assumes an empty input and every turn using its full token
-allowance, so a real run on a long subject sits at or above it.
+expected figure assumes an empty input, which puts it low, and every turn
+using its full token allowance, which puts it high — so it is a middle
+estimate a real run can land either side of. The cap is not an estimate.
 ```
 
-The expected figure is a replay of the chain's own stopping arithmetic against an empty input, so a real run lands at or above it, never below.
+The expected figure is a replay of the chain's own stopping arithmetic — the same functions the running chain calls, not a second model of it. Its two assumptions pull in **opposite** directions: an empty input puts the figure low, since a long subject makes every prompt longer, while every turn using its full `tokensPerTurn` puts it high, since that is a cap a model need not reach. So it is a middle estimate rather than a bound in either direction. The cap beside it is not an estimate at all.
 
 ## The presets
 
@@ -306,6 +318,29 @@ It checks the schema, not the budget floor – the budget-versus-synthesis check
 
 Four entry points, in order of how much you want to hold.
 
+**Offline, with no API key.** The command line's `--dry-run` is not a command-line feature – it is `createMockRunner` supplied as the `runner` option, and the same two lines work from code. A runner sits at the *base* of the chain, under the retry policy and the ledger, so an offline run terminates on the same condition an online one does. That is what makes it worth testing against.
+
+```typescript
+import { createMockRunner, preMortemPreset, runHarness } from "@sizls/ai-harness";
+
+const result = await runHarness(preMortemPreset, proposal, {
+  runner: createMockRunner({
+    // Keyed by agent name. Anything without an entry gets `defaultResponse`.
+    responses: {
+      engineer: "The dependency graph is the failure surface …",
+      security: ["First turn.", "Second turn."], // an array cycles per call
+    },
+    // Scripted failures, for exercising the retry and error paths.
+    failures: [{ agent: "product", call: 1, afterDeltas: 3 }],
+  }),
+  pricing: { inputPerMillion: 3, outputPerMillion: 15 },
+});
+```
+
+Supply `pricing` alongside it. A mock reports token usage proportional to the text it produces, and the ledger prices that at whatever rates it was given – so the offline chain's spend moves, and a chain whose spend never moves never reaches the condition it terminates on. Without `pricing` the preset's real model rates are used, which is fine for a single preset and misleading across a composition that names several.
+
+Every option below takes `runner` the same way, `runComposition` included.
+
 **One run, nothing to clean up** – `runHarness`. It builds the harness, runs it, and destroys the system on the way out.
 
 ```typescript
@@ -321,7 +356,8 @@ console.log(result.stopReason, result.spentUsd, result.synthesis);
 **You need the system, or you need to stop it** – `createHarness`. Same run, but you get `harness.system`, `harness.transcript` (readable mid-run), and `harness.abort()`.
 
 ```typescript
-import { codeReviewPreset, createFileTranscriptStore, createHarness } from "@sizls/ai-harness";
+import { codeReviewPreset, createHarness } from "@sizls/ai-harness";
+import { createFileTranscriptStore } from "@sizls/ai-harness/node";
 
 const harness = createHarness(codeReviewPreset, {
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -379,7 +415,7 @@ The chain then shares your plugins, your devtools session, and your reconciliati
 
 `harness.system` is exposed on purpose in all of these. It is an ordinary Directive system – `inspect()` it, attach an observer, read `system.derive.stopReason` mid-run, destroy it when you like. Hiding it behind a façade would only re-expose the same things under worse names. Reading facts off it is fine; writing them is not, because every fact has a resolver or an event that owns it.
 
-**The library writes nothing to disk unless you tell it where.** The default transcript store keeps the run in memory and reports paths as `memory://run-….md`, which surprises people who expect files. `createFileTranscriptStore({ dir })` is the filesystem, opted into; the CLI supplies it for you, and a server surface supplies its own store and the chain never learns there was no disk.
+**The library writes nothing to disk unless you tell it where.** The default transcript store keeps the run in memory and reports paths as `memory://run-….md`, which surprises people who expect files. The filesystem is a separate entry point – `@sizls/ai-harness/node` – rather than a named export from the package root, because a static re-export is not conditional: importing `runHarness` would have imported `node:fs` with it. Nothing on the package's main entry loads a node builtin, so it runs on a worker, an edge runtime, or a bundle for the browser. The CLI supplies the file store for you; a server surface supplies its own, and the chain never learns there was no disk.
 
 Everything a surface can see comes through `onEvent` as a `HarnessEvent` – turn started, delta, restarted, completed, cost updated, budget warning, synthesis started, chunk, phase change, chain complete, plus four `composition:*` events. The CLI has no private channel; it reads the same union and renders it.
 
@@ -449,7 +485,7 @@ Interrupting a composition ends the composition, not just the running step.
 The CLI writes to `--out-dir`, default `./runs`. A run produces two files:
 
 - `<runId>.md` – the transcript. A heading with the run ID, the input, then `## 1. persona` per turn, then `---` and `# Synthesis`. This is the artefact, so it holds exactly what the model produced, escape sequences and all; those are stripped on the way to your terminal instead, where they would otherwise clear the screen or write your clipboard.
-- `<runId>.jsonl` – the structured sidecar, one line per turn: `iteration`, `persona`, `text`, `costUsd`, `at`. Turns only – the closing document is in the markdown.
+- `<runId>.jsonl` – the structured sidecar, one line per turn: `turn`, `persona`, `text`, `costUsd`, `at`. Turns only – the closing document is in the markdown. `turn` counts from one and matches the markdown's `## N. persona` heading exactly, so joining the two files on it attributes each turn to the persona that took it. (The event stream's `iteration` is the zero-based index of the same turn; the two artefacts use `turn` so one word does not mean two numbers.)
 
 A composition adds a third: `<runId>.md` holding every step's synthesis in order, alongside each step's own `<runId>-<n>-<presetId>.md` and `.jsonl` pair.
 

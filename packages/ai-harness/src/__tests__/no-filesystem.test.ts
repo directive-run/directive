@@ -15,6 +15,7 @@
  * surviving write anywhere under `core/` fails this file.
  */
 
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Both factories are hoisted above every import, so each builds its own
@@ -147,5 +148,56 @@ describe("a chain with nowhere to write", () => {
     expect(combined).toContain("## 2. second");
     expect(store.documents().has("composed-1-first.md")).toBe(true);
     expect(store.documents().has("composed-2-second.jsonl")).toBe(true);
+  });
+});
+
+/**
+ * The mocks above prove a chain makes no filesystem *call*. This proves the
+ * library entry does not *load* one.
+ *
+ * They are different failures. A module that imports `node:fs` and never calls
+ * it passes every assertion in this file and still cannot be loaded on a
+ * runtime without a filesystem — the import is resolved before a line of it
+ * runs. That is what a static re-export of the filesystem store from the
+ * package entry did: `import { runHarness } from "@sizls/ai-harness"` pulled in
+ * `node:fs` whether or not anything asked for a file.
+ *
+ * Read from source rather than from `dist`, so the rule holds without a build
+ * having happened, and so a violation is named with the file that introduced it.
+ */
+describe("nothing on the library entry's path imports a builtin", () => {
+  const CORE_DIRS = ["core", "presets"];
+  const STATIC_NODE_IMPORT = /^\s*import\s[^;]*?from\s+["']node:[^"']+["']/m;
+
+  it("keeps node: imports out of the runtime-agnostic half", async () => {
+    const { readdir, readFile } =
+      await vi.importActual<typeof import("node:fs/promises")>(
+        "node:fs/promises",
+      );
+    const src = join(import.meta.dirname, "..");
+    const offenders: string[] = [];
+
+    for (const dir of [".", ...CORE_DIRS]) {
+      const base = join(src, dir);
+      for (const entry of await readdir(base, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith(".ts")) {
+          continue;
+        }
+        // `node.ts` is the subpath export that exists to hold exactly this,
+        // and `cli.ts` is a binary with a `#!/usr/bin/env node` on line one.
+        if (
+          dir === "." &&
+          (entry.name === "node.ts" || entry.name === "cli.ts")
+        ) {
+          continue;
+        }
+        const contents = await readFile(join(base, entry.name), "utf8");
+        if (STATIC_NODE_IMPORT.test(contents)) {
+          offenders.push(`${dir}/${entry.name}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 });

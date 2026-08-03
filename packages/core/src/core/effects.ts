@@ -39,7 +39,11 @@
 import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
-import { describeDep, withTracking } from "./tracking.js";
+import {
+  describeDep,
+  normalizeExplicitDeps,
+  withTracking,
+} from "./tracking.js";
 import type {
   EffectsDef,
   Facts,
@@ -159,6 +163,19 @@ export interface CreateEffectsOptions<S extends Schema> {
   facts: Facts<S>;
   /** Underlying fact store used for `batch()` coalescing of mutations. */
   store: FactsStore<S>;
+  /**
+   * Whether a name in an explicit `deps` array refers to a derivation.
+   *
+   * An auto-tracked derivation read is recorded under an internal namespace and
+   * a hand-written one is not, so without this `deps: ["total"]` naming a
+   * derivation records a name nothing ever invalidates and the effect never
+   * re-runs — while the auto-tracked equivalent works, which is what makes it
+   * look correct.
+   *
+   * Supplied by the engine, which is the only thing that knows the merged
+   * module set. Defaults to "nothing is a derivation".
+   */
+  isDerivation?: (name: string) => boolean;
   /** Called when an effect executes, with the fact keys that triggered it. */
   onRun?: (id: string, deps: string[]) => void;
   /** Called when an effect's `run()` or cleanup function throws. */
@@ -215,7 +232,14 @@ export interface CreateEffectsOptions<S extends Schema> {
 export function createEffectsManager<S extends Schema>(
   options: CreateEffectsOptions<S>,
 ): EffectsManager<S> {
-  const { definitions, facts, store, onRun, onError } = options;
+  const {
+    definitions,
+    facts,
+    store,
+    isDerivation = () => false,
+    onRun,
+    onError,
+  } = options;
 
   // Internal state for each effect
   const states = new Map<string, EffectState>();
@@ -249,12 +273,19 @@ export function createEffectsManager<S extends Schema>(
     let hasExplicitDeps = false;
 
     if (def.deps) {
-      dependencies = new Set(def.deps as string[]);
+      // Resolved against the module's derivation names, because auto-tracking
+      // files a derivation read under a namespace and a hand-written name has
+      // no way to know that. Without this, the documented escape hatch is dead
+      // for exactly the dependency it is most often reached for.
+      dependencies = normalizeExplicitDeps(def.deps as string[], isDerivation);
       hasExplicitDeps = true;
     } else if (def.on !== undefined) {
       // Declarative trigger — deps are extracted statically from the
       // predicate; the predicate is the gate evaluated after the
-      // dep-overlap pre-filter in shouldRun(). A non-predicate value here
+      // dep-overlap pre-filter in shouldRun(). Not resolved against derivation
+      // names the way `deps` is: the predicate is evaluated against the facts
+      // snapshot, which carries no derivations, so every path it names is a
+      // fact key by construction. A non-predicate value here
       // is a user error and must throw (matches the friendly throw used by
       // constraints/derivations) instead of silently no-op-ing.
       if (!isPredicate(def.on)) {

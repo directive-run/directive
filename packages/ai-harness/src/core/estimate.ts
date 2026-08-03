@@ -1,31 +1,37 @@
 /**
  * What a preset is expected to do before it is asked to do it.
  *
- * A preset carries two ceilings — `budgetUsd` and `maxIterations` — and on
- * roughly half the library the second one binds first, so the run never
- * approaches the first. Printing the dollar figure on its own therefore says
- * almost nothing: it is a cap, it is often not reached, and nothing on screen
- * distinguishes a preset that spends its budget from one that stops at the turn
- * ceiling with most of it unspent.
+ * A preset carries two ceilings — `budgetUsd` and `maxIterations` — and which
+ * one binds is not visible from either number. Printing the dollar figure on
+ * its own therefore says almost nothing: it is a cap, and nothing on screen
+ * distinguishes a preset that spends it from one that stops at the turn ceiling
+ * with most of it unspent.
  *
- * This replays the chain's own arithmetic offline to answer both questions at
- * once. It is a *replay*, not a second model: every line below has a counterpart
- * derivation in `./module.js` — the same projection, the same reserve, the same
- * affordability test — because two different answers to "when does this stop"
- * is exactly the failure the chain's single termination condition exists to
- * avoid.
+ * This replays the chain against its own stopping rules offline to answer both
+ * questions at once. It is a *replay*, not a second model: every figure below
+ * comes out of `./projection.js`, which is also where the chain's derivations
+ * get theirs. That file exists because this one used to carry its own copy of
+ * the arithmetic, and the copies had already diverged — the ceiling was tested
+ * before affordability here and after it there, so a preset that spent its last
+ * dollar on the turn that reached its ceiling was advertised as stopping "well
+ * under the cap".
  *
  * ## What it assumes, and therefore what it cannot know
  *
- * - **An empty input.** The subject is what a caller supplies at run time; a
- *   long diff makes every prompt longer and every turn dearer, so a real run is
- *   at or above this figure, never below.
+ * - **An empty input.** The subject is what a caller supplies at run time, and
+ *   a long diff makes every prompt longer and every turn dearer. This pushes
+ *   the figure **low**.
  * - **Every turn using its full token allowance.** `tokensPerTurn` is a ceiling
- *   the model need not reach. A chatty preset lands near this; a terse one
- *   under it.
+ *   the model need not reach; a terse preset lands under it. This pushes the
+ *   figure **high**.
+ * - **No retries.** A retried call is billed per attempt and this counts one,
+ *   which pushes the figure low again on a flaky provider.
  *
- * Both assumptions push the same way, which is the useful direction: the figure
- * is a realistic upper bound on an ordinary run, not an average.
+ * The two main assumptions push in **opposite** directions, so this is a
+ * middle estimate rather than a bound in either direction — a realistic figure
+ * for an ordinary run on a short subject, which a long subject or a chatty
+ * model will move either side of. What is not an estimate is the ceiling
+ * beside it: `budgetUsd` is enforced, whatever this says.
  *
  * @module
  */
@@ -33,6 +39,14 @@
 import type { TokenPricing } from "@directive-run/ai";
 import { CHARS_PER_TOKEN, harnessSystemPrompt } from "./agents.js";
 import type { PresetConfig } from "./preset-types.js";
+import {
+  canAffordTurn,
+  projectTurnUsd,
+  projectedReserveUsd,
+  stopReasonFor,
+  synthesisReserveUsd,
+  tokensFor,
+} from "./projection.js";
 
 /** What is expected to stop a preset first. */
 export type RunLimit = "budget" | "iterations";
@@ -50,10 +64,8 @@ export interface RunEstimate {
   synthesis: boolean;
 }
 
-/** Tokens a prompt of this many characters bills as. Matches `withBudget`. */
-function tokensFor(chars: number): number {
-  return Math.ceil(chars / CHARS_PER_TOKEN);
-}
+/** The estimator's stated assumption: nothing was pasted in. */
+const ASSUMED_INPUT_CHARS = 0;
 
 /**
  * Replay a preset's run against its own stopping rules.
@@ -65,46 +77,46 @@ export function estimateRun(
   preset: PresetConfig,
   pricing: TokenPricing,
 ): RunEstimate {
-  const { personas, synthesizer, tokensPerTurn, budgetUsd } = preset;
+  const { personas, tokensPerTurn, budgetUsd } = preset;
   /** What one turn appends to the transcript the next one re-reads. */
   const turnChars = tokensPerTurn * CHARS_PER_TOKEN;
-  const synthesisOverheadChars =
-    synthesizer.promptTemplate.length +
-    harnessSystemPrompt(synthesizer.systemPrompt).length;
-
-  /** `synthesisReserveUsd`, for a transcript of a given length. */
-  const reserveFor = (transcriptChars: number): number =>
-    (tokensFor(transcriptChars + synthesisOverheadChars) / 1_000_000) *
-      pricing.inputPerMillion +
-    (synthesizer.maxTokens / 1_000_000) * pricing.outputPerMillion;
 
   let turns = 0;
   let spentUsd = 0;
   let transcriptChars = 0;
   let lastTurnUsd = 0;
   let previousTurnUsd = 0;
+  let limit: RunLimit = "iterations";
 
-  while (turns < preset.maxIterations) {
-    // `projectedTurnUsd`: the last turn plus the growth between the last two,
-    // floored at the last turn's cost.
-    const projectedTurnUsd =
-      turns === 0
-        ? 0
-        : turns === 1
-          ? lastTurnUsd
-          : lastTurnUsd + Math.max(0, lastTurnUsd - previousTurnUsd);
-    // `projectedReserveUsd`: the closing document priced against the transcript
-    // the turn about to be authorized will leave behind.
-    const projectedReserveUsd =
-      reserveFor(transcriptChars) +
-      (tokensPerTurn / 1_000_000) * pricing.inputPerMillion;
-    const remainingUsd = budgetUsd - spentUsd;
+  for (;;) {
+    const size = {
+      transcriptChars,
+      inputChars: ASSUMED_INPUT_CHARS,
+    };
+    const state = {
+      iteration: turns,
+      lastTurnUsd,
+      previousTurnUsd,
+      ...size,
+    };
+    const affordable = canAffordTurn({
+      remainingUsd: budgetUsd - spentUsd,
+      projectedTurnUsd: projectTurnUsd(preset, pricing, state),
+      projectedReserveUsd: projectedReserveUsd(preset, pricing, size),
+    });
+    // Asked in one place and answered by the same precedence a running chain
+    // reports itself with, rather than by whichever of the two ceilings this
+    // loop happened to test first.
+    const stopReason = stopReasonFor({
+      budgetHalted: false,
+      failed: false,
+      interrupted: false,
+      canAffordTurn: affordable,
+      iterationsExhausted: turns >= preset.maxIterations,
+    });
 
-    // `canAffordTurn`.
-    if (
-      remainingUsd <= 0 ||
-      remainingUsd < projectedTurnUsd + projectedReserveUsd
-    ) {
+    if (stopReason !== "") {
+      limit = stopReason === "max-iterations" ? "iterations" : "budget";
       break;
     }
 
@@ -112,7 +124,9 @@ export function estimateRun(
     const promptChars =
       preset.promptTemplate.length +
       transcriptChars +
+      ASSUMED_INPUT_CHARS +
       harnessSystemPrompt(persona?.systemPrompt ?? "").length;
+
     const turnUsd =
       (tokensFor(promptChars) / 1_000_000) * pricing.inputPerMillion +
       (tokensPerTurn / 1_000_000) * pricing.outputPerMillion;
@@ -125,17 +139,14 @@ export function estimateRun(
   }
 
   // `canAffordSynthesis`, and the bill if it can.
-  const reserveUsd = reserveFor(transcriptChars);
+  const reserveUsd = synthesisReserveUsd(preset, pricing, {
+    transcriptChars,
+    inputChars: ASSUMED_INPUT_CHARS,
+  });
   const synthesis = turns > 0 && budgetUsd - spentUsd >= reserveUsd;
   if (synthesis) {
     spentUsd += reserveUsd;
   }
 
-  return {
-    turns,
-    limit: turns >= preset.maxIterations ? "iterations" : "budget",
-    expectedUsd: spentUsd,
-    budgetUsd,
-    synthesis,
-  };
+  return { turns, limit, expectedUsd: spentUsd, budgetUsd, synthesis };
 }
