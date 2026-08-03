@@ -92,13 +92,18 @@ import {
   createModule,
   t,
 } from "@directive-run/core";
-import { CHARS_PER_TOKEN, type HarnessAgents } from "./agents.js";
+import {
+  CHARS_PER_TOKEN,
+  type HarnessAgents,
+  harnessSystemPrompt,
+} from "./agents.js";
 import type { ChainPhase, HarnessEventSink, StopReason } from "./events.js";
 import {
   DEFAULT_BUDGET_WARNING_THRESHOLD,
   type PresetConfig,
   renderTemplate,
 } from "./preset-types.js";
+import { fence } from "./safety.js";
 import type { BurstRecord, Transcript } from "./transcript.js";
 
 // ============================================================================
@@ -161,12 +166,30 @@ export interface ChainDerived {
    */
   synthesisReserveUsd: number;
   /**
+   * What the closing document will cost **after one more burst**.
+   *
+   * {@link ChainDerived.synthesisReserveUsd} prices the transcript that exists
+   * right now, which is the correct figure for a synthesis about to run and the
+   * wrong one for deciding whether to add a burst first. A burst appends about
+   * `tokensPerBurst` to the transcript, and the synthesizer then reads all of it
+   * — so authorizing a burst against today's reserve reserves for a document the
+   * chain is in the act of making more expensive.
+   *
+   * The gap is one burst's worth of input on every decision, which is small
+   * until the last one, where it is the difference between stopping with the
+   * closing document paid for and stopping a few hundredths of a cent short of
+   * it. That is not a hypothetical: a preset whose budget is tuned to the run it
+   * produces lands exactly there, because the chain is built to spend down to
+   * the last affordable burst.
+   */
+  projectedReserveUsd: number;
+  /**
    * Whether there is room for another burst.
    *
    * True while what is left covers the next burst **and** the closing document
-   * the chain still owes. Both figures are computed rather than averaged — see
-   * {@link ChainDerived.projectedBurstUsd} and
-   * {@link ChainDerived.synthesisReserveUsd} — so the chain stops with the
+   * that burst will leave the chain owing. Both figures are computed rather than
+   * averaged — see {@link ChainDerived.projectedBurstUsd} and
+   * {@link ChainDerived.projectedReserveUsd} — so the chain stops with the
    * synthesis genuinely paid for rather than with one burst's worth of change in
    * its pocket and a synthesis bill five times that.
    *
@@ -362,6 +385,7 @@ export const chainSchema = {
     averageBurstUsd: t.number(),
     projectedBurstUsd: t.number(),
     synthesisReserveUsd: t.number(),
+    projectedReserveUsd: t.number(),
     canAffordBurst: t.boolean(),
     canAffordSynthesis: t.boolean(),
     synthesisSkipped: t.boolean(),
@@ -493,6 +517,20 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
     preset.budgetWarningThreshold ?? DEFAULT_BUDGET_WARNING_THRESHOLD;
 
   /**
+   * Quoted material, fenced on the way into a prompt.
+   *
+   * A preset writes its own markup around `{{input}}` — `<change>`, `<artifact>`
+   * — and interpolating a value straight into it lets the value close the tag
+   * and keep writing as though it were the preset. Fencing rather than escaping:
+   * the marker is unguessable and stripped from the body, so the fence holds,
+   * and the material arrives byte for byte. Escaping would have rewritten the
+   * angle brackets in every artefact this package is pointed at, which for a
+   * preset whose job is reading code is a change to the thing under analysis.
+   */
+  const quote = (tag: string, body: string) =>
+    body === "" ? "" : fence(tag, transcript.fenceToken, {}, body);
+
+  /**
    * The last phase announced.
    *
    * An edge detector, not a state machine: it never decides anything, it only
@@ -585,11 +623,18 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       synthesisReserveUsd: (facts) => {
         const { synthesizer } = facts.preset;
         // Everything the synthesizer will be sent: the transcript, the template
-        // around it, and the original input the template interpolates.
+        // around it, the original input the template interpolates, and the
+        // system prompt — the one that actually goes out, which is the preset's
+        // plus the standing notice the harness appends to every voice. Measuring
+        // the preset's alone would under-reserve by the length of that notice on
+        // every run, which is the difference between affording the closing
+        // document and stopping one burst short of it on a budget the chain is
+        // designed to spend to the last cent.
         const promptChars =
           facts.transcriptChars +
           synthesizer.promptTemplate.length +
-          facts.input.length;
+          facts.input.length +
+          harnessSystemPrompt(synthesizer.systemPrompt).length;
         const inputTokens = Math.ceil(promptChars / CHARS_PER_TOKEN);
 
         return (
@@ -598,10 +643,18 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         );
       },
 
+      // A burst appends about `tokensPerBurst` to the transcript, and the
+      // synthesizer reads the transcript — so the burst about to be authorized
+      // is also the burst that raises the closing document's bill. Priced at the
+      // input rate, which is what re-reading it costs.
+      projectedReserveUsd: (facts, derived) =>
+        derived.synthesisReserveUsd +
+        (facts.preset.tokensPerBurst / 1_000_000) * pricing.inputPerMillion,
+
       canAffordBurst: (_facts, derived) =>
         derived.remainingUsd > 0 &&
         derived.remainingUsd >=
-          derived.projectedBurstUsd + derived.synthesisReserveUsd,
+          derived.projectedBurstUsd + derived.projectedReserveUsd,
 
       canAffordSynthesis: (_facts, derived) =>
         derived.remainingUsd >= derived.synthesisReserveUsd,
@@ -743,10 +796,11 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
           const spentBefore = budgetRunner.getSpent("total");
           const prompt = renderTemplate(context.facts.preset.promptTemplate, {
-            input: req.input,
+            input: quote("subject", req.input),
             persona: req.persona,
             iteration: req.iteration + 1,
-            previousBurst: req.previousBurst,
+            previousBurst: quote("previous-turn", req.previousBurst),
+            // Already fenced, one turn at a time — see `Transcript.text`.
             transcript: transcript.text(),
             tokensPerBurst: context.facts.preset.tokensPerBurst,
           });
@@ -825,7 +879,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
           const { synthesizer } = context.facts.preset;
           const prompt = renderTemplate(synthesizer.promptTemplate, {
-            input: context.facts.input,
+            input: quote("subject", context.facts.input),
             transcript: transcript.text(),
             iterations: req.iteration,
             spentUsd: context.facts.spentUsd.toFixed(4),

@@ -126,7 +126,7 @@ export async function loadPreset(
   }
 
   return assertPreset(
-    parseJson(contents, nameOrPathOrJson),
+    parseFile(contents, nameOrPathOrJson),
     `file ${nameOrPathOrJson}`,
   );
 }
@@ -138,6 +138,31 @@ function parseJson(text: string, source: string): unknown {
   } catch (error) {
     throw new Error(
       `[ai-harness] loadPreset: ${source} is not valid JSON — ${(error as Error).message}`,
+    );
+  }
+}
+
+/**
+ * Parse a file's contents, without quoting them back.
+ *
+ * The parser's own message embeds the bytes it choked on, and this branch runs
+ * on any path the caller names. Echoing it turns `loadPreset` into a way to read
+ * the opening bytes of a file the caller could not otherwise see — the head of a
+ * private key, the prefix of a credential — from a surface that prints its
+ * errors. So the file branch names the file, says what a preset file is, and
+ * stops.
+ *
+ * Schema failures keep their detail, and should: by then the document has parsed
+ * as JSON and every field-level message is about a document the caller is
+ * holding. It is the *parse* error, and only for a path, that quotes contents
+ * nobody has established the caller may read.
+ */
+function parseFile(contents: string, path: string): unknown {
+  try {
+    return JSON.parse(contents);
+  } catch {
+    throw new Error(
+      `[ai-harness] loadPreset: "${path}" was read but is not valid JSON. A preset file is a single JSON object with id, model, personas, tokensPerBurst, budgetUsd, maxIterations, promptTemplate, and synthesizer. The parser's own message is withheld because it quotes the file's contents, and a path that turns out not to be a preset should not be a way to read one. Check that this is the file you meant.`,
     );
   }
 }

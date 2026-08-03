@@ -18,11 +18,32 @@
  * *does* stream, because synthesis is the last thing that happens and there is
  * nothing after it to be confused by.
  *
+ * ## Why every field is sanitized on the way out
+ *
+ * A terminal executes what is written to it. Model output reaches this file
+ * verbatim, and so do persona names and preset ids, which come from a preset a
+ * caller may have loaded off disk. An escape sequence in any of them clears the
+ * screen, hides text behind the conceal attribute, rewrites the window title, or
+ * — with an operating-system command — writes the reader's clipboard. So every
+ * string that came from outside this package goes through
+ * {@link sanitizeForTerminal} before it is composed into a line, and the
+ * package's own colour codes go on afterwards. `--verbose` was always safe by
+ * accident, because it serializes through `JSON.stringify`; the default path was
+ * not.
+ *
+ * The closing document streams, so its sanitizer is stateful — an escape
+ * sequence split across two chunks is two harmless halves that a terminal
+ * reassembles, and per-chunk stripping would pass both.
+ *
  * @module
  */
 
 import pc from "picocolors";
 import type { HarnessEvent } from "../../core/events.js";
+import {
+  createTerminalSanitizer,
+  sanitizeForTerminal,
+} from "../../core/safety.js";
 
 export interface RendererOptions {
   /** Print the event stream structurally instead of as prose. */
@@ -104,31 +125,39 @@ function renderVerbose(event: HarnessEvent): string | undefined {
 // Default
 // ============================================================================
 
-function renderProse(event: HarnessEvent): string | undefined {
+/** Anything that came from a preset, a provider, or a model. */
+function safe(value: string): string {
+  return sanitizeForTerminal(value);
+}
+
+function renderProse(
+  event: HarnessEvent,
+  stream: (chunk: string) => string,
+): string | undefined {
   switch (event.type) {
     case "composition:started":
-      return pc.dim(`chain: ${event.presets.join(" → ")}\n\n`);
+      return pc.dim(`chain: ${event.presets.map(safe).join(" → ")}\n\n`);
 
     case "composition:step:started":
-      return `${pc.bold(pc.magenta(`[${event.step}/${event.total}] ${event.presetId}`))}\n`;
+      return `${pc.bold(pc.magenta(`[${event.step}/${event.total}] ${safe(event.presetId)}`))}\n`;
 
     case "composition:step:complete":
       return pc.dim(
-        `  step ${event.step} done — ${plural(event.iterations, "burst")}, ${money(event.spentUsd)}, ${event.transcriptPath}\n\n`,
+        `  step ${event.step} done — ${plural(event.iterations, "burst")}, ${money(event.spentUsd)}, ${safe(event.transcriptPath)}\n\n`,
       );
 
     case "chain:started":
       return pc.dim(
-        `  ${event.personas.join(" · ")}\n  budget ${budget(event.budgetUsd)} → ${event.transcriptPath}\n\n`,
+        `  ${event.personas.map(safe).join(" · ")}\n  budget ${budget(event.budgetUsd)} → ${safe(event.transcriptPath)}\n\n`,
       );
 
     case "burst:restarted":
       return pc.dim(
-        `  ↻ ${event.persona} restarting burst ${event.iteration + 1} — ${event.reason}\n`,
+        `  ↻ ${safe(event.persona)} restarting burst ${event.iteration + 1} — ${safe(event.reason)}\n`,
       );
 
     case "burst:completed":
-      return `${pc.cyan(`${event.iteration + 1}. ${event.persona}`)} ${pc.dim(money(event.costUsd))}\n\n${event.text.trim()}\n\n`;
+      return `${pc.cyan(`${event.iteration + 1}. ${safe(event.persona)}`)} ${pc.dim(money(event.costUsd))}\n\n${safe(event.text).trim()}\n\n`;
 
     case "budget:warning":
       return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${budget(event.budgetUsd)})`)}\n\n`;
@@ -140,22 +169,22 @@ function renderProse(event: HarnessEvent): string | undefined {
       return `${pc.bold(pc.green("synthesis"))} ${pc.dim(`after ${plural(event.iteration, "burst")} — stopped on ${event.stopReason || "settled"}`)}\n\n`;
 
     case "synthesis:chunk":
-      return event.text;
+      return stream(event.text);
 
     case "error":
-      return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` burst ${event.iteration + 1}`}):`)} ${event.message}\n\n`;
+      return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` burst ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;
 
     case "chain:complete":
       return pc.dim(
-        `\n\n  ${plural(event.iterations, "burst")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} · stopped on ${event.stopReason || "settled"}\n  ${event.transcriptPath}\n\n`,
+        `\n\n  ${plural(event.iterations, "burst")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} · stopped on ${event.stopReason || "settled"}\n  ${safe(event.transcriptPath)}\n\n`,
       );
 
     case "composition:budget-exhausted":
-      return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${event.presetId})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${budget(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;
+      return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${safe(event.presetId)})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${budget(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;
 
     case "composition:complete":
       return pc.dim(
-        `  ${plural(event.steps, "step")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} total${event.interrupted ? " · interrupted" : ""}${event.budgetExhausted ? " · budget exhausted" : ""}\n  ${event.combinedPath}\n`,
+        `  ${plural(event.steps, "step")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} total${event.interrupted ? " · interrupted" : ""}${event.budgetExhausted ? " · budget exhausted" : ""}\n  ${safe(event.combinedPath)}\n`,
       );
 
     default:
@@ -171,10 +200,25 @@ export function createRenderer(
   options: RendererOptions,
 ): (event: HarnessEvent) => void {
   const { verbose, write } = options;
+  // One sanitizer for the whole run, because the closing document arrives in
+  // pieces and a sequence can be split across two of them. Anything held at the
+  // end of a chunk is an incomplete sequence, so it is released — as nothing —
+  // when the next event that is not a chunk arrives.
+  const synthesis = createTerminalSanitizer();
 
   return (event) => {
-    const text = verbose ? renderVerbose(event) : renderProse(event);
-    if (text !== undefined) {
+    if (event.type !== "synthesis:chunk") {
+      const remainder = synthesis.flush();
+      if (remainder !== "") {
+        write(remainder);
+      }
+    }
+
+    const text = verbose
+      ? renderVerbose(event)
+      : renderProse(event, (chunk) => synthesis.push(chunk));
+
+    if (text !== undefined && text !== "") {
       write(text);
     }
   };

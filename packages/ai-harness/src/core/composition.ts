@@ -29,10 +29,17 @@
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
 import type { HarnessEvent, HarnessEventSink } from "./events.js";
 import type { PresetConfig } from "./preset-types.js";
+import {
+  MAX_RUN_ID_LENGTH,
+  assertSafeIdentifier,
+  createFenceToken,
+  fence,
+  resolveWithin,
+} from "./safety.js";
 import {
   type Harness,
   type HarnessOptions,
@@ -148,25 +155,45 @@ interface PriorSynthesis {
  * Tagged rather than concatenated, because the personas' prompts embed
  * `{{input}}` inside their own markup and an untagged wall of prior text reads
  * to the model as more of the original subject.
+ *
+ * The tags carry the composition's marker, and the marker is stripped from each
+ * synthesis before it is embedded. A synthesis is model output being fed to
+ * another model, so without that a closing document could write its own `</step>`
+ * and attribute a paragraph to a step that never said it. The marker here is the
+ * composition's own — each step's transcript has a different one — so a step's
+ * fences and the composition's cannot be confused for one another.
  */
-function composeInput(original: string, prior: PriorSynthesis[]): string {
+function composeInput(
+  original: string,
+  prior: PriorSynthesis[],
+  token: string,
+): string {
   if (prior.length === 0) {
     return original;
   }
 
-  const sections = prior.map(
-    (entry) =>
-      `<step index="${entry.step}" preset="${entry.presetId}">\n${entry.text}\n</step>`,
+  const sections = prior.map((entry) =>
+    fence(
+      "step",
+      token,
+      { index: entry.step, preset: entry.presetId },
+      entry.text,
+    ),
   );
+
+  // The outer wrapper is written out rather than fenced through the helper: the
+  // helper strips the marker from whatever it is given, and what it would be
+  // given here is the step fences, which are made of the marker.
+  const wrapper = `prior-analysis-${token}`;
 
   return [
     original,
     "",
-    "<prior-analysis>",
+    `<${wrapper}>`,
     "The following came out of earlier passes over this same subject. Build on it — do not repeat it.",
     "",
     ...sections,
-    "</prior-analysis>",
+    `</${wrapper}>`,
   ].join("\n");
 }
 
@@ -232,8 +259,13 @@ export async function runChain(
     ...rest
   } = options;
   const now = options.now ?? Date.now;
-  const runId = providedRunId ?? createRunId(now);
+  const runId =
+    providedRunId === undefined
+      ? createRunId(now)
+      : assertSafeIdentifier(providedRunId, "runId", MAX_RUN_ID_LENGTH);
   const dir = outputDir ?? defaultTranscriptDir();
+  /** This composition's fence marker. Distinct from any step's. */
+  const fenceToken = createFenceToken();
   const emit: HarnessEventSink = (event: HarnessEvent) => {
     onEvent?.(event);
   };
@@ -324,7 +356,7 @@ export async function runChain(
 
     let result: HarnessRunResult;
     try {
-      result = await harness.run(composeInput(input, prior));
+      result = await harness.run(composeInput(input, prior, fenceToken));
     } finally {
       signal?.removeEventListener("abort", onAbort);
       harness.system.destroy();
@@ -358,7 +390,10 @@ export async function runChain(
     }
   }
 
-  const combinedPath = join(dir, `${runId}.md`);
+  // Same containment assertion the transcript makes, for the same reason: this
+  // is a second place a run ID becomes a path, and it must not be a second place
+  // that has to remember the rule.
+  const combinedPath = resolveWithin(dir, `${runId}.md`);
   await mkdir(dirname(combinedPath), { recursive: true });
   await writeFile(combinedPath, renderCombined(runId, input, steps), "utf8");
 

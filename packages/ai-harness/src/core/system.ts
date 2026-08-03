@@ -30,6 +30,7 @@ import {
 } from "./module.js";
 import { assertPreset } from "./preset-registry.js";
 import type { PresetConfig } from "./preset-types.js";
+import { MAX_RUN_ID_LENGTH, assertSafeIdentifier } from "./safety.js";
 import {
   type Transcript,
   createRunId,
@@ -57,7 +58,13 @@ export interface HarnessOptions {
   baseURL?: string;
   /** Where the transcript and its sidecar are written. @default `./.ai-harness` */
   outputDir?: string;
-  /** Names this run and its two files. Generated when omitted. */
+  /**
+   * Names this run and its two files. Generated when omitted.
+   *
+   * Constrained to letters, digits, dot, dash, and underscore, because it ends
+   * up in a filename. A run ID whose files already exist is refused rather than
+   * half-overwritten — see `./transcript.js`.
+   */
   runId?: string;
   /** Where the event stream goes. */
   onEvent?: HarnessEventSink;
@@ -143,7 +150,13 @@ export function createHarnessSystem(
 ): Harness {
   const validated = assertPreset(preset, "createHarnessSystem(preset)");
   const now = options.now ?? Date.now;
-  const runId = options.runId ?? createRunId(now);
+  // A caller-supplied run ID names the files this run writes, so it is held to
+  // the same rule the preset's own `id` is. The transcript asserts containment
+  // again below; this one is here so the refusal names the option that caused it.
+  const runId =
+    options.runId === undefined
+      ? createRunId(now)
+      : assertSafeIdentifier(options.runId, "runId", MAX_RUN_ID_LENGTH);
 
   const transcript = createTranscript({
     dir: options.outputDir ?? defaultTranscriptDir(),

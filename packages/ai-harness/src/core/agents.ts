@@ -60,6 +60,7 @@ import {
 } from "@directive-run/ai/anthropic";
 import type { Plugin } from "@directive-run/core";
 import type { PresetConfig } from "./preset-types.js";
+import { QUOTED_MATERIAL_NOTICE } from "./safety.js";
 
 export interface HarnessAgentsOptions {
   preset: PresetConfig;
@@ -234,6 +235,31 @@ export function createHarnessAgents(
 // ============================================================================
 
 /**
+ * A preset's system prompt, plus the one thing the harness always says.
+ *
+ * The notice is appended here rather than written into each preset, for two
+ * reasons. A preset loaded off disk has never heard of it and gets it anyway,
+ * which is the case that matters — that is the surface an untrusted preset
+ * arrives through. And the presets that already scope themselves carefully do
+ * not have to be rewritten to be covered: their scoping is prompt-level, so it
+ * inherits whatever weakness the prompt has, and this is what closes the gap
+ * between "the persona was told to stay defensive" and "the artefact it is
+ * reading cannot talk it out of that".
+ *
+ * Appended rather than prepended, so a preset's own framing is what the model
+ * reads first and the harness's rule is the last word.
+ *
+ * Exported because it is not free. The notice is sent on every call, so the
+ * chain has to be able to cost it — the synthesis reserve measures the prompt
+ * it is about to send, and measuring the preset's system prompt rather than the
+ * one that actually goes out would under-reserve by the length of this text on
+ * a budget the chain spends down to the last cent.
+ */
+export function harnessSystemPrompt(systemPrompt: string): string {
+  return `${systemPrompt}\n\n${QUOTED_MATERIAL_NOTICE}`;
+}
+
+/**
  * Every persona plus the synthesizer, as orchestrator agents.
  *
  * The preset's `meta.description` rides along on each registration so the
@@ -247,7 +273,7 @@ function buildRegistry(preset: PresetConfig): AgentRegistry {
     registry[persona.name] = {
       agent: {
         name: persona.name,
-        instructions: persona.systemPrompt,
+        instructions: harnessSystemPrompt(persona.systemPrompt),
         model: preset.model,
       },
       description: persona.meta?.description ?? persona.meta?.label,
@@ -257,7 +283,7 @@ function buildRegistry(preset: PresetConfig): AgentRegistry {
   registry[preset.synthesizer.name] = {
     agent: {
       name: preset.synthesizer.name,
-      instructions: preset.synthesizer.systemPrompt,
+      instructions: harnessSystemPrompt(preset.synthesizer.systemPrompt),
       model: preset.model,
     },
     description:

@@ -143,3 +143,22 @@ export {
   type MockFailure,
   type MockRunnerOptions,
 } from "./core/mock-runner.js";
+
+// ---------------------------------------------------------------------------
+// The untrusted-input boundary
+// ---------------------------------------------------------------------------
+//
+// Exported because a surface built on the event stream inherits the problem.
+// `burst:completed` and `synthesis:chunk` carry model output verbatim, and a
+// consumer that writes either to a terminal is writing whatever the model chose
+// to write — including escape sequences that clear the screen, hide text, or ask
+// the terminal to set the clipboard. The bundled command line runs its output
+// through these; anything else printing the same events needs to as well.
+export {
+  QUOTED_MATERIAL_NOTICE,
+  createTerminalSanitizer,
+  isSafeIdentifier,
+  resolveWithin,
+  sanitizeForTerminal,
+  type TerminalSanitizer,
+} from "./core/safety.js";

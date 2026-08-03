@@ -18,6 +18,7 @@
 
 import type { DefinitionMeta } from "@directive-run/core";
 import { z } from "zod";
+import { MAX_PRESET_ID_LENGTH, identifierSchema } from "./safety.js";
 
 // ============================================================================
 // Meta
@@ -118,7 +119,13 @@ export const synthesizerSchema = z.object({
  * ```
  */
 export interface PresetConfig {
-  /** Stable identifier — the name `loadPreset` resolves and the registry keys on. */
+  /**
+   * Stable identifier — the name `loadPreset` resolves and the registry keys
+   * on.
+   *
+   * Also the stem of the files a composition step writes, so it is constrained
+   * to letters, digits, dot, dash, and underscore. See `./safety.js`.
+   */
   id: string;
   /** Annotations for the module, and the default for definitions without their own. */
   meta?: DefinitionMeta;
@@ -190,16 +197,22 @@ export interface PresetConfig {
 /**
  * The only definition of "is this a valid preset".
  *
- * Two constraints here are worth their strictness. `personas` must be non-empty
- * because turn order is `iteration % personas.length`, and an empty list makes
- * that a division by zero that surfaces as an undefined persona name three
- * layers down. `budgetUsd` must be positive because a budget of zero produces a
- * chain that stops before its first burst and reports `"budget"` — technically
- * correct, and indistinguishable from a misconfiguration.
+ * Three constraints here are worth their strictness. `personas` must be
+ * non-empty because turn order is `iteration % personas.length`, and an empty
+ * list makes that a division by zero that surfaces as an undefined persona name
+ * three layers down. `budgetUsd` must be positive because a budget of zero
+ * produces a chain that stops before its first burst and reports `"budget"` —
+ * technically correct, and indistinguishable from a misconfiguration.
+ *
+ * And `id` is an identifier rather than any non-empty string, because a preset
+ * arrives from a JSON file the caller may not have written and the id ends up
+ * in a filename. That is one of two independent stops — the transcript writer
+ * refuses a path outside its output directory whether or not this schema ran —
+ * and it is the one that says so before a run starts.
  */
 export const presetSchema = z
   .object({
-    id: z.string().min(1),
+    id: identifierSchema("A preset's id", MAX_PRESET_ID_LENGTH),
     meta: metaSchema.optional(),
     model: z.string().min(1),
     temperature: z.number().min(0).max(1).optional(),

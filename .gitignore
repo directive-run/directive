@@ -58,6 +58,11 @@ packages/claude-plugin/skills/*/examples.md
 # Reference materials (third-party code, not for redistribution)
 .references/
 
+# Harness run artifacts — transcripts, sidecars, and combined documents.
+# `.ai-harness/` is the library default; `runs/` is the command line's.
+.ai-harness/
+runs/
+
 # Temporary
 tmp/
 temp/
