@@ -30,6 +30,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
 import type { HarnessEvent, HarnessEventSink } from "./events.js";
 import type { PresetConfig } from "./preset-types.js";
 import {
@@ -54,6 +55,34 @@ export interface RunChainOptions extends HarnessOptions {
    * is the one thing the chain is built not to do.
    */
   signal?: AbortSignal;
+  /**
+   * The composition's ceiling in dollars, across every step.
+   *
+   * **`budgetUsd` is per step, and always was.** `RunChainOptions` extends
+   * `HarnessOptions`, the options are handed to each step's harness in turn, and
+   * a preset carries its own `budgetUsd` — so `runChain([a, b, c], …)` with
+   * `budgetUsd: 5` is $15 of exposure, not $5. Nothing compared accumulated
+   * spend to anything, and no doc said which of the two readings was meant.
+   *
+   * This is the number that says it. Each step runs with the smaller of its own
+   * `budgetUsd` and what is left of this, and the composition stops when what is
+   * left cannot pay for the next step's closing document.
+   *
+   * Defaults to the sum of the presets' own budgets — so the figure is always
+   * defined, always reported on {@link ChainRunResult.budgetUsd}, and the
+   * default changes nothing about what a composition costs. Setting it lower is
+   * how a caller caps the whole run.
+   *
+   * **Why a separate number rather than dividing `budgetUsd` by the step
+   * count.** A preset is plain JSON meant to be read off disk and reused, and
+   * its `budgetUsd` is a statement about that preset — what a `code-review` pass
+   * over one diff is worth. Dividing it would make the same file mean a
+   * different thing depending on what it happened to be composed with, so a
+   * preset tuned in isolation would quietly under-run in a chain and nobody
+   * could tell by reading it. The step budget stays the step's; the composition
+   * gets its own.
+   */
+  totalBudgetUsd?: number;
 }
 
 /** One step's outcome, with its position in the composition. */
@@ -66,16 +95,35 @@ export interface ChainStepResult extends HarnessRunResult {
 export interface ChainRunResult {
   /** Names the composition, and stems every step's run ID. */
   runId: string;
-  /** Steps that ran, in order. Shorter than the preset list after an interrupt. */
+  /**
+   * Steps that ran, in order. Shorter than the preset list after an interrupt
+   * or once the composition's ceiling is used up.
+   */
   steps: ChainStepResult[];
-  /** Every step's spend, summed. */
+  /** Every step's spend, summed. Never above {@link ChainRunResult.budgetUsd}. */
   spentUsd: number;
+  /**
+   * The ceiling this composition ran under, across every step.
+   *
+   * `totalBudgetUsd` when one was given, otherwise the sum of the presets' own
+   * budgets. Reported either way, because the sum is the figure a caller is
+   * exposed to and it was previously implicit.
+   */
+  budgetUsd: number;
   /** The last step's closing document — the composition's answer. */
   synthesis: string;
   /** The file holding every step's synthesis, in order. */
   combinedPath: string;
   /** Whether an operator stopped the composition before its last step. */
   interrupted: boolean;
+  /**
+   * Whether the composition stopped early because the ceiling was used up.
+   *
+   * The steps that ran are whole — each one synthesized — and the ones that did
+   * not run were never started. A caller wanting all of them needs a bigger
+   * `totalBudgetUsd`, not a retry.
+   */
+  budgetExhausted: boolean;
 }
 
 // ============================================================================
@@ -175,13 +223,30 @@ export async function runChain(
     );
   }
 
-  const { signal, onEvent, runId: providedRunId, outputDir, ...rest } = options;
+  const {
+    signal,
+    onEvent,
+    runId: providedRunId,
+    outputDir,
+    totalBudgetUsd,
+    ...rest
+  } = options;
   const now = options.now ?? Date.now;
   const runId = providedRunId ?? createRunId(now);
   const dir = outputDir ?? defaultTranscriptDir();
   const emit: HarnessEventSink = (event: HarnessEvent) => {
     onEvent?.(event);
   };
+
+  const budgetUsd =
+    totalBudgetUsd ??
+    presets.reduce((total, preset) => total + preset.budgetUsd, 0);
+
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
+    throw new Error(
+      `[ai-harness] runChain needs a positive totalBudgetUsd — got ${String(totalBudgetUsd)}.`,
+    );
+  }
 
   emit({
     type: "composition:started",
@@ -195,6 +260,7 @@ export async function runChain(
   const prior: PriorSynthesis[] = [];
   let spentUsd = 0;
   let interrupted = signal?.aborted === true;
+  let budgetExhausted = false;
 
   for (const [index, preset] of presets.entries()) {
     if (interrupted) {
@@ -205,6 +271,37 @@ export async function runChain(
     const stepRunId = `${runId}-${step}-${preset.id}`;
     const stepMeta = { step, total: presets.length, presetId: preset.id };
 
+    // What this step may spend: its own budget, or whatever is left of the
+    // composition's, whichever is smaller. The clamp is a no-op on the default
+    // ceiling — the sum of the steps' own budgets — and is the whole mechanism
+    // when a caller sets one.
+    const remainingUsd = budgetUsd - spentUsd;
+    const pricing = resolvePresetPricing(preset, rest.pricing);
+    const floorUsd = minimumStepBudgetUsd(preset, pricing);
+
+    // Below the floor there is no step worth running: it could buy a burst or
+    // two but not the closing document that makes them useful to the next step,
+    // and a step whose synthesis is skipped contributes nothing downstream.
+    // Stop, and say so, rather than start something that cannot finish.
+    if (remainingUsd < floorUsd) {
+      budgetExhausted = true;
+      emit({
+        type: "composition:budget-exhausted",
+        runId,
+        ...stepMeta,
+        spentUsd,
+        budgetUsd,
+        requiredUsd: floorUsd,
+        at: now(),
+      });
+      break;
+    }
+
+    const stepPreset: PresetConfig =
+      remainingUsd < preset.budgetUsd
+        ? { ...preset, budgetUsd: remainingUsd }
+        : preset;
+
     emit({
       type: "composition:step:started",
       ...stepMeta,
@@ -212,7 +309,7 @@ export async function runChain(
       at: now(),
     });
 
-    const harness: Harness = createHarnessSystem(preset, {
+    const harness: Harness = createHarnessSystem(stepPreset, {
       ...rest,
       outputDir: dir,
       runId: stepRunId,
@@ -270,8 +367,10 @@ export async function runChain(
     runId,
     steps: steps.length,
     spentUsd,
+    budgetUsd,
     combinedPath,
     interrupted,
+    budgetExhausted,
     at: now(),
   });
 
@@ -279,8 +378,10 @@ export async function runChain(
     runId,
     steps,
     spentUsd,
+    budgetUsd,
     synthesis: steps.at(-1)?.synthesis ?? "",
     combinedPath,
     interrupted,
+    budgetExhausted,
   };
 }

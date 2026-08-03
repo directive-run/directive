@@ -91,6 +91,46 @@ export interface BudgetWindow {
 export interface BudgetConfig {
   /** Maximum estimated cost per individual call. */
   maxCostPerCall?: number;
+  /**
+   * Lifetime ceiling on this runner's recorded spend, in dollars.
+   *
+   * **A floor, not a forecast.** Every other cap here gates a *prediction*: the
+   * pre-call estimate is compared against what is left, and the call is refused
+   * before it runs. This one gates the ledger. Once `getSpent("total")` has
+   * reached `maxTotalCost`, no further call is dispatched — and until it has,
+   * nothing is refused, however large the next call looks.
+   *
+   * That asymmetry is the point, and it is what makes this cap composable with a
+   * caller's own stopping rule rather than a competitor to it. A chain that
+   * decides for itself when to stop — because it knows things this runner does
+   * not, like the token cap of the call it is about to make, or that a closing
+   * document still has to be paid for — wants its own rule to be the one that
+   * fires in the ordinary case, and wants a hard floor underneath for the case
+   * where its own estimate was wrong. A cap that also predicted would fire
+   * *instead of* the caller's rule as soon as its prediction was the more
+   * pessimistic of the two, which is exactly the arrangement where two ceilings
+   * at the same number disagree about what happened.
+   *
+   * Spend can therefore exceed `maxTotalCost` by at most the cost of the one
+   * call that crossed it. Nothing enforced after the fact against a provider
+   * that bills after the fact can do better without predicting, and a caller who
+   * wants the prediction has {@link BudgetConfig.maxCostPerCall} and
+   * {@link BudgetConfig.budgets} for it.
+   *
+   * Priced with the same rates as `getSpent("total")` — the top-level
+   * {@link BudgetConfig.pricing} when supplied, otherwise the first window's — so
+   * a cap set without either can never trip and is refused at construction.
+   *
+   * @example
+   * ```typescript
+   * const runner = withBudget(baseRunner, {
+   *   pricing,
+   *   // Whatever else stops this run, it does not get to spend past $5.
+   *   maxTotalCost: 5,
+   * });
+   * ```
+   */
+  maxTotalCost?: number;
   /** Rolling budget windows. */
   budgets?: BudgetWindow[];
   /** Pricing used for per-call estimation (when maxCostPerCall is set). */
@@ -141,10 +181,20 @@ export interface BudgetConfig {
   onBudgetExceeded?: (details: BudgetExceededDetails) => void;
 }
 
+/**
+ * Which ceiling a {@link BudgetExceededDetails} is about.
+ *
+ * `"total"` is the lifetime ledger floor ({@link BudgetConfig.maxTotalCost}) and
+ * is the one entry here that reports recorded spend rather than a prediction.
+ */
+export type BudgetWindowName = "per-call" | "total" | "hour" | "day";
+
 export interface BudgetExceededDetails {
   /**
    * The pre-call cost estimate, in dollars. Always an estimate, in both
-   * phases — see {@link BudgetExceededDetails.actual} for what was billed.
+   * phases — except for `window: "total"`, where it is the recorded lifetime
+   * spend the ceiling was measured against, since that cap gates the ledger and
+   * never a forecast.
    */
   estimated: number;
   /**
@@ -154,7 +204,7 @@ export interface BudgetExceededDetails {
   actual?: number;
   /** Dollars left against the cap that was checked. */
   remaining: number;
-  window: "per-call" | "hour" | "day";
+  window: BudgetWindowName;
   /**
    * Whether the overrun was caught before the call ran or after it returned.
    *
@@ -170,12 +220,14 @@ export interface BudgetExceededDetails {
 export class BudgetExceededError extends Error {
   readonly estimated: number;
   readonly remaining: number;
-  readonly window: "per-call" | "hour" | "day";
+  readonly window: BudgetWindowName;
 
   constructor(details: BudgetExceededDetails) {
     super(
-      `[Directive] Budget exceeded (${details.window}): estimated $${details.estimated.toFixed(4)}, ` +
-        `remaining $${details.remaining.toFixed(4)}`,
+      details.window === "total"
+        ? `[Directive] Budget exhausted (total): spent $${details.estimated.toFixed(4)} of a $${(details.estimated + details.remaining).toFixed(4)} lifetime ceiling. No further calls will be dispatched on this runner.`
+        : `[Directive] Budget exceeded (${details.window}): estimated $${details.estimated.toFixed(4)}, ` +
+            `remaining $${details.remaining.toFixed(4)}`,
     );
     this.name = "BudgetExceededError";
     this.estimated = details.estimated;
@@ -400,6 +452,7 @@ export function withBudget(
 ): BudgetRunner {
   const {
     maxCostPerCall,
+    maxTotalCost,
     budgets = [],
     pricing,
     charsPerToken = 4,
@@ -425,6 +478,14 @@ export function withBudget(
   ) {
     throw new Error(
       "[Directive] withBudget: maxCostPerCall must be a non-negative finite number.",
+    );
+  }
+  if (
+    maxTotalCost != null &&
+    (!Number.isFinite(maxTotalCost) || maxTotalCost < 0)
+  ) {
+    throw new Error(
+      "[Directive] withBudget: maxTotalCost must be a non-negative finite number.",
     );
   }
   if (
@@ -561,6 +622,28 @@ export function withBudget(
   // total rather than a ledger: it is never pruned, so storing entries would
   // grow without bound for the life of the runner.
   const totalPricing = callPricing ?? plans[0]?.pricing;
+
+  // A lifetime ceiling with nothing to price a call at is a ceiling the ledger
+  // can never reach: `totalSpent` stays at zero for the life of the runner and
+  // the cap silently does nothing. Refused rather than warned, because unlike
+  // zero rates — legitimate for a local model — there is no configuration this
+  // is the right shape of.
+  if (maxTotalCost != null && !totalPricing) {
+    throw new Error(
+      `[Directive] ${API}: maxTotalCost was set but no rates were supplied, so lifetime spend is never priced and the ceiling can never trip. Pass \`pricing\`, or configure at least one budget window.`,
+    );
+  }
+  if (
+    maxTotalCost != null &&
+    maxTotalCost > 0 &&
+    totalPricing &&
+    isZeroRated(totalPricing)
+  ) {
+    console.warn(
+      `[Directive] ${API}: maxTotalCost set against pricing where every rate is 0, so no call can ever cost anything and the ceiling can never trip. Either supply real rates or drop the cap.`,
+    );
+  }
+
   let totalSpent = 0;
   /** The part of `totalSpent` charged for calls that threw. */
   let totalFailedSpent = 0;
@@ -673,6 +756,22 @@ export function withBudget(
     const unpricedSoFar = countUnpriced();
     if (maxUnpricedCalls != null && unpricedSoFar >= maxUnpricedCalls) {
       throw new UnpricedCallLimitError(unpricedSoFar, maxUnpricedCalls);
+    }
+
+    // Pre-call: the lifetime floor.
+    //
+    // First, because it is the only check here that is not arguing about a
+    // prediction. Once the ledger has reached the ceiling there is no estimate
+    // that makes the next call affordable, and nothing below needs consulting.
+    if (maxTotalCost != null && totalSpent >= maxTotalCost) {
+      const details: BudgetExceededDetails = {
+        estimated: totalSpent,
+        remaining: Math.max(0, maxTotalCost - totalSpent),
+        window: "total",
+        phase: "pre-call",
+      };
+      report(details);
+      throw new BudgetExceededError(details);
     }
 
     // Pre-call: Check per-call budget
@@ -847,9 +946,29 @@ export function withBudget(
               : priced.cost;
 
           if (Number.isFinite(billed)) {
+            const before = totalSpent;
             totalSpent += billed;
             if (failed) {
               totalFailedSpent += billed;
+            }
+
+            // The call that crossed the lifetime floor. It ran — the floor
+            // gates the *next* one — so this is a report of the overshoot, and
+            // the overshoot is exactly `billed`. Reported once, on the
+            // crossing, not on every call afterwards, which is the only one
+            // worth a callback: after this the runner refuses outright.
+            if (
+              maxTotalCost != null &&
+              before < maxTotalCost &&
+              totalSpent >= maxTotalCost
+            ) {
+              report({
+                estimated: before,
+                actual: totalSpent,
+                remaining: Math.max(0, maxTotalCost - before),
+                window: "total",
+                phase: "post-call",
+              });
             }
           }
 

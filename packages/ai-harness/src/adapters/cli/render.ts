@@ -31,9 +31,26 @@ export interface RendererOptions {
   write: (text: string) => void;
 }
 
-/** Two decimal places for a budget, four for a per-burst cost. */
+/** Four decimal places, which is where a per-burst cost lives. */
 function money(value: number, places = 4): string {
   return `$${value.toFixed(places)}`;
+}
+
+/**
+ * A budget, at enough precision to be the number the operator typed.
+ *
+ * Two places reads well for the dollar-ish budgets the built-ins carry, and
+ * rounds `--budget 0.005` to `$0.01` — printing a ceiling twice the one in
+ * force, beside a spend figure at four places that appears to be under it.
+ * Cents when it is cents.
+ */
+function budget(value: number): string {
+  return money(value, value >= 0.1 ? 2 : 4);
+}
+
+/** `1 burst`, `3 bursts`. */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 // ============================================================================
@@ -97,12 +114,12 @@ function renderProse(event: HarnessEvent): string | undefined {
 
     case "composition:step:complete":
       return pc.dim(
-        `  step ${event.step} done — ${event.iterations} bursts, ${money(event.spentUsd)}, ${event.transcriptPath}\n\n`,
+        `  step ${event.step} done — ${plural(event.iterations, "burst")}, ${money(event.spentUsd)}, ${event.transcriptPath}\n\n`,
       );
 
     case "chain:started":
       return pc.dim(
-        `  ${event.personas.join(" · ")}\n  budget ${money(event.budgetUsd, 2)} → ${event.transcriptPath}\n\n`,
+        `  ${event.personas.join(" · ")}\n  budget ${budget(event.budgetUsd)} → ${event.transcriptPath}\n\n`,
       );
 
     case "burst:restarted":
@@ -114,10 +131,13 @@ function renderProse(event: HarnessEvent): string | undefined {
       return `${pc.cyan(`${event.iteration + 1}. ${event.persona}`)} ${pc.dim(money(event.costUsd))}\n\n${event.text.trim()}\n\n`;
 
     case "budget:warning":
-      return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${money(event.budgetUsd, 2)})`)}\n\n`;
+      return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${budget(event.budgetUsd)})`)}\n\n`;
+
+    case "budget:synthesis-skipped":
+      return `${pc.yellow("  no closing document —")} ${pc.dim(`the synthesis prices at ${money(event.reserveUsd)} and only ${money(event.remainingUsd)} of ${budget(event.budgetUsd)} is left. The ${plural(event.iterations, "burst")} above ${event.iterations === 1 ? "is" : "are"} the whole run; raise the budget for a summary of them.`)}\n\n`;
 
     case "synthesis:started":
-      return `${pc.bold(pc.green("synthesis"))} ${pc.dim(`after ${event.iteration} bursts — stopped on ${event.stopReason || "settled"}`)}\n\n`;
+      return `${pc.bold(pc.green("synthesis"))} ${pc.dim(`after ${plural(event.iteration, "burst")} — stopped on ${event.stopReason || "settled"}`)}\n\n`;
 
     case "synthesis:chunk":
       return event.text;
@@ -127,12 +147,15 @@ function renderProse(event: HarnessEvent): string | undefined {
 
     case "chain:complete":
       return pc.dim(
-        `\n\n  ${event.iterations} bursts · ${money(event.spentUsd)} of ${money(event.budgetUsd, 2)} · stopped on ${event.stopReason || "settled"}\n  ${event.transcriptPath}\n\n`,
+        `\n\n  ${plural(event.iterations, "burst")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} · stopped on ${event.stopReason || "settled"}\n  ${event.transcriptPath}\n\n`,
       );
+
+    case "composition:budget-exhausted":
+      return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${event.presetId})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${budget(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;
 
     case "composition:complete":
       return pc.dim(
-        `  ${event.steps} steps · ${money(event.spentUsd)} total${event.interrupted ? " · interrupted" : ""}\n  ${event.combinedPath}\n`,
+        `  ${plural(event.steps, "step")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} total${event.interrupted ? " · interrupted" : ""}${event.budgetExhausted ? " · budget exhausted" : ""}\n  ${event.combinedPath}\n`,
       );
 
     default:

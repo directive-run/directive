@@ -11,7 +11,15 @@
 
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { evaluateTemplate, isTemplate, memoizePredicate } from "./predicate.js";
-import { BLOCKED_PROPS, trackAccess, withTracking } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  derivationDep,
+  derivationDepId,
+  describeDep,
+  isDerivationDep,
+  trackAccess,
+  withTracking,
+} from "./tracking.js";
 import type {
   DefinitionMeta,
   DerivationState,
@@ -44,7 +52,16 @@ export interface DerivationsManager<
   subscribe(ids: Array<keyof D>, listener: () => void): () => void;
   /** Get the proxy for composition */
   getProxy(): DerivedValues<S, D>;
-  /** Get dependencies for a derivation */
+  /**
+   * Get what a derivation last read, as names a human reads.
+   *
+   * Fact keys keep their key; a dependency on another derivation reads
+   * `derive.total`. Internally the two live in one string keyspace separated by
+   * a namespace prefix, and this is the only place that encoding is unwrapped —
+   * an introspection accessor should not hand back a private separator.
+   *
+   * A fresh Set each call. Nothing on a hot path reads this.
+   */
   getDependencies(id: keyof D): Set<string>;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
@@ -190,32 +207,45 @@ export function createDerivationsManager<
   // ---- Shared dependency-map helpers ----
 
   /**
-   * Remove `id` from the dep-set keyed by `dep`. Deletes empty sets.
-   * Uses `states.has(dep)` (not `definitions`) because during unregister
-   * the definition may already be deleted while state still exists.
+   * Which map a tracked dependency belongs in, and under what key.
+   *
+   * The namespace decides, not a lookup. Both maps used to be selected by
+   * asking whether a *name* was also a derivation — `definitions[dep]` on the
+   * way in, `states.has(dep)` on the way out — which answers the wrong question
+   * for a module carrying a fact and a derivation of the same name. A derivation
+   * reading `facts.ready` alongside a sibling derivation named `ready` had its
+   * fact dependency filed under derivations, so changing the fact never
+   * invalidated it. The prefix says which kind the read was, at the point the
+   * read happened, and nothing downstream has to guess.
    */
+  function depMapFor(dep: string): {
+    map: Map<string, Set<string>>;
+    key: string;
+  } {
+    if (isDerivationDep(dep)) {
+      return { map: derivedToDerivedDeps, key: derivationDepId(dep) };
+    }
+
+    return { map: factToDerivedDeps, key: dep };
+  }
+
+  /** Remove `id` from the dep-set keyed by `dep`. Deletes empty sets. */
   function removeDepLink(dep: string, id: string): void {
-    const map = states.has(dep) ? derivedToDerivedDeps : factToDerivedDeps;
-    const depSet = map.get(dep);
+    const { map, key } = depMapFor(dep);
+    const depSet = map.get(key);
     depSet?.delete(id);
     if (depSet && depSet.size === 0) {
-      map.delete(dep);
+      map.delete(key);
     }
   }
 
-  /**
-   * Add `id` to the dep-set keyed by `dep`, creating the set if needed.
-   * Uses `definitions[dep]` (not `states`) because when adding a new link
-   * the definition must exist — this is the forward path during recomputation.
-   */
+  /** Add `id` to the dep-set keyed by `dep`, creating the set if needed. */
   function addDepLink(dep: string, id: string): void {
-    const map = definitions[dep as keyof D]
-      ? derivedToDerivedDeps
-      : factToDerivedDeps;
-    let depSet = map.get(dep);
+    const { map, key } = depMapFor(dep);
+    let depSet = map.get(key);
     if (!depSet) {
       depSet = new Set();
-      map.set(dep, depSet);
+      map.set(key, depSet);
     }
     depSet.add(id);
   }
@@ -341,9 +371,11 @@ export function createDerivationsManager<
       // Update dependency tracking
       updateDependencies(id, deps);
 
-      // Notify callback (guard avoids [...deps] allocation when no listener)
+      // Notify callback (guard avoids the allocation when no listener).
+      // Described, not raw: a plugin and a trace entry are both read by a
+      // person, and the namespace separator is an internal encoding.
       if (onCompute) {
-        onCompute(id, value, oldValue, [...deps]);
+        onCompute(id, value, oldValue, Array.from(deps, describeDep));
       }
 
       return value;
@@ -498,8 +530,10 @@ export function createDerivationsManager<
       }
 
       // Track this derivation access so the consuming derivation
-      // records a dependency on it (enables composition invalidation)
-      trackAccess(prop);
+      // records a dependency on it (enables composition invalidation).
+      // Namespaced, so the dependency cannot be mistaken for a fact key of
+      // the same name — see DERIVATION_DEP_PREFIX.
+      trackAccess(derivationDep(prop));
 
       const state = getState(prop);
 
@@ -545,7 +579,12 @@ export function createDerivationsManager<
       // `total` silently dropped: it evaluated once and was never brought back,
       // because nothing knew it cared. A no-op outside a tracking context,
       // which is where the overwhelming majority of these reads happen.
-      trackAccess(id as string);
+      //
+      // Namespaced, for the same reason the composition proxy is: a fact and a
+      // derivation may share a name, and a dependency set that could not tell
+      // them apart re-ran an effect gated on the fact whenever the derivation
+      // went stale.
+      trackAccess(derivationDep(id as string));
 
       const state = getState(id as string);
 
@@ -640,7 +679,12 @@ export function createDerivationsManager<
     },
 
     getDependencies(id: keyof D): Set<string> {
-      return getState(id as string).dependencies;
+      const described = new Set<string>();
+      for (const dep of getState(id as string).dependencies) {
+        described.add(describeDep(dep));
+      }
+
+      return described;
     },
 
     registerDefinitions(newDefs: DerivationsDef<S>): void {

@@ -130,7 +130,35 @@ export interface PresetConfig {
   personas: PersonaConfig[];
   /** Token cap on a single burst. Kept small — a burst is a contribution, not an essay. */
   tokensPerBurst: number;
-  /** The chain's ceiling in dollars. Spend past it stops the chain. */
+  /**
+   * This chain's ceiling in dollars.
+   *
+   * Enforced in three layers, because one of them has to be a prediction and a
+   * prediction is the part that can be wrong:
+   *
+   * 1. The chain stops adding bursts while what is left still covers the next
+   *    burst *and* the closing document. Both figures are computed rather than
+   *    averaged — the synthesizer's `maxTokens` is a hard output ceiling and the
+   *    transcript has a measured length — so the reserve is the real bill rather
+   *    than a guess derived from burst history.
+   * 2. The closing document is checked against what remains before it runs. A
+   *    synthesis that cannot be paid for is skipped and reported, not run.
+   * 3. Underneath both, the cost ledger refuses to dispatch anything once
+   *    recorded spend reaches this number. Final spend can exceed it only by the
+   *    cost of the single call that crossed it, and only when layer 1
+   *    mispredicted — which is then reported as `stopReason: "budget"` rather
+   *    than as an error.
+   *
+   * **Per chain, not per composition.** `runChain` runs several presets end to
+   * end, and each carries its own `budgetUsd`, so a three-preset composition is
+   * exposed to the sum of the three. Cap the whole thing with
+   * `RunChainOptions.totalBudgetUsd`.
+   *
+   * Must be at least the price of `synthesizer.maxTokens` at the model's output
+   * rate. Below that the chain can buy bursts and never the document that
+   * summarises them, which `createHarnessSystem` refuses at construction rather
+   * than discovering four calls in.
+   */
   budgetUsd: number;
   /**
    * Hard ceiling on burst count, independent of spend.

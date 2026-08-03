@@ -1854,3 +1854,96 @@ describe("withBudget – maxUnpricedCalls", () => {
     );
   });
 });
+
+// ============================================================================
+// maxTotalCost — the lifetime ledger floor
+// ============================================================================
+
+describe("maxTotalCost", () => {
+  it("keeps dispatching while the ledger is under the ceiling", async () => {
+    const inner = makeRunner(successResult(100, 50));
+    const runner = withBudget(inner, { pricing: PRICING, maxTotalCost: 1 });
+
+    for (let call = 0; call < 5; call++) {
+      await runner(mockAgent(), "Hi");
+    }
+
+    expect(runner.getSpent("total")).toBeLessThan(1);
+    expect(inner).toHaveBeenCalledTimes(5);
+  });
+
+  it("refuses once recorded spend reaches the ceiling", async () => {
+    // One call at these rates and counts bills $0.00105, so a $0.001 ceiling
+    // is crossed by the first call and closed to the second.
+    const inner = makeRunner(successResult(100, 50));
+    const runner = withBudget(inner, { pricing: PRICING, maxTotalCost: 0.001 });
+
+    await runner(mockAgent(), "Hi");
+    expect(inner).toHaveBeenCalledTimes(1);
+    expect(runner.getSpent("total")).toBeGreaterThan(0.001);
+
+    await expect(runner(mockAgent(), "Hi")).rejects.toThrow(
+      BudgetExceededError,
+    );
+    // Refused before dispatch: the inner runner never saw the second call, and
+    // a refusal is not itself charged.
+    expect(inner).toHaveBeenCalledTimes(1);
+    expect(runner.getSpent("total")).toBeLessThan(0.0011);
+  });
+
+  it("does not refuse on a prediction, however large the call looks", async () => {
+    // Enormous input: every predictive cap here would refuse this outright.
+    // The ledger floor does not, because the ledger is still empty — which is
+    // the property that lets a caller's own stopping rule fire first.
+    const inner = makeRunner(successResult(100, 50));
+    const runner = withBudget(inner, { pricing: PRICING, maxTotalCost: 0.001 });
+
+    const result = await runner(mockAgent(), "x".repeat(4_000_000));
+
+    expect(result.output).toBe("hello");
+    expect(inner).toHaveBeenCalledOnce();
+  });
+
+  it("reports the crossing once, naming the total window", async () => {
+    const onBudgetExceeded = vi.fn();
+    const runner = withBudget(makeRunner(successResult(100, 50)), {
+      pricing: PRICING,
+      maxTotalCost: 0.001,
+      onBudgetExceeded,
+    });
+
+    await runner(mockAgent(), "Hi");
+
+    const crossings = onBudgetExceeded.mock.calls
+      .map((call) => call[0])
+      .filter((details) => details.window === "total");
+
+    expect(crossings).toHaveLength(1);
+    expect(crossings[0].phase).toBe("post-call");
+    expect(crossings[0].actual).toBeGreaterThan(0.001);
+  });
+
+  it("names the ceiling in the error", async () => {
+    const runner = withBudget(makeRunner(successResult(100, 50)), {
+      pricing: PRICING,
+      maxTotalCost: 0.001,
+    });
+
+    await runner(mockAgent(), "Hi");
+    await expect(runner(mockAgent(), "Hi")).rejects.toThrow(
+      /Budget exhausted \(total\)/,
+    );
+  });
+
+  it("rejects a ceiling with no rates to price it against", () => {
+    expect(() => withBudget(makeRunner(), { maxTotalCost: 5 })).toThrow(
+      "maxTotalCost",
+    );
+  });
+
+  it("rejects a negative ceiling", () => {
+    expect(() =>
+      withBudget(makeRunner(), { pricing: PRICING, maxTotalCost: -1 }),
+    ).toThrow("maxTotalCost");
+  });
+});

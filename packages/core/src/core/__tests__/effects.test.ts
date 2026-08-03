@@ -859,4 +859,105 @@ describe("effects", () => {
       consoleSpy.mockRestore();
     });
   });
+
+  // ==========================================================================
+  // Async auto-tracking
+  // ==========================================================================
+
+  describe("async auto-tracking", () => {
+    it("does not re-run for a fact read only after an await", async () => {
+      const seen: number[] = [];
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { store, manager } = setup({
+        watcher: {
+          run: async (facts: { count: number; name: string }) => {
+            void facts.count;
+            await Promise.resolve();
+            seen.push(facts.count);
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+      store.set("name", "bob");
+      await manager.runEffects(new Set(["name"]));
+
+      // `name` is read past the await, so it was never recorded — the effect
+      // is deaf to it. This is the documented limitation; the assertion pins
+      // it so the warning below stays truthful.
+      expect(seen).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it("warns once when every read is past the await", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          run: async (facts: { count: number }) => {
+            await Promise.resolve();
+            void facts.count;
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+      await manager.runEffects(new Set(["count"]));
+      await manager.runEffects(new Set(["count"]));
+
+      const messages = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((message) => message.includes('Async effect "watcher"'));
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain("runs on every reconcile");
+      warn.mockRestore();
+    });
+
+    it("stays quiet for an async effect whose reads are hoisted above the await", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          run: async (facts: { count: number }) => {
+            const count = facts.count;
+            await Promise.resolve();
+            void count;
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+
+      expect(
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes("Async effect"),
+        ),
+      ).toHaveLength(0);
+      warn.mockRestore();
+    });
+
+    it("stays quiet for an async effect with explicit deps", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const { manager } = setup({
+        watcher: {
+          deps: ["count"],
+          run: async () => {
+            await Promise.resolve();
+          },
+        },
+      });
+
+      await manager.runEffects(new Set(["count"]));
+
+      expect(
+        warn.mock.calls.filter((call) =>
+          String(call[0]).includes("Async effect"),
+        ),
+      ).toHaveLength(0);
+      warn.mockRestore();
+    });
+  });
 });

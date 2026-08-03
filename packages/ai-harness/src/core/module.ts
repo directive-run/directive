@@ -35,16 +35,37 @@
  * ## How the chain terminates
  *
  * There is no exit condition anywhere, because there is nothing to exit. A
- * burst resolver writes `spentUsd` and `iteration`. Those invalidate
- * `remainingUsd` and `averageBurstUsd`, which invalidate `canAffordBurst`,
- * which invalidates `chainStopped`, which invalidates `burstPending` and
- * `synthesisPending`. The engine re-evaluates the two constraints against the
- * new values. While `burstPending` holds, `runBurst` emits again and the chain
- * takes another turn. When it stops holding, `runBurst` emits nothing —
- * `synthesisPending` has taken over, `synthesize` fires once, and its resolver
- * sets `synthesized`, which falsifies that too. No constraint has anything to
- * require, no requirement is unmet, and the system settles. The chain ends by
- * running out of things that must be true.
+ * burst resolver writes `spentUsd`, `lastBurstUsd`, `transcriptChars`, and
+ * `iteration`. Those invalidate `remainingUsd`, `projectedBurstUsd`, and
+ * `synthesisReserveUsd`, which invalidate `canAffordBurst`, which invalidates
+ * `chainStopped`, which invalidates `burstPending` and `synthesisPending`. The
+ * engine re-evaluates the two constraints against the new values. While
+ * `burstPending` holds, `runBurst` emits again and the chain takes another turn.
+ * When it stops holding, `runBurst` emits nothing — `synthesisPending` has taken
+ * over, `synthesize` fires once, and its resolver sets `synthesized`, which
+ * falsifies that too. No constraint has anything to require, no requirement is
+ * unmet, and the system settles. The chain ends by running out of things that
+ * must be true.
+ *
+ * ## Three layers of budget, doing three different jobs
+ *
+ * - `canAffordBurst` is the **graceful** stop: it refuses to start a burst that
+ *   would eat the closing document's money. Predictive, and the layer that
+ *   normally ends the run.
+ * - `canAffordSynthesis` is the **precise** stop: the synthesizer's `maxTokens`
+ *   and the transcript's measured length are both known, so the one call the
+ *   chain makes after it has already stopped is checked against what is left
+ *   rather than assumed affordable.
+ * - `maxTotalCost` on the budget runner is the **hard floor**: no call is
+ *   dispatched once the ledger has reached `budgetUsd`, whatever the two
+ *   predictions above believed. It cannot fire first — the others stop while
+ *   money is left — and when it does fire it means one of them was wrong, which
+ *   `budgetHalted` records and `stopReason` reports as `"budget"`.
+ *
+ * The three used to be one, and it was the wrong one: a reserve of a single
+ * *average burst* against a synthesizer that costs five to thirty times a burst,
+ * predicted with a trailing mean over a series that only grows, and nothing at
+ * all guarding the synthesis call itself.
  *
  * An interrupt is the same cascade entered from a different door: `abort()`
  * sets `interrupted`, `chainStopped` goes true one derivation later, and the
@@ -64,13 +85,14 @@
  * @module
  */
 
+import { BudgetExceededError, type TokenPricing } from "@directive-run/ai";
 import {
   type DefinitionMeta,
   type ModuleSchema,
   createModule,
   t,
 } from "@directive-run/core";
-import type { HarnessAgents } from "./agents.js";
+import { CHARS_PER_TOKEN, type HarnessAgents } from "./agents.js";
 import type { ChainPhase, HarnessEventSink, StopReason } from "./events.js";
 import {
   DEFAULT_BUDGET_WARNING_THRESHOLD,
@@ -98,20 +120,74 @@ export interface ChainDerived {
   /** `spentUsd / budgetUsd`. */
   budgetFraction: number;
   /**
-   * What a burst has cost on average so far, and therefore what the next one
-   * is expected to cost. Zero before the first burst, which is the honest
-   * answer — nothing has been measured yet.
+   * What a burst has cost on average so far.
+   *
+   * Reported, never predicted from. Every burst re-sends the whole transcript,
+   * so per-burst cost climbs monotonically and a trailing mean is *always* below
+   * the next burst — structurally, not on average. Predicting from this is what
+   * let a `$0.10` budget finish at `$0.1094`. See
+   * {@link ChainDerived.projectedBurstUsd} for the figure the chain actually
+   * stops on.
+   *
+   * Zero before the first burst, which is the honest answer — nothing has been
+   * measured yet.
    */
   averageBurstUsd: number;
   /**
+   * What the *next* burst is expected to cost.
+   *
+   * The last burst plus the growth between the last two, floored at the last
+   * burst's cost. Prompt growth per burst is roughly constant — each burst
+   * appends about `tokensPerBurst` to a transcript every later burst re-sends —
+   * so cost grows roughly linearly, and extrapolating the last observed step
+   * tracks that. Unlike a mean it can never sit below the last measurement,
+   * which is the property that matters: a predictor that under-shoots on a
+   * monotone series stops the chain one burst too late, every time.
+   *
+   * One data point (the first burst) degrades to that burst's cost; zero data
+   * points is zero.
+   */
+  projectedBurstUsd: number;
+  /**
+   * What the closing document will cost, in dollars.
+   *
+   * Not estimated from history — computed. The synthesizer's `maxTokens` is a
+   * hard ceiling on its output, and the transcript it will read has a length
+   * that can be measured right now, so both halves of the bill are known before
+   * the call is made. That is the whole reason the reserve was wrong before: it
+   * held back one *average burst*, while a synthesizer running at 2500–4000
+   * tokens against a `tokensPerBurst` of 450–700, reading the entire transcript,
+   * costs five to thirty times that.
+   */
+  synthesisReserveUsd: number;
+  /**
    * Whether there is room for another burst.
    *
-   * Compares what is left against what a burst has actually cost rather than
-   * against zero, so the chain stops while it can still pay for the closing
-   * document instead of one burst after it can. Self-calibrating: it needs no
-   * configured reserve, because the chain measures its own burn as it goes.
+   * True while what is left covers the next burst **and** the closing document
+   * the chain still owes. Both figures are computed rather than averaged — see
+   * {@link ChainDerived.projectedBurstUsd} and
+   * {@link ChainDerived.synthesisReserveUsd} — so the chain stops with the
+   * synthesis genuinely paid for rather than with one burst's worth of change in
+   * its pocket and a synthesis bill five times that.
+   *
+   * This is the *graceful* stop. It is a prediction, and a prediction can be
+   * wrong; the hard floor underneath it is `maxTotalCost` on the budget runner,
+   * which refuses to dispatch anything once the ledger has reached the budget.
    */
   canAffordBurst: boolean;
+  /**
+   * Whether the closing document can still be paid for.
+   *
+   * Checked separately from {@link ChainDerived.canAffordBurst} because
+   * synthesis runs *after* the chain has already stopped, and the constraint
+   * that fires it used to be gated on nothing but "bursting is over". A
+   * synthesis that cannot be afforded is not run: a chain that stops without a
+   * closing document and says why is better than one that quietly spends past
+   * the number it was given.
+   */
+  canAffordSynthesis: boolean;
+  /** Whether the closing document was given up on for want of budget. */
+  synthesisSkipped: boolean;
   /** Whether the iteration backstop has been reached. */
   iterationsExhausted: boolean;
   /**
@@ -125,10 +201,15 @@ export interface ChainDerived {
   /**
    * Why, once `chainStopped` holds; `""` before then.
    *
-   * Precedence when several apply at once: a failure outranks an interrupt,
-   * which outranks the budget, which outranks the iteration ceiling. Ordered
-   * most-specific first, so the reported reason is the one that would surprise
-   * the operator most.
+   * Precedence when several apply at once: the hard budget floor outranks a
+   * failure, which outranks an interrupt, which outranks the predicted budget
+   * stop, which outranks the iteration ceiling. Ordered most-specific first, so
+   * the reported reason is the one that would surprise the operator most.
+   *
+   * The floor sits at the top because it surfaces as a thrown error, and
+   * reporting a run that hit its ceiling as `"error"` is how the two ceilings
+   * would come to give different accounts of the same money. It is a budget
+   * stop; it says so.
    */
   stopReason: StopReason;
   /** Whose turn it is. Turn order is round-robin over the preset's personas. */
@@ -212,6 +293,41 @@ export const chainSchema = {
      * enforced against.
      */
     spentUsd: t.number().meta({ label: "Spent (USD)", category: "cost" }),
+    /**
+     * What the most recent burst cost, and what the one before it cost.
+     *
+     * Two facts rather than a history array, because the projection only ever
+     * looks at the last step: `last + (last - previous)`. Keeping the whole
+     * series would be keeping it for a predictor that does not read it.
+     */
+    lastBurstUsd: t
+      .number()
+      .meta({ label: "Last burst (USD)", category: "cost" }),
+    previousBurstUsd: t
+      .number()
+      .meta({ label: "Previous burst (USD)", category: "cost" }),
+    /**
+     * How long the transcript is, in characters, as of the last burst.
+     *
+     * The measured half of the synthesis reserve. A fact rather than a call to
+     * `transcript.text()` from inside a derivation: a derivation reading a
+     * mutable object outside the fact store is a value nothing can invalidate
+     * it on.
+     */
+    transcriptChars: t
+      .number()
+      .meta({ label: "Transcript (chars)", category: "cost" }),
+    /**
+     * Set when the budget runner's lifetime floor refused a call.
+     *
+     * The hard ceiling firing means the graceful one mispredicted, so this is
+     * worth recording distinctly rather than folding into `failure` — a run
+     * that hit its ceiling is a budget stop, and reporting it as an error would
+     * be the two ceilings disagreeing about the same money.
+     */
+    budgetHalted: t
+      .boolean()
+      .meta({ label: "Budget halted", category: "lifecycle" }),
     /** Set by `abort()`. Read by `chainStopped`, branched on by nothing. */
     interrupted: t
       .boolean()
@@ -221,6 +337,16 @@ export const chainSchema = {
     /** Set when the synthesizer itself failed — the one unrecoverable outcome. */
     synthesisFailed: t.boolean().meta({
       label: "Synthesis failed",
+      category: "lifecycle",
+    }),
+    /**
+     * Set when the budget floor refused the synthesis call itself.
+     *
+     * Distinct from `synthesisFailed`: nothing went wrong, there was no money.
+     * A run that ends this way is `"complete"`, not `"failed"`.
+     */
+    synthesisRefused: t.boolean().meta({
+      label: "Synthesis refused",
       category: "lifecycle",
     }),
     /** A burst resolver's error message, or `""`. */
@@ -234,7 +360,11 @@ export const chainSchema = {
     remainingUsd: t.number(),
     budgetFraction: t.number(),
     averageBurstUsd: t.number(),
+    projectedBurstUsd: t.number(),
+    synthesisReserveUsd: t.number(),
     canAffordBurst: t.boolean(),
+    canAffordSynthesis: t.boolean(),
+    synthesisSkipped: t.boolean(),
     iterationsExhausted: t.boolean(),
     chainStopped: t.boolean(),
     stopReason: t.string<StopReason>(),
@@ -309,6 +439,44 @@ function readIteration(
   return typeof value === "number" ? value : undefined;
 }
 
+/**
+ * Whether an error is the budget runner's lifetime floor refusing a call.
+ *
+ * Checked by name as well as by `instanceof`, and down the `cause` chain,
+ * because the error crosses the orchestrator between where it is thrown and
+ * where this reads it — and a mis-identified budget stop would be reported as a
+ * chain failure, which is the one outcome this distinction exists to prevent.
+ * `window === "total"` narrows it to the lifetime floor: a per-call or
+ * rolling-window cap tripping is a configuration the chain did not ask for and
+ * should still surface as an error.
+ */
+function isBudgetExhausted(error: unknown): boolean {
+  let current: unknown = error;
+
+  for (
+    let depth = 0;
+    depth < 8 && current !== null && current !== undefined;
+    depth++
+  ) {
+    const candidate = current as {
+      name?: unknown;
+      window?: unknown;
+      cause?: unknown;
+    };
+    const isBudgetError =
+      current instanceof BudgetExceededError ||
+      candidate.name === "BudgetExceededError";
+
+    if (isBudgetError && candidate.window === "total") {
+      return true;
+    }
+
+    current = candidate.cause;
+  }
+
+  return false;
+}
+
 // ============================================================================
 // Module
 // ============================================================================
@@ -317,6 +485,10 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
   const { preset, runId, transcript, agents, emit, readDerived } = deps;
   const now = deps.now ?? Date.now;
   const { orchestrator, budgetRunner } = agents;
+  // The rates the ledger will bill at, so the reserve and the bill are the same
+  // arithmetic. Closed over rather than a fact: they are fixed for the life of
+  // the harness, and a derivation reading them cannot go stale on them.
+  const pricing: TokenPricing = agents.pricing;
   const warningThreshold =
     preset.budgetWarningThreshold ?? DEFAULT_BUDGET_WARNING_THRESHOLD;
 
@@ -349,10 +521,15 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       facts.previousBurst = "";
       facts.lastBurst = null;
       facts.spentUsd = 0;
+      facts.lastBurstUsd = 0;
+      facts.previousBurstUsd = 0;
+      facts.transcriptChars = 0;
+      facts.budgetHalted = false;
       facts.interrupted = false;
       facts.synthesis = "";
       facts.synthesized = false;
       facts.synthesisFailed = false;
+      facts.synthesisRefused = false;
       facts.failure = "";
       facts.transcriptPath = transcript.markdownPath;
       facts.jsonlPath = transcript.jsonlPath;
@@ -384,25 +561,75 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       budgetFraction: (facts, derived) =>
         derived.budgetUsd > 0 ? facts.spentUsd / derived.budgetUsd : 0,
 
+      // Reported, not predicted from. See the field doc on ChainDerived.
       averageBurstUsd: (facts) =>
         facts.iteration > 0 ? facts.spentUsd / facts.iteration : 0,
 
+      projectedBurstUsd: (facts) => {
+        if (facts.iteration === 0) {
+          return 0;
+        }
+        if (facts.iteration === 1) {
+          return facts.lastBurstUsd;
+        }
+
+        // Linear extrapolation of the last observed step, floored at the last
+        // burst. Growth is clamped at zero so a burst that happened to come in
+        // cheaper than its predecessor does not predict a cheaper one still on
+        // a transcript that only ever gets longer.
+        const growth = Math.max(0, facts.lastBurstUsd - facts.previousBurstUsd);
+
+        return facts.lastBurstUsd + growth;
+      },
+
+      synthesisReserveUsd: (facts) => {
+        const { synthesizer } = facts.preset;
+        // Everything the synthesizer will be sent: the transcript, the template
+        // around it, and the original input the template interpolates.
+        const promptChars =
+          facts.transcriptChars +
+          synthesizer.promptTemplate.length +
+          facts.input.length;
+        const inputTokens = Math.ceil(promptChars / CHARS_PER_TOKEN);
+
+        return (
+          (inputTokens / 1_000_000) * pricing.inputPerMillion +
+          (synthesizer.maxTokens / 1_000_000) * pricing.outputPerMillion
+        );
+      },
+
       canAffordBurst: (_facts, derived) =>
         derived.remainingUsd > 0 &&
-        derived.remainingUsd >= derived.averageBurstUsd,
+        derived.remainingUsd >=
+          derived.projectedBurstUsd + derived.synthesisReserveUsd,
+
+      canAffordSynthesis: (_facts, derived) =>
+        derived.remainingUsd >= derived.synthesisReserveUsd,
 
       iterationsExhausted: (facts) =>
         facts.iteration >= facts.preset.maxIterations,
 
       chainStopped: (facts, derived) =>
+        facts.budgetHalted ||
         facts.failure !== "" ||
         facts.interrupted ||
         !derived.canAffordBurst ||
         derived.iterationsExhausted,
 
+      synthesisSkipped: (facts, derived) =>
+        facts.running &&
+        derived.chainStopped &&
+        facts.iteration > 0 &&
+        !facts.synthesized &&
+        !facts.synthesisFailed &&
+        (facts.synthesisRefused || !derived.canAffordSynthesis),
+
       stopReason: (facts, derived): StopReason => {
         if (!derived.chainStopped) {
           return "";
+        }
+        if (facts.budgetHalted) {
+          return "budget";
         }
         if (facts.failure !== "") {
           return "error";
@@ -430,7 +657,8 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         derived.chainStopped &&
         facts.iteration > 0 &&
         !facts.synthesized &&
-        !facts.synthesisFailed,
+        !facts.synthesisFailed &&
+        !derived.synthesisSkipped,
 
       phase: (facts, derived): ChainPhase => {
         if (!facts.running) {
@@ -562,6 +790,13 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           context.facts.previousBurst = text;
           context.facts.lastBurst = record;
           context.facts.spentUsd = spentAfter;
+          // The two figures the next-burst projection extrapolates from, and
+          // the measured half of the synthesis reserve. All three are what this
+          // burst actually cost and actually wrote, read off the ledger and the
+          // transcript rather than recomputed.
+          context.facts.previousBurstUsd = context.facts.lastBurstUsd;
+          context.facts.lastBurstUsd = spentAfter - spentBefore;
+          context.facts.transcriptChars = transcript.text().length;
           context.facts.iteration = req.iteration + 1;
         },
         meta: withPresetMeta(preset, {
@@ -694,6 +929,13 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
        * effect's body reads, and this body reads `phase`, so the effect ends up
        * depending on the derivation itself and re-runs precisely when it goes
        * stale. One dependency, declared by reading the thing.
+       *
+       * Which is exactly why every read below happens **before** the one
+       * `await`. Auto-tracking is a synchronous stack: it closes when the body
+       * returns its promise, and anything the continuation reads afterwards is
+       * recorded as a dependency of nothing. Core warns about this now; the
+       * shape that keeps the warning honest is to hoist the reads, not to hand
+       * back the dependency list this effect exists to avoid keeping.
        */
       announcePhase: {
         run: async (facts) => {
@@ -730,6 +972,40 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
             return;
           }
 
+          // Everything the completion event reports, read before the flush
+          // below. Auto-tracking closes at the first `await`, so a read after
+          // it registers no dependency — and this effect is deliberately
+          // dependency-declared by reading rather than by a `deps` list.
+          const stopReason = readDerived("stopReason");
+          const synthesisSkipped = readDerived("synthesisSkipped");
+          const completion = {
+            runId: facts.runId,
+            iterations: facts.iteration,
+            spentUsd: facts.spentUsd,
+            budgetUsd: readDerived("budgetUsd"),
+            remainingUsd: readDerived("remainingUsd"),
+            fraction: readDerived("budgetFraction"),
+            reserveUsd: readDerived("synthesisReserveUsd"),
+            synthesis: facts.synthesis,
+            transcriptPath: facts.transcriptPath,
+            jsonlPath: facts.jsonlPath,
+          };
+
+          // Said before the run closes, and said plainly. A missing closing
+          // document is the most visible thing about such a run, and without
+          // this it is also the least explained.
+          if (synthesisSkipped) {
+            emit({
+              type: "budget:synthesis-skipped",
+              reserveUsd: completion.reserveUsd,
+              iterations: completion.iterations,
+              spentUsd: completion.spentUsd,
+              budgetUsd: completion.budgetUsd,
+              remainingUsd: completion.remainingUsd,
+              fraction: completion.fraction,
+            });
+          }
+
           // The one place the mirror has to have landed. Flushes are
           // serialized, so this queues behind whatever the burst effects
           // started and resolves only once the files match memory.
@@ -737,15 +1013,16 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
           emit({
             type: "chain:complete",
-            runId: facts.runId,
+            runId: completion.runId,
             phase,
-            stopReason: readDerived("stopReason"),
-            iterations: facts.iteration,
-            spentUsd: facts.spentUsd,
-            budgetUsd: readDerived("budgetUsd"),
-            synthesis: facts.synthesis,
-            transcriptPath: facts.transcriptPath,
-            jsonlPath: facts.jsonlPath,
+            stopReason,
+            iterations: completion.iterations,
+            spentUsd: completion.spentUsd,
+            budgetUsd: completion.budgetUsd,
+            synthesis: completion.synthesis,
+            synthesisSkipped,
+            transcriptPath: completion.transcriptPath,
+            jsonlPath: completion.jsonlPath,
             at: now(),
           });
         },
@@ -769,6 +1046,26 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
        * same, and the chain would sit with an unmet requirement forever.
        */
       onResolverError: (error, requirement, context) => {
+        // The lifetime floor refused the call. Nothing is broken — the run
+        // reached the number it was given — so this is recorded as a budget
+        // stop rather than a failure, and the chain lands in `"complete"` with
+        // `stopReason: "budget"` however far in it happened.
+        if (isBudgetExhausted(error)) {
+          context.facts.budgetHalted = true;
+          if (requirement.type === "SYNTHESIZE") {
+            context.facts.synthesisRefused = true;
+          }
+          emit({
+            type: "error",
+            scope: requirement.type === "SYNTHESIZE" ? "synthesis" : "burst",
+            message: error.message,
+            iteration: readIteration(requirement),
+            at: now(),
+          });
+
+          return;
+        }
+
         if (requirement.type === "SYNTHESIZE") {
           context.facts.synthesisFailed = true;
           emit({

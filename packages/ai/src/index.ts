@@ -585,6 +585,7 @@ export {
   type BudgetConfig,
   type BudgetRunner,
   type BudgetWindow,
+  type BudgetWindowName,
   type ModelPricing,
   type TokenPricing,
   type BudgetExceededDetails,

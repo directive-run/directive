@@ -42,8 +42,9 @@ export type ChainPhase =
  * Why the chain stopped adding bursts.
  *
  * `""` while it has not stopped. The precedence when several apply at once is
- * fixed and documented on the `stopReason` derivation: a failure outranks an
- * interrupt, which outranks the budget, which outranks the iteration ceiling.
+ * fixed and documented on the `stopReason` derivation: the hard budget floor
+ * outranks a failure, which outranks an interrupt, which outranks the predicted
+ * budget stop, which outranks the iteration ceiling.
  */
 export type StopReason =
   | ""
@@ -51,7 +52,15 @@ export type StopReason =
   | "error"
   /** An operator called `abort()`. */
   | "interrupted"
-  /** The next burst could not be paid for out of what was left. */
+  /**
+   * The budget ran out.
+   *
+   * Either the next burst could not be paid for out of what was left — the
+   * ordinary, graceful case — or the runner's hard ledger floor refused a call
+   * outright, which means the chain's own arithmetic mispredicted. Both are the
+   * same fact about the run and report the same way; `budgetHalted` on the
+   * module tells them apart for anyone who needs to.
+   */
   | "budget"
   /** The configured iteration ceiling was reached. */
   | "max-iterations";
@@ -174,6 +183,23 @@ export type HarnessEvent =
    * per run, on the crossing — not on every burst above the line.
    */
   | ({ type: "budget:warning"; threshold: number } & CostSnapshot)
+  /**
+   * The closing document was given up on because it could not be paid for.
+   *
+   * The transcript is whole and the run is `"complete"` — nothing failed. What
+   * happened is that the chain's reserve turned out to be smaller than the
+   * synthesis it was reserving for, so rather than spend past the number it was
+   * given, the chain stops and says so. A surface should show this: a run that
+   * ends without its closing document and without an explanation is the outcome
+   * this event exists to prevent.
+   */
+  | ({
+      type: "budget:synthesis-skipped";
+      /** What the closing document was priced at, in dollars. */
+      reserveUsd: number;
+      /** Bursts that did make it into the transcript. */
+      iterations: number;
+    } & CostSnapshot)
   /** The synthesizer is about to read the transcript. */
   | {
       type: "synthesis:started";
@@ -211,6 +237,11 @@ export type HarnessEvent =
       budgetUsd: number;
       /** The closing document, or `""` when synthesis never ran or failed. */
       synthesis: string;
+      /**
+       * Whether `synthesis` is empty because it could not be afforded, rather
+       * than because it failed or never came due.
+       */
+      synthesisSkipped: boolean;
       transcriptPath: string;
       jsonlPath: string;
       at: number;
@@ -257,6 +288,25 @@ export type HarnessEvent =
       jsonlPath: string;
       at: number;
     } & CompositionStep)
+  /**
+   * The composition stopped before its remaining steps because the ceiling
+   * across every step was used up.
+   *
+   * `step` is the one that did *not* start. What ran before it is whole — this
+   * is not a partial step, it is a step declined. A caller that needs the rest
+   * needs a larger `totalBudgetUsd`.
+   */
+  | ({
+      type: "composition:budget-exhausted";
+      runId: string;
+      /** Spend across the steps that did run. */
+      spentUsd: number;
+      /** The composition's ceiling. */
+      budgetUsd: number;
+      /** The least this step would have needed to produce a closing document. */
+      requiredUsd: number;
+      at: number;
+    } & Omit<CompositionStep, "runId">)
   /** Every step is done. Always the last event of a composition. */
   | {
       type: "composition:complete";
@@ -265,10 +315,14 @@ export type HarnessEvent =
       steps: number;
       /** Every step's spend, summed. */
       spentUsd: number;
+      /** The ceiling that spend ran under, across every step. */
+      budgetUsd: number;
       /** The file holding every step's synthesis, in order. */
       combinedPath: string;
       /** Whether an operator stopped the composition before its last step. */
       interrupted: boolean;
+      /** Whether steps were declined because the ceiling was used up. */
+      budgetExhausted: boolean;
       at: number;
     };
 

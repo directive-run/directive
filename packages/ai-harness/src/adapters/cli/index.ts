@@ -72,8 +72,15 @@ export interface CliArgs {
   listPresets: boolean;
   /** Overrides `tokensPerBurst` on every preset in the run. */
   tokensPerBurst?: number;
-  /** Overrides `budgetUsd` on every preset in the run. */
+  /** Overrides `budgetUsd` on every preset in the run. Per step, not per run. */
   budgetUsd?: number;
+  /**
+   * Ceiling across every step of a `--chain`.
+   *
+   * Distinct from `--budget`, which is per step and always was: `--chain a,b,c
+   * --budget 5` is $15 of exposure. Defaults to the sum of the steps' budgets.
+   */
+  totalBudgetUsd?: number;
   model?: string;
   temperature?: number;
   dryRun: boolean;
@@ -146,8 +153,13 @@ function buildProgram(sink: string[]): Command {
     )
     .option(
       "--budget <usd>",
-      "override the preset's budget",
+      "override each preset's budget (per step, not per run)",
       positiveNumber("--budget"),
+    )
+    .option(
+      "--total-budget <usd>",
+      "ceiling across every step of a --chain (default: the steps' budgets, summed)",
+      positiveNumber("--total-budget"),
     )
     .option("--model <id>", "override the model")
     .option(
@@ -218,6 +230,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
     listPresets,
     tokensPerBurst: options.tokens,
     budgetUsd: options.budget,
+    totalBudgetUsd: options.totalBudget,
     model: options.model,
     temperature: options.temperature,
     dryRun: options.dryRun === true,
@@ -594,6 +607,12 @@ async function execute(
 
   const [only] = presets;
   if (presets.length === 1 && only !== undefined) {
+    if (args.totalBudgetUsd !== undefined) {
+      throw new CliError(
+        "--total-budget is the ceiling across a --chain's steps. With a single --preset there is one step, and --budget is its ceiling.",
+      );
+    }
+
     const harness = createHarness(only, shared);
 
     try {
@@ -605,7 +624,12 @@ async function execute(
     return;
   }
 
-  await runChain(presets, input, shared);
+  await runChain(presets, input, {
+    ...shared,
+    ...(args.totalBudgetUsd === undefined
+      ? {}
+      : { totalBudgetUsd: args.totalBudgetUsd }),
+  });
 }
 
 // ============================================================================

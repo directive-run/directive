@@ -41,7 +41,13 @@ import { applyPatch, evaluateKeySelector } from "./predicate.js";
 import { RequirementSet } from "./requirements.js";
 import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { type SourcesManager, createSourcesManager } from "./sources.js";
-import { BLOCKED_PROPS } from "./tracking.js";
+import {
+  BLOCKED_PROPS,
+  derivationDep,
+  derivationDepId,
+  describeDep,
+  isDerivationDep,
+} from "./tracking.js";
 import type {
   ConstraintsDef,
   DerivationsDef,
@@ -357,13 +363,19 @@ export function createEngine<S extends Schema>(
   let dispatchDepth = 0;
   let shouldTakeSnapshot = false;
 
-  // Dev-mode: Warn if a fact and derivation share the same name
+  // Dev-mode: Warn if a fact and derivation share the same name.
+  //
+  // Tracking handles it — the two are separate names inside every dependency
+  // set and invalidation set, and a constraint gated on one is not woken by the
+  // other. This warns because it is hard to *read*: `facts.ready` and
+  // `derived.ready` sit a line apart meaning different things, and a reviewer
+  // has to check which proxy every one of them came off.
   if (isDevelopment) {
     const derivationNames = new Set(Object.keys(mergedDerive));
     for (const key of Object.keys(mergedSchema)) {
       if (derivationNames.has(key)) {
         console.warn(
-          `[Directive] "${key}" exists as both a fact and a derivation. This may cause unexpected dependency tracking behavior.`,
+          `[Directive] "${key}" exists as both a fact and a derivation. They are tracked separately and will not invalidate each other, but two things one name apart are hard to read — consider renaming one.`,
         );
       }
     }
@@ -428,6 +440,13 @@ export function createEngine<S extends Schema>(
    * Held separately from `changedKeys` rather than merged into it so history
    * snapshot labels keep describing facts, and so an invalidation that arrives
    * without a fact change cannot make the system look dirty.
+   *
+   * Stored under {@link derivationDep} names, not bare IDs. The set they are
+   * folded into is matched against dependency sets that carry fact keys too, and
+   * a module is free to declare a fact and a derivation with the same name —
+   * `facts.ready` beside `derivations.ready`. Bare IDs made that name mean both
+   * at once, so a constraint gated on the fact re-evaluated when the derivation
+   * went stale and an effect gated on the fact re-ran.
    */
   const invalidatedDerivations = new Set<string>();
 
@@ -514,8 +533,9 @@ export function createEngine<S extends Schema>(
     onInvalidate: (id) => {
       if (hasPlugins()) pluginManager.emitDerivationInvalidate(id);
       // A derivation going stale is news for anything that read it — the same
-      // news a changed fact is, delivered on the same channel.
-      invalidatedDerivations.add(id);
+      // news a changed fact is, delivered on the same channel, under its own
+      // name on that channel.
+      invalidatedDerivations.add(derivationDep(id));
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("derivation", id, error);
@@ -1047,9 +1067,12 @@ export function createEngine<S extends Schema>(
       // Run effects for changed keys.
       //
       // Auto-tracked dependencies are whatever the body read, which is fact
-      // keys *and* derivation IDs, so the notification set has to carry both or
+      // keys *and* derivations, so the notification set has to carry both or
       // half of every tracked dependency set matches nothing. Folded in here
-      // rather than at the source so `changedKeys` stays a record of facts.
+      // rather than at the source so `changedKeys` stays a record of facts up
+      // to the point the snapshot label is taken, and carried under the
+      // derivation namespace so the two kinds of name cannot be confused for
+      // each other.
       if (invalidatedDerivations.size > 0) {
         for (const id of invalidatedDerivations) {
           state.changedKeys.add(id);
@@ -1085,7 +1108,7 @@ export function createEngine<S extends Schema>(
             currentTrace.constraintsHit.push({
               id: cId,
               priority: cState.priority,
-              deps: cDeps ? [...cDeps] : [],
+              deps: cDeps ? Array.from(cDeps, describeDep) : [],
               meta: mergedConstraints[cId]?.meta,
             });
           }
@@ -2263,14 +2286,22 @@ export function createEngine<S extends Schema>(
       const constraintState = constraintsManager.getState(req.fromConstraint);
       const resolverStatus = resolversManager.getStatus(requirementId);
 
-      // Get relevant facts from the constraint's tracked dependencies
+      // Get the relevant values from the constraint's tracked dependencies.
+      // A `when()` may have been gated on a derivation rather than a fact, and
+      // an explanation that dropped those (or looked them up in the fact store,
+      // where they are not) would show `undefined` for the value the constraint
+      // actually turned on.
       const relevantFacts: Record<string, unknown> = {};
       const constraintDeps = constraintsManager.getDependencies(
         req.fromConstraint,
       );
       if (constraintDeps) {
-        for (const key of constraintDeps) {
-          relevantFacts[key] = store.get(key);
+        for (const dep of constraintDeps) {
+          relevantFacts[describeDep(dep)] = isDerivationDep(dep)
+            ? derivationsManager.get(
+                derivationDepId(dep) as keyof DerivationsDef<S>,
+              )
+            : store.get(dep);
         }
       } else {
         // Fallback: include all facts if deps not tracked

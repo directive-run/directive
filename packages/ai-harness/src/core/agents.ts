@@ -32,6 +32,13 @@
  * one pricing shape into another is a second list of rates that can drift from
  * the first.
  *
+ * ## The rates are part of the interface
+ *
+ * They are returned rather than kept private, because the chain has to cost a
+ * call it has not made yet: what the closing document will run to, and whether
+ * a budget is large enough to produce one at all. Doing that from a second copy
+ * of the rate table would put the reserve and the bill on different numbers.
+ *
  * @module
  */
 
@@ -89,6 +96,74 @@ export interface HarnessAgents {
    * only be enforced against one of them.
    */
   budgetRunner: BudgetRunner;
+  /**
+   * The rates the ledger prices at.
+   *
+   * Handed to the module so the chain can cost a call it has not made yet.
+   * Reserving for the closing document is arithmetic, not a guess — the
+   * synthesizer's `maxTokens` is a hard ceiling on its output and the transcript
+   * is a measured length — but only if the same rates that will bill it are the
+   * ones doing the reserving.
+   */
+  pricing: TokenPricing;
+}
+
+/** Characters per token, matching `withBudget`'s own default. */
+export const CHARS_PER_TOKEN = 4;
+
+/**
+ * The rates a preset's calls will be priced at.
+ *
+ * One resolution path, so a caller deciding whether a budget is big enough and
+ * the ledger deciding what a call cost cannot be working from different numbers.
+ */
+export function resolvePresetPricing(
+  preset: PresetConfig,
+  override?: TokenPricing,
+): TokenPricing {
+  return override ?? requireModelPricing(ANTHROPIC_PRICING, preset.model);
+}
+
+/**
+ * The least a chain can cost and still produce a closing document.
+ *
+ * The synthesizer's output cap, at the output rate, and nothing else — no
+ * bursts, no transcript, no input. A budget below this cannot pay for the one
+ * thing every run is supposed to end with, so the chain would spend whatever it
+ * had on bursts and then stop with nothing to show for them.
+ *
+ * A floor rather than an estimate: `maxTokens` is enforced by the provider, so
+ * no synthesis can come in under it by more than the model chose to write.
+ */
+export function minimumBudgetUsd(
+  preset: PresetConfig,
+  pricing: TokenPricing,
+): number {
+  return (preset.synthesizer.maxTokens / 1_000_000) * pricing.outputPerMillion;
+}
+
+/**
+ * The least a chain is *worth* starting on.
+ *
+ * {@link minimumBudgetUsd} plus one burst's output. A budget between the two
+ * produces a run that is legal and pointless: the chain affords a burst or two,
+ * the transcript grows, the reserve grows with it, and the closing document goes
+ * from affordable to not while the bursts that were supposed to feed it sit
+ * there unsummarised.
+ *
+ * Used where declining is an option — a composition can simply not start the
+ * step. `createHarnessSystem` holds to the narrower floor, because a caller who
+ * asked for one chain at one budget should get the run rather than a refusal
+ * over a judgement call.
+ */
+export function minimumStepBudgetUsd(
+  preset: PresetConfig,
+  pricing: TokenPricing,
+): number {
+  return (
+    minimumBudgetUsd(preset, pricing) +
+    (preset.tokensPerBurst / 1_000_000) * pricing.outputPerMillion
+  );
 }
 
 /** Retry policy when the caller does not supply one. */
@@ -118,26 +193,31 @@ export function createHarnessAgents(
   }
 
   const base = runner ?? createAnthropicDispatcher(preset, apiKey!, baseURL);
-  const rates = pricing ?? requireModelPricing(ANTHROPIC_PRICING, preset.model);
+  const rates = resolvePresetPricing(preset, pricing);
 
-  // A ledger, deliberately without a cap.
+  // A ledger, and a floor under it.
   //
-  // `withBudget` can enforce a ceiling itself, and configuring one here at
-  // `preset.budgetUsd` was the obvious thing to do — it is also the mistake
-  // this package exists to avoid. The chain already has a ceiling, in
-  // `canAffordBurst`, one derivation composed from what the chain has spent.
-  // A second ceiling at the same number sits one level below where the
-  // decision is made, and the two do not agree about what happens at the
-  // boundary: the derivation stops the chain cleanly and reports `"budget"`,
-  // while the cap throws mid-call and surfaces as a resolver failure reported
-  // as `"error"`. Same money, same limit, two different accounts of the run.
+  // The floor is not a second copy of the chain's ceiling. `canAffordBurst`
+  // decides whether to *start* another burst, from what the chain has spent and
+  // what it still owes the closing document; it is predictive, and prediction is
+  // the part that can be wrong. `maxTotalCost` decides nothing — it refuses to
+  // dispatch once the ledger has already reached `budgetUsd`. One stops the
+  // chain cleanly and reports `"budget"`; the other catches the case where the
+  // first one's arithmetic was off, and bounds the damage to a single call.
   //
-  // So the cap lives in exactly one place and this is not it. What `withBudget`
-  // contributes is the thing there should only be one of: the ledger.
-  // `getSpent("total")` is the chain's accumulated cost, and the resolvers copy
-  // it into a fact rather than pricing anything themselves.
+  // An earlier version of this file left the cap off, reasoning that two
+  // ceilings at the same number disagree at the boundary. That reasoning was
+  // about a *per-call* cap, which really is a duplicate: it gates a prediction
+  // about one call against a number the chain is already gating a prediction
+  // about the whole run against, so whichever is more pessimistic fires and the
+  // run is reported twice, two different ways. A lifetime floor is layered
+  // rather than duplicated. It cannot fire before the derivation does, because
+  // the derivation stops while money is left and the floor only speaks when
+  // there is none — and when it does fire the chain records it as a budget stop
+  // (see the `budgetHalted` fact), so the two agree about what happened.
   const budgetRunner = withBudget(withRetry(base, retry ?? DEFAULT_RETRY), {
     pricing: rates,
+    maxTotalCost: preset.budgetUsd,
   });
 
   const orchestrator = createMultiAgentOrchestrator({
@@ -146,7 +226,7 @@ export function createHarnessAgents(
     plugins,
   });
 
-  return { orchestrator, budgetRunner };
+  return { orchestrator, budgetRunner, pricing: rates };
 }
 
 // ============================================================================

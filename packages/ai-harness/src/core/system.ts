@@ -16,7 +16,7 @@ import {
   devtoolsPlugin,
   loggingPlugin,
 } from "@directive-run/core/plugins";
-import { createHarnessAgents } from "./agents.js";
+import { createHarnessAgents, minimumBudgetUsd } from "./agents.js";
 import type {
   ChainPhase,
   HarnessEvent,
@@ -86,6 +86,15 @@ export interface HarnessRunResult {
   budgetUsd: number;
   /** The closing document, or `""` when synthesis never ran or failed. */
   synthesis: string;
+  /**
+   * Whether `synthesis` is empty because the chain could not pay for it.
+   *
+   * Distinct from a synthesis that failed (`phase: "failed"`) and from one that
+   * never came due (no bursts ran). A caller that treats an empty synthesis as
+   * an error should check this first — this one is the budget working, not
+   * breaking.
+   */
+  synthesisSkipped: boolean;
   transcriptPath: string;
   jsonlPath: string;
 }
@@ -171,6 +180,21 @@ export function createHarnessSystem(
     baseURL: options.baseURL,
   });
 
+  // Refused here rather than discovered four bursts in.
+  //
+  // A budget that cannot cover the closing document buys bursts nobody will
+  // ever read a summary of: the chain spends what it has, reaches synthesis,
+  // finds it unaffordable, and stops with a transcript and no conclusion. That
+  // is a correct outcome of the rules and a useless outcome for the operator,
+  // and it is knowable before a single call — the synthesizer's `maxTokens` and
+  // the model's output rate are both in hand right now.
+  const floor = minimumBudgetUsd(validated, agents.pricing);
+  if (validated.budgetUsd < floor) {
+    throw new Error(
+      `[ai-harness] budgetUsd of $${validated.budgetUsd.toFixed(4)} cannot pay for this preset's closing document, which prices at $${floor.toFixed(4)} (${validated.synthesizer.maxTokens} output tokens at $${agents.pricing.outputPerMillion}/M). The chain would spend the budget on bursts and then have nothing left to summarise them with. Raise the budget above $${floor.toFixed(4)}, or lower \`synthesizer.maxTokens\`.`,
+    );
+  }
+
   // Bound after `createSystem` and before `start()`. Constraints and effects
   // read derivations through this because the facts proxy they are handed does
   // not carry them; the read still goes through the derivation proxy, so it is
@@ -214,6 +238,7 @@ export function createHarnessSystem(
       spentUsd: system.facts.spentUsd,
       budgetUsd: system.derive.budgetUsd,
       synthesis: system.facts.synthesis,
+      synthesisSkipped: system.derive.synthesisSkipped,
       transcriptPath: transcript.markdownPath,
       jsonlPath: transcript.jsonlPath,
     };

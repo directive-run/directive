@@ -36,9 +36,10 @@
  * ```
  */
 
+import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
-import { withTracking } from "./tracking.js";
+import { describeDep, withTracking } from "./tracking.js";
 import type {
   EffectsDef,
   Facts,
@@ -448,6 +449,51 @@ export function createEffectsManager<S extends Schema>(
     }
   }
 
+  /**
+   * Effects already warned about reading facts past an `await`.
+   *
+   * Once per effect, not once per run: an effect that runs every reconcile
+   * would otherwise turn one design note into a log.
+   */
+  const warnedAsync = new Set<string>();
+
+  /**
+   * Say so, once, when an async auto-tracked effect read nothing it could be
+   * woken by.
+   *
+   * The tracking context is a synchronous stack: it is pushed, the body runs,
+   * and it is popped the moment the body *returns* — which for an `async` body
+   * is at its first `await`. Everything the continuation reads afterwards falls
+   * outside it and is recorded as a dependency of nothing. An effect whose reads
+   * are all past that boundary therefore ends up with an empty dependency set,
+   * which this manager reads as "no dependencies known" and runs on *every*
+   * reconcile. It looks like it works, because it does fire; what it has lost is
+   * any relationship between when it fires and what it reads.
+   *
+   * **Why not warn on every async auto-tracked effect**, the way core warns on
+   * every async constraint without `deps`. Because there is a correct shape —
+   * hoist every read above the first `await` — and nothing distinguishes it from
+   * the broken one at runtime, so a broad warning fires on correct code with no
+   * way to say "I did that". This repo has such an effect. A warning that cannot
+   * be satisfied gets muted, and a muted warning protects nothing. The empty
+   * dependency set is the case that is unambiguous, and it is the one worth
+   * interrupting someone for.
+   *
+   * Triggered on the return value rather than a declaration flag, because
+   * effects have no `async: true` to key on — and the return value is the truth
+   * where a flag is a claim.
+   */
+  function warnAsyncAutoTracked(id: string, deps: Set<string>): void {
+    if (deps.size > 0 || warnedAsync.has(id)) {
+      return;
+    }
+    warnedAsync.add(id);
+
+    console.warn(
+      `[Directive] Async effect "${id}" recorded no dependencies, so it runs on every reconcile. Auto-tracking cannot see across an \`await\` — the tracking context closes when the body returns its promise — and this effect read nothing before its first one. Add \`deps: ["key1", "key2"]\`, or move the reads above the first \`await\`.`,
+    );
+  }
+
   /** Run an auto-tracked effect, re-tracking dependencies each time */
   async function runAutoTrackedEffect(
     state: EffectState,
@@ -476,6 +522,9 @@ export function createEffectsManager<S extends Schema>(
     // If the effect is async, wait for it and capture cleanup
     let result = trackingResult.value;
     if (result instanceof Promise) {
+      if (isDevelopment) {
+        warnAsyncAutoTracked(state.id, trackedDeps);
+      }
       result = await result;
     }
     storeCleanup(state, result);
@@ -496,7 +545,10 @@ export function createEffectsManager<S extends Schema>(
     // Run previous cleanup before re-running
     runCleanup(state);
 
-    onRun?.(id, state.dependencies ? [...state.dependencies] : []);
+    onRun?.(
+      id,
+      state.dependencies ? Array.from(state.dependencies, describeDep) : [],
+    );
 
     try {
       if (!state.hasExplicitDeps) {
@@ -636,7 +688,10 @@ export function createEffectsManager<S extends Schema>(
       // Run cleanup of previous run
       runCleanup(state);
 
-      onRun?.(id, state.dependencies ? [...state.dependencies] : []);
+      onRun?.(
+        id,
+        state.dependencies ? Array.from(state.dependencies, describeDep) : [],
+      );
 
       try {
         let effectPromise: unknown;

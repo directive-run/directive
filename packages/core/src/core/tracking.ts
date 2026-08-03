@@ -101,6 +101,78 @@ export function trackAccess(key: string): void {
   depStack[len - 1]!.add(key);
 }
 
+// ============================================================================
+// Derivation namespace
+// ============================================================================
+
+/**
+ * The prefix that separates a derivation ID from a fact key inside a dependency
+ * set.
+ *
+ * A tracked dependency set is one flat `Set<string>`, and it carries both kinds
+ * of name: a body that reads `facts.ready` records `"ready"`, and a body that
+ * reads `derived.ready` or `system.derive.ready` records the derivation. Without
+ * a namespace those are the same string, so a module declaring a fact and a
+ * derivation with the same name — legal today, and harmless in every other
+ * respect — made the dependency lookup return the union of the two. A constraint
+ * gated on the fact re-evaluated when the derivation went stale, and an effect
+ * gated on the fact re-ran.
+ *
+ * The character is `US` (unit separator, `U+001F`), not a readable prefix like
+ * `"derive:"`. Fact keys are arbitrary strings — `t.object()` under a key of any
+ * shape is valid — so a readable prefix is only *unlikely* to collide, and this
+ * whole namespace exists because "unlikely" was not good enough the first time.
+ * A control character cannot appear in a property name written in source, and
+ * every place a namespaced name reaches a human it is unwrapped first (see
+ * {@link describeDep}).
+ *
+ * @internal
+ */
+export const DERIVATION_DEP_PREFIX = "\u001F";
+
+/**
+ * The dependency-set name for a derivation ID.
+ *
+ * @internal
+ */
+export function derivationDep(id: string): string {
+  return DERIVATION_DEP_PREFIX + id;
+}
+
+/**
+ * Whether a dependency-set name refers to a derivation rather than a fact.
+ *
+ * @internal
+ */
+export function isDerivationDep(dep: string): boolean {
+  return dep.charCodeAt(0) === 0x1f;
+}
+
+/**
+ * The derivation ID inside a namespaced dependency name.
+ *
+ * Returns `dep` unchanged when it is a fact key, so callers that just want a
+ * name can use it unconditionally.
+ *
+ * @internal
+ */
+export function derivationDepId(dep: string): string {
+  return isDerivationDep(dep) ? dep.slice(1) : dep;
+}
+
+/**
+ * A dependency name as a human should read it.
+ *
+ * Facts keep their key. Derivations are rendered `derive.total`, which is how
+ * they are read in source, so a trace or an `explain()` line never shows the
+ * separator.
+ *
+ * @internal
+ */
+export function describeDep(dep: string): string {
+  return isDerivationDep(dep) ? `derive.${dep.slice(1)}` : dep;
+}
+
 /**
  * Prototype pollution guard — shared across all proxy handlers.
  *

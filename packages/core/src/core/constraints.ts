@@ -91,15 +91,19 @@ export interface ConstraintsManager<_S extends Schema> {
    *
    * @param key - A dependency name that changed. Constraint dependencies are
    *   whatever `when()` read under tracking, which is fact store keys *and*
-   *   derivation IDs — so this accepts either. A name nothing tracked is a
-   *   no-op.
+   *   derivations — so this accepts either. Derivations arrive namespaced, so a
+   *   fact and a derivation sharing a name are two distinct keys here. A name
+   *   nothing tracked is a no-op.
    */
   invalidate(key: string): void;
   /**
    * Get the auto-tracked or explicit dependency set for a constraint.
    *
    * @param id - The constraint definition ID.
-   * @returns A `Set` of fact keys, or `undefined` if no dependencies have been recorded.
+   * @returns A `Set` of dependency names — fact store keys as written, and
+   *   derivations under the internal namespace prefix — or `undefined` if no
+   *   dependencies have been recorded. Render with `describeDep` rather than
+   *   printing these directly.
    */
   getDependencies(id: string): Set<string> | undefined;
   /**
