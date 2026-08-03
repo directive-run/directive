@@ -31,7 +31,7 @@ export const decipherPreset: PresetConfig = {
   },
   model: "claude-haiku-4-5",
   temperature: 0.3,
-  tokensPerBurst: 600,
+  tokensPerTurn: 600,
   budgetUsd: 0.15,
   maxIterations: 30,
   budgetWarningThreshold: 0.8,
@@ -76,7 +76,7 @@ export const decipherPreset: PresetConfig = {
     "{{transcript}}",
     "</analysis>",
     "",
-    "Your turn as {{persona}} (round {{iteration}}). Add what only your angle would recover, and quote the specific fragment you are explaining. Where you are inferring rather than reading, say which. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as {{persona}} (round {{iteration}}). Add what only your angle would recover, and quote the specific fragment you are explaining. Where you are inferring rather than reading, say which. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

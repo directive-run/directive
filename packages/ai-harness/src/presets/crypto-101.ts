@@ -31,7 +31,7 @@ export const crypto101Preset: PresetConfig = {
   },
   model: "claude-haiku-4-5",
   temperature: 0.4,
-  tokensPerBurst: 600,
+  tokensPerTurn: 600,
   budgetUsd: 0.15,
   maxIterations: 30,
   budgetWarningThreshold: 0.8,
@@ -76,7 +76,7 @@ export const crypto101Preset: PresetConfig = {
     "{{transcript}}",
     "</discussion>",
     "",
-    "Your turn as {{persona}} (round {{iteration}}). Teach the part only you would teach, and be exact — a wrong detail in a cryptography explanation is worse than a missing one. Where the subject is code, quote the line you are talking about. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as {{persona}} (round {{iteration}}). Teach the part only you would teach, and be exact — a wrong detail in a cryptography explanation is worse than a missing one. Where the subject is code, quote the line you are talking about. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

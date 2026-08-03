@@ -4,7 +4,7 @@
  * Two failures are worth guarding against here and they are not the same. The
  * first is a chain that never ends, which in a test looks like a timeout and in
  * production looks like a bill — so every case asserts that the run *finished*,
- * how many bursts it took, and which stop condition reported itself. The second
+ * how many turns it took, and which stop condition reported itself. The second
  * is a chain that ends correctly and still spends more than it was given, which
  * is what `spends no more than it was given` exists for and is the point of the
  * whole arrangement: a predicted stop, a checked synthesis, and a hard ledger
@@ -12,7 +12,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runChain } from "../core/composition.js";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import type { ChainDerived } from "../core/module.js";
@@ -60,7 +61,7 @@ describe("budget", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
@@ -73,7 +74,7 @@ describe("budget", () => {
     expect(result.iterations).toBeLessThan(preset.maxIterations);
     expect(result.spentUsd).toBeGreaterThan(0);
     // Stopped while it could still pay for the closing document, which is what
-    // `canAffordBurst` reserves for — and the document exists to prove it.
+    // `canAffordTurn` reserves for — and the document exists to prove it.
     expect(result.synthesis).not.toBe("");
     expect(result.synthesisSkipped).toBe(false);
   });
@@ -86,7 +87,7 @@ describe("budget", () => {
    * A spread of budgets rather than one.
    *
    * The old reserve failed differently at different scales — it held back one
-   * average burst, so the shortfall grew with the gap between a burst and the
+   * average turn, so the shortfall grew with the gap between a turn and the
    * synthesis — and a single budget would have been a single point on that
    * curve. Every one of these overspent before the fix.
    */
@@ -99,7 +100,7 @@ describe("budget", () => {
 
       const harness = createHarnessSystem(preset, {
         runner: createMockRunner({ responses: cannedResponses() }),
-        outputDir: scratch.dir,
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
         retry: { maxRetries: 0 },
       });
 
@@ -119,9 +120,9 @@ describe("budget", () => {
       testPreset({ id: "step-three", budgetUsd: 0.05, maxIterations: 40 }),
     ];
 
-    const result = await runChain(presets, "go", {
+    const result = await runComposition(presets, "go", {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       totalBudgetUsd,
     });
@@ -145,9 +146,9 @@ describe("budget", () => {
       testPreset({ id: "two", budgetUsd: 0.06, maxIterations: 2 }),
     ];
 
-    const result = await runChain(presets, "go", {
+    const result = await runComposition(presets, "go", {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
@@ -172,9 +173,9 @@ describe("budget", () => {
       { ...second, synthesizer: { ...second.synthesizer, maxTokens: 4000 } },
     ];
 
-    const result = await runChain(presets, "go", {
+    const result = await runComposition(presets, "go", {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       // Enough for the first step and not the second.
       totalBudgetUsd: 0.055,
@@ -200,35 +201,35 @@ describe("budget", () => {
 
   it("refuses a budget that cannot pay for the closing document", () => {
     // The synthesizer's 1000 output tokens price at $0.015 on this model, so a
-    // cent buys bursts and nothing to summarise them with.
+    // cent buys turns and nothing to summarise them with.
     expect(() =>
       createHarnessSystem(testPreset({ budgetUsd: 0.01 }), {
         runner: createMockRunner({ responses: cannedResponses() }),
-        outputDir: scratch.dir,
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       }),
     ).toThrow(/cannot pay for this preset's closing document/);
   });
 
-  it("reserves the synthesis rather than one average burst", async () => {
+  it("reserves the synthesis rather than one average turn", async () => {
     const preset = testPreset({ budgetUsd: 0.05, maxIterations: 40 });
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
     await harness.run("go");
 
     // What the chain held back is the synthesizer's own price. Its output half
-    // alone — `maxTokens` at the model's output rate — is more than a burst
-    // costs, and the old reserve was one burst.
+    // alone — `maxTokens` at the model's output rate — is more than a turn
+    // costs, and the old reserve was one turn.
     const reserve = derived(harness).synthesisReserveUsd;
-    const averageBurst = derived(harness).averageBurstUsd;
+    const averageTurn = derived(harness).averageTurnUsd;
     const outputFloor = (preset.synthesizer.maxTokens / 1_000_000) * 15;
 
     expect(reserve).toBeGreaterThan(outputFloor);
-    expect(reserve).toBeGreaterThan(averageBurst);
+    expect(reserve).toBeGreaterThan(averageTurn);
     // And it grows with the transcript, because that is what the synthesizer
     // reads. A reserve fixed at construction would be right on turn one and
     // low on every turn after.
@@ -241,7 +242,7 @@ describe("budget", () => {
   // ==========================================================================
 
   /**
-   * A burst that costs wildly more than anything before it.
+   * A turn that costs wildly more than anything before it.
    *
    * No predictor sees this coming — that is the point. It is the case the
    * graceful stop cannot cover and the hard ledger floor exists for.
@@ -256,7 +257,7 @@ describe("budget", () => {
   }
 
   /**
-   * The overshoot a mispredicted burst can cause is exactly one call.
+   * The overshoot a mispredicted turn can cause is exactly one call.
    *
    * Note what this does *not* assert: `budgetHalted`. The hard ledger floor is
    * deliberately unreachable while the chain's own gates are working — they
@@ -265,7 +266,7 @@ describe("budget", () => {
    * it is why the floor's own behaviour is pinned at the level it lives on, in
    * `packages/ai`'s `maxTotalCost` tests, rather than here.
    */
-  it("dispatches nothing further after a burst blows through the ceiling", async () => {
+  it("dispatches nothing further after a turn blows through the ceiling", async () => {
     const preset = testPreset({ budgetUsd: 0.05, maxIterations: 40 });
 
     let calls = 0;
@@ -277,15 +278,15 @@ describe("budget", () => {
 
         return mock(agent, input, options);
       },
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
     const result = await harness.run("go");
     const callsAtEnd = calls;
 
-    // One provider call per burst and not one more. The surprise burst is the
-    // last thing dispatched: no further burst, and no synthesis call either,
+    // One provider call per turn and not one more. The surprise turn is the
+    // last thing dispatched: no further turn, and no synthesis call either,
     // so the overrun is exactly the one call that caused it.
     expect(callsAtEnd).toBe(result.iterations);
     expect(result.iterations).toBeGreaterThan(1);
@@ -307,7 +308,7 @@ describe("budget", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: surpriseResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => events.push(event),
     });
@@ -328,22 +329,22 @@ describe("budget", () => {
     expect(complete[0]?.synthesisSkipped).toBe(true);
   });
 
-  it("projects the next burst above the last one, never below", async () => {
+  it("projects the next turn above the last one, never below", async () => {
     const preset = testPreset({ budgetUsd: 0.05, maxIterations: 40 });
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
     await harness.run("go");
 
-    const projected = derived(harness).projectedBurstUsd;
-    const last = chainFacts(harness).lastBurstUsd as number;
-    const average = derived(harness).averageBurstUsd;
+    const projected = derived(harness).projectedTurnUsd;
+    const last = chainFacts(harness).lastTurnUsd as number;
+    const average = derived(harness).averageTurnUsd;
 
-    // Every burst re-sends the whole transcript, so cost climbs monotonically
+    // Every turn re-sends the whole transcript, so cost climbs monotonically
     // and the trailing mean sits below the last measurement — structurally, not
     // on average. That is the number the chain used to stop on.
     expect(average).toBeLessThan(last);
@@ -356,7 +357,7 @@ describe("budget", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
@@ -373,27 +374,27 @@ describe("budget", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => events.push(event),
     });
 
     const result = await harness.run("go");
     // Read the ledger the chain was terminated against, directly.
-    const perBurst = events
-      .filter((event) => event.type === "burst:completed")
+    const perTurn = events
+      .filter((event) => event.type === "turn:completed")
       .map((event) => event.costUsd);
     harness.system.destroy();
 
-    // Every burst cost something, and the parts sum to the whole. If the
+    // Every turn cost something, and the parts sum to the whole. If the
     // resolver were pricing calls itself instead of copying the ledger, these
     // two figures would be free to disagree.
-    expect(perBurst).toHaveLength(3);
-    for (const cost of perBurst) {
+    expect(perTurn).toHaveLength(3);
+    for (const cost of perTurn) {
       expect(cost).toBeGreaterThan(0);
     }
-    const summed = perBurst.reduce((total, cost) => total + cost, 0);
-    // The synthesis call is also billed, so the total is at least the bursts.
+    const summed = perTurn.reduce((total, cost) => total + cost, 0);
+    // The synthesis call is also billed, so the total is at least the turns.
     expect(result.spentUsd).toBeGreaterThan(summed);
   });
 
@@ -410,7 +411,7 @@ describe("budget", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => events.push(event),
     });

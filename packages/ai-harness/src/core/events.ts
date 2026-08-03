@@ -30,8 +30,8 @@ export type ChainPhase =
   /** Nothing has been asked of the chain yet. */
   | "idle"
   /** Personas are taking turns. */
-  | "bursting"
-  /** Bursting is over; the synthesizer is producing the closing document. */
+  | "taking-turns"
+  /** Turning is over; the synthesizer is producing the closing document. */
   | "synthesizing"
   /** The chain finished — with or without a synthesis, depending on `stopReason`. */
   | "complete"
@@ -39,7 +39,7 @@ export type ChainPhase =
   | "failed";
 
 /**
- * Why the chain stopped adding bursts.
+ * Why the chain stopped adding turns.
  *
  * `""` while it has not stopped. The precedence when several apply at once is
  * fixed and documented on the `stopReason` derivation: the hard budget floor
@@ -48,14 +48,14 @@ export type ChainPhase =
  */
 export type StopReason =
   | ""
-  /** A burst resolver threw and the chain cut over to synthesis early. */
+  /** A turn resolver threw and the chain cut over to synthesis early. */
   | "error"
   /** An operator called `abort()`. */
   | "interrupted"
   /**
    * The budget ran out.
    *
-   * Either the next burst could not be paid for out of what was left — the
+   * Either the next turn could not be paid for out of what was left — the
    * ordinary, graceful case — or the runner's hard ledger floor refused a call
    * outright, which means the chain's own arithmetic mispredicted. Both are the
    * same fact about the run and report the same way; `budgetHalted` on the
@@ -65,15 +65,23 @@ export type StopReason =
   /** The configured iteration ceiling was reached. */
   | "max-iterations";
 
-/** Which part of the chain an error came from. */
-export type ErrorScope = "burst" | "synthesis";
+/**
+ * Which part of the chain an error came from.
+ *
+ * `"listener"` is the odd one and belongs here anyway: a surface that throws
+ * while rendering is not a chain failure and must not become one, but it is also
+ * not something the chain may quietly swallow. The chain has no console — it
+ * reports on this stream and nothing else — so a listener that throws is
+ * reported on this stream, to the listeners that did not.
+ */
+export type ErrorScope = "turn" | "synthesis" | "listener";
 
 /**
  * Which step of a composition is speaking.
  *
  * A composition runs several presets end to end, and every one of them emits
  * the ordinary chain events. A surface rendering a composition needs to know
- * which step a `burst:completed` belongs to — and it can, because the steps are
+ * which step a `turn:completed` belongs to — and it can, because the steps are
  * strictly sequential and each is bracketed by a `composition:step:started` and
  * a `composition:step:complete`. The bracket carries the attribution, so the
  * events inside it do not have to and stay identical to a single run's.
@@ -93,15 +101,15 @@ export interface CompositionStep {
 // Events
 // ============================================================================
 
-/** A burst that ran to completion and is now part of the transcript. */
-export interface BurstSummary {
-  /** Zero-based index of this burst in the chain. */
+/** A turn that ran to completion and is now part of the transcript. */
+export interface TurnSummary {
+  /** Zero-based index of this turn in the chain. */
   iteration: number;
   /** The persona that produced it, by agent name. */
   persona: string;
-  /** The burst's full text. */
+  /** The turn's full text. */
   text: string;
-  /** What this burst added to the running total, in dollars. */
+  /** What this turn added to the running total, in dollars. */
   costUsd: number;
   /** Wall-clock ms at completion. */
   at: number;
@@ -120,7 +128,7 @@ export interface CostSnapshot {
 }
 
 export type HarnessEvent =
-  /** The chain accepted an input and is about to run its first burst. */
+  /** The chain accepted an input and is about to run its first turn. */
   | {
       type: "chain:started";
       runId: string;
@@ -133,43 +141,43 @@ export type HarnessEvent =
     }
   /** A persona is about to speak. No text yet. */
   | {
-      type: "burst:started";
+      type: "turn:started";
       iteration: number;
       persona: string;
       at: number;
     }
   /**
-   * One provider delta for the burst in flight.
+   * One provider delta for the turn in flight.
    *
    * Not in the same category as the other events: it is the only one with no
-   * fact behind it, because a half-arrived burst is not chain state. A surface
+   * fact behind it, because a half-arrived turn is not chain state. A surface
    * that only wants finished text can ignore it entirely and read
-   * `burst:completed`.
+   * `turn:completed`.
    */
   | {
-      type: "burst:delta";
+      type: "turn:delta";
       iteration: number;
       persona: string;
       text: string;
     }
   /**
-   * The burst in flight is starting over — a retry, a fallback, or a schema
-   * re-ask replayed it — so every `burst:delta` already delivered for this
+   * The turn in flight is starting over — a retry, a fallback, or a schema
+   * re-ask replayed it — so every `turn:delta` already delivered for this
    * iteration is void.
    *
    * Its only job is to keep a surface that renders deltas from showing two
-   * attempts end to end as one run-on burst. It travels with `burst:delta`
+   * attempts end to end as one run-on turn. It travels with `turn:delta`
    * because a consumer of one is always a consumer of the other.
    */
   | {
-      type: "burst:restarted";
+      type: "turn:restarted";
       iteration: number;
       persona: string;
       reason: string;
     }
-  /** A burst finished and is now in the transcript. */
+  /** A turn finished and is now in the transcript. */
   | {
-      type: "burst:completed";
+      type: "turn:completed";
       iteration: number;
       persona: string;
       text: string;
@@ -180,7 +188,7 @@ export type HarnessEvent =
   | ({ type: "cost:updated" } & CostSnapshot)
   /**
    * Spend crossed the configured warning fraction of the budget. Fires once
-   * per run, on the crossing — not on every burst above the line.
+   * per run, on the crossing — not on every turn above the line.
    */
   | ({ type: "budget:warning"; threshold: number } & CostSnapshot)
   /**
@@ -197,7 +205,7 @@ export type HarnessEvent =
       type: "budget:synthesis-skipped";
       /** What the closing document was priced at, in dollars. */
       reserveUsd: number;
-      /** Bursts that did make it into the transcript. */
+      /** Turns that did make it into the transcript. */
       iterations: number;
     } & CostSnapshot)
   /** The synthesizer is about to read the transcript. */
@@ -215,8 +223,8 @@ export type HarnessEvent =
   /**
    * The chain moved from one phase to the next.
    *
-   * The chain's heartbeat at chain granularity, where `burst:completed` is the
-   * heartbeat at burst granularity. Emitted on the transition only, so a
+   * The chain's heartbeat at chain granularity, where `turn:completed` is the
+   * heartbeat at turn granularity. Emitted on the transition only, so a
    * surface can drive a stepper from it without deduplicating.
    */
   | {
@@ -246,12 +254,16 @@ export type HarnessEvent =
       jsonlPath: string;
       at: number;
     }
-  /** A resolver threw after its retries were exhausted. */
+  /**
+   * A resolver threw after its retries were exhausted — or, with
+   * `scope: "listener"`, one of this stream's own consumers threw while
+   * rendering. See {@link ErrorScope}.
+   */
   | {
       type: "error";
       scope: ErrorScope;
       message: string;
-      /** The burst this happened on; absent for synthesis. */
+      /** The turn this happened on; absent for synthesis and for a listener. */
       iteration?: number;
       at: number;
     }

@@ -3,12 +3,12 @@
  *
  * The persona that makes this preset work is `skeptic`. A chain of agents
  * asked to research something will otherwise converge quickly and confidently
- * on whatever the first burst asserted, because every later burst reads that
+ * on whatever the first turn asserted, because every later turn reads that
  * assertion as established context. A voice whose only job is to attack the
- * previous burst's confidence keeps the transcript honest, and the closing
+ * previous turn's confidence keeps the transcript honest, and the closing
  * brief inherits the disagreement rather than a smoothed-over consensus.
  *
- * Runs on a cheap model on purpose. Forty bursts of moderate length beats eight
+ * Runs on a cheap model on purpose. Forty turns of moderate length beats eight
  * long ones for coverage, and coverage is what a research pass is for — the
  * closing brief is where the reasoning has to be good, and it reads everything.
  *
@@ -32,7 +32,7 @@ export const researchPreset: PresetConfig = {
   },
   model: "claude-haiku-4-5",
   temperature: 0.5,
-  tokensPerBurst: 500,
+  tokensPerTurn: 500,
   budgetUsd: 0.25,
   maxIterations: 40,
   budgetWarningThreshold: 0.8,
@@ -83,7 +83,7 @@ export const researchPreset: PresetConfig = {
     "{{transcript}}",
     "</research>",
     "",
-    "Your turn as {{persona}} (round {{iteration}}). Add what your role is for and nothing else. Where you are uncertain, say so in the same sentence as the claim rather than in a disclaimer. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as {{persona}} (round {{iteration}}). Add what your role is for and nothing else. Where you are uncertain, say so in the same sentence as the claim rather than in a disclaimer. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

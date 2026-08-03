@@ -14,7 +14,7 @@
  *
  * ## One ledger, one retry policy, several adapters
  *
- * A burst and the closing document have different token caps, and the Anthropic
+ * A turn and the closing document have different token caps, and the Anthropic
  * adapter takes `maxTokens` at construction. The obvious response — build two
  * runners and wrap each — gives the chain two independent ledgers and two
  * independent retry budgets, so neither knows what the other spent and the
@@ -129,9 +129,9 @@ export function resolvePresetPricing(
  * The least a chain can cost and still produce a closing document.
  *
  * The synthesizer's output cap, at the output rate, and nothing else — no
- * bursts, no transcript, no input. A budget below this cannot pay for the one
+ * turns, no transcript, no input. A budget below this cannot pay for the one
  * thing every run is supposed to end with, so the chain would spend whatever it
- * had on bursts and then stop with nothing to show for them.
+ * had on turns and then stop with nothing to show for them.
  *
  * A floor rather than an estimate: `maxTokens` is enforced by the provider, so
  * no synthesis can come in under it by more than the model chose to write.
@@ -144,12 +144,36 @@ export function minimumBudgetUsd(
 }
 
 /**
+ * Refuse a budget that cannot pay for the closing document.
+ *
+ * Refused at construction rather than discovered four turns in. A budget that
+ * cannot cover the closing document buys turns nobody will ever read a summary
+ * of: the chain spends what it has, reaches synthesis, finds it unaffordable,
+ * and stops with a transcript and no conclusion. That is a correct outcome of
+ * the rules and a useless outcome for the operator, and it is knowable before a
+ * single call — the synthesizer's `maxTokens` and the model's output rate are
+ * both in hand.
+ */
+export function assertBudgetCoversSynthesis(
+  preset: PresetConfig,
+  pricing: TokenPricing,
+): void {
+  const floor = minimumBudgetUsd(preset, pricing);
+
+  if (preset.budgetUsd < floor) {
+    throw new Error(
+      `[ai-harness] budgetUsd of $${preset.budgetUsd.toFixed(4)} cannot pay for this preset's closing document, which prices at $${floor.toFixed(4)} (${preset.synthesizer.maxTokens} output tokens at $${pricing.outputPerMillion}/M). The chain would spend the budget on turns and then have nothing left to summarise them with. Raise the budget above $${floor.toFixed(4)}, or lower \`synthesizer.maxTokens\`.`,
+    );
+  }
+}
+
+/**
  * The least a chain is *worth* starting on.
  *
- * {@link minimumBudgetUsd} plus one burst's output. A budget between the two
- * produces a run that is legal and pointless: the chain affords a burst or two,
+ * {@link minimumBudgetUsd} plus one turn's output. A budget between the two
+ * produces a run that is legal and pointless: the chain affords a turn or two,
  * the transcript grows, the reserve grows with it, and the closing document goes
- * from affordable to not while the bursts that were supposed to feed it sit
+ * from affordable to not while the turns that were supposed to feed it sit
  * there unsummarised.
  *
  * Used where declining is an option — a composition can simply not start the
@@ -163,7 +187,7 @@ export function minimumStepBudgetUsd(
 ): number {
   return (
     minimumBudgetUsd(preset, pricing) +
-    (preset.tokensPerBurst / 1_000_000) * pricing.outputPerMillion
+    (preset.tokensPerTurn / 1_000_000) * pricing.outputPerMillion
   );
 }
 
@@ -198,8 +222,8 @@ export function createHarnessAgents(
 
   // A ledger, and a floor under it.
   //
-  // The floor is not a second copy of the chain's ceiling. `canAffordBurst`
-  // decides whether to *start* another burst, from what the chain has spent and
+  // The floor is not a second copy of the chain's ceiling. `canAffordTurn`
+  // decides whether to *start* another turn, from what the chain has spent and
   // what it still owes the closing document; it is predictive, and prediction is
   // the part that can be wrong. `maxTotalCost` decides nothing — it refuses to
   // dispatch once the ledger has already reached `budgetUsd`. One stops the
@@ -302,7 +326,7 @@ function buildRegistry(preset: PresetConfig): AgentRegistry {
  *
  * The dispatcher is what the retry policy and the ledger wrap, so every agent
  * shares both no matter which adapter answers. Adapters are built lazily and
- * memoized — a preset with one burst cap and one synthesis cap builds two, and
+ * memoized — a preset with one turn cap and one synthesis cap builds two, and
  * a run that never synthesizes builds one.
  */
 function createAnthropicDispatcher(
@@ -336,7 +360,7 @@ function createAnthropicDispatcher(
     const maxTokens =
       agent.name === preset.synthesizer.name
         ? preset.synthesizer.maxTokens
-        : preset.tokensPerBurst;
+        : preset.tokensPerTurn;
 
     return adapterFor(maxTokens)(agent, input, runOptions);
   };

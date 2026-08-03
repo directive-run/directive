@@ -2,7 +2,7 @@
  * `@sizls/ai-harness` — a configurable persona-chain engine.
  *
  * A set of personas take turns on one growing transcript, each reading all of
- * it and adding a short burst, until a dollar budget runs out or an operator
+ * it and adding a short turn, until a dollar budget runs out or an operator
  * interrupts. Then a synthesizer reads the whole thing and writes the closing
  * document.
  *
@@ -11,14 +11,23 @@
  * resolvers for the provider calls. There is no loop. See `./core/module.js`,
  * which is the file worth reading.
  *
+ * Nothing here touches a disk unless you say where. A run writes through a
+ * `TranscriptStore` and defaults to the in-memory one; `createFileTranscriptStore`
+ * is the filesystem, opted into.
+ *
  * @example
  * ```typescript
- * import { codeReviewPreset, createHarness } from "@sizls/ai-harness";
+ * import {
+ *   codeReviewPreset,
+ *   createFileTranscriptStore,
+ *   createHarness,
+ * } from "@sizls/ai-harness";
  *
  * const harness = createHarness(codeReviewPreset, {
  *   apiKey: process.env.ANTHROPIC_API_KEY!,
+ *   transcripts: createFileTranscriptStore({ dir: "./runs" }),
  *   onEvent: (event) => {
- *     if (event.type === "burst:completed") {
+ *     if (event.type === "turn:completed") {
  *       console.log(`${event.persona}: ${event.text}`);
  *     }
  *   },
@@ -55,26 +64,28 @@ export {
 } from "./core/system.js";
 
 export {
-  runChain,
-  type ChainRunResult,
-  type ChainStepResult,
-  type RunChainOptions,
+  runComposition,
+  type CompositionResult,
+  type CompositionStepResult,
+  type RunCompositionOptions,
 } from "./core/composition.js";
 
 export {
   chainSchema,
-  createHarnessModule,
+  createHarnessChain,
   type ChainDerived,
+  type ChainHost,
   type DerivedReader,
+  type HarnessChain,
+  type HarnessChainDeps,
   type HarnessModule,
-  type HarnessModuleDeps,
 } from "./core/module.js";
 
 // ---------------------------------------------------------------------------
 // Events — the one union every surface renders from
 // ---------------------------------------------------------------------------
 export type {
-  BurstSummary,
+  TurnSummary,
   ChainPhase,
   CompositionStep,
   CostSnapshot,
@@ -129,14 +140,25 @@ export {
   type HarnessAgentsOptions,
 } from "./core/agents.js";
 
+// The output side. A chain writes through a `TranscriptStore` and defaults to
+// the in-memory one, so nothing touches a disk unless the caller says where.
 export {
+  createMemoryTranscriptStore,
   createRunId,
   createTranscript,
-  defaultTranscriptDir,
-  type BurstRecord,
+  type MemoryTranscriptStore,
+  type OpenTranscriptOptions,
   type Transcript,
-  type TranscriptOptions,
+  type TranscriptSink,
+  type TranscriptStore,
+  type TurnRecord,
 } from "./core/transcript.js";
+
+export {
+  createFileTranscriptStore,
+  defaultTranscriptDir,
+  type FileTranscriptStoreOptions,
+} from "./adapters/node/transcript.js";
 
 export {
   createMockRunner,
@@ -149,7 +171,7 @@ export {
 // ---------------------------------------------------------------------------
 //
 // Exported because a surface built on the event stream inherits the problem.
-// `burst:completed` and `synthesis:chunk` carry model output verbatim, and a
+// `turn:completed` and `synthesis:chunk` carry model output verbatim, and a
 // consumer that writes either to a terminal is writing whatever the model chose
 // to write — including escape sequences that clear the screen, hide text, or ask
 // the terminal to set the clipboard. The bundled command line runs its output

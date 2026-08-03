@@ -6,7 +6,7 @@
  *
  * ## There is no loop
  *
- * A persona chain is the shape most people write as a `while`: run a burst,
+ * A persona chain is the shape most people write as a `while`: run a turn,
  * add up the cost, check the budget, pick the next persona, go again, and drop
  * out to a synthesis step at the bottom. That version works, and it has one
  * property that makes it a bad foundation — every question the chain answers is
@@ -19,29 +19,29 @@
  * - **Facts** — where the chain is. `iteration`, `spentUsd`, `interrupted`,
  *   `synthesized`, and the rest. Nothing but a resolver writes them, and no
  *   fact encodes a decision.
- * - **Derivations** — what the facts mean. `canAffordBurst`, `chainStopped`,
- *   `burstPending`, `synthesisPending`, `phase`, `stopReason`. Every question
+ * - **Derivations** — what the facts mean. `canAffordTurn`, `chainStopped`,
+ *   `turnPending`, `synthesisPending`, `phase`, `stopReason`. Every question
  *   the loop body used to answer inline is one of these, computed in exactly
  *   one place and readable from outside.
- * - **Constraints** — what must happen next. `runBurst` fires while
- *   `burstPending`; `synthesize` fires while `synthesisPending`. Neither knows
+ * - **Constraints** — what must happen next. `runTurn` fires while
+ *   `turnPending`; `synthesize` fires while `synthesisPending`. Neither knows
  *   anything about budgets, interrupts, or turn order — they read a derivation
  *   and emit a requirement.
  * - **Resolvers** — how it happens. Call the agent, write what came back to
  *   facts. They do not decide whether they should have run.
- * - **Effects** — telling anyone about it. Mirroring the transcript to disk and
- *   emitting the event stream.
+ * - **Effects** — telling anyone about it. Mirroring the transcript to whatever
+ *   store it was opened on, and emitting the event stream.
  *
  * ## How the chain terminates
  *
  * There is no exit condition anywhere, because there is nothing to exit. A
- * burst resolver writes `spentUsd`, `lastBurstUsd`, `transcriptChars`, and
- * `iteration`. Those invalidate `remainingUsd`, `projectedBurstUsd`, and
- * `synthesisReserveUsd`, which invalidate `canAffordBurst`, which invalidates
- * `chainStopped`, which invalidates `burstPending` and `synthesisPending`. The
+ * turn resolver writes `spentUsd`, `lastTurnUsd`, `transcriptChars`, and
+ * `iteration`. Those invalidate `remainingUsd`, `projectedTurnUsd`, and
+ * `synthesisReserveUsd`, which invalidate `canAffordTurn`, which invalidates
+ * `chainStopped`, which invalidates `turnPending` and `synthesisPending`. The
  * engine re-evaluates the two constraints against the new values. While
- * `burstPending` holds, `runBurst` emits again and the chain takes another turn.
- * When it stops holding, `runBurst` emits nothing — `synthesisPending` has taken
+ * `turnPending` holds, `runTurn` emits again and the chain takes another turn.
+ * When it stops holding, `runTurn` emits nothing — `synthesisPending` has taken
  * over, `synthesize` fires once, and its resolver sets `synthesized`, which
  * falsifies that too. No constraint has anything to require, no requirement is
  * unmet, and the system settles. The chain ends by running out of things that
@@ -49,7 +49,7 @@
  *
  * ## Three layers of budget, doing three different jobs
  *
- * - `canAffordBurst` is the **graceful** stop: it refuses to start a burst that
+ * - `canAffordTurn` is the **graceful** stop: it refuses to start a turn that
  *   would eat the closing document's money. Predictive, and the layer that
  *   normally ends the run.
  * - `canAffordSynthesis` is the **precise** stop: the synthesizer's `maxTokens`
@@ -63,7 +63,7 @@
  *   `budgetHalted` records and `stopReason` reports as `"budget"`.
  *
  * The three used to be one, and it was the wrong one: a reserve of a single
- * *average burst* against a synthesizer that costs five to thirty times a burst,
+ * *average turn* against a synthesizer that costs five to thirty times a turn,
  * predicted with a trailing mean over a series that only grows, and nothing at
  * all guarding the synthesis call itself.
  *
@@ -71,16 +71,16 @@
  * sets `interrupted`, `chainStopped` goes true one derivation later, and the
  * chain lands in synthesis by the identical path the budget takes it down. That
  * is the reason it is a fact and not a branch — a branch would need its own
- * handling for "interrupted while a burst is in flight" and its own answer for
+ * handling for "interrupted while a turn is in flight" and its own answer for
  * whether synthesis still runs. There is no such code here, and there is
  * nothing for it to get wrong.
  *
  * ## Requirement identity
  *
- * A burst requirement is keyed `burst-<iteration>`. Facts wobble — a resolver
+ * A turn requirement is keyed `turn-<iteration>`. Facts wobble — a resolver
  * writes four of them, a derivation recomputes more than once, a constraint is
  * re-evaluated. Typed identity means every one of those re-emissions is
- * recognized as the same requirement and the burst runs once.
+ * recognized as the same requirement and the turn runs once.
  *
  * @module
  */
@@ -95,16 +95,18 @@ import {
 import {
   CHARS_PER_TOKEN,
   type HarnessAgents,
+  assertBudgetCoversSynthesis,
   harnessSystemPrompt,
 } from "./agents.js";
 import type { ChainPhase, HarnessEventSink, StopReason } from "./events.js";
+import { assertPreset } from "./preset-registry.js";
 import {
   DEFAULT_BUDGET_WARNING_THRESHOLD,
   type PresetConfig,
   renderTemplate,
 } from "./preset-types.js";
 import { fence } from "./safety.js";
-import type { BurstRecord, Transcript } from "./transcript.js";
+import type { Transcript, TurnRecord } from "./transcript.js";
 
 // ============================================================================
 // Derived surface
@@ -125,34 +127,34 @@ export interface ChainDerived {
   /** `spentUsd / budgetUsd`. */
   budgetFraction: number;
   /**
-   * What a burst has cost on average so far.
+   * What a turn has cost on average so far.
    *
-   * Reported, never predicted from. Every burst re-sends the whole transcript,
-   * so per-burst cost climbs monotonically and a trailing mean is *always* below
-   * the next burst — structurally, not on average. Predicting from this is what
+   * Reported, never predicted from. Every turn re-sends the whole transcript,
+   * so per-turn cost climbs monotonically and a trailing mean is *always* below
+   * the next turn — structurally, not on average. Predicting from this is what
    * let a `$0.10` budget finish at `$0.1094`. See
-   * {@link ChainDerived.projectedBurstUsd} for the figure the chain actually
+   * {@link ChainDerived.projectedTurnUsd} for the figure the chain actually
    * stops on.
    *
-   * Zero before the first burst, which is the honest answer — nothing has been
+   * Zero before the first turn, which is the honest answer — nothing has been
    * measured yet.
    */
-  averageBurstUsd: number;
+  averageTurnUsd: number;
   /**
-   * What the *next* burst is expected to cost.
+   * What the *next* turn is expected to cost.
    *
-   * The last burst plus the growth between the last two, floored at the last
-   * burst's cost. Prompt growth per burst is roughly constant — each burst
-   * appends about `tokensPerBurst` to a transcript every later burst re-sends —
+   * The last turn plus the growth between the last two, floored at the last
+   * turn's cost. Prompt growth per turn is roughly constant — each turn
+   * appends about `tokensPerTurn` to a transcript every later turn re-sends —
    * so cost grows roughly linearly, and extrapolating the last observed step
    * tracks that. Unlike a mean it can never sit below the last measurement,
    * which is the property that matters: a predictor that under-shoots on a
-   * monotone series stops the chain one burst too late, every time.
+   * monotone series stops the chain one turn too late, every time.
    *
-   * One data point (the first burst) degrades to that burst's cost; zero data
+   * One data point (the first turn) degrades to that turn's cost; zero data
    * points is zero.
    */
-  projectedBurstUsd: number;
+  projectedTurnUsd: number;
   /**
    * What the closing document will cost, in dollars.
    *
@@ -160,50 +162,50 @@ export interface ChainDerived {
    * hard ceiling on its output, and the transcript it will read has a length
    * that can be measured right now, so both halves of the bill are known before
    * the call is made. That is the whole reason the reserve was wrong before: it
-   * held back one *average burst*, while a synthesizer running at 2500–4000
-   * tokens against a `tokensPerBurst` of 450–700, reading the entire transcript,
+   * held back one *average turn*, while a synthesizer running at 2500–4000
+   * tokens against a `tokensPerTurn` of 450–700, reading the entire transcript,
    * costs five to thirty times that.
    */
   synthesisReserveUsd: number;
   /**
-   * What the closing document will cost **after one more burst**.
+   * What the closing document will cost **after one more turn**.
    *
    * {@link ChainDerived.synthesisReserveUsd} prices the transcript that exists
    * right now, which is the correct figure for a synthesis about to run and the
-   * wrong one for deciding whether to add a burst first. A burst appends about
-   * `tokensPerBurst` to the transcript, and the synthesizer then reads all of it
-   * — so authorizing a burst against today's reserve reserves for a document the
+   * wrong one for deciding whether to add a turn first. A turn appends about
+   * `tokensPerTurn` to the transcript, and the synthesizer then reads all of it
+   * — so authorizing a turn against today's reserve reserves for a document the
    * chain is in the act of making more expensive.
    *
-   * The gap is one burst's worth of input on every decision, which is small
+   * The gap is one turn's worth of input on every decision, which is small
    * until the last one, where it is the difference between stopping with the
    * closing document paid for and stopping a few hundredths of a cent short of
    * it. That is not a hypothetical: a preset whose budget is tuned to the run it
    * produces lands exactly there, because the chain is built to spend down to
-   * the last affordable burst.
+   * the last affordable turn.
    */
   projectedReserveUsd: number;
   /**
-   * Whether there is room for another burst.
+   * Whether there is room for another turn.
    *
-   * True while what is left covers the next burst **and** the closing document
-   * that burst will leave the chain owing. Both figures are computed rather than
-   * averaged — see {@link ChainDerived.projectedBurstUsd} and
+   * True while what is left covers the next turn **and** the closing document
+   * that turn will leave the chain owing. Both figures are computed rather than
+   * averaged — see {@link ChainDerived.projectedTurnUsd} and
    * {@link ChainDerived.projectedReserveUsd} — so the chain stops with the
-   * synthesis genuinely paid for rather than with one burst's worth of change in
+   * synthesis genuinely paid for rather than with one turn's worth of change in
    * its pocket and a synthesis bill five times that.
    *
    * This is the *graceful* stop. It is a prediction, and a prediction can be
    * wrong; the hard floor underneath it is `maxTotalCost` on the budget runner,
    * which refuses to dispatch anything once the ledger has reached the budget.
    */
-  canAffordBurst: boolean;
+  canAffordTurn: boolean;
   /**
    * Whether the closing document can still be paid for.
    *
-   * Checked separately from {@link ChainDerived.canAffordBurst} because
+   * Checked separately from {@link ChainDerived.canAffordTurn} because
    * synthesis runs *after* the chain has already stopped, and the constraint
-   * that fires it used to be gated on nothing but "bursting is over". A
+   * that fires it used to be gated on nothing but "the turns are over". A
    * synthesis that cannot be afforded is not run: a chain that stops without a
    * closing document and says why is better than one that quietly spends past
    * the number it was given.
@@ -214,7 +216,7 @@ export interface ChainDerived {
   /** Whether the iteration backstop has been reached. */
   iterationsExhausted: boolean;
   /**
-   * Whether the chain is done adding bursts, for any reason.
+   * Whether the chain is done adding turns, for any reason.
    *
    * **The single termination condition.** Every way the chain can stop is one
    * clause of this expression, and everything downstream — the constraints, the
@@ -237,8 +239,8 @@ export interface ChainDerived {
   stopReason: StopReason;
   /** Whose turn it is. Turn order is round-robin over the preset's personas. */
   nextPersona: string;
-  /** Whether another burst should run right now. */
-  burstPending: boolean;
+  /** Whether another turn should run right now. */
+  turnPending: boolean;
   /** Whether the closing document should be written right now. */
   synthesisPending: boolean;
   /** Where the chain is, computed from facts rather than assigned. */
@@ -249,12 +251,13 @@ export interface ChainDerived {
  * Read one derivation.
  *
  * Constraints and effects receive a facts proxy that does not carry
- * derivations, so they reach them through this. It is bound to the system after
- * `createSystem` and before `start()` — see `createHarnessSystem`.
+ * derivations, so they reach them through this. It is pointed at the system
+ * running the chain by {@link HarnessChain.bind}, between `createSystem()` and
+ * `start()`.
  *
- * Reads through it are still tracked: the binding hands back `system.derive`,
- * whose proxy registers the access with whatever tracking context is open. A
- * constraint reading `burstPending` this way records a dependency on it and is
+ * Reads through it are still tracked: the binding hands back the system's derive
+ * proxy, which registers the access with whatever tracking context is open. A
+ * constraint reading `turnPending` this way records a dependency on it and is
  * re-evaluated when it changes, exactly as if it had read a fact.
  */
 export type DerivedReader = <K extends keyof ChainDerived>(
@@ -265,13 +268,12 @@ export type DerivedReader = <K extends keyof ChainDerived>(
 // Module dependencies
 // ============================================================================
 
-export interface HarnessModuleDeps {
+export interface HarnessChainDeps {
   preset: PresetConfig;
   runId: string;
   transcript: Transcript;
   agents: HarnessAgents;
   emit: HarnessEventSink;
-  readDerived: DerivedReader;
   now?: () => number;
 }
 
@@ -297,16 +299,16 @@ export const chainSchema = {
     input: t.string().meta({ label: "Input", category: "config" }),
     /** Flipped by the `start` event. Nothing happens until it is true. */
     running: t.boolean().meta({ label: "Running", category: "lifecycle" }),
-    /** Bursts completed. Also the index of the burst about to run. */
+    /** Turns completed. Also the index of the turn about to run. */
     iteration: t.number().meta({ label: "Iteration", category: "chain" }),
-    /** The previous burst's text, for presets whose template references it. */
-    previousBurst: t
+    /** The previous turn's text, for presets whose template references it. */
+    previousTurn: t
       .string()
-      .meta({ label: "Previous burst", category: "chain" }),
-    /** The most recently committed burst. The effects' change signal. */
-    lastBurst: t
-      .object<BurstRecord>()
-      .meta({ label: "Last burst", category: "chain" })
+      .meta({ label: "Previous turn", category: "chain" }),
+    /** The most recently committed turn. The effects' change signal. */
+    lastTurn: t
+      .object<TurnRecord>()
+      .meta({ label: "Last turn", category: "chain" })
       .nullable(),
     /**
      * Dollars charged so far.
@@ -317,20 +319,20 @@ export const chainSchema = {
      */
     spentUsd: t.number().meta({ label: "Spent (USD)", category: "cost" }),
     /**
-     * What the most recent burst cost, and what the one before it cost.
+     * What the most recent turn cost, and what the one before it cost.
      *
      * Two facts rather than a history array, because the projection only ever
      * looks at the last step: `last + (last - previous)`. Keeping the whole
      * series would be keeping it for a predictor that does not read it.
      */
-    lastBurstUsd: t
+    lastTurnUsd: t
       .number()
-      .meta({ label: "Last burst (USD)", category: "cost" }),
-    previousBurstUsd: t
+      .meta({ label: "Last turn (USD)", category: "cost" }),
+    previousTurnUsd: t
       .number()
-      .meta({ label: "Previous burst (USD)", category: "cost" }),
+      .meta({ label: "Previous turn (USD)", category: "cost" }),
     /**
-     * How long the transcript is, in characters, as of the last burst.
+     * How long the transcript is, in characters, as of the last turn.
      *
      * The measured half of the synthesis reserve. A fact rather than a call to
      * `transcript.text()` from inside a derivation: a derivation reading a
@@ -372,7 +374,7 @@ export const chainSchema = {
       label: "Synthesis refused",
       category: "lifecycle",
     }),
-    /** A burst resolver's error message, or `""`. */
+    /** A turn resolver's error message, or `""`. */
     failure: t.string().meta({ label: "Failure", category: "lifecycle" }),
     transcriptPath: t.string().meta({ label: "Transcript", category: "io" }),
     jsonlPath: t.string().meta({ label: "Sidecar", category: "io" }),
@@ -382,18 +384,18 @@ export const chainSchema = {
     budgetUsd: t.number(),
     remainingUsd: t.number(),
     budgetFraction: t.number(),
-    averageBurstUsd: t.number(),
-    projectedBurstUsd: t.number(),
+    averageTurnUsd: t.number(),
+    projectedTurnUsd: t.number(),
     synthesisReserveUsd: t.number(),
     projectedReserveUsd: t.number(),
-    canAffordBurst: t.boolean(),
+    canAffordTurn: t.boolean(),
     canAffordSynthesis: t.boolean(),
     synthesisSkipped: t.boolean(),
     iterationsExhausted: t.boolean(),
     chainStopped: t.boolean(),
     stopReason: t.string<StopReason>(),
     nextPersona: t.string(),
-    burstPending: t.boolean(),
+    turnPending: t.boolean(),
     synthesisPending: t.boolean(),
     phase: t.string<ChainPhase>(),
   },
@@ -404,11 +406,11 @@ export const chainSchema = {
   },
 
   requirements: {
-    RUN_BURST: {
+    RUN_TURN: {
       iteration: t.number(),
       persona: t.string(),
       input: t.string(),
-      previousBurst: t.string(),
+      previousTurn: t.string(),
     },
     SYNTHESIZE: {
       iteration: t.number(),
@@ -505,7 +507,7 @@ function isBudgetExhausted(error: unknown): boolean {
 // Module
 // ============================================================================
 
-export function createHarnessModule(deps: HarnessModuleDeps) {
+function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
   const { preset, runId, transcript, agents, emit, readDerived } = deps;
   const now = deps.now ?? Date.now;
   const { orchestrator, budgetRunner } = agents;
@@ -556,11 +558,11 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       facts.input = "";
       facts.running = false;
       facts.iteration = 0;
-      facts.previousBurst = "";
-      facts.lastBurst = null;
+      facts.previousTurn = "";
+      facts.lastTurn = null;
       facts.spentUsd = 0;
-      facts.lastBurstUsd = 0;
-      facts.previousBurstUsd = 0;
+      facts.lastTurnUsd = 0;
+      facts.previousTurnUsd = 0;
       facts.transcriptChars = 0;
       facts.budgetHalted = false;
       facts.interrupted = false;
@@ -581,9 +583,9 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       /**
        * The entire interrupt implementation.
        *
-       * One fact. The derivations do the rest, and a burst already in flight
+       * One fact. The derivations do the rest, and a turn already in flight
        * finishes rather than being torn up — the chain interrupts between
-       * turns, so the transcript the synthesizer reads is never half a burst.
+       * turns, so the transcript the synthesizer reads is never half a turn.
        */
       interrupt: (facts) => {
         facts.interrupted = true;
@@ -600,24 +602,24 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         derived.budgetUsd > 0 ? facts.spentUsd / derived.budgetUsd : 0,
 
       // Reported, not predicted from. See the field doc on ChainDerived.
-      averageBurstUsd: (facts) =>
+      averageTurnUsd: (facts) =>
         facts.iteration > 0 ? facts.spentUsd / facts.iteration : 0,
 
-      projectedBurstUsd: (facts) => {
+      projectedTurnUsd: (facts) => {
         if (facts.iteration === 0) {
           return 0;
         }
         if (facts.iteration === 1) {
-          return facts.lastBurstUsd;
+          return facts.lastTurnUsd;
         }
 
         // Linear extrapolation of the last observed step, floored at the last
-        // burst. Growth is clamped at zero so a burst that happened to come in
+        // turn. Growth is clamped at zero so a turn that happened to come in
         // cheaper than its predecessor does not predict a cheaper one still on
         // a transcript that only ever gets longer.
-        const growth = Math.max(0, facts.lastBurstUsd - facts.previousBurstUsd);
+        const growth = Math.max(0, facts.lastTurnUsd - facts.previousTurnUsd);
 
-        return facts.lastBurstUsd + growth;
+        return facts.lastTurnUsd + growth;
       },
 
       synthesisReserveUsd: (facts) => {
@@ -628,7 +630,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         // plus the standing notice the harness appends to every voice. Measuring
         // the preset's alone would under-reserve by the length of that notice on
         // every run, which is the difference between affording the closing
-        // document and stopping one burst short of it on a budget the chain is
+        // document and stopping one turn short of it on a budget the chain is
         // designed to spend to the last cent.
         const promptChars =
           facts.transcriptChars +
@@ -643,18 +645,18 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         );
       },
 
-      // A burst appends about `tokensPerBurst` to the transcript, and the
-      // synthesizer reads the transcript — so the burst about to be authorized
-      // is also the burst that raises the closing document's bill. Priced at the
+      // A turn appends about `tokensPerTurn` to the transcript, and the
+      // synthesizer reads the transcript — so the turn about to be authorized
+      // is also the turn that raises the closing document's bill. Priced at the
       // input rate, which is what re-reading it costs.
       projectedReserveUsd: (facts, derived) =>
         derived.synthesisReserveUsd +
-        (facts.preset.tokensPerBurst / 1_000_000) * pricing.inputPerMillion,
+        (facts.preset.tokensPerTurn / 1_000_000) * pricing.inputPerMillion,
 
-      canAffordBurst: (_facts, derived) =>
+      canAffordTurn: (_facts, derived) =>
         derived.remainingUsd > 0 &&
         derived.remainingUsd >=
-          derived.projectedBurstUsd + derived.projectedReserveUsd,
+          derived.projectedTurnUsd + derived.projectedReserveUsd,
 
       canAffordSynthesis: (_facts, derived) =>
         derived.remainingUsd >= derived.synthesisReserveUsd,
@@ -666,7 +668,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         facts.budgetHalted ||
         facts.failure !== "" ||
         facts.interrupted ||
-        !derived.canAffordBurst ||
+        !derived.canAffordTurn ||
         derived.iterationsExhausted,
 
       synthesisSkipped: (facts, derived) =>
@@ -690,7 +692,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         if (facts.interrupted) {
           return "interrupted";
         }
-        if (!derived.canAffordBurst) {
+        if (!derived.canAffordTurn) {
           return "budget";
         }
 
@@ -703,7 +705,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         return personas[facts.iteration % personas.length]?.name ?? "";
       },
 
-      burstPending: (facts, derived) => facts.running && !derived.chainStopped,
+      turnPending: (facts, derived) => facts.running && !derived.chainStopped,
 
       synthesisPending: (facts, derived) =>
         facts.running &&
@@ -721,7 +723,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           return "failed";
         }
         if (!derived.chainStopped) {
-          return "bursting";
+          return "taking-turns";
         }
 
         return derived.synthesisPending ? "synthesizing" : "complete";
@@ -730,29 +732,29 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
     constraints: {
       /**
-       * While another burst should run, one must.
+       * While another turn should run, one must.
        *
-       * The whole decision is `burstPending`. Nothing about budgets, turn
+       * The whole decision is `turnPending`. Nothing about budgets, turn
        * order, or interrupts appears here — swapping any of those out is a
        * change to a derivation, and this constraint does not notice.
        */
-      runBurst: {
-        when: () => readDerived("burstPending"),
+      runTurn: {
+        when: () => readDerived("turnPending"),
         require: (facts) => ({
-          type: "RUN_BURST" as const,
+          type: "RUN_TURN" as const,
           iteration: facts.iteration,
           persona: readDerived("nextPersona"),
           input: facts.input,
-          previousBurst: facts.previousBurst,
+          previousTurn: facts.previousTurn,
         }),
         meta: withPresetMeta(preset, {
-          label: "Next burst",
+          label: "Next turn",
           description: "A persona owes the transcript a contribution.",
           category: "chain",
         }),
       },
 
-      /** Once bursting is over and there is something to read, close it out. */
+      /** Once the turns are over and there is something to read, close it out. */
       synthesize: {
         when: () => readDerived("synthesisPending"),
         require: (facts) => ({
@@ -782,27 +784,27 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
        * assembly and the transcript bookkeeping, and the two policies would
        * multiply.
        */
-      runBurst: {
-        requirement: "RUN_BURST",
-        key: (req) => `burst-${req.iteration}`,
+      runTurn: {
+        requirement: "RUN_TURN",
+        key: (req) => `turn-${req.iteration}`,
         resolve: async (req, context) => {
           emit({
-            type: "burst:started",
+            type: "turn:started",
             iteration: req.iteration,
             persona: req.persona,
             at: now(),
           });
-          transcript.beginBurst();
+          transcript.beginTurn();
 
           const spentBefore = budgetRunner.getSpent("total");
           const prompt = renderTemplate(context.facts.preset.promptTemplate, {
             input: quote("subject", req.input),
             persona: req.persona,
             iteration: req.iteration + 1,
-            previousBurst: quote("previous-turn", req.previousBurst),
+            previousTurn: quote("previous-turn", req.previousTurn),
             // Already fenced, one turn at a time — see `Transcript.text`.
             transcript: transcript.text(),
-            tokensPerBurst: context.facts.preset.tokensPerBurst,
+            tokensPerTurn: context.facts.preset.tokensPerTurn,
           });
 
           const result = await orchestrator.runAgent(req.persona, prompt, {
@@ -810,7 +812,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
             onToken: (token) => {
               transcript.appendToken(token);
               emit({
-                type: "burst:delta",
+                type: "turn:delta",
                 iteration: req.iteration,
                 persona: req.persona,
                 text: token,
@@ -821,9 +823,9 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
             // the transcript; the event is what keeps it off a surface that
             // rendered the deltas.
             onStreamRestart: (reason) => {
-              transcript.beginBurst();
+              transcript.beginTurn();
               emit({
-                type: "burst:restarted",
+                type: "turn:restarted",
                 iteration: req.iteration,
                 persona: req.persona,
                 reason,
@@ -833,7 +835,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
           const text = readOutputText(result.output, transcript.pending());
           const spentAfter = budgetRunner.getSpent("total");
-          const record = transcript.completeBurst({
+          const record = transcript.completeTurn({
             iteration: req.iteration,
             persona: req.persona,
             text,
@@ -841,20 +843,20 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
             at: now(),
           });
 
-          context.facts.previousBurst = text;
-          context.facts.lastBurst = record;
+          context.facts.previousTurn = text;
+          context.facts.lastTurn = record;
           context.facts.spentUsd = spentAfter;
-          // The two figures the next-burst projection extrapolates from, and
+          // The two figures the next-turn projection extrapolates from, and
           // the measured half of the synthesis reserve. All three are what this
-          // burst actually cost and actually wrote, read off the ledger and the
+          // turn actually cost and actually wrote, read off the ledger and the
           // transcript rather than recomputed.
-          context.facts.previousBurstUsd = context.facts.lastBurstUsd;
-          context.facts.lastBurstUsd = spentAfter - spentBefore;
+          context.facts.previousTurnUsd = context.facts.lastTurnUsd;
+          context.facts.lastTurnUsd = spentAfter - spentBefore;
           context.facts.transcriptChars = transcript.text().length;
           context.facts.iteration = req.iteration + 1;
         },
         meta: withPresetMeta(preset, {
-          label: "Run persona burst",
+          label: "Run persona turn",
           category: "chain",
         }),
       },
@@ -864,7 +866,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
        *
        * Reads {@link Transcript.text}, not the file. The file is a mirror
        * written by an effect, and a synthesis that read the mirror would be one
-       * unflushed burst behind whenever the two were out of step.
+       * unflushed turn behind whenever the two were out of step.
        */
       synthesize: {
         requirement: "SYNTHESIZE",
@@ -909,27 +911,34 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 
     effects: {
       /**
-       * Mirror the transcript to disk.
+       * Keep the transcript's mirror level with the facts.
        *
-       * Fire-and-forget on purpose: nothing reads these files during a run, so
-       * a slow disk should not hold up the next turn. The one place the write
-       * genuinely has to have landed — the end of the run — awaits it, in the
-       * completion effect below.
+       * The input is carried across here rather than set by whoever called
+       * `run()`, so a chain driven by dispatching `start` — which is what
+       * composing this module into a system you own looks like — gets a
+       * transcript header without having to know that a second call was
+       * expected of it. The fact is the source; the transcript is the mirror.
+       *
+       * The flush is fire-and-forget on purpose: nothing reads the artefacts
+       * during a run, so a slow sink should not hold up the next turn. The one
+       * place the write genuinely has to have landed — the end of the run —
+       * awaits it, in the completion effect below.
        */
       mirrorTranscript: {
-        deps: ["lastBurst", "synthesis"],
-        run: () => {
+        deps: ["input", "lastTurn", "synthesis"],
+        run: (facts) => {
+          transcript.setInput(facts.input);
           void transcript.flush();
         },
-        meta: { label: "Mirror transcript to disk", category: "io" },
+        meta: { label: "Mirror the transcript", category: "io" },
       },
 
-      /** Announce a finished burst and what it did to the running total. */
-      announceBurst: {
-        deps: ["lastBurst"],
+      /** Announce a finished turn and what it did to the running total. */
+      announceTurn: {
+        deps: ["lastTurn"],
         run: (facts, prev) => {
-          const record = facts.lastBurst;
-          if (record === null || prev === null || prev.lastBurst === record) {
+          const record = facts.lastTurn;
+          if (record === null || prev === null || prev.lastTurn === record) {
             return;
           }
 
@@ -943,7 +952,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           };
 
           emit({
-            type: "burst:completed",
+            type: "turn:completed",
             iteration: record.iteration,
             persona: record.persona,
             text: record.text,
@@ -952,7 +961,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           });
           emit({ type: "cost:updated", ...cost });
 
-          // Fires on the crossing, not on every burst above the line. The
+          // Fires on the crossing, not on every turn above the line. The
           // previous snapshot is what makes that a property of this one read
           // rather than a flag someone has to remember to reset.
           const previousFraction =
@@ -968,7 +977,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
             });
           }
         },
-        meta: { label: "Announce burst", category: "events" },
+        meta: { label: "Announce turn", category: "events" },
       },
 
       /**
@@ -1061,7 +1070,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           }
 
           // The one place the mirror has to have landed. Flushes are
-          // serialized, so this queues behind whatever the burst effects
+          // serialized, so this queues behind whatever the turn effects
           // started and resolves only once the files match memory.
           await transcript.flush();
 
@@ -1088,7 +1097,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
       /**
        * Every terminal resolver failure, in one place.
        *
-       * A failed burst is recoverable at chain level: the transcript keeps
+       * A failed turn is recoverable at chain level: the transcript keeps
        * whatever was already written, `failure` makes `chainStopped` true, and
        * the chain cuts over to synthesis on what it has. A failed synthesis is
        * not — there is nothing further to try — so it sets its own fact and the
@@ -1111,7 +1120,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
           }
           emit({
             type: "error",
-            scope: requirement.type === "SYNTHESIZE" ? "synthesis" : "burst",
+            scope: requirement.type === "SYNTHESIZE" ? "synthesis" : "turn",
             message: error.message,
             iteration: readIteration(requirement),
             at: now(),
@@ -1135,7 +1144,7 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
         context.facts.failure = error.message;
         emit({
           type: "error",
-          scope: "burst",
+          scope: "turn",
           message: error.message,
           iteration: readIteration(requirement),
           at: now(),
@@ -1146,4 +1155,147 @@ export function createHarnessModule(deps: HarnessModuleDeps) {
 }
 
 /** The module type, for callers that hold one. */
-export type HarnessModule = ReturnType<typeof createHarnessModule>;
+export type HarnessModule = ReturnType<typeof buildModule>;
+
+// ============================================================================
+// The chain, and the one thing it needs from its system
+// ============================================================================
+
+/**
+ * What {@link HarnessChain.bind} reads off a Directive system.
+ *
+ * Deliberately structural and deliberately tiny. Every `System` satisfies it,
+ * and naming the two members it touches says plainly that binding is a read of
+ * the derive proxy and nothing more.
+ */
+export interface ChainHost {
+  /** Directive's system-mode discriminator: `module:` versus `modules:`. */
+  readonly _mode: "single" | "namespaced";
+  readonly derive: unknown;
+}
+
+/**
+ * A chain module and the binding that connects it to the system running it.
+ *
+ * Two things rather than one because of an ordering that cannot be avoided: the
+ * module's constraints and effects read derivations, derivations belong to a
+ * system, and the system cannot exist until the module does. So the module is
+ * built with a reader that is not pointed anywhere yet, and `bind` points it —
+ * after `createSystem()`, before `start()`.
+ *
+ * @example Composed into a system you own
+ * ```typescript
+ * const chain = createHarnessChain({ preset, runId, transcript, agents, emit });
+ *
+ * const system = createSystem({
+ *   modules: { chain: chain.module, billing: billingModule },
+ * });
+ *
+ * chain.bind(system, "chain");
+ * system.start();
+ * system.events.chain.start({ input: diff });
+ * ```
+ */
+export interface HarnessChain {
+  /** The Directive module. Hand it to `createSystem`. */
+  module: HarnessModule;
+  /**
+   * Point the chain's constraints and effects at the system running them.
+   *
+   * @param system - The system the module was registered with.
+   * @param namespace - The key it was registered under, in the `modules:` form.
+   *   Omitted in the `module:` form, where there is no namespace to name.
+   *
+   * @throws If the system is namespaced and no namespace is given, or if the
+   *   namespace names no module. Both are refused loudly here because the
+   *   failure they would otherwise cause is silent: a namespaced derive proxy
+   *   resolves module names, not derivations, so an unnamespaced read returns
+   *   `undefined`, the gating derivation reads falsy, the constraint never
+   *   fires, and the chain sits idle with nothing to say about why.
+   */
+  bind(system: ChainHost, namespace?: string): void;
+}
+
+/**
+ * Build the chain.
+ *
+ * Everything the chain needs from the outside world arrives here: the preset,
+ * the transcript to write into, the agents to call, and the sink to report on.
+ * None of it is constructed in this file, which is what lets the same module run
+ * against a provider or a script, and against a filesystem or nothing.
+ */
+export function createHarnessChain(deps: HarnessChainDeps): HarnessChain {
+  // Both checks live here rather than in `createHarnessSystem`, because this is
+  // the door every arrangement comes through. A caller composing the module
+  // into a system of their own never calls that function, and would otherwise
+  // get neither the schema check nor the budget floor.
+  const preset = assertPreset(deps.preset, "createHarnessChain(preset)");
+  assertBudgetCoversSynthesis(preset, deps.agents.pricing);
+
+  // Bound by `bind` below. Constraints and effects read derivations through
+  // this because the facts proxy they are handed does not carry them; the read
+  // still goes through the derive proxy, so it is tracked exactly like a fact
+  // read.
+  const binding: { derived?: ChainDerived } = {};
+  const readDerived: DerivedReader = (key) => {
+    const derived = binding.derived;
+    if (derived === undefined) {
+      throw new Error(
+        "[ai-harness] a derivation was read before the chain was bound. Call chain.bind(system) — or chain.bind(system, namespace) in the multi-module form — between createSystem() and start().",
+      );
+    }
+
+    return derived[key];
+  };
+
+  return {
+    module: buildModule({ ...deps, preset, readDerived }),
+
+    bind(system, namespace) {
+      binding.derived = resolveChainDerived(system, namespace);
+    },
+  };
+}
+
+/**
+ * The chain's derivations, from either shape of system.
+ *
+ * `createSystem({ module })` puts them on `system.derive` directly.
+ * `createSystem({ modules })` puts a *module name* there and the derivations one
+ * level down, so the same read that works in the first shape silently returns
+ * `undefined` in the second. Which shape it is, is on the system; which
+ * namespace, is not — so it is asked for, checked against the modules the system
+ * actually has, and refused by name when it is wrong.
+ */
+function resolveChainDerived(
+  system: ChainHost,
+  namespace: string | undefined,
+): ChainDerived {
+  if (system._mode !== "namespaced") {
+    if (namespace !== undefined) {
+      throw new Error(
+        `[ai-harness] bind() was given the namespace "${namespace}", but this system was built with createSystem({ module }) and has none. Drop the second argument, or build the system with createSystem({ modules: { ${namespace}: chain.module } }).`,
+      );
+    }
+
+    return system.derive as ChainDerived;
+  }
+
+  const derive = system.derive as Record<string, ChainDerived | undefined>;
+  const available = Object.keys(derive);
+
+  if (namespace === undefined) {
+    throw new Error(
+      `[ai-harness] bind() needs the name the chain module was registered under, because this system has more than one module and its derivations are namespaced. Pass chain.bind(system, "<name>") — this system's modules are: ${available.join(", ")}.`,
+    );
+  }
+
+  const derived = derive[namespace];
+  if (derived === undefined) {
+    throw new Error(
+      `[ai-harness] bind() was given the namespace "${namespace}", which names no module in this system. Its modules are: ${available.join(", ")}.`,
+    );
+  }
+
+  return derived;
+}

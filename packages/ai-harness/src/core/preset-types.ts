@@ -56,7 +56,7 @@ export interface PersonaConfig {
   /**
    * The agent name. Used as the orchestrator's agent ID, so it must be unique
    * within a preset and stable across runs — it is what a transcript line and
-   * a `burst:completed` event identify the speaker by.
+   * a `turn:completed` event identify the speaker by.
    */
   name: string;
   /** The persona's system prompt, verbatim. */
@@ -84,7 +84,7 @@ export interface SynthesizerConfig {
    * plus `{{transcript}}`, `{{iterations}}`, and `{{spentUsd}}`.
    */
   promptTemplate: string;
-  /** Token cap for the closing document specifically — usually well above a burst. */
+  /** Token cap for the closing document specifically — usually well above a turn. */
   maxTokens: number;
   meta?: DefinitionMeta;
 }
@@ -110,7 +110,7 @@ export const synthesizerSchema = z.object({
  *   id: "code-review",
  *   model: "claude-sonnet-4-5-20250929",
  *   personas: [{ name: "correctness", systemPrompt: "…" }],
- *   tokensPerBurst: 700,
+ *   tokensPerTurn: 700,
  *   budgetUsd: 2,
  *   maxIterations: 12,
  *   promptTemplate: "{{transcript}}\n\nYour turn, {{persona}}.",
@@ -135,19 +135,19 @@ export interface PresetConfig {
   temperature?: number;
   /** The personas, in the order they take turns. Turn order wraps. */
   personas: PersonaConfig[];
-  /** Token cap on a single burst. Kept small — a burst is a contribution, not an essay. */
-  tokensPerBurst: number;
+  /** Token cap on a single turn. Kept small — a turn is a contribution, not an essay. */
+  tokensPerTurn: number;
   /**
    * This chain's ceiling in dollars.
    *
    * Enforced in three layers, because one of them has to be a prediction and a
    * prediction is the part that can be wrong:
    *
-   * 1. The chain stops adding bursts while what is left still covers the next
-   *    burst *and* the closing document. Both figures are computed rather than
+   * 1. The chain stops adding turns while what is left still covers the next
+   *    turn *and* the closing document. Both figures are computed rather than
    *    averaged — the synthesizer's `maxTokens` is a hard output ceiling and the
    *    transcript has a measured length — so the reserve is the real bill rather
-   *    than a guess derived from burst history.
+   *    than a guess derived from turn history.
    * 2. The closing document is checked against what remains before it runs. A
    *    synthesis that cannot be paid for is skipped and reported, not run.
    * 3. Underneath both, the cost ledger refuses to dispatch anything once
@@ -156,19 +156,19 @@ export interface PresetConfig {
    *    mispredicted — which is then reported as `stopReason: "budget"` rather
    *    than as an error.
    *
-   * **Per chain, not per composition.** `runChain` runs several presets end to
+   * **Per chain, not per composition.** `runComposition` runs several presets end to
    * end, and each carries its own `budgetUsd`, so a three-preset composition is
    * exposed to the sum of the three. Cap the whole thing with
-   * `RunChainOptions.totalBudgetUsd`.
+   * `RunCompositionOptions.totalBudgetUsd`.
    *
    * Must be at least the price of `synthesizer.maxTokens` at the model's output
-   * rate. Below that the chain can buy bursts and never the document that
+   * rate. Below that the chain can buy turns and never the document that
    * summarises them, which `createHarnessSystem` refuses at construction rather
    * than discovering four calls in.
    */
   budgetUsd: number;
   /**
-   * Hard ceiling on burst count, independent of spend.
+   * Hard ceiling on turn count, independent of spend.
    *
    * The budget is the primary stop; this is the backstop for the case the
    * budget cannot catch — a provider that reports no usage prices every call at
@@ -177,10 +177,10 @@ export interface PresetConfig {
    */
   maxIterations: number;
   /**
-   * The per-burst prompt.
+   * The per-turn prompt.
    *
    * Placeholders are `{{input}}`, `{{persona}}`, `{{iteration}}`,
-   * `{{previousBurst}}`, `{{transcript}}`, and `{{tokensPerBurst}}`. Anything
+   * `{{previousTurn}}`, `{{transcript}}`, and `{{tokensPerTurn}}`. Anything
    * else is left exactly as written, so a prompt containing literal braces
    * survives rendering.
    */
@@ -201,7 +201,7 @@ export interface PresetConfig {
  * non-empty because turn order is `iteration % personas.length`, and an empty
  * list makes that a division by zero that surfaces as an undefined persona name
  * three layers down. `budgetUsd` must be positive because a budget of zero
- * produces a chain that stops before its first burst and reports `"budget"` —
+ * produces a chain that stops before its first turn and reports `"budget"` —
  * technically correct, and indistinguishable from a misconfiguration.
  *
  * And `id` is an identifier rather than any non-empty string, because a preset
@@ -217,7 +217,7 @@ export const presetSchema = z
     model: z.string().min(1),
     temperature: z.number().min(0).max(1).optional(),
     personas: z.array(personaSchema).min(1),
-    tokensPerBurst: z.number().int().positive(),
+    tokensPerTurn: z.number().int().positive(),
     budgetUsd: z.number().positive(),
     maxIterations: z.number().int().positive(),
     promptTemplate: z.string().min(1),
@@ -230,11 +230,11 @@ export const presetSchema = z
    * A name is not a label here — it is the orchestrator's agent ID, and the
    * registry is keyed by it. Two personas sharing a name silently collapse into
    * one registration, so the second one's system prompt is discarded while turn
-   * order keeps calling on it and the transcript keeps attributing bursts to
+   * order keeps calling on it and the transcript keeps attributing turns to
    * it. A persona sharing the synthesizer's name is worse: the token cap is
    * chosen by comparing the agent name against the synthesizer's, so that
    * persona would run with the closing document's much larger cap and quietly
-   * cost several times what the preset budgeted for a burst.
+   * cost several times what the preset budgeted for a turn.
    *
    * Neither failure raises anything at runtime, which is exactly why it belongs
    * in the schema.
@@ -268,7 +268,7 @@ export const DEFAULT_BUDGET_WARNING_THRESHOLD = 0.8;
 /**
  * Render a preset template.
  *
- * Shared by the burst prompt and the synthesizer prompt so the two cannot come
+ * Shared by the turn prompt and the synthesizer prompt so the two cannot come
  * to disagree about what `{{transcript}}` means. Unknown placeholders are left
  * untouched rather than blanked: a prompt that mentions `{{TODO}}` should reach
  * the model saying so, not silently lose it.

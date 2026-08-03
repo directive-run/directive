@@ -15,8 +15,8 @@ import type { PresetConfig } from "../core/preset-types.js";
 /** The model every fixture prices against. Must exist in `ANTHROPIC_PRICING`. */
 export const TEST_MODEL = "claude-sonnet-4-5-20250929";
 
-/** Distinct, long-ish canned bursts, so cost accrues and text is countable. */
-export function cannedBurst(persona: string, turn: number): string {
+/** Distinct, long-ish canned turns, so cost accrues and text is countable. */
+export function cannedTurn(persona: string, turn: number): string {
   return `[${persona}#${turn}] ${"considered point ".repeat(60)}end-of-${persona}-${turn}`;
 }
 
@@ -36,7 +36,7 @@ export function testPreset(
       { name: "beta", systemPrompt: "You are beta." },
       { name: "gamma", systemPrompt: "You are gamma." },
     ],
-    tokensPerBurst: 300,
+    tokensPerTurn: 300,
     budgetUsd: 1,
     maxIterations: 6,
     promptTemplate:
@@ -56,9 +56,9 @@ export function cannedResponses(): Record<string, string[]> {
   const turns = [1, 2, 3, 4, 5, 6];
 
   return {
-    alpha: turns.map((turn) => cannedBurst("alpha", turn)),
-    beta: turns.map((turn) => cannedBurst("beta", turn)),
-    gamma: turns.map((turn) => cannedBurst("gamma", turn)),
+    alpha: turns.map((turn) => cannedTurn("alpha", turn)),
+    beta: turns.map((turn) => cannedTurn("beta", turn)),
+    gamma: turns.map((turn) => cannedTurn("gamma", turn)),
     synth: ["SYNTHESIS: the reviewers converged on three things."],
   };
 }

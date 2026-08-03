@@ -2,13 +2,14 @@
  * An interrupt is a fact flip, and the cascade does the rest.
  *
  * The property under test is that interrupting takes the chain down the *same*
- * path the budget takes it down — it stops bursting and it still synthesizes.
+ * path the budget takes it down — it stops taking turns and it still synthesizes.
  * If interrupting were a branch rather than a fact, "did synthesis still run"
  * would be a separate decision with its own answer, and this is the test that
  * would find the two answers disagreeing.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { createHarnessSystem } from "../core/system.js";
@@ -37,11 +38,11 @@ describe("interrupt", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => {
         events.push(event);
-        if (event.type === "burst:completed" && event.iteration === 1) {
+        if (event.type === "turn:completed" && event.iteration === 1) {
           // Dispatched off the reconcile pass that produced this event — the
           // chain is mid-flight, not between runs.
           queueMicrotask(() => harness.abort());
@@ -63,32 +64,32 @@ describe("interrupt", () => {
     expect(types.at(-1)).toBe("chain:complete");
   });
 
-  it("lets the burst in flight finish, so the transcript is never half a burst", async () => {
+  it("lets the turn in flight finish, so the transcript is never half a turn", async () => {
     const preset = testPreset({ budgetUsd: 100, maxIterations: 30 });
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses(), delayMs: 5 }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => {
-        // Interrupt while a burst is streaming, not between bursts.
-        if (event.type === "burst:delta" && event.iteration === 1) {
+        // Interrupt while a turn is streaming, not between turns.
+        if (event.type === "turn:delta" && event.iteration === 1) {
           queueMicrotask(() => harness.abort());
         }
       },
     });
 
     const result = await harness.run("go");
-    const bursts = harness.transcript.bursts();
+    const turns = harness.transcript.turns();
     harness.system.destroy();
 
     expect(result.stopReason).toBe("interrupted");
-    // Every committed burst is whole — the one that was streaming when the
+    // Every committed turn is whole — the one that was streaming when the
     // interrupt landed ran to completion rather than being torn up.
-    for (const burst of bursts) {
-      expect(burst.text).toContain(`end-of-${burst.persona}-`);
+    for (const turn of turns) {
+      expect(turn.text).toContain(`end-of-${turn.persona}-`);
     }
-    expect(bursts.length).toBe(result.iterations);
+    expect(turns.length).toBe(result.iterations);
   });
 
   it("is idempotent — aborting twice is aborting once", async () => {
@@ -96,10 +97,10 @@ describe("interrupt", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       onEvent: (event) => {
-        if (event.type === "burst:completed" && event.iteration === 0) {
+        if (event.type === "turn:completed" && event.iteration === 0) {
           queueMicrotask(() => {
             harness.abort();
             harness.abort();

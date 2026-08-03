@@ -162,7 +162,7 @@ function parseFile(contents: string, path: string): unknown {
     return JSON.parse(contents);
   } catch {
     throw new Error(
-      `[ai-harness] loadPreset: "${path}" was read but is not valid JSON. A preset file is a single JSON object with id, model, personas, tokensPerBurst, budgetUsd, maxIterations, promptTemplate, and synthesizer. The parser's own message is withheld because it quotes the file's contents, and a path that turns out not to be a preset should not be a way to read one. Check that this is the file you meant.`,
+      `[ai-harness] loadPreset: "${path}" was read but is not valid JSON. A preset file is a single JSON object with id, model, personas, tokensPerTurn, budgetUsd, maxIterations, promptTemplate, and synthesizer. The parser's own message is withheld because it quotes the file's contents, and a path that turns out not to be a preset should not be a way to read one. Check that this is the file you meant.`,
     );
   }
 }

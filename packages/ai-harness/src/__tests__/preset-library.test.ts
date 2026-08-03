@@ -3,7 +3,7 @@
  *
  * The failure this guards against is a preset library that type-checks and then
  * does not run — a placeholder left in a prompt, an agent name reused between a
- * persona and the synthesizer, a budget too small to reach the first burst.
+ * persona and the synthesizer, a budget too small to reach the first turn.
  * None of those show up in a type, and all of them show up on the first run, so
  * every built-in is run here rather than only validated.
  *
@@ -14,6 +14,7 @@
 
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { loadPreset, validatePreset } from "../core/preset-registry.js";
 import type { PresetConfig } from "../core/preset-types.js";
@@ -32,7 +33,7 @@ const DREAM_PATH = join(
 );
 
 /**
- * Long enough that spend accrues on every burst, so the presets with large
+ * Long enough that spend accrues on every turn, so the presets with large
  * iteration ceilings terminate on their budget rather than grinding through
  * fifty mock calls.
  */
@@ -102,7 +103,7 @@ describe("preset library", () => {
       it("runs to completion with the mock runner", async () => {
         const harness = createHarnessSystem(preset, {
           runner: runnerFor(),
-          outputDir: scratch.dir,
+          transcripts: createFileTranscriptStore({ dir: scratch.dir }),
           runId: `library-${id}`,
           retry: { maxRetries: 0 },
         });
@@ -175,7 +176,7 @@ describe("preset library", () => {
       // each voice gets about a word and a half and has to hand over
       // mid-thought, which is why the iteration ceiling sits far above what
       // the budget will actually pay for. The budget is the real stop.
-      expect(preset.tokensPerBurst).toBe(3);
+      expect(preset.tokensPerTurn).toBe(3);
       expect(preset.maxIterations).toBeGreaterThan(preset.personas.length * 4);
       expect(preset.budgetUsd).toBe(0.1);
     });
@@ -188,7 +189,7 @@ describe("preset library", () => {
       const preset = await loadPreset(DREAM_PATH);
       const harness = createHarnessSystem(preset, {
         runner: runnerFor(),
-        outputDir: scratch.dir,
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
         runId: "library-dream",
         retry: { maxRetries: 0 },
       });

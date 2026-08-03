@@ -3,18 +3,18 @@
  *
  * The CLI does not know anything the caller of this file cannot find out. It
  * builds a harness, subscribes to the event stream, and renders. So does
- * `runHarness`, so does `runChain`, and so will MCP and HTTP. A surface that
+ * `runHarness`, so does `runComposition`, and so will MCP and HTTP. A surface that
  * needed a private channel into the system would be a second path from engine
  * to screen, and two paths diverge — the CLI would start reporting something
  * the SDK could not.
  *
  * ## The escape hatch
  *
- * {@link createHarnessModule} is re-exported here on purpose. A caller who
- * wants the chain running inside *their* Directive system, next to their own
- * modules, sharing their plugins and their devtools session, composes the
- * module directly and never calls {@link createHarness} at all. That is the
- * most Directive-idiomatic thing this package can offer and it costs one line;
+ * {@link createHarnessChain} is re-exported here on purpose. A caller who wants
+ * the chain running inside *their* Directive system, next to their own modules,
+ * sharing their plugins and their devtools session, composes the module directly
+ * and never calls {@link createHarness} at all. That is the most
+ * Directive-idiomatic thing this package can offer and it costs three lines;
  * `createHarness` is the convenience, not the boundary.
  *
  * @example
@@ -24,7 +24,7 @@
  * const harness = createHarness(codeReviewPreset, {
  *   apiKey: process.env.ANTHROPIC_API_KEY,
  *   onEvent: (event) => {
- *     if (event.type === "burst:completed") {
+ *     if (event.type === "turn:completed") {
  *       console.log(`${event.persona}: ${event.text}`);
  *     }
  *   },
@@ -38,10 +38,10 @@
  */
 
 import {
-  type ChainRunResult,
-  type ChainStepResult,
-  type RunChainOptions,
-  runChain,
+  type CompositionResult,
+  type CompositionStepResult,
+  type RunCompositionOptions,
+  runComposition,
 } from "../../core/composition.js";
 import { assertPreset } from "../../core/preset-registry.js";
 import type { PresetConfig } from "../../core/preset-types.js";
@@ -61,7 +61,7 @@ export interface CreateHarnessOptions extends HarnessOptions {
    * Stops the chain from outside.
    *
    * Sugar over {@link Harness.abort}, for callers already holding a signal.
-   * Like `abort()`, it flips the interrupt fact — the burst in flight finishes
+   * Like `abort()`, it flips the interrupt fact — the turn in flight finishes
    * and the chain still synthesizes. It is not forwarded to the provider call.
    */
   signal?: AbortSignal;
@@ -140,7 +140,7 @@ export async function runHarness(
  * `defineConfig`-style: it returns exactly what it was given. What it adds is
  * that the object literal is checked against {@link PresetConfig} while you are
  * writing it, and against the schema when the module loads — so a preset in a
- * user's config file fails at import rather than three bursts into a run.
+ * user's config file fails at import rather than three turns into a run.
  *
  * @example
  * ```typescript
@@ -148,7 +148,7 @@ export async function runHarness(
  *   id: "my-chain",
  *   model: "claude-sonnet-4-5-20250929",
  *   personas: [{ name: "first", systemPrompt: "…" }],
- *   tokensPerBurst: 500,
+ *   tokensPerTurn: 500,
  *   budgetUsd: 0.5,
  *   maxIterations: 8,
  *   promptTemplate: "{{transcript}}\n\nYour turn, {{persona}}.",
@@ -170,10 +170,10 @@ export function definePreset(config: PresetConfig): PresetConfig {
 // ============================================================================
 
 export {
-  runChain,
-  type ChainRunResult,
-  type ChainStepResult,
-  type RunChainOptions,
+  runComposition,
+  type CompositionResult,
+  type CompositionStepResult,
+  type RunCompositionOptions,
 };
 
 export {
@@ -193,17 +193,21 @@ export type {
 } from "../../core/system.js";
 
 /**
- * The raw module, for composing the chain into a system you own.
+ * The chain itself, for composing it into a system you own.
  *
- * `createHarnessModule` is a factory rather than a value because a chain needs
- * a transcript, an orchestrator, and an event sink handed to it — but what it
- * returns is an ordinary Directive module, and `createSystem({ modules: { …,
- * chain } })` is a supported thing to do with it.
+ * `createHarnessChain` is a factory rather than a value because a chain needs a
+ * transcript, an orchestrator, and an event sink handed to it — but what comes
+ * back is an ordinary Directive module plus the one call that connects it to the
+ * system running it, and `createSystem({ modules: { chain: chain.module, …} })`
+ * is a supported thing to do with it. See {@link HarnessChain} for the shape of
+ * that, end to end.
  */
 export {
   chainSchema,
-  createHarnessModule,
+  createHarnessChain,
   type ChainDerived,
+  type ChainHost,
+  type HarnessChain,
+  type HarnessChainDeps,
   type HarnessModule,
-  type HarnessModuleDeps,
 } from "../../core/module.js";

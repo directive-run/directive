@@ -17,13 +17,14 @@ import type {
   RunResult,
 } from "@directive-run/ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runChain } from "../core/composition.js";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import type { PresetConfig } from "../core/preset-types.js";
 import {
   type Scratch,
-  cannedBurst,
+  cannedTurn,
   createScratch,
   testPreset,
 } from "./fixtures.js";
@@ -53,9 +54,9 @@ interface Recorded {
 function recordingRunner(recorded: Recorded[]): AgentRunner {
   const base = createMockRunner({
     responses: {
-      alpha: [1, 2, 3, 4].map((turn) => cannedBurst("alpha", turn)),
-      beta: [1, 2, 3, 4].map((turn) => cannedBurst("beta", turn)),
-      gamma: [1, 2, 3, 4].map((turn) => cannedBurst("gamma", turn)),
+      alpha: [1, 2, 3, 4].map((turn) => cannedTurn("alpha", turn)),
+      beta: [1, 2, 3, 4].map((turn) => cannedTurn("beta", turn)),
+      gamma: [1, 2, 3, 4].map((turn) => cannedTurn("gamma", turn)),
       "synth-one": [FIRST_MARKER],
       "synth-two": [SECOND_MARKER],
     },
@@ -72,7 +73,7 @@ function recordingRunner(recorded: Recorded[]): AgentRunner {
   };
 }
 
-describe("runChain", () => {
+describe("runComposition", () => {
   let scratch: Scratch;
 
   beforeEach(async () => {
@@ -90,9 +91,9 @@ describe("runChain", () => {
       stepPreset("second", "synth-two"),
     ];
 
-    const result = await runChain(presets, "the original subject", {
+    const result = await runComposition(presets, "the original subject", {
       runner: recordingRunner(recorded),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "compose",
       retry: { maxRetries: 0 },
     });
@@ -118,7 +119,7 @@ describe("runChain", () => {
     expect(stepTwoPrompts.length).toBeGreaterThan(0);
     expect(stepTwoPrompts[0]?.input).toContain(FIRST_MARKER);
     expect(stepTwoPrompts[0]?.input).toContain("the original subject");
-    // Step one's bursts are not forwarded — only what its synthesizer made of
+    // Step one's turns are not forwarded — only what its synthesizer made of
     // them.
     expect(stepTwoPrompts[0]?.input).not.toContain("end-of-alpha-1");
   });
@@ -129,9 +130,9 @@ describe("runChain", () => {
       stepPreset("second", "synth-two"),
     ];
 
-    const result = await runChain(presets, "the subject", {
+    const result = await runComposition(presets, "the subject", {
       runner: recordingRunner([]),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "files",
       retry: { maxRetries: 0 },
     });
@@ -160,9 +161,9 @@ describe("runChain", () => {
       stepPreset("second", "synth-two"),
     ];
 
-    await runChain(presets, "the subject", {
+    await runComposition(presets, "the subject", {
       runner: recordingRunner([]),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "events",
       retry: { maxRetries: 0 },
       onEvent: (event) => events.push(event),
@@ -180,7 +181,7 @@ describe("runChain", () => {
     expect(started.every((event) => event.total === 2)).toBe(true);
 
     // Every chain event sits inside exactly one step's bracket, which is what
-    // lets a surface attribute a burst without the burst carrying a step field.
+    // lets a surface attribute a turn without the turn carrying a step field.
     const firstOpen = types.indexOf("composition:step:started");
     const firstClose = types.indexOf("composition:step:complete");
     const chainStarts = types
@@ -198,9 +199,9 @@ describe("runChain", () => {
       stepPreset("second", "synth-two"),
     ];
 
-    const result = await runChain(presets, "the subject", {
+    const result = await runComposition(presets, "the subject", {
       runner: recordingRunner([]),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
@@ -221,14 +222,14 @@ describe("runChain", () => {
     ];
     presets[0] = { ...(presets[0] as PresetConfig), maxIterations: 20 };
 
-    const result = await runChain(presets, "the subject", {
+    const result = await runComposition(presets, "the subject", {
       runner: recordingRunner([]),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
       signal: controller.signal,
       onEvent: (event) => {
         events.push(event);
-        if (event.type === "burst:completed" && event.iteration === 0) {
+        if (event.type === "turn:completed" && event.iteration === 0) {
           queueMicrotask(() => controller.abort());
         }
       },
@@ -251,12 +252,16 @@ describe("runChain", () => {
     const controller = new AbortController();
     controller.abort();
 
-    const result = await runChain([stepPreset("first", "synth-one")], "x", {
-      runner: recordingRunner([]),
-      outputDir: scratch.dir,
-      retry: { maxRetries: 0 },
-      signal: controller.signal,
-    });
+    const result = await runComposition(
+      [stepPreset("first", "synth-one")],
+      "x",
+      {
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        signal: controller.signal,
+      },
+    );
 
     expect(result.steps).toHaveLength(0);
     expect(result.spentUsd).toBe(0);
@@ -264,8 +269,10 @@ describe("runChain", () => {
   });
 
   it("refuses an empty composition", async () => {
-    await expect(runChain([], "x", { outputDir: scratch.dir })).rejects.toThrow(
-      /at least one preset/,
-    );
+    await expect(
+      runComposition([], "x", {
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      }),
+    ).rejects.toThrow(/at least one preset/);
   });
 });

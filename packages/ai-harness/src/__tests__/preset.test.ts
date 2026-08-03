@@ -52,7 +52,7 @@ describe("presets", () => {
       id: "",
       model: "m",
       personas: [],
-      tokensPerBurst: 0,
+      tokensPerTurn: 0,
       budgetUsd: -1,
       maxIterations: 3,
       promptTemplate: "x",

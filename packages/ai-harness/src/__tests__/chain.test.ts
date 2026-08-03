@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { createHarnessSystem } from "../core/system.js";
@@ -27,7 +28,7 @@ describe("chain", () => {
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "chain-run",
       onEvent: (event) => events.push(event),
       retry: { maxRetries: 0 },
@@ -51,10 +52,8 @@ describe("chain", () => {
     expect(types.filter((type) => type === "chain:complete")).toHaveLength(1);
 
     // ---- one started/completed pair per iteration, in order ----
-    const started = events.filter((event) => event.type === "burst:started");
-    const completed = events.filter(
-      (event) => event.type === "burst:completed",
-    );
+    const started = events.filter((event) => event.type === "turn:started");
+    const completed = events.filter((event) => event.type === "turn:completed");
     expect(started.map((event) => event.iteration)).toEqual([0, 1, 2, 3]);
     expect(completed.map((event) => event.iteration)).toEqual([0, 1, 2, 3]);
 
@@ -66,15 +65,15 @@ describe("chain", () => {
       "alpha",
     ]);
 
-    // ---- every burst is announced before it is completed ----
+    // ---- every turn is announced before it is completed ----
     for (const iteration of [0, 1, 2, 3]) {
       const startIndex = events.findIndex(
         (event) =>
-          event.type === "burst:started" && event.iteration === iteration,
+          event.type === "turn:started" && event.iteration === iteration,
       );
       const endIndex = events.findIndex(
         (event) =>
-          event.type === "burst:completed" && event.iteration === iteration,
+          event.type === "turn:completed" && event.iteration === iteration,
       );
       expect(startIndex).toBeGreaterThanOrEqual(0);
       expect(endIndex).toBeGreaterThan(startIndex);
@@ -90,14 +89,14 @@ describe("chain", () => {
     // ---- phase transitions, derived and announced exactly once each ----
     const steps = events.filter((event) => event.type === "step:complete");
     expect(steps.map((event) => `${event.from}->${event.to}`)).toEqual([
-      "idle->bursting",
-      "bursting->synthesizing",
+      "idle->taking-turns",
+      "taking-turns->synthesizing",
       "synthesizing->complete",
     ]);
 
-    // ---- synthesis streamed, and after the last burst ----
+    // ---- synthesis streamed, and after the last turn ----
     expect(types.indexOf("synthesis:started")).toBeGreaterThan(
-      types.lastIndexOf("burst:completed"),
+      types.lastIndexOf("turn:completed"),
     );
     expect(
       types.filter((type) => type === "synthesis:chunk").length,
@@ -106,11 +105,11 @@ describe("chain", () => {
     expect(types).not.toContain("error");
   });
 
-  it("writes the transcript and a one-line-per-burst sidecar", async () => {
+  it("writes the transcript and a one-line-per-turn sidecar", async () => {
     const preset = testPreset({ maxIterations: 3, budgetUsd: 5 });
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "files-run",
       retry: { maxRetries: 0 },
     });
@@ -134,7 +133,7 @@ describe("chain", () => {
     ]);
   });
 
-  it("gives every persona the whole transcript, not just the last burst", async () => {
+  it("gives every persona the whole transcript, not just the last turn", async () => {
     const prompts: string[] = [];
     const preset = testPreset({ maxIterations: 3, budgetUsd: 5 });
 
@@ -145,14 +144,14 @@ describe("chain", () => {
 
         return base(agent, input, options);
       },
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
     await harness.run("the input");
     harness.system.destroy();
 
-    // The third persona's prompt carries both earlier bursts.
+    // The third persona's prompt carries both earlier turns.
     const third = prompts[2] ?? "";
     expect(third).toContain("end-of-alpha-1");
     expect(third).toContain("end-of-beta-1");
@@ -161,12 +160,55 @@ describe("chain", () => {
   it("refuses a second run rather than writing two chains into one transcript", async () => {
     const harness = createHarnessSystem(testPreset({ maxIterations: 1 }), {
       runner: createMockRunner({ responses: cannedResponses() }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 0 },
     });
 
     await harness.run("first");
     await expect(harness.run("second")).rejects.toThrow(/already been run/);
     harness.system.destroy();
+  });
+
+  /**
+   * A surface that throws while rendering used to reach a `console.error` in
+   * the core — invisible to a surface that swapped stdout for a socket, which
+   * is every surface that is not the bundled command line. The chain has one
+   * channel and this now goes down it.
+   */
+  it("reports a listener that throws on the stream, and finishes anyway", async () => {
+    const seen: HarnessEvent[] = [];
+    let thrown = 0;
+
+    const harness = createHarnessSystem(
+      testPreset({ maxIterations: 2, budgetUsd: 5 }),
+      {
+        runner: createMockRunner({ responses: cannedResponses() }),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => {
+          seen.push(event);
+          // Throws on the first turn only, so the failure report itself is
+          // delivered to a listener that is by then behaving.
+          if (event.type === "turn:completed" && thrown === 0) {
+            thrown += 1;
+            throw new Error("the renderer fell over");
+          }
+        },
+      },
+    );
+
+    const result = await harness.run("go");
+    harness.system.destroy();
+
+    expect(result.phase).toBe("complete");
+    expect(result.iterations).toBe(2);
+
+    const reported = seen.filter(
+      (event) => event.type === "error" && event.scope === "listener",
+    );
+    expect(reported).toHaveLength(1);
+    expect(reported[0]?.type === "error" && reported[0].message).toBe(
+      "the renderer fell over",
+    );
   });
 });

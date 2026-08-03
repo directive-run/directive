@@ -5,9 +5,9 @@
  * own system, its own budget, its own transcript, and its own synthesizer —
  * what crosses the boundary between two steps is a *finished document*, not a
  * running conversation. That is the whole design: a step cannot see the
- * previous step's bursts, only what its synthesizer decided they amounted to.
+ * previous step's turns, only what its synthesizer decided they amounted to.
  * The narrowing is the point of composing rather than concatenating persona
- * lists, and it is why a four-preset chain does not end up with a thirty-burst
+ * lists, and it is why a four-preset chain does not end up with a thirty-turn
  * transcript no single persona can read.
  *
  * ## Sequential only
@@ -28,8 +28,6 @@
  * @module
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
 import type { HarnessEvent, HarnessEventSink } from "./events.js";
 import type { PresetConfig } from "./preset-types.js";
@@ -38,7 +36,6 @@ import {
   assertSafeIdentifier,
   createFenceToken,
   fence,
-  resolveWithin,
 } from "./safety.js";
 import {
   type Harness,
@@ -46,18 +43,18 @@ import {
   type HarnessRunResult,
   createHarnessSystem,
 } from "./system.js";
-import { createRunId, defaultTranscriptDir } from "./transcript.js";
+import { createMemoryTranscriptStore, createRunId } from "./transcript.js";
 
 // ============================================================================
 // Options and results
 // ============================================================================
 
-export interface RunChainOptions extends HarnessOptions {
+export interface RunCompositionOptions extends HarnessOptions {
   /**
    * Stops the composition.
    *
    * Aborting flips the running step's interrupt fact — so that step finishes
-   * the burst in flight and still synthesizes — and no further step starts.
+   * the turn in flight and still synthesizes — and no further step starts.
    * It is not passed to the provider call: tearing up a request mid-response
    * is the one thing the chain is built not to do.
    */
@@ -65,9 +62,9 @@ export interface RunChainOptions extends HarnessOptions {
   /**
    * The composition's ceiling in dollars, across every step.
    *
-   * **`budgetUsd` is per step, and always was.** `RunChainOptions` extends
+   * **`budgetUsd` is per step, and always was.** `RunCompositionOptions` extends
    * `HarnessOptions`, the options are handed to each step's harness in turn, and
-   * a preset carries its own `budgetUsd` — so `runChain([a, b, c], …)` with
+   * a preset carries its own `budgetUsd` — so `runComposition([a, b, c], …)` with
    * `budgetUsd: 5` is $15 of exposure, not $5. Nothing compared accumulated
    * spend to anything, and no doc said which of the two readings was meant.
    *
@@ -76,7 +73,7 @@ export interface RunChainOptions extends HarnessOptions {
    * left cannot pay for the next step's closing document.
    *
    * Defaults to the sum of the presets' own budgets — so the figure is always
-   * defined, always reported on {@link ChainRunResult.budgetUsd}, and the
+   * defined, always reported on {@link CompositionResult.budgetUsd}, and the
    * default changes nothing about what a composition costs. Setting it lower is
    * how a caller caps the whole run.
    *
@@ -93,21 +90,21 @@ export interface RunChainOptions extends HarnessOptions {
 }
 
 /** One step's outcome, with its position in the composition. */
-export interface ChainStepResult extends HarnessRunResult {
+export interface CompositionStepResult extends HarnessRunResult {
   /** One-based position. */
   step: number;
   presetId: string;
 }
 
-export interface ChainRunResult {
+export interface CompositionResult {
   /** Names the composition, and stems every step's run ID. */
   runId: string;
   /**
    * Steps that ran, in order. Shorter than the preset list after an interrupt
    * or once the composition's ceiling is used up.
    */
-  steps: ChainStepResult[];
-  /** Every step's spend, summed. Never above {@link ChainRunResult.budgetUsd}. */
+  steps: CompositionStepResult[];
+  /** Every step's spend, summed. Never above {@link CompositionResult.budgetUsd}. */
   spentUsd: number;
   /**
    * The ceiling this composition ran under, across every step.
@@ -204,11 +201,11 @@ function composeInput(
 function renderCombined(
   runId: string,
   input: string,
-  steps: ChainStepResult[],
+  steps: CompositionStepResult[],
 ): string {
   const sections = steps.map((step) => {
     const heading = `## ${step.step}. ${step.presetId}`;
-    const note = `*${step.iterations} bursts · $${step.spentUsd.toFixed(4)} · stopped: ${step.stopReason || "settled"}*`;
+    const note = `*${step.iterations} turns · $${step.spentUsd.toFixed(4)} · stopped: ${step.stopReason || "settled"}*`;
     const body =
       step.synthesis === ""
         ? "_This step produced no closing document._"
@@ -221,7 +218,7 @@ function renderCombined(
 }
 
 // ============================================================================
-// runChain
+// runComposition
 // ============================================================================
 
 /**
@@ -229,7 +226,7 @@ function renderCombined(
  *
  * @example
  * ```typescript
- * const result = await runChain([codeReviewPreset, preMortemPreset], diff, {
+ * const result = await runComposition([codeReviewPreset, preMortemPreset], diff, {
  *   apiKey: process.env.ANTHROPIC_API_KEY,
  *   onEvent: (event) => {
  *     if (event.type === "composition:step:started") {
@@ -239,14 +236,14 @@ function renderCombined(
  * });
  * ```
  */
-export async function runChain(
+export async function runComposition(
   presets: readonly PresetConfig[],
   input: string,
-  options: RunChainOptions = {},
-): Promise<ChainRunResult> {
+  options: RunCompositionOptions = {},
+): Promise<CompositionResult> {
   if (presets.length === 0) {
     throw new Error(
-      "[ai-harness] runChain needs at least one preset — an empty composition has nothing to synthesize.",
+      "[ai-harness] runComposition needs at least one preset — an empty composition has nothing to synthesize.",
     );
   }
 
@@ -254,7 +251,7 @@ export async function runChain(
     signal,
     onEvent,
     runId: providedRunId,
-    outputDir,
+    transcripts,
     totalBudgetUsd,
     ...rest
   } = options;
@@ -263,7 +260,12 @@ export async function runChain(
     providedRunId === undefined
       ? createRunId(now)
       : assertSafeIdentifier(providedRunId, "runId", MAX_RUN_ID_LENGTH);
-  const dir = outputDir ?? defaultTranscriptDir();
+  // One store for the whole composition: every step's transcript and the
+  // combined document all go through it. The combined document used to be
+  // written by a second, separate call to the filesystem sitting beside the
+  // transcript's own and knowing nothing about it, which is one writer too many
+  // for a package whose output side is meant to be substitutable.
+  const store = transcripts ?? createMemoryTranscriptStore();
   /** This composition's fence marker. Distinct from any step's. */
   const fenceToken = createFenceToken();
   const emit: HarnessEventSink = (event: HarnessEvent) => {
@@ -276,7 +278,7 @@ export async function runChain(
 
   if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
     throw new Error(
-      `[ai-harness] runChain needs a positive totalBudgetUsd — got ${String(totalBudgetUsd)}.`,
+      `[ai-harness] runComposition needs a positive totalBudgetUsd — got ${String(totalBudgetUsd)}.`,
     );
   }
 
@@ -288,7 +290,7 @@ export async function runChain(
     at: now(),
   });
 
-  const steps: ChainStepResult[] = [];
+  const steps: CompositionStepResult[] = [];
   const prior: PriorSynthesis[] = [];
   let spentUsd = 0;
   let interrupted = signal?.aborted === true;
@@ -311,7 +313,7 @@ export async function runChain(
     const pricing = resolvePresetPricing(preset, rest.pricing);
     const floorUsd = minimumStepBudgetUsd(preset, pricing);
 
-    // Below the floor there is no step worth running: it could buy a burst or
+    // Below the floor there is no step worth running: it could buy a turn or
     // two but not the closing document that makes them useful to the next step,
     // and a step whose synthesis is skipped contributes nothing downstream.
     // Stop, and say so, rather than start something that cannot finish.
@@ -343,7 +345,7 @@ export async function runChain(
 
     const harness: Harness = createHarnessSystem(stepPreset, {
       ...rest,
-      outputDir: dir,
+      transcripts: store,
       runId: stepRunId,
       onEvent: emit,
     });
@@ -362,7 +364,7 @@ export async function runChain(
       harness.system.destroy();
     }
 
-    const stepResult: ChainStepResult = { ...result, ...stepMeta };
+    const stepResult: CompositionStepResult = { ...result, ...stepMeta };
     steps.push(stepResult);
     spentUsd += result.spentUsd;
     if (result.synthesis !== "") {
@@ -390,12 +392,13 @@ export async function runChain(
     }
   }
 
-  // Same containment assertion the transcript makes, for the same reason: this
-  // is a second place a run ID becomes a path, and it must not be a second place
-  // that has to remember the rule.
-  const combinedPath = resolveWithin(dir, `${runId}.md`);
-  await mkdir(dirname(combinedPath), { recursive: true });
-  await writeFile(combinedPath, renderCombined(runId, input, steps), "utf8");
+  // Through the same store every step's transcript went through, so containment
+  // — and whether there is a filesystem here at all — is decided in one place
+  // rather than asserted again by a second writer that has to remember the rule.
+  const combinedPath = await store.writeDocument(
+    `${runId}.md`,
+    renderCombined(runId, input, steps),
+  );
 
   emit({
     type: "composition:complete",

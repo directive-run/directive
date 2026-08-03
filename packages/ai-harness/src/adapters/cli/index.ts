@@ -2,7 +2,7 @@
  * The command line.
  *
  * A renderer over the event stream and an argument parser in front of the SDK.
- * It calls `createHarness` and `runChain` and reads `HarnessEvent`s, which is
+ * It calls `createHarness` and `runComposition` and reads `HarnessEvent`s, which is
  * everything a consumer of this package can do — there is no private channel
  * here, and the CLI cannot report anything a caller of the SDK could not.
  *
@@ -10,13 +10,13 @@
  *
  * Every check that can be made before a provider call is made before one:
  * `--tokens 0`, a negative budget, a preset name that resolves to nothing, an
- * unreadable `--input-file`, a missing API key. A run that gets four bursts in
+ * unreadable `--input-file`, a missing API key. A run that gets four turns in
  * and then fails on a typo has already spent money answering a question the
  * operator did not ask.
  *
  * ## The two interrupts
  *
- * The first `SIGINT` flips the chain's interrupt fact. The burst in flight
+ * The first `SIGINT` flips the chain's interrupt fact. The turn in flight
  * finishes, the chain synthesizes what it has, and the transcript is whole —
  * the core is deliberately built so that stopping early still produces a
  * closing document, and tearing up the request in flight would throw that away.
@@ -31,14 +31,17 @@ import { intro, isCancel, log, outro, text } from "@clack/prompts";
 import type { TokenPricing } from "@directive-run/ai";
 import { Command, type CommanderError, InvalidArgumentError } from "commander";
 import pc from "picocolors";
-import { runChain } from "../../core/composition.js";
+import { resolvePresetPricing } from "../../core/agents.js";
+import { runComposition } from "../../core/composition.js";
+import { type RunEstimate, estimateRun } from "../../core/estimate.js";
 import { createMockRunner } from "../../core/mock-runner.js";
 import { assertPreset, loadPreset } from "../../core/preset-registry.js";
 import type { PresetConfig } from "../../core/preset-types.js";
 import type { HarnessOptions } from "../../core/system.js";
 import { PRESET_LIST } from "../../presets/index.js";
+import { createFileTranscriptStore } from "../node/transcript.js";
 import { createHarness } from "../sdk/index.js";
-import { createRenderer } from "./render.js";
+import { createRenderer, dollars, plural } from "./render.js";
 
 // ============================================================================
 // Errors
@@ -70,14 +73,14 @@ export interface CliArgs {
   input?: string;
   inputFile?: string;
   listPresets: boolean;
-  /** Overrides `tokensPerBurst` on every preset in the run. */
-  tokensPerBurst?: number;
+  /** Overrides `tokensPerTurn` on every preset in the run. */
+  tokensPerTurn?: number;
   /** Overrides `budgetUsd` on every preset in the run. Per step, not per run. */
   budgetUsd?: number;
   /**
-   * Ceiling across every step of a `--chain`.
+   * Ceiling across every step of a `--compose`.
    *
-   * Distinct from `--budget`, which is per step and always was: `--chain a,b,c
+   * Distinct from `--budget`, which is per step and always was: `--compose a,b,c
    * --budget 5` is $15 of exposure. Defaults to the sum of the steps' budgets.
    */
   totalBudgetUsd?: number;
@@ -142,13 +145,13 @@ function buildProgram(sink: string[]): Command {
       "--preset <name|path>",
       "built-in id or a path to a preset JSON file",
     )
-    .option("--chain <a,b,c>", "run presets in order; overrides --preset")
+    .option("--compose <a,b,c>", "run presets in order; overrides --preset")
     .option("--input <text>", "the question / diff / codebase summary")
     .option("--input-file <path>", "read input from a file (large inputs)")
     .option("--list-presets", "print the registry and exit", false)
     .option(
       "--tokens <n>",
-      "override the preset's tokens per burst",
+      "override the preset's tokens per turn",
       positiveInteger("--tokens"),
     )
     .option(
@@ -158,7 +161,7 @@ function buildProgram(sink: string[]): Command {
     )
     .option(
       "--total-budget <usd>",
-      "ceiling across every step of a --chain (default: the steps' budgets, summed)",
+      "ceiling across every step of a --compose (default: the steps' budgets, summed)",
       positiveNumber("--total-budget"),
     )
     .option("--model <id>", "override the model")
@@ -167,8 +170,16 @@ function buildProgram(sink: string[]): Command {
       "sampling temperature, 0 to 1",
       unitInterval("--temperature"),
     )
-    .option("--dry-run", "no API calls; canned responses", false)
-    .option("--out-dir <path>", "transcript destination", "./runs")
+    .option(
+      "--dry-run",
+      "no API calls; canned responses and fictional costs",
+      false,
+    )
+    .option(
+      "--out-dir <path>",
+      "directory the artefacts are written to",
+      "./runs",
+    )
     .option("--verbose", "print the event stream structurally", false)
     .allowExcessArguments(false)
     .exitOverride()
@@ -210,11 +221,11 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 
   const options = program.opts();
   const listPresets = options.listPresets === true;
-  const presets = readPresetTokens(options.chain, options.preset);
+  const presets = readPresetTokens(options.compose, options.preset);
 
   if (!listPresets && presets.length === 0) {
     throw new CliError(
-      "nothing to run — pass --preset <name|path> or --chain <a,b,c>. Run `harness --list-presets` to see what ships.",
+      "nothing to run — pass --preset <name|path> or --compose <a,b,c>. Run `harness --list-presets` to see what ships.",
     );
   }
   if (options.input !== undefined && options.inputFile !== undefined) {
@@ -228,7 +239,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
     input: options.input,
     inputFile: options.inputFile,
     listPresets,
-    tokensPerBurst: options.tokens,
+    tokensPerTurn: options.tokens,
     budgetUsd: options.budget,
     totalBudgetUsd: options.totalBudget,
     model: options.model,
@@ -240,18 +251,18 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 }
 
 function readPresetTokens(
-  chain: string | undefined,
+  compose: string | undefined,
   preset: string | undefined,
 ): string[] {
-  if (chain !== undefined) {
-    const tokens = chain
+  if (compose !== undefined) {
+    const tokens = compose
       .split(",")
       .map((entry) => entry.trim())
       .filter((entry) => entry !== "");
 
     if (tokens.length === 0) {
       throw new CliError(
-        "--chain needs at least one preset — for example --chain code-review,pre-mortem.",
+        "--compose needs at least one preset — for example --compose code-review,pre-mortem.",
       );
     }
 
@@ -322,9 +333,9 @@ function describeLoadFailure(token: string, error: Error): string {
 function applyOverrides(preset: PresetConfig, args: CliArgs): PresetConfig {
   const overridden: PresetConfig = {
     ...preset,
-    ...(args.tokensPerBurst === undefined
+    ...(args.tokensPerTurn === undefined
       ? {}
-      : { tokensPerBurst: args.tokensPerBurst }),
+      : { tokensPerTurn: args.tokensPerTurn }),
     ...(args.budgetUsd === undefined ? {} : { budgetUsd: args.budgetUsd }),
     ...(args.model === undefined ? {} : { model: args.model }),
     ...(args.temperature === undefined
@@ -453,6 +464,38 @@ function wrap(body: string, indent: string): string[] {
 }
 
 /**
+ * What stops a preset, and what it is expected to cost getting there.
+ *
+ * The line this replaces printed `$2.00` and nothing else, which reads as a
+ * price and is a ceiling — and on the presets whose turn count runs out first,
+ * a ceiling the run never approaches. So the ceiling is labelled as one, the
+ * expected spend sits beside it, and the limit that actually ends the run is
+ * named. `estimateRun` replays the chain's own stopping rules rather than
+ * guessing; see `../../core/estimate.js` for what it assumes.
+ */
+function renderPresetLimits(preset: PresetConfig): string {
+  let estimate: RunEstimate;
+  try {
+    estimate = estimateRun(preset, resolvePresetPricing(preset));
+  } catch {
+    // A model with no published rate. The ceilings are still worth printing;
+    // the estimate is not available and is not invented.
+    return `    stops on: whichever comes first — ${preset.maxIterations} turns, or the ${dollars(preset.budgetUsd)} cap`;
+  }
+
+  const reason =
+    estimate.limit === "iterations"
+      ? `the turn ceiling, at ${plural(estimate.turns, "turn")}`
+      : `the budget, after about ${plural(estimate.turns, "turn")}`;
+  const cap =
+    estimate.limit === "iterations"
+      ? `, well under the ${dollars(preset.budgetUsd)} cap`
+      : ` of the ${dollars(preset.budgetUsd)} cap`;
+
+  return `    stops on: ${reason} — expect about ${dollars(estimate.expectedUsd)}${cap}`;
+}
+
+/**
  * `--list-presets`, rendered from each preset's own `meta`.
  *
  * Nothing here is a second description of a preset kept alongside the preset.
@@ -470,16 +513,31 @@ export function renderPresetList(): string {
     }
     lines.push(
       pc.dim(
-        `    ${preset.personas.length} personas · up to ${preset.maxIterations} bursts · $${preset.budgetUsd.toFixed(2)} · ${preset.model}`,
+        `    ${preset.personas.length} personas · ${preset.tokensPerTurn} tokens a turn · ${preset.model}`,
       ),
     );
+    lines.push(pc.dim(renderPresetLimits(preset)));
     lines.push("");
   }
+
+  for (const line of wrap(
+    "The dollar figure is a ceiling, not a price: the chain refuses to start a turn it cannot pay for alongside the closing document it still owes. The expected figure assumes an empty input and every turn using its full token allowance, so a real run on a long subject sits at or above it.",
+    "",
+  )) {
+    lines.push(pc.dim(line));
+  }
+  lines.push("");
 
   lines.push(pc.dim("A path to a preset JSON file works anywhere an id does:"));
   lines.push(
     pc.dim('  harness --preset ./presets/custom/dream.json --input "…"'),
   );
+  for (const line of wrap(
+    'That file is deliberately unusual — three tokens a turn, where every built-in above uses several hundred — because for that preset the fragment is the whole artefact. Copy it for the shape of a preset file, not for its numbers. The README\'s "Writing a preset" section carries an annotated template with conventional ones.',
+    "",
+  )) {
+    lines.push(pc.dim(line));
+  }
   lines.push("");
 
   return lines.join("\n");
@@ -503,11 +561,26 @@ const DRY_RUN_PRICING: TokenPricing = {
   outputPerMillion: 15,
 };
 
-function cannedBurst(agent: string): string {
+/**
+ * Said once, before the first figure appears.
+ *
+ * Two things make an offline cost fictional rather than approximate, and both
+ * are worth naming where someone is about to read dollars off a screen: every
+ * model is billed at one nominal rate regardless of what the preset names, and
+ * the canned answer is a fixed paragraph that ignores `tokensPerTurn` entirely.
+ * So the figures do not compare between presets and do not compare to a live
+ * run. What they *do* is move, which is the whole reason a dry run bills at all
+ * — a ledger that never moves never reaches the condition the chain terminates
+ * on, and the offline path would stop exercising the path it exists to exercise.
+ */
+const DRY_RUN_COST_NOTICE =
+  "Costs below are fictional: every model bills at one nominal rate and the canned answers ignore each preset's tokens-per-turn, so they compare neither between presets nor to a live run. Use --list-presets for what a real run is expected to cost.";
+
+function cannedTurn(agent: string): string {
   return [
     `(dry run — ${agent})`,
     "",
-    "No provider was called. This paragraph stands in for a persona's burst so the run exercises the same transcript, the same ledger, and the same termination path a live one does. It is this long on purpose: the offline runner reports token usage proportional to the text it produces, and a chain whose spend never moves is a chain that only ever stops on the iteration backstop.",
+    "No provider was called. This paragraph stands in for a persona's turn so the run exercises the same transcript, the same ledger, and the same termination path a live one does. It is this long on purpose: the offline runner reports token usage proportional to the text it produces, and a chain whose spend never moves is a chain that only ever stops on the iteration backstop.",
   ].join("\n");
 }
 
@@ -532,7 +605,7 @@ function dryRunOptions(presets: readonly PresetConfig[]): HarnessOptions {
 
   for (const preset of presets) {
     for (const persona of preset.personas) {
-      responses[persona.name] = cannedBurst(persona.name);
+      responses[persona.name] = cannedTurn(persona.name);
     }
     responses[preset.synthesizer.name] = cannedSynthesis(
       preset.synthesizer.name,
@@ -574,7 +647,7 @@ function installInterrupt(
 
     if (count === 1) {
       notify(
-        "Interrupt — finishing the burst in flight, then synthesizing. Press Ctrl-C again to exit now.",
+        "Interrupt — finishing the turn in flight, then synthesizing. Press Ctrl-C again to exit now.",
       );
       controller.abort();
 
@@ -600,7 +673,9 @@ async function execute(
 ): Promise<void> {
   const shared = {
     ...providerOptions(presets, args),
-    outputDir: args.outDir,
+    // The command line is where the filesystem enters. Nothing under
+    // `../../core/` knows there is one — see `../node/transcript.js`.
+    transcripts: createFileTranscriptStore({ dir: args.outDir }),
     onEvent,
     signal,
   };
@@ -609,7 +684,7 @@ async function execute(
   if (presets.length === 1 && only !== undefined) {
     if (args.totalBudgetUsd !== undefined) {
       throw new CliError(
-        "--total-budget is the ceiling across a --chain's steps. With a single --preset there is one step, and --budget is its ceiling.",
+        "--total-budget is the ceiling across a --compose's steps. With a single --preset there is one step, and --budget is its ceiling.",
       );
     }
 
@@ -624,7 +699,7 @@ async function execute(
     return;
   }
 
-  await runChain(presets, input, {
+  await runComposition(presets, input, {
     ...shared,
     ...(args.totalBudgetUsd === undefined
       ? {}
@@ -681,13 +756,17 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     const input = await resolveInput(args);
 
     intro(pc.inverse(pc.bold(" harness ")));
+    // Ahead of the first cost on screen, because that is the figure it is about.
+    if (args.dryRun) {
+      log.warn(DRY_RUN_COST_NOTICE);
+    }
     uninstall = installInterrupt(controller, (message) => log.warn(message));
 
     await execute(
       presets,
       input,
       args,
-      createRenderer({ verbose: args.verbose, write }),
+      createRenderer({ verbose: args.verbose, dryRun: args.dryRun, write }),
       controller.signal,
     );
 

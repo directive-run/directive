@@ -25,7 +25,7 @@
  *    interpreting the bytes, not the bytes existing, and a stored artefact that
  *    silently differs from what the model produced is its own problem.
  * 3. **Prompts** — {@link createFenceToken}, {@link stripToken}, {@link fence}.
- *    Every persona reads every earlier burst, so model output becomes text a
+ *    Every persona reads every earlier turn, so model output becomes text a
  *    later model reads. Quoted material is wrapped in tags carrying a random
  *    per-run marker, and the marker is stripped from the material first, so
  *    quoted text cannot close its own fence or open a convincing one.
@@ -383,14 +383,14 @@ function quoteAttribute(value: string): string {
  * Wrap quoted material in a fence nothing inside it can forge.
  *
  * The tag name carries the run's marker and the marker is stripped from the
- * body first, so a burst cannot close the fence early, cannot open a second
+ * body first, so a turn cannot close the fence early, cannot open a second
  * one, and cannot fabricate the structure that separates one turn from the
  * next. Escaping the material instead was the alternative and was rejected:
  * this package is routinely pointed at code, and an artefact arriving with its
  * angle brackets rewritten is an artefact the analysis is now wrong about.
  *
  * **Residual.** This makes the *structure* unforgeable, not the content
- * harmless. Every burst is read by every later persona and by the synthesizer,
+ * harmless. Every turn is read by every later persona and by the synthesizer,
  * so a persona can still be argued with, misled, or talked into a tangent by
  * what an earlier one wrote — a shared transcript is the entire mechanic of the
  * package and there is no version of it where earlier output does not influence

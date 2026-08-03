@@ -2,8 +2,9 @@
  * Assembling a chain: preset in, running harness out.
  *
  * Everything here is wiring. The decisions all live in `./module.js`; this file
- * builds a transcript, a runner chain, an event fan-out, and a Directive system
- * over them, and hands back three things a surface can use.
+ * opens a transcript on whatever store it was given, builds a runner chain and
+ * an event fan-out, puts a Directive system over them, and hands back three
+ * things a surface can use.
  *
  * @module
  */
@@ -16,26 +17,22 @@ import {
   devtoolsPlugin,
   loggingPlugin,
 } from "@directive-run/core/plugins";
-import { createHarnessAgents, minimumBudgetUsd } from "./agents.js";
+import { createHarnessAgents } from "./agents.js";
 import type {
   ChainPhase,
   HarnessEvent,
   HarnessEventSink,
   StopReason,
 } from "./events.js";
-import {
-  type ChainDerived,
-  type DerivedReader,
-  createHarnessModule,
-} from "./module.js";
+import { createHarnessChain } from "./module.js";
 import { assertPreset } from "./preset-registry.js";
 import type { PresetConfig } from "./preset-types.js";
 import { MAX_RUN_ID_LENGTH, assertSafeIdentifier } from "./safety.js";
 import {
   type Transcript,
+  type TranscriptStore,
+  createMemoryTranscriptStore,
   createRunId,
-  createTranscript,
-  defaultTranscriptDir,
 } from "./transcript.js";
 
 // ============================================================================
@@ -56,14 +53,22 @@ export interface HarnessOptions {
   retry?: RetryConfig;
   /** Alternate Anthropic base URL. Ignored when `runner` is supplied. */
   baseURL?: string;
-  /** Where the transcript and its sidecar are written. @default `./.ai-harness` */
-  outputDir?: string;
   /**
-   * Names this run and its two files. Generated when omitted.
+   * Where this run's artefacts go.
    *
-   * Constrained to letters, digits, dot, dash, and underscore, because it ends
-   * up in a filename. A run ID whose files already exist is refused rather than
-   * half-overwritten — see `./transcript.js`.
+   * Defaults to an in-memory store, so nothing here touches a disk unless the
+   * caller says where. Files are one argument away —
+   * `createFileTranscriptStore({ dir })`, which is what the command line
+   * supplies for `--out-dir`. A server surface supplies its own and the chain is
+   * none the wiser.
+   */
+  transcripts?: TranscriptStore;
+  /**
+   * Names this run and its two artefacts. Generated when omitted.
+   *
+   * Constrained to letters, digits, dot, dash, and underscore, because a store
+   * may turn it into a filename. The filesystem store refuses a run ID whose
+   * files already exist rather than half-overwriting them.
    */
   runId?: string;
   /** Where the event stream goes. */
@@ -87,7 +92,7 @@ export interface HarnessRunResult {
   runId: string;
   phase: Extract<ChainPhase, "complete" | "failed">;
   stopReason: StopReason;
-  /** Bursts that completed. */
+  /** Turns that completed. */
   iterations: number;
   spentUsd: number;
   budgetUsd: number;
@@ -97,7 +102,7 @@ export interface HarnessRunResult {
    * Whether `synthesis` is empty because the chain could not pay for it.
    *
    * Distinct from a synthesis that failed (`phase: "failed"`) and from one that
-   * never came due (no bursts ran). A caller that treats an empty synthesis as
+   * never came due (no turns ran). A caller that treats an empty synthesis as
    * an error should check this first — this one is the budget working, not
    * breaking.
    */
@@ -120,7 +125,7 @@ export interface Harness {
   /** Run the chain to completion. One run per harness. */
   run(input: string): Promise<HarnessRunResult>;
   /**
-   * Stop the chain after the burst in flight.
+   * Stop the chain after the turn in flight.
    *
    * Flips one fact. The chain still synthesizes — an interrupt asks for the
    * closing document early, it does not throw away the transcript.
@@ -150,19 +155,17 @@ export function createHarnessSystem(
 ): Harness {
   const validated = assertPreset(preset, "createHarnessSystem(preset)");
   const now = options.now ?? Date.now;
-  // A caller-supplied run ID names the files this run writes, so it is held to
-  // the same rule the preset's own `id` is. The transcript asserts containment
-  // again below; this one is here so the refusal names the option that caused it.
+  // A caller-supplied run ID may become a filename, so it is held to the same
+  // rule the preset's own `id` is. The filesystem store asserts containment
+  // again when it opens; this one is here so the refusal names the option that
+  // caused it, whether or not the store in force writes anything.
   const runId =
     options.runId === undefined
       ? createRunId(now)
       : assertSafeIdentifier(options.runId, "runId", MAX_RUN_ID_LENGTH);
 
-  const transcript = createTranscript({
-    dir: options.outputDir ?? defaultTranscriptDir(),
-    runId,
-    now,
-  });
+  const store = options.transcripts ?? createMemoryTranscriptStore();
+  const transcript = store.open({ runId });
 
   // Every event goes through one fan-out. `run()` subscribes to it the same way
   // a surface does, rather than reaching for a second completion signal — one
@@ -172,15 +175,41 @@ export function createHarnessSystem(
   if (options.onEvent) {
     listeners.add(options.onEvent);
   }
+  /**
+   * Guards the one recursion this fan-out can produce.
+   *
+   * A listener that throws is reported on the same channel every other problem
+   * is reported on — this file has no console of its own, because the event
+   * stream is the whole point of the event stream and a surface that swapped
+   * stdout for a socket would never see a `console.error`. Which means the
+   * report is itself an event, delivered to the listener that just threw. One
+   * level deep is a report; two is a loop, so the second level is dropped.
+   */
+  let reportingListenerFailure = false;
   const emit: HarnessEventSink = (event) => {
+    const failures: string[] = [];
+
     for (const listener of [...listeners]) {
       try {
         listener(event);
       } catch (error) {
         // A surface that throws while rendering is not the chain's problem,
         // and must not become the chain's failure.
-        console.error("[ai-harness] event listener threw:", error);
+        failures.push(error instanceof Error ? error.message : String(error));
       }
+    }
+
+    if (failures.length === 0 || reportingListenerFailure) {
+      return;
+    }
+
+    reportingListenerFailure = true;
+    try {
+      for (const message of failures) {
+        emit({ type: "error", scope: "listener", message, at: now() });
+      }
+    } finally {
+      reportingListenerFailure = false;
     }
   };
 
@@ -193,49 +222,24 @@ export function createHarnessSystem(
     baseURL: options.baseURL,
   });
 
-  // Refused here rather than discovered four bursts in.
-  //
-  // A budget that cannot cover the closing document buys bursts nobody will
-  // ever read a summary of: the chain spends what it has, reaches synthesis,
-  // finds it unaffordable, and stops with a transcript and no conclusion. That
-  // is a correct outcome of the rules and a useless outcome for the operator,
-  // and it is knowable before a single call — the synthesizer's `maxTokens` and
-  // the model's output rate are both in hand right now.
-  const floor = minimumBudgetUsd(validated, agents.pricing);
-  if (validated.budgetUsd < floor) {
-    throw new Error(
-      `[ai-harness] budgetUsd of $${validated.budgetUsd.toFixed(4)} cannot pay for this preset's closing document, which prices at $${floor.toFixed(4)} (${validated.synthesizer.maxTokens} output tokens at $${agents.pricing.outputPerMillion}/M). The chain would spend the budget on bursts and then have nothing left to summarise them with. Raise the budget above $${floor.toFixed(4)}, or lower \`synthesizer.maxTokens\`.`,
-    );
-  }
-
-  // Bound after `createSystem` and before `start()`. Constraints and effects
-  // read derivations through this because the facts proxy they are handed does
-  // not carry them; the read still goes through the derivation proxy, so it is
-  // tracked exactly like a fact read.
-  const binding: { derived?: ChainDerived } = {};
-  const readDerived: DerivedReader = (key) => {
-    const derived = binding.derived;
-    if (derived === undefined) {
-      throw new Error(
-        "[ai-harness] a derivation was read before the system was bound — createHarnessSystem binds it between createSystem() and start().",
-      );
-    }
-
-    return derived[key];
-  };
-
-  const module = createHarnessModule({
+  // The chain checks the budget floor itself — see `createHarnessChain`, which
+  // is the door a composing caller comes through too.
+  const chain = createHarnessChain({
     preset: validated,
     runId,
     transcript,
     agents,
     emit,
-    readDerived,
     now,
   });
 
-  const system = createSystem({ module, plugins: buildPlugins(options) });
-  binding.derived = system.derive;
+  const system = createSystem({
+    module: chain.module,
+    plugins: buildPlugins(options),
+  });
+  // The single-module form, so no namespace. The multi-module form is the whole
+  // reason `bind` takes one — see `HarnessChain.bind`.
+  chain.bind(system);
   system.start();
 
   let consumed = false;
@@ -271,8 +275,6 @@ export function createHarnessSystem(
         );
       }
       consumed = true;
-
-      transcript.setInput(input);
 
       const finished = new Promise<void>((resolve) => {
         const onComplete: HarnessEventSink = (event: HarnessEvent) => {

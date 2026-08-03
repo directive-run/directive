@@ -1,23 +1,23 @@
 /**
  * A retry replays a response. The transcript must not replay with it.
  *
- * This is the reason bursts are buffered rather than appended per token. The
+ * This is the reason turns are buffered rather than appended per token. The
  * bug being guarded against is quiet: the transcript ends up holding the
- * abandoned half of a burst followed by the whole of it, as one contribution,
+ * abandoned half of a turn followed by the whole of it, as one contribution,
  * and every persona downstream reads that as context. Nothing errors, nothing
  * is missing, and the review just gets slightly worse.
  */
 
 import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createFileTranscriptStore } from "../adapters/node/transcript.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { createHarnessSystem } from "../core/system.js";
-import { createTranscript } from "../core/transcript.js";
 import {
   type Scratch,
-  cannedBurst,
   cannedResponses,
+  cannedTurn,
   createScratch,
   testPreset,
 } from "./fixtures.js";
@@ -38,7 +38,7 @@ describe("transcript", () => {
     await scratch.cleanup();
   });
 
-  it("holds one copy of a burst that was retried mid-stream", async () => {
+  it("holds one copy of a turn that was retried mid-stream", async () => {
     const events: HarnessEvent[] = [];
     const preset = testPreset({ budgetUsd: 100, maxIterations: 3 });
 
@@ -49,13 +49,13 @@ describe("transcript", () => {
           // A fixed string rather than a cycling script: the replay returns
           // byte-for-byte what the failed attempt was delivering, which is what
           // a real provider does and what makes "exactly one copy" meaningful.
-          alpha: cannedBurst("alpha", 1),
+          alpha: cannedTurn("alpha", 1),
         },
         // Fail two deltas in, so the provider has already delivered text when
         // the call dies.
         failures: [{ agent: "alpha", call: 1, afterDeltas: 2 }],
       }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       runId: "retry-run",
       retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 },
       onEvent: (event) => events.push(event),
@@ -65,72 +65,74 @@ describe("transcript", () => {
     harness.system.destroy();
 
     // The retry really did happen, and really did replay.
-    const restarts = events.filter((event) => event.type === "burst:restarted");
+    const restarts = events.filter((event) => event.type === "turn:restarted");
     expect(restarts).toHaveLength(1);
     expect(restarts[0]?.iteration).toBe(0);
     expect(result.stopReason).toBe("max-iterations");
     expect(result.iterations).toBe(3);
 
-    // One committed burst per iteration — the failed attempt committed nothing.
-    const bursts = harness.transcript.bursts();
-    expect(bursts).toHaveLength(3);
-    expect(bursts[0]?.persona).toBe("alpha");
+    // One committed turn per iteration — the failed attempt committed nothing.
+    const turns = harness.transcript.turns();
+    expect(turns).toHaveLength(3);
+    expect(turns[0]?.persona).toBe("alpha");
 
-    // And the surviving text is exactly one burst, not one and a half.
-    const expected = cannedBurst("alpha", 1);
-    expect(bursts[0]?.text).toBe(expected);
+    // And the surviving text is exactly one turn, not one and a half.
+    const expected = cannedTurn("alpha", 1);
+    expect(turns[0]?.text).toBe(expected);
 
     const markdown = await readFile(result.transcriptPath, "utf8");
     expect(countOccurrences(markdown, "end-of-alpha-1")).toBe(1);
     expect(countOccurrences(markdown, "## 1. alpha")).toBe(1);
     // The abandoned attempt's prefix appears once — as the start of the one
-    // surviving burst, not a second time ahead of it.
+    // surviving turn, not a second time ahead of it.
     expect(countOccurrences(markdown, "[alpha#1]")).toBe(1);
 
     const sidecar = await readFile(result.jsonlPath, "utf8");
     expect(sidecar.trim().split("\n")).toHaveLength(3);
   });
 
-  it("commits nothing for a burst that never completed", async () => {
+  it("commits nothing for a turn that never completed", async () => {
     const preset = testPreset({ budgetUsd: 100, maxIterations: 3 });
 
     const harness = createHarnessSystem(preset, {
       runner: createMockRunner({
         responses: cannedResponses(),
-        // Every attempt at beta's first burst fails, so it exhausts retries.
+        // Every attempt at beta's first turn fails, so it exhausts retries.
         failures: [
           { agent: "beta", call: 1, afterDeltas: 2 },
           { agent: "beta", call: 2, afterDeltas: 2 },
         ],
       }),
-      outputDir: scratch.dir,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       retry: { maxRetries: 1, baseDelayMs: 1, maxDelayMs: 2 },
     });
 
     const result = await harness.run("go");
-    const bursts = harness.transcript.bursts();
+    const turns = harness.transcript.turns();
     harness.system.destroy();
 
     // The chain cut over to synthesis on what it had rather than stalling on an
     // unmet requirement, and reported why.
     expect(result.stopReason).toBe("error");
     expect(result.iterations).toBe(1);
-    expect(bursts).toHaveLength(1);
-    expect(bursts[0]?.persona).toBe("alpha");
-    // Nothing from the failed burst leaked in.
-    expect(bursts.some((burst) => burst.persona === "beta")).toBe(false);
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.persona).toBe("alpha");
+    // Nothing from the failed turn leaked in.
+    expect(turns.some((turn) => turn.persona === "beta")).toBe(false);
     // The transcript it did have was still synthesized.
     expect(result.synthesis).toContain("SYNTHESIS");
   });
 
   it("appends the sidecar rather than rewriting it, and flushes idempotently", async () => {
-    const transcript = createTranscript({ dir: scratch.dir, runId: "flush" });
+    const transcript = createFileTranscriptStore({ dir: scratch.dir }).open({
+      runId: "flush",
+    });
     transcript.setInput("in");
 
-    transcript.beginBurst();
+    transcript.beginTurn();
     transcript.appendToken("hello ");
     transcript.appendToken("world");
-    transcript.completeBurst({
+    transcript.completeTurn({
       iteration: 0,
       persona: "alpha",
       text: "",
@@ -148,18 +150,20 @@ describe("transcript", () => {
     expect(JSON.parse(sidecar.trim()).text).toBe("hello world");
   });
 
-  it("discards the pending buffer on beginBurst, which is what a replay does", () => {
-    const transcript = createTranscript({ dir: scratch.dir, runId: "buffer" });
+  it("discards the pending buffer on beginTurn, which is what a replay does", () => {
+    const transcript = createFileTranscriptStore({ dir: scratch.dir }).open({
+      runId: "buffer",
+    });
 
-    transcript.beginBurst();
+    transcript.beginTurn();
     transcript.appendToken("abandoned half");
     expect(transcript.pending()).toBe("abandoned half");
 
-    transcript.beginBurst();
+    transcript.beginTurn();
     expect(transcript.pending()).toBe("");
 
     transcript.appendToken("the real thing");
-    const record = transcript.completeBurst({
+    const record = transcript.completeTurn({
       iteration: 0,
       persona: "alpha",
       text: "",

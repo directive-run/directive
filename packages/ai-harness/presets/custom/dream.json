@@ -11,7 +11,7 @@
   },
   "model": "claude-sonnet-4-5-20250929",
   "temperature": 0.95,
-  "tokensPerBurst": 3,
+  "tokensPerTurn": 3,
   "budgetUsd": 0.1,
   "maxIterations": 120,
   "budgetWarningThreshold": 0.8,
@@ -67,7 +67,7 @@
       }
     }
   ],
-  "promptTemplate": "The idea:\n\n<idea>\n{{input}}\n</idea>\n\nThe conversation so far:\n\n<conversation>\n{{transcript}}\n</conversation>\n\nYour turn as the {{persona}} (round {{iteration}}). Say what only you would say, and build on what came before rather than starting over. Roughly {{tokensPerBurst}} tokens.",
+  "promptTemplate": "The idea:\n\n<idea>\n{{input}}\n</idea>\n\nThe conversation so far:\n\n<conversation>\n{{transcript}}\n</conversation>\n\nYour turn as the {{persona}} (round {{iteration}}). Say what only you would say, and build on what came before rather than starting over. Roughly {{tokensPerTurn}} tokens.",
   "synthesizer": {
     "name": "dream-report",
     "systemPrompt": "You turn a conversation between unlike voices into one page that keeps what each of them contributed. You do not average them into a consensus, and you say plainly where they disagreed.",

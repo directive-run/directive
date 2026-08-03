@@ -6,7 +6,7 @@
  * ("marketing", "engineering") produce five people describing the same idea in
  * their own vocabulary; approaches produce five different ideas.
  *
- * Seven bursts over five angles means two of them get a second turn, which is
+ * Seven turns over five angles means two of them get a second turn, which is
  * where the combining happens: the second pass is reading four other angles
  * rather than a blank page.
  *
@@ -26,7 +26,7 @@ export const brainstormPreset: PresetConfig = {
   },
   model: "claude-sonnet-4-5-20250929",
   temperature: 0.9,
-  tokensPerBurst: 450,
+  tokensPerTurn: 450,
   budgetUsd: 0.1,
   maxIterations: 7,
   budgetWarningThreshold: 0.8,
@@ -77,7 +77,7 @@ export const brainstormPreset: PresetConfig = {
     "{{transcript}}",
     "</session>",
     "",
-    "Your turn as the {{persona}} voice (round {{iteration}}). Add ideas nobody has put on the table yet, in your particular way of looking. Do not evaluate the others except where evaluating them produces a new idea. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as the {{persona}} voice (round {{iteration}}). Add ideas nobody has put on the table yet, in your particular way of looking. Do not evaluate the others except where evaluating them produces a new idea. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

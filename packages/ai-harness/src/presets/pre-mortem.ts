@@ -6,7 +6,7 @@
  * which reliably surfaces objections that a forward-looking review talks itself
  * out of.
  *
- * Short by design. Five bursts over four personas is one full round plus the
+ * Short by design. Five turns over four personas is one full round plus the
  * engineer coming back to answer the other three, and a pre-mortem that runs
  * longer than that starts inventing failures rather than finding them.
  *
@@ -26,7 +26,7 @@ export const preMortemPreset: PresetConfig = {
   },
   model: "claude-sonnet-4-5-20250929",
   temperature: 0.7,
-  tokensPerBurst: 500,
+  tokensPerTurn: 500,
   budgetUsd: 0.1,
   maxIterations: 5,
   budgetWarningThreshold: 0.8,
@@ -71,7 +71,7 @@ export const preMortemPreset: PresetConfig = {
     "{{transcript}}",
     "</postmortem>",
     "",
-    "It is your turn as {{persona}} (round {{iteration}}). Add the failure only you would have seen coming. Say what happened, in what order, and what the earliest visible sign was. Be specific and be brief — roughly {{tokensPerBurst}} tokens.",
+    "It is your turn as {{persona}} (round {{iteration}}). Add the failure only you would have seen coming. Say what happened, in what order, and what the earliest visible sign was. Be specific and be brief — roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

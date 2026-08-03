@@ -31,8 +31,8 @@ export interface MockFailure {
   /** Which call to that agent fails, 1-based. */
   call: number;
   /**
-   * Deltas to stream before throwing, so the failure lands mid-burst — the
-   * case that would duplicate a burst if the transcript appended per token.
+   * Deltas to stream before throwing, so the failure lands mid-turn — the
+   * case that would duplicate a turn if the transcript appended per token.
    * @default 1
    */
   afterDeltas?: number;

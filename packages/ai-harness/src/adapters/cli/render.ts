@@ -6,14 +6,14 @@
  * something belongs on screen and is not in the union, the union is what
  * changes.
  *
- * ## Why finished bursts and not deltas
+ * ## Why finished turns and not deltas
  *
- * The default renderer prints a burst when it completes rather than streaming
- * its deltas, even though `burst:delta` is right there. A burst can be replayed
+ * The default renderer prints a turn when it completes rather than streaming
+ * its deltas, even though `turn:delta` is right there. A turn can be replayed
  * — a retry re-invokes the runner and the provider starts the response over,
- * which is what `burst:restarted` announces — and a terminal cannot unprint. A
+ * which is what `turn:restarted` announces — and a terminal cannot unprint. A
  * surface that streamed deltas would show the abandoned attempt and the real
- * one end to end as a single run-on burst, which is precisely the corruption
+ * one end to end as a single run-on turn, which is precisely the corruption
  * the transcript's pending buffer exists to prevent. The closing document
  * *does* stream, because synthesis is the last thing that happens and there is
  * nothing after it to be confused by.
@@ -48,29 +48,40 @@ import {
 export interface RendererOptions {
   /** Print the event stream structurally instead of as prose. */
   verbose: boolean;
+  /**
+   * Mark every total as offline money.
+   *
+   * A dry run bills at one nominal rate for every model and answers with a
+   * fixed paragraph that ignores `tokensPerTurn`, so its figures compare
+   * neither between presets nor to a live run. The command line says so once
+   * before the run starts; this is what keeps the closing totals — the figures
+   * someone scrolls back to — from being read as real after that line has
+   * scrolled away. @default false
+   */
+  dryRun?: boolean;
   /** Where output goes. Injected so the renderer is testable without a TTY. */
   write: (text: string) => void;
 }
 
-/** Four decimal places, which is where a per-burst cost lives. */
+/** Four decimal places, which is where a per-turn cost lives. */
 function money(value: number, places = 4): string {
   return `$${value.toFixed(places)}`;
 }
 
 /**
- * A budget, at enough precision to be the number the operator typed.
+ * A dollar figure, at enough precision to be the number the operator typed.
  *
  * Two places reads well for the dollar-ish budgets the built-ins carry, and
  * rounds `--budget 0.005` to `$0.01` — printing a ceiling twice the one in
  * force, beside a spend figure at four places that appears to be under it.
  * Cents when it is cents.
  */
-function budget(value: number): string {
+export function dollars(value: number): string {
   return money(value, value >= 0.1 ? 2 : 4);
 }
 
-/** `1 burst`, `3 bursts`. */
-function plural(count: number, noun: string): string {
+/** `1 turn`, `3 turns`. */
+export function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
@@ -81,7 +92,7 @@ function plural(count: number, noun: string): string {
 const MAX_FIELD_CHARS = 80;
 
 /** Token-level events, omitted from `--verbose`. See the module note. */
-const TOKEN_EVENTS = new Set(["burst:delta", "synthesis:chunk"]);
+const TOKEN_EVENTS = new Set(["turn:delta", "synthesis:chunk"]);
 
 function renderValue(value: unknown): string {
   if (Array.isArray(value)) {
@@ -106,7 +117,7 @@ function renderValue(value: unknown): string {
  * The two token-level events are the exception — one line per twenty-four
  * characters of model output is not a structural view of anything, and a
  * `--verbose` that scrolled them past would be less legible than the default.
- * `burst:restarted` is kept, because that is the one a delta consumer needs.
+ * `turn:restarted` is kept, because that is the one a delta consumer needs.
  */
 function renderVerbose(event: HarnessEvent): string | undefined {
   if (TOKEN_EVENTS.has(event.type)) {
@@ -133,58 +144,60 @@ function safe(value: string): string {
 function renderProse(
   event: HarnessEvent,
   stream: (chunk: string) => string,
+  /** Appended to every total, so an offline figure is never read as a real one. */
+  costCaveat: string,
 ): string | undefined {
   switch (event.type) {
     case "composition:started":
-      return pc.dim(`chain: ${event.presets.map(safe).join(" → ")}\n\n`);
+      return pc.dim(`composition: ${event.presets.map(safe).join(" → ")}\n\n`);
 
     case "composition:step:started":
       return `${pc.bold(pc.magenta(`[${event.step}/${event.total}] ${safe(event.presetId)}`))}\n`;
 
     case "composition:step:complete":
       return pc.dim(
-        `  step ${event.step} done — ${plural(event.iterations, "burst")}, ${money(event.spentUsd)}, ${safe(event.transcriptPath)}\n\n`,
+        `  step ${event.step} done — ${plural(event.iterations, "turn")}, ${money(event.spentUsd)}, ${safe(event.transcriptPath)}\n\n`,
       );
 
     case "chain:started":
       return pc.dim(
-        `  ${event.personas.map(safe).join(" · ")}\n  budget ${budget(event.budgetUsd)} → ${safe(event.transcriptPath)}\n\n`,
+        `  ${event.personas.map(safe).join(" · ")}\n  budget ${dollars(event.budgetUsd)} → ${safe(event.transcriptPath)}\n\n`,
       );
 
-    case "burst:restarted":
+    case "turn:restarted":
       return pc.dim(
-        `  ↻ ${safe(event.persona)} restarting burst ${event.iteration + 1} — ${safe(event.reason)}\n`,
+        `  ↻ ${safe(event.persona)} restarting turn ${event.iteration + 1} — ${safe(event.reason)}\n`,
       );
 
-    case "burst:completed":
+    case "turn:completed":
       return `${pc.cyan(`${event.iteration + 1}. ${safe(event.persona)}`)} ${pc.dim(money(event.costUsd))}\n\n${safe(event.text).trim()}\n\n`;
 
     case "budget:warning":
-      return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${budget(event.budgetUsd)})`)}\n\n`;
+      return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${dollars(event.budgetUsd)})`)}\n\n`;
 
     case "budget:synthesis-skipped":
-      return `${pc.yellow("  no closing document —")} ${pc.dim(`the synthesis prices at ${money(event.reserveUsd)} and only ${money(event.remainingUsd)} of ${budget(event.budgetUsd)} is left. The ${plural(event.iterations, "burst")} above ${event.iterations === 1 ? "is" : "are"} the whole run; raise the budget for a summary of them.`)}\n\n`;
+      return `${pc.yellow("  no closing document —")} ${pc.dim(`the synthesis prices at ${money(event.reserveUsd)} and only ${money(event.remainingUsd)} of ${dollars(event.budgetUsd)} is left. The ${plural(event.iterations, "turn")} above ${event.iterations === 1 ? "is" : "are"} the whole run; raise the budget for a summary of them.`)}\n\n`;
 
     case "synthesis:started":
-      return `${pc.bold(pc.green("synthesis"))} ${pc.dim(`after ${plural(event.iteration, "burst")} — stopped on ${event.stopReason || "settled"}`)}\n\n`;
+      return `${pc.bold(pc.green("synthesis"))} ${pc.dim(`after ${plural(event.iteration, "turn")} — stopped on ${event.stopReason || "settled"}`)}\n\n`;
 
     case "synthesis:chunk":
       return stream(event.text);
 
     case "error":
-      return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` burst ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;
+      return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` turn ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;
 
     case "chain:complete":
       return pc.dim(
-        `\n\n  ${plural(event.iterations, "burst")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} · stopped on ${event.stopReason || "settled"}\n  ${safe(event.transcriptPath)}\n\n`,
+        `\n\n  ${plural(event.iterations, "turn")} · ${money(event.spentUsd)} of ${dollars(event.budgetUsd)}${costCaveat} · stopped on ${event.stopReason || "settled"}\n  ${safe(event.transcriptPath)}\n\n`,
       );
 
     case "composition:budget-exhausted":
-      return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${safe(event.presetId)})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${budget(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;
+      return `${pc.yellow(`  stopping before step ${event.step}/${event.total} (${safe(event.presetId)})`)} ${pc.dim(`— ${money(event.spentUsd)} of ${dollars(event.budgetUsd)} spent, and that step needs at least ${money(event.requiredUsd)}. Raise --total-budget to run the rest.`)}\n\n`;
 
     case "composition:complete":
       return pc.dim(
-        `  ${plural(event.steps, "step")} · ${money(event.spentUsd)} of ${budget(event.budgetUsd)} total${event.interrupted ? " · interrupted" : ""}${event.budgetExhausted ? " · budget exhausted" : ""}\n  ${safe(event.combinedPath)}\n`,
+        `  ${plural(event.steps, "step")} · ${money(event.spentUsd)} of ${dollars(event.budgetUsd)} total${costCaveat}${event.interrupted ? " · interrupted" : ""}${event.budgetExhausted ? " · budget exhausted" : ""}\n  ${safe(event.combinedPath)}\n`,
       );
 
     default:
@@ -200,6 +213,7 @@ export function createRenderer(
   options: RendererOptions,
 ): (event: HarnessEvent) => void {
   const { verbose, write } = options;
+  const costCaveat = options.dryRun === true ? " (dry-run pricing)" : "";
   // One sanitizer for the whole run, because the closing document arrives in
   // pieces and a sequence can be split across two of them. Anything held at the
   // end of a chunk is an incomplete sequence, so it is released — as nothing —
@@ -216,7 +230,7 @@ export function createRenderer(
 
     const text = verbose
       ? renderVerbose(event)
-      : renderProse(event, (chunk) => synthesis.push(chunk));
+      : renderProse(event, (chunk) => synthesis.push(chunk), costCaveat);
 
     if (text !== undefined && text !== "") {
       write(text);

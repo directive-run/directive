@@ -41,7 +41,7 @@ export const moonshotPreset: PresetConfig = {
   },
   model: "claude-sonnet-4-5-20250929",
   temperature: 0.95,
-  tokensPerBurst: 500,
+  tokensPerTurn: 500,
   budgetUsd: 0.3,
   maxIterations: 50,
   budgetWarningThreshold: 0.8,
@@ -98,7 +98,7 @@ export const moonshotPreset: PresetConfig = {
     "{{transcript}}",
     "</exploration>",
     "",
-    "Your turn as {{persona}} (round {{iteration}}). Add directions from your angle that the transcript does not already have. Everything here is a candidate for an expert to evaluate, so state each one as a hypothesis and say what would show it wrong. Do not assert a factual, clinical, or empirical result. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as {{persona}} (round {{iteration}}). Add directions from your angle that the transcript does not already have. Everything here is a candidate for an expert to evaluate, so state each one as a hypothesis and say what would show it wrong. Do not assert a factual, clinical, or empirical result. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

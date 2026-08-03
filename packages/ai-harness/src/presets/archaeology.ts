@@ -29,7 +29,7 @@ export const archaeologyPreset: PresetConfig = {
   },
   model: "claude-haiku-4-5",
   temperature: 0.4,
-  tokensPerBurst: 600,
+  tokensPerTurn: 600,
   budgetUsd: 0.2,
   maxIterations: 30,
   budgetWarningThreshold: 0.8,
@@ -74,7 +74,7 @@ export const archaeologyPreset: PresetConfig = {
     "{{transcript}}",
     "</findings>",
     "",
-    "Your turn as {{persona}} (round {{iteration}}). Add what your angle sees that the transcript does not have yet, and point at specific files, modules, or symbols. Where the material does not support a conclusion, say so instead of assuming the usual shape. Roughly {{tokensPerBurst}} tokens.",
+    "Your turn as {{persona}} (round {{iteration}}). Add what your angle sees that the transcript does not have yet, and point at specific files, modules, or symbols. Where the material does not support a conclusion, say so instead of assuming the usual shape. Roughly {{tokensPerTurn}} tokens.",
   ].join("\n"),
 
   synthesizer: {

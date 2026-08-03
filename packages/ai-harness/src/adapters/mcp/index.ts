@@ -10,13 +10,13 @@
  *
  * - **Tools.** `harness_run(preset, input, overrides?)` and
  *   `harness_chain(presets[], input, overrides?)` wrap `runHarness` and
- *   `runChain`. `harness_presets()` lists `PRESET_LIST` from each preset's
+ *   `runComposition`. `harness_presets()` lists `PRESET_LIST` from each preset's
  *   `meta`, exactly as `--list-presets` does.
  * - **Progress.** MCP progress notifications map from `HarnessEvent`:
- *   `burst:started` and `burst:completed` carry the fraction
+ *   `turn:started` and `turn:completed` carry the fraction
  *   `iteration / maxIterations`, `cost:updated` and `budget:warning` carry
  *   spend, and `composition:step:started` names the step of a chain. The token
- *   events (`burst:delta`, `synthesis:chunk`) have no progress meaning and are
+ *   events (`turn:delta`, `synthesis:chunk`) have no progress meaning and are
  *   dropped rather than throttled.
  * - **Result.** The tool returns the synthesis text plus the transcript paths
  *   from `chain:complete` — the same fields `HarnessRunResult` carries, because
@@ -25,11 +25,16 @@
  * ## What has to be true before this is written
  *
  * Cancellation. MCP's cancellation notification has to reach `Harness.abort()`
- * — which flips the interrupt fact so the burst in flight finishes and the
+ * — which flips the interrupt fact so the turn in flight finishes and the
  * chain still synthesizes. A cancellation that tore up the request would leave
- * a transcript holding half a burst, which is the one outcome the core is built
+ * a transcript holding half a turn, which is the one outcome the core is built
  * to prevent, so this surface must not implement cancellation as a request
  * abort.
+ *
+ * Where the artefacts go is no longer one of these. A run writes through a
+ * `TranscriptStore` and defaults to the in-memory one, so a server hands it
+ * whatever it keeps runs in — or nothing, and reads the closing document off
+ * `chain:complete`.
  *
  * Nothing here reaches into the system. If this surface turns out to need a
  * field the event union does not carry, the union gets the field.

@@ -3,7 +3,7 @@
  *
  * Every case below is something the CLI can know is wrong before a provider is
  * called. The cost of getting this wrong is not a confusing message — it is a
- * run that spends four bursts of real money and then fails on a typo, with a
+ * run that spends four turns of real money and then fails on a typo, with a
  * transcript on disk nobody asked for.
  */
 
@@ -54,11 +54,11 @@ describe("cli argument parsing", () => {
     expect(parsed.dryRun).toBe(false);
   });
 
-  it("lets --chain override --preset, in order", () => {
+  it("lets --compose override --preset, in order", () => {
     const parsed = parseArgs([
       "--preset",
       "code-review",
-      "--chain",
+      "--compose",
       "research, pre-mortem ,moonshot",
       "--input",
       "x",
@@ -93,8 +93,8 @@ describe("cli argument parsing", () => {
     expect(() => parseArgs(["--input", "x"])).toThrow(/--list-presets/);
   });
 
-  it("refuses an empty --chain", () => {
-    expect(() => parseArgs(["--chain", " , ,", "--input", "x"])).toThrow(
+  it("refuses an empty --compose", () => {
+    expect(() => parseArgs(["--compose", " , ,", "--input", "x"])).toThrow(
       CliError,
     );
   });
@@ -188,7 +188,7 @@ describe("cli preset resolution", () => {
     const resolved = await resolvePresets(
       args({
         presets: ["code-review", "pre-mortem"],
-        tokensPerBurst: 120,
+        tokensPerTurn: 120,
         budgetUsd: 0.05,
         model: "claude-haiku-4-5",
         temperature: 0.1,
@@ -196,7 +196,7 @@ describe("cli preset resolution", () => {
     );
 
     for (const preset of resolved) {
-      expect(preset.tokensPerBurst).toBe(120);
+      expect(preset.tokensPerTurn).toBe(120);
       expect(preset.budgetUsd).toBe(0.05);
       expect(preset.model).toBe("claude-haiku-4-5");
       expect(preset.temperature).toBe(0.1);
@@ -267,6 +267,38 @@ describe("--list-presets", () => {
 
     expect(rendered).toContain("./presets/custom/dream.json");
   });
+
+  /**
+   * The listing used to print `$2.00` and nothing else, which reads as a price
+   * and is a ceiling — and on a preset whose turn count runs out first, a
+   * ceiling the run never approaches.
+   */
+  it("names the limit that actually stops each preset, and calls the figure a cap", () => {
+    const rendered = renderPresetList();
+
+    for (const preset of PRESET_LIST) {
+      expect(rendered).toContain(`${preset.tokensPerTurn} tokens a turn`);
+    }
+
+    // Both limits are represented across the library, and each is named.
+    expect(rendered).toContain("stops on: the budget, after about");
+    expect(rendered).toContain("stops on: the turn ceiling, at");
+    expect(rendered).toContain("expect about");
+    expect(rendered).toContain("cap");
+    expect(rendered).toContain("The dollar figure is a ceiling, not a price");
+  });
+
+  /**
+   * The shipped JSON preset is an outlier on purpose, and it is also the only
+   * JSON example and the file this listing points at for "write your own".
+   */
+  it("says the shipped example is unusual, and where a conventional one lives", () => {
+    const rendered = renderPresetList();
+
+    expect(rendered).toContain("deliberately unusual");
+    expect(rendered).toContain("three tokens a turn");
+    expect(rendered).toContain("Writing a preset");
+  });
 });
 
 describe("runCli", () => {
@@ -313,7 +345,7 @@ describe("runCli", () => {
 
   it("completes a dry-run chain of two presets with no key present", async () => {
     const code = await runCli([
-      "--chain",
+      "--compose",
       "code-review,pre-mortem",
       "--input",
       "a change worth reviewing",
@@ -345,10 +377,10 @@ describe("runCli", () => {
     expect(code).toBe(0);
     const printed = stdout.join("");
     expect(printed).toContain("chain:started");
-    expect(printed).toContain("burst:completed");
+    expect(printed).toContain("turn:completed");
     expect(printed).toContain("chain:complete");
     // Token-level events would be one line per two dozen characters.
-    expect(printed).not.toContain("burst:delta");
+    expect(printed).not.toContain("turn:delta");
   }, 30_000);
 
   it("reports a bad flag as a sentence rather than a stack", async () => {

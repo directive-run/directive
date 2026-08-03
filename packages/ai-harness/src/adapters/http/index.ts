@@ -15,18 +15,15 @@
  *   as JSON. No translation layer: the union is already free of formatting
  *   decisions, which is what makes it directly serialisable.
  * - **`GET /runs/:id`** is the terminal snapshot — the fields of
- *   `HarnessRunResult`, and for a composition, `ChainRunResult`.
+ *   `HarnessRunResult`, and for a composition, `CompositionResult`.
  * - **`DELETE /runs/:id`** calls `Harness.abort()`. It returns `202`, not
- *   `204`: the chain finishes the burst in flight and still synthesizes, so the
+ *   `204`: the chain finishes the turn in flight and still synthesizes, so the
  *   run is not over when the request returns.
  *
  * ## What has to be decided before this is written
  *
- * Three things, none of them about the chain.
+ * Two things, neither of them about the chain.
  *
- * - **Where the transcripts go.** The core writes to a directory. A server
- *   process wants object storage or a per-run temporary directory it cleans up,
- *   and the transcript's `dir` is the only seam that has to move.
  * - **Who pays.** `budgetUsd` arrives in a request body over HTTP, so it is
  *   attacker-controlled. A deployment needs a ceiling the request cannot raise,
  *   applied before `createHarness`.
@@ -34,6 +31,13 @@
  *   `Last-Event-ID` replay, or the endpoint documents that a reconnect resumes
  *   from the present and the client re-reads `GET /runs/:id` for what it
  *   missed.
+ *
+ * ## What no longer has to be decided
+ *
+ * Where the transcripts go. A run writes through a `TranscriptStore` and
+ * defaults to the in-memory one, so a server process supplies object storage, a
+ * per-run temporary directory it cleans up, or nothing at all, and the chain
+ * makes no filesystem call it was not handed. See `../../core/transcript.js`.
  *
  * @module
  */
