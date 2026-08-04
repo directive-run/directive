@@ -9,8 +9,8 @@ Spread is the ordinary way to snapshot a module's state, so the empty object did
 ```typescript
 const system = createSystem({ modules: { auth: authModule } });
 
-system.modules.auth.facts.token; // "abc" — always worked
-{ ...system.modules.auth.facts }; // {} — now { token: "abc" }
+system.facts.auth.token; // "abc" — always worked
+{ ...system.facts.auth }; // {} — now { token: "abc" }
 ```
 
 The facts proxy translates unprefixed names to the flat store's prefixed keys, and it carried traps for reading, writing, `in` and `delete` but none for enumeration. A proxy without an `ownKeys` trap enumerates as empty no matter what it holds.

@@ -75,15 +75,27 @@ function main() {
   log.header(PHASE);
 
   if (!existsSync(JSON_PATH)) {
-    log.warn("api-reference.json not found — generating placeholder");
-    writeFileSync(
-      OUTPUT,
-      "# API Skeleton\n\n> Auto-generated. Do not edit.\n\n> Source JSON not found. Build website docs first.\n",
-      "utf-8",
+    // Fail rather than write a placeholder. The placeholder was five lines and
+    // exited zero, so a release built anywhere the sibling docs checkout is
+    // absent — which is every CI runner, since the release workflow checks out
+    // this repository alone — published a stub in place of the whole API
+    // reference, to the knowledge package and to every skill copy inside the
+    // plugin.
+    //
+    // Nothing caught it: the skill-sync check compares those copies against
+    // each other, and twelve identical stubs are perfectly in sync.
+    throw new Error(
+      [
+        `[knowledge] api-reference.json not found at ${JSON_PATH}.`,
+        "",
+        "This file is the whole API skeleton. Writing a placeholder instead of",
+        "failing is how a stub reached npm, so this now stops the build.",
+        "",
+        "Locally: build the website docs, which generate it.",
+        "In CI: the release must produce or fetch api-reference.json before",
+        "building this package — it is not in this repository.",
+      ].join("\n"),
     );
-    log.done(PHASE);
-
-    return;
   }
 
   const raw = readFileSync(JSON_PATH, "utf-8");
