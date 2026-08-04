@@ -64,7 +64,7 @@ A `deps` name is resolved against the derivations the system holds when the effe
 
 The types moved with it. `DynamicEffectDef["deps"]` accepted fact keys only, so the correct code did not compile on the one API where the problem was reachable.
 
-**A dependent gated on a derivation is woken every time the derivation changes, not once.** A derivation is lazy: it is marked stale and recomputed on the next read. Marking was the point at which its dependents were told, and marking happens only on the transition from valid to stale — so if nothing read the derivation back, it stayed stale and every later fact change was a no-op for anything depending on it.
+**A dependent gated on a derivation is woken every time the derivation may have moved, not once.** A derivation is lazy: it is marked stale and recomputed on the next read. Marking was also how its dependents were told, and marking happens only on the transition from valid to stale — so if nothing read the derivation back, it stayed stale and every later fact change was a no-op for anything depending on it.
 
 The effect of that is an effect or constraint that fires exactly once and then goes quiet while the facts underneath keep moving:
 
@@ -74,15 +74,53 @@ effects: {
   watch: {
     deps: ["doubled"],
     // Reads the fact, never the derivation. Nothing here brings `doubled`
-    // back to a valid state, so nothing re-arms the announcement.
-    run: (facts) => log(facts.count),
+    // back to a valid state, so nothing re-armed the announcement.
+    run: (facts) => console.log(facts.count),
   },
 },
 ```
 
-Three changes to `count` ran this once. It was also non-deterministic in a real application, because any unrelated reader recomputing the derivation silently re-armed it — so the same code worked or did not depending on what else happened to be watching.
+Three changes to `count` ran this once; they now run it three times. It was also non-deterministic in a real application, because any unrelated reader recomputing the derivation silently re-armed it — so the same code worked or did not depending on what else happened to be watching.
 
-Staleness is still latched and still marked on the edge; what repeats is the announcement, which is the only thing anything outside the derivation graph ever sees. Listeners are unaffected — they read the value back, so they see every edge, and notifying them about a value already known stale would be the same news twice. The visible change beyond the fix is that the devtools and logging plugins emit `derivation.invalidate` once per invalidation rather than once per staleness transition.
+Two questions ride on one fact change, and they are now answered separately. *Which derivations are stale* is a state change: staleness latches, and everything downstream of a stale derivation is already stale, so marking stops at the stale frontier as it always did. *Which watched derivations may have moved* keeps being true for as long as a derivation stays stale, so it is asked once per reconcile — from the derivations whose own dependency changed, over the graph, and only for derivations something outside the graph actually watches.
+
+Listeners are unaffected: they read the value back, so they see every edge. `derivation.invalidate` on the devtools and logging plugins still fires once per valid-to-stale transition, which is what it has always meant.
+
+**A derivation dependency wakes on possible movement; a fact dependency wakes on a change.** Writing a fact its current value is not a change, and an effect declared on that fact does not run. A derivation has no value to compare at the moment its inputs move — producing one means running it, which is the one thing a lazy value cannot be made to do on its own — so a derivation dependency wakes its dependent whenever the facts underneath the derivation move, whether or not the derived value moved with them. This applies equally to a derivation named in `deps` and one picked up by auto-tracking from a `system.derive.x` read.
+
+It is invisible until the effect has a teardown, and then it is a socket closing and reopening on every heartbeat:
+
+```typescript
+derive: { shouldConnect: (facts) => facts.userId !== "" && facts.beats >= 0 },
+effects: {
+  socket: {
+    deps: ["shouldConnect"],
+    // Ten writes to `beats`: ten opens and nine teardowns between them.
+    // `shouldConnect` was `true` throughout.
+    run: () => {
+      const ws = new WebSocket("/ws");
+      return () => ws.close();
+    },
+  },
+},
+```
+
+Guard on the value when an effect owns a resource — read the derivation, keep what it was, return early when it has not moved. The full pattern is on `EffectDef`. An effect that only reads needs nothing.
+
+**Invalidation no longer costs the size of the derivation graph.** Marking stops at the stale frontier again, so a graph nothing reads back settles after the first write and every write after it is flat: a chain of 500 derivations, a chain of 20, and a 500-node graph with 15,000 edges all cost the same per fact write, and none of them allocate. Per reconcile pass on a 500-deep chain, with nothing watching: 0.13 ms to 0.01 ms. The same graph with an effect watching the far end of the chain: 0.15 ms to 0.055 ms, since the closure out to that watcher genuinely has to be walked. Systems that read every derivation each pass were never affected either way, and are not affected now.
+
+The log volume goes with it. `loggingPlugin` at `debug` over 200 derivations and ten fact writes emitted 2,032 lines, 2,000 of them `derivation.invalidate`; it emits 232, of which 200 are the one-time transition of each derivation to stale. `devtoolsPlugin` keeps one ring-buffer entry per announcement, so at the old volume two fact writes evicted everything else from the default 1,000-entry buffer — which made devtools least usable on exactly the systems worth opening it for. Same buffer, same default, and it now holds a session.
+
+**`system.derive.assign()` now invalidates the derivations composed on top of the one it replaced.** A new function means a new value, and every derivation that read the old one was still holding what it computed from it:
+
+```typescript
+derive: {
+  doubled: (facts) => facts.count * 2,
+  quadrupled: (_facts, derived) => derived.doubled * 2,
+},
+```
+
+With `count` at 2, `quadrupled` reads 8. After `system.derive.assign("doubled", (facts) => facts.count * 10)` it kept reading 8; it reads 40.
 
 **Known limitation, unchanged in this release.** A fact written while the effects phase is open — by a resolver resuming across an `await`, or by another effect — reaches the constraints but not the effects. The changed-key set is cleared after the phase completes, so an effect declared on that exact key does not run for that write. Whether it bites depends on which microtask the write lands in, which makes it look like a scheduling wobble rather than a miss.
 

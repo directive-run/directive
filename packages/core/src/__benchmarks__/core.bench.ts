@@ -210,6 +210,108 @@ describe("Derivation Invalidation", () => {
 });
 
 // ============================================================================
+// 2b. Invalidating a graph nothing reads back
+// ============================================================================
+//
+// The shape a server-side system and a plugin-observing system are: derivations
+// that exist, are composed on top of each other, and are read rarely or never.
+// Staleness latches, so after the first write every one of these is already
+// stale and there is nothing left to mark — the per-write cost should be the
+// same at 500 deep as at 20, and the same in a dense graph as a chain. Any
+// number here that climbs with the graph means the invalidation walk went back
+// to re-deciding staleness that was already decided.
+
+function buildUnreadChain(depth: number) {
+  const derive: Record<string, unknown> = {};
+  const derivSchema: Record<string, { _type: unknown }> = {};
+  derive.d0 = (f: Record<string, unknown>) => (f.f0 as number) + 1;
+  derivSchema.d0 = { _type: 0 as unknown };
+  for (let i = 1; i < depth; i++) {
+    const prev = `d${i - 1}`;
+    derive[`d${i}`] = (_f: unknown, derived: Record<string, unknown>) =>
+      (derived[prev] as number) + 1;
+    derivSchema[`d${i}`] = { _type: 0 as unknown };
+  }
+
+  const mod = createModule(`bench-unread-${depth}`, {
+    schema: {
+      facts: { f0: { _type: 0 as unknown } },
+      derivations: derivSchema,
+      events: {},
+      requirements: {},
+    },
+    init: (f) => {
+      f.f0 = 0;
+    },
+    derive,
+  });
+  const sys = createSystem({ module: mod });
+  sys.start();
+  // Computed once so every edge in the graph exists, then never read again.
+  void sys.read(`d${depth - 1}`);
+
+  return sys;
+}
+
+function buildUnreadDense(nodes: number, fanIn: number) {
+  const derive: Record<string, unknown> = {};
+  const derivSchema: Record<string, { _type: unknown }> = {};
+  derive.d0 = (f: Record<string, unknown>) => (f.f0 as number) + 1;
+  derivSchema.d0 = { _type: 0 as unknown };
+  for (let i = 1; i < nodes; i++) {
+    const parents: string[] = [];
+    for (let k = 1; k <= fanIn && i - k >= 0; k++) {
+      parents.push(`d${i - k}`);
+    }
+    derive[`d${i}`] = (_f: unknown, derived: Record<string, unknown>) => {
+      let sum = 0;
+      for (const parent of parents) {
+        sum += derived[parent] as number;
+      }
+
+      return sum;
+    };
+    derivSchema[`d${i}`] = { _type: 0 as unknown };
+  }
+
+  const mod = createModule("bench-unread-dense", {
+    schema: {
+      facts: { f0: { _type: 0 as unknown } },
+      derivations: derivSchema,
+      events: {},
+      requirements: {},
+    },
+    init: (f) => {
+      f.f0 = 0;
+    },
+    derive,
+  });
+  const sys = createSystem({ module: mod });
+  sys.start();
+  void sys.read(`d${nodes - 1}`);
+
+  return sys;
+}
+
+describe("Derivation Invalidation – graph nothing reads back", () => {
+  const shallow = buildUnreadChain(20);
+  const deep = buildUnreadChain(500);
+  const dense = buildUnreadDense(500, 30);
+
+  bench("chain of 20, unread", () => {
+    shallow.facts.f0 = (shallow.facts.f0 as number) + 1;
+  });
+
+  bench("chain of 500, unread", () => {
+    deep.facts.f0 = (deep.facts.f0 as number) + 1;
+  });
+
+  bench("500 nodes / ~15k edges, unread", () => {
+    dense.facts.f0 = (dense.facts.f0 as number) + 1;
+  });
+});
+
+// ============================================================================
 // 3. Constraint Evaluation
 // ============================================================================
 

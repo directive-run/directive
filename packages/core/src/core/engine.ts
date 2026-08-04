@@ -43,7 +43,6 @@ import { type ResolversManager, createResolversManager } from "./resolvers.js";
 import { type SourcesManager, createSourcesManager } from "./sources.js";
 import {
   BLOCKED_PROPS,
-  derivationDep,
   derivationDepId,
   describeDep,
   isDerivationDep,
@@ -407,7 +406,7 @@ export function createEngine<S extends Schema>(
   /**
    * Whether an explicit `deps` entry names a derivation.
    *
-   * Auto-tracking already files a derivation read under {@link derivationDep};
+   * Auto-tracking already files a derivation read under a namespace;
    * a `deps` array is written by hand and cannot. This is what brings the two
    * onto one keyspace, and it is answered here because the engine is the only
    * thing holding the merged module set — a name that means nothing at
@@ -433,6 +432,29 @@ export function createEngine<S extends Schema>(
    * revisiting.
    */
   const isFactKeyName = (name: string): boolean => name in mergedSchema;
+
+  /**
+   * `isDerivationDepName`, plus the record that someone is now watching.
+   *
+   * An effect or constraint that names a derivation in `deps` is watching it as
+   * surely as one whose body reads it — more surely, since a body may read
+   * conditionally — but nothing about a hand-written name announces itself the
+   * way a tracked read does. Asking what the name means is the moment the
+   * intent is visible, so it is the moment it gets recorded. Only names that
+   * turn out to be derivations are recorded; a fact key resolves through the
+   * other branch and never reaches here.
+   *
+   * What the record buys is at the drain: with nothing watching, the transitive
+   * "may have moved" closure is never computed at all.
+   */
+  const observeDerivationDepName = (name: string): boolean => {
+    if (!isDerivationDepName(name)) {
+      return false;
+    }
+    derivationsManager.markObserved(name);
+
+    return true;
+  };
 
   // Create plugin manager
   const pluginManager: PluginManager<S> = createPluginManager();
@@ -477,31 +499,6 @@ export function createEngine<S extends Schema>(
   // Forward-declared so onChange/onBatch closures can check isRestoring.
   // Assigned after createHistoryManager() below.
   let historyRef: HistoryManager<S> | null = null;
-
-  /**
-   * Derivations that went stale since the last reconcile.
-   *
-   * Constraints and effects both auto-track what their bodies read, and a body
-   * that reads a derivation records the derivation's *ID* as a dependency.
-   * Incremental evaluation then matched those dependencies against
-   * `changedKeys`, which holds fact keys only — so the derivation half of every
-   * tracked dependency set matched nothing, and a constraint or effect gated on
-   * a derivation ran once, at startup, and never again. The derivation would
-   * flip, every direct reader would see the new value, and the constraint would
-   * sit on its first answer forever.
-   *
-   * Held separately from `changedKeys` rather than merged into it so history
-   * snapshot labels keep describing facts, and so an invalidation that arrives
-   * without a fact change cannot make the system look dirty.
-   *
-   * Stored under {@link derivationDep} names, not bare IDs. The set they are
-   * folded into is matched against dependency sets that carry fact keys too, and
-   * a module is free to declare a fact and a derivation with the same name —
-   * `facts.ready` beside `derivations.ready`. Bare IDs made that name mean both
-   * at once, so a constraint gated on the fact re-evaluated when the derivation
-   * went stale and an effect gated on the fact re-ran.
-   */
-  const invalidatedDerivations = new Set<string>();
 
   // Trace management (per-run reconciliation changelog, gated by config.trace)
   const traceManager = createTraceManager({
@@ -585,10 +582,6 @@ export function createEngine<S extends Schema>(
     },
     onInvalidate: (id) => {
       if (hasPlugins()) pluginManager.emitDerivationInvalidate(id);
-      // A derivation going stale is news for anything that read it — the same
-      // news a changed fact is, delivered on the same channel, under its own
-      // name on that channel.
-      invalidatedDerivations.add(derivationDep(id));
     },
     onError: (id, error) => {
       const strategy = errorBoundary.handleError("derivation", id, error);
@@ -609,7 +602,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedEffects,
     facts,
     store,
-    isDerivation: isDerivationDepName,
+    isDerivation: observeDerivationDepName,
     isFactKey: isFactKeyName,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
@@ -715,7 +708,7 @@ export function createEngine<S extends Schema>(
     definitions: mergedConstraints,
     facts,
     requirementKeys,
-    isDerivation: isDerivationDepName,
+    isDerivation: observeDerivationDepName,
     onEvaluate: (id, active) => {
       if (hasPlugins()) {
         // For data-form `when` constraints, pass the per-clause breakdown
@@ -1129,12 +1122,14 @@ export function createEngine<S extends Schema>(
       // to the point the snapshot label is taken, and carried under the
       // derivation namespace so the two kinds of name cannot be confused for
       // each other.
-      if (invalidatedDerivations.size > 0) {
-        for (const id of invalidatedDerivations) {
-          state.changedKeys.add(id);
-        }
-        invalidatedDerivations.clear();
-      }
+      //
+      // Asked once per reconcile rather than pushed on every fact write. The
+      // question is "which watched derivations may have moved", its answer is a
+      // transitive closure over the derivation graph, and a derivation that
+      // nothing reads back stays stale — so pushing it meant re-walking the
+      // whole downstream graph per write forever, while the set it fed is
+      // drained once per pass regardless.
+      derivationsManager.collectInvalidated(state.changedKeys);
       await effectsManager.runEffects(state.changedKeys);
 
       // Copy changed keys for constraint evaluation before clearing

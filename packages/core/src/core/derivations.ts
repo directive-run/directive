@@ -17,6 +17,7 @@ import {
   derivationDepId,
   describeDep,
   isDerivationDep,
+  isTracking,
   trackAccess,
   withTracking,
 } from "./tracking.js";
@@ -63,6 +64,25 @@ export interface DerivationsManager<
    * A fresh Set each call. Nothing on a hot path reads this.
    */
   getDependencies(id: keyof D): Set<string>;
+  /**
+   * Record that something outside the derivation graph watches this derivation.
+   *
+   * A derivation read from inside a tracking context marks itself; a derivation
+   * named in a hand-written `deps` array cannot, because nothing reads it, so
+   * the engine says so on its behalf. Monotone — a name is never unmarked while
+   * the derivation exists, because a dependency set that stopped naming it may
+   * name it again on the next run and the cost of assuming it still watches is
+   * one entry in a Set.
+   */
+  markObserved(id: string): void;
+  /**
+   * Drain the derivations that may have moved since the last drain into `out`,
+   * under {@link derivationDep} names.
+   *
+   * See {@link CreateDerivationsOptions.onInvalidate} for why this is separate
+   * from the announcement, and what it costs.
+   */
+  collectInvalidated(out: Set<string>): void;
   /** Register new derivation definitions (for dynamic module registration) */
   registerDefinitions(newDefs: DerivationsDef<S>): void;
   /** Override an existing derivation function */
@@ -92,7 +112,19 @@ export interface CreateDerivationsOptions<
     oldValue: unknown,
     deps: string[],
   ) => void;
-  /** Callback when a derivation is invalidated */
+  /**
+   * Callback when a derivation transitions from valid to stale.
+   *
+   * Edge-triggered, and deliberately so: it reports a state *change*, which is
+   * what a log line and a devtools timeline entry are for. A derivation that is
+   * already stale has not changed state, and repeating the announcement on
+   * every fact write turns a 200-derivation graph into two thousand log lines
+   * per ten writes and evicts everything else from a devtools ring buffer.
+   *
+   * Anything that needs to know a derivation *may have moved* — which is a
+   * different question, and one whose answer repeats while the derivation stays
+   * stale — reads {@link DerivationsManager.collectInvalidated} instead.
+   */
   onInvalidate?: (id: string) => void;
   /** Callback when a derivation errors */
   onError?: (id: string, error: unknown) => void;
@@ -193,6 +225,30 @@ export function createDerivationsManager<
   // Track which derivations depend on which other derivations
   const derivedToDerivedDeps = new Map<string, Set<string>>();
 
+  /**
+   * Derivations something outside the graph watches — see
+   * {@link DerivationsManager.markObserved}.
+   *
+   * Empty is the common case and the cheap one: with nothing watching, an
+   * invalidation has no audience outside the graph and {@link collectInvalidated}
+   * does no work at all.
+   */
+  const observedIds = new Set<string>();
+
+  /**
+   * Derivations whose own dependency changed since the last drain.
+   *
+   * The roots of the "may have moved" question, recorded rather than answered:
+   * the answer is their transitive closure, and walking that costs the whole
+   * downstream graph, so it is walked once per drain instead of once per fact
+   * write — and only when something is watching. A Set of derivation IDs, so a
+   * write storm between two drains cannot make it larger than the graph.
+   */
+  const invalidationRoots = new Set<string>();
+
+  /** Set by `invalidateAll()`, which has every derivation as a root. */
+  let allInvalidated = false;
+
   // Deferred notification: during invalidation, collect IDs to notify.
   // Listeners fire AFTER all invalidations complete so they see consistent state.
   let invalidationDepth = 0;
@@ -286,6 +342,8 @@ export function createDerivationsManager<
     listeners.delete(id);
     pendingNotifications.delete(id);
     derivationMeta.delete(id);
+    observedIds.delete(id);
+    invalidationRoots.delete(id);
   }
 
   /** Initialize state for a derivation */
@@ -479,23 +537,25 @@ export function createDerivationsManager<
    * Accepts an optional shared `visited` Set so that `invalidateMany` can
    * coalesce multiple root invalidations into a single traversal.
    *
-   * **Marking is an edge; announcing is not.** Staleness is a latch — a
-   * derivation that is already stale has nothing to re-mark, and the traversal
-   * used to stop there. But `onInvalidate` is how anything *outside* the
-   * derivation graph learns the value may have moved, and the consumer on the
-   * other end of it treats each announcement as one wake-up and then forgets
-   * it. A derivation nothing reads back never leaves the stale state, so an
-   * edge-only announcement woke its dependents exactly once and then went quiet
-   * while the facts underneath kept moving — and whether it went quiet at all
-   * depended on some unrelated reader happening to recompute it in between. So
-   * the announcement is repeated on every invalidation and the traversal
-   * continues through stale nodes, while the state writes below stay on the
-   * edge where they belong.
+   * **Staleness latches, so the walk stops at the stale frontier.** A derivation
+   * that is already stale has nothing to re-mark, and — because a derivation
+   * only becomes valid by reading every dependency back — everything downstream
+   * of a stale derivation is stale too. Walking through it would re-decide
+   * facts already decided, once per fact write, over the whole downstream graph.
+   *
+   * That leaves the other question — which derivations *may have moved* — which
+   * does repeat while a derivation stays stale, and which the frontier does not
+   * answer. That one is not pushed. `startId` is filed as a root and the
+   * transitive answer is computed at drain time, once per reconcile rather than
+   * once per write, and only when something is watching. See
+   * {@link DerivationsManager.collectInvalidated}.
    */
   function invalidateDerivation(
     startId: string,
     visited = new Set<string>(),
   ): void {
+    invalidationRoots.add(startId);
+
     const queue = [startId];
 
     while (queue.length > 0) {
@@ -506,27 +566,21 @@ export function createDerivationsManager<
       visited.add(id);
 
       const state = states.get(id);
-      if (!state) {
+      if (!state || state.isStale) {
         continue;
       }
 
-      if (!state.isStale) {
-        state.isStale = true;
-        // Reset dep stability so next recompute re-tracks via withTracking()
-        state.depsStable = false;
-        state.stableRunCount = 0;
-
-        // Defer listener notification until all invalidations complete.
-        // This prevents listeners from observing partially-stale state and
-        // avoids infinite loops from Set mutation during iteration (listeners
-        // recompute derivations → updateDependencies → modify dep Sets).
-        // Edge-triggered, unlike the announcement below: a listener reads the
-        // value back, so it sees every edge, and notifying it while the value
-        // is already known-stale would be the same news twice.
-        pendingNotifications.add(id);
-      }
-
+      state.isStale = true;
+      // Reset dep stability so next recompute re-tracks via withTracking()
+      state.depsStable = false;
+      state.stableRunCount = 0;
       onInvalidate?.(id);
+
+      // Defer listener notification until all invalidations complete.
+      // This prevents listeners from observing partially-stale state and
+      // avoids infinite loops from Set mutation during iteration (listeners
+      // recompute derivations → updateDependencies → modify dep Sets).
+      pendingNotifications.add(id);
 
       enqueueDependents(id, queue);
     }
@@ -603,7 +657,17 @@ export function createDerivationsManager<
       // derivation may share a name, and a dependency set that could not tell
       // them apart re-ran an effect gated on the fact whenever the derivation
       // went stale.
-      trackAccess(derivationDep(id as string));
+      //
+      // A read under tracking is also the definition of an outside watcher:
+      // whatever body is running had this derivation written into its
+      // dependency set, and that set is matched against the invalidation set
+      // every reconcile. A read with no tracking context — a component
+      // rendering, a test asserting — records nothing and watches nothing
+      // through this channel, so it does not mark.
+      if (isTracking()) {
+        trackAccess(derivationDep(id as string));
+        observedIds.add(id as string);
+      }
 
       const state = getState(id as string);
 
@@ -656,6 +720,7 @@ export function createDerivationsManager<
 
     invalidateAll(): void {
       invalidationDepth++;
+      allInvalidated = true;
       try {
         for (const state of states.values()) {
           if (!state.isStale) {
@@ -706,6 +771,73 @@ export function createDerivationsManager<
       return described;
     },
 
+    markObserved(id: string): void {
+      observedIds.add(id);
+    },
+
+    collectInvalidated(out: Set<string>): void {
+      if (observedIds.size === 0) {
+        // Nothing outside the graph is watching, so there is no closure to
+        // compute and nothing to compute it for. The roots go, rather than
+        // accumulating for whoever watches first: a watcher starts watching by
+        // reading — a constraint's `when()`, an effect's body, an effect's
+        // `deps` resolving — and whatever it read, it read after these. Holding
+        // them back to deliver later would tell a fresh reader that a value it
+        // has just seen may have moved since.
+        invalidationRoots.clear();
+        allInvalidated = false;
+
+        return;
+      }
+
+      if (allInvalidated) {
+        for (const id of observedIds) {
+          out.add(derivationDep(id));
+        }
+        allInvalidated = false;
+        invalidationRoots.clear();
+
+        return;
+      }
+
+      if (invalidationRoots.size === 0) {
+        return;
+      }
+
+      const queue = [...invalidationRoots];
+      invalidationRoots.clear();
+      const seen = new Set(queue);
+
+      // Every watched derivation the walk can still reach is one it has not
+      // reached yet, so once it has reached all of them there is nothing left
+      // to find. `seen` makes each node arrive once, so this counts nodes, not
+      // arrivals. Turns a graph where the watched derivations sit near the
+      // changed fact into a walk of a few nodes rather than the whole cone.
+      const watched = observedIds.size;
+      let reached = 0;
+
+      while (queue.length > 0) {
+        const id = queue.pop()!;
+        if (observedIds.has(id)) {
+          out.add(derivationDep(id));
+          if (++reached >= watched) {
+            break;
+          }
+        }
+
+        const dependents = derivedToDerivedDeps.get(id);
+        if (!dependents) {
+          continue;
+        }
+        for (const dependent of dependents) {
+          if (!seen.has(dependent)) {
+            seen.add(dependent);
+            queue.push(dependent);
+          }
+        }
+      }
+    },
+
     registerDefinitions(newDefs: DerivationsDef<S>): void {
       for (const [key, raw] of Object.entries(newDefs)) {
         if (typeof raw === "function") {
@@ -736,13 +868,39 @@ export function createDerivationsManager<
         unwrapDerivationAt(id, fn);
       }
 
-      // Mark stale so it recomputes with the new function
+      // Mark stale so it recomputes with the new function, and carry that
+      // through to everything composed on top of it.
+      //
+      // A new function means a new value, which means every derivation that
+      // read this one is holding a value computed from the old one. Marking
+      // only this derivation left those caches standing and, worse, left a
+      // valid derivation sitting downstream of a stale one — the one shape the
+      // invalidation walk assumes cannot happen, since it stops at the stale
+      // frontier on the grounds that everything past it is stale already.
       const state = states.get(id);
       if (state) {
+        const wasStale = state.isStale;
         state.isStale = true;
         state.depsStable = false;
         state.stableRunCount = 0;
         pendingNotifications.add(id);
+        if (!wasStale) {
+          onInvalidate?.(id);
+        }
+        invalidationRoots.add(id);
+
+        invalidationDepth++;
+        try {
+          const visited = new Set<string>([id]);
+          const dependents = derivedToDerivedDeps.get(id);
+          if (dependents) {
+            for (const dependent of dependents) {
+              invalidateDerivation(dependent, visited);
+            }
+          }
+        } finally {
+          invalidationDepth--;
+        }
       }
 
       flushNotifications();

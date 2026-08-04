@@ -612,3 +612,182 @@ describe("a fact and a derivation with the same name", () => {
     system.destroy();
   });
 });
+
+/**
+ * What an invalidation costs, and what it says.
+ *
+ * Two questions ride on one fact change, and they have different shapes. "Which
+ * derivations are now stale" is an edge — staleness latches, and a derivation
+ * that is already stale stays stale, so the answer stops at the frontier. "Which
+ * watched derivations may have moved" repeats for as long as a derivation stays
+ * stale, because a consumer that never reads the value back has no other way to
+ * hear about it.
+ *
+ * Answering both with one walk made the second correct and the first linear in
+ * the size of the graph, per fact write, forever. These hold the two apart: the
+ * announcement stays flat while the waking keeps happening.
+ */
+describe("invalidation cost", () => {
+  /** A chain of `n` derivations over one fact, with nothing reading it back. */
+  function chainModule(n: number, effects: Record<string, unknown> = {}) {
+    const derive: Record<string, (facts: never, derived: never) => unknown> = {
+      d0: (facts: { x: number }) => facts.x + 1,
+    };
+    const derivations: Record<string, ReturnType<typeof t.number>> = {
+      d0: t.number(),
+    };
+    for (let i = 1; i < n; i++) {
+      const previous = `d${i - 1}`;
+      derive[`d${i}`] = (_facts: never, derived: Record<string, number>) =>
+        derived[previous]! + 1;
+      derivations[`d${i}`] = t.number();
+    }
+
+    return createModule("chain", {
+      schema: { facts: { x: t.number() }, derivations },
+      init: (facts) => {
+        facts.x = 0;
+      },
+      derive: derive as never,
+      effects: effects as never,
+    });
+  }
+
+  /** A plugin that counts what the derivation channel says. */
+  function countingPlugin(counts: { invalidate: number }) {
+    return {
+      name: "counter",
+      onDerivationInvalidate: () => {
+        counts.invalidate++;
+      },
+    };
+  }
+
+  it("announces a derivation going stale once, not once per later write", async () => {
+    const counts = { invalidate: 0 };
+    const size = 60;
+
+    const system = createSystem({
+      module: chainModule(size),
+      plugins: [countingPlugin(counts)] as never,
+    });
+    system.start();
+    // Compute the whole chain once so every edge exists.
+    void system.derive[`d${size - 1}` as never];
+    await settle();
+
+    counts.invalidate = 0;
+    for (let i = 1; i <= 10; i++) {
+      system.facts.x = i;
+      await settle();
+    }
+
+    // The first write takes the chain from valid to stale, which is `size`
+    // transitions. Nothing reads it back, so the nine writes after it change no
+    // derivation's state and have nothing to announce. A walk that repeated the
+    // announcement through stale nodes reported ten times this.
+    expect(counts.invalidate).toBe(size);
+
+    system.destroy();
+  });
+
+  it("keeps waking a watcher while the derivation it named stays stale", async () => {
+    const counts = { invalidate: 0 };
+    const runs: number[] = [];
+    const size = 60;
+    const tip = `d${size - 1}`;
+
+    const system = createSystem({
+      module: chainModule(size, {
+        // Names the far end of the chain and never reads it, so nothing ever
+        // takes it back out of the stale state.
+        watch: {
+          deps: [tip],
+          run: (facts: { x: number }) => {
+            runs.push(facts.x);
+          },
+        },
+      }),
+      plugins: [countingPlugin(counts)] as never,
+    });
+    system.start();
+    void system.derive[tip as never];
+    await settle();
+
+    runs.length = 0;
+    counts.invalidate = 0;
+
+    for (let i = 1; i <= 5; i++) {
+      system.facts.x = i;
+      await settle();
+    }
+
+    // Woken every time, and told once.
+    expect(runs).toEqual([1, 2, 3, 4, 5]);
+    expect(counts.invalidate).toBe(size);
+
+    system.destroy();
+  });
+
+  it("says nothing about a derivation no dependency set names", async () => {
+    const runs: number[] = [];
+    const size = 40;
+
+    const system = createSystem({
+      module: chainModule(size, {
+        // A fact dependency only. The chain is invalidated by the same write
+        // and no part of it is anyone's dependency.
+        watch: {
+          deps: ["x"],
+          run: (facts: { x: number }) => {
+            runs.push(facts.x);
+          },
+        },
+      }),
+    });
+    system.start();
+    void system.derive[`d${size - 1}` as never];
+    await settle();
+    runs.length = 0;
+
+    system.facts.x = 1;
+    await settle();
+
+    expect(runs).toEqual([1]);
+    // Nothing watches a derivation, so no derivation name reaches the
+    // dependency comparison and the closure is never walked. Observable only
+    // as the effect still running on the fact it did name.
+    system.destroy();
+  });
+
+  it("carries a reassigned derivation through to what composes it", () => {
+    const mod = createModule("reassign", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { doubled: t.number(), quadrupled: t.number() },
+      },
+      init: (facts) => {
+        facts.count = 2;
+      },
+      derive: {
+        doubled: (facts) => facts.count * 2,
+        quadrupled: (_facts, derived) => derived.doubled * 2,
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+
+    expect(system.derive.quadrupled).toBe(8);
+
+    system.derive.assign("doubled", (facts) => facts.count * 10);
+
+    // The composed value was computed from the old function and has to go with
+    // it — and, less visibly, a valid derivation must not be left sitting
+    // downstream of a stale one, because the invalidation walk stops at the
+    // stale frontier on the grounds that it cannot be.
+    expect(system.derive.quadrupled).toBe(40);
+
+    system.destroy();
+  });
+});
