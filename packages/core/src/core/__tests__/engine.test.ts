@@ -2277,3 +2277,291 @@ describe("constraint-binding (RFC-0003) — engine integration", () => {
     system.destroy();
   });
 });
+
+// ============================================================================
+// Facts that change while the effects phase is open
+// ============================================================================
+
+/**
+ * **These pin a known limitation. They assert what the engine does, not what
+ * it should do.** A test that fails here is not necessarily a regression — it
+ * may be the limitation being closed, in which case these are what has to be
+ * rewritten, and rewriting them is the point of their being here.
+ *
+ * `reconcile` clears the changed-key set after the effects phase awaits.
+ * Anything written while that phase is open therefore reaches the constraints,
+ * which are evaluated on a later pass against live facts, and never reaches the
+ * effects, which are dispatched from the key set that was cleared. An effect
+ * declared on the exact key that changed does not run for that write.
+ *
+ * A fix was written for this and withdrawn the same day. Delivering late keys
+ * on a following pass, without also bounding the feedback path, turns an effect
+ * that writes a fact in its own dependency set into an unbounded reconcile loop
+ * — measured at 480,784 effect runs per second, with `settle()` never
+ * resolving, because `reconcileDepth` resets per top-level pass and the depth
+ * ceiling is therefore never reached. The revert was right. What it left behind
+ * was a limitation with no coverage at all, so the next attempt to re-land had
+ * nothing telling it what the current behaviour was and where it was observable
+ * from.
+ *
+ * The four cases below are that scope, measured rather than assumed. The
+ * limitation needs neither an async effect nor a resolver to appear: a
+ * synchronous effect's write is dropped, a write arriving from outside the
+ * system is dropped, and an effect gated on a derivation the write invalidates
+ * is dropped. Only the last case needs an `await` at all, and it needs a second
+ * effect to hold the phase open — a resolver dispatched by the pass whose phase
+ * is open does not even enter its body until that phase has completed.
+ */
+describe("effects and the reconcile boundary — pinned known limitation", () => {
+  /**
+   * The original shape: an async effect holds the phase open and writes while
+   * it is. The write lands, a constraint reading it fires, and the effect
+   * declared on it does not run.
+   */
+  it("gives a fact written during the effects phase to the constraints and not to the effects", async () => {
+    const sawB: number[] = [];
+    const resolved: number[] = [];
+    let release: (() => void) | undefined;
+
+    const mod = createModule("late-write", {
+      schema: {
+        facts: { a: t.number(), b: t.number() },
+        requirements: { SAW_B: { value: t.number() } },
+      },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+      },
+      constraints: {
+        // The other half of the miss: the constraints do see the key.
+        onB: {
+          when: (facts) => facts.b > 0,
+          require: (facts) => ({ type: "SAW_B" as const, value: facts.b }),
+        },
+      },
+      resolvers: {
+        onB: {
+          requirement: "SAW_B",
+          resolve: async (req) => {
+            resolved.push(req.value);
+          },
+        },
+      },
+      effects: {
+        // Holds the effects phase open, and writes `b` while it is.
+        slow: {
+          deps: ["a"],
+          run: async (facts) => {
+            if (facts.a === 0) {
+              return;
+            }
+            await new Promise<void>((resolve) => {
+              release = resolve;
+              setTimeout(resolve, 0);
+            });
+            facts.b = facts.a * 10;
+          },
+        },
+        watchB: {
+          deps: ["b"],
+          run: (facts) => {
+            sawB.push(facts.b);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await flush();
+
+    const before = sawB.length;
+
+    system.facts.a = 3;
+    await flush();
+    release?.();
+    await flush();
+
+    // The write landed.
+    expect(system.facts.b).toBe(30);
+    // The constraint saw it.
+    expect(resolved).toEqual([30]);
+    // The effect declared on the very key that changed did not.
+    expect(sawB.length).toBe(before);
+    expect(sawB.at(-1)).toBe(0);
+
+    system.destroy();
+  });
+
+  /**
+   * No `await` anywhere. The changed-key set is cleared once per pass whether
+   * or not the phase suspended, so an effect that writes a key another effect
+   * is declared on drops it in the same synchronous run.
+   */
+  it("drops it for a synchronous effect's write, with no async effect and no resolver in sight", async () => {
+    const sawB: number[] = [];
+
+    const mod = createModule("sync-late-write", {
+      schema: { facts: { a: t.number(), b: t.number() } },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+      },
+      effects: {
+        writer: {
+          deps: ["a"],
+          run: (facts) => {
+            if (facts.a !== 0) {
+              facts.b = facts.a * 10;
+            }
+          },
+        },
+        watchB: {
+          deps: ["b"],
+          run: (facts) => {
+            sawB.push(facts.b);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await flush();
+
+    const before = sawB.length;
+
+    system.facts.a = 3;
+    await flush();
+    await flush();
+
+    expect(system.facts.b).toBe(30);
+    expect(sawB.length).toBe(before);
+
+    system.destroy();
+  });
+
+  /**
+   * The writer does not have to be inside the system. An ordinary external
+   * write that happens to land while the phase is open is dropped the same
+   * way, which is what makes the miss read as a scheduling wobble: the same
+   * line of caller code works or does not depending on what the system was
+   * doing at the time.
+   */
+  it("drops it for a write arriving from outside the system", async () => {
+    const sawB: number[] = [];
+    let release: (() => void) | undefined;
+
+    const mod = createModule("external-late-write", {
+      schema: { facts: { a: t.number(), b: t.number() } },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+      },
+      effects: {
+        slow: {
+          deps: ["a"],
+          run: async (facts) => {
+            if (facts.a === 0) {
+              return;
+            }
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+          },
+        },
+        watchB: {
+          deps: ["b"],
+          run: (facts) => {
+            sawB.push(facts.b);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await flush();
+
+    const before = sawB.length;
+
+    system.facts.a = 3;
+    await flush();
+    // The phase is open on `slow`. This is the caller, not the system.
+    system.facts.b = 99;
+    await flush();
+    release?.();
+    await flush();
+    await flush();
+
+    expect(system.facts.b).toBe(99);
+    expect(sawB.length).toBe(before);
+
+    system.destroy();
+  });
+
+  /**
+   * And it is not only fact keys. A derivation downstream of the written fact
+   * is invalidated, and an effect declared on the derivation misses the same
+   * way — which matters because a derivation dependency is the shape the
+   * effects doc recommends for anything gating on composed state.
+   */
+  it("drops it for an effect gated on a derivation the write invalidates", async () => {
+    const sawDoubled: number[] = [];
+    let release: (() => void) | undefined;
+
+    const mod = createModule("derived-late-write", {
+      schema: {
+        facts: { a: t.number(), b: t.number() },
+        derivations: { doubledB: t.number() },
+      },
+      init: (facts) => {
+        facts.a = 0;
+        facts.b = 0;
+      },
+      derive: { doubledB: (facts) => facts.b * 2 },
+      effects: {
+        slow: {
+          deps: ["a"],
+          run: async (facts) => {
+            if (facts.a === 0) {
+              return;
+            }
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+            facts.b = 7;
+          },
+        },
+        watchDoubled: {
+          deps: ["doubledB"],
+          run: () => {
+            sawDoubled.push(system.derive.doubledB);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await flush();
+
+    // An ordinary write first, so the effect is demonstrably live on the
+    // derivation before the one that is dropped.
+    system.facts.b = 1;
+    await flush();
+    expect(sawDoubled).toEqual([2]);
+
+    system.facts.a = 3;
+    await flush();
+    release?.();
+    await flush();
+    await flush();
+
+    // The derivation moved, and nothing woke the effect watching it.
+    expect(system.derive.doubledB).toBe(14);
+    expect(sawDoubled).toEqual([2]);
+
+    system.destroy();
+  });
+});

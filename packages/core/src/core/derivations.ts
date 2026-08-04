@@ -317,6 +317,58 @@ export function createDerivationsManager<
     }
   }
 
+  /**
+   * A derivation's definition has been replaced. Mark it stale, and carry that
+   * through to everything composed on top of it.
+   *
+   * A new function means a new value, which means every derivation that read
+   * this one is holding a value computed from the old one. Marking only this
+   * derivation leaves those caches standing and, worse, leaves a valid
+   * derivation sitting downstream of a stale one — the one shape the
+   * invalidation walk assumes cannot happen, since it stops at the stale
+   * frontier on the grounds that everything past it is stale already. From
+   * then on every walk stops here and the dependents are never woken again.
+   *
+   * Shared by the two ways a definition can be replaced — assigning over it,
+   * and registering a module whose `derive` names it — because they are the
+   * same act and diverging on either obligation is how one of them acquired
+   * this defect while the other did not.
+   *
+   * Deliberately does not touch the dependency set. Keeping it is what lets
+   * the next recompute's diff remove the links the old definition tracked;
+   * discarding it compares the new dependencies against nothing and leaves
+   * every old link in place.
+   */
+  function invalidateReplacedDefinition(id: string): void {
+    const state = states.get(id);
+    if (!state) {
+      return;
+    }
+
+    const wasStale = state.isStale;
+    state.isStale = true;
+    state.depsStable = false;
+    state.stableRunCount = 0;
+    pendingNotifications.add(id);
+    if (!wasStale) {
+      onInvalidate?.(id);
+    }
+    invalidationRoots.add(id);
+
+    invalidationDepth++;
+    try {
+      const visited = new Set<string>([id]);
+      const dependents = derivedToDerivedDeps.get(id);
+      if (dependents) {
+        for (const dependent of dependents) {
+          invalidateDerivation(dependent, visited);
+        }
+      }
+    } finally {
+      invalidationDepth--;
+    }
+  }
+
   /** Invalidate derivations that depend on `id`, then clean up its entry */
   function invalidateDependentsOf(id: string): void {
     const dependents = derivedToDerivedDeps.get(id);
@@ -840,13 +892,47 @@ export function createDerivationsManager<
 
     registerDefinitions(newDefs: DerivationsDef<S>): void {
       for (const [key, raw] of Object.entries(newDefs)) {
+        // Whether this key already names a live node. Registering over one is
+        // a *replacement* — the same act `assignDefinition` performs, reached
+        // through `system.registerModule` with a module whose `derive` names a
+        // derivation the system already has, which nothing refuses: the
+        // registration path checks fact-name collisions and never derivation
+        // ones.
+        //
+        // It has to be told apart from a genuinely new key, because a fresh
+        // state object is the wrong answer for a live one twice over. The old
+        // dependency set goes with it, so the diff that removes stale links on
+        // the next recompute compares against an empty set and every link the
+        // replaced definition tracked is left standing. And the node is reset
+        // to stale with nothing downstream told, which leaves a valid
+        // derivation sitting under a stale one — the one shape the
+        // invalidation walk assumes cannot happen, since it stops at the stale
+        // frontier on the grounds that everything past it is stale already.
+        // The damage is permanent rather than transient: every later walk
+        // stops at the same node, so its dependents are never woken again.
+        const replacing = states.has(key);
+
         if (typeof raw === "function") {
           (definitions as Record<string, unknown>)[key] = raw;
+          if (replacing) {
+            derivationMeta.delete(key);
+          }
         } else {
+          derivationMeta.delete(key);
           unwrapDerivationAt(key, raw);
         }
-        initState(key);
+
+        if (replacing) {
+          // Keeps the state — and with it the dependency set the diff needs —
+          // and carries the change through the graph. Exactly what assigning
+          // over the same name does, because it is the same thing happening.
+          invalidateReplacedDefinition(key);
+        } else {
+          initState(key);
+        }
       }
+
+      flushNotifications();
     },
 
     assignDefinition(
@@ -868,40 +954,7 @@ export function createDerivationsManager<
         unwrapDerivationAt(id, fn);
       }
 
-      // Mark stale so it recomputes with the new function, and carry that
-      // through to everything composed on top of it.
-      //
-      // A new function means a new value, which means every derivation that
-      // read this one is holding a value computed from the old one. Marking
-      // only this derivation left those caches standing and, worse, left a
-      // valid derivation sitting downstream of a stale one — the one shape the
-      // invalidation walk assumes cannot happen, since it stops at the stale
-      // frontier on the grounds that everything past it is stale already.
-      const state = states.get(id);
-      if (state) {
-        const wasStale = state.isStale;
-        state.isStale = true;
-        state.depsStable = false;
-        state.stableRunCount = 0;
-        pendingNotifications.add(id);
-        if (!wasStale) {
-          onInvalidate?.(id);
-        }
-        invalidationRoots.add(id);
-
-        invalidationDepth++;
-        try {
-          const visited = new Set<string>([id]);
-          const dependents = derivedToDerivedDeps.get(id);
-          if (dependents) {
-            for (const dependent of dependents) {
-              invalidateDerivation(dependent, visited);
-            }
-          }
-        } finally {
-          invalidationDepth--;
-        }
-      }
+      invalidateReplacedDefinition(id);
 
       flushNotifications();
     },

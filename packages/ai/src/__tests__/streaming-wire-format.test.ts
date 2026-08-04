@@ -58,16 +58,35 @@ const fetchOf = (body: string, headers?: Record<string, string>) =>
  */
 function unstoppableStream(frame: string, gapMs: number): Response {
   const encoder = new TextEncoder();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let done = false;
+
   const stream = new ReadableStream<Uint8Array>({
     pull(controller) {
       return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          if (frame !== "") {
-            controller.enqueue(encoder.encode(frame));
+        timer = setTimeout(() => {
+          // The body ignores the *abort signal* — that is the point of this
+          // fixture, and it is unchanged. What it does not do is keep writing
+          // into a controller the reader has already let go of: once the
+          // library gives up on a stalled stream the timer is still pending,
+          // and enqueuing there throws an uncaught `ERR_INVALID_STATE` that
+          // lands outside any test's stack.
+          if (!done && frame !== "") {
+            try {
+              controller.enqueue(encoder.encode(frame));
+            } catch {
+              done = true;
+            }
           }
           resolve();
         }, gapMs);
       });
+    },
+    cancel() {
+      done = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
     },
   });
 

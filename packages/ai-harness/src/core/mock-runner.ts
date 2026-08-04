@@ -6,6 +6,15 @@
  * so the offline chain exercises the same retry policy, the same ledger, and
  * the same termination condition as the online one.
  *
+ * **It observes `RunOptions.signal`, and that is not decoration either.** A
+ * shipped adapter folds the caller's signal into the `fetch` and into the
+ * stream reader, so an abort mid-response rejects the call. A mock that ignored
+ * the signal would be structurally incapable of failing an abort assertion —
+ * every cancellation test written against it would pass whatever the code under
+ * test did with the signal, which is the opposite of what a stand-in is for. So
+ * a pre-aborted signal rejects before anything is delivered, and an abort during
+ * delivery rejects between deltas, both with an `AbortError`.
+ *
  * **It reports token usage, and that is not decoration.** The chain stops when
  * the budget runner's ledger reaches the preset's ceiling, and the ledger only
  * moves when a call reports usage. A mock returning `tokenUsage: undefined`
@@ -56,6 +65,53 @@ export interface MockRunnerOptions {
   delayMs?: number;
   /** Approximate characters per token, for the reported usage. @default 4 */
   charsPerToken?: number;
+  /**
+   * Whether {@link RunOptions.signal} ends the call, the way it ends a real
+   * provider request. @default true
+   *
+   * Off is for a test that wants a call the signal cannot reach — an
+   * unstoppable in-flight turn, say. It is not for making an abort assertion
+   * pass; the shipped adapter cancels, and a mock that does not is a mock that
+   * cannot fail the assertion.
+   */
+  signalAware?: boolean;
+}
+
+/**
+ * The rejection a cancelled provider call produces.
+ *
+ * `fetch` rejects with an `AbortError` when its signal fires, so that is what
+ * this rejects with — the point of the mock is that the code above it cannot
+ * tell which one it is talking to.
+ */
+function abortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("This operation was aborted", "AbortError");
+  }
+
+  const error = new Error("This operation was aborted");
+  error.name = "AbortError";
+
+  return error;
+}
+
+/** Wait, unless the signal ends the wait first. */
+function delay(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  if (signal === undefined) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(abortError());
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /** Split text into fixed-size deltas, the way a provider streams it. */
@@ -80,6 +136,7 @@ export function createMockRunner(options: MockRunnerOptions = {}): AgentRunner {
     failures = [],
     delayMs = 0,
     charsPerToken = 4,
+    signalAware = true,
   } = options;
 
   /** Calls made per agent, so `MockFailure.call` and response cycling line up. */
@@ -111,8 +168,22 @@ export function createMockRunner(options: MockRunnerOptions = {}): AgentRunner {
     const call = (callCounts.get(agent.name) ?? 0) + 1;
     callCounts.set(agent.name, call);
 
+    // Where the signal sits, so it is read the way the adapter reads it —
+    // once before the request goes out, and again between chunks. Read through
+    // a call rather than inline, because `aborted` is a readonly property and
+    // narrowing it once would tell the compiler every later read has the same
+    // answer. The whole point is that it does not.
+    const signal = signalAware ? runOptions?.signal : undefined;
+    const aborted = () => signal?.aborted === true;
+
+    // `fetch` rejects immediately on a signal that is already aborted, without
+    // opening a connection. Nothing is delivered here either.
+    if (aborted()) {
+      throw abortError();
+    }
+
     if (delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await delay(delayMs, signal);
     }
 
     const text = responseFor(agent.name, call);
@@ -123,6 +194,12 @@ export function createMockRunner(options: MockRunnerOptions = {}): AgentRunner {
     const failAfter = failure ? (failure.afterDeltas ?? 1) : Number.NaN;
 
     for (const [index, delta] of deltas.entries()) {
+      // Between chunks, which is where the stream reader checks it. Deltas
+      // already handed over stay handed over — a cancelled response keeps
+      // whatever crossed the wire before the cancel.
+      if (aborted()) {
+        throw abortError();
+      }
       if (failure !== undefined && index >= failAfter) {
         throw new Error(
           failure.message ??
@@ -144,6 +221,13 @@ export function createMockRunner(options: MockRunnerOptions = {}): AgentRunner {
         failure.message ??
           `[ai-harness mock] scripted failure on call ${call} to ${agent.name}`,
       );
+    }
+
+    // The last chunk is delivered and the terminal event has not arrived. A
+    // stream reader given an aborted signal here rejects rather than handing
+    // back a response, so this does too.
+    if (aborted()) {
+      throw abortError();
     }
 
     runOptions?.onMessage?.({ role: "assistant", content: text });

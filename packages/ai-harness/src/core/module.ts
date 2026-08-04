@@ -600,6 +600,34 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
     body === "" ? "" : fence(tag, transcript.fenceToken, {}, body);
 
   /**
+   * The signal the provider calls are made under: teardown, and nothing else.
+   *
+   * **Not `context.signal`.** A resolver's own signal answers "is this
+   * requirement still wanted", and the chain's answer to that goes false the
+   * moment an interrupt lands — `interrupted` flips, `chainStopped` follows,
+   * `turnPending` goes false, the requirement leaves the tracked set, and the
+   * engine aborts the resolver holding it. Handing that signal to the provider
+   * turns the operator's own Ctrl-C into a cancelled request: the call rejects,
+   * `recordFailure` writes `failure`, and `stopReason` reports `"error"` for a
+   * chain that was interrupted. The turn whose deltas were already on the
+   * operator's screen is discarded rather than committed, and the run exits `3`
+   * where the exit-code table documents `0`.
+   *
+   * Which is the opposite of what this package documents in five places, and
+   * the opposite of what it is for. An interrupt is a *fact*, and the whole
+   * point of it being a fact is that the cascade decides what happens next —
+   * the turn in flight finishes, is committed whole, and the chain synthesizes
+   * what it has.
+   *
+   * Teardown is the other question and it has the other answer. A system being
+   * destroyed is not asking the chain to wind up gracefully, it is going away,
+   * and a provider request nobody will read the answer to should not outlive
+   * it. So this controller is aborted from `onStop` and from nowhere else, and
+   * it is what the two provider calls are made under.
+   */
+  const teardown = new AbortController();
+
+  /**
    * The last phase announced.
    *
    * An edge detector, not a state machine: it never decides anything, it only
@@ -1014,7 +1042,8 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
             });
 
             const result = await orchestrator.runAgent(req.persona, prompt, {
-              signal: context.signal,
+              // The teardown signal, not `context.signal` — see its note.
+              signal: teardown.signal,
               onToken: (token) => {
                 transcript.appendToken(token);
                 emit({
@@ -1108,7 +1137,8 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
               synthesizer.name,
               prompt,
               {
-                signal: context.signal,
+                // The teardown signal, for the same reason the turn uses it.
+                signal: teardown.signal,
                 onToken: (token) => {
                   emit({ type: "synthesis:chunk", text: token });
                 },
@@ -1380,6 +1410,18 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
     },
 
     hooks: {
+      /**
+       * The system is going away, so the calls it opened go with it.
+       *
+       * The one thing that cancels a provider request. Everything else that
+       * ends a chain — the budget, an interrupt, a failure, the iteration
+       * ceiling — stops it *taking another turn*, which is a different act and
+       * has a different implementation: a fact, and the cascade below it.
+       */
+      onStop: () => {
+        teardown.abort();
+      },
+
       /**
        * The backstop, for a throw the resolvers' own `catch` did not see.
        *

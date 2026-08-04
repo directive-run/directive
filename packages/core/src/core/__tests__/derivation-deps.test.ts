@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
+import { flushMicrotasks } from "../../utils/testing.js";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
 
@@ -755,10 +756,77 @@ describe("invalidation cost", () => {
 
     expect(runs).toEqual([1]);
     // Nothing watches a derivation, so no derivation name reaches the
-    // dependency comparison and the closure is never walked. Observable only
-    // as the effect still running on the fact it did name.
+    // dependency comparison. That the closure is therefore never *walked* is
+    // not something this test can see — the effect goes on running on the fact
+    // it named whether the walk happens or not, so removing the skip leaves
+    // this green. The test below is the one that fails.
     system.destroy();
   });
+
+  /**
+   * The skip is the whole point, so it is measured rather than asserted about.
+   *
+   * When nothing outside the graph is watching a derivation there is no
+   * closure to compute and nobody to compute it for, so the answer is returned
+   * without walking. Every other consequence of that skip is invisible: the
+   * invalidation set comes out empty either way, the roots are cleared either
+   * way, and every value read afterwards is identical. What changes is the
+   * cost, and only the cost — which is why this is a timing comparison and not
+   * a state assertion, and why the suite stayed green when the skip was
+   * removed.
+   *
+   * It is a *ratio* rather than a budget, so it says the thing the change
+   * claims — that invalidating a graph nothing is watching does not cost the
+   * size of the graph — rather than a number that means something different on
+   * a different machine. Both figures are the same work over the same number
+   * of reconcile passes; the only difference is how many derivations sit
+   * behind the fact being written.
+   *
+   * Measured on the machine this was written on: 1.2× with the skip in place,
+   * 12.6× without it. The threshold sits an order of magnitude away from both.
+   */
+  it("does not pay for the size of a graph nothing is watching", async () => {
+    const passes = 2000;
+
+    /** Milliseconds for `passes` reconcile passes over a chain of `size`. */
+    async function costOf(size: number): Promise<number> {
+      const system = createSystem({ module: chainModule(size) });
+      system.start();
+      // Compute the chain once so every edge exists, then take it stale once
+      // so the valid-to-stale marking — which is O(size) exactly once — is
+      // outside the measurement.
+      void system.derive[`d${size - 1}` as never];
+      await settle();
+      system.facts.x = -1;
+      await settle();
+
+      const started = performance.now();
+      for (let i = 1; i <= passes; i++) {
+        system.facts.x = i;
+        // A reconcile is scheduled on a microtask, so this is a full pass
+        // without a timer's resolution sitting on top of the measurement.
+        await flushMicrotasks();
+      }
+      const elapsed = performance.now() - started;
+
+      system.destroy();
+
+      return elapsed;
+    }
+
+    // A warm-up of each, so neither figure carries the JIT's opinion of code
+    // it has not seen before.
+    await costOf(2);
+    await costOf(1000);
+
+    const small = await costOf(2);
+    const large = await costOf(1000);
+
+    // 500 times the derivations, and it does not cost 500 times as much — or
+    // three times as much. Without the skip, the closure out from the changed
+    // fact is walked every pass and this is an order of magnitude.
+    expect(large).toBeLessThan(small * 3);
+  }, 60_000);
 
   it("carries a reassigned derivation through to what composes it", () => {
     const mod = createModule("reassign", {
@@ -787,6 +855,152 @@ describe("invalidation cost", () => {
     // downstream of a stale one, because the invalidation walk stops at the
     // stale frontier on the grounds that it cannot be.
     expect(system.derive.quadrupled).toBe(40);
+
+    system.destroy();
+  });
+});
+
+// ============================================================================
+// Registering over a derivation that is already live
+// ============================================================================
+
+/**
+ * The invalidation walk stops at the stale frontier, on the grounds that
+ * everything past a stale node is stale already. Anything that can leave a
+ * *valid* derivation sitting downstream of a stale one breaks that assumption,
+ * and the break is permanent — every later walk stops at the same node and the
+ * dependents never hear another thing.
+ */
+describe("registering a derivation over a live one", () => {
+  it("carries the replacement through to what composes it", async () => {
+    const first = createModule("first", {
+      schema: {
+        facts: { n: t.number() },
+        derivations: { total: t.number(), downstream: t.number() },
+      },
+      init: (facts) => {
+        facts.n = 10;
+      },
+      derive: {
+        total: (facts) => facts.n + 1,
+        downstream: (_facts, derived) => derived.total + 1,
+      },
+    });
+
+    const system = createSystem({ module: first });
+    system.start();
+
+    // Compute both, so `downstream` is valid and holding a value it computed
+    // from the definition about to be replaced.
+    expect(system.derive.total).toBe(11);
+    expect(system.derive.downstream).toBe(12);
+
+    // A second module naming a derivation the system already has. Nothing
+    // refuses this: `registerModule` checks fact-name collisions and, in
+    // development, warns about a fact and a derivation sharing a name — it has
+    // never checked one derivation name against another.
+    const second = createModule("second", {
+      schema: {
+        facts: { m: t.number() },
+        derivations: { total: t.number() },
+      },
+      init: (facts) => {
+        facts.m = 0;
+      },
+      // Reads a fact the first module declared, which is the point: one
+      // system, one fact store, one derivation keyspace.
+      derive: { total: (facts: { n: number }) => facts.n * 10 } as never,
+    });
+
+    system.registerModule(second as never);
+
+    // The replacement is live where it is read directly...
+    expect(system.derive.total).toBe(100);
+    // ...and where it is composed. Registration used to hand the key a brand
+    // new state object: stale, with an empty dependency set, and with nothing
+    // told. `downstream` stayed valid on the old value, and because the node
+    // above it was now permanently stale the walk stopped there for good.
+    expect(system.derive.downstream).toBe(101);
+
+    const readings: number[] = [];
+    for (const n of [20, 30, 40, 50, 60]) {
+      system.facts.n = n;
+      await settle();
+      readings.push(system.derive.downstream);
+    }
+
+    expect(readings).toEqual([201, 301, 401, 501, 601]);
+
+    system.destroy();
+  });
+
+  it("drops the replaced definition's dependency links", async () => {
+    const runs: number[] = [];
+
+    const first = createModule("first-links", {
+      schema: {
+        facts: { a: t.number(), b: t.number() },
+        derivations: { pick: t.number() },
+      },
+      init: (facts) => {
+        facts.a = 1;
+        facts.b = 100;
+      },
+      derive: { pick: (facts) => facts.a },
+      effects: {
+        watch: {
+          deps: ["pick"],
+          run: () => {
+            runs.push(readPick());
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: first });
+    const readPick = () => system.derive.pick;
+    system.start();
+    // Compute it once so the edge from `a` exists.
+    void system.derive.pick;
+    await settle();
+    runs.length = 0;
+
+    // `a` is a dependency, and this is what that looks like.
+    system.facts.a = 2;
+    await settle();
+    expect(runs).toEqual([2]);
+
+    // The replacement reads `b` and never `a`.
+    const second = createModule("second-links", {
+      schema: {
+        facts: { c: t.number() },
+        derivations: { pick: t.number() },
+      },
+      init: (facts) => {
+        facts.c = 0;
+      },
+      derive: { pick: (facts: { b: number }) => facts.b } as never,
+    });
+    system.registerModule(second as never);
+    await settle();
+
+    expect(system.derive.pick).toBe(100);
+    runs.length = 0;
+
+    // `a` is not a dependency of anything any more, so writing it wakes
+    // nobody. A fresh state object discarded the old dependency set, so the
+    // diff that removes stale links compared the new deps against an empty
+    // set and left `a -> pick` standing — and every write to `a` went on
+    // invalidating a derivation that had stopped reading it.
+    system.facts.a = 3;
+    await settle();
+    expect(runs).toEqual([]);
+
+    // And the dependency it does have still drives it, so this is not the
+    // link being severed wholesale.
+    system.facts.b = 200;
+    await settle();
+    expect(runs).toEqual([200]);
 
     system.destroy();
   });

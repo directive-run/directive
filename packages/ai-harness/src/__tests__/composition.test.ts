@@ -249,6 +249,49 @@ describe("runComposition", () => {
     expect(started).toHaveLength(1);
   });
 
+  it("lets the turn in flight finish when the interrupt lands mid-stream", async () => {
+    // The test above aborts between turns, where there is nothing in flight for
+    // a cancel to reach. This aborts while a turn is streaming, which is the
+    // arrangement an operator's Ctrl-C actually produces — and the one where
+    // handing the resolver's own signal to the provider turned the interrupt
+    // into a provider failure.
+    const controller = new AbortController();
+    const events: HarnessEvent[] = [];
+    const presets = [
+      stepPreset("first", "synth-one"),
+      stepPreset("second", "synth-two"),
+    ];
+    presets[0] = { ...(presets[0] as PresetConfig), maxIterations: 20 };
+
+    const result = await runComposition(presets, "the subject", {
+      runner: recordingRunner([]),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+      signal: controller.signal,
+      onEvent: (event) => {
+        events.push(event);
+        if (event.type === "turn:delta" && event.iteration === 1) {
+          queueMicrotask(() => controller.abort());
+        }
+      },
+    });
+
+    expect(result.interrupted).toBe(true);
+    expect(result.failure).toBe("");
+    expect(result.steps).toHaveLength(1);
+    // The step reports the operator's act, not a fault, and it still wrote its
+    // closing document.
+    expect(result.steps[0]?.stopReason).toBe("interrupted");
+    expect(result.steps[0]?.synthesis).toContain(FIRST_MARKER);
+    // Nothing anywhere in the composition called it an error.
+    expect(events.filter((event) => event.type === "error")).toEqual([]);
+    // And the composition closed itself out rather than waiting on a step it
+    // had let go of.
+    expect(events.some((event) => event.type === "composition:complete")).toBe(
+      true,
+    );
+  });
+
   it("starts nothing at all when the signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
