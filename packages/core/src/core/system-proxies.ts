@@ -286,6 +286,21 @@ export function createModuleFactsProxy(
 
       return true;
     },
+    // Without this the proxy enumerates as empty while every read still
+    // works, so `{ ...facts }`, `Object.keys(facts)` and `JSON.stringify(facts)`
+    // quietly produce `{}` for a namespaced module. Spread is how a snapshot is
+    // usually taken, which makes the empty result look like an empty module.
+    ownKeys: () => {
+      const prefix = `${namespace}${SEPARATOR}`;
+      const keys: string[] = [];
+      for (const key of Object.keys(facts)) {
+        if (key.startsWith(prefix)) {
+          keys.push(key.slice(prefix.length));
+        }
+      }
+
+      return keys;
+    },
   });
 
   namespaceCache.set(namespace, proxy);
