@@ -141,9 +141,11 @@ interface EffectState {
   hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
   dependencies: Set<string> | null; // null = not yet tracked
   /**
-   * Declared `deps` names that did not resolve to a derivation, kept so they
-   * can be asked again. Empty once every name has resolved; `null` for an
-   * effect with no explicit `deps`. See {@link EffectState.hasExplicitDeps}.
+   * Declared `deps` names that name nothing the system holds yet — neither a
+   * fact key nor a derivation — kept so they can be asked again. Empty once
+   * every name has resolved, which for a `deps` array written against declared
+   * facts is from the first call; `null` for an effect with no explicit `deps`.
+   * See {@link EffectState.hasExplicitDeps}.
    */
   unresolvedDeps: string[] | null;
   /** The raw `deps` array, for re-resolving {@link EffectState.unresolvedDeps}. */
@@ -180,6 +182,20 @@ export interface CreateEffectsOptions<S extends Schema> {
    * module set. Defaults to "nothing is a derivation".
    */
   isDerivation?: (name: string) => boolean;
+  /**
+   * Whether a name in an explicit `deps` array refers to a declared fact.
+   *
+   * Only used to decide which names are worth asking about again. A name that
+   * already means a fact is settled — {@link CreateEffectsOptions.isDerivation}
+   * resolves a fact/derivation collision toward the fact, so a declared fact key
+   * cannot later come to mean a derivation — and re-asking it every reconcile is
+   * work with no reachable answer.
+   *
+   * Supplied by the engine alongside `isDerivation`, from the same merged module
+   * set. Defaults to "nothing is a declared fact", which costs a re-ask per
+   * reconcile and decides nothing differently.
+   */
+  isFactKey?: (name: string) => boolean;
   /** Called when an effect executes, with the fact keys that triggered it. */
   onRun?: (id: string, deps: string[]) => void;
   /** Called when an effect's `run()` or cleanup function throws. */
@@ -241,6 +257,7 @@ export function createEffectsManager<S extends Schema>(
     facts,
     store,
     isDerivation = () => false,
+    isFactKey = () => false,
     onRun,
     onError,
   } = options;
@@ -262,8 +279,20 @@ export function createEffectsManager<S extends Schema>(
   >();
 
   /**
+   * Whether the system now holds something under this name, either way.
+   *
+   * A name that means a fact and a name that means a derivation are both
+   * answered: the first keeps the bare key, the second takes the namespaced
+   * form, and either way the question has been settled and does not need asking
+   * again.
+   */
+  function isKnownName(name: string): boolean {
+    return isDerivation(name) || isFactKey(name);
+  }
+
+  /**
    * A declared `deps` array, on the keyspace auto-tracking uses, plus the names
-   * that did not land on a derivation.
+   * that the system does not yet hold anything under.
    *
    * `isDerivation` is a live lookup over the merged module set, so what a name
    * means is not fixed when the effect is registered — registering an effect
@@ -272,6 +301,11 @@ export function createEffectsManager<S extends Schema>(
    * Resolving once at registration made that order significant and silently so:
    * the effect kept the bare name, nothing ever announces a bare derivation
    * name, and the effect never ran again.
+   *
+   * A name the system already holds is not carried forward. That is the whole
+   * of the second return value: it is the list of names still capable of
+   * changing meaning, and for the ordinary `deps` array — every name a fact the
+   * module declares — it is empty on the first call and stays that way.
    */
   function resolveDeps(raw: readonly string[]): {
     dependencies: Set<string>;
@@ -285,7 +319,9 @@ export function createEffectsManager<S extends Schema>(
         dependencies.add(derivationDep(name));
       } else {
         dependencies.add(name);
-        unresolved.push(name);
+        if (!isFactKey(name)) {
+          unresolved.push(name);
+        }
       }
     }
 
@@ -293,16 +329,16 @@ export function createEffectsManager<S extends Schema>(
   }
 
   /**
-   * Ask the unresolved names again, and rebuild if one of them now names a
-   * derivation. A no-op once every name has resolved, and a handful of property
-   * lookups until then.
+   * Ask the unresolved names again, and rebuild if the system has since come to
+   * hold one of them. A no-op once every name has resolved, and a handful of
+   * property lookups until then.
    */
   function refreshDeps(state: EffectState): void {
     const pending = state.unresolvedDeps;
     if (state.rawDeps === null || pending === null || pending.length === 0) {
       return;
     }
-    if (!pending.some(isDerivation)) {
+    if (!pending.some(isKnownName)) {
       return;
     }
 
@@ -422,8 +458,9 @@ export function createEffectsManager<S extends Schema>(
       return false;
     }
 
-    // Declared names are re-asked here rather than trusted from registration —
-    // see `resolveDeps`.
+    // Declared names that the system did not hold at registration are re-asked
+    // here rather than trusted from it — see `resolveDeps`. Names it did hold
+    // are settled and this costs nothing.
     refreshDeps(state);
 
     // If effect has tracked deps (explicit or auto-tracked), check if any changed

@@ -415,8 +415,12 @@ export interface QueryDefinition<TData> {
    * teardown, and the two look identical from inside it. This fires only at
    * teardown, so a cleanup is free to mark rather than tear down and let this
    * be the one that acts.
+   *
+   * Receives the facts of the system that is stopping. A definition can back
+   * any number of systems at once, so a teardown that did not know which one
+   * had stopped could only release everything it held.
    */
-  readonly onStop?: () => void;
+  readonly onStop?: (facts: Record<string, unknown>) => void;
 
   // --- Imperative handles ---
 

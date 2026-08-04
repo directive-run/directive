@@ -417,6 +417,69 @@ describe("createSubscription", () => {
       system.destroy();
       expect(cleanup).toHaveBeenCalled();
     });
+
+    it("destroying one system leaves another system's stream alone", async () => {
+      const cleanup = vi.fn();
+      const captured: Array<{ onData: (data: unknown) => void }> = [];
+
+      // One definition, two systems — the shape of request-scoped systems,
+      // isolated tests, and a worker serving more than one tenant.
+      const sub = createSubscription({
+        name: "price",
+        key: () => ({ ticker: "AAPL" }),
+        subscribe: (_params: unknown, callbacks: unknown) => {
+          captured.push(callbacks as { onData: (data: unknown) => void });
+
+          return cleanup;
+        },
+      });
+      const mod = createModule(
+        "test",
+        withQueries([sub], {
+          schema: {
+            facts: {},
+            derivations: {},
+            events: {},
+            requirements: {},
+          } satisfies ModuleSchema,
+        }),
+      );
+
+      const first = createSystem({ module: mod });
+      first.start();
+      await flushMicrotasks(20);
+      const second = createSystem({ module: mod });
+      second.start();
+      await flushMicrotasks(20);
+
+      expect(captured).toHaveLength(2);
+      captured[0]!.onData({ price: 1, ticker: "AAPL" });
+      captured[1]!.onData({ price: 2, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      first.destroy();
+
+      // Only the stopping system's stream was closed.
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(second.isRunning).toBe(true);
+
+      const afterDestroy = second.read("price") as ResourceState<unknown>;
+      expect(afterDestroy.status).toBe("success");
+
+      // The state above reads healthy either way — what a closed stream
+      // actually costs is everything that arrives afterwards.
+      captured[1]!.onData({ price: 3, ticker: "AAPL" });
+      await flushMicrotasks();
+
+      const state = second.read("price") as ResourceState<{
+        price: number;
+        ticker: string;
+      }>;
+      expect(state.data).toEqual({ price: 3, ticker: "AAPL" });
+
+      second.destroy();
+      expect(cleanup).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("setData", () => {

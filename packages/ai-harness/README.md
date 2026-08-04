@@ -415,11 +415,11 @@ system.events.chain.start({ input: diff });
 
 The chain then shares your plugins, your devtools session, and your reconciliation loop. `bind` needs the namespace in the `modules:` form and refuses it in the `module:` form, loudly, because getting it wrong otherwise means every gating derivation reads `undefined` and the chain sits idle saying nothing.
 
-`harness.system` is exposed on purpose in all of these. It is an ordinary Directive system – `inspect()` it, attach an observer, read `system.derive.stopReason` mid-run, destroy it when you like. Hiding it behind a façade would only re-expose the same things under worse names. Reading facts off it is fine; writing them is not, because every fact has a resolver or an event that owns it.
+`harness.system` is exposed on purpose in all of these. It is an ordinary Directive system – `inspect()` it, attach an observer, destroy it when you like. Hiding it behind a façade would only re-expose the same things under worse names. It is typed `System<never>`, though: the schema belongs to the module and the module is an implementation detail, so `system.facts.iteration` and `system.derive.stopReason` do not compile through it. A caller holds this handle to inspect and destroy, not to type against – the chain's account of itself is the event stream and the run result, and every figure you might want mid-run is on a `HarnessEvent`. Writing facts through it is not supported at all, because every fact has a resolver or an event handler that owns it.
 
 **The library writes nothing to disk unless you tell it where.** The default transcript store keeps the run in memory and reports paths as `memory://run-….md`, which surprises people who expect files. The filesystem is a separate entry point – `@sizls/ai-harness/node` – rather than a named export from the package root, because a static re-export is not conditional: importing `runHarness` would have imported `node:fs` with it. Nothing on the package's main entry loads a node builtin, so it runs on a worker, an edge runtime, or a bundle for the browser. The CLI supplies the file store for you; a server surface supplies its own, and the chain never learns there was no disk.
 
-Everything a surface can see comes through `onEvent` as a `HarnessEvent` – turn started, delta, restarted, completed, cost updated, budget warning, synthesis started, chunk, phase change, chain complete, plus four `composition:*` events. The CLI has no private channel; it reads the same union and renders it.
+Everything a surface can see comes through `onEvent` as a `HarnessEvent` – turn started, delta, restarted, completed, cost updated, budget warning, synthesis started, chunk, restarted, phase change, chain complete, plus four `composition:*` events. The CLI has no private channel; it reads the same union and renders it.
 
 ## How it's built
 
@@ -495,14 +495,14 @@ Reusing a run ID is refused rather than half-honoured, because the markdown is r
 
 ## Exit codes
 
-`harness … && ship` should not ship on a run that produced nothing, so the outcome is on the exit code and not only on the screen. The line the codes are drawn along is "is there a closing document", because that is the thing a caller chains onto.
+`harness … && ship` should not ship on a run that produced nothing, so the outcome is on the exit code and not only on the screen. The line the codes are drawn along is "did the caller get what they asked for", because that is the thing a caller chains onto.
 
 | Code | Meaning |
 | ---- | ------- |
-| `0` | Finished, and a closing document was written. |
-| `1` | The command could not run — a bad flag, an unreadable `--input-file`, a preset that resolves to nothing, no API key. Nothing was spent. |
-| `2` | Finished, and produced no closing document. Nothing failed: the budget could not cover a first turn alongside the synthesis, or ran out before the synthesis came due, or an interrupt arrived before the first turn did. The line above the totals says which. |
-| `3` | A run failed — the synthesizer threw, a composition step could not run, or the provider refused every attempt. |
+| `0` | Finished, and produced everything asked for — a closing document, and one from every step of a `--compose`. A single interrupt lands here when it still produced one: that is what one interrupt asks for. |
+| `1` | The command could not run — a bad flag, an unreadable `--input-file`, a preset that resolves to nothing, no API key, nothing on stdin. Nothing was spent. |
+| `2` | Finished short of what was asked for, without anything failing. Either no closing document — the budget could not cover a first turn alongside the synthesis, or ran out before the synthesis came due, or an interrupt arrived before the first turn did — or a `--compose` that could not afford all of its steps. A larger `--budget` or `--total-budget` is the answer; the line above the totals says which case it was. |
+| `3` | A run failed — the synthesizer threw, a turn's provider call failed every attempt, a composition step could not run, or the transcript could not be written. A failed turn lands here even when the chain went on to synthesize what it had: the document is real and so is the gap underneath it. |
 | `130` | Interrupted twice. One interrupt is not this: the chain synthesizes what it has and exits on its own outcome. |
 
 ## Untrusted input

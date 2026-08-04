@@ -11,19 +11,33 @@ Constraints and effects auto-track what their bodies read, and that tracking was
 
 The visible symptom is a constraint that will not fire. The derivation flips, every direct reader sees the new value, `system.derive.total` returns it correctly — and the constraint keeps answering with whatever it computed at startup, because nothing knew it cared.
 
+A constraint's `when()` receives facts. It reads a derivation through the system's `derive` proxy, which means a reader bound once the system exists:
+
 ```typescript
-derive: {
-  overBudget: (facts) => facts.spent > facts.limit,
-},
-constraints: {
-  halt: {
-    // Evaluated once. `spent` changing did not bring it back, because the
-    // dependency recorded here was `overBudget`, and only fact keys were
-    // ever matched against.
-    when: (facts, derived) => derived.overBudget,
-    require: { type: "HALT" },
+let overBudget: () => boolean = () => false;
+
+const module = createModule("spend", {
+  schema: {
+    facts: { spent: t.number(), limit: t.number() },
+    derivations: { overBudget: t.boolean() },
+    requirements: { HALT: {} },
   },
-},
+  derive: {
+    overBudget: (facts) => facts.spent > facts.limit,
+  },
+  constraints: {
+    halt: {
+      // Evaluated once. `spent` changing did not bring it back: the read
+      // through `system.derive` registered no dependency, and even where one
+      // was recorded, only fact keys were ever matched against it.
+      when: () => overBudget(),
+      require: { type: "HALT" },
+    },
+  },
+});
+
+const system = createSystem({ module });
+overBudget = () => system.derive.overBudget;
 ```
 
 **What changes for you.** A constraint or effect in this shape starts re-evaluating, which means requirements that never fired may begin firing and effects that ran once may begin running again. That is the documented behavior of auto-tracking, and code written against the documentation is what starts working. But a system built around the old behavior — even unknowingly — will see new activity, which is why this is a minor rather than a patch.

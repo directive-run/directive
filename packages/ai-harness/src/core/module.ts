@@ -17,8 +17,9 @@
  * Here, the same chain is:
  *
  * - **Facts** — where the chain is. `iteration`, `spentUsd`, `interrupted`,
- *   `synthesized`, and the rest. Nothing but a resolver writes them, and no
- *   fact encodes a decision.
+ *   `synthesized`, and the rest. Nothing but a resolver or an event handler
+ *   writes them — `interrupted` is the event handler's, everything else is a
+ *   resolver's — and no fact encodes a decision.
  * - **Derivations** — what the facts mean. `canAffordTurn`, `chainStopped`,
  *   `turnPending`, `synthesisPending`, `phase`, `stopReason`. Every question
  *   the loop body used to answer inline is one of these, computed in exactly
@@ -193,6 +194,13 @@ export interface ChainDerived {
    * the input half — see the note on the four-characters-per-token measure in
    * `./projection.js`, which under-measures code and therefore under-measures
    * the three presets aimed at it.
+   *
+   * **It prices one attempt, not the retry envelope.** The runner may dispatch
+   * the call up to three times and bills each, so a run can finish above its
+   * ceiling. That is bounded by the ledger floor rather than by this figure —
+   * `./projection.js` sets out why reserving the envelope instead costs far
+   * more than it saves — and a run that ends above its ceiling now says so on
+   * the event stream.
    */
   synthesisReserveUsd: number;
   /**
@@ -1104,6 +1112,16 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
                 onToken: (token) => {
                   emit({ type: "synthesis:chunk", text: token });
                 },
+                // The same announcement the turn path makes, for the same
+                // reason: the runner is about to replay this response from the
+                // beginning, and a surface rendering chunks would otherwise
+                // show the abandoned attempt and the real document as one
+                // run-on paragraph. Nothing to clear on this side — the
+                // synthesis is not buffered into the transcript until it
+                // returns — so the event is the whole of it.
+                onStreamRestart: (reason) => {
+                  emit({ type: "synthesis:restarted", reason });
+                },
               },
             );
 
@@ -1287,6 +1305,24 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
             transcriptPath: facts.transcriptPath,
             jsonlPath: facts.jsonlPath,
           };
+
+          // Said before the run closes, because a run that went over its
+          // ceiling is the one outcome a caller cannot discover for themselves
+          // — the phase is `"complete"`, no ceiling reports having fired, and
+          // the fraction that knows was computed and thrown away. The overshoot
+          // is possible by construction: every ceiling here is a pre-call
+          // check, and a pre-call check can only refuse the call after the one
+          // that crossed the line.
+          if (completion.fraction > 1) {
+            emit({
+              type: "budget:overrun",
+              overshootUsd: completion.spentUsd - completion.budgetUsd,
+              spentUsd: completion.spentUsd,
+              budgetUsd: completion.budgetUsd,
+              remainingUsd: completion.remainingUsd,
+              fraction: completion.fraction,
+            });
+          }
 
           // Said before the run closes, and said plainly. A missing closing
           // document is the most visible thing about such a run, and without

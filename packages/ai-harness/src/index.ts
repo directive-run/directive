@@ -83,7 +83,6 @@ export {
 // Events — the one union every surface renders from
 // ---------------------------------------------------------------------------
 export type {
-  TurnSummary,
   ChainPhase,
   CompositionStep,
   CostSnapshot,

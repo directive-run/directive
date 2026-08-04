@@ -12,8 +12,19 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../agent-utils.js";
-import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
+import {
+  DEFAULT_STREAM_IDLE_MS,
+  createRunner,
+  createStreamDeadline,
+  validateBaseURL,
+  validateStreamTimeout,
+} from "../agent-utils.js";
+import {
+  type ModelPricing,
+  attachReportedUsage,
+  readReportedUsage,
+  toTokenPricingTable,
+} from "../pricing.js";
 import type { AdapterHooks, AgentRunner } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
@@ -337,7 +348,20 @@ export interface AnthropicRunnerOptions {
   maxTokens?: number;
   baseURL?: string;
   fetch?: typeof globalThis.fetch;
-  /** @default undefined */
+  /**
+   * Wall-clock cap on the whole call, in milliseconds, applied through
+   * `AbortSignal.timeout` – so a call that overruns it fails with an error named
+   * `"TimeoutError"`, distinct from an abort the caller raised.
+   *
+   * It caps a streamed call the same way it caps a buffered one: from the
+   * request going out to the last delta, however much the model had left to say.
+   * That is the right shape for a buffered call and a blunt one for a stream,
+   * where the interesting failure is silence rather than length – see
+   * {@link AnthropicStreamingRunnerOptions.timeoutMs}, which measures the gap
+   * between events instead.
+   *
+   * @default undefined – no deadline
+   */
   timeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
@@ -568,6 +592,35 @@ export interface AnthropicStreamingRunnerOptions {
   maxTokens?: number;
   baseURL?: string;
   fetch?: typeof globalThis.fetch;
+  /**
+   * How long the stream may say nothing before the call is abandoned, in
+   * milliseconds.
+   *
+   * **The gap between events, not the length of the call.** A streamed response
+   * runs for as long as the model has something to say, so a wall-clock cap on
+   * the whole call – which is what `timeoutMs` means on
+   * {@link AnthropicRunnerOptions} – either truncates a long answer or is set so
+   * high that it bounds nothing. The failure worth catching is a connection that
+   * is open and silent, and the measurement for that is how long it has been
+   * quiet. Every sign of life restarts the clock: the response headers, each
+   * delta, and the keep-alive pings Anthropic sends while it works.
+   *
+   * The default is two minutes of silence. A healthy stream is never anywhere
+   * near that quiet – `message_start` follows the request almost immediately and
+   * pings arrive throughout – so the interval is generous enough to survive a
+   * slow start on a very large transcript while still bounding a stall to
+   * something a person waiting on the turn will sit through.
+   *
+   * A stalled stream fails with an error named `"TimeoutError"`, matching what
+   * `AbortSignal.timeout` raises on the buffered path, so a caller can tell a
+   * provider that stopped talking from a run they cancelled themselves.
+   *
+   * `Infinity` disables the deadline and leaves `callbacks.signal` as the only
+   * thing that can end a stalled stream.
+   *
+   * @default 120_000
+   */
+  timeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
   /** Sampling temperature (0–1). Higher = more random. */
@@ -602,6 +655,7 @@ export function createAnthropicStreamingRunner(
     maxTokens = 4096,
     baseURL = "https://api.anthropic.com/v1",
     fetch: fetchFn = globalThis.fetch,
+    timeoutMs = DEFAULT_STREAM_IDLE_MS,
     hooks,
     temperature,
     topP,
@@ -610,9 +664,20 @@ export function createAnthropicStreamingRunner(
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createAnthropicStreamingRunner");
+  validateStreamTimeout(timeoutMs, "createAnthropicStreamingRunner");
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
+    // Armed before the request goes out, so a connection that never answers is
+    // bounded by the same clock as one that answers and then stops. The
+    // caller's own signal is folded in rather than replaced – a deadline that
+    // took the fetch's only signal slot would disable cancellation to install
+    // a timeout, which is a trade nobody asked for.
+    const deadline = createStreamDeadline(
+      timeoutMs,
+      callbacks.signal,
+      "Anthropic",
+    );
 
     try {
       const response = await fetchFn(`${baseURL}/messages`, {
@@ -632,8 +697,9 @@ export function createAnthropicStreamingRunner(
           messages: [{ role: "user", content: input }],
           stream: true,
         }),
-        signal: callbacks.signal,
+        signal: deadline.signal,
       });
+      deadline.touch();
 
       if (!response.ok) {
         await throwStreamingHTTPError(response, "Anthropic");
@@ -645,10 +711,17 @@ export function createAnthropicStreamingRunner(
         await parseEventStream(
           reader,
           callbacks.onToken,
-          parseAnthropicStreamEvent,
+          // Every event is a sign of life, pings included: a ping is the
+          // provider saying the connection is live and it is still working, and
+          // silence is the condition being measured.
+          (event) => {
+            deadline.touch();
+
+            return parseAnthropicStreamEvent(event);
+          },
           "Anthropic",
           "sse",
-          { signal: callbacks.signal, requireTerminalEvent: true },
+          { signal: deadline.signal, requireTerminalEvent: true },
         );
 
       const tokenUsage = { inputTokens, outputTokens };
@@ -673,9 +746,22 @@ export function createAnthropicStreamingRunner(
         usageReported,
       );
     } catch (err) {
-      fireErrorHook(hooks, agent, input, err, startTime);
+      // What a cancelled body rejects with is the runtime's business, and it is
+      // not always the reason the signal carried. When this deadline is what
+      // ended the call, the caller sees that and not whatever the socket said
+      // on its way down – the whole point of the deadline is being able to tell
+      // a stalled provider from an abort. Whatever the abandoned stream had
+      // already been billed for travels across with it; a call cut off before
+      // its first token has usually reported its input tokens, and those are
+      // most of the bill on a long transcript.
+      const error = deadline.expired
+        ? attachReportedUsage(deadline.reason, readReportedUsage(err))
+        : err;
+      fireErrorHook(hooks, agent, input, error, startTime);
 
-      throw err;
+      throw error;
+    } finally {
+      deadline.release();
     }
   };
 }

@@ -16,7 +16,9 @@
  * one end to end as a single run-on turn, which is precisely the corruption
  * the transcript's pending buffer exists to prevent. The closing document
  * *does* stream, because synthesis is the last thing that happens and there is
- * nothing after it to be confused by.
+ * nothing after it to be confused by — but it can be replayed too, so
+ * `synthesis:restarted` prints a rule across the output rather than letting two
+ * attempts run together.
  *
  * ## Why every field is sanitized on the way out
  *
@@ -129,7 +131,8 @@ function renderValue(value: unknown): string {
  * The two token-level events are the exception — one line per twenty-four
  * characters of model output is not a structural view of anything, and a
  * `--verbose` that scrolled them past would be less legible than the default.
- * `turn:restarted` is kept, because that is the one a delta consumer needs.
+ * The two `*:restarted` events are kept, because those are the ones a delta
+ * consumer needs.
  */
 function renderVerbose(event: HarnessEvent): string | undefined {
   if (TOKEN_EVENTS.has(event.type)) {
@@ -238,6 +241,9 @@ function renderProse(
     case "budget:warning":
       return `${pc.yellow(`  budget ${Math.round(event.fraction * 100)}% spent`)} ${pc.dim(`(${money(event.spentUsd)} of ${dollars(event.budgetUsd)})`)}\n\n`;
 
+    case "budget:overrun":
+      return `${pc.red(`  over budget by ${money(event.overshootUsd)}`)} ${pc.dim(`— ${money(event.spentUsd)} spent against a ceiling of ${dollars(event.budgetUsd)}. A call is billed for what it delivered before the ledger can refuse the next one, so a run can finish above its ceiling; this is by how much.`)}\n\n`;
+
     case "budget:synthesis-skipped":
       return `${pc.yellow("  no closing document —")} ${pc.dim(`the synthesis prices at ${money(event.reserveUsd)} and only ${money(event.remainingUsd)} of ${dollars(event.budgetUsd)} is left. The ${plural(event.iterations, "turn")} above ${event.iterations === 1 ? "is" : "are"} the whole run; raise the budget for a summary of them.`)}\n\n`;
 
@@ -246,6 +252,11 @@ function renderProse(
 
     case "synthesis:chunk":
       return stream(event.text);
+
+    case "synthesis:restarted":
+      return pc.dim(
+        `\n  ↻ restarting the closing document — ${safe(event.reason)}\n\n`,
+      );
 
     case "error":
       return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` turn ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;

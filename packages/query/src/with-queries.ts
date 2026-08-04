@@ -112,8 +112,12 @@ export function withQueries(
    * Separate from effect cleanups because they mean a different thing: a
    * cleanup fires before every re-run of its effect, and these fire only when
    * the system is actually going away.
+   *
+   * Each is handed the stopping system's facts. A query definition is a plain
+   * value that any number of systems can be built from, so "the system is going
+   * away" is only a useful signal if it also says *which* system.
    */
-  const stops: Array<() => void> = [];
+  const stops: Array<(facts: Record<string, unknown>) => void> = [];
 
   for (const query of queries) {
     // Merge schema facts
@@ -136,8 +140,11 @@ export function withQueries(
     if (query.effects) {
       Object.assign(allEffects, query.effects);
     }
-    if (typeof (query as { onStop?: () => void }).onStop === "function") {
-      stops.push((query as { onStop: () => void }).onStop);
+    const queryStop = (
+      query as { onStop?: (facts: Record<string, unknown>) => void }
+    ).onStop;
+    if (typeof queryStop === "function") {
+      stops.push(queryStop);
     }
 
     // Collect init functions
@@ -270,8 +277,11 @@ export function withQueries(
           ...userHooks,
           onStop: (system: unknown) => {
             userHooks?.onStop?.(system);
+            // The facts of the system that is stopping — the identity a
+            // teardown needs to leave every other system's work alone.
+            const { facts } = system as { facts: Record<string, unknown> };
             for (const stop of stops) {
-              stop();
+              stop(facts);
             }
           },
         };

@@ -25,6 +25,7 @@ import type {
   HarnessEventSink,
   StopReason,
 } from "./events.js";
+import { createEventFanOut } from "./fan-out.js";
 import { createHarnessChain } from "./module.js";
 import { assertPreset } from "./preset-registry.js";
 import type { PresetConfig } from "./preset-types.js";
@@ -54,6 +55,13 @@ export interface HarnessOptions {
   retry?: RetryConfig;
   /** Alternate Anthropic base URL. Ignored when `runner` is supplied. */
   baseURL?: string;
+  /**
+   * Wall-clock cap on one provider call, in milliseconds.
+   *
+   * Ignored when `runner` is supplied, since a stand-in decides its own
+   * deadlines. @default {@link DEFAULT_CALL_TIMEOUT_MS}
+   */
+  timeoutMs?: number;
   /**
    * Where this run's artefacts go.
    *
@@ -117,8 +125,15 @@ export interface Harness {
    * The Directive system running the chain.
    *
    * Exposed so a caller can `inspect()` it, attach an observer, or `destroy()`
-   * it. Reading facts off it is fine; writing them is not — every fact has a
-   * resolver or an event that owns it.
+   * it. It is deliberately typed `System<never>`: the schema is the module's,
+   * the module is an implementation detail, and a caller holds this to inspect
+   * and destroy rather than to type against. So `system.facts.iteration` and
+   * `system.derive.stopReason` do not compile through it — the chain's own
+   * account of itself is the event stream and {@link Harness.run}'s result, and
+   * a surface that wants a figure mid-run reads it from a `HarnessEvent`.
+   *
+   * Writing facts through it is not supported at all — every fact has a
+   * resolver or an event handler that owns it.
    */
   system: System<never>;
   /** The transcript, live. Readable mid-run. */
@@ -126,11 +141,22 @@ export interface Harness {
   /**
    * What this run has been billed so far, in dollars.
    *
-   * A method rather than a property, because it is live — the ledger is copied
-   * into the facts on every resolver exit, including the ones that threw, and a
-   * caller reading this after a failed turn gets what that turn actually cost.
-   * Readable mid-run, and readable after one; a composition reads it to charge
-   * a step whose `run()` rejected before it could report anything.
+   * Read straight off the runner's ledger rather than off the chain's
+   * `spentUsd` fact. The two are the same number most of the time and they are
+   * not the same number at the moment this accessor is most often reached for.
+   * The fact is a *copy*, written on a resolver's way out; while a call is
+   * still parked on the provider the copy holds what the previous exit left,
+   * and a caller who tears the system down mid-turn reads it before the
+   * resolver's `finally` has run. That reported `$0.0000` for a run that had
+   * spent twenty-two cents.
+   *
+   * The fact still exists and is still written, because derivations have to be
+   * able to go stale on spend and a ledger call is not something they can
+   * depend on. This accessor has no such need, so it does not inherit the lag.
+   *
+   * A method rather than a property because it is live. Readable mid-run, and
+   * readable after one; a composition reads it to charge a step whose `run()`
+   * rejected before it could report anything.
    */
   spentUsd(): number;
   /** Run the chain to completion. One run per harness. */
@@ -181,48 +207,10 @@ export function createHarnessSystem(
   // Every event goes through one fan-out. `run()` subscribes to it the same way
   // a surface does, rather than reaching for a second completion signal — one
   // channel means the promise cannot resolve on a different notion of "done"
-  // than the one the caller is watching.
-  const listeners = new Set<HarnessEventSink>();
-  if (options.onEvent) {
-    listeners.add(options.onEvent);
-  }
-  /**
-   * Guards the one recursion this fan-out can produce.
-   *
-   * A listener that throws is reported on the same channel every other problem
-   * is reported on — this file has no console of its own, because the event
-   * stream is the whole point of the event stream and a surface that swapped
-   * stdout for a socket would never see a `console.error`. Which means the
-   * report is itself an event, delivered to the listener that just threw. One
-   * level deep is a report; two is a loop, so the second level is dropped.
-   */
-  let reportingListenerFailure = false;
-  const emit: HarnessEventSink = (event) => {
-    const failures: string[] = [];
-
-    for (const listener of [...listeners]) {
-      try {
-        listener(event);
-      } catch (error) {
-        // A surface that throws while rendering is not the chain's problem,
-        // and must not become the chain's failure.
-        failures.push(error instanceof Error ? error.message : String(error));
-      }
-    }
-
-    if (failures.length === 0 || reportingListenerFailure) {
-      return;
-    }
-
-    reportingListenerFailure = true;
-    try {
-      for (const message of failures) {
-        emit({ type: "error", scope: "listener", message, at: now() });
-      }
-    } finally {
-      reportingListenerFailure = false;
-    }
-  };
+  // than the one the caller is watching. The fan-out itself is shared with the
+  // composition; see `./fan-out.js` for why a listener that throws is caught
+  // rather than allowed out.
+  const { listeners, emit } = createEventFanOut(now, options.onEvent);
 
   const agents = createHarnessAgents({
     preset: validated,
@@ -231,6 +219,9 @@ export function createHarnessSystem(
     pricing: options.pricing,
     retry: options.retry,
     baseURL: options.baseURL,
+    ...(options.timeoutMs === undefined
+      ? {}
+      : { timeoutMs: options.timeoutMs }),
   });
 
   // The chain checks the budget floor itself — see `createHarnessChain`, which
@@ -278,6 +269,20 @@ export function createHarnessSystem(
 
   let consumed = false;
 
+  /**
+   * The ledger, not the copy of it that lives in the facts.
+   *
+   * Everything a caller can reach outside a reconcile pass reports through
+   * this — the accessor on the returned harness, and the teardown message
+   * below. Both are read at moments the fact copy is stale by construction:
+   * `destroy()` runs `stop()`, the plugin's `onStop`, and the teardown handler
+   * synchronously, while the turn resolver is still parked on the provider
+   * call and its `finally` is ticks away.
+   */
+  function spentUsd(): number {
+    return agents.budgetRunner.getSpent("total");
+  }
+
   function snapshot(): HarnessRunResult {
     const phase = system.derive.phase;
 
@@ -302,9 +307,7 @@ export function createHarnessSystem(
     system: system as unknown as System<never>,
     transcript,
 
-    spentUsd() {
-      return system.facts.spentUsd;
-    },
+    spentUsd,
 
     async run(input) {
       if (consumed) {
@@ -329,7 +332,7 @@ export function createHarnessSystem(
           onTeardown = undefined;
           reject(
             new Error(
-              `[ai-harness] run "${runId}" was torn down before it finished. The system was stopped or destroyed with the chain still going, so every resolver was aborted and no closing document was written. ${system.facts.iteration} turns and $${system.facts.spentUsd.toFixed(4)} are on the transcript at ${transcript.markdownPath}.`,
+              `[ai-harness] run "${runId}" was torn down before it finished. The system was stopped or destroyed with the chain still going, so every resolver was aborted and no closing document was written. ${system.facts.iteration} turns and $${spentUsd().toFixed(4)} are on the transcript at ${transcript.markdownPath}.`,
             ),
           );
         };
@@ -347,7 +350,7 @@ export function createHarnessSystem(
         // chain saying so rather than the caller assuming it.
         () => system.isSettled && !system.derive.turnInFlight,
         () =>
-          `[ai-harness] run "${runId}" stopped without finishing. The system has nothing left to do — no resolver in flight, no reconcile pending — and no chain:complete was emitted. Phase ${JSON.stringify(system.derive.phase)}, ${system.facts.iteration} turns, $${system.facts.spentUsd.toFixed(4)} of $${system.derive.budgetUsd.toFixed(4)} spent${system.facts.failure === "" ? "" : `, last failure: ${system.facts.failure}`}.`,
+          `[ai-harness] run "${runId}" stopped without finishing. The system has nothing left to do — no resolver in flight, no reconcile pending — and no chain:complete was emitted. Phase ${JSON.stringify(system.derive.phase)}, ${system.facts.iteration} turns, $${spentUsd().toFixed(4)} of $${system.derive.budgetUsd.toFixed(4)} spent${system.facts.failure === "" ? "" : `, last failure: ${system.facts.failure}`}.`,
       );
 
       return snapshot();

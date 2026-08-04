@@ -62,6 +62,60 @@ describe("transcript", () => {
     await scratch.cleanup();
   });
 
+  it("marks the boundary when the closing document is replayed", async () => {
+    // The turn path announces a replay so a surface rendering deltas does not
+    // show two attempts as one run-on turn. The closing document streams too,
+    // and said nothing — so a retried synthesis rendered as partial, partial,
+    // and full, concatenated with no boundary anywhere.
+    const events: HarnessEvent[] = [];
+    const preset = testPreset({ budgetUsd: 100, maxIterations: 1 });
+
+    const harness = createHarnessSystem(preset, {
+      runner: createMockRunner({
+        responses: {
+          ...cannedResponses(),
+          synth: "SYNTHESIS: the whole document.",
+        },
+        failures: [{ agent: "synth", call: 1, afterDeltas: 1 }],
+      }),
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      runId: "synth-retry-run",
+      retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 },
+      onEvent: (event) => events.push(event),
+    });
+
+    const result = await harness.run("go");
+    harness.system.destroy();
+
+    const restarts = events.filter(
+      (event) => event.type === "synthesis:restarted",
+    );
+    expect(restarts).toHaveLength(1);
+    expect(restarts[0]).toMatchObject({ type: "synthesis:restarted" });
+    expect(
+      (restarts[0] as Extract<HarnessEvent, { type: "synthesis:restarted" }>)
+        .reason,
+    ).not.toBe("");
+
+    // The boundary sits between the abandoned chunks and the real ones, which
+    // is the only position that lets a surface discard what came before it.
+    const stream = events.filter(
+      (event) =>
+        event.type === "synthesis:chunk" ||
+        event.type === "synthesis:restarted",
+    );
+    const boundary = stream.findIndex(
+      (event) => event.type === "synthesis:restarted",
+    );
+    expect(boundary).toBeGreaterThan(0);
+    expect(
+      stream.slice(boundary + 1).every((e) => e.type === "synthesis:chunk"),
+    ).toBe(true);
+
+    // And the document itself is whole and single.
+    expect(result.synthesis).toBe("SYNTHESIS: the whole document.");
+  });
+
   it("holds one copy of a turn that was retried mid-stream", async () => {
     const events: HarnessEvent[] = [];
     const preset = testPreset({ budgetUsd: 100, maxIterations: 3 });

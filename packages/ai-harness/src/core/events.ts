@@ -33,7 +33,13 @@ export type ChainPhase =
   | "taking-turns"
   /** Turning is over; the synthesizer is producing the closing document. */
   | "synthesizing"
-  /** The chain finished — with or without a synthesis, depending on `stopReason`. */
+  /**
+   * The chain finished — with or without a closing document.
+   *
+   * Which of the two is `synthesisSkipped` on `chain:complete`, not
+   * `stopReason`: a chain stops for one reason and pays for its closing
+   * document out of what is left, and every stop reason can land either way.
+   */
   | "complete"
   /** The synthesizer itself failed, so there is no closing document. */
   | "failed";
@@ -110,20 +116,6 @@ export interface CompositionStep {
 // ============================================================================
 // Events
 // ============================================================================
-
-/** A turn that ran to completion and is now part of the transcript. */
-export interface TurnSummary {
-  /** Zero-based index of this turn in the chain. */
-  iteration: number;
-  /** The persona that produced it, by agent name. */
-  persona: string;
-  /** The turn's full text. */
-  text: string;
-  /** What this turn added to the running total, in dollars. */
-  costUsd: number;
-  /** Wall-clock ms at completion. */
-  at: number;
-}
 
 /** Everything the chain spent and everything it has left, in one shape. */
 export interface CostSnapshot {
@@ -202,6 +194,26 @@ export type HarnessEvent =
    */
   | ({ type: "budget:warning"; threshold: number } & CostSnapshot)
   /**
+   * The run finished having spent more than it was given.
+   *
+   * Emitted once, immediately before `chain:complete`, when `fraction` is above
+   * one. The chain's ceilings are layered predictions over a pre-call ledger
+   * check, and a pre-call check can only refuse the call *after* the one that
+   * crossed the line — so an overshoot is possible by construction, and the one
+   * thing that must not happen is for it to be possible *and* silent. A run
+   * that finished at 138% of its budget used to report `phase: "complete"`, no
+   * budget stop, and no error, with the figure computed and discarded.
+   *
+   * `overshootUsd` is what was spent above the ceiling. It is the number worth
+   * acting on: a caller who set the budget from a quota needs to know the quota
+   * moved further than they authorized.
+   */
+  | ({
+      type: "budget:overrun";
+      /** Dollars spent above `budgetUsd`. */
+      overshootUsd: number;
+    } & CostSnapshot)
+  /**
    * The closing document was given up on because it could not be paid for.
    *
    * The transcript is whole and the run is `"complete"` — nothing failed. What
@@ -231,6 +243,19 @@ export type HarnessEvent =
       text: string;
     }
   /**
+   * The closing document is starting over — a retry, a fallback, or a schema
+   * re-ask replayed it — so every `synthesis:chunk` already delivered is void.
+   *
+   * `turn:restarted` for the synthesizer, and it exists for the same reason: a
+   * surface that renders chunks as they arrive would otherwise show two
+   * abandoned attempts and the real document concatenated, with no boundary
+   * between them and no way to find one.
+   */
+  | {
+      type: "synthesis:restarted";
+      reason: string;
+    }
+  /**
    * The chain moved from one phase to the next.
    *
    * The chain's heartbeat at chain granularity, where `turn:completed` is the
@@ -244,7 +269,15 @@ export type HarnessEvent =
       iteration: number;
       spentUsd: number;
     }
-  /** The chain reached a terminal phase. Always the last event of a run. */
+  /**
+   * The chain reached a terminal phase.
+   *
+   * The last event a *chain* emits, and the one {@link Harness.run} resolves
+   * off. Not necessarily the last event a listener sees: a listener that throws
+   * while handling this one is reported back on the same stream, so an `error`
+   * with `scope: "listener"` can follow it. That report is delivered to every
+   * listener, including the one that threw.
+   */
   | {
       type: "chain:complete";
       runId: string;
@@ -329,7 +362,11 @@ export type HarnessEvent =
       requiredUsd: number;
       at: number;
     } & Omit<CompositionStep, "runId">)
-  /** Every step is done. Always the last event of a composition. */
+  /**
+   * Every step is done. The last event a composition emits, with the same
+   * caveat `chain:complete` carries: a listener that throws while handling it
+   * is reported back on this stream afterwards.
+   */
   | {
       type: "composition:complete";
       runId: string;

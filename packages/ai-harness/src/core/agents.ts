@@ -98,6 +98,8 @@ export interface HarnessAgentsOptions {
   /** Plugins for the orchestrator's own Directive system. */
   plugins?: Plugin[];
   baseURL?: string;
+  /** See {@link DEFAULT_CALL_TIMEOUT_MS}. Ignored when `runner` is supplied. */
+  timeoutMs?: number;
 }
 
 export interface HarnessAgents {
@@ -143,12 +145,20 @@ export function resolvePresetPricing(
  * The least a chain can cost and still produce a closing document.
  *
  * The synthesizer's output cap, at the output rate, and nothing else — no
- * turns, no transcript, no input. A budget below this cannot pay for the one
- * thing every run is supposed to end with, so the chain would spend whatever it
- * had on turns and then stop with nothing to show for them.
+ * turns, no transcript, no input, and one attempt rather than the retry
+ * policy's several. A budget below this cannot pay for the one thing every run
+ * is supposed to end with, so the chain would spend whatever it had on turns
+ * and then stop with nothing to show for them.
  *
  * A floor rather than an estimate: `maxTokens` is enforced by the provider, so
  * no synthesis can come in under it by more than the model chose to write.
+ *
+ * **One attempt, deliberately.** A retried synthesis is billed per attempt, so
+ * a run whose synthesizer fails twice mid-stream can finish above its ceiling
+ * — see `synthesisReserveUsd` in `./projection.js`, which measures what
+ * pricing the whole envelope here would cost. It would refuse two of the
+ * shipped presets outright at the budgets they document. The overshoot is
+ * instead bounded by the ledger floor and reported by `budget:overrun`.
  */
 export function minimumBudgetUsd(
   preset: PresetConfig,
@@ -204,6 +214,27 @@ export function minimumStepBudgetUsd(
     (preset.tokensPerTurn / 1_000_000) * pricing.outputPerMillion
   );
 }
+
+/**
+ * How long one provider call may run before it is abandoned.
+ *
+ * There has to be a number here, because the whole interrupt design rests on
+ * "the turn in flight finishes" and nothing was making that true. The adapter
+ * applies a deadline only when it is given one, and this package never gave it
+ * one — so a stream that opened and then went quiet left the first Ctrl-C
+ * waiting on a turn that was never going to end, with no second signal short of
+ * killing the process.
+ *
+ * Ten minutes: far longer than any call this package makes should take — a turn
+ * is capped at `tokensPerTurn` and the closing document at the synthesizer's
+ * `maxTokens`, both a few thousand tokens, which is a minute or two of
+ * streaming at a bad rate — and short enough that a stalled run ends on its own
+ * rather than on an operator noticing. It is a backstop against a connection
+ * that stopped talking, not a performance budget, and it is deliberately not
+ * tight: a deadline that fires on a slow-but-healthy call turns a delay into a
+ * retry and a retry into a bill.
+ */
+export const DEFAULT_CALL_TIMEOUT_MS = 600_000;
 
 /** Retry policy when the caller does not supply one. */
 const DEFAULT_RETRY: RetryConfig = {
@@ -269,6 +300,7 @@ export function createHarnessAgents(
     retry,
     plugins = [],
     baseURL,
+    timeoutMs = DEFAULT_CALL_TIMEOUT_MS,
   } = options;
 
   if (runner === undefined && apiKey === undefined) {
@@ -277,7 +309,8 @@ export function createHarnessAgents(
     );
   }
 
-  const base = runner ?? createAnthropicDispatcher(preset, apiKey!, baseURL);
+  const base =
+    runner ?? createAnthropicDispatcher(preset, apiKey!, baseURL, timeoutMs);
   const rates = resolvePresetPricing(preset, pricing);
 
   // A ledger, and a floor under it.
@@ -398,6 +431,7 @@ function createAnthropicDispatcher(
   preset: PresetConfig,
   apiKey: string,
   baseURL: string | undefined,
+  timeoutMs: number,
 ): AgentRunner {
   const adapters = new Map<number, AgentRunner>();
 
@@ -411,6 +445,7 @@ function createAnthropicDispatcher(
       apiKey,
       model: preset.model,
       maxTokens,
+      timeoutMs,
       ...(preset.temperature !== undefined
         ? { temperature: preset.temperature }
         : {}),

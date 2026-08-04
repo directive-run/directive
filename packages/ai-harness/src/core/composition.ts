@@ -59,7 +59,8 @@ import {
 } from "@directive-run/core";
 import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
 import { awaitCompletion } from "./completion.js";
-import type { HarnessEvent, HarnessEventSink } from "./events.js";
+import type { HarnessEventSink } from "./events.js";
+import { createEventFanOut } from "./fan-out.js";
 import type { PresetConfig } from "./preset-types.js";
 import {
   MAX_RUN_ID_LENGTH,
@@ -134,7 +135,19 @@ export interface CompositionResult {
    * or once the composition's ceiling is used up.
    */
   steps: CompositionStepResult[];
-  /** Every step's spend, summed. Never above {@link CompositionResult.budgetUsd}. */
+  /**
+   * Every step's spend, summed.
+   *
+   * Not bounded by {@link CompositionResult.budgetUsd}, and it used to say it
+   * was. The ceiling decides whether the *next* step may start, which is the
+   * only decision a composition gets to make about money — a step already
+   * running is governed by its own harness, and a harness is itself bounded by
+   * a pre-call ledger check that can be crossed by the call it was checked
+   * against. Two layers of "refuse the next one" cannot add up to "the total
+   * never exceeds", and a caller who needs the total to hold should set
+   * `totalBudgetUsd` with room for a step to overshoot rather than read this
+   * figure as a guarantee.
+   */
   spentUsd: number;
   /**
    * The ceiling this composition ran under, across every step.
@@ -457,16 +470,10 @@ export async function runComposition(
   // One fan-out, subscribed to the same way a surface subscribes. The promise
   // this function returns resolves off the event stream rather than off a
   // second completion signal, so it cannot resolve on a different notion of
-  // "done" than the caller is watching.
-  const listeners = new Set<HarnessEventSink>();
-  if (onEvent) {
-    listeners.add(onEvent);
-  }
-  const emit: HarnessEventSink = (event: HarnessEvent) => {
-    for (const listener of [...listeners]) {
-      listener(event);
-    }
-  };
+  // "done" than the caller is watching. Shared with the chain, which is what
+  // keeps a listener that throws from stranding the step counter — see
+  // `./fan-out.js`.
+  const { listeners, emit } = createEventFanOut(now, onEvent);
 
   const budgetUsd =
     totalBudgetUsd ??
@@ -616,13 +623,6 @@ export async function runComposition(
             return;
           }
 
-          // Dispatched. `stepInFlight` holds from here until the `finally`
-          // below, which is what keeps the composition from writing itself up
-          // while a step it interrupted is still synthesizing — and what keeps
-          // it from waiting forever on a step that never got as far as
-          // running.
-          context.facts.stepsStarted = req.step + 1;
-
           const step = req.step + 1;
           const stepRunId = `${context.facts.runId}-${step}-${preset.id}`;
           const stepMeta = { step, total: presets.length, presetId: preset.id };
@@ -648,20 +648,32 @@ export async function runComposition(
               ? { ...preset, budgetUsd: remainingUsd }
               : preset;
 
-          emit({
-            type: "composition:step:started",
-            ...stepMeta,
-            runId: stepRunId,
-            at: now(),
-          });
-
           let harness: Harness | undefined;
 
+          // Dispatched, with nothing between the counter and the `try` that
+          // closes it. `stepInFlight` holds from here until the `finally`,
+          // which is what keeps the composition from writing itself up while a
+          // step it interrupted is still synthesizing — and what keeps it from
+          // waiting forever on a step that never got as far as running. Every
+          // statement that can throw therefore sits inside, including the
+          // announcement: an event fan-out that let a listener's throw out used
+          // to strand this counter open, and a stranded counter is the one
+          // failure the completion watchdog cannot see, because its own quiet
+          // test reads it.
+          context.facts.stepsStarted = req.step + 1;
+
           try {
-            // Inside the try, because building a harness is one of the things
-            // that can fail — an output directory already holding this step's
-            // transcript, a derived run ID over the identifier limit — and the
-            // counter above is already open by the time it does.
+            emit({
+              type: "composition:step:started",
+              ...stepMeta,
+              runId: stepRunId,
+              at: now(),
+            });
+
+            // Building a harness is one of the things that can fail — an
+            // output directory already holding this step's transcript, a
+            // derived run ID over the identifier limit — and the counter above
+            // is already open by the time it does.
             harness = createHarnessSystem(stepPreset, {
               ...rest,
               transcripts: store,
@@ -694,10 +706,17 @@ export async function runComposition(
             running = undefined;
             if (harness !== undefined) {
               stepSpentUsd = harness.spentUsd();
-              harness.system.destroy();
             }
+            // Both counters written before the step is torn down, because
+            // `destroy()` is the one call left in this block that can throw and
+            // the composition cannot survive losing them: an unwritten
+            // `stepsSettled` leaves `stepInFlight` true for good, which stops
+            // the composition settling and blinds the watchdog to it. Tearing
+            // the step down after they land costs nothing — the ledger read
+            // above is the only thing that needed the harness alive.
             context.facts.spentUsd = context.facts.spentUsd + stepSpentUsd;
             context.facts.stepsSettled = req.step + 1;
+            harness?.system.destroy();
           }
         },
         meta: { label: "Run composition step", category: "chain" },

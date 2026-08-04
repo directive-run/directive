@@ -79,13 +79,39 @@ export interface TurnCostState extends PromptSize {
 }
 
 /**
- * What the closing document will cost, in dollars.
+ * What the closing document will cost, in dollars — for **one** attempt.
  *
  * Not estimated from history — computed. The synthesizer's `maxTokens` is a
  * hard ceiling on its output, and the transcript it will read has a length that
- * can be measured, so both halves of the bill are known before the call is
+ * can be measured, so both halves of one call's bill are known before it is
  * made. The output half is exact; the input half is a character count divided
  * by four, which the module note says more about.
+ *
+ * ## What one attempt does not cover
+ *
+ * The runner chain puts `withRetry` *outside* `withBudget`, so every attempt is
+ * metered and every attempt is billed, and the shipped policy may dispatch the
+ * call three times. A synthesis authorized against this figure and then retried
+ * twice can therefore finish a run above its ceiling — measured at 138% of a
+ * budget on a synthesizer that emitted its full `maxTokens` and failed twice
+ * mid-stream.
+ *
+ * **Multiplying this by the attempt count is not the answer, and the numbers
+ * say so plainly.** Reserving the whole envelope on every run leaves two of the
+ * shipped presets unable to afford a single turn — `pre-mortem` and
+ * `brainstorm` go from four and five turns with a closing document to zero
+ * turns and none — halves `moonshot` from twelve turns to six, and leaves
+ * roughly half of every other preset's budget permanently unspent against a
+ * transient failure that almost never happens. That trades a certain,
+ * every-run loss of most of what a budget buys for a hedge against a rare one.
+ *
+ * What bounds the overshoot instead is the ledger floor underneath this: no
+ * call is dispatched once spend has reached `budgetUsd`, so the exposure is one
+ * call past the ceiling rather than the whole envelope. That bound is
+ * `withBudget`'s documented contract, not an accident here. What was genuinely
+ * wrong is that a run which finished above its ceiling said nothing at all
+ * about it — the fraction was computed and discarded. It is now announced; see
+ * the `budget:overrun` event.
  *
  * The system prompt measured here is the one that actually goes out — the
  * preset's plus the standing notice the harness appends to every voice.

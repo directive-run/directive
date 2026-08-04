@@ -26,7 +26,7 @@
  */
 
 import { normalizeTokenUsage } from "@directive-run/core/plugins";
-import type { RunResult } from "./types.js";
+import type { RunResult, TokenUsage } from "./types.js";
 
 // ============================================================================
 // Reading caller-supplied objects
@@ -593,7 +593,7 @@ export function describeUnpricedReason(reason: UnpricedReason): string {
     case "zero-usage":
       return "result.tokenUsage reported zero input, output, and cache tokens, which no provider bills for a call that ran";
     case "failed-call":
-      return "the runner threw, so the call reported no usage at all — the provider may still have billed for whatever it delivered first";
+      return "the runner threw, so no usage report covering the whole call exists — one that arrived before the failure describes only the part of the call that had happened by then";
     case "replayed-generation":
       return "text arrived for a generation that was replayed over — a retry, a fallback, or a schema re-ask — which the reported usage on the surviving result says nothing about";
     case "unusable-cost":
@@ -702,6 +702,111 @@ export function snapshotCallUsage(
       cacheWriteTokens,
     }),
   };
+}
+
+// ============================================================================
+// Usage a call reported before it failed
+// ============================================================================
+
+/**
+ * The property a failed call's token usage travels on.
+ *
+ * The same name it has on a successful result, because it is the same thing:
+ * what the provider said it counted. The only difference is what is carrying it.
+ */
+const REPORTED_USAGE = "tokenUsage";
+
+/**
+ * Record, on the error a call is about to throw, whatever the provider had
+ * already reported for it.
+ *
+ * A stream is billed as it goes, and it reports as it goes too — Anthropic
+ * sends the input token count in its opening `message_start` frame, before a
+ * single token of the answer exists. A call abandoned after that frame and
+ * before the first delta has been counted and billed in full on the input side,
+ * which on a long transcript is most of what the call was ever going to cost.
+ * Thrown away, it becomes a call that spent real money and recorded nothing,
+ * and every ceiling downstream is reading a total that is missing it.
+ *
+ * The usage rides on the error because the error is the only thing that comes
+ * back. Attached as a non-enumerable own property so it changes nothing about
+ * how the error prints, serializes, or compares — a wrapper that copies an
+ * error's own enumerable fields does not accidentally start carrying a usage
+ * report, and a test asserting on an error's shape does not start failing.
+ *
+ * Errors that cannot take the property — a frozen one, a primitive thrown as an
+ * error — are returned untouched. There is nothing to be done about them, and
+ * failing to record a bill is not worth throwing over on top of the failure
+ * that is already in flight.
+ *
+ * @param error - The error about to be thrown, returned unchanged.
+ * @param usage - What the provider reported, or `undefined` when it reported nothing.
+ * @internal
+ */
+export function attachReportedUsage<E>(
+  error: E,
+  usage: TokenUsage | undefined,
+): E {
+  if (usage === undefined || typeof error !== "object" || error === null) {
+    return error;
+  }
+
+  try {
+    Object.defineProperty(error, REPORTED_USAGE, {
+      value: usage,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+  } catch {
+    /* an error that will not hold the report is still the error to throw */
+  }
+
+  return error;
+}
+
+/**
+ * Read back what {@link attachReportedUsage} recorded, if anything.
+ *
+ * @internal
+ */
+export function readReportedUsage(error: unknown): TokenUsage | undefined {
+  const raw = readOwn(error, REPORTED_USAGE);
+
+  return raw === undefined || raw === null ? undefined : (raw as TokenUsage);
+}
+
+/**
+ * Resolve the usage a thrown call reported before it failed.
+ *
+ * The counterpart to {@link snapshotCallUsage} for the path where there is no
+ * result to read. A call that reported nothing is `"failed-call"`, exactly as
+ * before — and so is one whose report resolves to nothing usable, since a
+ * partial report is held to the same standard as a complete one. A poisoned
+ * count on the way out of a failure is no more billable than a poisoned count
+ * on the way out of a success.
+ *
+ * What the resolved case describes is a *partial* bill: the call did not
+ * finish, so the counts cover only what the provider had reported by the time
+ * it stopped. That makes them a floor under the real figure rather than the
+ * figure itself, which is why a call priced this way is still counted as one
+ * the ledger could not price exactly.
+ *
+ * @internal
+ */
+export function snapshotFailedCallUsage(error: unknown): UsageSnapshot {
+  const usage = readReportedUsage(error);
+  if (usage === undefined) {
+    return { kind: "unusable", reason: "failed-call" };
+  }
+
+  const snapshot = snapshotCallUsage({ tokenUsage: usage });
+
+  // Anything the ordinary reader could not resolve says the same thing here as
+  // an error carrying no report at all: the call failed and nobody counted it.
+  return snapshot.kind === "resolved"
+    ? snapshot
+    : { kind: "unusable", reason: "failed-call" };
 }
 
 /**

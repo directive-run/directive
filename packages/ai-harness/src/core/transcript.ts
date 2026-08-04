@@ -42,7 +42,14 @@ import { createFenceToken, fence } from "./safety.js";
 // Records
 // ============================================================================
 
-/** One completed turn. Also the shape of one line in the JSONL sidecar. */
+/**
+ * One completed turn, as the chain holds it.
+ *
+ * Not the shape of a sidecar line, though it is what a sidecar line is rendered
+ * from. `iteration` here is the zero-based index the fact store and the event
+ * stream mean by it, and the sidecar publishes a one-based `turn` instead so it
+ * agrees with the markdown's headings — see {@link renderSidecarLine}.
+ */
 export interface TurnRecord {
   iteration: number;
   persona: string;

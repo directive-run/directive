@@ -75,15 +75,25 @@ import type { SourceDef, SourcesDef } from "./types/sources.js";
 // ============================================================================
 
 /**
- * The changed-key the error boundary raises to ask for another reconcile after
- * an effect threw under the `"retry"` strategy.
+ * The changed-key the error boundary files when an effect throws under the
+ * `"retry"` strategy.
  *
  * Not a fact key — no fact by this name can exist, and no dependency set names
- * it. It exists to make the pending set non-empty so the tail of `reconcile`
- * schedules another pass. It is deliberately *not* carried across the effects
- * boundary in that pass: it is raised from inside the effects phase, about the
- * effects phase, and handing it back to the same phase has no fixed point —
- * the effect that failed re-runs, fails again, and raises it again.
+ * it, so it selects nothing. Every consumer of the changed-key set matches
+ * names against dependencies, which means this one is inert everywhere it is
+ * read: it marks the pass as having had something happen without claiming that
+ * any particular thing changed.
+ *
+ * The retry pass itself is scheduled outright at the point the key is filed,
+ * beside the `add`, rather than inferred from the set being non-empty. The key
+ * is filed anyway so that everything downstream of the effects phase in that
+ * pass — the constraint evaluation the set is copied into, and a history
+ * snapshot if the raise happened outside a reconcile — sees a set consistent
+ * with a reconcile having been asked for.
+ *
+ * It does not survive the pass. `state.changedKeys` is cleared once it has been
+ * copied for constraint evaluation, so nothing hands the key back to the phase
+ * that raised it.
  */
 const EFFECT_RETRY_KEY = "*";
 
@@ -412,6 +422,18 @@ export function createEngine<S extends Schema>(
   const isDerivationDepName = (name: string): boolean =>
     name in mergedDerive && !(name in mergedSchema);
 
+  /**
+   * Whether an explicit `deps` entry names a declared fact.
+   *
+   * The companion to `isDerivationDepName`, and live for the same reason:
+   * `registerModule` adds to the merged schema after the engine exists. It
+   * exists so a dependency resolver can tell "this name means a fact" from
+   * "this name means nothing yet" — the first is settled, because the rule
+   * above hands a collision to the fact, and the second is the only case worth
+   * revisiting.
+   */
+  const isFactKeyName = (name: string): boolean => name in mergedSchema;
+
   // Create plugin manager
   const pluginManager: PluginManager<S> = createPluginManager();
   for (const plugin of config.plugins ?? []) {
@@ -588,6 +610,7 @@ export function createEngine<S extends Schema>(
     facts,
     store,
     isDerivation: isDerivationDepName,
+    isFactKey: isFactKeyName,
     onRun: (id, deps) => {
       if (hasPlugins()) pluginManager.emitEffectRun(id);
       if (traceManager.currentTrace) {

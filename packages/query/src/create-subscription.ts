@@ -85,13 +85,16 @@ export interface SubscriptionDefinition<TData> {
   readonly resolvers: Record<string, unknown>;
   readonly effects: Record<string, unknown>;
   /**
-   * Close every established stream. Wired by `withQueries` to the module's
-   * `onStop`, which Directive calls after every effect cleanup has fired.
+   * Close the stream belonging to the stopping system. Wired by `withQueries`
+   * to the module's `onStop`, which Directive calls after every effect cleanup
+   * has fired, and handed that system's facts so the teardown can tell its own
+   * stream from one belonging to another system built from this same
+   * definition.
    *
    * A stream cannot be closed from an effect cleanup: that fires before every
    * re-run of the effect too, and the two are indistinguishable from inside it.
    */
-  readonly onStop: () => void;
+  readonly onStop: (facts: Record<string, unknown>) => void;
   setData: (facts: Record<string, unknown>, data: TData) => void;
 }
 
@@ -136,6 +139,23 @@ export function createSubscription<
   const prevKeyByFacts = new WeakMap<object, string>();
 
   /**
+   * The system a facts object belongs to, as an identity we can recover from
+   * both sides of a teardown.
+   *
+   * The effect body only ever sees facts, and in a namespaced system that is a
+   * module-scoped view rather than the store-wide proxy `onStop` is handed —
+   * two different objects over one system. What they share is the facts store
+   * underneath, which Directive exposes as `$store` on either view and creates
+   * exactly once per system. So the store is the thing that says "this system"
+   * no matter which door you came in through. A facts object with no store
+   * behind it stands for itself, which is the single-module case where the two
+   * views are the same object anyway.
+   */
+  function systemOf(facts: Record<string, unknown>): object {
+    return (facts.$store as object | undefined) ?? facts;
+  }
+
+  /**
    * The stream currently established, per system.
    *
    * Directive fires an effect's cleanup **before** re-running it as well as
@@ -154,8 +174,16 @@ export function createSubscription<
    * because it is building the replacement, and system stop, which arrives on
    * `onStop` after every cleanup has fired. A re-run marks and then clears the
    * mark, and the stream never notices.
+   *
+   * Keyed per system, because this closure is per *definition*. A subscription
+   * definition is an ordinary value: nothing stops two systems being built from
+   * it, and request-scoped systems, isolated tests, and multi-tenant workers all
+   * do exactly that. A registry that held every system's stream together would
+   * hand teardown a list it cannot tell apart, and stopping one system would
+   * close streams belonging to systems still running — silently, since closing a
+   * stream leaves its resource state reporting the last value it received.
    */
-  const liveByFacts = new WeakMap<
+  const liveBySystem = new WeakMap<
     object,
     {
       controller: AbortController;
@@ -165,18 +193,12 @@ export function createSubscription<
       marked: boolean;
     }
   >();
-  /** Every system's live stream, for the one signal that means teardown. */
-  const allLive = new Set<{
-    controller: AbortController;
-    unsubscribe: (() => void) | undefined;
-  }>();
 
   /** Close a stream for good. */
   function close(record: {
     controller: AbortController;
     unsubscribe: (() => void) | undefined;
   }): void {
-    allLive.delete(record);
     record.controller.abort();
     record.unsubscribe?.();
   }
@@ -222,6 +244,7 @@ export function createSubscription<
     effects: {
       [`${PREFIX}${name}_sub`]: {
         run: (facts: Record<string, unknown>) => {
+          const system = systemOf(facts);
           const currentKey = keyFn(facts);
           if (currentKey === null) {
             // Key gone (e.g. trigger fact cleared). The previous run's
@@ -229,9 +252,9 @@ export function createSubscription<
             // contract, so the AbortController is torn down already; here
             // we just clear the prev-key bookkeeping so a future re-key
             // to the same value still establishes a fresh subscription.
-            const gone = liveByFacts.get(facts);
+            const gone = liveBySystem.get(system);
             if (gone !== undefined) {
-              liveByFacts.delete(facts);
+              liveBySystem.delete(system);
               close(gone);
             }
             if (prevKeyByFacts.delete(facts)) {
@@ -252,7 +275,7 @@ export function createSubscription<
           // Track prev key off-fact so we don't depend on our own writes.
           const prevKey = prevKeyByFacts.get(facts) ?? null;
 
-          const live = liveByFacts.get(facts);
+          const live = liveBySystem.get(system);
 
           // Key hasn't changed and the stream is still established — this is a
           // re-run, not a re-key. Clear the mark the cleanup left and hand the
@@ -266,7 +289,7 @@ export function createSubscription<
           // Re-keyed. The stream being replaced goes now, because its
           // successor is built below and the two must not overlap.
           if (live !== undefined) {
-            liveByFacts.delete(facts);
+            liveBySystem.delete(system);
             close(live);
           }
 
@@ -368,8 +391,7 @@ export function createSubscription<
           record.teardown = () => {
             record.marked = true;
           };
-          liveByFacts.set(facts, record);
-          allLive.add(record);
+          liveBySystem.set(system, record);
 
           return record.teardown;
         },
@@ -384,10 +406,17 @@ export function createSubscription<
      * after every effect cleanup — so by this point a cleanup that was really
      * a re-run has already been cleared by the body that followed it, and what
      * is left is a stream nobody is going to re-establish.
+     *
+     * The facts belong to the system that is stopping, and only its stream is
+     * closed. Any other system built from this same definition is still running
+     * and still expecting its data.
      */
-    onStop: () => {
-      for (const record of [...allLive]) {
-        close(record);
+    onStop: (facts: Record<string, unknown>) => {
+      const system = systemOf(facts);
+      const live = liveBySystem.get(system);
+      if (live !== undefined) {
+        liveBySystem.delete(system);
+        close(live);
       }
     },
 

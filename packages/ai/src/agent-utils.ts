@@ -227,6 +227,160 @@ export function combineSignals(
 }
 
 // ============================================================================
+// Stream deadlines
+// ============================================================================
+
+/**
+ * How long a stream may say nothing before it is abandoned, when the adapter's
+ * caller did not choose an interval.
+ *
+ * Two minutes. The number has to clear the longest silence a healthy stream
+ * produces, and on a streamed call that is short: the provider acknowledges the
+ * request before it starts generating, and keeps the connection warm with
+ * keep-alive frames while it thinks. It also has to be short enough that a run
+ * nobody is going to get an answer from stops occupying the caller – an
+ * interrupt that waits for the turn in flight to finish has to be able to
+ * finish. Two minutes clears the first by a wide margin without failing the
+ * second, and a model that genuinely pauses for longer has `timeoutMs`.
+ *
+ * @internal
+ */
+export const DEFAULT_STREAM_IDLE_MS = 120_000;
+
+/**
+ * Reject a stream deadline that can never do anything, at adapter-creation
+ * time rather than on the first stalled call.
+ *
+ * @internal
+ */
+export function validateStreamTimeout(
+  timeoutMs: number,
+  functionName: string,
+): void {
+  if (timeoutMs === Number.POSITIVE_INFINITY) {
+    return;
+  }
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error(
+      `[Directive] ${functionName}: timeoutMs must be a positive number of milliseconds (received ${JSON.stringify(timeoutMs)}). Pass Infinity to run without a deadline.`,
+    );
+  }
+}
+
+/**
+ * A silence clock for one streamed call.
+ *
+ * The deadline a stream needs is not the one a buffered call needs. A buffered
+ * call has a single answer arriving at a single moment, so a wall-clock cap on
+ * the whole call – `AbortSignal.timeout(timeoutMs)` – says exactly the right
+ * thing. A stream has no such moment: its total duration is a function of how
+ * much the model chooses to say, so the same cap either cuts a healthy long
+ * generation off mid-sentence or is set so high that it no longer bounds
+ * anything. What goes wrong on a stream is not that it takes a long time, it is
+ * that it stops saying anything and never ends, and the measurement that catches
+ * that is the gap between events rather than the length of the call.
+ *
+ * So this measures silence. The clock starts when the request goes out and is
+ * restarted by every sign of life – response headers, a delta, a keep-alive
+ * ping – and when it runs out, the call is abandoned. A stream that talks for an
+ * hour is never touched; a stream that goes quiet is cut off a fixed interval
+ * later, whatever it had already delivered.
+ *
+ * @internal
+ */
+export interface StreamDeadline {
+  /**
+   * The signal to hand to `fetch` and to the stream reader – the caller's own
+   * signal and the deadline combined, so aborting either one ends the call.
+   */
+  readonly signal: AbortSignal | undefined;
+  /** Whether the deadline is what ended this call. */
+  readonly expired: boolean;
+  /**
+   * The error the deadline aborted with. Named `"TimeoutError"`, the same name
+   * `AbortSignal.timeout` gives the buffered path, so one check covers both and
+   * a provider that stalled is never mistaken for a caller that cancelled.
+   */
+  readonly reason: Error;
+  /** Something arrived: restart the clock. */
+  touch(): void;
+  /** Stop the clock. Call from a `finally`, once. */
+  release(): void;
+}
+
+/**
+ * Start a silence clock for one streamed call. See {@link StreamDeadline}.
+ *
+ * `idleMs` is the interval, and `Infinity` disables the deadline entirely,
+ * leaving the caller's signal as the only way to end a stalled stream.
+ *
+ * @internal
+ */
+export function createStreamDeadline(
+  idleMs: number,
+  callerSignal: AbortSignal | undefined,
+  adapterName: string,
+): StreamDeadline {
+  if (idleMs === Number.POSITIVE_INFINITY) {
+    return {
+      signal: callerSignal,
+      expired: false,
+      reason: streamTimeoutError(adapterName, idleMs),
+      touch: () => {},
+      release: () => {},
+    };
+  }
+
+  const controller = new AbortController();
+  const reason = streamTimeoutError(adapterName, idleMs);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = {
+    signal: combineSignals([controller.signal, callerSignal]),
+    expired: false,
+    reason,
+    touch: (): void => {
+      // Once it has fired the call is over; re-arming would only leave a timer
+      // running past the error that ended it.
+      if (deadline.expired) {
+        return;
+      }
+      deadline.release();
+      timer = setTimeout(() => {
+        deadline.expired = true;
+        controller.abort(reason);
+      }, idleMs);
+    },
+    release: (): void => {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+    },
+  };
+  deadline.touch();
+
+  return deadline;
+}
+
+/**
+ * The error a stalled stream ends with.
+ *
+ * A plain `Error` rather than a `DOMException`, which is what
+ * `AbortSignal.timeout` produces: the name is the part callers read, every
+ * runtime has `Error`, and an abort reason that is not an `Error` is replaced
+ * with a generic one on its way out of the stream reader.
+ */
+function streamTimeoutError(adapterName: string, idleMs: number): Error {
+  const error = new Error(
+    `[Directive] ${adapterName} stream sent nothing for ${idleMs}ms and was abandoned. The connection was open and silent – the provider stalled, or something between it and here did. Raise \`timeoutMs\` if this is a model that pauses for longer than that.`,
+  );
+  error.name = "TimeoutError";
+
+  return error;
+}
+
+// ============================================================================
 // createRunner Helper
 // ============================================================================
 

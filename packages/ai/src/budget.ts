@@ -43,6 +43,7 @@ import {
   isZeroRated,
   priceCall,
   snapshotCallUsage,
+  snapshotFailedCallUsage,
   snapshotTokenPricing,
 } from "./pricing.js";
 import type { TokenSink } from "./streaming.js";
@@ -151,11 +152,11 @@ export interface BudgetConfig {
    * An unpriced call is one the provider gave no usable price for — no
    * `tokenUsage`, a count no ledger can accept, an all-zero or explicitly
    * unreported usage, a cost that overflowed, or a call that threw. Whatever
-   * such a call delivered is charged, so the window still accrues and the
-   * ceiling still trips — but from measured text rather than a counted
-   * response, and a call that delivered nothing before failing is charged
-   * nothing at all. Past some number of them a hard budget is not being
-   * enforced against spend any more, it is being enforced against a guess.
+   * such a call reported or delivered is charged, so the window still accrues
+   * and the ceiling still trips — but from a partial account of the call rather
+   * than a complete one, and a call that left nothing behind at all is charged
+   * nothing. Past some number of them a hard budget is not being enforced
+   * against spend any more, it is being enforced against a guess.
    *
    * Counted over a rolling window, like the budgets themselves: the widest
    * window configured, or an hour when there is none. An outage that ends
@@ -844,6 +845,39 @@ export function withBudget(
       : options;
 
     /**
+     * A partial usage report, topped up with text the report does not cover.
+     *
+     * What a stream reports as it goes and what it has delivered as it goes are
+     * two different clocks. Anthropic sends the input count in its opening
+     * frame and the output count in its closing one, so a stream cut off in
+     * between carries a real input figure beside an output figure of zero,
+     * however much text has already arrived. Pricing that report as it stands
+     * bills the input side correctly and the output side at nothing.
+     *
+     * So the output side takes whichever is larger: what the provider reported,
+     * or what was measured arriving. Neither number is wrong — they are answers
+     * to the same question from two different moments, and the later one is the
+     * one that counts.
+     */
+    function withDeliveredOutput(
+      snapshot: UsageSnapshot,
+      deliveredChars: number,
+    ): UsageSnapshot {
+      if (snapshot.kind !== "resolved") {
+        return snapshot;
+      }
+      const delivered = Math.ceil(Math.max(0, deliveredChars) / charsPerToken);
+      if (delivered <= snapshot.usage.outputTokens) {
+        return snapshot;
+      }
+
+      return {
+        kind: "resolved",
+        usage: Object.freeze({ ...snapshot.usage, outputTokens: delivered }),
+      };
+    }
+
+    /**
      * Reconcile one completed attempt against every cap, and record it.
      *
      * Takes a {@link UsageSnapshot}, never a result: the usage is read once at
@@ -856,10 +890,16 @@ export function withBudget(
      * fallback, a schema re-ask — which are always charged from what arrived,
      * since no usage report covers them.
      *
-     * `chargeable` is whether anything arrived at all. A refused connection
-     * delivered nothing, so there is nothing to price and nothing is recorded;
-     * it is still counted, because a call that fails after dispatch may have
-     * been billed for work whose size is unknowable from here.
+     * `chargeable` is whether anything is known about the call: text that
+     * arrived, or counts the provider reported before it stopped. A refused
+     * connection has neither, so there is nothing to price and nothing is
+     * recorded; it is still counted, because a call that fails after dispatch
+     * may have been billed for work whose size is unknowable from here.
+     *
+     * `unpricedReason` counts the call as one the ledger could not price
+     * exactly even when the snapshot could price it — which is the case for
+     * every call that threw, since a report that arrived before the failure
+     * describes only the part of the call that had happened by then.
      */
     function settle(settlement: {
       snapshot: UsageSnapshot;
@@ -867,9 +907,16 @@ export function withBudget(
       extraChars: number;
       failed: boolean;
       chargeable: boolean;
+      unpricedReason?: UnpricedReason;
     }): void {
-      const { snapshot, observedChars, extraChars, failed, chargeable } =
-        settlement;
+      const {
+        snapshot,
+        observedChars,
+        extraChars,
+        failed,
+        chargeable,
+        unpricedReason,
+      } = settlement;
 
       // `tokenUsage` is optional, and plenty of runners never populate it. Left
       // uncounted, such a runner reads as $0 spent forever while real money
@@ -878,11 +925,12 @@ export function withBudget(
       // reports which it did, so the substitution is visible rather than
       // inferred.
       let estimatedReason: UnpricedReason | null =
-        snapshot.kind === "unusable"
+        unpricedReason ??
+        (snapshot.kind === "unusable"
           ? snapshot.reason
           : extraChars > 0
             ? "replayed-generation"
-            : null;
+            : null);
 
       if (chargeable) {
         // One record per window, not per budget: the ledger is shared, so a
@@ -1014,25 +1062,38 @@ export function withBudget(
         throw error;
       }
 
-      // Otherwise: charge what arrived before it failed, which for a stream cut
-      // short by a marker check or a truncated body is the whole response the
-      // provider generated and billed. A call that delivered nothing — a DNS
-      // failure, a refused connection, a pre-flight throw — cost nothing and is
-      // charged nothing; charging those at a predicted ceiling locked a $5/hour
-      // budget for a full hour over seventy-four connection refusals that never
-      // reached a provider.
+      // Otherwise: charge whatever is known about the call. Two things can be,
+      // and they arrive by different routes. What the provider *reported* before
+      // it stopped rides out on the error, and on a stream that is the input
+      // count — sent in the opening frame, before a token of the answer exists,
+      // and billed in full whether or not the answer ever arrives. What the
+      // provider *delivered* was counted as it streamed. A call abandoned
+      // during time-to-first-token has the first and not the second, which is
+      // the case that used to record nothing: on a long transcript the input
+      // side is most of the bill, and a run that spent it went into the ledger
+      // as free.
       //
-      // What *is* charged here is recorded separately as well, and
-      // `getFailedCallSpend` reports it. An operator watching a cap fill up can
-      // then see how much of it is money a provider counted and how much is a
-      // delivery this guard had to measure for itself, which is the question
-      // the single figure could not answer.
+      // A call that has neither — a DNS failure, a refused connection, a
+      // pre-flight throw — cost nothing and is charged nothing; charging those
+      // at a predicted ceiling locked a $5/hour budget for a full hour over
+      // seventy-four connection refusals that never reached a provider.
+      //
+      // Every failure is counted as unpriced regardless, including the ones
+      // priced from a report. A report that arrived before the failure covers
+      // the part of the call that had happened by then and nothing after it, so
+      // the figure is a floor rather than a price, and the count is what says
+      // so. What *is* charged here is recorded separately as well, and
+      // `getFailedCallSpend` reports it.
+      const reportedBeforeFailure = snapshotFailedCallUsage(error);
+
       settle({
-        snapshot: { kind: "unusable", reason: "failed-call" },
+        snapshot: withDeliveredOutput(reportedBeforeFailure, deliveredChars),
         observedChars: deliveredChars,
         extraChars: 0,
         failed: true,
-        chargeable: deliveredChars > 0,
+        chargeable:
+          reportedBeforeFailure.kind === "resolved" || deliveredChars > 0,
+        unpricedReason: "failed-call",
       });
 
       throw error;
@@ -1112,11 +1173,13 @@ export function withBudget(
    *
    * Read alongside `getSpent`, never instead of it: `getSpent("hour")` is what
    * the cap gates on, and this says how much of that figure came from a call
-   * that never returned. A throw carries no usage report, so whatever the
-   * provider delivered before it failed is measured and charged — right, since
-   * the provider generated and billed exactly that text, and unavoidably
-   * approximate, since no count for it ever arrived. A failure that delivered
-   * nothing is charged nothing and appears in neither figure.
+   * that never returned. A throw carries no report of the whole call, so the
+   * charge is built from what is known of it — the counts the provider had
+   * already reported, and the text that had already arrived, whichever of the
+   * two the failure left behind. Right, since the provider generated and billed
+   * exactly that, and unavoidably a floor, since nothing says what it billed
+   * afterwards. A failure that left neither is charged nothing and appears in
+   * neither figure.
    *
    * A figure that approaches `getSpent` means the cap is being consumed by
    * calls that break part-way through: a gateway truncating responses, a
@@ -1195,10 +1258,10 @@ export type BudgetRunner = AgentRunner & {
    * Get how much of {@link BudgetRunner.getSpent}'s figure was charged for
    * calls that threw, rather than for calls the provider completed.
    *
-   * A throw reports no usage, so whatever arrived before it is measured and
-   * charged against every cap; a failure that delivered nothing is charged
-   * nothing. Subtract this from `getSpent` for spend attributable to calls that
-   * returned.
+   * A throw reports nothing about the whole call, so what the provider had
+   * already reported and already delivered is charged against every cap; a
+   * failure that left neither is charged nothing. Subtract this from `getSpent`
+   * for spend attributable to calls that returned.
    */
   getFailedCallSpend(window: "hour" | "day" | "total"): number;
   /**

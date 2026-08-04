@@ -617,3 +617,194 @@ describe("createAnthropicStreamingRunner", () => {
     );
   });
 });
+
+// ============================================================================
+// createAnthropicStreamingRunner – the deadline on a stalled stream
+// ============================================================================
+
+/**
+ * An SSE body that emits its events on a clock, and then either ends or goes
+ * quiet with the connection still open.
+ *
+ * The signal is honoured the way a real fetch body honours it: a cancelled call
+ * errors the body with the signal's reason rather than leaving the reader
+ * parked. Without that a stalled-stream test would pass by hanging.
+ */
+function pacedSseResponse(config: {
+  events: string[];
+  gapMs: number;
+  signal?: AbortSignal;
+  thenStall?: boolean;
+}): Response {
+  const { events, gapMs, signal, thenStall = false } = config;
+  const encoder = new TextEncoder();
+  let index = 0;
+
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const event = events[index++];
+
+      return new Promise<void>((resolve, reject) => {
+        const onAbort = (): void => {
+          reject(signal?.reason ?? new Error("aborted"));
+        };
+        signal?.addEventListener("abort", onAbort, { once: true });
+        if (signal?.aborted) {
+          onAbort();
+
+          return;
+        }
+        if (event === undefined && thenStall) {
+          return;
+        }
+        setTimeout(() => {
+          signal?.removeEventListener("abort", onAbort);
+          if (event === undefined) {
+            controller.close();
+          } else {
+            controller.enqueue(encoder.encode(`${event}\n\n`));
+          }
+          resolve();
+        }, gapMs);
+      });
+    },
+  });
+
+  return new Response(body, {
+    status: 200,
+    statusText: "OK",
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+const OPENING_FRAME =
+  'data: {"type":"message_start","message":{"usage":{"input_tokens":4000}}}';
+
+describe("createAnthropicStreamingRunner – a stream that stops talking", () => {
+  it("abandons a stream that has gone quiet for timeoutMs", async () => {
+    vi.useFakeTimers();
+    try {
+      const mockFetch = vi.fn(async (_url: string, init: RequestInit) =>
+        pacedSseResponse({
+          events: [OPENING_FRAME],
+          gapMs: 0,
+          signal: init.signal ?? undefined,
+          thenStall: true,
+        }),
+      );
+
+      const streamingRunner = createAnthropicStreamingRunner({
+        apiKey: "test-key",
+        fetch: mockFetch as unknown as typeof fetch,
+        timeoutMs: 30_000,
+      });
+
+      const call = streamingRunner(mockAgent(), "Hi", {});
+      const settled = expect(call).rejects.toMatchObject({
+        name: "TimeoutError",
+      });
+
+      await vi.advanceTimersByTimeAsync(31_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("applies a two-minute deadline when the caller sets none", async () => {
+    vi.useFakeTimers();
+    try {
+      const mockFetch = vi.fn(async (_url: string, init: RequestInit) =>
+        pacedSseResponse({
+          events: [OPENING_FRAME],
+          gapMs: 0,
+          signal: init.signal ?? undefined,
+          thenStall: true,
+        }),
+      );
+
+      const streamingRunner = createAnthropicStreamingRunner({
+        apiKey: "test-key",
+        fetch: mockFetch as unknown as typeof fetch,
+      });
+
+      const call = streamingRunner(mockAgent(), "Hi", {});
+      const settled = expect(call).rejects.toThrow(/sent nothing for 120000ms/);
+
+      // Still running well past any single-call wall clock would allow.
+      await vi.advanceTimersByTimeAsync(119_000);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("measures the gap between events, not the length of the call", async () => {
+    vi.useFakeTimers();
+    try {
+      const mockFetch = vi.fn(async (_url: string, init: RequestInit) =>
+        pacedSseResponse({
+          events: [
+            OPENING_FRAME,
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"slow"}}',
+            'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":" but alive"}}',
+            'data: {"type":"message_delta","usage":{"output_tokens":5}}',
+            'data: {"type":"message_stop"}',
+          ],
+          // Every event arrives well inside the deadline; the call as a whole
+          // runs for four times it. A wall clock would have cut this off.
+          gapMs: 90_000,
+          signal: init.signal ?? undefined,
+        }),
+      );
+
+      const streamingRunner = createAnthropicStreamingRunner({
+        apiKey: "test-key",
+        fetch: mockFetch as unknown as typeof fetch,
+        timeoutMs: 120_000,
+      });
+
+      const call = streamingRunner(mockAgent(), "Hi", {});
+      await vi.advanceTimersByTimeAsync(10 * 90_000);
+
+      const result = await call;
+      expect(result.output).toBe("slow but alive");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names a stall differently from a cancellation", async () => {
+    const controller = new AbortController();
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) =>
+      pacedSseResponse({
+        events: [OPENING_FRAME],
+        gapMs: 0,
+        signal: init.signal ?? undefined,
+        thenStall: true,
+      }),
+    );
+
+    const streamingRunner = createAnthropicStreamingRunner({
+      apiKey: "test-key",
+      fetch: mockFetch as unknown as typeof fetch,
+      timeoutMs: 30_000,
+    });
+
+    const call = streamingRunner(mockAgent(), "Hi", {
+      signal: controller.signal,
+    });
+    const settled = expect(call).rejects.toMatchObject({ name: "AbortError" });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.abort();
+    await settled;
+  });
+
+  it("refuses a timeoutMs no stream could ever trip", () => {
+    expect(() =>
+      createAnthropicStreamingRunner({ apiKey: "test-key", timeoutMs: 0 }),
+    ).toThrow(/timeoutMs must be a positive number/);
+  });
+});

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { createAnthropicRunner } from "../adapters/anthropic.js";
 import {
   BudgetExceededError,
   UnpricedCallLimitError,
   withBudget,
 } from "../budget.js";
+import { attachReportedUsage } from "../pricing.js";
 import type { AgentRunner, RunResult } from "../types.js";
 
 // ============================================================================
@@ -1945,5 +1947,130 @@ describe("maxTotalCost", () => {
     expect(() =>
       withBudget(makeRunner(), { pricing: PRICING, maxTotalCost: -1 }),
     ).toThrow("maxTotalCost");
+  });
+});
+
+// ============================================================================
+// A call the provider counted and then never finished
+// ============================================================================
+
+describe("withBudget – a call abandoned after the provider counted it", () => {
+  /**
+   * An SSE body that opens with a usage frame and then never says another
+   * word, with the connection still up. A real fetch body errors when its
+   * signal aborts; this one does the same, so cancelling the run ends the read
+   * rather than parking it.
+   */
+  function stalledAfterOpeningFrame(
+    inputTokens: number,
+    signal: AbortSignal | undefined,
+  ): Response {
+    const encoder = new TextEncoder();
+    let sent = false;
+
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) {
+          sent = true;
+          controller.enqueue(
+            encoder.encode(
+              `data: {"type":"message_start","message":{"usage":{"input_tokens":${inputTokens}}}}\n\n`,
+            ),
+          );
+
+          return;
+        }
+
+        return new Promise<void>((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(signal.reason ?? new Error("aborted")),
+            { once: true },
+          );
+        });
+      },
+    });
+
+    return new Response(body, {
+      status: 200,
+      statusText: "OK",
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  }
+
+  it("charges the input tokens for a run cancelled before its first token", async () => {
+    // The shape that recorded nothing: a long transcript goes out, Anthropic
+    // counts it and says so in `message_start`, and the run is cancelled while
+    // the model is still thinking. Not one character of the answer arrived,
+    // and the input side of a call that size is most of the bill.
+    const mockFetch = vi.fn(async (_url: string, init: RequestInit) =>
+      stalledAfterOpeningFrame(120_000, init.signal ?? undefined),
+    );
+    const runner = withBudget(
+      createAnthropicRunner({
+        apiKey: "test-key",
+        fetch: mockFetch as unknown as typeof fetch,
+      }),
+      {
+        budgets: [{ window: "hour", maxCost: 1e9, pricing: DOLLAR_PER_TOKEN }],
+      },
+    );
+
+    const controller = new AbortController();
+    const call = runner(mockAgent(), "Hi", {
+      onToken: () => {},
+      signal: controller.signal,
+    });
+    const settled = expect(call).rejects.toThrow();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.abort();
+    await settled;
+
+    expect(runner.getSpent("hour")).toBeCloseTo(120_000, 5);
+    expect(runner.getFailedCallSpend("hour")).toBeCloseTo(120_000, 5);
+    // Charged from a report that covers only the part of the call that
+    // happened, so the ledger says it is approximating.
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("tops a partial report up with text the report does not cover", async () => {
+    // Anthropic sends the input count first and the output count last, so a
+    // stream cut off in between reports real input beside an output of zero,
+    // however much text has already been delivered. Pricing the report as it
+    // stands bills the output side at nothing.
+    const inner = vi.fn(async (_agent, _input, options) => {
+      await options?.onToken?.("y".repeat(400));
+
+      throw attachReportedUsage(new Error("connection reset"), {
+        inputTokens: 5000,
+        outputTokens: 0,
+      });
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 1e9, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await expect(
+      runner(mockAgent(), "x".repeat(40), { onToken: () => {} }),
+    ).rejects.toThrow("connection reset");
+
+    // 5000 counted input tokens – which the 10-token guess off the input
+    // string knows nothing about – plus the 100 tokens of text that arrived.
+    expect(runner.getSpent("hour")).toBeCloseTo(5100, 5);
+  });
+
+  it("still charges nothing for a failure that reported and delivered nothing", async () => {
+    const inner = vi.fn(async () => {
+      throw new Error("getaddrinfo ENOTFOUND");
+    }) as unknown as AgentRunner;
+    const runner = withBudget(inner, {
+      budgets: [{ window: "hour", maxCost: 20, pricing: DOLLAR_PER_TOKEN }],
+    });
+
+    await expect(runner(mockAgent(), "Hi")).rejects.toThrow("ENOTFOUND");
+
+    expect(runner.getSpent("hour")).toBe(0);
+    expect(runner.getUnpricedCallCount()).toBe(1);
   });
 });

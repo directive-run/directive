@@ -28,8 +28,10 @@
  * See {@link ExitCode}. Every outcome used to be `0`, which meant a shell could
  * not tell a finished run from a failed one and `harness … && ship` shipped on
  * a run that produced nothing. The distinction a caller actually needs is not
- * "did the process crash" but "is there a closing document", and that is the
- * line the codes are drawn along.
+ * "did the process crash" but "did the caller get what they asked for", and
+ * that is the line the codes are drawn along — which is why a composition that
+ * could afford one step of three is not a clean exit either, and why a turn
+ * whose provider refused every attempt is a failure rather than a thin run.
  *
  * @module
  */
@@ -59,33 +61,51 @@ import { createRenderer, dollars, plural } from "./render.js";
 /**
  * What the process exits with, and what each one means to a script.
  *
- * `0` is the only one that says a closing document was written, because that is
- * the only outcome a caller can chain something onto. Everything else is a
- * distinct reason there is nothing to chain onto, and they are separate because
- * they call for different responses: fix the command, raise the budget, or look
- * at what failed.
+ * The line the codes are drawn along is "did the caller get what they asked
+ * for", because that is what a caller chains onto. `0` is the only value that
+ * says yes. Everything else is a distinct reason it is no, and they are
+ * separate because they call for different responses: fix the command, raise
+ * the budget, or look at what failed.
  */
 export const ExitCode = {
-  /** The run finished and produced a closing document. */
+  /**
+   * The run finished and produced everything it was asked for: a closing
+   * document, and — for a `--compose` — one from every step.
+   *
+   * A single interrupt lands here when it still produced a closing document.
+   * That is what one interrupt asks for: the summary now rather than later, and
+   * the run delivered it. The double interrupt is `130`.
+   */
   ok: 0,
   /**
    * The command could not run: bad arguments, an unreadable input file, a
-   * preset that resolves to nothing, no API key. Nothing was spent.
+   * preset that resolves to nothing, no API key, nothing on stdin. Nothing was
+   * spent.
    */
   usage: 1,
   /**
-   * The run finished and produced no closing document.
+   * The run finished short of what was asked for, without anything failing.
    *
-   * Nothing failed. The budget covered the synthesis but not a first turn
-   * alongside it, or it ran out before the synthesis came due, or an interrupt
-   * arrived before the first turn finished. A larger `--budget` is usually the
-   * answer, and the line above the totals says which case it was.
+   * Either no closing document was written — the budget covered the synthesis
+   * but not a first turn alongside it, or ran out before the synthesis came
+   * due, or an interrupt arrived before the first turn finished — or a
+   * `--compose` could not afford all of its steps and stopped after the ones it
+   * could. A larger `--budget` or `--total-budget` is the answer in every case,
+   * and the line above the totals says which one it was.
    */
   noOutput: 2,
   /**
-   * A run failed: the synthesizer itself threw, a composition step could not
-   * run, or the provider refused every attempt. The error is on stderr and
-   * whatever the run did produce is on the transcript.
+   * A run failed.
+   *
+   * The synthesizer threw, a turn's provider call failed every attempt, a
+   * composition step could not run, or the transcript could not be written. The
+   * error is on stderr and whatever the run did produce is in memory; whether
+   * it reached the transcript is the one case worth reading the error for.
+   *
+   * A turn that failed every attempt lands here even when the chain went on to
+   * synthesize what it had. The closing document is real and so is the gap in
+   * the transcript underneath it, and a script that chains on this output is
+   * entitled to know the difference.
    */
   failed: 3,
   /**
@@ -241,10 +261,10 @@ function buildProgram(sink: string[]): Command {
       [
         "",
         "Exit codes:",
-        "  0    finished, and a closing document was written",
+        "  0    finished, and produced everything asked for",
         "  1    the command could not run — nothing was spent",
-        "  2    finished, and produced no closing document",
-        "  3    the run failed",
+        "  2    finished short — no closing document, or a --compose that ran out of budget",
+        "  3    the run failed — a call, a step, or the transcript",
         "  130  interrupted twice",
         "",
       ].join("\n"),
@@ -442,15 +462,67 @@ export function requireCredentials(
   );
 }
 
-async function readStdin(): Promise<string> {
+/**
+ * How long stdin has to deliver its first byte before the command gives up.
+ *
+ * A deadline on the *first* byte only. Once anything has arrived the rest is
+ * read to end with no clock on it, because a slow producer piping a large diff
+ * is the case this must not interrupt.
+ *
+ * It is here because "no TTY" does not mean "something is going to write". A CI
+ * step that inherits an open pipe nobody ever closes leaves the stream readable
+ * forever and empty forever, and the loop below waits on it — so a job that
+ * should have exited with the usage code hangs until the runner kills it. Two
+ * seconds is far longer than a pipe's first write takes and far shorter than
+ * anyone's patience with a stuck build.
+ */
+const STDIN_FIRST_BYTE_MS = 2_000;
+
+/**
+ * Everything on stdin, or nothing if it never starts.
+ *
+ * Resolves `null` when the deadline passes with no byte delivered and the
+ * stream has not ended, which the caller reports as missing input rather than
+ * as empty input — they are different mistakes and want different sentences.
+ */
+async function readStdin(firstByteMs: number): Promise<string | null> {
   const chunks: string[] = [];
 
   process.stdin.setEncoding("utf8");
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as string);
-  }
 
-  return chunks.join("");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), firstByteMs);
+  });
+
+  const read = (async () => {
+    for await (const chunk of process.stdin) {
+      // The first byte retires the deadline. `unref` is not enough on its own
+      // — the timer would stop holding the process open but would still fire
+      // and resolve the race under a large, slow input.
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      chunks.push(chunk as string);
+    }
+
+    return chunks.join("");
+  })();
+
+  try {
+    return await Promise.race([read, stalled]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/** Overrides for the parts of {@link resolveInput} a test needs to drive. */
+export interface ResolveInputOptions {
+  /** See {@link STDIN_FIRST_BYTE_MS}. */
+  stdinFirstByteMs?: number;
 }
 
 /**
@@ -459,9 +531,14 @@ async function readStdin(): Promise<string> {
  * `--input`, then `--input-file`, then a prompt on a terminal, then whatever
  * was piped in. The prompt is last among the interactive options and first
  * among none of them: a script with no TTY and no flags gets an error, not a
- * hung process waiting on a keystroke nobody is there to press.
+ * hung process waiting on a keystroke nobody is there to press — and, since a
+ * pipe that is never written to and never closed is the same hang wearing a
+ * different hat, not a process waiting on one of those either.
  */
-export async function resolveInput(args: CliArgs): Promise<string> {
+export async function resolveInput(
+  args: CliArgs,
+  options: ResolveInputOptions = {},
+): Promise<string> {
   if (args.input !== undefined) {
     return args.input;
   }
@@ -493,8 +570,10 @@ export async function resolveInput(args: CliArgs): Promise<string> {
     return answer;
   }
 
-  const piped = await readStdin();
-  if (piped.trim() === "") {
+  const piped = await readStdin(
+    options.stdinFirstByteMs ?? STDIN_FIRST_BYTE_MS,
+  );
+  if (piped === null || piped.trim() === "") {
     throw new CliError(
       "no input — pass --input <text>, --input-file <path>, or pipe it in on stdin.",
     );
@@ -740,11 +819,81 @@ function installInterrupt(
  * reading either from its own return shape would be two ways of deciding the
  * exit code — which is how they come to disagree. The events say it once.
  */
-interface Outcome {
+export interface Outcome {
   /** Whether the last chain to finish wrote a closing document. */
   produced: boolean;
   /** Whether anything failed outright. */
   failed: boolean;
+  /**
+   * Whether the run finished short of what was asked for without failing.
+   *
+   * Currently only a composition that ran some of its steps and declined the
+   * rest for want of budget. A chain that produced no closing document is
+   * already covered by `produced`.
+   */
+  short: boolean;
+}
+
+/** Nothing has happened yet. */
+export function emptyOutcome(): Outcome {
+  return { produced: false, failed: false, short: false };
+}
+
+/**
+ * Fold one event into what the run amounted to.
+ *
+ * Separate from the rendering, and exported, because this is the whole of the
+ * exit-code decision and it is worth being able to state it in a test without
+ * standing up a provider. Mutates rather than returns, because a run is a
+ * stream of events and rebuilding the record for each one would say nothing
+ * extra.
+ */
+export function observeOutcome(outcome: Outcome, event: HarnessEvent): void {
+  if (event.type === "chain:complete") {
+    outcome.produced = event.synthesis !== "";
+    // `phase` is not the whole answer and was once read as though it were.
+    // It reports `"failed"` only when the *synthesizer* failed, because a chain
+    // whose turn failed goes on to synthesize what it has and finishes
+    // legitimately complete. A first turn that failed has nothing to
+    // synthesize, so the chain completes with no document and no phase to say
+    // why — which the exit code then read as a budget problem while the screen,
+    // correctly, said it was not one. `stopReason` is the field that knows, and
+    // it is on this event already.
+    outcome.failed =
+      outcome.failed ||
+      event.phase === "failed" ||
+      event.stopReason === "error";
+  }
+
+  // A composition that ran some of its steps and declined the rest. What ran is
+  // whole, so nothing failed — but the caller did not get what they asked for,
+  // and a larger ceiling is the answer.
+  if (event.type === "composition:budget-exhausted") {
+    outcome.short = true;
+  }
+
+  // A step that could not run, and a transcript that could not be written. The
+  // second is a failure of the command's output contract rather than of the
+  // run: the paths are printed either way, and a caller reading one that was
+  // never written has been told something untrue.
+  if (
+    event.type === "error" &&
+    (event.scope === "step" || event.scope === "transcript")
+  ) {
+    outcome.failed = true;
+  }
+}
+
+/** What the process should exit with, given what the run amounted to. */
+export function exitCodeFor(outcome: Outcome): number {
+  if (outcome.failed) {
+    return ExitCode.failed;
+  }
+  if (!outcome.produced || outcome.short) {
+    return ExitCode.noOutput;
+  }
+
+  return ExitCode.ok;
 }
 
 async function execute(
@@ -754,15 +903,9 @@ async function execute(
   onEvent: ReturnType<typeof createRenderer>,
   signal: AbortSignal,
 ): Promise<Outcome> {
-  const outcome: Outcome = { produced: false, failed: false };
+  const outcome = emptyOutcome();
   const observe = (event: HarnessEvent) => {
-    if (event.type === "chain:complete") {
-      outcome.produced = event.synthesis !== "";
-      outcome.failed = outcome.failed || event.phase === "failed";
-    }
-    if (event.type === "error" && event.scope === "step") {
-      outcome.failed = true;
-    }
+    observeOutcome(outcome, event);
     onEvent(event);
   };
 
@@ -870,11 +1013,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
 
     outro(pc.dim(args.dryRun ? "done (dry run)" : "done"));
 
-    if (outcome.failed) {
-      return ExitCode.failed;
-    }
-
-    return outcome.produced ? ExitCode.ok : ExitCode.noOutput;
+    return exitCodeFor(outcome);
   } catch (error) {
     // A throw out of `execute` is the run itself failing — a torn-down system,
     // a store that would not open. `CliError` is the other kind and is the

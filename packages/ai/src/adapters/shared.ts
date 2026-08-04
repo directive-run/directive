@@ -5,6 +5,7 @@
  * building logic used across Anthropic, OpenAI, and Gemini streaming runners.
  */
 
+import { attachReportedUsage } from "../pricing.js";
 import { StreamConsumerError } from "../streaming.js";
 import type { AdapterHooks, AgentLike, Message, TokenUsage } from "../types.js";
 
@@ -353,6 +354,29 @@ export async function parseEventStream(
     }
   }
 
+  /**
+   * What the provider has said it counted so far, for an error to carry out.
+   *
+   * Only when a number above zero has arrived: a report of all zeros is not a
+   * report, and attaching one would turn a call nobody counted into a call
+   * counted at nothing. Both token classes are always present, because a
+   * partial report with a missing field is not one any ledger accepts – an
+   * output count of zero on a stream cut off before its first delta is the
+   * truth about what it generated.
+   */
+  const reportedSoFar = (): TokenUsage | undefined => {
+    if (!usageReported) {
+      return undefined;
+    }
+
+    return {
+      inputTokens,
+      outputTokens,
+      ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+      ...(cacheCreationTokens !== undefined ? { cacheCreationTokens } : {}),
+    };
+  };
+
   try {
     while (!sawEndOfStream) {
       const { done, value } = await reader.read();
@@ -383,6 +407,12 @@ export async function parseEventStream(
     if (!sawEndOfStream && buf.length > 0) {
       await handleLine(buf);
     }
+  } catch (err) {
+    // A stream that fails part-way still costs what it had already run up, and
+    // the counts for it are sitting right here. Nothing else downstream can
+    // recover them – the totals this function returns are the only place they
+    // ever existed, and it is not going to return.
+    throw attachReportedUsage(err, reportedSoFar());
   } finally {
     abortWatch?.release();
     reader.cancel().catch(() => {});
@@ -391,8 +421,11 @@ export async function parseEventStream(
   // A body cut short arrives as a clean EOF. Without this the caller gets a
   // short answer and no indication that the rest of it is missing.
   if (requireTerminalEvent && !sawTerminal) {
-    throw new Error(
-      `[Directive] ${adapterName} stream ended without a completion marker after ${fullText.length} characters – the response is incomplete.`,
+    throw attachReportedUsage(
+      new Error(
+        `[Directive] ${adapterName} stream ended without a completion marker after ${fullText.length} characters – the response is incomplete.`,
+      ),
+      reportedSoFar(),
     );
   }
 
