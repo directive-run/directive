@@ -21,6 +21,6 @@ Reading `total` gave the new value. Reading `downstream` gave the old one, and w
 
 The key was handed a brand new state object: stale, with an empty dependency set, and with nothing downstream told. Both halves of that hurt. The old dependency set went with the old state, so the diff that removes stale links on the next recompute compared the new dependencies against nothing and left every link the replaced definition had tracked in place — a fact the replacement never reads goes on invalidating it. And a node reset to stale with its dependents left valid is a valid derivation sitting under a stale one, which is the one shape the invalidation walk assumes cannot happen: it stops at the stale frontier on the grounds that everything past it is already stale. So the walk stopped at that node, every time, and the dependents were never woken again.
 
-This is the same defect that was fixed in `system.derive.assign()` a release ago, on the other route to the same act. Both now go through one path, because they are the same thing happening and diverging on either obligation is how one of them acquired the defect while the other did not.
+This is the same defect as the one fixed in `system.derive.assign()` — described elsewhere in these notes, and shipping in the same release — on the other route to the same act. Both now go through one path, because they are the same thing happening and diverging on either obligation is how one of them acquired the defect while the other did not.
 
 Registering a derivation name that is genuinely new is unchanged.

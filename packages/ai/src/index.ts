@@ -226,6 +226,13 @@ export {
   type StreamWireFormat,
 } from "./agent-utils.js";
 
+// A streaming HTTP failure throws this, and the release notes describe it as
+// the contract: it carries the status, the retry interval the server asked for,
+// and the request id you would quote in a support ticket. None of that is
+// reachable without the class — `instanceof` needs the constructor, and reading
+// the fields off a bare `Error` needs a cast.
+export { ProviderHTTPError } from "./adapters/shared.js";
+
 // ============================================================================
 // Middleware Composition
 // ============================================================================

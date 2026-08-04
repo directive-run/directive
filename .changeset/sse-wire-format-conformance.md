@@ -1,5 +1,5 @@
 ---
-"@directive-run/ai": patch
+"@directive-run/ai": minor
 ---
 
 **The streaming adapters now parse the event-stream format the way the format is defined, rather than the way one provider happens to write it.**

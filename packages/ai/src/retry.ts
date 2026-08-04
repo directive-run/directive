@@ -94,7 +94,75 @@ const NON_RETRYABLE_STATUSES = new Set([400, 401, 403, 404, 422]);
  * Checks `error.status` / `error.statusCode` properties first, then falls back
  * to matching common error message patterns like "request failed: 429" or "HTTP 503".
  */
+/**
+ * How far to follow `cause` looking for the error that actually carries the
+ * HTTP details. Eight, matching the ledger's walk — this policy wraps its own
+ * last failure in a `RetryExhaustedError` and puts the original on `cause`, and
+ * a fallback layer wraps that again, so the error a caller finally holds is
+ * several links from the response it describes.
+ */
+const MAX_CAUSE_DEPTH = 8;
+
+/**
+ * Apply `read` to each error in a `cause` chain and return its first answer.
+ *
+ * Without this the status was read off the outermost error only, and a wrapped
+ * error has none — so `parseHttpStatus` returned `null`, which this module
+ * treats as retryable. One wrapper was enough to turn a 401 into three attempts
+ * and to discard the interval the server asked to be waited.
+ */
+function firstInChain<T>(
+  error: unknown,
+  read: (candidate: Record<string, unknown>) => T | null,
+): T | null {
+  let current: unknown = error;
+
+  for (
+    let depth = 0;
+    depth < MAX_CAUSE_DEPTH && current !== null && current !== undefined;
+    depth++
+  ) {
+    if (typeof current === "object") {
+      const answer = read(current as Record<string, unknown>);
+      if (answer !== null) {
+        return answer;
+      }
+    }
+
+    const holder = current as Record<string, unknown>;
+    const next = holder.cause ?? holder.lastError;
+    if (next === current) {
+      break;
+    }
+    current = next;
+  }
+
+  return null;
+}
+
 export function parseHttpStatus(error: Error): number | null {
+  const fromChain = firstInChain(error, (errObj) => {
+    if (
+      typeof errObj.status === "number" &&
+      errObj.status >= 100 &&
+      errObj.status <= 599
+    ) {
+      return errObj.status;
+    }
+    if (
+      typeof errObj.statusCode === "number" &&
+      errObj.statusCode >= 100 &&
+      errObj.statusCode <= 599
+    ) {
+      return errObj.statusCode;
+    }
+
+    return null;
+  });
+  if (fromChain !== null) {
+    return fromChain;
+  }
+
   // Check error properties first (many HTTP libraries set these)
   const errObj = error as unknown as Record<string, unknown>;
   if (
@@ -137,6 +205,19 @@ export function parseHttpStatus(error: Error): number | null {
  * Returns the value converted to milliseconds.
  */
 export function parseRetryAfter(error: Error): number | null {
+  // The interval is attached to the error built from the response, which by the
+  // time a caller sees it is usually two wrappers down. Zero is a legal
+  // delta-seconds value meaning "retry now" and is distinct from having no
+  // instruction at all, which is what `null` says.
+  const fromChain = firstInChain(error, (errObj) =>
+    typeof errObj.retryAfter === "number" && errObj.retryAfter >= 0
+      ? errObj.retryAfter * 1000
+      : null,
+  );
+  if (fromChain !== null) {
+    return fromChain;
+  }
+
   // Check error properties first (many HTTP libraries set these)
   const errObj = error as unknown as Record<string, unknown>;
   if (typeof errObj.retryAfter === "number" && errObj.retryAfter > 0) {
