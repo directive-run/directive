@@ -39,11 +39,7 @@
 import isDevelopment from "#is-development";
 import { attributeError, freezeSpec } from "../utils/utils.js";
 import { extractDeps, isPredicate, memoizePredicate } from "./predicate.js";
-import {
-  describeDep,
-  normalizeExplicitDeps,
-  withTracking,
-} from "./tracking.js";
+import { derivationDep, describeDep, withTracking } from "./tracking.js";
 import type {
   EffectsDef,
   Facts,
@@ -144,6 +140,14 @@ interface EffectState {
   enabled: boolean;
   hasExplicitDeps: boolean; // true = user-provided deps (fixed), false = auto-tracked (re-track every run)
   dependencies: Set<string> | null; // null = not yet tracked
+  /**
+   * Declared `deps` names that did not resolve to a derivation, kept so they
+   * can be asked again. Empty once every name has resolved; `null` for an
+   * effect with no explicit `deps`. See {@link EffectState.hasExplicitDeps}.
+   */
+  unresolvedDeps: string[] | null;
+  /** The raw `deps` array, for re-resolving {@link EffectState.unresolvedDeps}. */
+  rawDeps: readonly string[] | null;
   cleanup: (() => void) | null; // cleanup function returned by last run()
   /** How many consecutive runs produced the same deps (auto-tracked only) */
   stableRunCount: number;
@@ -257,6 +261,56 @@ export function createEffectsManager<S extends Schema>(
     (facts: Record<string, unknown>, prev?: Record<string, unknown>) => boolean
   >();
 
+  /**
+   * A declared `deps` array, on the keyspace auto-tracking uses, plus the names
+   * that did not land on a derivation.
+   *
+   * `isDerivation` is a live lookup over the merged module set, so what a name
+   * means is not fixed when the effect is registered — registering an effect
+   * and then the derivation it names is an ordinary thing to do with the
+   * piecemeal API, and the name means a derivation only after the second call.
+   * Resolving once at registration made that order significant and silently so:
+   * the effect kept the bare name, nothing ever announces a bare derivation
+   * name, and the effect never ran again.
+   */
+  function resolveDeps(raw: readonly string[]): {
+    dependencies: Set<string>;
+    unresolved: string[];
+  } {
+    const dependencies = new Set<string>();
+    const unresolved: string[] = [];
+
+    for (const name of raw) {
+      if (isDerivation(name)) {
+        dependencies.add(derivationDep(name));
+      } else {
+        dependencies.add(name);
+        unresolved.push(name);
+      }
+    }
+
+    return { dependencies, unresolved };
+  }
+
+  /**
+   * Ask the unresolved names again, and rebuild if one of them now names a
+   * derivation. A no-op once every name has resolved, and a handful of property
+   * lookups until then.
+   */
+  function refreshDeps(state: EffectState): void {
+    const pending = state.unresolvedDeps;
+    if (state.rawDeps === null || pending === null || pending.length === 0) {
+      return;
+    }
+    if (!pending.some(isDerivation)) {
+      return;
+    }
+
+    const resolved = resolveDeps(state.rawDeps);
+    state.dependencies = resolved.dependencies;
+    state.unresolvedDeps = resolved.unresolved;
+  }
+
   /** Initialize state for an effect */
   function initState(id: string): EffectState {
     const def = definitions[id];
@@ -271,13 +325,18 @@ export function createEffectsManager<S extends Schema>(
 
     let dependencies: Set<string> | null = null;
     let hasExplicitDeps = false;
+    let unresolvedDeps: string[] | null = null;
+    let rawDeps: readonly string[] | null = null;
 
     if (def.deps) {
       // Resolved against the module's derivation names, because auto-tracking
       // files a derivation read under a namespace and a hand-written name has
       // no way to know that. Without this, the documented escape hatch is dead
       // for exactly the dependency it is most often reached for.
-      dependencies = normalizeExplicitDeps(def.deps as string[], isDerivation);
+      rawDeps = def.deps as string[];
+      const resolved = resolveDeps(rawDeps);
+      dependencies = resolved.dependencies;
+      unresolvedDeps = resolved.unresolved;
       hasExplicitDeps = true;
     } else if (def.on !== undefined) {
       // Declarative trigger — deps are extracted statically from the
@@ -315,6 +374,8 @@ export function createEffectsManager<S extends Schema>(
       enabled: true,
       hasExplicitDeps,
       dependencies,
+      unresolvedDeps,
+      rawDeps,
       cleanup: null,
       stableRunCount: 0,
       depsStable: false,
@@ -360,6 +421,10 @@ export function createEffectsManager<S extends Schema>(
     if (!state.enabled) {
       return false;
     }
+
+    // Declared names are re-asked here rather than trusted from registration —
+    // see `resolveDeps`.
+    refreshDeps(state);
 
     // If effect has tracked deps (explicit or auto-tracked), check if any changed
     if (state.dependencies) {

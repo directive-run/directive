@@ -9,7 +9,8 @@
  * prompts the runner was actually handed rather than the results.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type {
   AgentLike,
   AgentRunner,
@@ -274,5 +275,69 @@ describe("runComposition", () => {
         transcripts: createFileTranscriptStore({ dir: scratch.dir }),
       }),
     ).rejects.toThrow(/at least one preset/);
+  });
+
+  // ==========================================================================
+  // A step that cannot run
+  // ==========================================================================
+
+  it("closes itself out when a step's harness cannot be built", async () => {
+    // A file already sitting at the name step one is about to open. The store
+    // refuses reuse, so the harness throws before the step has run anything —
+    // which used to leave the dispatched counter permanently ahead of the
+    // completed one, pin `stepInFlight`, and mean the composition never wrote
+    // itself up.
+    const runId = "squatted";
+    await writeFile(join(scratch.dir, `${runId}-1-first.md`), "taken", "utf8");
+
+    const events: HarnessEvent[] = [];
+    const result = await runComposition(
+      [stepPreset("first", "synth-one"), stepPreset("second", "synth-two")],
+      "the subject",
+      {
+        runId,
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => events.push(event),
+      },
+    );
+
+    expect(result.steps).toHaveLength(0);
+    expect(result.failure).toMatch(/already has a transcript/);
+
+    const types = events.map((event) => event.type);
+    expect(types.at(-1)).toBe("composition:complete");
+    expect(
+      events.some((event) => event.type === "error" && event.scope === "step"),
+    ).toBe(true);
+  });
+
+  it("charges a step whose run never reported against the composition's ceiling", async () => {
+    // The first step's second preset is squatted, so step two throws at
+    // construction while step one has already been billed. The composition's
+    // spend has to come out of the steps' ledgers rather than out of the
+    // reports they made, because one of them made none.
+    const runId = "partial";
+    await writeFile(join(scratch.dir, `${runId}-2-second.md`), "taken", "utf8");
+
+    const result = await runComposition(
+      [stepPreset("first", "synth-one"), stepPreset("second", "synth-two")],
+      "the subject",
+      {
+        runId,
+        runner: recordingRunner([]),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+      },
+    );
+
+    expect(result.steps).toHaveLength(1);
+    expect(result.failure).toMatch(/already has a transcript/);
+    // Step one's spend survives step two's failure, and the total is still the
+    // sum of what the steps were billed.
+    expect(result.spentUsd).toBeGreaterThan(0);
+    expect(result.spentUsd).toBeCloseTo(result.steps[0]?.spentUsd ?? 0, 10);
+    expect(result.spentUsd).toBeLessThanOrEqual(result.budgetUsd);
   });
 });

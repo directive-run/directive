@@ -46,6 +46,30 @@ This closes the gap the async-effect warning above points at. That warning tells
 
 A fact and a derivation of the same name resolve to the fact. `deps` has meant fact keys for as long as it has existed, so the older meaning wins; the name collision itself still warns, as it did before.
 
-**An effect no longer misses a fact written while the effects phase is open.** The changed-key set was cleared after the effects phase awaited, which threw away every key that arrived while it was open — a resolver resuming across an `await`, or an effect writing a fact. The constraints saw those keys; the effects never did, and an effect declared on that exact key simply did not run.
+A `deps` name is resolved against the derivations the system holds when the effect is *considered*, not the ones it held when the effect was registered. With the piecemeal API the order is a caller's to choose — `system.effects.register("watch", { deps: ["doubled"] })` before `system.derive.register("doubled", …)` is an ordinary thing to write — and resolving once at registration made that order significant and silently so: the effect kept the bare name, nothing ever announces a bare derivation name, and the effect never ran again. Constraints already re-resolved per evaluation; effects now match them.
 
-It presented as a scheduling wobble rather than a miss, because whether a key survived depended on which microtask a resolver's writes happened to land in — the same code could work and then stop working after an unrelated `await` moved upstream. Keys arriving during the effects phase are now held for the pass that the tail of reconcile already schedules, which is the treatment keys arriving during constraint evaluation always got.
+The types moved with it. `DynamicEffectDef["deps"]` accepted fact keys only, so the correct code did not compile on the one API where the problem was reachable.
+
+**A dependent gated on a derivation is woken every time the derivation changes, not once.** A derivation is lazy: it is marked stale and recomputed on the next read. Marking was the point at which its dependents were told, and marking happens only on the transition from valid to stale — so if nothing read the derivation back, it stayed stale and every later fact change was a no-op for anything depending on it.
+
+The effect of that is an effect or constraint that fires exactly once and then goes quiet while the facts underneath keep moving:
+
+```typescript
+derive: { doubled: (facts) => facts.count * 2 },
+effects: {
+  watch: {
+    deps: ["doubled"],
+    // Reads the fact, never the derivation. Nothing here brings `doubled`
+    // back to a valid state, so nothing re-arms the announcement.
+    run: (facts) => log(facts.count),
+  },
+},
+```
+
+Three changes to `count` ran this once. It was also non-deterministic in a real application, because any unrelated reader recomputing the derivation silently re-armed it — so the same code worked or did not depending on what else happened to be watching.
+
+Staleness is still latched and still marked on the edge; what repeats is the announcement, which is the only thing anything outside the derivation graph ever sees. Listeners are unaffected — they read the value back, so they see every edge, and notifying them about a value already known stale would be the same news twice. The visible change beyond the fix is that the devtools and logging plugins emit `derivation.invalidate` once per invalidation rather than once per staleness transition.
+
+**Known limitation, unchanged in this release.** A fact written while the effects phase is open — by a resolver resuming across an `await`, or by another effect — reaches the constraints but not the effects. The changed-key set is cleared after the phase completes, so an effect declared on that exact key does not run for that write. Whether it bites depends on which microtask the write lands in, which makes it look like a scheduling wobble rather than a miss.
+
+Hold the write until after the phase, or declare the effect on a key that changes outside it. A fix is in progress and is not in this release: delivering those keys on a later pass, without also bounding the feedback path, turns an effect that writes a fact it depends on into an unbounded reconcile loop.

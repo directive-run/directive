@@ -39,7 +39,7 @@
  */
 
 import pc from "picocolors";
-import type { HarnessEvent } from "../../core/events.js";
+import type { HarnessEvent, StopReason } from "../../core/events.js";
 import {
   createTerminalSanitizer,
   sanitizeForTerminal,
@@ -153,6 +153,57 @@ function safe(value: string): string {
   return sanitizeForTerminal(value);
 }
 
+/**
+ * A run that produced nothing, explained by why it produced nothing.
+ *
+ * The empty run is the outcome that reads as a silent failure: no transcript,
+ * no closing document, and — unless something says so — no account of it. There
+ * is more than one way to get here and they want different things from the
+ * operator, so the message is keyed on the stop reason rather than on the turn
+ * count alone. Keyed on the count alone, an authentication failure, a prompt
+ * over the model's limit, and a provider that stayed overloaded through every
+ * retry all told the operator to raise their budget, which is advice that
+ * cannot work and sends them to look in the wrong place. The error itself has
+ * already been printed above by the time this runs; this says what it meant for
+ * the run.
+ */
+function zeroTurnNote(
+  stopReason: StopReason,
+  event: { budgetUsd: number },
+): string {
+  const note = (headline: string, detail: string) =>
+    `${pc.yellow(`  ${headline} —`)} ${pc.dim(detail)}\n`;
+
+  switch (stopReason) {
+    case "budget":
+      return note(
+        "no turns",
+        `${dollars(event.budgetUsd)} covers the closing document but not a first turn alongside it. Raise the budget.`,
+      );
+
+    case "error":
+      return note(
+        "no turns",
+        "the first turn failed and the chain had nothing to summarise. The error above is what the provider said — an authentication failure, a prompt over the model's limit, and an overloaded provider that stayed overloaded through every retry all land here, and none of them is a budget problem.",
+      );
+
+    case "interrupted":
+      return note(
+        "no turns",
+        "the run was interrupted before its first turn finished, so there is nothing on the transcript to close out.",
+      );
+
+    case "max-iterations":
+      return note(
+        "no turns",
+        "maxIterations is zero on this preset, so the chain had no turn to take. Raise it.",
+      );
+
+    default:
+      return "";
+  }
+}
+
 function renderProse(
   event: HarnessEvent,
   stream: (chunk: string) => string,
@@ -200,16 +251,8 @@ function renderProse(
       return `${pc.red(`  error (${event.scope}${event.iteration === undefined ? "" : ` turn ${event.iteration + 1}`}):`)} ${safe(event.message)}\n\n`;
 
     case "chain:complete": {
-      // A run that could not afford even its first turn. It is a legitimate
-      // outcome — the budget cleared the closing document's price at
-      // construction and not the first turn plus the reserve that turn would
-      // leave owing — and it is the one that reads as a silent failure, because
-      // there is no transcript, no closing document, and no `budget:warning`
-      // to explain the empty screen.
       const nothingRan =
-        event.iterations === 0
-          ? `${pc.yellow("  no turns —")} ${pc.dim(`${dollars(event.budgetUsd)} covers the closing document but not a first turn alongside it. Raise the budget.`)}\n`
-          : "";
+        event.iterations === 0 ? zeroTurnNote(event.stopReason, event) : "";
 
       return `${nothingRan}${pc.dim(
         `\n\n  ${plural(event.iterations, "turn")} · ${money(event.spentUsd)} of ${dollars(event.budgetUsd)}${costCaveat} · stopped on ${event.stopReason || "settled"}\n  ${safe(event.transcriptPath)}\n\n`,

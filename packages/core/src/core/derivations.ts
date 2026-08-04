@@ -478,6 +478,19 @@ export function createDerivationsManager<
    *
    * Accepts an optional shared `visited` Set so that `invalidateMany` can
    * coalesce multiple root invalidations into a single traversal.
+   *
+   * **Marking is an edge; announcing is not.** Staleness is a latch — a
+   * derivation that is already stale has nothing to re-mark, and the traversal
+   * used to stop there. But `onInvalidate` is how anything *outside* the
+   * derivation graph learns the value may have moved, and the consumer on the
+   * other end of it treats each announcement as one wake-up and then forgets
+   * it. A derivation nothing reads back never leaves the stale state, so an
+   * edge-only announcement woke its dependents exactly once and then went quiet
+   * while the facts underneath kept moving — and whether it went quiet at all
+   * depended on some unrelated reader happening to recompute it in between. So
+   * the announcement is repeated on every invalidation and the traversal
+   * continues through stale nodes, while the state writes below stay on the
+   * edge where they belong.
    */
   function invalidateDerivation(
     startId: string,
@@ -493,21 +506,27 @@ export function createDerivationsManager<
       visited.add(id);
 
       const state = states.get(id);
-      if (!state || state.isStale) {
+      if (!state) {
         continue;
       }
 
-      state.isStale = true;
-      // Reset dep stability so next recompute re-tracks via withTracking()
-      state.depsStable = false;
-      state.stableRunCount = 0;
-      onInvalidate?.(id);
+      if (!state.isStale) {
+        state.isStale = true;
+        // Reset dep stability so next recompute re-tracks via withTracking()
+        state.depsStable = false;
+        state.stableRunCount = 0;
 
-      // Defer listener notification until all invalidations complete.
-      // This prevents listeners from observing partially-stale state and
-      // avoids infinite loops from Set mutation during iteration (listeners
-      // recompute derivations → updateDependencies → modify dep Sets).
-      pendingNotifications.add(id);
+        // Defer listener notification until all invalidations complete.
+        // This prevents listeners from observing partially-stale state and
+        // avoids infinite loops from Set mutation during iteration (listeners
+        // recompute derivations → updateDependencies → modify dep Sets).
+        // Edge-triggered, unlike the announcement below: a listener reads the
+        // value back, so it sees every edge, and notifying it while the value
+        // is already known-stale would be the same news twice.
+        pendingNotifications.add(id);
+      }
+
+      onInvalidate?.(id);
 
       enqueueDependents(id, queue);
     }

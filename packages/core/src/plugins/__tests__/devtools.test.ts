@@ -1151,9 +1151,14 @@ describe("devtoolsPlugin", () => {
 
       const events = dt().getEvents("overflow");
       expect(events.length).toBeLessThanOrEqual(3);
-      // Most recent events should be preserved
-      const lastEvent = events[events.length - 1]!;
-      expect(lastEvent.type).toBe("fact.set");
+      // Most recent events should be preserved — nothing from registration or
+      // start survives, and the newest `fact.set` in the buffer is the last
+      // write rather than an earlier one.
+      expect(events.some((e) => e.type === "system.start")).toBe(false);
+      const lastFactSet = [...events]
+        .reverse()
+        .find((e) => e.type === "fact.set");
+      expect(lastFactSet?.data).toMatchObject({ key: "count", value: 5 });
 
       system.destroy();
     });

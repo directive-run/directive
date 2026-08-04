@@ -58,6 +58,7 @@ import {
   t,
 } from "@directive-run/core";
 import { minimumStepBudgetUsd, resolvePresetPricing } from "./agents.js";
+import { awaitCompletion } from "./completion.js";
 import type { HarnessEvent, HarnessEventSink } from "./events.js";
 import type { PresetConfig } from "./preset-types.js";
 import {
@@ -149,6 +150,16 @@ export interface CompositionResult {
   combinedPath: string;
   /** Whether an operator stopped the composition before its last step. */
   interrupted: boolean;
+  /**
+   * A step's failure message, or `""`.
+   *
+   * A step can fail outright — its harness could not be built, or its run was
+   * torn down — and when one does the composition stops there. The steps in
+   * {@link CompositionResult.steps} are whole; this is why there are no more of
+   * them. It is on the result as well as on the event stream so a caller
+   * holding only the promise is not the last to know.
+   */
+  failure: string;
   /**
    * Whether the composition stopped early because the ceiling was used up.
    *
@@ -286,6 +297,8 @@ interface CompositionDerived {
    * two different questions, and closing the composition needs both.
    */
   stepInFlight: boolean;
+  /** Whether a step failed outright, which ends the composition. */
+  failed: boolean;
   /** Whether another step should start right now. */
   stepPending: boolean;
   /** Whether the composition is finished and can be written up. */
@@ -306,15 +319,38 @@ const compositionSchema = {
     /** Steps completed. Also the index of the step about to run. */
     step: t.number().meta({ label: "Step", category: "chain" }),
     /**
-     * Steps dispatched, which leads {@link step} by one while a step runs.
+     * Steps dispatched, and steps whose resolver has exited.
      *
      * Two counters rather than a boolean, so the gap between them is the
      * answer to "is a step in flight" rather than a flag somebody has to
      * remember to clear on every way out of the resolver.
+     *
+     * `stepsSettled` rather than {@link step} as the second half, because a
+     * step that threw exits without completing. Read against `step`, a step
+     * whose harness could not even be built — a transcript already at the
+     * file it was going to write, a derived run ID one character too long —
+     * left the gap open forever, and a composition that believes a step is
+     * still running never writes itself up. The counter is moved from a
+     * `finally`, so every way out of the resolver closes it.
      */
     stepsStarted: t
       .number()
       .meta({ label: "Steps started", category: "chain" }),
+    stepsSettled: t
+      .number()
+      .meta({ label: "Steps settled", category: "chain" }),
+    /**
+     * A step resolver's error message, or `""`.
+     *
+     * A step that failed ends the composition rather than being retried or
+     * skipped: the next step's whole reason to exist is reading this one's
+     * conclusion, and there is no conclusion. Recorded as a fact for the same
+     * reason the chain records its own — without it the constraint that
+     * produced the requirement would still hold, the requirement would still
+     * be keyed the same, and the composition would sit with an unmet
+     * requirement forever.
+     */
+    failure: t.string().meta({ label: "Failure", category: "lifecycle" }),
     /** The composition's ceiling, across every step. */
     budgetUsd: t.number().meta({ label: "Budget (USD)", category: "cost" }),
     /** Every finished step's spend, summed. */
@@ -345,6 +381,7 @@ const compositionSchema = {
     remainingUsd: t.number(),
     stepsExhausted: t.boolean(),
     stepInFlight: t.boolean(),
+    failed: t.boolean(),
     compositionSettled: t.boolean(),
     nextStepFloorUsd: t.number(),
     canAffordStep: t.boolean(),
@@ -492,6 +529,8 @@ export async function runComposition(
       facts.running = false;
       facts.step = 0;
       facts.stepsStarted = 0;
+      facts.stepsSettled = 0;
+      facts.failure = "";
       facts.budgetUsd = budgetUsd;
       facts.spentUsd = 0;
       // An already-aborted signal is the same fact as one aborted mid-run,
@@ -526,10 +565,15 @@ export async function runComposition(
       budgetExhausted: (_facts, derived) =>
         !derived.stepsExhausted && !derived.canAffordStep,
 
-      compositionStopped: (facts, derived) =>
-        facts.interrupted || derived.stepsExhausted || !derived.canAffordStep,
+      failed: (facts) => facts.failure !== "",
 
-      stepInFlight: (facts) => facts.stepsStarted > facts.step,
+      compositionStopped: (facts, derived) =>
+        derived.failed ||
+        facts.interrupted ||
+        derived.stepsExhausted ||
+        !derived.canAffordStep,
+
+      stepInFlight: (facts) => facts.stepsStarted > facts.stepsSettled,
 
       stepPending: (facts, derived) =>
         facts.running && !derived.compositionStopped && !derived.stepInFlight,
@@ -572,14 +616,27 @@ export async function runComposition(
             return;
           }
 
-          // Dispatched. `stepInFlight` holds from here until the facts below
-          // are written, which is what keeps the composition from writing
-          // itself up while a step it interrupted is still synthesizing.
+          // Dispatched. `stepInFlight` holds from here until the `finally`
+          // below, which is what keeps the composition from writing itself up
+          // while a step it interrupted is still synthesizing — and what keeps
+          // it from waiting forever on a step that never got as far as
+          // running.
           context.facts.stepsStarted = req.step + 1;
 
           const step = req.step + 1;
           const stepRunId = `${context.facts.runId}-${step}-${preset.id}`;
           const stepMeta = { step, total: presets.length, presetId: preset.id };
+          /**
+           * What this step has been billed, whatever happens next.
+           *
+           * Accumulated in the `finally` rather than after the `await`, for
+           * the reason the chain settles its own ledger in one: a step that
+           * streamed and then threw has been charged for what it delivered,
+           * and the composition's ceiling is enforced against the sum of these.
+           * Adding it on the success path alone let a failing step spend and
+           * then hand the next one a ceiling that had not moved.
+           */
+          let stepSpentUsd = 0;
 
           // What this step may spend: its own budget, or whatever is left of
           // the composition's, whichever is smaller. The clamp is a no-op on
@@ -598,41 +655,80 @@ export async function runComposition(
             at: now(),
           });
 
-          const harness = createHarnessSystem(stepPreset, {
-            ...rest,
-            transcripts: store,
-            runId: stepRunId,
-            onEvent: emit,
-          });
-          running = harness;
+          let harness: Harness | undefined;
 
-          let result: HarnessRunResult;
           try {
-            result = await harness.run(
+            // Inside the try, because building a harness is one of the things
+            // that can fail — an output directory already holding this step's
+            // transcript, a derived run ID over the identifier limit — and the
+            // counter above is already open by the time it does.
+            harness = createHarnessSystem(stepPreset, {
+              ...rest,
+              transcripts: store,
+              runId: stepRunId,
+              onEvent: emit,
+            });
+            running = harness;
+
+            const result = await harness.run(
               composeInput(context.facts.input, prior, fenceToken),
             );
+            const stepResult: CompositionStepResult = {
+              ...result,
+              ...stepMeta,
+            };
+            steps.push(stepResult);
+            if (result.synthesis !== "") {
+              prior.push({ step, presetId: preset.id, text: result.synthesis });
+            }
+
+            context.facts.lastStep = stepResult;
+            context.facts.step = req.step + 1;
+            // The step said an operator stopped it, which stops the
+            // composition too — written as the same fact `abort()` writes, not
+            // as a second way of saying it.
+            if (result.stopReason === "interrupted") {
+              context.facts.interrupted = true;
+            }
           } finally {
             running = undefined;
-            harness.system.destroy();
-          }
-
-          const stepResult: CompositionStepResult = { ...result, ...stepMeta };
-          steps.push(stepResult);
-          if (result.synthesis !== "") {
-            prior.push({ step, presetId: preset.id, text: result.synthesis });
-          }
-
-          context.facts.spentUsd = context.facts.spentUsd + result.spentUsd;
-          context.facts.lastStep = stepResult;
-          context.facts.step = req.step + 1;
-          // The step said an operator stopped it, which stops the composition
-          // too — written as the same fact `abort()` writes, not as a second
-          // way of saying it.
-          if (result.stopReason === "interrupted") {
-            context.facts.interrupted = true;
+            if (harness !== undefined) {
+              stepSpentUsd = harness.spentUsd();
+              harness.system.destroy();
+            }
+            context.facts.spentUsd = context.facts.spentUsd + stepSpentUsd;
+            context.facts.stepsSettled = req.step + 1;
           }
         },
         meta: { label: "Run composition step", category: "chain" },
+      },
+    },
+
+    hooks: {
+      /**
+       * A step that could not run, in one place.
+       *
+       * Without this the failure is invisible and terminal at once. Core's
+       * default recovery for a resolver that threw is to skip it, and it
+       * surfaces the error to plugins — of which this system deliberately has
+       * none — so a step whose harness could not be built, or whose run
+       * rejected, left a composition that had emitted a `composition:step:started`
+       * and would emit nothing further. The fact recorded here is what ends
+       * the composition and what the combined document reports; the event is
+       * what a surface renders.
+       *
+       * A failed step ends the composition rather than being skipped, because
+       * every later step's input is the earlier steps' conclusions and there is
+       * no conclusion to pass on.
+       */
+      onResolverError: (error, _requirement, context) => {
+        context.facts.failure = error.message;
+        emit({
+          type: "error",
+          scope: "step",
+          message: error.message,
+          at: now(),
+        });
       },
     },
 
@@ -710,10 +806,28 @@ export async function runComposition(
           // containment — and whether there is a filesystem here at all — is
           // decided in one place rather than asserted again by a second writer
           // that has to remember the rule.
-          const combinedPath = await store.writeDocument(
-            `${composedRunId}.md`,
-            renderCombined(composedRunId, composedInput, steps),
-          );
+          //
+          // Caught, because this is the last thing between the composition and
+          // the event that ends it. `runComposition` resolves off
+          // `composition:complete`, and `closed` above means this effect will
+          // not be entered a second time — so a store that rejected here used
+          // to leave a settled system, a correct ledger, every step's own
+          // transcript already on disk, and a caller waiting forever for the
+          // index of them.
+          let combinedPath = "";
+          try {
+            combinedPath = await store.writeDocument(
+              `${composedRunId}.md`,
+              renderCombined(composedRunId, composedInput, steps),
+            );
+          } catch (error) {
+            emit({
+              type: "error",
+              scope: "transcript",
+              message: error instanceof Error ? error.message : String(error),
+              at: now(),
+            });
+          }
           facts.combinedPath = combinedPath;
 
           emit({
@@ -765,7 +879,19 @@ export async function runComposition(
       at: now(),
     });
     system.dispatch({ type: "start", input });
-    await finished;
+    // Backed by the system's own settlement, so a cascade that stops short of
+    // the completion event ends the wait with what the composition was doing
+    // rather than with a hang. See `./completion.js`.
+    await awaitCompletion(
+      finished,
+      system,
+      // The step constraint stops holding the moment a step is dispatched, so
+      // the engine lets go of a resolver that is still running. `stepInFlight`
+      // is the composition's own answer, and it is the one that counts.
+      () => system.isSettled && !readDerived("stepInFlight"),
+      () =>
+        `[ai-harness] composition "${runId}" stopped without finishing. The system has nothing left to do — no step in flight, no reconcile pending — and no composition:complete was emitted. ${steps.length} of ${presets.length} steps ran, $${system.facts.spentUsd.toFixed(4)} of $${budgetUsd.toFixed(4)} spent${system.facts.failure === "" ? "" : `, last failure: ${system.facts.failure}`}.`,
+    );
 
     // Read while the system is still alive, and read from the derivation
     // rather than reconstructed: `budgetExhausted` is one expression, and this
@@ -778,6 +904,7 @@ export async function runComposition(
       synthesis: steps.at(-1)?.synthesis ?? "",
       combinedPath: system.facts.combinedPath,
       interrupted: system.facts.interrupted,
+      failure: system.facts.failure,
       budgetExhausted: readDerived("budgetExhausted"),
     };
   } finally {

@@ -1112,35 +1112,13 @@ export function createEngine<S extends Schema>(
         }
         invalidatedDerivations.clear();
       }
-      //
-      // Cleared *before* the effects run, not after. `runEffects` is async, and
-      // a resolver resuming across an await — or an effect writing a fact —
-      // adds to `state.changedKeys` while it is open. Clearing the whole set
-      // afterwards threw those keys away before any effect had been offered
-      // them: the constraints saw them, the effects never did, and an effect
-      // declared on that exact key simply did not run. It looked like a
-      // scheduling wobble, because whether it happened depended on which
-      // microtask a resolver's writes landed in.
-      //
-      // Keys that arrive while this is open now stay pending, and the tail of
-      // this function schedules the pass that delivers them — the same
-      // treatment keys arriving during constraint evaluation already got.
-      const keysForEffects = new Set(state.changedKeys);
+      await effectsManager.runEffects(state.changedKeys);
+
+      // Copy changed keys for constraint evaluation before clearing
+      const keysForConstraints = new Set(state.changedKeys);
+
+      // Clear changed keys
       state.changedKeys.clear();
-
-      await effectsManager.runEffects(keysForEffects);
-
-      // See EFFECT_RETRY_KEY. The one signal that must not survive this
-      // boundary, because it is the effects phase asking to be re-run and the
-      // ask is re-raised by the re-run.
-      state.changedKeys.delete(EFFECT_RETRY_KEY);
-
-      // Constraints are evaluated against everything known now, which is what
-      // the effects were given plus anything that arrived behind them.
-      const keysForConstraints = new Set(keysForEffects);
-      for (const key of state.changedKeys) {
-        keysForConstraints.add(key);
-      }
 
       // Evaluate constraints (pass changed keys for incremental evaluation)
       const currentRequirements =

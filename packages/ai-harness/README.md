@@ -106,7 +106,9 @@ Both runs wrote two files: the transcript and a JSONL sidecar. See [Interrupting
 
 ## What it costs
 
-The dollar figure on a preset is a **ceiling, not an expected cost**. It is the number the chain refuses to cross. One of the eight shipped presets never approaches it – `code-review` runs out of turns first, at about $0.23 of its $0.30 cap – and the other seven spend theirs.
+The dollar figure on a preset is a **ceiling, not an expected cost**. It is the number the chain stops at, and it stops *before* a call rather than during one – so a run can finish a little above the figure, by at most the cost of the single call that crossed it. One of the eight shipped presets never approaches it – `code-review` runs out of turns first, at about $0.23 of its $0.30 cap – and the other seven spend theirs.
+
+One call is the whole of the overshoot, and against the shipped Anthropic adapter it is a small one: `maxTokens` goes out with every call, so the output half of the bill is capped before the call is made and the input half is a prompt the chain assembled and measured. Supply your own `runner` – [a supported thing to do](#using-it-from-code) – and that last guarantee is yours to keep. A runner that ignores `maxTokens` can return a response of any size, and the ledger bills what arrives.
 
 The chain stops adding turns while it can still pay for the closing document. That document is the expensive call: the synthesizer is capped at several thousand output tokens against a turn's few hundred, and it reads the entire transcript on the way in. In the live run above, four turns came to $0.0444 and the closing document came to $0.0399 on its own – roughly three times the last turn.
 
@@ -489,7 +491,19 @@ The CLI writes to `--out-dir`, default `./runs`. A run produces two files:
 
 A composition adds a third: `<runId>.md` holding every step's synthesis in order, alongside each step's own `<runId>-<n>-<presetId>.md` and `.jsonl` pair.
 
-Reusing a run ID is refused rather than half-honoured, because the markdown is rewritten whole and the sidecar is appended to, so the two would end up describing different runs with nothing saying which. If you use the library's file store without naming a directory, it writes to `.ai-harness/` under the working directory.
+Reusing a run ID is refused rather than half-honoured, because the markdown is rewritten whole and the sidecar is appended to, so the two would end up describing different runs with nothing saying which. The refusal is the file's creation, not a check in front of it, so a name already taken by anything — including a symbolic link the store did not put there — is refused rather than written through. If you use the library's file store without naming a directory, it writes to `.ai-harness/` under the working directory.
+
+## Exit codes
+
+`harness … && ship` should not ship on a run that produced nothing, so the outcome is on the exit code and not only on the screen. The line the codes are drawn along is "is there a closing document", because that is the thing a caller chains onto.
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | Finished, and a closing document was written. |
+| `1` | The command could not run — a bad flag, an unreadable `--input-file`, a preset that resolves to nothing, no API key. Nothing was spent. |
+| `2` | Finished, and produced no closing document. Nothing failed: the budget could not cover a first turn alongside the synthesis, or ran out before the synthesis came due, or an interrupt arrived before the first turn did. The line above the totals says which. |
+| `3` | A run failed — the synthesizer threw, a composition step could not run, or the provider refused every attempt. |
+| `130` | Interrupted twice. One interrupt is not this: the chain synthesizes what it has and exits on its own outcome. |
 
 ## Untrusted input
 

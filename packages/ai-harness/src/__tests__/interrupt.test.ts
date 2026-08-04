@@ -8,6 +8,7 @@
  * would find the two answers disagreeing.
  */
 
+import type { AgentRunner } from "@directive-run/ai";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFileTranscriptStore } from "../adapters/node/transcript.js";
 import type { HarnessEvent } from "../core/events.js";
@@ -90,6 +91,71 @@ describe("interrupt", () => {
       expect(turn.text).toContain(`end-of-${turn.persona}-`);
     }
     expect(turns.length).toBe(result.iterations);
+  });
+
+  it("does not start the synthesis alongside the turn it interrupted", async () => {
+    // Ample budget, so the only thing that ends this run is the interrupt and
+    // the only thing that can put the ledger and the report out of step is the
+    // turn still in flight when the synthesis is authorized.
+    const preset = testPreset({ budgetUsd: 100, maxIterations: 30 });
+    /** Every prompt the synthesizer was given. */
+    const synthesisPrompts: string[] = [];
+
+    const scripted = createMockRunner({
+      responses: cannedResponses(),
+      delayMs: 5,
+    });
+    const runner: AgentRunner = async (agent, input, options) => {
+      if (agent.name === "synth") {
+        synthesisPrompts.push(input);
+      }
+
+      return scripted(agent, input, options);
+    };
+
+    const turnCosts: number[] = [];
+    const harness = createHarnessSystem(preset, {
+      runner,
+      transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+      retry: { maxRetries: 0 },
+      onEvent: (event) => {
+        if (event.type === "turn:completed") {
+          turnCosts.push(event.costUsd);
+        }
+        // Mid-stream, so the interrupt lands while the turn is being billed.
+        if (event.type === "turn:delta" && event.iteration === 1) {
+          queueMicrotask(() => harness.abort());
+        }
+      },
+    });
+
+    const result = await harness.run("go");
+    const billed = harness.spentUsd();
+    const turns = harness.transcript.turns();
+    harness.system.destroy();
+
+    expect(result.stopReason).toBe("interrupted");
+    expect(result.synthesis).toContain("SYNTHESIS");
+
+    // The document was written from the transcript the artefact holds.
+    // Dispatching the synthesis alongside the turn assembled its prompt from a
+    // transcript missing that turn, while the turn landed in the markdown — so
+    // the closing document described a conversation the artefact contradicted.
+    expect(synthesisPrompts).toHaveLength(1);
+    const [prompt] = synthesisPrompts;
+    expect(turns.length).toBe(result.iterations);
+    for (const turn of turns) {
+      expect(prompt).toContain(`end-of-${turn.persona}-`);
+      expect(prompt).toContain(turn.text);
+    }
+
+    // And the figure the caller was given covers every turn plus the closing
+    // document, rather than being the total as it stood before the interrupted
+    // turn was billed.
+    const turnTotal = turnCosts.reduce((total, cost) => total + cost, 0);
+    expect(result.spentUsd).toBeGreaterThan(turnTotal);
+    expect(result.spentUsd).toBe(billed);
+    expect(result.spentUsd).toBeLessThanOrEqual(preset.budgetUsd);
   });
 
   it("is idempotent — aborting twice is aborting once", async () => {

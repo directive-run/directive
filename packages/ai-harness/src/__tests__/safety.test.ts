@@ -12,7 +12,7 @@
  * outside the output directory.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRenderer } from "../adapters/cli/render.js";
@@ -174,6 +174,47 @@ describe("run identifiers name a file and nothing else", () => {
       // pair on disk is still one run's.
       const sidecar = await readFile(first.jsonlPath, "utf8");
       expect(sidecar.trim().split("\n")).toHaveLength(1);
+    });
+  });
+
+  it("does not write through a link sitting at the name it is about to take", async () => {
+    await withScratch(async (scratch) => {
+      const outputDir = join(scratch.dir, "runs");
+      const elsewhere = join(scratch.dir, "elsewhere");
+      await mkdir(outputDir, { recursive: true });
+      await mkdir(elsewhere, { recursive: true });
+
+      // A link pointing out of the output directory at a file that does not
+      // exist yet. It resolves inside `runs` by every lexical measure, and an
+      // existence check follows it, finds nothing, and reports the name free —
+      // after which an ordinary write creates the target it points at.
+      const target = join(elsewhere, "planted.md");
+      await symlink(target, join(outputDir, "linked.md"));
+
+      expect(() =>
+        createFileTranscriptStore({ dir: outputDir }).open({
+          runId: "linked",
+        }),
+      ).toThrow(/already has a transcript/);
+
+      await expect(readFile(target, "utf8")).rejects.toThrow();
+    });
+  });
+
+  it("refuses a document name that reaches through a directory", async () => {
+    await withScratch(async (scratch) => {
+      const outputDir = join(scratch.dir, "runs");
+      await mkdir(outputDir, { recursive: true });
+
+      // Lands inside the output directory and gets there through a component
+      // this store did not create — which is the other half of the same
+      // question a link at the leaf asks.
+      await expect(
+        createFileTranscriptStore({ dir: outputDir }).writeDocument(
+          "nested/report.md",
+          "contents",
+        ),
+      ).rejects.toThrow(/a path rather than a name/);
     });
   });
 });

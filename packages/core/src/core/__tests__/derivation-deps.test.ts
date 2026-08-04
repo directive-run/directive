@@ -296,6 +296,12 @@ describe("a fact and a derivation with the same name", () => {
   // it reads as correct until someone declares the dependency they were told to
   // declare.
 
+  // A body that reads the derivation it declared is the easy half, and it is
+  // the half that hides the hard one: reading puts the derivation back in a
+  // valid state, so the next fact change is a fresh valid-to-stale transition.
+  // A body that only *declares* the dependency never does that, so every test
+  // below runs several fact changes with a body that reads nothing derived.
+
   it("re-runs an effect whose explicit deps name a derivation", async () => {
     const runs: number[] = [];
     let readDoubled: () => number = () => 0;
@@ -331,6 +337,48 @@ describe("a fact and a derivation with the same name", () => {
 
     expect(runs.length).toBeGreaterThan(afterStart);
     expect(runs.at(-1)).toBe(8);
+
+    system.destroy();
+  });
+
+  it("keeps waking an effect whose body never reads the derivation it named", async () => {
+    const runs: number[] = [];
+
+    const mod = createModule("explicit-effect-blind", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { doubled: t.number() },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      derive: { doubled: (facts) => facts.count * 2 },
+      effects: {
+        watch: {
+          deps: ["doubled"],
+          // Reads the fact, never the derivation. Nothing here brings
+          // `doubled` back to a valid state, so nothing re-arms an
+          // announcement that only fires on the way to stale.
+          run: (facts) => {
+            runs.push(facts.count);
+          },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await settle();
+    runs.length = 0;
+
+    system.facts.count = 1;
+    await settle();
+    system.facts.count = 2;
+    await settle();
+    system.facts.count = 3;
+    await settle();
+
+    expect(runs).toEqual([1, 2, 3]);
 
     system.destroy();
   });
@@ -389,6 +437,101 @@ describe("a fact and a derivation with the same name", () => {
 
     expect(evaluations.length).toBeGreaterThan(afterStart);
     expect(system.facts.fired).toBe(true);
+
+    system.destroy();
+  });
+
+  it("keeps re-evaluating an async constraint that never reads the derivation", async () => {
+    const evaluations: number[] = [];
+
+    const mod = createModule("explicit-async-blind", {
+      schema: {
+        facts: { count: t.number() },
+        derivations: { ready: t.boolean() },
+        requirements: { GO: {} },
+      },
+      init: (facts) => {
+        facts.count = 0;
+      },
+      derive: { ready: (facts) => facts.count >= 2 },
+      constraints: {
+        go: {
+          async: true,
+          deps: ["ready"],
+          when: async (facts) => {
+            evaluations.push(facts.count);
+
+            return false;
+          },
+          require: { type: "GO" },
+        },
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+    await settle();
+    evaluations.length = 0;
+
+    system.facts.count = 1;
+    await settle();
+    system.facts.count = 2;
+    await settle();
+    system.facts.count = 3;
+    await settle();
+    system.facts.count = 4;
+    await settle();
+
+    expect(evaluations).toEqual([1, 2, 3, 4]);
+
+    system.destroy();
+  });
+
+  it("resolves an effect's declared derivation name when the derivation arrives after it", async () => {
+    const runs: number[] = [];
+
+    // Declared in the schema and supplied at runtime, which is what the
+    // piecemeal API is for. Nothing implements `doubled` until `register` does.
+    const mod = createModule("late-derivation", {
+      schema: {
+        facts: { count: t.number(), other: t.number() },
+        derivations: { doubled: t.number() },
+      },
+      init: (facts) => {
+        facts.count = 0;
+        facts.other = 0;
+      },
+    });
+
+    const system = createSystem({ module: mod });
+    system.start();
+
+    // The effect first, naming something that means nothing yet. A `deps` name
+    // is resolved against the derivations the system holds when the effect is
+    // considered, not the ones it held when the effect was registered.
+    system.effects.register("watch", {
+      deps: ["doubled"],
+      run: (facts) => {
+        runs.push(facts.count as number);
+      },
+    });
+    system.derive.register("doubled", (facts) => (facts.count as number) * 2);
+    // A derivation registered at runtime is lazy — it records what it reads
+    // when it first computes, so read it once to give it a dependency on
+    // `count` at all.
+    expect(system.derive.doubled).toBe(0);
+    await settle();
+    runs.length = 0;
+
+    system.facts.count = 5;
+    await settle();
+
+    expect(runs).toEqual([5]);
+
+    // And a fact the derivation does not read still leaves the effect alone.
+    system.facts.other = 1;
+    await settle();
+    expect(runs).toEqual([5]);
 
     system.destroy();
   });

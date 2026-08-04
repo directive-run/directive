@@ -14,6 +14,7 @@ import {
   type CliArgs,
   CliError,
   CliHelp,
+  ExitCode,
   parseArgs,
   renderPresetList,
   requireCredentials,
@@ -337,6 +338,68 @@ describe("a run that could not afford a turn", () => {
     expect(printed).toContain("Raise the budget");
   });
 
+  /**
+   * There is more than one way to finish with no turns, and they want
+   * different things from the operator. Keyed on the turn count alone, a bad
+   * API key, a prompt over the model's limit, and a provider that stayed
+   * overloaded through every retry all told the operator to raise their
+   * budget — advice that cannot work, about a number that is not the problem.
+   */
+  it("does not blame the budget for a first turn that failed", () => {
+    const chunks: string[] = [];
+    const renderer = createRenderer({
+      verbose: false,
+      write: (text) => chunks.push(text),
+    });
+
+    renderer({
+      type: "chain:complete",
+      runId: "r",
+      phase: "complete",
+      stopReason: "error",
+      iterations: 0,
+      spentUsd: 0,
+      budgetUsd: 5,
+      synthesis: "",
+      synthesisSkipped: false,
+      transcriptPath: "memory://r.md",
+      jsonlPath: "memory://r.jsonl",
+      at: 1,
+    });
+
+    const printed = chunks.join("");
+    expect(printed).toContain("no turns");
+    expect(printed).toContain("the first turn failed");
+    expect(printed).not.toContain("Raise the budget");
+  });
+
+  it("says an interrupt was an interrupt", () => {
+    const chunks: string[] = [];
+    const renderer = createRenderer({
+      verbose: false,
+      write: (text) => chunks.push(text),
+    });
+
+    renderer({
+      type: "chain:complete",
+      runId: "r",
+      phase: "complete",
+      stopReason: "interrupted",
+      iterations: 0,
+      spentUsd: 0,
+      budgetUsd: 5,
+      synthesis: "",
+      synthesisSkipped: false,
+      transcriptPath: "memory://r.md",
+      jsonlPath: "memory://r.jsonl",
+      at: 1,
+    });
+
+    const printed = chunks.join("");
+    expect(printed).toContain("interrupted");
+    expect(printed).not.toContain("Raise the budget");
+  });
+
   it("says nothing extra when turns did run", () => {
     const chunks: string[] = [];
     const renderer = createRenderer({
@@ -450,5 +513,65 @@ describe("runCli", () => {
       await runCli(["--preset", "code-review", "--input", "x", "--tokens=0"]),
     ).toBe(1);
     expect(stderr.join("")).toContain("--tokens");
+  });
+
+  /**
+   * A shell cannot read a screen. Every outcome used to exit `0`, so
+   * `harness … && ship` shipped on a run that produced nothing — which is the
+   * whole reason to run the harness from a script in the first place.
+   */
+  it("exits with a code that tells a finished run from an empty one", async () => {
+    // A budget that clears the closing document's price at construction — which
+    // is all construction checks — and cannot pay for a first turn alongside
+    // the reserve that turn would leave owing. Nothing failed; nothing was
+    // produced.
+    const preset = join(scratch.dir, "thin.json");
+    await writeFile(
+      preset,
+      JSON.stringify(
+        testPreset({
+          id: "thin",
+          budgetUsd: 0.0002,
+          maxIterations: 4,
+          synthesizer: {
+            name: "synth",
+            systemPrompt: "You synthesize.",
+            promptTemplate: "{{transcript}}",
+            maxTokens: 10,
+          },
+        }),
+      ),
+      "utf8",
+    );
+
+    const code = await runCli([
+      "--preset",
+      preset,
+      "--input",
+      "a change worth reviewing",
+      "--dry-run",
+      "--out-dir",
+      scratch.dir,
+    ]);
+
+    // 2 by name and by number, because the number is the contract a shell
+    // reads and the name is only how this file spells it.
+    expect(code).toBe(ExitCode.noOutput);
+    expect(code).toBe(2);
+    expect(stdout.join("")).toContain("no turns");
+  }, 30_000);
+
+  it("documents its exit codes in --help", () => {
+    let text = "";
+    try {
+      parseArgs(["--help"]);
+    } catch (error) {
+      if (error instanceof CliHelp) {
+        text = error.text;
+      }
+    }
+
+    expect(text).toContain("Exit codes:");
+    expect(text).toContain("130");
   });
 });

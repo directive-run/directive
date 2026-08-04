@@ -71,9 +71,30 @@
  * sets `interrupted`, `chainStopped` goes true one derivation later, and the
  * chain lands in synthesis by the identical path the budget takes it down. That
  * is the reason it is a fact and not a branch — a branch would need its own
- * handling for "interrupted while a turn is in flight" and its own answer for
- * whether synthesis still runs. There is no such code here, and there is
- * nothing for it to get wrong.
+ * answer for whether synthesis still runs, and this has the one answer the rest
+ * of the chain already has.
+ *
+ * ## The one thing that can move mid-turn
+ *
+ * `interrupted` is the only fact that flips while a turn resolver is in flight,
+ * and it flips every derivation downstream of it in the same pass. Left alone,
+ * that means the chain declares itself stopped and dispatches the synthesis
+ * while the turn is still streaming — and three separate things then read a
+ * chain that is in two states at once. The synthesis is authorized against a
+ * ledger the in-flight call has not been billed to, so it is affordable when it
+ * is not. `run()` resolves off `chain:complete` and reports a total the turn is
+ * still adding to. And the synthesizer's prompt is assembled from a transcript
+ * that does not have the turn in it, while the markdown artefact ends up with
+ * the turn — so the closing document describes a conversation its own transcript
+ * contradicts.
+ *
+ * So there is a second counter. `turnsStarted` moves when a turn is dispatched
+ * and `turnsFinished` moves on the resolver's way out — by any door, which is
+ * why it is a `finally` and not a line at the bottom of the happy path. The gap
+ * between them is `turnInFlight`, and `synthesisPending` requires it closed.
+ * Two counters rather than a flag for the reason the composition uses two: a
+ * flag has to be cleared on every exit and a counter is written with the same
+ * value from wherever it is written.
  *
  * ## Requirement identity
  *
@@ -223,6 +244,15 @@ export interface ChainDerived {
   /** Whether the iteration backstop has been reached. */
   iterationsExhausted: boolean;
   /**
+   * Whether a turn has been dispatched and its resolver has not yet exited.
+   *
+   * The chain can be told to stop while a turn is still streaming — that is
+   * what an interrupt is — so "nothing further will start" and "nothing is
+   * running" are two different questions, and everything that reads the chain
+   * as finished needs both. See the module note.
+   */
+  turnInFlight: boolean;
+  /**
    * Whether the chain is done adding turns, for any reason.
    *
    * **The single termination condition.** Every way the chain can stop is one
@@ -308,6 +338,22 @@ export const chainSchema = {
     running: t.boolean().meta({ label: "Running", category: "lifecycle" }),
     /** Turns completed. Also the index of the turn about to run. */
     iteration: t.number().meta({ label: "Iteration", category: "chain" }),
+    /**
+     * Turns dispatched, and turns whose resolver has exited.
+     *
+     * Two counters rather than a boolean, so the gap between them answers "is a
+     * turn in flight" without anyone having to remember to clear a flag on
+     * every way out of the resolver — including the ways out that throw.
+     * `turnsFinished` rather than `iteration` as the second half, because a
+     * failed turn exits without completing, and a chain that read the gap
+     * against `iteration` would believe that turn was still running forever.
+     */
+    turnsStarted: t
+      .number()
+      .meta({ label: "Turns started", category: "chain" }),
+    turnsFinished: t
+      .number()
+      .meta({ label: "Turns finished", category: "chain" }),
     /** The previous turn's text, for presets whose template references it. */
     previousTurn: t
       .string()
@@ -399,6 +445,7 @@ export const chainSchema = {
     canAffordSynthesis: t.boolean(),
     synthesisSkipped: t.boolean(),
     iterationsExhausted: t.boolean(),
+    turnInFlight: t.boolean(),
     chainStopped: t.boolean(),
     stopReason: t.string<StopReason>(),
     nextPersona: t.string(),
@@ -461,6 +508,11 @@ function withPresetMeta(
     ...meta,
     tags: [`preset:${preset.id}`, ...presetTags, ...ownTags],
   };
+}
+
+/** Whatever a rejected promise carried, as a sentence. */
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Read a number off an untyped requirement, for the error hook. */
@@ -549,6 +601,15 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
   let announcedPhase: ChainPhase = "idle";
 
   /**
+   * Failures already recorded, by identity.
+   *
+   * {@link recordFailure} has two callers on purpose — the resolver that had
+   * the failure, and the hook behind it — and they are handed the same thrown
+   * value. Weak, so nothing here keeps an error alive.
+   */
+  const recordedFailures = new WeakSet<object>();
+
+  /**
    * Copy the ledger into the facts. The `finally` of every resolver that can
    * reach a provider, and the only place `spentUsd` is written.
    *
@@ -582,6 +643,107 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
     facts.spentUsd = budgetRunner.getSpent("total");
   }
 
+  /**
+   * Close a turn out: the ledger, and the counter that says it is no longer
+   * running. The `finally` of the turn resolver, for both the reason above and
+   * one of its own — a turn that threw has stopped running just as surely as
+   * one that returned, and a chain that only learned about the returning kind
+   * would wait for it forever.
+   */
+  function settleTurn(
+    facts: { spentUsd: number; turnsFinished: number },
+    iteration: number,
+  ): void {
+    settleSpend(facts);
+    facts.turnsFinished = iteration + 1;
+  }
+
+  /**
+   * Record a resolver failure, in the resolver that had it.
+   *
+   * A failed turn is recoverable at chain level: the transcript keeps whatever
+   * was already written, `failure` makes `chainStopped` true, and the chain cuts
+   * over to synthesis on what it has. A failed synthesis is not — there is
+   * nothing further to try — so it sets its own fact and the chain lands in
+   * `"failed"`. The lifetime budget floor refusing a call is neither: nothing is
+   * broken, the run reached the number it was given, and it is recorded as a
+   * budget stop so the two ceilings do not give different accounts of the same
+   * money.
+   *
+   * All three also matter for a reason that has nothing to do with reporting:
+   * without a fact recording the outcome, the constraint that produced the
+   * requirement would still hold, the requirement would still be keyed the same,
+   * and the chain would sit with an unmet requirement forever.
+   *
+   * **Why here and not in a resolver-error hook.** Core offers one, and it is
+   * the obvious home for this — one place, both resolvers, no duplication. It
+   * runs a tick later, though, and this module is built on the rule stated
+   * above {@link settleSpend}: everything a resolver's exit says about the chain
+   * has to land in one synchronous block. Split across two ticks, the ledger
+   * copy opens a reconcile pass and the failure lands inside it, so the two
+   * halves of one exit are read by the chain as two separate events — and the
+   * phase they jointly imply is computed from the first half alone.
+   *
+   * Nothing here reads the ledger, deliberately: a call that streamed and then
+   * threw has already been billed for what it delivered, and the `finally`
+   * above has already carried that forward.
+   */
+  function recordFailure(
+    facts: {
+      budgetHalted: boolean;
+      synthesisRefused: boolean;
+      synthesisFailed: boolean;
+      failure: string;
+    },
+    error: unknown,
+    requirement: { type: "RUN_TURN" | "SYNTHESIZE"; iteration: number },
+  ): void {
+    // Once per failure, whichever of the two callers gets there first. Writing
+    // the same facts twice is free — a fact set to what it already is is not a
+    // change — but announcing the same failure twice is a surface showing an
+    // operator two errors where one thing went wrong.
+    if (typeof error === "object" && error !== null) {
+      if (recordedFailures.has(error)) {
+        return;
+      }
+      recordedFailures.add(error);
+    }
+
+    const message = describeError(error);
+    const scope = requirement.type === "SYNTHESIZE" ? "synthesis" : "turn";
+    const report = () => {
+      emit({
+        type: "error",
+        scope,
+        message,
+        ...(requirement.type === "SYNTHESIZE"
+          ? {}
+          : { iteration: requirement.iteration }),
+        at: now(),
+      });
+    };
+
+    if (isBudgetExhausted(error)) {
+      facts.budgetHalted = true;
+      if (requirement.type === "SYNTHESIZE") {
+        facts.synthesisRefused = true;
+      }
+      report();
+
+      return;
+    }
+
+    if (requirement.type === "SYNTHESIZE") {
+      facts.synthesisFailed = true;
+      report();
+
+      return;
+    }
+
+    facts.failure = message;
+    report();
+  }
+
   return createModule("ai-harness-chain", {
     schema: chainSchema,
 
@@ -599,6 +761,8 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       facts.input = "";
       facts.running = false;
       facts.iteration = 0;
+      facts.turnsStarted = 0;
+      facts.turnsFinished = 0;
       facts.previousTurn = "";
       facts.lastTurn = null;
       facts.spentUsd = 0;
@@ -684,6 +848,8 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       iterationsExhausted: (facts) =>
         facts.iteration >= facts.preset.maxIterations,
 
+      turnInFlight: (facts) => facts.turnsStarted > facts.turnsFinished,
+
       chainStopped: (facts, derived) =>
         chainStopped({
           budgetHalted: facts.budgetHalted,
@@ -696,6 +862,7 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
       synthesisSkipped: (facts, derived) =>
         facts.running &&
         derived.chainStopped &&
+        !derived.turnInFlight &&
         facts.iteration > 0 &&
         !facts.synthesized &&
         !facts.synthesisFailed &&
@@ -718,9 +885,15 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
 
       turnPending: (facts, derived) => facts.running && !derived.chainStopped,
 
+      // The turn in flight is the whole of the interrupt handling. An
+      // interrupt flips `chainStopped` while a turn is streaming, and without
+      // this clause the synthesis would be authorized against a ledger that
+      // call has not been billed to yet and prompted with a transcript that
+      // does not contain it. See the module note.
       synthesisPending: (facts, derived) =>
         facts.running &&
         derived.chainStopped &&
+        !derived.turnInFlight &&
         facts.iteration > 0 &&
         !facts.synthesized &&
         !facts.synthesisFailed &&
@@ -733,7 +906,11 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
         if (facts.synthesisFailed) {
           return "failed";
         }
-        if (!derived.chainStopped) {
+        // A turn still running is still turn-taking, whatever the stop
+        // condition says. Without this an interrupted chain reports itself
+        // complete — and closes the run out — while the turn it interrupted is
+        // still billing.
+        if (!derived.chainStopped || derived.turnInFlight) {
           return "taking-turns";
         }
 
@@ -799,10 +976,15 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
         requirement: "RUN_TURN",
         key: (req) => `turn-${req.iteration}`,
         // The `finally` is the whole of the failed-turn accounting — see
-        // `settleSpend`. A turn that streamed and then threw has been billed
-        // for what it delivered, and this is what carries that forward.
+        // `settleTurn`. A turn that streamed and then threw has been billed
+        // for what it delivered, and this is what carries that forward, along
+        // with the fact that the turn is no longer running.
         resolve: async (req, context) => {
           const spentBefore = budgetRunner.getSpent("total");
+          // Dispatched. `turnInFlight` holds from here until the `finally`
+          // below, which is what keeps an interrupt arriving mid-turn from
+          // dispatching the synthesis alongside it.
+          context.facts.turnsStarted = req.iteration + 1;
 
           try {
             emit({
@@ -869,8 +1051,12 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
             context.facts.lastTurnUsd = spentAfter - spentBefore;
             context.facts.transcriptChars = transcript.text().length;
             context.facts.iteration = req.iteration + 1;
+          } catch (error) {
+            recordFailure(context.facts, error, req);
+
+            throw error;
           } finally {
-            settleSpend(context.facts);
+            settleTurn(context.facts, req.iteration);
           }
         },
         meta: withPresetMeta(preset, {
@@ -926,6 +1112,10 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
 
             context.facts.synthesis = text;
             context.facts.synthesized = true;
+          } catch (error) {
+            recordFailure(context.facts, error, req);
+
+            throw error;
           } finally {
             settleSpend(context.facts);
           }
@@ -951,12 +1141,28 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
        * during a run, so a slow sink should not hold up the next turn. The one
        * place the write genuinely has to have landed — the end of the run —
        * awaits it, in the completion effect below.
+       *
+       * Fire-and-forget is not the same as unwatched. A store is a seam and a
+       * seam can reject — a disk that filled, a directory removed under the
+       * run — and a rejected promise nobody is holding is an unhandled
+       * rejection, which on Node's default settings takes the process down. So
+       * the rejection is caught and reported on the one channel this package
+       * reports on. The run carries on: the artefacts are a mirror, and a
+       * mirror that cannot be written is not a reason to stop the thing it is
+       * mirroring.
        */
       mirrorTranscript: {
         deps: ["input", "lastTurn", "synthesis"],
         run: (facts) => {
           transcript.setInput(facts.input);
-          void transcript.flush();
+          void transcript.flush().catch((error: unknown) => {
+            emit({
+              type: "error",
+              scope: "transcript",
+              message: describeError(error),
+              at: now(),
+            });
+          });
         },
         meta: { label: "Mirror the transcript", category: "io" },
       },
@@ -1100,7 +1306,23 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
           // The one place the mirror has to have landed. Flushes are
           // serialized, so this queues behind whatever the turn effects
           // started and resolves only once the files match memory.
-          await transcript.flush();
+          //
+          // And it is the last thing standing between the run and the event
+          // that ends it, which is why the failure is caught rather than
+          // allowed to propagate. `run()` resolves off `chain:complete`; an
+          // effect that threw on its way there would leave a settled chain,
+          // a correct ledger, and a caller waiting forever. A store that
+          // cannot write is worth reporting and is not worth hanging over.
+          try {
+            await transcript.flush();
+          } catch (error) {
+            emit({
+              type: "error",
+              scope: "transcript",
+              message: describeError(error),
+              at: now(),
+            });
+          }
 
           emit({
             type: "chain:complete",
@@ -1123,67 +1345,20 @@ function buildModule(deps: HarnessChainDeps & { readDerived: DerivedReader }) {
 
     hooks: {
       /**
-       * Every terminal resolver failure, in one place.
+       * The backstop, for a throw the resolvers' own `catch` did not see.
        *
-       * A failed turn is recoverable at chain level: the transcript keeps
-       * whatever was already written, `failure` makes `chainStopped` true, and
-       * the chain cuts over to synthesis on what it has. A failed synthesis is
-       * not — there is nothing further to try — so it sets its own fact and the
-       * chain lands in `"failed"`.
-       *
-       * Both also matter for a reason that has nothing to do with reporting:
-       * without a fact recording the failure, the constraint that produced the
-       * requirement would still hold, the requirement would still be keyed the
-       * same, and the chain would sit with an unmet requirement forever.
-       *
-       * **Nothing here reads the ledger, deliberately.** A call that streamed
-       * and then threw has already been billed for what it delivered, and this
-       * hook used to be a path that ended a turn without copying that forward —
-       * so a failed turn reported `$0.0000` while the money was gone. The fix
-       * is not a `spentUsd` write here; it is that {@link callAgent} settles
-       * the ledger into the facts in a `finally`, so this hook runs *after* the
-       * copy has already happened and there is no second place to keep in step.
+       * {@link recordFailure} runs inside each resolver, which is where it has
+       * to run — see its note. A resolver that failed somewhere the body cannot
+       * reach, or one added later that forgets, would otherwise leave the
+       * constraint holding, the requirement keyed the same, and the chain
+       * waiting on it forever. Writing the same facts a second time is free:
+       * they already hold the values this would give them, and a fact set to
+       * what it already is is not a change.
        */
       onResolverError: (error, requirement, context) => {
-        // The lifetime floor refused the call. Nothing is broken — the run
-        // reached the number it was given — so this is recorded as a budget
-        // stop rather than a failure, and the chain lands in `"complete"` with
-        // `stopReason: "budget"` however far in it happened.
-        if (isBudgetExhausted(error)) {
-          context.facts.budgetHalted = true;
-          if (requirement.type === "SYNTHESIZE") {
-            context.facts.synthesisRefused = true;
-          }
-          emit({
-            type: "error",
-            scope: requirement.type === "SYNTHESIZE" ? "synthesis" : "turn",
-            message: error.message,
-            iteration: readIteration(requirement),
-            at: now(),
-          });
-
-          return;
-        }
-
-        if (requirement.type === "SYNTHESIZE") {
-          context.facts.synthesisFailed = true;
-          emit({
-            type: "error",
-            scope: "synthesis",
-            message: error.message,
-            at: now(),
-          });
-
-          return;
-        }
-
-        context.facts.failure = error.message;
-        emit({
-          type: "error",
-          scope: "turn",
-          message: error.message,
-          iteration: readIteration(requirement),
-          at: now(),
+        recordFailure(context.facts, error, {
+          type: requirement.type === "SYNTHESIZE" ? "SYNTHESIZE" : "RUN_TURN",
+          iteration: readIteration(requirement) ?? 0,
         });
       },
     },

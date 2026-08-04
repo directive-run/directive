@@ -11,9 +11,11 @@
 import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createFileTranscriptStore } from "../adapters/node/transcript.js";
+import { runComposition } from "../core/composition.js";
 import type { HarnessEvent } from "../core/events.js";
 import { createMockRunner } from "../core/mock-runner.js";
 import { createHarnessSystem } from "../core/system.js";
+import { type TranscriptStore, createTranscript } from "../core/transcript.js";
 import {
   type Scratch,
   cannedResponses,
@@ -25,6 +27,28 @@ import {
 /** How many times `needle` occurs in `haystack`. */
 function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
+}
+
+/**
+ * A store that renders everything and writes nothing, loudly.
+ *
+ * Stands in for every way the shipped filesystem store can refuse: a full
+ * disk, a quota, a read-only mount, an output directory removed under the run.
+ */
+function rejectingStore(message: string): TranscriptStore {
+  return {
+    open: ({ runId, fenceToken }) =>
+      createTranscript({
+        runId,
+        ...(fenceToken === undefined ? {} : { fenceToken }),
+        sink: {
+          markdownPath: `rejecting:${runId}.md`,
+          jsonlPath: `rejecting:${runId}.jsonl`,
+          write: () => Promise.reject(new Error(message)),
+        },
+      }),
+    writeDocument: () => Promise.reject(new Error(message)),
+  };
 }
 
 describe("transcript", () => {
@@ -148,6 +172,74 @@ describe("transcript", () => {
     expect(sidecar.trim().split("\n")).toHaveLength(1);
     // The buffered deltas stood in for a runner that returned no text.
     expect(JSON.parse(sidecar.trim()).text).toBe("hello world");
+  });
+
+  // ==========================================================================
+  // A store that cannot write
+  // ==========================================================================
+  //
+  // The artefacts are a mirror of a transcript that is whole in memory, so a
+  // sink that rejects costs the run its files and nothing else. It used to cost
+  // the run its ending: the flush before the completion event was awaited
+  // unguarded, so a full disk, a read-only mount, or an output directory
+  // removed mid-run left a settled chain, a correct ledger, and a caller
+  // holding a promise that never resolved.
+
+  it("finishes a run whose store rejects every write, and says so", async () => {
+    const preset = testPreset({ budgetUsd: 100, maxIterations: 2 });
+    const events: HarnessEvent[] = [];
+
+    const harness = createHarnessSystem(preset, {
+      runner: createMockRunner({ responses: cannedResponses() }),
+      transcripts: rejectingStore("ENOSPC: no space left on device"),
+      retry: { maxRetries: 0 },
+      onEvent: (event) => events.push(event),
+    });
+
+    const result = await harness.run("go");
+    harness.system.destroy();
+
+    expect(result.iterations).toBe(2);
+    expect(result.synthesis).toContain("SYNTHESIS");
+    expect(result.spentUsd).toBeGreaterThan(0);
+
+    const types = events.map((event) => event.type);
+    expect(types.at(-1)).toBe("chain:complete");
+    // The failure is not swallowed — it is reported on the one channel this
+    // package reports on.
+    expect(
+      events.some(
+        (event) =>
+          event.type === "error" &&
+          event.scope === "transcript" &&
+          event.message.includes("ENOSPC"),
+      ),
+    ).toBe(true);
+  });
+
+  it("finishes a composition whose combined document cannot be written", async () => {
+    const events: HarnessEvent[] = [];
+    const result = await runComposition(
+      [testPreset({ id: "one", budgetUsd: 5, maxIterations: 1 })],
+      "go",
+      {
+        runner: createMockRunner({ responses: cannedResponses() }),
+        transcripts: rejectingStore("EACCES: permission denied"),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => events.push(event),
+      },
+    );
+
+    expect(result.steps).toHaveLength(1);
+    expect(result.combinedPath).toBe("");
+    expect(events.map((event) => event.type).at(-1)).toBe(
+      "composition:complete",
+    );
+    expect(
+      events.some(
+        (event) => event.type === "error" && event.scope === "transcript",
+      ),
+    ).toBe(true);
   });
 
   it("discards the pending buffer on beginTurn, which is what a replay does", () => {

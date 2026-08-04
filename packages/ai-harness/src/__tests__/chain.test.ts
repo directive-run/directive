@@ -221,4 +221,68 @@ describe("chain", () => {
       "the renderer fell over",
     );
   });
+
+  /**
+   * A failed turn is recorded by the resolver that had it, in the same
+   * synchronous block as its ledger copy — the module's own rule, and the rule
+   * that keeps the two halves of one resolver exit from being read by the chain
+   * as two separate events. The hook behind it is a backstop for a throw the
+   * body could not see, so both are handed the same failure and only one of
+   * them may announce it.
+   */
+  it("announces a failed turn once, and still closes the run out", async () => {
+    const events: HarnessEvent[] = [];
+    const harness = createHarnessSystem(
+      testPreset({ maxIterations: 3, budgetUsd: 5 }),
+      {
+        runner: createMockRunner({
+          responses: cannedResponses(),
+          failures: [{ agent: "alpha", call: 1, afterDeltas: 2 }],
+        }),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => events.push(event),
+      },
+    );
+
+    const result = await harness.run("go");
+    harness.system.destroy();
+
+    expect(result.stopReason).toBe("error");
+
+    const errors = events.filter(
+      (event) => event.type === "error" && event.scope === "turn",
+    );
+    expect(errors).toHaveLength(1);
+    // And the run reached its end rather than stalling on the failure.
+    expect(events.map((event) => event.type).at(-1)).toBe("chain:complete");
+  });
+
+  /**
+   * `destroy()` is the only handle a caller has on a chain that is spending
+   * more than they meant it to, and core already makes it a real one — every
+   * resolver's signal is aborted and the turn resolver hands that signal to the
+   * provider call. What it could not do is end the wait: `run()` resolves off
+   * `chain:complete`, and teardown means no further reconcile and therefore no
+   * further event. So the caller who reached for the kill switch was left
+   * holding a promise that never settled, which is the one thing a kill switch
+   * must not do.
+   */
+  it("ends the run when the system is destroyed under it", async () => {
+    const harness = createHarnessSystem(
+      testPreset({ maxIterations: 20, budgetUsd: 5 }),
+      {
+        runner: createMockRunner({ responses: cannedResponses(), delayMs: 5 }),
+        transcripts: createFileTranscriptStore({ dir: scratch.dir }),
+        retry: { maxRetries: 0 },
+        onEvent: (event) => {
+          if (event.type === "turn:delta") {
+            queueMicrotask(() => harness.system.destroy());
+          }
+        },
+      },
+    );
+
+    await expect(harness.run("go")).rejects.toThrow(/torn down/);
+  });
 });

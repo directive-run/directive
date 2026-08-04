@@ -23,6 +23,14 @@
  * The second exits immediately, because an operator pressing it twice has
  * stopped asking politely.
  *
+ * ## Exit codes
+ *
+ * See {@link ExitCode}. Every outcome used to be `0`, which meant a shell could
+ * not tell a finished run from a failed one and `harness … && ship` shipped on
+ * a run that produced nothing. The distinction a caller actually needs is not
+ * "did the process crash" but "is there a closing document", and that is the
+ * line the codes are drawn along.
+ *
  * @module
  */
 
@@ -34,6 +42,7 @@ import pc from "picocolors";
 import { resolvePresetPricing } from "../../core/agents.js";
 import { runComposition } from "../../core/composition.js";
 import { type RunEstimate, estimateRun } from "../../core/estimate.js";
+import type { HarnessEvent } from "../../core/events.js";
 import { createMockRunner } from "../../core/mock-runner.js";
 import { assertPreset, loadPreset } from "../../core/preset-registry.js";
 import type { PresetConfig } from "../../core/preset-types.js";
@@ -42,6 +51,52 @@ import { PRESET_LIST } from "../../presets/index.js";
 import { createFileTranscriptStore } from "../node/transcript.js";
 import { createHarness } from "../sdk/index.js";
 import { createRenderer, dollars, plural } from "./render.js";
+
+// ============================================================================
+// Exit codes
+// ============================================================================
+
+/**
+ * What the process exits with, and what each one means to a script.
+ *
+ * `0` is the only one that says a closing document was written, because that is
+ * the only outcome a caller can chain something onto. Everything else is a
+ * distinct reason there is nothing to chain onto, and they are separate because
+ * they call for different responses: fix the command, raise the budget, or look
+ * at what failed.
+ */
+export const ExitCode = {
+  /** The run finished and produced a closing document. */
+  ok: 0,
+  /**
+   * The command could not run: bad arguments, an unreadable input file, a
+   * preset that resolves to nothing, no API key. Nothing was spent.
+   */
+  usage: 1,
+  /**
+   * The run finished and produced no closing document.
+   *
+   * Nothing failed. The budget covered the synthesis but not a first turn
+   * alongside it, or it ran out before the synthesis came due, or an interrupt
+   * arrived before the first turn finished. A larger `--budget` is usually the
+   * answer, and the line above the totals says which case it was.
+   */
+  noOutput: 2,
+  /**
+   * A run failed: the synthesizer itself threw, a composition step could not
+   * run, or the provider refused every attempt. The error is on stderr and
+   * whatever the run did produce is on the transcript.
+   */
+  failed: 3,
+  /**
+   * Interrupted twice. The conventional `128 + SIGINT`, so a shell reports it
+   * the way it reports any other interrupted command. One interrupt is not
+   * this — the chain synthesizes what it has and exits on its own outcome.
+   */
+  interrupted: 130,
+} as const;
+
+export type ExitCodeValue = (typeof ExitCode)[keyof typeof ExitCode];
 
 // ============================================================================
 // Errors
@@ -181,6 +236,19 @@ function buildProgram(sink: string[]): Command {
       "./runs",
     )
     .option("--verbose", "print the event stream structurally", false)
+    .addHelpText(
+      "after",
+      [
+        "",
+        "Exit codes:",
+        "  0    finished, and a closing document was written",
+        "  1    the command could not run — nothing was spent",
+        "  2    finished, and produced no closing document",
+        "  3    the run failed",
+        "  130  interrupted twice",
+        "",
+      ].join("\n"),
+    )
     .allowExcessArguments(false)
     .exitOverride()
     .configureOutput({
@@ -654,7 +722,7 @@ function installInterrupt(
       return;
     }
 
-    process.exit(130);
+    process.exit(ExitCode.interrupted);
   };
 
   process.on("SIGINT", handler);
@@ -664,19 +732,46 @@ function installInterrupt(
   };
 }
 
+/**
+ * What the run amounted to, read off the same event stream the screen is.
+ *
+ * Not off the result objects, deliberately. A composition's last step is the
+ * one whose closing document is the answer, a single run has exactly one, and
+ * reading either from its own return shape would be two ways of deciding the
+ * exit code — which is how they come to disagree. The events say it once.
+ */
+interface Outcome {
+  /** Whether the last chain to finish wrote a closing document. */
+  produced: boolean;
+  /** Whether anything failed outright. */
+  failed: boolean;
+}
+
 async function execute(
   presets: readonly PresetConfig[],
   input: string,
   args: CliArgs,
   onEvent: ReturnType<typeof createRenderer>,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<Outcome> {
+  const outcome: Outcome = { produced: false, failed: false };
+  const observe = (event: HarnessEvent) => {
+    if (event.type === "chain:complete") {
+      outcome.produced = event.synthesis !== "";
+      outcome.failed = outcome.failed || event.phase === "failed";
+    }
+    if (event.type === "error" && event.scope === "step") {
+      outcome.failed = true;
+    }
+    onEvent(event);
+  };
+
   const shared = {
     ...providerOptions(presets, args),
     // The command line is where the filesystem enters. Nothing under
     // `../../core/` knows there is one — see `../node/transcript.js`.
     transcripts: createFileTranscriptStore({ dir: args.outDir }),
-    onEvent,
+    onEvent: observe,
     signal,
   };
 
@@ -696,7 +791,7 @@ async function execute(
       harness.system.destroy();
     }
 
-    return;
+    return outcome;
   }
 
   await runComposition(presets, input, {
@@ -705,6 +800,8 @@ async function execute(
       ? {}
       : { totalBudgetUsd: args.totalBudgetUsd }),
   });
+
+  return outcome;
 }
 
 // ============================================================================
@@ -715,6 +812,7 @@ async function execute(
  * Run the CLI and return the process exit code.
  *
  * Returns rather than exits, so the whole surface is callable from a test.
+ * See {@link ExitCode} for what each value means.
  *
  * @param argv - Arguments only — no `node`, no script path.
  */
@@ -722,10 +820,10 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   const write = (chunk: string) => {
     process.stdout.write(chunk);
   };
-  const fail = (message: string) => {
+  const fail = (message: string, code: number = ExitCode.usage) => {
     process.stderr.write(`${pc.red("harness:")} ${message}\n`);
 
-    return 1;
+    return code;
   };
 
   let args: CliArgs;
@@ -735,7 +833,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     if (error instanceof CliHelp) {
       write(error.text);
 
-      return 0;
+      return ExitCode.ok;
     }
 
     return fail((error as Error).message);
@@ -744,7 +842,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   if (args.listPresets) {
     write(renderPresetList());
 
-    return 0;
+    return ExitCode.ok;
   }
 
   const controller = new AbortController();
@@ -762,7 +860,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     }
     uninstall = installInterrupt(controller, (message) => log.warn(message));
 
-    await execute(
+    const outcome = await execute(
       presets,
       input,
       args,
@@ -772,9 +870,19 @@ export async function runCli(argv: readonly string[]): Promise<number> {
 
     outro(pc.dim(args.dryRun ? "done (dry run)" : "done"));
 
-    return 0;
+    if (outcome.failed) {
+      return ExitCode.failed;
+    }
+
+    return outcome.produced ? ExitCode.ok : ExitCode.noOutput;
   } catch (error) {
-    return fail((error as Error).message);
+    // A throw out of `execute` is the run itself failing — a torn-down system,
+    // a store that would not open. `CliError` is the other kind and is the
+    // operator's to fix, which is a different code and a different response.
+    return fail(
+      (error as Error).message,
+      error instanceof CliError ? ExitCode.usage : ExitCode.failed,
+    );
   } finally {
     uninstall();
   }

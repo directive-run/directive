@@ -73,8 +73,18 @@ export type StopReason =
  * not something the chain may quietly swallow. The chain has no console — it
  * reports on this stream and nothing else — so a listener that throws is
  * reported on this stream, to the listeners that did not.
+ *
+ * `"transcript"` and `"step"` are the same kind of thing one layer out. A store
+ * that cannot write does not stop the chain that was writing through it, and a
+ * step that failed does not stop the composition from closing itself out and
+ * saying what it got — but neither may pass unsaid.
  */
-export type ErrorScope = "turn" | "synthesis" | "listener";
+export type ErrorScope =
+  | "turn"
+  | "synthesis"
+  | "listener"
+  | "transcript"
+  | "step";
 
 /**
  * Which step of a composition is speaking.

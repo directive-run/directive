@@ -18,6 +18,7 @@ import {
   loggingPlugin,
 } from "@directive-run/core/plugins";
 import { createHarnessAgents } from "./agents.js";
+import { awaitCompletion } from "./completion.js";
 import type {
   ChainPhase,
   HarnessEvent,
@@ -122,6 +123,16 @@ export interface Harness {
   system: System<never>;
   /** The transcript, live. Readable mid-run. */
   transcript: Transcript;
+  /**
+   * What this run has been billed so far, in dollars.
+   *
+   * A method rather than a property, because it is live — the ledger is copied
+   * into the facts on every resolver exit, including the ones that threw, and a
+   * caller reading this after a failed turn gets what that turn actually cost.
+   * Readable mid-run, and readable after one; a composition reads it to charge
+   * a step whose `run()` rejected before it could report anything.
+   */
+  spentUsd(): number;
   /** Run the chain to completion. One run per harness. */
   run(input: string): Promise<HarnessRunResult>;
   /**
@@ -233,9 +244,32 @@ export function createHarnessSystem(
     now,
   });
 
+  /**
+   * Torn down while a run was still going.
+   *
+   * `destroy()` is the only handle a caller has on a chain that is spending
+   * more than they meant it to, and core already makes it a real one — `stop()`
+   * aborts every resolver's signal, and the turn resolver hands that signal to
+   * the provider call. What it could not do is end the wait: `run()` resolves
+   * off `chain:complete`, teardown means no further reconcile and therefore no
+   * further event, and the caller who reached for the kill switch was left
+   * holding a promise that would never settle. This is how the teardown reaches
+   * them, wherever it was triggered from — the harness does not own the
+   * `destroy()` call, so it listens for it rather than wrapping it.
+   */
+  let onTeardown: (() => void) | undefined;
+
   const system = createSystem({
     module: chain.module,
-    plugins: buildPlugins(options),
+    plugins: [
+      ...buildPlugins(options),
+      {
+        name: "ai-harness-teardown",
+        onStop: () => {
+          onTeardown?.();
+        },
+      },
+    ],
   });
   // The single-module form, so no namespace. The multi-module form is the whole
   // reason `bind` takes one — see `HarnessChain.bind`.
@@ -268,6 +302,10 @@ export function createHarnessSystem(
     system: system as unknown as System<never>,
     transcript,
 
+    spentUsd() {
+      return system.facts.spentUsd;
+    },
+
     async run(input) {
       if (consumed) {
         throw new Error(
@@ -276,18 +314,41 @@ export function createHarnessSystem(
       }
       consumed = true;
 
-      const finished = new Promise<void>((resolve) => {
+      const finished = new Promise<void>((resolve, reject) => {
         const onComplete: HarnessEventSink = (event: HarnessEvent) => {
           if (event.type === "chain:complete") {
             listeners.delete(onComplete);
+            onTeardown = undefined;
             resolve();
           }
         };
         listeners.add(onComplete);
+
+        onTeardown = () => {
+          listeners.delete(onComplete);
+          onTeardown = undefined;
+          reject(
+            new Error(
+              `[ai-harness] run "${runId}" was torn down before it finished. The system was stopped or destroyed with the chain still going, so every resolver was aborted and no closing document was written. ${system.facts.iteration} turns and $${system.facts.spentUsd.toFixed(4)} are on the transcript at ${transcript.markdownPath}.`,
+            ),
+          );
+        };
       });
 
       system.dispatch({ type: "start", input });
-      await finished;
+      // Backed by the system's own settlement, so a cascade that stops short of
+      // the completion event ends the wait with what the chain was doing rather
+      // than with a hang. See `./completion.js`.
+      await awaitCompletion(
+        finished,
+        system,
+        // A turn is dispatched under a requirement that stays active for its
+        // whole life, so the engine's own count is enough here — this is the
+        // chain saying so rather than the caller assuming it.
+        () => system.isSettled && !system.derive.turnInFlight,
+        () =>
+          `[ai-harness] run "${runId}" stopped without finishing. The system has nothing left to do — no resolver in flight, no reconcile pending — and no chain:complete was emitted. Phase ${JSON.stringify(system.derive.phase)}, ${system.facts.iteration} turns, $${system.facts.spentUsd.toFixed(4)} of $${system.derive.budgetUsd.toFixed(4)} spent${system.facts.failure === "" ? "" : `, last failure: ${system.facts.failure}`}.`,
+      );
 
       return snapshot();
     },
