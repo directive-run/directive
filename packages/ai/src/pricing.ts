@@ -734,6 +734,19 @@ const REPORTED_USAGE = "tokenUsage";
  * error's own enumerable fields does not accidentally start carrying a usage
  * report, and a test asserting on an error's shape does not start failing.
  *
+ * **The report is in-realm only, and that is a contract, not an oversight.** A
+ * non-enumerable property does not survive `structuredClone`, `postMessage`,
+ * `JSON.stringify`, or any wrapper that rebuilds an error from its enumerable
+ * fields. So a failed call whose error crosses a worker boundary, a devtools
+ * bridge or an OTel exporter arrives on the other side with no usage on it, and
+ * a ledger reading it there records nothing for a call the provider billed. The
+ * fix at such a boundary is to read the report before the crossing with
+ * {@link readReportedUsage} and carry it as an ordinary field of whatever
+ * message goes over. The alternative — making it enumerable — would put a token
+ * count into the serialized form of every error in the package, which changes
+ * what a logger prints and what an assertion on error shape sees, for every
+ * caller, to serve the boundary-crossing minority.
+ *
  * Errors that cannot take the property — a frozen one, a primitive thrown as an
  * error — are returned untouched. There is nothing to be done about them, and
  * failing to record a bill is not worth throwing over on top of the failure
@@ -766,14 +779,54 @@ export function attachReportedUsage<E>(
 }
 
 /**
+ * How far down a chain of wrapped errors to look for a usage report.
+ *
+ * Eight, the same depth the harness walks looking for a budget stop, and for
+ * the same reason: the error crosses several layers between where it is thrown
+ * and where it is read, and each of them may wrap it.
+ */
+const MAX_CAUSE_DEPTH = 8;
+
+/**
  * Read back what {@link attachReportedUsage} recorded, if anything.
+ *
+ * Walks the `cause` chain, because by the time anything asks, the error is
+ * rarely the one the adapter threw. `withRetry` wraps its last failure in a
+ * `RetryExhaustedError` and puts the original on `cause`; `withFallback` wraps
+ * again. Reading only the outermost error's own property meant a call the
+ * provider had billed in full on the prompt was recorded at $0.00 the moment
+ * any wrapper stood between the stream and the ledger — measured through the
+ * documented `runner` extension point, that was real spend running to 1.9x and
+ * 2.7x of a ceiling that reported itself well under, with no overrun event,
+ * because the fraction was computed from a ledger that was wrong.
+ *
+ * `lastError` is followed as well as `cause`: `RetryExhaustedError` publishes
+ * the original under both names, and a caller building their own wrapper on the
+ * same shape should not have to know which one this reads.
  *
  * @internal
  */
 export function readReportedUsage(error: unknown): TokenUsage | undefined {
-  const raw = readOwn(error, REPORTED_USAGE);
+  let current: unknown = error;
 
-  return raw === undefined || raw === null ? undefined : (raw as TokenUsage);
+  for (
+    let depth = 0;
+    depth < MAX_CAUSE_DEPTH && current !== null && current !== undefined;
+    depth++
+  ) {
+    const raw = readOwn(current, REPORTED_USAGE);
+    if (raw !== undefined && raw !== null) {
+      return raw as TokenUsage;
+    }
+
+    const next = readOwn(current, "cause") ?? readOwn(current, "lastError");
+    if (next === current) {
+      break;
+    }
+    current = next;
+  }
+
+  return undefined;
 }
 
 /**

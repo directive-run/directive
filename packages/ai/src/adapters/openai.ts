@@ -13,14 +13,28 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../agent-utils.js";
+import {
+  DEFAULT_STREAM_IDLE_MS,
+  DEFAULT_STREAM_STALL_MS,
+  createRunner,
+  createStreamDeadline,
+  validateBaseURL,
+  validateStreamTimeout,
+} from "../agent-utils.js";
 import type { EmbedderFn, Embedding } from "../guardrails/semantic-cache.js";
-import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
-import type { AdapterHooks, AgentRunner } from "../types.js";
+import {
+  type ModelPricing,
+  attachReportedUsage,
+  readReportedUsage,
+  toTokenPricingTable,
+} from "../pricing.js";
+import type { AdapterHooks, AgentRunner, StopReason } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  SSE_ACCEPT_HEADER,
   anyTokenCountReported,
+  assertEventStreamResponse,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
@@ -111,6 +125,15 @@ export const OPENAI_TOKEN_PRICING: Record<string, ModelPricing> =
  * Shared by the streaming path of `createOpenAIRunner` and by
  * `createOpenAIStreamingRunner` so the two cannot drift.
  */
+/** OpenAI's `finish_reason` values, in the shared vocabulary. */
+const OPENAI_STOP_REASONS: Record<string, StopReason> = {
+  stop: "stop",
+  length: "length",
+  tool_calls: "tool_use",
+  function_call: "tool_use",
+  content_filter: "content_filter",
+};
+
 function parseOpenAIStreamEvent(
   event: Record<string, unknown>,
 ): StreamEventResult {
@@ -125,6 +148,10 @@ function parseOpenAIStreamEvent(
   // directly, but gateways vary in which of the two they send.
   if (choice?.finish_reason != null) {
     result.terminal = true;
+    if (typeof choice.finish_reason === "string") {
+      result.rawStopReason = choice.finish_reason;
+      result.stopReason = OPENAI_STOP_REASONS[choice.finish_reason] ?? "other";
+    }
   }
 
   // Read the counts, not the container. A gateway that forwards
@@ -173,6 +200,20 @@ export interface OpenAIRunnerOptions {
    * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
    */
   responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
+  /**
+   * Ask the endpoint for a token-usage frame at the end of a streamed response
+   * (`stream_options: { include_usage: true }`).
+   *
+   * On by default, because without it a streamed call reports no usage at all
+   * and every ledger downstream falls back to an estimate. Turn it off for
+   * endpoints that reject the parameter rather than ignoring it: Azure OpenAI
+   * below api-version 2024-06-01 answers 400, which made every streamed call
+   * through such a deployment fail outright with no way to ask for anything
+   * else.
+   *
+   * @default true
+   */
+  includeUsage?: boolean;
 }
 
 /**
@@ -206,6 +247,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
     baseURL = "https://api.openai.com/v1",
     fetch: fetchFn = globalThis.fetch,
     timeoutMs,
+    includeUsage = true,
     hooks,
     temperature,
     topP,
@@ -230,6 +272,7 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(stream ? { Accept: SSE_ACCEPT_HEADER } : {}),
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
@@ -251,7 +294,12 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
           // stays byte-for-byte what it was. `include_usage` keeps the token
           // breakdown available on the streaming path.
           ...(stream
-            ? { stream: true, stream_options: { include_usage: true } }
+            ? {
+                stream: true,
+                ...(includeUsage
+                  ? { stream_options: { include_usage: true } }
+                  : {}),
+              }
             : {}),
         }),
         ...(timeoutMs != null
@@ -264,12 +312,19 @@ export function createOpenAIRunner(options: OpenAIRunnerOptions): AgentRunner {
       const text = data.choices?.[0]?.message?.content ?? "";
       const inputTokens = data.usage?.prompt_tokens ?? 0;
       const outputTokens = data.usage?.completion_tokens ?? 0;
+      const finishReason = data.choices?.[0]?.finish_reason;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        ...(typeof finishReason === "string"
+          ? {
+              rawStopReason: finishReason,
+              stopReason: OPENAI_STOP_REASONS[finishReason] ?? "other",
+            }
+          : {}),
         // Gateways that strip `usage` – or null out the counts inside it –
         // leave zeros behind; say so rather than letting cost tracking read
         // the response as free.
@@ -385,6 +440,42 @@ export interface OpenAIStreamingRunnerOptions {
    * - Object form enables JSON Schema mode (`{ type: "json_schema", json_schema: ... }`)
    */
   responseFormat?: "json" | { type: "json_schema"; json_schema: unknown };
+  /**
+   * How long the stream may say nothing at all – not even a keep-alive – before
+   * the call is abandoned, in milliseconds.
+   *
+   * The gap between events, not the length of the call: a streamed response runs
+   * for as long as the model has something to say, so a wall-clock cap either
+   * truncates a long answer or bounds nothing. A stalled stream fails with an
+   * error named `"TimeoutError"`. `Infinity` disables it.
+   *
+   * @default 120_000
+   */
+  timeoutMs?: number;
+  /**
+   * How long the stream may stay alive and produce nothing, in milliseconds.
+   *
+   * Keep-alives do not restart this clock, which is the point of it: a provider
+   * wedged behind a queue keeps its connection warm indefinitely. `Infinity`
+   * disables it.
+   *
+   * @default 600_000
+   */
+  contentTimeoutMs?: number;
+  /**
+   * Ask the endpoint for a token-usage frame at the end of a streamed response
+   * (`stream_options: { include_usage: true }`).
+   *
+   * On by default, because without it a streamed call reports no usage at all
+   * and every ledger downstream falls back to an estimate. Turn it off for
+   * endpoints that reject the parameter rather than ignoring it: Azure OpenAI
+   * below api-version 2024-06-01 answers 400, which made every streamed call
+   * through such a deployment fail outright with no way to ask for anything
+   * else.
+   *
+   * @default true
+   */
+  includeUsage?: boolean;
 }
 
 /**
@@ -411,6 +502,9 @@ export function createOpenAIStreamingRunner(
     maxTokens,
     baseURL = "https://api.openai.com/v1",
     fetch: fetchFn = globalThis.fetch,
+    timeoutMs = DEFAULT_STREAM_IDLE_MS,
+    contentTimeoutMs = DEFAULT_STREAM_STALL_MS,
+    includeUsage = true,
     hooks,
     temperature,
     topP,
@@ -420,6 +514,12 @@ export function createOpenAIStreamingRunner(
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createOpenAIStreamingRunner");
+  validateStreamTimeout(timeoutMs, "createOpenAIStreamingRunner");
+  validateStreamTimeout(
+    contentTimeoutMs,
+    "createOpenAIStreamingRunner",
+    "contentTimeoutMs",
+  );
 
   const resolvedResponseFormat =
     responseFormat === "json"
@@ -428,12 +528,24 @@ export function createOpenAIStreamingRunner(
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
+    // `createStreamDeadline` was always provider-agnostic; it simply had not
+    // been adopted here. A streamed OpenAI call had nothing but the caller's
+    // own signal between it and a connection that stays open and silent.
+    const deadline = createStreamDeadline(
+      timeoutMs,
+      callbacks.signal,
+      "OpenAI",
+      {
+        contentMs: contentTimeoutMs,
+      },
+    );
 
     try {
       const response = await fetchFn(`${baseURL}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: SSE_ACCEPT_HEADER,
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
@@ -452,27 +564,29 @@ export function createOpenAIStreamingRunner(
             { role: "user", content: input },
           ],
           stream: true,
-          stream_options: { include_usage: true },
+          ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
         }),
-        signal: callbacks.signal,
+        signal: deadline.signal,
       });
+      deadline.progress();
 
       if (!response.ok) {
         await throwStreamingHTTPError(response, "OpenAI");
       }
+      await assertEventStreamResponse(response, "OpenAI");
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens, usageReported } =
-        await parseEventStream(
-          reader,
-          callbacks.onToken,
-          parseOpenAIStreamEvent,
-          "OpenAI",
-          "sse",
-          { signal: callbacks.signal, requireTerminalEvent: true },
-        );
+      const totals = await parseEventStream(
+        reader,
+        callbacks.onToken,
+        parseOpenAIStreamEvent,
+        "OpenAI",
+        "sse",
+        { signal: deadline.signal, deadline, requireTerminalEvent: true },
+      );
 
+      const { fullText, inputTokens, outputTokens, usageReported } = totals;
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
 
@@ -493,11 +607,20 @@ export function createOpenAIStreamingRunner(
         totalTokens,
         tokenUsage,
         usageReported,
+        {
+          stopReason: totals.stopReason,
+          rawStopReason: totals.rawStopReason,
+        },
       );
     } catch (err) {
-      fireErrorHook(hooks, agent, input, err, startTime);
+      const error = deadline.expired
+        ? attachReportedUsage(deadline.reason, readReportedUsage(err))
+        : err;
+      fireErrorHook(hooks, agent, input, error, startTime);
 
-      throw err;
+      throw error;
+    } finally {
+      deadline.release();
     }
   };
 }

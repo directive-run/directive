@@ -497,8 +497,15 @@ describe("createGeminiStreamingRunner", () => {
       signal: controller.signal,
     });
 
+    // The fetch gets the caller's signal folded together with the stream
+    // deadline's, not the caller's object itself – asserting on identity would
+    // say the deadline had taken the only signal slot, which is the trade this
+    // combination exists to avoid. What matters is that the caller's abort
+    // still reaches the request.
     const [, init] = mockFetch.mock.calls[0]!;
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal.aborted).toBe(false);
+    controller.abort();
+    expect(init.signal.aborted).toBe(true);
   });
 
   it("calls hooks.onError on failure", async () => {

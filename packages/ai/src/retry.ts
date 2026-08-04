@@ -179,14 +179,15 @@ function getRetryDelay(
   baseDelayMs: number,
   maxDelayMs: number,
 ): number {
-  const status = parseHttpStatus(error);
-
-  // 429: Prefer Retry-After header value
-  if (status === 429) {
-    const retryAfter = parseRetryAfter(error);
-    if (retryAfter !== null) {
-      return Math.min(retryAfter, maxDelayMs);
-    }
+  // The server's own instruction wins wherever it sent one. RFC 9110 §10.2.3
+  // defines `Retry-After` for 429 and 503 alike, and a rate limiter that says
+  // "come back in 20 seconds" is stating a fact about when the window resets,
+  // not offering an opinion to weigh against a backoff curve. Guessing instead
+  // means retrying at 0.5s and 1s into a window that has not moved, exhausting
+  // the attempts, and failing a call that would have succeeded.
+  const retryAfter = parseRetryAfter(error);
+  if (retryAfter !== null) {
+    return Math.min(retryAfter, maxDelayMs);
   }
 
   // All retryable statuses: exponential backoff with jitter

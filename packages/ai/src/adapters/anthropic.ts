@@ -14,6 +14,7 @@
 
 import {
   DEFAULT_STREAM_IDLE_MS,
+  DEFAULT_STREAM_STALL_MS,
   createRunner,
   createStreamDeadline,
   validateBaseURL,
@@ -25,11 +26,13 @@ import {
   readReportedUsage,
   toTokenPricingTable,
 } from "../pricing.js";
-import type { AdapterHooks, AgentRunner } from "../types.js";
+import type { AdapterHooks, AgentRunner, StopReason } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  SSE_ACCEPT_HEADER,
   anyTokenCountReported,
+  assertEventStreamResponse,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
@@ -270,7 +273,75 @@ export const ANTHROPIC_TOKEN_PRICING: Record<string, ModelPricing> =
 // ============================================================================
 
 /**
- * Extract text and token counts from one Anthropic SSE event.
+ * The cache-token half of an Anthropic `tokenUsage`.
+ *
+ * One function, called from every Anthropic path – buffered, `createRunner`
+ * streaming, and the standalone streaming runner – because the standalone one
+ * used to have its own answer: it destructured four fields off the stream
+ * totals and let the cache counts fall on the floor. On a fully cached prompt
+ * that is the difference between a bill of nine thousand tokens and a bill of
+ * nineteen, which any token-window budget reads as a free call.
+ *
+ * With caching requested, both counts are always emitted, defaulting to zero –
+ * a cache miss really did read zero cached tokens. Without it they are omitted,
+ * because the live API answers `cache_read_input_tokens: 0` on every response
+ * whether or not a `cache_control` was ever sent, and emitting that pair would
+ * change the shape of `tokenUsage` for every caller who never asked for
+ * caching. A count *above* zero is emitted either way: something cached the
+ * prompt, the provider billed it, and the ledger has to see it.
+ */
+function anthropicCacheTokens(
+  promptCaching: "automatic" | undefined,
+  cacheReadTokens: number | undefined,
+  cacheCreationTokens: number | undefined,
+): { cacheReadTokens?: number; cacheCreationTokens?: number } {
+  if (promptCaching === "automatic") {
+    return {
+      cacheReadTokens: cacheReadTokens ?? 0,
+      cacheCreationTokens: cacheCreationTokens ?? 0,
+    };
+  }
+
+  return {
+    ...(cacheReadTokens ? { cacheReadTokens } : {}),
+    ...(cacheCreationTokens ? { cacheCreationTokens } : {}),
+  };
+}
+
+/** Anthropic's `stop_reason` values, in the shared vocabulary. */
+const ANTHROPIC_STOP_REASONS: Record<string, StopReason> = {
+  end_turn: "stop",
+  stop_sequence: "stop",
+  max_tokens: "length",
+  tool_use: "tool_use",
+  pause_turn: "other",
+  refusal: "content_filter",
+};
+
+/** The buffered response's `stop_reason`, in both spellings. */
+function readAnthropicStopReason(value: unknown): {
+  stopReason?: StopReason;
+  rawStopReason?: string;
+} {
+  if (typeof value !== "string") {
+    return {};
+  }
+
+  return {
+    stopReason: ANTHROPIC_STOP_REASONS[value] ?? "other",
+    rawStopReason: value,
+  };
+}
+
+/** A content-block index, or `undefined` when the event carried no usable one. */
+function readBlockIndex(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+/**
+ * Extract text, tool calls and token counts from one Anthropic SSE event.
  *
  * Shared by the streaming path of `createAnthropicRunner` and by
  * `createAnthropicStreamingRunner` so the two cannot drift.
@@ -288,11 +359,35 @@ function parseAnthropicStreamEvent(
   if (event.type === "message_stop") {
     result.terminal = true;
   }
+  const delta = event.delta as Record<string, unknown> | undefined;
+  if (event.type === "content_block_delta" && delta?.type === "text_delta") {
+    result.text = delta.text as string;
+  }
+  // A tool call's arguments arrive as a run of string fragments that is only
+  // valid JSON once concatenated. Dropping them left every tool-using stream
+  // returning an empty answer, a clean terminal marker and a full token bill.
+  if (
+    event.type === "content_block_start" &&
+    (event.content_block as Record<string, unknown>)?.type === "tool_use"
+  ) {
+    const block = event.content_block as Record<string, unknown>;
+    const index = readBlockIndex(event.index);
+    if (index !== undefined) {
+      result.toolCallStart = {
+        index,
+        id: String(block.id ?? ""),
+        name: String(block.name ?? ""),
+      };
+    }
+  }
   if (
     event.type === "content_block_delta" &&
-    (event.delta as Record<string, unknown>)?.type === "text_delta"
+    delta?.type === "input_json_delta"
   ) {
-    result.text = (event.delta as Record<string, unknown>).text as string;
+    const index = readBlockIndex(event.index);
+    if (index !== undefined && typeof delta.partial_json === "string") {
+      result.toolCallDelta = { index, json: delta.partial_json };
+    }
   }
   // Read the counts, not the container: a `usage` object whose numbers are
   // null or absent is a provider that reported nothing, and recording it as a
@@ -304,6 +399,16 @@ function parseAnthropicStreamEvent(
     if (outputTokens !== undefined) {
       result.outputTokens = outputTokens;
     }
+  }
+  // `stop_reason` rides the `message_delta` that precedes `message_stop`.
+  // `"max_tokens"` is the one that matters: the answer is cut off mid-sentence,
+  // and without this it arrived as an ordinary success.
+  if (
+    event.type === "message_delta" &&
+    typeof delta?.stop_reason === "string"
+  ) {
+    result.rawStopReason = delta.stop_reason;
+    result.stopReason = ANTHROPIC_STOP_REASONS[delta.stop_reason] ?? "other";
   }
   if (
     event.type === "message_start" &&
@@ -471,6 +576,9 @@ export function createAnthropicRunner(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            // Without it a gateway is free to content-negotiate its way to a
+            // buffered JSON body on a request that asked for a stream.
+            ...(stream ? { Accept: SSE_ACCEPT_HEADER } : {}),
             "x-api-key": apiKey,
             "anthropic-version": "2023-06-01",
           },
@@ -515,29 +623,24 @@ export function createAnthropicRunner(
       // when it's off we omit them entirely so `tokenUsage` is byte-identical to
       // the pre-caching behavior. `input_tokens` is the uncached remainder, so
       // cache tokens are additive – include them in `totalTokens`.
-      if (promptCaching === "automatic") {
-        const cacheReadTokens =
-          readTokenCount(data.usage?.cache_read_input_tokens) ?? 0;
-        const cacheCreationTokens =
-          readTokenCount(data.usage?.cache_creation_input_tokens) ?? 0;
-
-        return {
-          text,
-          totalTokens:
-            inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens,
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          cacheCreationTokens,
-          usageReported,
-        };
-      }
+      const cache = anthropicCacheTokens(
+        promptCaching,
+        readTokenCount(data.usage?.cache_read_input_tokens),
+        readTokenCount(data.usage?.cache_creation_input_tokens),
+      );
+      const stopReason = readAnthropicStopReason(data.stop_reason);
 
       return {
         text,
-        totalTokens: inputTokens + outputTokens,
+        totalTokens:
+          inputTokens +
+          outputTokens +
+          (cache.cacheReadTokens ?? 0) +
+          (cache.cacheCreationTokens ?? 0),
         inputTokens,
         outputTokens,
+        ...cache,
+        ...stopReason,
         usageReported,
       };
     },
@@ -545,35 +648,27 @@ export function createAnthropicRunner(
       adapterName: "Anthropic",
       parseEvent: parseAnthropicStreamEvent,
       requireTerminalEvent: true,
-      // Mirrors `parseResponse` exactly – cache tokens are gated on the option,
-      // never on the presence of the response fields, so `tokenUsage` is the
-      // same shape whether or not the caller asked for deltas.
+      // Mirrors `parseResponse` exactly – both call the same cache-token
+      // function, so `tokenUsage` is the same shape whether or not the caller
+      // asked for deltas.
       buildResponse: (totals) => {
         const { fullText: text, inputTokens, outputTokens } = totals;
-
-        if (promptCaching === "automatic") {
-          const cacheReadTokens = totals.cacheReadTokens ?? 0;
-          const cacheCreationTokens = totals.cacheCreationTokens ?? 0;
-
-          return {
-            text,
-            totalTokens:
-              inputTokens +
-              outputTokens +
-              cacheReadTokens +
-              cacheCreationTokens,
-            inputTokens,
-            outputTokens,
-            cacheReadTokens,
-            cacheCreationTokens,
-          };
-        }
+        const cache = anthropicCacheTokens(
+          promptCaching,
+          totals.cacheReadTokens,
+          totals.cacheCreationTokens,
+        );
 
         return {
           text,
-          totalTokens: inputTokens + outputTokens,
+          totalTokens:
+            inputTokens +
+            outputTokens +
+            (cache.cacheReadTokens ?? 0) +
+            (cache.cacheCreationTokens ?? 0),
           inputTokens,
           outputTokens,
+          ...cache,
         };
       },
     },
@@ -621,6 +716,23 @@ export interface AnthropicStreamingRunnerOptions {
    * @default 120_000
    */
   timeoutMs?: number;
+  /**
+   * How long the stream may stay alive and produce nothing, in milliseconds.
+   *
+   * The other half of {@link AnthropicStreamingRunnerOptions.timeoutMs}, and the
+   * one a keep-alive cannot hold off. `timeoutMs` measures total silence, which
+   * a `ping` or a proxy's `:` comment legitimately breaks; this measures the gap
+   * between the parts of an actual response. A provider wedged behind a queue
+   * pings for as long as the socket is open, so without a second clock it holds
+   * the call, the socket and the interrupt path open indefinitely – the precise
+   * failure the deadline was added for.
+   *
+   * Ten minutes by default, which clears the longest a thinking model plausibly
+   * goes without emitting anything. `Infinity` disables it.
+   *
+   * @default 600_000
+   */
+  contentTimeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
   /** Sampling temperature (0–1). Higher = more random. */
@@ -629,6 +741,14 @@ export interface AnthropicStreamingRunnerOptions {
   topP?: number;
   /** Custom stop sequences. The model will stop generating when it encounters one. */
   stopSequences?: string[];
+  /**
+   * Prompt caching strategy. Identical in meaning and effect to
+   * {@link AnthropicRunnerOptions.promptCaching} – a `cache_control` breakpoint
+   * on the system prompt, and cache token counts on `tokenUsage`.
+   *
+   * @default undefined – caching disabled.
+   */
+  promptCaching?: "automatic";
 }
 
 /**
@@ -656,20 +776,27 @@ export function createAnthropicStreamingRunner(
     baseURL = "https://api.anthropic.com/v1",
     fetch: fetchFn = globalThis.fetch,
     timeoutMs = DEFAULT_STREAM_IDLE_MS,
+    contentTimeoutMs = DEFAULT_STREAM_STALL_MS,
     hooks,
     temperature,
     topP,
     stopSequences,
+    promptCaching,
   } = options;
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createAnthropicStreamingRunner");
   validateStreamTimeout(timeoutMs, "createAnthropicStreamingRunner");
+  validateStreamTimeout(
+    contentTimeoutMs,
+    "createAnthropicStreamingRunner",
+    "contentTimeoutMs",
+  );
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
     // Armed before the request goes out, so a connection that never answers is
-    // bounded by the same clock as one that answers and then stops. The
+    // bounded by the same clocks as one that answers and then stops. The
     // caller's own signal is folded in rather than replaced – a deadline that
     // took the fetch's only signal slot would disable cancellation to install
     // a timeout, which is a trade nobody asked for.
@@ -677,13 +804,16 @@ export function createAnthropicStreamingRunner(
       timeoutMs,
       callbacks.signal,
       "Anthropic",
+      { contentMs: contentTimeoutMs },
     );
 
     try {
+      const instructions = agent.instructions ?? "";
       const response = await fetchFn(`${baseURL}/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: SSE_ACCEPT_HEADER,
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
         },
@@ -693,39 +823,59 @@ export function createAnthropicStreamingRunner(
           ...(temperature != null ? { temperature } : {}),
           ...(topP != null ? { top_p: topP } : {}),
           ...(stopSequences != null ? { stop_sequences: stopSequences } : {}),
-          system: agent.instructions ?? "",
+          system:
+            promptCaching === "automatic" && instructions.trim() !== ""
+              ? [
+                  {
+                    type: "text",
+                    text: instructions,
+                    cache_control: { type: "ephemeral" },
+                  },
+                ]
+              : instructions,
           messages: [{ role: "user", content: input }],
           stream: true,
         }),
         signal: deadline.signal,
       });
-      deadline.touch();
+      deadline.progress();
 
       if (!response.ok) {
         await throwStreamingHTTPError(response, "Anthropic");
       }
+      await assertEventStreamResponse(response, "Anthropic");
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens, usageReported } =
-        await parseEventStream(
-          reader,
-          callbacks.onToken,
-          // Every event is a sign of life, pings included: a ping is the
-          // provider saying the connection is live and it is still working, and
-          // silence is the condition being measured.
-          (event) => {
-            deadline.touch();
+      const totals = await parseEventStream(
+        reader,
+        callbacks.onToken,
+        parseAnthropicStreamEvent,
+        "Anthropic",
+        "sse",
+        {
+          signal: deadline.signal,
+          deadline,
+          requireTerminalEvent: true,
+        },
+      );
 
-            return parseAnthropicStreamEvent(event);
-          },
-          "Anthropic",
-          "sse",
-          { signal: deadline.signal, requireTerminalEvent: true },
-        );
-
-      const tokenUsage = { inputTokens, outputTokens };
-      const totalTokens = inputTokens + outputTokens;
+      const { fullText, inputTokens, outputTokens, usageReported } = totals;
+      // The same cache-token function the buffered runner calls. Reading four
+      // fields off the totals and stopping there is what let this path report a
+      // fully cached run at 1/490th of what the other one reported for the same
+      // body, and made the claim that the two "cannot drift" false.
+      const cache = anthropicCacheTokens(
+        promptCaching,
+        totals.cacheReadTokens,
+        totals.cacheCreationTokens,
+      );
+      const tokenUsage = { inputTokens, outputTokens, ...cache };
+      const totalTokens =
+        inputTokens +
+        outputTokens +
+        (cache.cacheReadTokens ?? 0) +
+        (cache.cacheCreationTokens ?? 0);
 
       callbacks.onMessage?.({ role: "assistant", content: fullText });
       fireAfterCallHook(
@@ -744,6 +894,11 @@ export function createAnthropicStreamingRunner(
         totalTokens,
         tokenUsage,
         usageReported,
+        {
+          stopReason: totals.stopReason,
+          rawStopReason: totals.rawStopReason,
+          toolCalls: totals.toolCalls,
+        },
       );
     } catch (err) {
       // What a cancelled body rejects with is the runtime's business, and it is

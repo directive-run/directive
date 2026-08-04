@@ -595,7 +595,12 @@ describe("createOpenAIStreamingRunner", () => {
       signal: controller.signal,
     });
 
+    // Combined with the stream deadline's signal rather than handed through
+    // whole: a deadline that took the fetch's only signal slot would disable
+    // cancellation to install a timeout.
     const [, init] = mockFetch.mock.calls[0]!;
-    expect(init.signal).toBe(controller.signal);
+    expect(init.signal.aborted).toBe(false);
+    controller.abort();
+    expect(init.signal.aborted).toBe(true);
   });
 });

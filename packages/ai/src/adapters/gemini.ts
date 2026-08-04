@@ -12,13 +12,27 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../agent-utils.js";
-import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
-import type { AdapterHooks, AgentRunner } from "../types.js";
+import {
+  DEFAULT_STREAM_IDLE_MS,
+  DEFAULT_STREAM_STALL_MS,
+  createRunner,
+  createStreamDeadline,
+  validateBaseURL,
+  validateStreamTimeout,
+} from "../agent-utils.js";
+import {
+  type ModelPricing,
+  attachReportedUsage,
+  readReportedUsage,
+  toTokenPricingTable,
+} from "../pricing.js";
+import type { AdapterHooks, AgentRunner, StopReason } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
+  SSE_ACCEPT_HEADER,
   anyTokenCountReported,
+  assertEventStreamResponse,
   buildStreamingResult,
   fireAfterCallHook,
   fireBeforeCallHook,
@@ -104,23 +118,95 @@ export const GEMINI_TOKEN_PRICING: Record<string, ModelPricing> =
  * Shared by the streaming path of `createGeminiRunner` and by
  * `createGeminiStreamingRunner` so the two cannot drift.
  */
+/** Gemini's `finishReason` values, in the shared vocabulary. */
+const GEMINI_STOP_REASONS: Record<string, StopReason> = {
+  STOP: "stop",
+  MAX_TOKENS: "length",
+  SAFETY: "content_filter",
+  RECITATION: "content_filter",
+  PROHIBITED_CONTENT: "content_filter",
+  BLOCKLIST: "content_filter",
+  SPII: "content_filter",
+  IMAGE_SAFETY: "content_filter",
+  MALFORMED_FUNCTION_CALL: "other",
+  OTHER: "other",
+};
+
+/**
+ * The answer text in a Gemini candidate, which is not necessarily the first
+ * part of it.
+ *
+ * A thinking model returns its reasoning summary as an ordinary text part
+ * flagged `thought: true`, ahead of the answer, in the same chunk. Reading
+ * `parts[0].text` therefore returned "Let me think..." as the response and
+ * discarded the answer entirely, with a clean terminal marker and no error – on
+ * `gemini-2.5-flash` and `-pro`, both of which this adapter publishes rates for.
+ * Every non-thought part is concatenated, because a single chunk can also split
+ * one answer across several parts.
+ */
+function readAnswerText(
+  parts: Record<string, unknown>[] | undefined,
+): string | undefined {
+  if (!parts) {
+    return undefined;
+  }
+  let text = "";
+  for (const part of parts) {
+    if (part?.thought === true) {
+      continue;
+    }
+    if (typeof part?.text === "string") {
+      text += part.text;
+    }
+  }
+
+  return text === "" ? undefined : text;
+}
+
+/**
+ * The prompt never reached the model.
+ *
+ * A blocked prompt produces a body with `promptFeedback` and no candidates, so
+ * without this it read as a stream that ended with no completion marker – which
+ * sends the caller looking for a truncated response instead of telling them
+ * their prompt was refused.
+ */
+function assertNotBlocked(event: Record<string, unknown>): void {
+  const feedback = event.promptFeedback as Record<string, unknown> | undefined;
+  const blockReason = feedback?.blockReason;
+  if (typeof blockReason !== "string") {
+    return;
+  }
+
+  throw new Error(
+    `[Directive] Gemini refused the prompt: ${blockReason}. Nothing was generated.`,
+  );
+}
+
 function parseGeminiStreamEvent(
   event: Record<string, unknown>,
 ): StreamEventResult {
+  assertNotBlocked(event);
+
   const result: StreamEventResult = {};
 
   const candidate = (event.candidates as Record<string, unknown>[])?.[0];
   const parts = (candidate?.content as Record<string, unknown>)?.parts as
     | Record<string, unknown>[]
     | undefined;
-  const textVal = parts?.[0]?.text;
+  const textVal = readAnswerText(parts);
   if (textVal) {
-    result.text = textVal as string;
+    result.text = textVal;
   }
   // Gemini's SSE stream carries no `[DONE]` sentinel; the last chunk of a
   // complete response is the one that says why generation stopped.
   if (candidate?.finishReason != null) {
     result.terminal = true;
+    if (typeof candidate.finishReason === "string") {
+      result.rawStopReason = candidate.finishReason;
+      result.stopReason =
+        GEMINI_STOP_REASONS[candidate.finishReason] ?? "other";
+    }
   }
 
   // Read the counts, not the container: a `usageMetadata` object whose numbers
@@ -132,13 +218,33 @@ function parseGeminiStreamEvent(
     if (promptTokenCount !== undefined) {
       result.inputTokens = promptTokenCount;
     }
-    const candidatesTokenCount = readTokenCount(meta.candidatesTokenCount);
-    if (candidatesTokenCount !== undefined) {
-      result.outputTokens = candidatesTokenCount;
+    const outputTokens = readGeminiOutputTokens(meta);
+    if (outputTokens !== undefined) {
+      result.outputTokens = outputTokens;
     }
   }
 
   return result;
+}
+
+/**
+ * Gemini's billed output count.
+ *
+ * `candidatesTokenCount` covers the answer only. A thinking model bills its
+ * reasoning as output too and reports it separately as `thoughtsTokenCount`, so
+ * reading the first field alone under-counts every call to a 2.5-series model
+ * by however much of it was thinking – which on a hard question is most of it.
+ */
+function readGeminiOutputTokens(
+  meta: Record<string, unknown>,
+): number | undefined {
+  const candidates = readTokenCount(meta.candidatesTokenCount);
+  const thoughts = readTokenCount(meta.thoughtsTokenCount);
+  if (candidates === undefined && thoughts === undefined) {
+    return undefined;
+  }
+
+  return (candidates ?? 0) + (thoughts ?? 0);
 }
 
 // ============================================================================
@@ -223,6 +329,7 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(stream ? { Accept: SSE_ACCEPT_HEADER } : {}),
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
@@ -242,22 +349,31 @@ export function createGeminiRunner(options: GeminiRunnerOptions): AgentRunner {
     }),
     parseResponse: async (res) => {
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      assertNotBlocked(data);
+      const text = readAnswerText(data.candidates?.[0]?.content?.parts) ?? "";
       const inputTokens =
         readTokenCount(data.usageMetadata?.promptTokenCount) ?? 0;
       const outputTokens =
-        readTokenCount(data.usageMetadata?.candidatesTokenCount) ?? 0;
+        readGeminiOutputTokens(data.usageMetadata ?? {}) ?? 0;
+      const finishReason = data.candidates?.[0]?.finishReason;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        ...(typeof finishReason === "string"
+          ? {
+              rawStopReason: finishReason,
+              stopReason: GEMINI_STOP_REASONS[finishReason] ?? "other",
+            }
+          : {}),
         // A `usageMetadata` object holding no usable number says the same
         // thing as no `usageMetadata` at all: nothing was reported.
         usageReported: anyTokenCountReported(
           data.usageMetadata?.promptTokenCount,
           data.usageMetadata?.candidatesTokenCount,
+          data.usageMetadata?.thoughtsTokenCount,
         ),
       };
     },
@@ -280,6 +396,23 @@ export interface GeminiStreamingRunnerOptions {
   maxOutputTokens?: number;
   baseURL?: string;
   fetch?: typeof globalThis.fetch;
+  /**
+   * How long the stream may say nothing at all – not even a keep-alive – before
+   * the call is abandoned, in milliseconds. `Infinity` disables it.
+   *
+   * The gap between events, not the length of the call. A stalled stream fails
+   * with an error named `"TimeoutError"`.
+   *
+   * @default 120_000
+   */
+  timeoutMs?: number;
+  /**
+   * How long the stream may stay alive and produce nothing, in milliseconds.
+   * Keep-alives do not restart this clock. `Infinity` disables it.
+   *
+   * @default 600_000
+   */
+  contentTimeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
   /** Sampling temperature. Higher = more random. */
@@ -314,6 +447,8 @@ export function createGeminiStreamingRunner(
     maxOutputTokens,
     baseURL = "https://generativelanguage.googleapis.com/v1beta",
     fetch: fetchFn = globalThis.fetch,
+    timeoutMs = DEFAULT_STREAM_IDLE_MS,
+    contentTimeoutMs = DEFAULT_STREAM_STALL_MS,
     hooks,
     temperature,
     topP,
@@ -322,6 +457,12 @@ export function createGeminiStreamingRunner(
 
   validateBaseURL(baseURL);
   warnIfMissingApiKey(apiKey, "createGeminiStreamingRunner");
+  validateStreamTimeout(timeoutMs, "createGeminiStreamingRunner");
+  validateStreamTimeout(
+    contentTimeoutMs,
+    "createGeminiStreamingRunner",
+    "contentTimeoutMs",
+  );
 
   const genConfig: Record<string, unknown> = {};
   if (maxOutputTokens != null) {
@@ -340,6 +481,14 @@ export function createGeminiStreamingRunner(
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
+    const deadline = createStreamDeadline(
+      timeoutMs,
+      callbacks.signal,
+      "Gemini",
+      {
+        contentMs: contentTimeoutMs,
+      },
+    );
 
     try {
       const response = await fetchFn(
@@ -348,6 +497,7 @@ export function createGeminiStreamingRunner(
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Accept: SSE_ACCEPT_HEADER,
             "x-goog-api-key": apiKey,
           },
           body: JSON.stringify({
@@ -357,26 +507,28 @@ export function createGeminiStreamingRunner(
             contents: [{ role: "user", parts: [{ text: input }] }],
             ...(hasGenConfig ? { generationConfig: genConfig } : {}),
           }),
-          signal: callbacks.signal,
+          signal: deadline.signal,
         },
       );
+      deadline.progress();
 
       if (!response.ok) {
         await throwStreamingHTTPError(response, "Gemini");
       }
+      await assertEventStreamResponse(response, "Gemini");
 
       const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens, usageReported } =
-        await parseEventStream(
-          reader,
-          callbacks.onToken,
-          parseGeminiStreamEvent,
-          "Gemini",
-          "sse",
-          { signal: callbacks.signal, requireTerminalEvent: true },
-        );
+      const totals = await parseEventStream(
+        reader,
+        callbacks.onToken,
+        parseGeminiStreamEvent,
+        "Gemini",
+        "sse",
+        { signal: deadline.signal, deadline, requireTerminalEvent: true },
+      );
 
+      const { fullText, inputTokens, outputTokens, usageReported } = totals;
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
 
@@ -397,11 +549,20 @@ export function createGeminiStreamingRunner(
         totalTokens,
         tokenUsage,
         usageReported,
+        {
+          stopReason: totals.stopReason,
+          rawStopReason: totals.rawStopReason,
+        },
       );
     } catch (err) {
-      fireErrorHook(hooks, agent, input, err, startTime);
+      const error = deadline.expired
+        ? attachReportedUsage(deadline.reason, readReportedUsage(err))
+        : err;
+      fireErrorHook(hooks, agent, input, error, startTime);
 
-      throw err;
+      throw error;
+    } finally {
+      deadline.release();
     }
   };
 }

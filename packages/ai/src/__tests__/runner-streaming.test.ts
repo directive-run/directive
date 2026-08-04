@@ -38,14 +38,21 @@ function mockAgent(overrides: Record<string, unknown> = {}): AgentLike {
   };
 }
 
-/** Emit each line as its own chunk, all queued up front. */
+/**
+ * Emit each event as its own chunk, all queued up front.
+ *
+ * Terminated with a blank line, which is what closes an event on the wire: a
+ * run of `data:` lines with nothing between them is one event whose payload is
+ * those lines joined, not several events. The NDJSON adapters read the same
+ * body, and a blank line between records is nothing to them.
+ */
 function lineStream(lines: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
   return new ReadableStream({
     start(controller) {
       for (const line of lines) {
-        controller.enqueue(encoder.encode(`${line}\n`));
+        controller.enqueue(encoder.encode(`${line}\n\n`));
       }
       controller.close();
     },
@@ -196,7 +203,7 @@ describe("backpressure", () => {
             return;
           }
           log.push(`pull:${next}`);
-          controller.enqueue(encoder.encode(`${ANTHROPIC_SSE[next]}\n`));
+          controller.enqueue(encoder.encode(`${ANTHROPIC_SSE[next]}\n\n`));
           next++;
         },
       },
@@ -725,7 +732,7 @@ describe("truncated streams", () => {
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode(`${ANTHROPIC_SSE.join("\n")}\n`));
+        controller.enqueue(encoder.encode(`${ANTHROPIC_SSE.join("\n\n")}\n\n`));
         // No newline after the last event, which servers are not obliged to
         // send – and which now decides whether the run reads as complete.
         controller.enqueue(encoder.encode('data: {"type":"message_stop"}'));
@@ -1239,7 +1246,7 @@ describe("content after the end-of-response marker", () => {
       pull(controller) {
         pulled++;
         if (pulled === 1) {
-          controller.enqueue(encoder.encode("data: [DONE]\n"));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
 
           return;
         }
@@ -1249,7 +1256,7 @@ describe("content after the end-of-response marker", () => {
           return;
         }
         controller.enqueue(
-          encoder.encode('data: {"choices":[{"delta":{"content":"x"}}]}\n'),
+          encoder.encode('data: {"choices":[{"delta":{"content":"x"}}]}\n\n'),
         );
       },
     });

@@ -47,9 +47,51 @@ export interface RunResult<T = unknown> {
    * read as "usage is trustworthy" – the behavior every existing runner had.
    */
   usageReported?: boolean;
+  /**
+   * Why the provider stopped generating, normalized across providers.
+   *
+   * The distinction that matters is `"length"`: the model was cut off at its
+   * token ceiling mid-sentence. Every provider says so – Anthropic's
+   * `stop_reason: "max_tokens"`, OpenAI's `finish_reason: "length"`, Gemini's
+   * `finishReason: "MAX_TOKENS"`, Ollama's `done_reason: "length"` – and until
+   * this field existed all four arrived as a clean success indistinguishable
+   * from a complete answer, so a truncated response was parsed, validated and
+   * acted on as though the model had finished saying it.
+   *
+   * Omitted by runners that do not report it. See {@link RunResult.rawStopReason}
+   * for the provider's own spelling.
+   */
+  stopReason?: StopReason;
+  /**
+   * The provider's own spelling of {@link RunResult.stopReason}, verbatim.
+   *
+   * Normalization loses detail – Gemini's `"SAFETY"` and `"RECITATION"` both
+   * normalize to `"content_filter"` – and the detail is what a caller needs to
+   * decide what to do next.
+   */
+  rawStopReason?: string;
   /** True when result was served from semantic cache */
   isCached?: boolean;
 }
+
+/**
+ * Why a provider stopped generating, in one vocabulary for all of them.
+ *
+ * - `"stop"` – the model finished, or hit a caller-supplied stop sequence.
+ * - `"length"` – cut off at the output token ceiling. The answer is truncated.
+ * - `"tool_use"` – the model stopped to call a tool.
+ * - `"content_filter"` – a safety system ended it. Gemini's `SAFETY`,
+ *   `RECITATION` and `PROHIBITED_CONTENT`, OpenAI's `content_filter`,
+ *   Anthropic's `refusal`.
+ * - `"other"` – the provider reported a reason with no equivalent here. The
+ *   verbatim value is on {@link RunResult.rawStopReason}.
+ */
+export type StopReason =
+  | "stop"
+  | "length"
+  | "tool_use"
+  | "content_filter"
+  | "other";
 
 /** Why a new generation started – the runner was re-invoked and replays. */
 export type StreamRestartReason = "retry" | "schema-retry" | "reroute";
@@ -101,7 +143,18 @@ export interface ToolCall {
   result?: string;
 }
 
-/** Run function type */
+/**
+ * Run function type.
+ *
+ * **A runner that wraps the errors it catches must keep the original reachable,
+ * or the ledger under-bills.** A streamed call reports its input token count in
+ * the provider's opening frame, long before it can fail, and when it does fail
+ * that count is recorded on the thrown error. Cost tracking reads it back by
+ * walking `cause` (and `lastError`) up to eight links, so a wrapper that sets
+ * `cause` — as `withRetry` and `withFallback` do — costs nothing. A wrapper that
+ * throws a fresh error without one drops the report, and every ceiling
+ * downstream then prices a call the provider charged in full at zero.
+ */
 export type AgentRunner = <T = unknown>(
   agent: AgentLike,
   input: string,

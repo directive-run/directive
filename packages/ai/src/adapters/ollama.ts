@@ -14,9 +14,21 @@
  * ```
  */
 
-import { createRunner, validateBaseURL } from "../agent-utils.js";
-import { type ModelPricing, toTokenPricingTable } from "../pricing.js";
-import type { AdapterHooks, AgentRunner } from "../types.js";
+import {
+  DEFAULT_STREAM_IDLE_MS,
+  DEFAULT_STREAM_STALL_MS,
+  createRunner,
+  createStreamDeadline,
+  validateBaseURL,
+  validateStreamTimeout,
+} from "../agent-utils.js";
+import {
+  type ModelPricing,
+  attachReportedUsage,
+  readReportedUsage,
+  toTokenPricingTable,
+} from "../pricing.js";
+import type { AdapterHooks, AgentRunner, StopReason } from "../types.js";
 import type { StreamingCallbackRunner } from "../types.js";
 import type { StreamEventResult } from "./shared.js";
 import {
@@ -25,8 +37,10 @@ import {
   fireAfterCallHook,
   fireBeforeCallHook,
   fireErrorHook,
+  getStreamReader,
   parseEventStream,
   readTokenCount,
+  throwStreamingHTTPError,
 } from "./shared.js";
 
 // ============================================================================
@@ -114,9 +128,26 @@ export const OLLAMA_TOKEN_PRICING: Record<string, ModelPricing> =
  * Ollama frames its stream as newline-delimited JSON rather than server-sent
  * events, and reports token counts only on the final `done` chunk.
  */
+/** Ollama's `done_reason` values, in the shared vocabulary. */
+const OLLAMA_STOP_REASONS: Record<string, StopReason> = {
+  stop: "stop",
+  length: "length",
+  load: "other",
+  unload: "other",
+};
+
 function parseOllamaStreamChunk(
   chunk: Record<string, unknown>,
 ): StreamEventResult {
+  // Ollama reports a mid-generation failure – a model that will not fit in
+  // memory, a model pulled out from under the call – as an `error` field on a
+  // chunk of an otherwise healthy HTTP 200 body. Without this it parses as an
+  // event carrying nothing, and the run ends as a stream with no completion
+  // marker rather than as the failure it is.
+  if (typeof chunk.error === "string" && chunk.error !== "") {
+    throw new Error(`[Directive] Ollama stream error: ${chunk.error}`);
+  }
+
   const result: StreamEventResult = {};
 
   const message = chunk.message as Record<string, unknown> | undefined;
@@ -127,6 +158,10 @@ function parseOllamaStreamChunk(
 
   if (chunk.done) {
     result.terminal = true;
+    if (typeof chunk.done_reason === "string") {
+      result.rawStopReason = chunk.done_reason;
+      result.stopReason = OLLAMA_STOP_REASONS[chunk.done_reason] ?? "other";
+    }
     // Left unset when the field holds no usable number, so a `done` chunk
     // stripped of its counts is recorded as unpriceable rather than free.
     const promptEvalCount = readTokenCount(chunk.prompt_eval_count);
@@ -250,12 +285,19 @@ export function createOllamaRunner(
         ((data.message as Record<string, unknown>)?.content as string) ?? "";
       const inputTokens = readTokenCount(data.prompt_eval_count) ?? 0;
       const outputTokens = readTokenCount(data.eval_count) ?? 0;
+      const doneReason = data.done_reason;
 
       return {
         text,
         totalTokens: inputTokens + outputTokens,
         inputTokens,
         outputTokens,
+        ...(typeof doneReason === "string"
+          ? {
+              rawStopReason: doneReason,
+              stopReason: OLLAMA_STOP_REASONS[doneReason] ?? "other",
+            }
+          : {}),
         usageReported: anyTokenCountReported(
           data.prompt_eval_count,
           data.eval_count,
@@ -280,6 +322,23 @@ export interface OllamaStreamingRunnerOptions {
   model?: string;
   baseURL?: string;
   fetch?: typeof globalThis.fetch;
+  /**
+   * How long the stream may say nothing at all before the call is abandoned, in
+   * milliseconds. `Infinity` disables it.
+   *
+   * The gap between chunks, not the length of the call. A stalled stream fails
+   * with an error named `"TimeoutError"`.
+   *
+   * @default 120_000
+   */
+  timeoutMs?: number;
+  /**
+   * How long the stream may stay alive and produce nothing, in milliseconds.
+   * `Infinity` disables it.
+   *
+   * @default 600_000
+   */
+  contentTimeoutMs?: number;
   /** Lifecycle hooks for tracing, logging, and metrics */
   hooks?: AdapterHooks;
   /** Sampling temperature. Higher = more random. */
@@ -315,6 +374,8 @@ export function createOllamaStreamingRunner(
     model = "llama3",
     baseURL = "http://localhost:11434",
     fetch: fetchFn = globalThis.fetch,
+    timeoutMs = DEFAULT_STREAM_IDLE_MS,
+    contentTimeoutMs = DEFAULT_STREAM_STALL_MS,
     hooks,
     temperature,
     topP,
@@ -323,6 +384,12 @@ export function createOllamaStreamingRunner(
   } = options;
 
   validateBaseURL(baseURL);
+  validateStreamTimeout(timeoutMs, "createOllamaStreamingRunner");
+  validateStreamTimeout(
+    contentTimeoutMs,
+    "createOllamaStreamingRunner",
+    "contentTimeoutMs",
+  );
 
   const ollamaOptions: Record<string, unknown> = {};
   if (temperature != null) {
@@ -341,6 +408,14 @@ export function createOllamaStreamingRunner(
 
   return async (agent, input, callbacks) => {
     const startTime = fireBeforeCallHook(hooks, agent, input);
+    const deadline = createStreamDeadline(
+      timeoutMs,
+      callbacks.signal,
+      "Ollama",
+      {
+        contentMs: contentTimeoutMs,
+      },
+    );
 
     try {
       const response = await fetchFn(`${baseURL}/api/chat`, {
@@ -357,32 +432,26 @@ export function createOllamaStreamingRunner(
           stream: true,
           ...(hasOptions ? { options: ollamaOptions } : {}),
         }),
-        signal: callbacks.signal,
+        signal: deadline.signal,
       });
+      deadline.progress();
 
       if (!response.ok) {
-        const errBody = await response.text().catch(() => "");
-
-        throw new Error(
-          `[Directive] Ollama streaming error ${response.status}${errBody ? ` – ${errBody.slice(0, 200)}` : ""}`,
-        );
+        await throwStreamingHTTPError(response, "Ollama");
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("[Directive] No response body from Ollama");
-      }
+      const reader = getStreamReader(response);
 
-      const { fullText, inputTokens, outputTokens, usageReported } =
-        await parseEventStream(
-          reader,
-          callbacks.onToken,
-          parseOllamaStreamChunk,
-          "Ollama",
-          "ndjson",
-          { signal: callbacks.signal, requireTerminalEvent: true },
-        );
+      const totals = await parseEventStream(
+        reader,
+        callbacks.onToken,
+        parseOllamaStreamChunk,
+        "Ollama",
+        "ndjson",
+        { signal: deadline.signal, deadline, requireTerminalEvent: true },
+      );
 
+      const { fullText, inputTokens, outputTokens, usageReported } = totals;
       const tokenUsage = { inputTokens, outputTokens };
       const totalTokens = inputTokens + outputTokens;
 
@@ -403,11 +472,20 @@ export function createOllamaStreamingRunner(
         totalTokens,
         tokenUsage,
         usageReported,
+        {
+          stopReason: totals.stopReason,
+          rawStopReason: totals.rawStopReason,
+        },
       );
     } catch (err) {
-      fireErrorHook(hooks, agent, input, err, startTime);
+      const error = deadline.expired
+        ? attachReportedUsage(deadline.reason, readReportedUsage(err))
+        : err;
+      fireErrorHook(hooks, agent, input, error, startTime);
 
-      throw err;
+      throw error;
+    } finally {
+      deadline.release();
     }
   };
 }
