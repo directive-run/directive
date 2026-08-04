@@ -2074,3 +2074,117 @@ describe("withBudget – a call abandoned after the provider counted it", () => 
     expect(runner.getUnpricedCallCount()).toBe(1);
   });
 });
+
+// ============================================================================
+// A usage report that is present but not a price
+// ============================================================================
+
+describe("a reported usage far under its delivery is not trusted", () => {
+  const pricing = { inputPerMillion: 3, outputPerMillion: 15 };
+  const TEXT = "x".repeat(16000); // 4000 tokens at four characters each
+
+  const reporting =
+    (usage: { inputTokens: number; outputTokens: number }) =>
+    async (
+      _agent: unknown,
+      _input: string,
+      options?: { onToken?: (t: string) => void },
+    ) => {
+      for (let i = 0; i < TEXT.length; i += 200) {
+        options?.onToken?.(TEXT.slice(i, i + 200));
+      }
+
+      return {
+        output: TEXT,
+        messages: [{ role: "assistant", content: TEXT }],
+        tokenUsage: usage,
+        usageReported: true,
+      };
+    };
+
+  /**
+   * The shape a gateway produces: forward the frame carrying input tokens, drop
+   * the one carrying output tokens. The stream closes cleanly, so the report is
+   * present — and being present, it was priced as written. Reporting *nothing*
+   * was always safe; reporting almost nothing was the hole.
+   */
+  it("charges a call whose output count was dropped, and says the figure is a floor", async () => {
+    const runner = withBudget(reporting({ inputTokens: 100, outputTokens: 0 }) as never, {
+      pricing,
+      maxTotalCost: 100,
+    });
+
+    await runner({ name: "a" } as never, "short prompt", {
+      onToken: () => {},
+    } as never);
+
+    // Priced from what arrived. Against the reported zero this was $0.0003.
+    expect(runner.getSpent("total")).toBeGreaterThan(0.05);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+
+  it("leaves an honest report alone, and does not count it unpriced", async () => {
+    const runner = withBudget(
+      reporting({ inputTokens: 100, outputTokens: 4000 }) as never,
+      { pricing, maxTotalCost: 100 },
+    );
+
+    await runner({ name: "a" } as never, "short prompt", {
+      onToken: () => {},
+    } as never);
+
+    expect(runner.getSpent("total")).toBeCloseTo(0.0603, 6);
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
+
+  /**
+   * Four characters per token is a rough count that under-measures code badly,
+   * so it must not adjudicate small differences — only catch a report that is
+   * absent in all but name.
+   */
+  it("leaves a report modestly under its delivery alone", async () => {
+    const runner = withBudget(
+      reporting({ inputTokens: 100, outputTokens: 3000 }) as never,
+      { pricing, maxTotalCost: 100 },
+    );
+
+    await runner({ name: "a" } as never, "short prompt", {
+      onToken: () => {},
+    } as never);
+
+    expect(runner.getSpent("total")).toBeCloseTo(0.0453, 6);
+    expect(runner.getUnpricedCallCount()).toBe(0);
+  });
+
+  /**
+   * The post-call block reads caller-supplied data, and a property read can
+   * throw. Unfenced, the throw unwound past the recording entirely: nothing was
+   * charged, the unpriced count did not move, and a successful call surfaced as
+   * a failure that a retry policy would then buy again.
+   */
+  it("charges a call whose result cannot be read", async () => {
+    const base = reporting({ inputTokens: 100, outputTokens: 4000 });
+    const runner = withBudget(
+      (async (agent: never, input: string, options: never) => {
+        const result = await base(agent, input, options);
+
+        return Object.defineProperty({ ...result }, "tokenUsage", {
+          get() {
+            throw new Error("disposed");
+          },
+          enumerable: true,
+        });
+      }) as never,
+      { pricing, maxTotalCost: 100 },
+    );
+
+    await expect(
+      runner({ name: "a" } as never, "short prompt", {
+        onToken: () => {},
+      } as never),
+    ).resolves.toBeDefined();
+
+    expect(runner.getSpent("total")).toBeGreaterThan(0.05);
+    expect(runner.getUnpricedCallCount()).toBe(1);
+  });
+});

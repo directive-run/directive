@@ -878,6 +878,30 @@ export function withBudget(
     }
 
     /**
+     * Whether a reported output count is too far under what arrived to be a
+     * price at all.
+     *
+     * Deliberately blunt. Four characters per token is a rough count, so a
+     * report modestly below its delivery is ordinary and left alone; the factor
+     * exists to catch a report that is not low but absent in all but name — an
+     * output count of zero, or one, against thousands of tokens of text. That
+     * is what a gateway produces when it drops the frame carrying the count,
+     * and it is indistinguishable from an honest report to every cap that reads
+     * the resulting number.
+     */
+    function implausibleAgainstDelivery(
+      snapshot: UsageSnapshot,
+      deliveredChars: number,
+    ): boolean {
+      if (snapshot.kind !== "resolved") {
+        return false;
+      }
+      const delivered = Math.ceil(Math.max(0, deliveredChars) / charsPerToken);
+
+      return delivered > snapshot.usage.outputTokens * 2 + charsPerToken;
+    }
+
+    /**
      * Reconcile one completed attempt against every cap, and record it.
      *
      * Takes a {@link UsageSnapshot}, never a result: the usage is read once at
@@ -1108,13 +1132,48 @@ export function withBudget(
     // much outright with `usageReported: false` is not to be taken for one
     // reporting a free call either. Recording those zeros means the window
     // never accrues and the ceiling never trips.
-    const reported = snapshotCallUsage(result);
-    const snapshot: UsageSnapshot =
-      reported.kind === "resolved" && declaredUnreported(result)
-        ? { kind: "unusable", reason: "zero-usage" }
-        : reported;
+    // Everything from here to `settle` reads a value the caller produced, and a
+    // property read on caller-supplied data can throw: an accessor backed by a
+    // disposed handle, a Proxy, a getter that asserts. Unfenced, such a throw
+    // unwinds past `settle` entirely — the call is recorded at nothing, the
+    // unpriced count does not move, and a successful call is reported as a
+    // failure, which `withRetry` then reads as transient and buys again.
+    //
+    // The rule is the one the failure path already states: charge what is
+    // known. What is known here is what was seen arriving.
+    let snapshot: UsageSnapshot;
+    let deliveredByResult: number;
+    try {
+      const reported = snapshotCallUsage(result);
+      const resolved: UsageSnapshot =
+        reported.kind === "resolved" && declaredUnreported(result)
+          ? { kind: "unusable", reason: "zero-usage" }
+          : reported;
+      deliveredByResult = assistantText(result)?.length ?? 0;
+      // A report that is present but incomplete is the dangerous shape, and it
+      // is the one a gateway produces: forward the frame carrying input tokens,
+      // drop or null the one carrying output tokens, and the stream still
+      // closes cleanly. Reporting *nothing* is safe — the estimate path engages
+      // below. Reporting half is what got trusted absolutely, so a call that
+      // delivered thousands of tokens was priced at the handful it admitted to,
+      // and every ceiling reading that one number went quiet together.
+      //
+      // What arrived is not a better measurement than what was reported —
+      // four characters per token is a rough count and it under-measures code
+      // badly — so it does not adjudicate small differences, and a report a
+      // little under its delivery is left alone. It is a plausibility check.
+      // Past the factor below the report is not a slightly-low count, it is a
+      // different call, and the honest move is to stop treating it as a price:
+      // the call is charged from what was observed and counted as unpriced, so
+      // `getUnpricedCallCount` says out loud that the ledger is a floor here.
+      snapshot = implausibleAgainstDelivery(resolved, deliveredByResult)
+        ? { kind: "unusable", reason: "unusable-usage" }
+        : resolved;
+    } catch {
+      snapshot = { kind: "unusable", reason: "unusable-usage" };
+      deliveredByResult = 0;
+    }
     const metered = snapshot.kind === "resolved";
-    const deliveredByResult = assistantText(result)?.length ?? 0;
 
     settle({
       snapshot,
