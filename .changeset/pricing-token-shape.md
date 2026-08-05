@@ -60,7 +60,11 @@ Every read of a caller-supplied object in the cost path is also gated on `Object
 
 ### Cached tokens are billed, under one name
 
-`TokenPricing` gains optional `cacheReadPerMillion` and `cacheWritePerMillion`. On providers that report cache usage, `inputTokens` is the *uncached remainder* and the cache counts are additive, so pricing only input and output billed a heavily cached call at close to zero. All four classes are now priced in both surfaces; absent cache rates default to the input rate, which is conservative and never free. The published `cacheWritePerMillion` values assume the **5-minute** cache TTL &ndash; a 1-hour cache writes at 2.0x input rather than 1.25x, so pass your own rate if you use it.
+`TokenPricing` gains optional `cacheReadPerMillion` and `cacheWritePerMillion`. On providers that report cache usage, `inputTokens` is the *uncached remainder* and the cache counts are additive, so pricing only input and output billed a heavily cached call at close to zero.
+
+**Expect your recorded spend to rise, and by a lot on cached workloads.** The rates did not change and neither did your provider bill; what changed is how much of that bill the ledger sees. A long-context agent turn on Sonnet 4.5 — a 200k prompt served mostly from cache, 2k uncached input, 190k cache reads, 8k cache writes, 500 output — recorded $0.0135 and now records $0.1005, which is 7.4x for that shape. It scales with how much of your prompt is cached, so a short uncached call barely moves and a long cached one moves most.
+
+If you have a cap sized against the old figures, resize it before upgrading. A budget that sat comfortably under its ceiling can start tripping on the first call, and it will be right to. All four classes are now priced in both surfaces; absent cache rates default to the input rate, which is conservative and never free. The published `cacheWritePerMillion` values assume the **5-minute** cache TTL &ndash; a 1-hour cache writes at 2.0x input rather than 1.25x, so pass your own rate if you use it.
 
 The count has one canonical name, `cacheWriteTokens`, matching the rate that prices it; `cacheCreationTokens` is a documented alias, and adapters populate that one. Supply either. Both resolve in a single function, `normalizeTokenUsage` in `@directive-run/core`, that every consumer of token usage now routes through. Two metrics consumers were reading counts their own way:
 
