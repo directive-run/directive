@@ -12,10 +12,15 @@ The short version: if you use `withBudget` or `createConstraintRouter`, your rec
 Each adapter published rates as `{ input, output }`, sized for `estimateCost`; the budget surfaces are typed against `TokenPricing`, which spells the same numbers `{ inputPerMillion, outputPerMillion }`. Handing a table to a budget left both rates `undefined`: every cost was `NaN`, every `estimated > remaining` check was `false`, and the budget never tripped. Every `*_PRICING` entry now carries both field pairs, derived from one source so they cannot drift:
 
 ```typescript
-import { estimateCost, withBudget } from "@directive-run/ai";
+import { estimateCost, requireModelPricing, withBudget } from "@directive-run/ai";
 import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
 
-const pricing = ANTHROPIC_PRICING["claude-opus-5"];
+// The tables are `Record<string, ModelPricing>`, so a bare index gives you
+// `ModelPricing | undefined` under `noUncheckedIndexedAccess` — and an
+// unrecognised model reads as "no rates" much later, where it looks like a
+// missing-rate complaint rather than a typo. `requireModelPricing` throws at
+// the lookup, naming the model and the table's known models.
+const pricing = requireModelPricing(ANTHROPIC_PRICING, "claude-opus-5");
 
 const cost = estimateCost(inputTokens, pricing.input);
 const guarded = withBudget(runner, {
@@ -92,4 +97,11 @@ Two malformed keys are corrected. `claude-haiku-4-5-20250514` was never a model 
 2. **Check `getUnpricedCallCount()`.** Non-zero means that many recent calls were charged from what they delivered rather than from what the provider billed. It is kept over a rolling window &ndash; the widest budget window configured, or an hour when there is none &ndash; so a count tracking your call rate means your runner never reports usable usage and every figure is a measurement.
 3. **Check `getFailedCallSpend()` too.** It is the part of `getSpent()` charged for calls that threw after delivering something. A figure close to `getSpent()` means a cap is filling with calls that break part-way through, not work.
 4. **More than one set of rates on a runner?** Two budgets on one window, or a top-level `pricing` beside window budgets, must price a call identically &ndash; otherwise construction now throws.
-5. **`@directive-run/ai` now requires `@directive-run/core` >= 1.25.0** as a peer, for the shared token-usage normalizer. This is a value import, not a type: an older core installs cleanly and then misprices cached calls at runtime.
+5. **`@directive-run/ai` now requires `@directive-run/core` >= 1.25.0** as a peer, for the shared token-usage normalizer. `normalizeTokenUsage` is a runtime function imported by name from `@directive-run/core/plugins`, and an older core does not export it — so this is not a misprice you would have to go looking for. The module fails to load:
+
+   ```
+   SyntaxError: The requested module '@directive-run/core/plugins' does not
+   provide an export named 'normalizeTokenUsage'
+   ```
+
+   It surfaces the first time anything imports `@directive-run/ai`, before any of your code runs. If your package manager reports a peer conflict here, resolve it rather than override it — there is no degraded mode on the other side of that warning.

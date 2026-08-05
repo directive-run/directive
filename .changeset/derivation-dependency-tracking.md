@@ -62,6 +62,17 @@ A fact and a derivation of the same name resolve to the fact. `deps` has meant f
 
 A `deps` name is resolved against the derivations the system holds when the effect is *considered*, not the ones it held when the effect was registered. With the piecemeal API the order is a caller's to choose — `system.effects.register("watch", { deps: ["doubled"] })` before `system.derive.register("doubled", …)` is an ordinary thing to write — and resolving once at registration made that order significant and silently so: the effect kept the bare name, nothing ever announces a bare derivation name, and the effect never ran again. Constraints already re-resolved per evaluation; effects now match them.
 
+One thing to know if you register a derivation at runtime: it is lazy, and it records what it reads the first time it computes, so until something reads it back it has no dependencies and there is nothing for a fact change to travel along. Read it once after registering it, and the effect wakes from then on:
+
+```typescript
+system.effects.register("watch", { deps: ["doubled"], run: (facts) => … });
+system.derive.register("doubled", (facts) => facts.count * 2);
+
+system.derive.doubled; // gives it its dependency on `count`
+```
+
+Without that read the effect stays quiet through every later write, which looks exactly like the bug above and is not it. A derivation declared in the module's `derive` block is computed as part of startup and needs nothing extra.
+
 The types moved with it. `DynamicEffectDef["deps"]` accepted fact keys only, so the correct code did not compile on the one API where the problem was reachable.
 
 **A dependent gated on a derivation is woken every time the derivation may have moved, not once.** A derivation is lazy: it is marked stale and recomputed on the next read. Marking was also how its dependents were told, and marking happens only on the transition from valid to stale — so if nothing read the derivation back, it stayed stale and every later fact change was a no-op for anything depending on it.
