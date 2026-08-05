@@ -93,8 +93,13 @@ export interface SubscriptionDefinition<TData> {
    *
    * A stream cannot be closed from an effect cleanup: that fires before every
    * re-run of the effect too, and the two are indistinguishable from inside it.
+   *
+   * Optional because a hand-built definition — a test double, a wrapper typed
+   * as this interface — has no stream of its own to close, and `withQueries`
+   * already skips a definition that does not carry one. `createSubscription`
+   * always returns it.
    */
-  readonly onStop: (facts: Record<string, unknown>) => void;
+  readonly onStop?: (facts: Record<string, unknown>) => void;
   setData: (facts: Record<string, unknown>, data: TData) => void;
 }
 
@@ -200,7 +205,20 @@ export function createSubscription<
     unsubscribe: (() => void) | undefined;
   }): void {
     record.controller.abort();
-    record.unsubscribe?.();
+    // `unsubscribe` is whatever the user's `subscribe` handed back. A throw
+    // here used to escape into `system.stop()`, which runs these in a loop —
+    // so one stream whose teardown failed left every stream after it open, and
+    // took the rest of the stop sequence with it. Abort has already happened
+    // by this point, so the stream is closed either way; what is lost on a
+    // throw is only the user's own teardown, and that is reported.
+    try {
+      record.unsubscribe?.();
+    } catch (error) {
+      console.error(
+        `[Directive] Subscription "${name}" unsubscribe threw an error:`,
+        error,
+      );
+    }
   }
 
   /** Build ResourceState derivation. */

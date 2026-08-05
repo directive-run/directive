@@ -280,8 +280,21 @@ export function withQueries(
             // The facts of the system that is stopping — the identity a
             // teardown needs to leave every other system's work alone.
             const { facts } = system as { facts: Record<string, unknown> };
+            // Every teardown runs even if an earlier one throws. These close
+            // independent streams, so letting one failure end the loop would
+            // leak every stream registered after it — and the failure that
+            // leaks them is the one least likely to be noticed, because the
+            // streams it leaves open go on reporting the last value they
+            // received rather than going quiet.
             for (const stop of stops) {
-              stop(facts);
+              try {
+                stop(facts);
+              } catch (error) {
+                console.error(
+                  "[Directive] A query teardown threw during system stop:",
+                  error,
+                );
+              }
             }
           },
         };

@@ -514,3 +514,63 @@ describe("createSubscription", () => {
     });
   });
 });
+
+// ============================================================================
+// Teardown isolation
+// ============================================================================
+
+describe("teardown on system stop", () => {
+  it("closes every stream even when one unsubscribe throws", async () => {
+    // These close independent streams. A throw used to escape the loop that
+    // runs them, so the streams registered after the failing one stayed open
+    // — and stayed reporting their last value, which is why nobody noticed.
+    const order: string[] = [];
+
+    const first = createSubscription({
+      name: "first",
+      key: () => ({ id: 1 }),
+      subscribe: () => {
+        return () => {
+          order.push("first");
+          throw new Error("teardown blew up");
+        };
+      },
+    });
+
+    const second = createSubscription({
+      name: "second",
+      key: () => ({ id: 2 }),
+      subscribe: () => {
+        return () => {
+          order.push("second");
+        };
+      },
+    });
+
+    const mod = createModule(
+      "test",
+      withQueries([first, second], {
+        schema: {
+          facts: {},
+          derivations: {},
+          events: {},
+          requirements: {},
+        } satisfies ModuleSchema,
+      }),
+    );
+    const system = createSystem({ module: mod });
+    system.start();
+    await flushMicrotasks();
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(() => {
+      system.stop();
+    }).not.toThrow();
+
+    expect(order).toEqual(["first", "second"]);
+    expect(errors).toHaveBeenCalled();
+
+    errors.mockRestore();
+  });
+});
