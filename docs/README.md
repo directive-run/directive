@@ -16,7 +16,7 @@ April 2026; the field-report lives in
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md) – the runtime architecture in one diagram + 1500 words.
 - [`concepts/chained-pipelines.md`](./concepts/chained-pipelines.md) – how facts → constraints → resolvers → facts forms causal chains.
-- [`derivations.md`](./derivations.md) – purity rule, composition (`derive` parameter, not `sys.derive`), top-of-funnel placement.
+- [`derivations.md`](./derivations.md) – purity rule, composition (the `derived` parameter, not `system.derive`), top-of-funnel placement.
 - [`patterns/internal-events.md`](./patterns/internal-events.md) – `status`-as-event-bus; why no `module.fire('INTERNAL_EVENT')` API.
 - [`concepts/predicate-from-intent.md`](./concepts/predicate-from-intent.md) – LLM → validated `FactPredicate` pipeline; five-layer guard, provenance, hash semantics.
 - [`concepts/predicate-codegen.md`](./concepts/predicate-codegen.md) – one predicate, run on client AND server (SQL / Mongo / PostgREST).

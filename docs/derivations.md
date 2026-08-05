@@ -1,159 +1,215 @@
 # Derivations
 
-Derivations are computed reads over facts. They're memoized via the causal
-cache: a derivation that reads `facts.a + facts.b` only recomputes when `a`
-or `b` change. This is one of Directive's biggest wins over hand-rolled
-reactivity – and it has rules.
+Derivations are computed reads over facts. They're memoized: a derivation that
+reads `facts.a + facts.b` only recomputes when `a` or `b` change. This is one
+of Directive's biggest wins over hand-rolled reactivity – and it has rules.
+
+Derivations are declared inside a module, in its `derive` block. A derivation
+body is called with two positional arguments, `(facts, derived)`.
 
 ## The two rules
 
 1. **Derivations must be pure.** No side effects, no clock reads, no
    `Math.random()`, no environment reads.
-2. **Derivations can compose with other derivations** – the cache propagates
-   correctly.
+2. **Derivations can compose with other derivations** – invalidation
+   propagates through the chain.
 
-Break rule 1 and the cache returns stale values. Break rule 2 – well, you
-can't, the engine handles it. But naming it explicitly is worth a section.
+Break rule 1 and you read stale values. Break rule 2 – well, you can't, the
+engine handles it. But naming it explicitly is worth a section.
 
 ## Pure derivations
 
 ```ts
-derivation.create('isReady', ({ facts }) => facts.status === 'ready');
+const cart = createModule("cart", {
+  schema: {
+    facts: { status: t.string<"idle" | "ready">(), items: t.array(t.string()) },
+    derivations: {
+      isReady: t.boolean(),
+      itemCount: t.number(),
+      topItem: t.string().nullable(),
+    },
+  },
 
-derivation.create('itemCount', ({ facts }) => facts.items.length);
-
-derivation.create('topItem', ({ facts }) =>
-  facts.items.length > 0 ? facts.items[0] : null,
-);
+  derive: {
+    isReady: (facts) => facts.status === "ready",
+    itemCount: (facts) => facts.items.length,
+    topItem: (facts) => (facts.items.length > 0 ? facts.items[0] : null),
+  },
+});
 ```
 
-These all read facts only. The cache invalidates when any read fact changes.
-Reading `sys.derive.isReady` is `O(1)` after the first compute.
+These all read facts only. The memo invalidates when any read fact changes.
+Reading `system.derive.isReady` is `O(1)` after the first compute.
+
+Dependencies are tracked by what the body actually reads – there is no deps
+array to keep in sync.
 
 ## Composition: derivations that read other derivations
 
 ```ts
-derivation.create('isReady', ({ facts }) => facts.status === 'ready');
+derive: {
+  isReady: (facts) => facts.status === "ready",
+  itemCount: (facts) => facts.items.length,
 
-derivation.create('readyAndHasItems', ({ derive }) =>
-  derive.isReady && derive.itemCount > 0,
-);
+  readyAndHasItems: (_facts, derived) => derived.isReady && derived.itemCount > 0,
+}
 ```
 
-Read other derivations via the `derive` parameter, NOT via `sys.derive.X`.
-The `derive` parameter is the cache-tracked path; `sys.derive` reaches around
-the cache and won't propagate correctly.
+Read other derivations via the second parameter, `derived` – not via
+`system.derive.X`. The parameter is the tracked path; `system.derive` is the
+outside-the-module read accessor and reaching for it from inside a body does
+not register the dependency, so the composed value will not invalidate when
+its input changes.
 
-This pattern came up enough during the migration (cycle 4 onward) that it
-deserves its own callout. **Lead with it in your mental model**: derivations
-form a DAG. Facts feed derivations; derivations feed derivations; the React
-hooks subscribe to leaves and re-render only when ancestor facts change.
+The parameter is named `derived` because it is a value – the derived values as
+they stand right now – not an instruction to derive something.
+
+**Lead with this in your mental model**: derivations form a DAG. Facts feed
+derivations; derivations feed derivations; the framework hooks subscribe to
+leaves and re-render only when an ancestor fact changes.
 
 ## Anti-pattern: clock reads in derivations
 
 ```ts
 // ❌ broken – derivation reads Date.now()
-derivation.create('isStale', ({ facts }) =>
-  Date.now() - facts.lastUpdatedMs > 5000,
-);
+derive: {
+  isStale: (facts) => Date.now() - facts.lastUpdatedMs > 5000,
+}
 ```
 
-The cache doesn't know `Date.now()` changed. If you read `sys.derive.isStale`
-twice, 10 seconds apart, you get the same value the second time.
+Nothing tells the memo that `Date.now()` changed. Read `system.derive.isStale`
+twice, ten seconds apart, and you get the same value the second time.
 
 **Fix**: drive the staleness from a fact that gets dispatched on a tick:
 
 ```ts
-const schema = {
-  lastUpdatedMs: t.number(),
-  nowMs: t.number(), // dispatched from a useTickWhile in the consumer
-};
+schema: {
+  facts: {
+    lastUpdatedMs: t.number(),
+    nowMs: t.number(), // dispatched on a tick from the consumer
+  },
+  derivations: { isStale: t.boolean() },
+  events: { TICK: {} },
+},
 
-derivation.create('isStale', ({ facts }) =>
-  facts.nowMs - facts.lastUpdatedMs > 5000,
-);
+events: {
+  TICK: (facts) => {
+    facts.nowMs = Date.now();
+  },
+},
+
+derive: {
+  isStale: (facts) => facts.nowMs - facts.lastUpdatedMs > 5000,
+},
 ```
 
 The consumer wires the tick:
 
 ```tsx
-useTickWhile(sys, () => true, 'TICK', 1000);
-// where TICK handler does: facts.nowMs = Date.now()
+useTickWhile(system, () => true, "TICK", 1000);
 ```
 
-Now the cache knows `nowMs` changed. The derivation invalidates correctly.
-
-A future `t.timer({ms})` schema primitive (RFC) would let you skip the
-manual ticking – declare a "this fact represents elapsed time since X" and
-the engine handles re-evaluation. Until then, the manual tick is the answer.
+Now `nowMs` is a tracked read, and the derivation invalidates correctly.
 
 ## Anti-pattern: side effects in derivations
 
 ```ts
 // ❌ broken – derivation logs
-derivation.create('count', ({ facts }) => {
-  console.log('recomputing count'); // side effect
-  return facts.items.length;
-});
+derive: {
+  count: (facts) => {
+    console.log("recomputing count"); // side effect
+    return facts.items.length;
+  },
+}
 ```
 
-Derivations may compute many times during dev (devtools subscriptions,
+Derivations may compute many times during development (devtools subscriptions,
 StrictMode double-render). Logs, fetches, dispatches – none of these belong.
 
-If you want to react to a derivation changing, use a constraint:
+To *react* to a value changing, use an effect for fire-and-forget work, or a
+constraint plus a resolver when the reaction has to be something the engine
+tracks to completion:
 
 ```ts
-constraint.create({
-  given: ({ facts }) => facts.items.length > 100,
-  effect: ({ facts }) => {
-    console.log('over 100');
-    // dispatch, fetch, whatever
+schema: {
+  // ...facts and derivations as above
+  requirements: { TRIM_CART: {} },
+},
+
+effects: {
+  warnOnLargeCart: {
+    run: (facts, prev) => {
+      if (prev?.items.length !== facts.items.length && facts.items.length > 100) {
+        console.log("over 100");
+      }
+    },
   },
-});
+},
+
+constraints: {
+  trim: {
+    when: (facts) => facts.items.length > 100,
+    require: { type: "TRIM_CART" },
+  },
+},
+
+resolvers: {
+  trim: {
+    requirement: "TRIM_CART",
+    resolve: async (req, context) => {
+      context.facts.items = context.facts.items.slice(0, 100);
+    },
+  },
+},
 ```
+
+Note the asymmetry: a derivation body receives `(facts, derived)`, but a
+constraint's `when()` and an effect's `run()` receive facts only. If a
+constraint needs to gate on something computed, compute it from facts in the
+predicate itself.
 
 ## Reading external state (the hard case)
 
 If a derivation truly needs external state – say, "is the user authenticated"
-where auth lives in a context outside Directive – make it a fact, not a
-derivation. Wire the external state in via a subscription:
+where auth lives outside Directive – make it a fact, not a derivation. Wire the
+external state in through an event:
 
 ```tsx
 useEffect(() => {
   const sub = authClient.onChange((u) => {
-    sys.events.AUTH_CHANGED({ userId: u?.id ?? null });
+    system.events.AUTH_CHANGED({ userId: u?.id ?? null });
   });
+
   return sub.unsubscribe;
-}, [sys]);
+}, [system]);
 ```
 
-The module then has `facts.userId` and derivations read it via the cache
-correctly.
+The module then has `facts.userId`, and derivations read it as a tracked read.
 
 ## React hooks: granular subscriptions
 
-`useDerivation(sys, 'name')` subscribes only to that derivation. Re-renders
-fire when the derivation's value changes (deep-equal check). This replaces
-the XState `useSelector(state, selector)` pattern with first-class
-granularity.
+`useDerived(system, "name")` subscribes only to that derivation. Re-renders
+fire when its value changes. This replaces the XState `useSelector(state,
+selector)` pattern with first-class granularity.
 
 ```tsx
-function ItemCount({ sys }) {
-  const count = useDerivation(sys, 'itemCount');
+function ItemCount({ system }) {
+  const count = useDerived(system, "itemCount");
+
   return <span>{count} items</span>;
 }
 ```
 
-Adding a new item to `facts.items` re-renders `<ItemCount />`. Changing
+Adding an item to `facts.items` re-renders `<ItemCount />`. Changing
 `facts.lastUpdatedMs` does not.
 
 ## Top-of-funnel placement
 
-Derivation composition (#9 in MIGRATION_FEEDBACK) is the single most
-under-documented Directive feature. Most newcomers' first reaction is "this
-is just a getter" – until they see derivations reading derivations and
-realize the whole point. If you take one thing from this page: lead with
-`derive: ({ derive }) => derive.X && derive.Y` in your own examples.
+Derivation composition is the single most under-documented Directive feature.
+Most newcomers' first reaction is "this is just a getter" – until they see
+derivations reading derivations and realize the point. If you take one thing
+from this page: lead with `(facts, derived) => derived.X && derived.Y` in your
+own examples.
 
 ## See also
 

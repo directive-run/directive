@@ -43,7 +43,7 @@ export function createPIIGuardrail(options: {
   patterns?: RegExp[];
   redact?: boolean;
   redactReplacement?: string;
-}): GuardrailFn<InputGuardrailData> {
+} = {}): GuardrailFn<InputGuardrailData> {
   const {
     patterns = [
       /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
@@ -151,7 +151,7 @@ export interface RateLimitGuardrail extends GuardrailFn<InputGuardrailData> {
 export function createRateLimitGuardrail(options: {
   maxTokensPerMinute?: number;
   maxRequestsPerMinute?: number;
-}): RateLimitGuardrail {
+} = {}): RateLimitGuardrail {
   const { maxTokensPerMinute = 100000, maxRequestsPerMinute = 60 } = options;
 
   const maxEntries = Math.max(maxRequestsPerMinute, 1000);
@@ -246,7 +246,7 @@ export function createToolGuardrail(options: {
   denylist?: string[];
   /** @default false */
   caseSensitive?: boolean;
-}): GuardrailFn<ToolCallGuardrailData> {
+} = {}): GuardrailFn<ToolCallGuardrailData> {
   const { allowlist, denylist, caseSensitive = false } = options;
 
   const normalizedAllowlist = allowlist?.map((t) =>
@@ -491,7 +491,7 @@ export function createLengthGuardrail(options: {
   maxTokens?: number;
   /** Custom token estimator (default: chars / 4) */
   estimateTokens?: (text: string) => number;
-}): GuardrailFn<OutputGuardrailData> {
+} = {}): GuardrailFn<OutputGuardrailData> {
   const {
     maxCharacters,
     maxTokens,

@@ -56,7 +56,7 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "@directive-run/core": "^1.0.0",
+    "@directive-run/core": "^1.18.0",
     "@directive-run/query": "^1.0.0",
     "solid-js": ">=1"
   },
