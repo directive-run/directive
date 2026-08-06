@@ -44,7 +44,9 @@ overBudget = () => system.derive.overBudget;
 
 **Read that as "may go from never to often", not "may go from once to twice".** An effect whose `deps` name only a derivation did not run at all before — not at startup, not on any later change. Measured against 1.24.1 on a module with `doubled: (facts) => facts.n * 2` and two writes to `n`: the effect body observed `[]`, and it observes `[1, 2]` now. Nothing in that effect was ever reached, so nothing in it was ever exercised — a first run that has never happened is a first run whose error handling, its network call, its write, have never happened either.
 
-How often it runs from here is set by how often your system reconciles, which is not something the effect's author chose. On a system driven by a stream, a timer, or a resolver chain, an effect that has been inert since it was written begins running at that rate on upgrade with no change to its code. Before upgrading, find the effects and constraints that read a derivation and satisfy yourself that they are safe to run — repeatedly, starting immediately.
+How often it runs from here is how often a fact the derivation reads changes — not every reconcile. Measured: five writes to a fact outside the derivation wake it zero times, three writes to a fact inside it wake it three times, and five writes of the same value wake it once, because only the first of those is a change. That is a rate the author can reason about; it is the dependency chain they named.
+
+What they did not choose is that it starts at all. Before upgrading, find the effects and constraints that read a derivation and satisfy yourself they are safe to run — repeatedly, starting immediately.
 
 Gating on facts alone is unaffected, and there is a test pinning that. The invalidation set is tracked separately from changed fact keys, so history snapshot labels still describe facts, and a derivation going stale without any fact changing cannot make a settled system look dirty.
 
