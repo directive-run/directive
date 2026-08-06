@@ -19,6 +19,13 @@ function build(dep: string) {
   return { system: createSystem({ module: mod }), seen };
 }
 
+/**
+ * Measured against the published 1.24.1 in a worktree: the fact-dep case is
+ * identical there, and the derivation-dep case observes `[]` — the effect never
+ * runs at all, at startup or on any later change. The `[1, 2]` below is this
+ * release's change, and it is the whole of it: an effect that was inert goes to
+ * running whenever the derivation may have moved.
+ */
 describe("startup + wake behaviour by dep kind", () => {
   it("fact dep", async () => {
     const { system, seen } = build("n");
