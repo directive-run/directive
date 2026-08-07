@@ -1,17 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { requireModelPricing, withBudget } from "../index.js";
 import { ANTHROPIC_PRICING } from "../adapters/anthropic.js";
+import { requireModelPricing, withBudget } from "../index.js";
 
 /**
  * The budget example published at /ai/guides/control-ai-costs. It shipped with
  * `{ inputPerToken, outputPerToken }` — field names that do not exist — and no
- * per-window `pricing`, so it threw at construction. Pinned here because the
- * guide is a copy-paste target and nothing else compiles it.
+ * per-window `pricing`, so it threw at construction. Its callback then read
+ * `details.reason`, which is not a field either: the guide's own error message
+ * interpolated `undefined`. Pinned here because the guide is a copy-paste
+ * target and nothing else compiles it.
  */
 describe("docs site: control-ai-costs budget example", () => {
   it("constructs", () => {
     const runner: any = {
-      run: async () => ({ output: "", messages: [], toolCalls: [], totalTokens: 0 }),
+      run: async () => ({
+        output: "",
+        messages: [],
+        toolCalls: [],
+        totalTokens: 0,
+      }),
     };
     const pricing = requireModelPricing(
       ANTHROPIC_PRICING,
@@ -26,7 +33,10 @@ describe("docs site: control-ai-costs budget example", () => {
       ],
       pricing,
       onBudgetExceeded: (details) => {
-        console.error(`Budget exceeded: ${details.reason}`);
+        console.error(
+          `Budget exceeded (${details.window}, ${details.phase}): ` +
+            `$${details.estimated.toFixed(4)} against $${details.remaining.toFixed(4)} left`,
+        );
       },
     });
 

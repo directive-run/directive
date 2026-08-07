@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createModule, createSystem, t } from "../../index.js";
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
-function build(dep: string) {
+// `deps` is keyed on this module's own facts and derivations, so a bare
+// `string` here widens past what the config accepts and takes the rest of the
+// module's inference down with it.
+function build(dep: "n" | "doubled") {
   const seen: number[] = [];
   const mod = createModule("m", {
     schema: {
@@ -10,10 +13,17 @@ function build(dep: string) {
       derivations: { doubled: t.number() },
       requirements: {},
     },
-    init: (facts) => { facts.n = 0; },
+    init: (facts) => {
+      facts.n = 0;
+    },
     derive: { doubled: (facts) => facts.n * 2 },
     effects: {
-      watch: { deps: [dep], run: (facts) => { seen.push(facts.n); } },
+      watch: {
+        deps: [dep],
+        run: (facts) => {
+          seen.push(facts.n);
+        },
+      },
     },
   });
   return { system: createSystem({ module: mod }), seen };
@@ -32,8 +42,10 @@ describe("startup + wake behaviour by dep kind", () => {
     system.start();
     await settle();
     const atStart = [...seen];
-    system.facts.n = 1; await settle();
-    system.facts.n = 2; await settle();
+    system.facts.n = 1;
+    await settle();
+    system.facts.n = 2;
+    await settle();
     // Startup announces the fact keys `init` wrote, so a fact dep matches.
     expect(atStart).toEqual([0]);
     expect(seen).toEqual([0, 1, 2]);
@@ -45,8 +57,10 @@ describe("startup + wake behaviour by dep kind", () => {
     system.start();
     await settle();
     const atStart = [...seen];
-    system.facts.n = 1; await settle();
-    system.facts.n = 2; await settle();
+    system.facts.n = 1;
+    await settle();
+    system.facts.n = 2;
+    await settle();
     // A derivation is not among the announced startup keys, so a
     // derivation-only `deps` has nothing to match until the first fact change.
     expect(atStart).toEqual([]);

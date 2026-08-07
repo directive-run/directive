@@ -22,7 +22,10 @@ engine handles it. But naming it explicitly is worth a section.
 ```ts
 const cart = createModule("cart", {
   schema: {
-    facts: { status: t.string<"idle" | "ready">(), items: t.array(t.string()) },
+    facts: {
+      status: t.string<"idle" | "ready">(),
+      items: t.array<string>().of(t.string()),
+    },
     derivations: {
       isReady: t.boolean(),
       itemCount: t.number(),
@@ -33,7 +36,7 @@ const cart = createModule("cart", {
   derive: {
     isReady: (facts) => facts.status === "ready",
     itemCount: (facts) => facts.items.length,
-    topItem: (facts) => (facts.items.length > 0 ? facts.items[0] : null),
+    topItem: (facts) => facts.items[0] ?? null,
   },
 });
 ```

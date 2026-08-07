@@ -5,7 +5,7 @@ const cart = createModule("cart", {
   schema: {
     facts: {
       status: t.string<"idle" | "ready">(),
-      items: t.array(t.string()),
+      items: t.array<string>().of(t.string()),
       lastUpdatedMs: t.number(),
       nowMs: t.number(),
     },
@@ -36,7 +36,7 @@ const cart = createModule("cart", {
   derive: {
     isReady: (facts) => facts.status === "ready",
     itemCount: (facts) => facts.items.length,
-    topItem: (facts) => (facts.items.length > 0 ? facts.items[0] : null),
+    topItem: (facts) => facts.items[0] ?? null,
     readyAndHasItems: (_facts, derived) =>
       derived.isReady && derived.itemCount > 0,
     isStale: (facts) => facts.nowMs - facts.lastUpdatedMs > 5000,
@@ -45,7 +45,10 @@ const cart = createModule("cart", {
   effects: {
     warnOnLargeCart: {
       run: (facts, prev) => {
-        if (prev?.items.length !== facts.items.length && facts.items.length > 100) {
+        if (
+          prev?.items.length !== facts.items.length &&
+          facts.items.length > 100
+        ) {
           console.log("over 100");
         }
       },
@@ -62,7 +65,7 @@ const cart = createModule("cart", {
   resolvers: {
     trim: {
       requirement: "TRIM_CART",
-      resolve: async (req, context) => {
+      resolve: async (_req, context) => {
         context.facts.items = context.facts.items.slice(0, 100);
       },
     },
