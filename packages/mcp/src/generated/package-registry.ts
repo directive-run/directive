@@ -244,6 +244,7 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
     "dependencies": [],
     "peerDependencies": [
       "@directive-run/core",
+      "@directive-run/query",
       "lit"
     ],
     "optionalDependencies": [],
@@ -585,4 +586,4 @@ export const PACKAGE_REGISTRY: readonly PackageRegistryEntry[] = [
   }
 ] as const;
 
-export const PACKAGE_REGISTRY_BUILT_AT = "2026-08-04T18:31:03.007Z";
+export const PACKAGE_REGISTRY_BUILT_AT = "2026-08-06T14:07:19.052Z";
