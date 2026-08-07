@@ -321,28 +321,49 @@ describe("model output cannot drive the terminal", () => {
   it("strips a sequence split across two streamed chunks", () => {
     // The clipboard write, cut in half. Each half is inert on its own; a
     // terminal reassembles them, and so would a per-chunk stripper.
-    const printed = render([
-      { type: "synthesis:chunk", text: `one${ESC}]52;c;` },
-      { type: "synthesis:chunk", text: `aGVsbG8=${BEL}two` },
-      {
-        type: "chain:complete",
-        runId: "r",
-        stopReason: "",
-        iterations: 1,
-        spentUsd: 0,
-        budgetUsd: 1,
-        synthesis: "",
-        transcriptPath: "/tmp/r.md",
-        jsonlPath: "/tmp/r.jsonl",
-        at: 2,
-      },
-    ] as HarnessEvent[]);
+    const writes: string[] = [];
+    const renderer = createRenderer({
+      verbose: false,
+      write: (text) => writes.push(text),
+    });
 
-    expect(printed).not.toContain(ESC);
-    expect(printed).not.toContain(BEL);
-    expect(printed).not.toContain("aGVsbG8=");
-    expect(printed).toContain("one");
-    expect(printed).toContain("two");
+    renderer({
+      type: "synthesis:chunk",
+      text: `one${ESC}]52;c;`,
+    } as HarnessEvent);
+    renderer({
+      type: "synthesis:chunk",
+      text: `aGVsbG8=${BEL}two`,
+    } as HarnessEvent);
+
+    // A non-chunk event is what releases whatever the sanitizer still holds,
+    // so the run has to end for the second half to have anywhere to go.
+    renderer({
+      type: "chain:complete",
+      runId: "r",
+      stopReason: "",
+      iterations: 1,
+      spentUsd: 0,
+      budgetUsd: 1,
+      synthesis: "",
+      transcriptPath: "/tmp/r.md",
+      jsonlPath: "/tmp/r.jsonl",
+      at: 2,
+    } as HarnessEvent);
+
+    // The closing summary is our own styling, and `pc.dim` is escape sequences
+    // by definition — so a blanket escape check over the whole transcript would
+    // be measuring picocolors, not the sanitizer. Everything before that last
+    // write is model bytes, including any remainder the flush released, and
+    // that is the part nothing may survive into.
+    const fromModel = writes.slice(0, -1).join("");
+
+    expect(fromModel).not.toContain(ESC);
+    expect(fromModel).not.toContain(BEL);
+    expect(fromModel).toContain("one");
+    expect(fromModel).toContain("two");
+    // The payload itself is barred from the whole transcript, styling included.
+    expect(writes.join("")).not.toContain("aGVsbG8=");
   });
 
   it("keeps ordinary whitespace, and drops only what a terminal acts on", () => {
