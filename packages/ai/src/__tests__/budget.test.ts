@@ -2109,10 +2109,13 @@ describe("a reported usage far under its delivery is not trusted", () => {
    * was always safe; reporting almost nothing was the hole.
    */
   it("charges a call whose output count was dropped, and says the figure is a floor", async () => {
-    const runner = withBudget(reporting({ inputTokens: 100, outputTokens: 0 }) as never, {
-      pricing,
-      maxTotalCost: 100,
-    });
+    const runner = withBudget(
+      reporting({ inputTokens: 100, outputTokens: 0 }) as never,
+      {
+        pricing,
+        maxTotalCost: 100,
+      },
+    );
 
     await runner({ name: "a" } as never, "short prompt", {
       onToken: () => {},

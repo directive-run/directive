@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { createAnthropicRunner } from "../adapters/anthropic.js";
 import {
   createAgentOrchestrator,
   createModerationGuardrail,
   createPIIGuardrail,
 } from "../index.js";
-import { createAnthropicRunner } from "../adapters/anthropic.js";
 
 describe("README — the AI orchestration example must keep compiling", () => {
   it("type-checks and constructs", () => {
@@ -15,9 +15,11 @@ describe("README — the AI orchestration example must keep compiling", () => {
       }),
       guardrails: {
         input: [createPIIGuardrail()],
-        output: [createModerationGuardrail({
-          checkFn: (text) => /\b(secret|confidential)\b/i.test(text),
-        })],
+        output: [
+          createModerationGuardrail({
+            checkFn: (text) => /\b(secret|confidential)\b/i.test(text),
+          }),
+        ],
       },
       maxTokenBudget: 100_000,
     });
