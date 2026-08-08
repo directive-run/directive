@@ -36,12 +36,7 @@ jobs:
       # cannot succeed without this file, and stopping here says why in one
       # line instead of surfacing as a confusing build error two steps later.
       - name: Fetch api-reference.json from latest release
-        id: fetch_api_reference
-        run: |
-          mkdir -p ../directive-docs/docs/generated
-          curl -sfL https://github.com/directive-run/directive/releases/latest/download/api-reference.json \
-            -o ../directive-docs/docs/generated/api-reference.json
-          echo "[ci] fetched api-reference.json from latest release"
+        run: .github/scripts/fetch-api-reference.sh
 
       - run: pnpm -r --filter './packages/*' build
 
@@ -98,10 +93,7 @@ jobs:
       # api-reference.json on disk, and this runner has no sibling docs
       # checkout either.
       - name: Fetch api-reference.json from latest release
-        run: |
-          mkdir -p ../directive-docs/docs/generated
-          curl -sfL https://github.com/directive-run/directive/releases/latest/download/api-reference.json \
-            -o ../directive-docs/docs/generated/api-reference.json
+        run: .github/scripts/fetch-api-reference.sh
 
       - run: pnpm -r --filter './packages/*' build
 

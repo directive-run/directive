@@ -47,10 +47,7 @@ jobs:
       # to supply the real file. A failed fetch stops the release here rather
       # than publishing something hollow.
       - name: Fetch api-reference.json from latest release
-        run: |
-          mkdir -p ../directive-docs/docs/generated
-          curl -sfL https://github.com/directive-run/directive/releases/latest/download/api-reference.json \
-            -o ../directive-docs/docs/generated/api-reference.json
+        run: .github/scripts/fetch-api-reference.sh
 
       - run: pnpm -r --filter './packages/*' build
 
@@ -140,10 +137,7 @@ jobs:
       # circular — it reads the previous release's file and publishes a fresh
       # one below.
       - name: Fetch api-reference.json from latest release
-        run: |
-          mkdir -p ../directive-docs/docs/generated
-          curl -sfL https://github.com/directive-run/directive/releases/latest/download/api-reference.json \
-            -o ../directive-docs/docs/generated/api-reference.json
+        run: .github/scripts/fetch-api-reference.sh
 
       - run: pnpm -r --filter './packages/*' build
 
