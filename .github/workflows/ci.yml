@@ -35,8 +35,10 @@ jobs:
       # each cut. A failed fetch fails the job: the build immediately after it
       # cannot succeed without this file, and stopping here says why in one
       # line instead of surfacing as a confusing build error two steps later.
-      - name: Fetch api-reference.json from latest release
+      - name: Fetch api-reference.json from the newest release carrying it
         run: .github/scripts/fetch-api-reference.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
 
@@ -92,8 +94,10 @@ jobs:
       # Same reason as the build-and-test job: building the packages requires
       # api-reference.json on disk, and this runner has no sibling docs
       # checkout either.
-      - name: Fetch api-reference.json from latest release
+      - name: Fetch api-reference.json from the newest release carrying it
         run: .github/scripts/fetch-api-reference.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: pnpm -r --filter './packages/*' build
 
