@@ -1,5 +1,514 @@
 # @directive-run/ai
 
+## 1.25.0
+
+### Minor Changes
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`7ed05b5`](https://github.com/directive-run/directive/commit/7ed05b56f26f7910cc43316abcb3dcc590b819a9) Thanks [@jasoncomes](https://github.com/jasoncomes)! - Real per-delta token streaming from `run`, `runStream` and `runAgentStream`.
+
+  `runStream` previously promised token granularity and delivered a single chunk
+  holding the entire response, synthesized once the message completed. It now
+  emits one `token` chunk per completed message **by default** — unchanged — and
+  one chunk per provider delta when you ask:
+
+  ```ts
+  // per-delta chunks, no callback
+  const { stream, result } = orchestrator.runStream(agent, prompt, {
+    deltas: true,
+  });
+
+  // per-delta chunks plus a callback of your own
+  const { stream } = orchestrator.runStream(agent, prompt, {
+    onToken: (token) => process.stdout.write(token),
+  });
+  ```
+
+  `onToken` is also accepted by `run()`, so you can have deltas and one awaited
+  `RunResult` without switching APIs.
+
+  Streaming is a field on the options object every runner already receives, not a
+  separate runner. That is deliberate: a second runner slot would bypass the
+  wrappers you had composed, so a `withBudget`-wrapped runner would stop enforcing
+  its budget the moment you streamed. As an option it survives `withRetry`,
+  `withBudget`, `withFallback`, `withModelSelection` and `withStructuredOutput`
+  untouched, and tool-call guardrails keep gating calls while deltas flow.
+
+  **`backpressure: "block"` now works.** It never did before. The SSE parser called
+  `onToken` without awaiting it, and `createStreamingRunner`'s own async callback
+  had its promise dropped, so against every shipped adapter `"block"` silently
+  behaved as `"buffer"` — which is the opposite of what you pick it for. Returning
+  a promise from `onToken` now genuinely stops the reader pulling from the
+  provider until it settles. If you chose `"block"` because losing output was
+  unacceptable, you were getting `"buffer"`; you are now getting what you asked
+  for, including the pause in generation that comes with it.
+
+  Behavior changes worth knowing:
+
+  - **`stream_restart` is a new chunk type.** If you exhaustively `switch` over
+    the chunk union, add a branch. It fires whenever the runner is re-invoked and
+    replays the response from the start — an agent retry, a `withRetry` retry, a
+    structured-output schema retry, a `withFallback` move to the next provider, or
+    a multi-agent reroute. Discard everything you rendered for the current
+    generation; `generation` on the chunk is an opaque marker for the one now
+    starting. Emitted only when per-delta streaming was requested.
+  - **`RunOptions.onStreamRestart` carries the same boundary to any runner.** The
+    wrappers that re-invoke the runner — `withRetry`, `withFallback`,
+    `withStructuredOutput` — call it as they do, and every wrapper forwards it the
+    way it already forwards `onToken`. Without it a caller streaming through a
+    retrying runner rendered the first attempt and the second end to end, as one
+    run-on response, and with `withFallback` the stream and the returned
+    `RunResult` disagreed outright. `run(agent, input, { onToken, onStreamRestart })`
+    gets the boundary too, so the documented shortcut of `run` over `runStream` is
+    no longer a downgrade. If you wrote your own wrapper that re-invokes a runner,
+    call `options.onStreamRestart` when you do.
+  - **`tokenCount` on `token` chunks is deprecated** in favor of `deltaCount`.
+    Neither is a token count: a provider delta is not a token (Anthropic sends
+    several per delta, Gemini sends sentences). `result.tokenUsage` and
+    `result.totalTokens` remain authoritative. `tokenCount` still carries its
+    historical value and is not going away in this release.
+  - **`done.droppedTokens` reports a real figure.** It was a hardcoded `0`, so a
+    truncated stream declared itself complete. Consumers with a drop check that
+    had never fired may start seeing non-zero values — that is loss that was
+    already happening.
+  - **Buffer eviction changed ends.** An overflowing orchestrator stream now drops
+    the newest droppable chunk rather than the oldest, so the beginning of a
+    message survives and the tail is what is lost. A control chunk —
+    `stream_restart`, `approval_required`, `interrupted`, `done`, `error` — is
+    never refused: it makes room by evicting the newest droppable chunk, or the
+    oldest chunk of any kind when nothing droppable is buffered. The cap applies to
+    every type, though: a consumer that stops reading can no longer make the buffer
+    grow without limit. `context_updated` counts as droppable, because it only
+    names the facts that changed and the values are still readable from the system.
+  - **`error` chunks carry `droppedTokens`.** A run that dropped chunks and then
+    failed reported nothing about the loss, because only `done` carried the figure.
+  - Accumulated partial output is truncated on code-point boundaries, so a lone
+    surrogate can no longer break JSON serialization to plugins or devtools.
+
+  A runner that cannot stream ignores the request and returns its ordinary
+  buffered result, and the whole-message chunk is still emitted — so nothing
+  breaks. If deltas were requested and none arrived alongside non-empty output,
+  the orchestrator says so once instead of leaving it silent.
+
+  **Token accounting no longer reads "the provider said nothing" as "the call was
+  free."** `RunResult` gains `usageReported`. It is `false` when `tokenUsage` holds
+  zeros because the provider sent no usage at all — an OpenAI-compatible endpoint
+  that ignores `stream_options.include_usage` (vLLM, LiteLLM, OpenRouter, older
+  Azure) is the common case, and it is reported on the buffered path too. On a
+  streamed run against such an endpoint the old behavior was `totalTokens: 0` per
+  call forever: `withBudget` recorded `$0`, rolling windows never accrued, and
+  `maxTokenBudget` never tripped however many calls went out. `withBudget` now
+  charges an estimate for a call it cannot price, and
+  `runner.getUnpricedCallCount()` says how many of those there have been, so you
+  can tell an estimated figure from a measured one.
+
+  This applies everywhere spend is counted, not only in `withBudget`:
+
+  - **`maxTokenBudget` on both orchestrators accrues the estimate too.** It read
+    `result.totalTokens` and nothing else, so an orchestrator configured with a
+    ceiling ran without one against an endpoint that reports no usage —
+    `facts.agent.tokenUsage` sat at zero call after call, and `budgetEstimateTokens`
+    did not help, because that reservation is released when the call returns and
+    only ever guarded concurrency. `facts.agent.tokenUsage`,
+    `orchestrator.totalTokens` and the multi-agent global counter now rise by an
+    estimate for such a call, so `onBudgetWarning` and the ceiling both fire.
+  - **Both orchestrators accrue when the call ends, not when the run succeeds.**
+    The accrual sat after the `pre_output_guardrails` breakpoint and the output
+    guardrails, both of which throw, so a prompt that reliably trips an output
+    guardrail bought unlimited unrecorded spend — fifty provider calls and half a
+    million tokens against a thousand-token cap, with `tokenUsage` still reading
+    zero. It now happens against the provider call itself, on either outcome, and
+    charges what the call delivered.
+  - **A call is charged for what it delivered, on either outcome.** `withBudget`
+    recorded only on the success path, so a response the provider generated,
+    delivered and billed cost nothing on the ledger if anything downstream threw —
+    including the end-of-response marker check, which by design throws _after_ the
+    response has been paid for. A call that throws now accrues the text that
+    reached the consumer before it failed, which for a marker-stripping gateway is
+    the whole response. A call that delivered nothing accrues nothing: a DNS
+    failure and a refused connection cost no money and no longer spend a budget
+    that outlives the outage.
+  - **Requests the wrappers made on the budget's behalf are charged as they
+    arrive.** A budget composed _around_ `withRetry` or `withFallback` saw one call
+    where six were made. It now charges every response those wrappers received,
+    because every one of them was delivered through the same `onToken` the caller
+    passed. Nothing is charged on a wrapper's say-so.
+  - **`usageReported` tests the numbers, not the container.** A gateway forwarding
+    `"usage":{"prompt_tokens":null,"completion_tokens":null}` used to satisfy the
+    presence check and record the call as costing exactly zero — no spend, no
+    unpriced-call count, no signal of any kind, where the same gateway omitting the
+    `usage` key was correctly charged. Every adapter, on both the streamed and the
+    buffered path, now requires a count above zero before treating usage as
+    reported. One count is enough; nulls are not, and neither is a frame of zeros —
+    no call that reached a model consumed zero input tokens. A real zero output
+    count still reports, because the input count beside it is not zero.
+
+  **Every charge is measured, and nothing is priced from a declared figure.**
+  `estimatedOutputMultiplier` prices output as a multiple of the _input_, which has
+  nothing to do with the response: a retrieval prompt answered in a sentence
+  over-charges by nearly six times and a one-line prompt answered at length
+  under-charges by orders of magnitude. It is now used for one thing only — the
+  pre-call check, where there is by definition nothing yet to measure. Every charge
+  after the call is made from the text that actually arrived, at the same
+  `length / 4` heuristic this package already applies to input.
+
+  `AgentLike.maxTokens`, added in an earlier iteration of this change as a bound
+  for that estimate, is removed. It is written by the caller whose spend is being
+  limited, so it bounded nothing: `maxTokens: 1` shrank a pre-call estimate until a
+  five-cent per-call cap admitted a call that cost eighteen dollars, and the same
+  field charged a budget four thousand dollars for a connection that was never
+  established. Set `max_tokens` on the adapter, which is what sends it.
+
+  **`withBudget` gains `maxUnpricedCalls`.** Unset by default. Set it and the
+  runner refuses further calls with a new `UnpricedCallLimitError` once that many
+  recent calls have been charged at estimate rather than at reported usage. A hard
+  budget enforced against estimates is still a budget, but an endpoint that has
+  quietly stopped reporting usage should not be able to keep it that way
+  indefinitely. The count is kept over a rolling window — the widest budget window
+  configured, or an hour when there is none — like every other figure the wrapper
+  keeps, so an outage that ends stops refusing calls once its failures age out.
+  `getUnpricedCallCount()` reads that window. Calls a nested budget refused before
+  dispatch are neither charged nor counted, by either error it raises.
+
+  **A stream that ends early is an error, and the marker ends the response.** The
+  shipped adapters now require the provider's end-of-response marker — `[DONE]` or
+  a `finish_reason` for OpenAI-compatible endpoints, `message_stop` for Anthropic,
+  `done: true` for Ollama, a `finishReason` for Gemini. A body truncated
+  mid-response arrives as a clean end of stream, so a partial answer used to
+  resolve successfully and was indistinguishable from a complete one. A runner you
+  built with `createRunner` is unaffected unless you opt in with
+  `streaming.requireTerminalEvent` and report the marker from `parseEvent` via
+  `terminal: true`.
+
+  The marker also stops the read rather than merely being noted. `[DONE]` ends the
+  body: nothing after it is parsed, delivered or accumulated, and the reader stops
+  pulling. Text arriving after an end-of-response event is discarded whatever the
+  provider — that is what a gateway joining two upstream generations onto one body
+  produces, and delivering it hands the consumer both answers as one. Token counts
+  are still read past the marker, because OpenAI sends its usage frame after the
+  `finish_reason` that ends the response.
+
+  **`onToken` is interruptible, and a throw from it is yours.** The awaited
+  callback is now raced against the abort signal, so a callback that never settles
+  can no longer park the reader — `abort()` and `destroy()` settle the run and
+  cancel the stream instead of leaking the socket, the fetch and a `"running"`
+  agent state. A callback that throws is wrapped in a new `StreamConsumerError`
+  and treated as consumer-side: `withRetry`, `withFallback` and the orchestrators'
+  own retry stop rather than buying the same response again for a consumer that
+  just crashed on it. Provider failures retry exactly as before.
+
+  **`runStream` now uses the runner the orchestrator was configured with.** It
+  invoked the bare runner, so an orchestrator with an `outputSchema` or a
+  `circuitBreaker` silently had neither the moment you streamed — including the
+  schema retry the `deltas` documentation said you would see. Streamed runs are now
+  validated and gated exactly like buffered ones.
+
+  **Multi-agent paths that accepted streaming options now honor them.**
+  `runAgentStream` against a registered task hands the task's output to `onToken`
+  as well as to the stream, and `runParallelStream` takes `deltas` and forwards it,
+  so a multiplexed stream can carry per-delta chunks tagged by agent.
+
+  **A streamed run now leaves the same record behind as a buffered one.** Stream
+  chunks are consumed once and then gone, so anything only ever reported as a
+  chunk is unavailable to whoever reconstructs the run afterwards.
+
+  - `orchestrator.runStream` writes `agent_start` and `agent_complete` to the
+    debug timeline, with the same fields `orchestrator.run` writes and at the same
+    two points. It previously wrote nothing at all, so a streamed run was invisible
+    on the timeline — including which agent ran and what it produced. The
+    multi-agent orchestrator's streaming path already recorded both. Timelines only
+    exist when `debug: true`, so this is additive where it appears at all.
+  - The single-agent streaming path caps the `toolCalls` fact at 200 entries, which
+    is the cap the buffered path has always applied. It appended without bound
+    before, so a long streamed session grew the fact forever and a consumer reading
+    it could tell which path had produced it.
+
+  **`destroy()` no longer abandons streams that are still open.** It was
+  `system.destroy()` and nothing more: a stream in flight kept its consumers parked
+  on an iterator that would never resolve, and the provider request — and the spend
+  it was accruing — was left with nothing to cancel it. Both orchestrators now
+  abort and close every stream still open, so a consumer mid-`for await` observes
+  the stream ending. Streams remove themselves as they terminate, so the bookkeeping
+  does not grow across a long-lived orchestrator's lifetime, and `destroy()` with
+  nothing streaming does exactly what it did before.
+
+  `destroy()`, `abort()` and `interrupt()` also settle the `result` promise.
+  Closing the stream released consumers parked on the iterator, but nothing settled
+  `result`, so a runner that does not honor the `AbortSignal` it was handed left a
+  graceful shutdown waiting on it forever. Each now rejects with the abort signal's
+  own reason — the same value a signal-honoring runner reports — and only while the
+  run is still in flight, so a completed run's `result` is untouched. `interrupt()`
+  also ends the stream and stops counting toward `getActiveStreamCount()`, which it
+  did not; what it still keeps alive, and the only thing that distinguishes it from
+  `abort()`, is the `liveContext` subscription. `destroy()` detaches that.
+
+  **Diagnosing a stalled stream from outside the library.** `runStream` and
+  `runAgentStream` return a `getStats()` reading the stream's buffered chunk count,
+  dropped-chunk count, time to first token, current generation and restart count;
+  both orchestrators expose `getActiveStreamCount()`. A consumer that stopped
+  pulling and a provider that stopped sending were previously indistinguishable
+  from the outside — the first shows a filling buffer, the second shows no first
+  token. `restarts` counts re-invocations whether or not deltas were requested;
+  `generation` only moves when they were, so deriving one from the other reported a
+  structural zero on the buffered path where it meant "not measured".
+
+  **A retry that will not happen no longer announces itself.** `withRetry` emitted
+  its restart signal before checking whether the run had been aborted, so an
+  aborted retry told the consumer to discard a generation that nothing ever
+  replaced.
+
+  **`token` chunks carry `generation`.** The same marker `stream_restart` carries,
+  repeated on every token, so a boundary the consumer never received is still
+  detectable. Control chunks are also no longer refused when the buffer is
+  saturated with other control chunks: a control chunk now always lands, evicting
+  the newest droppable chunk or, failing that, the oldest chunk of any kind. A
+  dropped `approval_required` left a tool call waiting out the full approval
+  timeout for a question nobody was asked, and a dropped `stream_restart` let two
+  generations concatenate — the defect that chunk exists to prevent. The cap still
+  applies to every type.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`bf1e8f5`](https://github.com/directive-run/directive/commit/bf1e8f51cdb9d85c946ddf54a0247b38714ca1a4) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **`withBudget` accepts `maxTotalCost`: a hard ceiling on a runner's lifetime spend.**
+
+  Every cap the guard already had gates a _prediction_ — the pre-call estimate is compared against what is left and the call is refused before it runs. That is the right shape for a cap that is the only thing standing between a caller and a bill, and the wrong shape for one that is meant to sit _underneath_ a caller's own stopping rule. A predictive cap fires in place of the caller's rule the moment its prediction is the more pessimistic of the two, and then two ceilings at the same number give two different accounts of the same run.
+
+  `maxTotalCost` gates the ledger instead. Nothing is refused while recorded spend is under it, however large the next call looks; once `getSpent("total")` reaches it, no further call is dispatched.
+
+  ```typescript
+  const runner = withBudget(base, {
+    pricing,
+    // Whatever else stops this run, it does not get to spend past $5.
+    maxTotalCost: 5,
+  });
+  ```
+
+  That makes it composable with a caller that knows things the runner does not — the token cap of the call it is about to make, or that a closing document still has to be paid for. The caller's rule stops the run in the ordinary case; this catches the case where the caller's arithmetic was wrong, and bounds the overshoot to the single call that crossed the line. Nothing enforced after the fact against a provider that bills after the fact can do better without predicting, and `maxCostPerCall` and `budgets` are still there for callers who want the prediction.
+
+  Configuration is checked at construction: a ceiling with no rates to price lifetime spend against is refused rather than left silently inert, and one set against all-zero rates warns.
+
+  `BudgetExceededDetails["window"]` and `BudgetExceededError["window"]` gain `"total"`, exported as the new `BudgetWindowName` type. Additive to a union — a consumer with an exhaustive `switch` over the old three will need a fourth arm.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`2996a18`](https://github.com/directive-run/directive/commit/2996a182b99c91270b1eacde3179918cb17a020a) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **Cost enforcement: adapter pricing tables now work with every cost surface, and the surfaces no longer fail open.**
+
+  The short version: if you use `withBudget` or `createConstraintRouter`, your recorded spend was probably too low &ndash; sometimes zero &ndash; and your caps may never have tripped. Upgrade, then re-read the action items at the bottom.
+
+  ### Pricing tables and the budget speak the same language
+
+  Each adapter published rates as `{ input, output }`, sized for `estimateCost`; the budget surfaces are typed against `TokenPricing`, which spells the same numbers `{ inputPerMillion, outputPerMillion }`. Handing a table to a budget left both rates `undefined`: every cost was `NaN`, every `estimated > remaining` check was `false`, and the budget never tripped. Every `*_PRICING` entry now carries both field pairs, derived from one source so they cannot drift:
+
+  ```typescript
+  import {
+    estimateCost,
+    requireModelPricing,
+    withBudget,
+  } from "@directive-run/ai";
+  import { ANTHROPIC_PRICING } from "@directive-run/ai/anthropic";
+
+  // The tables are `Record<string, ModelPricing>`, so a bare index gives you
+  // `ModelPricing | undefined` under `noUncheckedIndexedAccess` — and an
+  // unrecognised model reads as "no rates" much later, where it looks like a
+  // missing-rate complaint rather than a typo. `requireModelPricing` throws at
+  // the lookup, naming the model and the table's known models.
+  const pricing = requireModelPricing(ANTHROPIC_PRICING, "claude-opus-5");
+
+  const cost = estimateCost(inputTokens, pricing.input);
+  const guarded = withBudget(runner, {
+    pricing,
+    budgets: [{ window: "day", maxCost: 10, pricing }],
+  });
+  ```
+
+  `ANTHROPIC_TOKEN_PRICING`, `OPENAI_TOKEN_PRICING`, `GEMINI_TOKEN_PRICING`, and `OLLAMA_TOKEN_PRICING` remain as aliases for the same tables. `ModelPricing` describes the widened entry; `toTokenPricingTable` is exported so you can widen your own the same way. `TokenPricing`, `ModelPricing`, `BareTokenRates`, and `toTokenPricingTable` moved into the pricing module and are re-exported from `budget.ts`, so existing imports keep working.
+
+  ### One place decides what an unpriceable call costs
+
+  `withBudget` charged the pre-call estimate for a call it could not price; `createConstraintRouter`, given the same helper, charged `0`. A runner that never populates `tokenUsage` therefore held `facts.totalCost` at exactly zero for the router's whole life, and a documented `facts.totalCost > 10` failover never fired &ndash; no cost, no counter, no warning. The pricing module now owns that decision instead of handing each caller a `null` to interpret, and returns a dollar figure together with how it was priced. Six conditions charge from what the call delivered rather than from what the provider billed, count against `getUnpricedCallCount()`, and warn once:
+
+  - No `tokenUsage` at all.
+  - A count that is not a non-negative integer. A token is a discrete thing, so a real report is a whole number: one `NaN` in a running total is permanent, and a fractional or subnormal count fails quietly instead &ndash; `5e-324` is finite, positive, and not zero, so it priced out to nothing while also slipping past the all-zero check below. A count supplied as a string is refused rather than read as absent; previously a `cacheReadTokens` of `"10000000"` billed as zero while the same string in `inputTokens` was correctly refused.
+  - **New:** a report of zero input, output, _and_ cache tokens. A call that ran had a prompt, and a prompt has tokens &ndash; all-zero is a gateway that dropped the usage block, not a free call. A genuinely free local model is unaffected: its rates are zero, so the estimate is zero.
+  - **New:** a runner that threw. A throw is not a refund &ndash; a structured-output parse failure, a blocking guardrail, or post-stream validation all reject a completion the provider already generated and billed. Under `withRetry` every attempt burned money no ledger ever saw.
+  - **New:** text delivered for a generation the surviving result does not describe &ndash; a retry, a fallback, or a schema re-ask replayed over. The provider billed for it; the usage on the result that survived describes only itself.
+  - Counts that price out to a non-finite cost.
+
+  `createConstraintRouter` gains `getUnpricedCallCount()` and the same once-per-condition warning.
+
+  **Charging for a throw, without pretending it is the same as spend.** A cap that fills with money that was never spent is no better than one that misses money that was &ndash; five refused connections consumed $9 of a $10 hourly cap in testing, indistinguishable from real spend. Three changes:
+
+  - A `BudgetExceededError` or `UnpricedCallLimitError` from a nested `withBudget` is charged **nothing**. That guard raises both from its own pre-call checks, before it invokes the runner it wraps, so the provider was provably never contacted. Chained guards no longer bill each other for calls none of them made.
+  - Every other throw is charged **what it delivered**, measured off the deltas that reached the caller's `onToken` before it failed &ndash; which for a gateway that strips the completion marker is the whole response the provider generated and billed. A throw that delivered nothing is charged nothing; there is no observation to price, and a DNS failure should not consume an hour of a budget.
+  - What _is_ charged for a throw is reported separately by a new **`getFailedCallSpend(window)`** on `BudgetRunner`, alongside `getSpent`. `getSpent(w) - getFailedCallSpend(w)` is spend attributable to calls that returned; a figure approaching `getSpent` means a cap is being consumed by calls that break part-way through rather than by work.
+
+  `createConstraintRouter` gets the nested-refusal exemption and the separate figure, for the same reason it gets everything else here: a `facts.totalCost` that moves on a call the provider never saw makes a `facts.totalCost > N` failover fire on spend that never happened. It sees no deltas of its own, so it still charges the estimate for a throw that reached it; its accessor is `getFailedCallSpend()` &ndash; no window argument, since the router keeps a lifetime total. A blocked call still counts toward `facts.errorCount`, because the routing constraints should see that it failed.
+
+  ### Untrusted input is read once, at the boundary
+
+  Rates were already snapshotted at construction, so a getter or a post-construction `pricing.inputPerMillion = NaN` no longer reaches the cost math. Token counts now get the same treatment. `withBudget` prices one call against every window ledger and once more for the lifetime total, so it priced the call N+1 times; each of those read `result.tokenUsage` itself, and a usage backed by getters answered each one differently &ndash; one recorded run read `$0` against a one-dollar hourly cap while the lifetime total read `$1800`, every result labelled metered, the unpriced counter at zero, not one warning. `result.tokenUsage` is now read exactly once per call into a value threaded everywhere, and `priceCall` will not accept a raw `tokenUsage`, so a second read site is a type error. Same change in `createConstraintRouter`.
+
+  Every read of a caller-supplied object in the cost path is also gated on `Object.hasOwn` through a single helper. Ungated, a polluted `Object.prototype` reached every object that omits an optional field &ndash; for cache rates and cache counts, most of them. `cacheRead = 0` made cache tokens free through the documented JSON-table path; `cacheWrite = -1` made every table construction throw; `cacheWriteTokens = NaN` downgraded every metered call to the estimate; `cacheReadTokens = 1e15` inflated every bill into a false `BudgetExceeded`; `cost = 1e308` summed into `createAgentMetrics`' cost counter on a call that supplied no cost.
+
+  ### Cached tokens are billed, under one name
+
+  `TokenPricing` gains optional `cacheReadPerMillion` and `cacheWritePerMillion`. On providers that report cache usage, `inputTokens` is the _uncached remainder_ and the cache counts are additive, so pricing only input and output billed a heavily cached call at close to zero.
+
+  **Expect your recorded spend to rise, and by a lot on cached workloads.** The rates did not change and neither did your provider bill; what changed is how much of that bill the ledger sees. A long-context agent turn on Sonnet 4.5 — a 200k prompt served mostly from cache, 2k uncached input, 190k cache reads, 8k cache writes, 500 output — recorded $0.0135 and now records $0.1005, which is 7.4x for that shape. It scales with how much of your prompt is cached, so a short uncached call barely moves and a long cached one moves most.
+
+  If you have a cap sized against the old figures, resize it before upgrading. A budget that sat comfortably under its ceiling can start tripping on the first call, and it will be right to. All four classes are now priced in both surfaces; absent cache rates default to the input rate, which is conservative and never free. The published `cacheWritePerMillion` values assume the **5-minute** cache TTL &ndash; a 1-hour cache writes at 2.0x input rather than 1.25x, so pass your own rate if you use it.
+
+  The count has one canonical name, `cacheWriteTokens`, matching the rate that prices it; `cacheCreationTokens` is a documented alias, and adapters populate that one. Supply either. Both resolve in a single function, `normalizeTokenUsage` in `@directive-run/core`, that every consumer of token usage now routes through. Two metrics consumers were reading counts their own way:
+
+  - `createAgentMetrics().trackRun` read only `cacheWriteTokens` while every shipped adapter emitted the other, so adapter usage passed straight through reported no cache writes and a total of 150 rather than 10,000,150. It now also drops non-finite and negative counts, and reads `cost` and `toolCalls` through the same own-property gate and the same validation &ndash; a counter is cumulative and one bad addend is permanent.
+  - The **debug timeline's `agent_complete` event** recorded input and output only, so a run that read ten million tokens from the provider's cache showed as a tiny one &ndash; `inputTokens` is the uncached remainder when a provider reports cache usage. `AgentCompleteEvent` gains optional `cacheReadTokens` and `cacheWriteTokens`, and both orchestrators populate all four classes. A count no ledger would accept is reported as `0` rather than rendering `NaN` into a timeline row.
+
+  ### Budgets, caps, and reporting
+
+  - **Every set of rates on one runner must agree.** Budgets sharing a window share one ledger, so it records at one set of rates while the other budget's cap gates against a total never computed at its rates: `[{hour, $1M cap, $0.001/M}, {hour, $100 cap, $15/$75}]` recorded fifty calls costing $4,500 as ten cents, and neither cap tripped. The top-level `pricing` is held to the same rule, because it prices the same call &ndash; it drives `maxCostPerCall` and `getSpent("total")` while the window rates drive the window ledgers, so `pricing: {0.001/M}` beside `budgets: [{hour, $15/$75}]` reported `getSpent("hour")` of $450 next to a `getSpent("total")` of one cent, with `maxCostPerCall` estimating 15,000x low. Both configurations now throw at construction &ndash; **this may reject a config that previously built.**
+  - **A call is recorded once per window, not once per budget.** Two budgets on `"hour"` double-charged: ten $3 calls read as $60, and a pair of $100 hourly caps blocked after $51 of real spend.
+  - **`maxCostPerCall` is enforced after the call as well as before.** A call estimated at a cent that billed five dollars passed the gate and was absorbed in silence. The money is already spent, so this reports rather than throws, distinguished by a new `phase: "pre-call" | "post-call"` on `BudgetExceededDetails`.
+  - **Window overruns are reported too**, not only per-call ones. A call that estimated under its remaining hour and billed over it landed in the ledger unremarked, and the _next_ call got blocked.
+  - **`BudgetExceededDetails.estimated` always holds the pre-call estimate.** The billed figure moved to a new `actual` field, present on `phase: "post-call"`. It previously carried the actual cost in that phase, so a handler logging it printed one thing under a name meaning another.
+  - **The `onBudgetExceeded` payload is frozen** before the callback sees it, and the thrown error is built from the untouched original. A callback could previously rewrite the fields of the error about to be thrown; assigning a non-number surfaced a `TypeError` in place of `BudgetExceededError`, which callers read as transient and retried.
+  - **`getSpent("total")`** reports lifetime spend, previously unobservable with no windows configured.
+  - **`budgets[].window` is validated.** Any string was accepted; `"hourly"` produced a window whose spend always read zero, so the cap could never trip.
+  - **Every caller-supplied budget value is read exactly once**, `maxCost` and `window` included.
+  - **The pre-call estimate reads the cache rates**, charging input tokens at the highest of input, cache-read, and cache-write &ndash; before the call there is no way to know how the provider will split them, and an estimate under the eventual bill is a cap that does not gate. It still reads only the input string, so it remains a floor, not a prediction.
+  - **The inert-cap warning tests what the estimate can produce**, not whether every rate is zero. `{input: 0, output: 0, cacheRead: 5}` is not all-zero, yet its estimate was zero and the cap never blocked anything.
+  - **`createConstraintRouter` gets `withBudget`'s protections.** Provider pricing was read live and unvalidated on every call: a negative rate won `preferCheapest` every time and drove the cost fact negative.
+  - **Pricing tables are frozen, null-prototype objects &ndash; the table and every entry in it.** A `__proto__` key from parsed JSON cannot reroute the table, an entry cannot be swapped for an all-zero one that leaves a cap inert, and a missing cache rate reads as missing. That last part needs the _entries_, not just the table: `estimateCost(tokens, rates.cacheRead)` is the documented way to price cache tokens and reads the field directly, so on a plain object literal `Object.prototype.cacheRead = 0` answered for every entry that omits the rate &ndash; which is most of them.
+
+  ### Anthropic pricing table
+
+  The table stopped at Sonnet 4.5 and held five keys. Missing pricing throws, so a caller on anything else had no pricing at all and could not use `withBudget` windows. It now carries the current generation &ndash; Fable 5, Opus 5, Opus 4.8/4.7/4.6, Sonnet 5, Sonnet 4.6, Haiku 4.5 &ndash; and the previous one &ndash; Opus 4.5, Opus 4.1, Opus 4, Sonnet 4.5, Sonnet 4 &ndash; with undated aliases alongside the dated keys for models that have both. Sonnet 5 is priced at **list**, not its introductory promotion: a promotion expires, and a spend guard that reads low is a spend guard that does not gate.
+
+  The inclusion rule is now written down beside the rates: every model ID a caller might pass, in every spelling, and rows go in and stay in. A model leaving the API moves its row down rather than deleting it &ndash; reconciling last quarter's invoice needs the rates that quarter was billed at, which is why retired Haiku 3.5 is still listed and why Opus 4.1 is listed despite its retirement date.
+
+  Two malformed keys are corrected. `claude-haiku-4-5-20250514` was never a model ID &ndash; it is `claude-haiku-4-5-20251001` &ndash; and it carried $0.80/$4.00 rather than $1/$5, so every rate derived from it was wrong. `claude-haiku-3-5-20241022` should be `claude-3-5-haiku-20241022`. Either way the caller passing the real ID got nothing back. New `requireModelPricing(TABLE, model)` fails at the lookup naming the model, the table, and its known models, instead of returning `undefined` that surfaces much later as a complaint about a missing rate.
+
+  ### Action items
+
+  1. **Re-read your spend numbers.** Anything recorded before this release may be far too low. `getSpent()` and `facts.totalCost` are now correct; historical figures are not.
+  2. **Check `getUnpricedCallCount()`.** Non-zero means that many recent calls were charged from what they delivered rather than from what the provider billed. It is kept over a rolling window &ndash; the widest budget window configured, or an hour when there is none &ndash; so a count tracking your call rate means your runner never reports usable usage and every figure is a measurement.
+  3. **Check `getFailedCallSpend()` too.** It is the part of `getSpent()` charged for calls that threw after delivering something. A figure close to `getSpent()` means a cap is filling with calls that break part-way through, not work.
+  4. **More than one set of rates on a runner?** Two budgets on one window, or a top-level `pricing` beside window budgets, must price a call identically &ndash; otherwise construction now throws.
+  5. **`@directive-run/ai` now requires `@directive-run/core` >= 1.25.0** as a peer, for the shared token-usage normalizer. `normalizeTokenUsage` is a runtime function imported by name from `@directive-run/core/plugins`, and an older core does not export it — so this is not a misprice you would have to go looking for. The module fails to load:
+
+     ```
+     SyntaxError: The requested module '@directive-run/core/plugins' does not
+     provide an export named 'normalizeTokenUsage'
+     ```
+
+     It surfaces the first time anything imports `@directive-run/ai`, before any of your code runs. If your package manager reports a peer conflict here, resolve it rather than override it — there is no degraded mode on the other side of that warning.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`fef89ed`](https://github.com/directive-run/directive/commit/fef89ed265455290181d736f9d4c5b89f4b1e08d) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **The streaming adapters now parse the event-stream format the way the format is defined, rather than the way one provider happens to write it.**
+
+  Every streamed call in the package went through a parser that matched `"data: "` as a literal prefix, split lines on `\n` alone, and treated each `data:` line as a complete JSON document. All three are narrower than the format allows, and each one turns a perfectly healthy response into a wrong answer:
+
+  - **The space after `data:` is optional.** A server that writes `data:{…}` — TGI, several vLLM builds, Workers AI, and anything using `fmt.Fprintf(w, "data:%s\n\n")` — produced zero parsed events, so the call failed with "ended without a completion marker after 0 characters" and no usage attached. That reads as a truncation, so it was retried, and the failed attempts were billed. These are exactly the endpoints the `baseURL` option exists to reach.
+  - **Lines end at CR, LF, or CRLF.** A CR-only body buffered as one ever-growing line whose JSON never parsed, and the resulting `SyntaxError` is swallowed as a malformed event — so a healthy stream reported itself truncated.
+  - **An event's `data` lines are one payload, joined with newlines, dispatched on the blank line that closes the event.** A server is free to break a payload at any newline, and one that split Anthropic's opening `message_start` across two `data:` lines lost it silently: the run **succeeded with `inputTokens: 0`**, under-billing with no error anywhere.
+
+  Comments (`: keep-alive`), `event:`, `id:` and `retry:` fields, and `data:` heartbeats with an empty payload are all now recognized for what they are.
+
+  **Two silence clocks instead of one, and neither one measures the wrong thing.**
+
+  The stream deadline was restarted from inside each adapter's event parser, so it only moved for lines that produced a JSON payload. That got both directions wrong at once: the format's own keep-alive mechanism — a `:` comment, which is what nginx and Cloudflare send to hold a connection open — never touched it, while Anthropic's `ping` events always did. Measured, comment keep-alives every 100ms against a 500ms deadline threw `TimeoutError` at 513ms, and pings every 100ms against the same deadline ran past 3000ms and kept going.
+
+  A ping means the connection is up. It does not mean the model is producing. So there are now two clocks:
+
+  ```typescript
+  const runner = createAnthropicStreamingRunner({
+    apiKey,
+    timeoutMs: 120_000, // total silence — nothing at all on the wire
+    contentTimeoutMs: 600_000, // alive, but producing nothing. Keep-alives do not restart this.
+  });
+  ```
+
+  `timeoutMs` keeps its meaning and is now restarted by any sign of life, keep-alives included. `contentTimeoutMs` is new, defaults to ten minutes, and is the ceiling on a connection that keeps saying hello and nothing else. Either running out fails with an error named `"TimeoutError"`, and the message says which. **If you have a model that legitimately thinks for more than ten minutes before emitting anything, raise `contentTimeoutMs`.**
+
+  The clocks also stop while a consumer callback holds a token. `onToken` is awaited — that is what makes backpressure real — and the deadline used to run during it, so a consumer doing 600ms of work per delta under a 400ms deadline tripped a `TimeoutError` that blamed the provider for the consumer's own time. The two shipped features cancelled each other out.
+
+  **The deadline now enforces itself.** `reader.read()` is raced against the abort signal instead of relying on the fetch implementation to error the body. Every adapter accepts an injected `fetch`, and a wrapper that tees the body for logging, replays it from a recording, or hands back a fresh `Response` need not propagate the signal at all — which silently disarmed every stream deadline in the package.
+
+  **And every streaming runner has one.** `createOpenAIStreamingRunner`, `createGeminiStreamingRunner` and `createOllamaStreamingRunner` gain `timeoutMs` and `contentTimeoutMs`, and so does the streaming path of `createRunner` — which is the path the shipped adapters and the harness actually take, and which had no deadline at all. Both default as above, so a stalled call that used to hang indefinitely now fails after two minutes of silence.
+
+  **Truncation is no longer indistinguishable from completion.** `stop_reason: "max_tokens"`, `finish_reason: "length"`, `finishReason: "MAX_TOKENS"` and `done_reason: "length"` all resolved as clean successes, so a response cut off mid-sentence was parsed, validated and acted on as though the model had finished saying it. `RunResult` now carries `stopReason` — `"stop" | "length" | "tool_use" | "content_filter" | "other"` — and `rawStopReason` with the provider's own spelling, on the buffered and streamed paths of all four adapters.
+
+  **Money, in four places:**
+
+  - `createAnthropicStreamingRunner` dropped the prompt-cache token counts its own parser had already read. Against the same body, `createRunner`'s streaming path reported `total=9319` and this one reported `total=19` — a 490x under-report on a fully cached prompt, which any token-window budget reads as a free call. Both paths now call one function, the standalone runner accepts `promptCaching: "automatic"` like the buffered one, and a cache count above zero is never dropped even when caching was not requested.
+  - A failed call's usage was lost the moment anything wrapped the error. It travels on the error as an own property, and the reader checked only the outermost one — so `withRetry`, which puts the original on `cause`, was enough to lose it. A budget over a retrying stack recorded **$0.00** for a call the provider billed in full on the prompt; measured through the documented `runner` extension point, that was $0.3836 of real spend against a $0.20 ceiling reported as $0.1384, with no overrun event, because the fraction was computed from a ledger that was wrong. The reader now walks `cause` and `lastError` eight links deep. **A custom runner that wraps its errors must keep the original reachable via `cause`, or the ledger under-bills.**
+  - Gemini returned the reasoning summary as the answer. A thinking model sends its summary as an ordinary text part flagged `thought: true` ahead of the real one, and the adapter read `parts[0].text` — so against `gemini-2.5-flash` and `-pro` it returned "Let me think..." and discarded the answer, with a clean terminal marker and no error. Thought parts are now skipped, every remaining part is concatenated, and `thoughtsTokenCount` is added to `outputTokens`, which is how the provider bills it.
+  - Anthropic tool use produced an empty success: `input_json_delta` fragments were dropped and `toolCalls` was hard-coded to `[]`, so a tool-calling stream returned `output: ""` with 30 tokens billed. Tool calls are assembled from their fragments and returned. **A streamed Anthropic call that makes a tool call now returns it, where it previously returned none** — code downstream of a streaming runner will start seeing `toolCalls` it never saw before.
+
+  **`Retry-After` reaches the code that waits.** The thrown HTTP error carried only prose, and `withRetry` scanned the message for a header that had never been put in it — so against a 429 that said "come back in 20 seconds" it backed off 500ms, then 1s, then gave up. Streaming HTTP failures now throw a `ProviderHTTPError` carrying `status`, `statusText`, `retryAfter` (seconds), `retryAfterMs`, and the rate-limit and request-id response headers. `withRetry` honours the server's interval wherever one was sent, per RFC 9110 §10.2.3, rather than only on a 429.
+
+  **Smaller things:** SSE requests send `Accept: text/event-stream`, and a 200 that answers with a JSON content type says so instead of failing as a truncated stream; `stream_options: { include_usage: true }` can be turned off with `includeUsage: false`, for Azure deployments below api-version 2024-06-01 that answer 400 to it rather than ignoring it; Ollama's `{"error": …}` at HTTP 200 surfaces as that error rather than as a missing completion marker; Gemini's `promptFeedback.blockReason` surfaces as a refusal rather than as a truncation; and the `AbortSignal` combination helper detaches its listeners on runtimes without `AbortSignal.any`, where it previously left one on the caller's signal for every call made with it.
+
+### Patch Changes
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`90af9a3`](https://github.com/directive-run/directive/commit/90af9a356f96de79592b0ea8408e65ebd0f46671) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A stalled Anthropic stream is no longer able to hang forever.**
+
+  `createAnthropicStreamingRunner` passed the caller's `signal` to `fetch` and nothing else. A connection that stayed open and stopped sending was therefore bounded by exactly one thing: a caller remembering to cancel it. Nothing in the adapter would ever end that call – not a wall clock, not a token count, not the end of the process's patience. A run that reached that state occupied its slot until something outside the library intervened, and an interrupt written to let the turn in flight finish first had nothing to finish.
+
+  There is now a deadline, and it measures the gap between events rather than the length of the call:
+
+  ```typescript
+  const runner = createAnthropicStreamingRunner({
+    apiKey,
+    // Abandon the call after this long with nothing on the wire.
+    timeoutMs: 60_000,
+  });
+  ```
+
+  The distinction is the whole design. A streamed response runs for as long as the model has something to say, so a wall-clock cap on the call as a whole – which is what `timeoutMs` means on `createAnthropicRunner`, and still does – either truncates a long answer or is set so high that it bounds nothing worth bounding. What goes wrong on a stream is not that it takes a long time, it is that it goes quiet and never ends. So the clock starts when the request goes out and is restarted by every sign of life: the response headers, each delta, and the keep-alive pings Anthropic sends while it works. A stream that talks for an hour is never touched. A stream that goes silent is abandoned a fixed interval later, whatever it had already delivered.
+
+  The default is two minutes of silence, which a healthy stream comes nowhere near – the opening frame follows the request almost immediately and pings arrive throughout – and which still bounds a stall to something a person waiting on the turn will sit through. Pass `Infinity` to run without one. Anything that is not a positive number of milliseconds — zero, a negative, `NaN` — is refused when the runner is built rather than on the first stalled call.
+
+  A stall fails with an error named `"TimeoutError"`, the same name `AbortSignal.timeout` gives the buffered path, so a caller can tell a provider that stopped talking from a run they cancelled themselves. The deadline composes with `callbacks.signal` rather than replacing it: cancellation keeps working, and aborting for either reason ends the call.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`90af9a3`](https://github.com/directive-run/directive/commit/90af9a356f96de79592b0ea8408e65ebd0f46671) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **`withBudget` now charges a call the provider counted and never finished, instead of recording it as free.**
+
+  A call that threw was charged only from the text it had delivered. That covered a stream cut short part-way through its answer and missed the case that costs the most: a run cancelled during time-to-first-token. Anthropic reports the input token count in its opening `message_start` frame, before a token of the answer exists, and bills for it whether or not the answer ever arrives. On a long transcript the input side is most of the bill. Under a guard that only measured delivered text, such a run went into the ledger at zero – with no delivery to measure, there was nothing to charge – and every window total, every lifetime ceiling, and every consumer reading accumulated spend to decide what a later step may spend was short by exactly the calls that failed most expensively.
+
+  Counts a stream reported before it failed now travel out on the error it throws, and the budget prices the call from them. Nothing is charged twice: the report covers the same call the delivered text does, and the two are reconciled rather than added. Where they disagree the larger figure wins, which matters because the two sides of a report arrive at different moments – Anthropic sends the input count in its first frame and the output count in its last, so a stream cut off in between carries a real input figure beside an output figure of zero, however much text has already arrived. The output side takes whichever is larger, the count or the measurement.
+
+  A failure that left nothing behind – a DNS failure, a refused connection, a throw before dispatch – is still charged nothing, since it cost nothing.
+
+  Every failed call is still counted as one the ledger could not price exactly, including the ones now priced from a report, and `getUnpricedCallCount()` and `maxUnpricedCalls` are unchanged in meaning. A report that arrived before a failure describes the part of the call that had happened by then and says nothing about what the provider billed afterwards, so the charge is a floor under the real figure rather than the figure itself, and the count is what says so.
+
+  `getSpent` and `getFailedCallSpend` will read higher than before for any runner whose calls are being cancelled or cut off. That is the correction: the money was always going out.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`499d400`](https://github.com/directive-run/directive/commit/499d4007229595d6330919cb279bb2dac0e3c4bb) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **The guardrails whose options are all optional can now be called with no options.** `createPIIGuardrail()`, `createRateLimitGuardrail()`, `createToolGuardrail()` and `createLengthGuardrail()` each took an options object in which every field was optional — and then required you to pass it anyway.
+
+  The natural call threw, and it threw from inside the factory while destructuring, so the message named a field you had never heard of rather than the argument you had left out:
+
+  ```typescript
+  createPIIGuardrail();
+  // TypeError: Cannot read properties of undefined (reading 'patterns')
+  ```
+
+  All four now default to `{}`. `createPIIGuardrail()` gives you the built-in patterns, which is what the signature always implied. Passing options explicitly behaves exactly as before.
+
+  Guardrails with a genuinely required field are unchanged — `createModerationGuardrail` still needs its `checkFn`, and `createContentFilterGuardrail` still needs `blockedPatterns`.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`9ddaa9e`](https://github.com/directive-run/directive/commit/9ddaa9ebcb4c00e0ffcab5afe6d0b8df1a9db315) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A retry decision now reads the error that carries the HTTP details, not just the one on top.** `withRetry` wraps its last failure in a `RetryExhaustedError` and puts the original on `cause`; a fallback layer wraps that again. The status and `Retry-After` were read off the outermost error only, and a wrapped error has neither.
+
+  A missing status is treated as retryable, so one wrapper was enough to turn a documented non-retryable status into three attempts, and to discard the interval the server asked to be waited. Both readers now follow `cause` and `lastError` to the same depth the cost ledger already walks.
+
+  `Retry-After: 0` is also honoured. Zero is a legal delta-seconds value meaning retry now, and it is distinct from the server having sent no instruction at all — which is what falls back to exponential backoff.
+
+  **`ProviderHTTPError` is exported.** A streaming HTTP failure throws it and these notes describe it as the contract, but the class was not reachable from any entry point: `instanceof` needs the constructor, and reading `status`, `retryAfter` or the request id off a bare `Error` needed a cast.
+
+- [#109](https://github.com/directive-run/directive/pull/109) [`427af64`](https://github.com/directive-run/directive/commit/427af6485800c69d611bb084c10d4b3c76bc88b2) Thanks [@jasoncomes](https://github.com/jasoncomes)! - **A usage report far under what the call delivered is no longer priced as written.** Reporting _no_ usage was always safe — the ledger falls back to charging what it observed arriving and counts the call as unpriced. Reporting almost none was the hole: the figure was present, so it was trusted, and a call that delivered thousands of tokens was billed for the handful it admitted to.
+
+  That is the shape a gateway produces. Anthropic carries output tokens in `message_delta`, the second-to-last frame on the wire; a proxy that truncates, reorders or nulls the tail loses it while `message_stop` still arrives, so the stream closes cleanly and nothing looks wrong.
+
+  It went quiet everywhere at once, because every cap reads the same number: the graceful stop kept authorizing calls, the hard ceiling never tripped, and no overrun was announced. Measured against a real provider frame: **$1.53 spent against a $1.00 ceiling, reported as $0.81, with no event raised.**
+
+  A report is now checked against what arrived before it is used as a price. Past a wide margin it is treated as unusable rather than quietly corrected — the call is charged from what was observed and counted by `getUnpricedCallCount()`, so the ledger says out loud that it is a floor there.
+
+  The check is deliberately blunt, and it does not adjudicate small differences. Four characters per token is a rough count that under-measures code by a wide margin, so a report modestly below its delivery is ordinary and is left exactly as reported. What it catches is a count that is absent in all but name.
+
+  **A call whose result cannot be read is now charged.** The block that reads the provider's usage runs on caller-supplied data, and a property read can throw — an accessor over a disposed handle, a Proxy, a getter that asserts. That throw used to unwind past the recording entirely: nothing was charged, the unpriced count did not move, and a call that had in fact succeeded surfaced as a failure, which a retry policy then read as transient and bought again. It now charges what was observed, counts the call as unpriced, and returns the result.
+
 ## 1.24.1
 
 ## 1.24.0
